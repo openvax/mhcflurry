@@ -1,4 +1,4 @@
-# Copyright (c) 2014. Mount Sinai School of Medicine
+# Copyright (c) 2015. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ if __name__ == '__main__':
         install_requires=[
             'numpy>=1.7',
             'pandas>=0.13.1',
-	    'appdirs',
+            'appdirs',
         ],
         long_description=readme,
         packages=['mhcflurry'],

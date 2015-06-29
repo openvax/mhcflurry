@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from os.path import join
-from appdirs import user_data_dir
+def parse_int_list(s):
+    return [int(part.strip() for part in s.split(","))]
 
-BASE_DIRECTORY = user_data_dir("mhcflurry", version="0.1")
-CLASS1_DATA_DIRECTORY = join(BASE_DIRECTORY, "class1_data")
-CLASS1_MODEL_DIRECTORY = join(BASE_DIRECTORY, "class1_models")
+def split_peptide_sequences(s):
+    return [part.strip().upper() for part in s.split(",")]
