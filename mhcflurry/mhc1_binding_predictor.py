@@ -2,6 +2,7 @@
 Allele specific MHC Class I binding affinity predictor
 """
 
+from os import listdir
 from os.path import exists, join
 from itertools import groupby
 import pickle
@@ -17,6 +18,7 @@ from .class1_allele_specific_hyperparameters import (
     DROPOUT_PROBABILITY,
 )
 from .data_helpers import index_encoding, normalize_allele_name
+from .paths import CLASS1_MODEL_DIRECTORY
 
 _allele_model_cache = {}
 
@@ -24,7 +26,10 @@ class Mhc1BindingPredictor(object):
     def __init__(
             self,
             allele,
-            model_directory="class1_predictors"):
+            model_directory=CLASS1_MODEL_DIRECTORY):
+        if not exists(model_directory) or len(listdir(model_directory)) == 0:
+            raise ValueError(
+                "No trained models found for MHC Class I prediction")
         original_allele_name = allele
         self.allele = normalize_allele_name(allele)
         if self.allele in _allele_model_cache:
