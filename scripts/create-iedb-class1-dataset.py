@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Turn a raw CSV snapshot of the IEDB contents into a usable
 class I binding prediction dataset by grouping all unique pMHCs

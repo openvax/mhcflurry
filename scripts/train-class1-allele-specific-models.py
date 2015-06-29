@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Train one neural network for every allele w/ more than 50 data points in
 our dataset.

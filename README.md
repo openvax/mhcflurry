@@ -6,6 +6,13 @@ Peptide-MHC binding affinity prediction
 ```
 scripts/download-iedb.sh
 scripts/download-peters-2013-dataset.sh
-python scripts/create-iedb-class1-dataset.py
-python scripts/create-combined-class1-dataset.py
+scripts/create-iedb-class1-dataset.py
+scripts/create-combined-class1-dataset.py
 ```
+
+## Getting Started: Train Neural Network Models
+
+```
+scripts/train-class1-allele-specific-models.py
+```
+

@@ -1,17 +1,37 @@
+#!/usr/bin/env python
+
 """
 Combine 2013 Kim/Peters NetMHCpan dataset[*] with more recent IEDB entries
 
 * = "Dataset size and composition impact the reliability..."
 """
+
+from os.path import join
 import pickle
-import pandas as pd
 from collections import Counter
 
+import pandas as pd
+
+from mhcflurry.paths import CLASS1_DATA_DIRECTORY
+
+IEDB_PICKLE_FILENAME = "iedb_human_class1_assay_datasets.pickle"
+IEDB_PICKLE_PATH = join(CLASS1_DATA_DIRECTORY, IEDB_PICKLE_FILENAME)
+
+PETERS_CSV_FILENAME = "bdata.20130222.mhci.public.1.txt"
+PETERS_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS_CSV_FILENAME)
+
+OUTPUT_CSV_FILENAME = "combined_human_class1_dataset.csv"
+OUTPUT_CSV_PATH = join(CLASS1_DATA_DIRECTORY, OUTPUT_CSV_FILENAME)
+
 if __name__ == "__main__":
-    with open("iedb_human_class1_assay_datasets.pickle", "r'") as f:
+    print("Reading %s..." % IEDB_PICKLE_PATH)
+    with open(IEDB_PICKLE_PATH, "r'") as f:
         iedb_datasets = pickle.load(f)
-    nielsen_data = pd.read_csv("bdata.20130222.mhci.public.1.txt", sep="\t")
-    print("Size of 2013 Nielsen dataset: %d" % len(nielsen_data))
+
+    print("Reading %s..." % PETERS_CSV_PATH)
+    nielsen_data = pd.read_csv(PETERS_CSV_PATH, sep="\t")
+    print("Size of 2013 Peters dataset: %d" % len(nielsen_data))
+
     new_allele_counts = Counter()
     combined_columns = {
         "species": list(nielsen_data["species"]),
@@ -49,6 +69,9 @@ if __name__ == "__main__":
         print("  fraction similar binding values=%0.4f" % fraction_similar)
         new_peptides = joined[left_missing & ~right_missing]
         if fraction_similar > 0.9:
+            print("---")
+            print("\t using assay: %s" % (assay,))
+            print("---")
             combined_columns["mhc"].extend(new_peptides["mhc"])
             combined_columns["peptide"].extend(new_peptides["peptide"])
             combined_columns["peptide_length"].extend(new_peptides["peptide"].str.len())
@@ -67,4 +90,5 @@ if __name__ == "__main__":
     print("Combined DataFrame size: %d (+%d)" % (
             len(combined_df),
             len(combined_df) - len(nielsen_data)))
-    combined_df.to_csv("combined_human_class1_dataset.csv", index=False)
+    print("Writing %s..." % OUTPUT_CSV_PATH)
+    combined_df.to_csv(OUTPUT_CSV_PATH, index=False)
