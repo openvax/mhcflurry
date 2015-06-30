@@ -19,10 +19,11 @@ Allele specific MHC Class I binding affinity predictor
 from os import listdir
 from os.path import exists, join
 from itertools import groupby
-import pickle
 
+import numpy as np
 import pandas as pd
 
+from .amino_acid import amino_acid_letters
 from .feedforward import make_network
 from .class1_allele_specific_hyperparameters import (
     EMBEDDING_DIM,
@@ -43,7 +44,7 @@ class Mhc1BindingPredictor(object):
             model_directory=CLASS1_MODEL_DIRECTORY):
         if not exists(model_directory) or len(listdir(model_directory)) == 0:
             raise ValueError(
-                "No trained models found for MHC Class I prediction")
+                "No MHC prediction models found in %s" % (model_directory,))
         original_allele_name = allele
         self.allele = normalize_allele_name(allele)
         if self.allele in _allele_model_cache:
@@ -61,31 +62,98 @@ class Mhc1BindingPredictor(object):
                 layer_sizes=(HIDDEN_LAYER_SIZE,),
                 activation=ACTIVATION,
                 init=INITIALIZATION_METHOD,
-                dropout_probability=DROPOUT_PROBABILITY)
-            pickle.dumps(self.model)
+                dropout_probability=DROPOUT_PROBABILITY,
+                compile_for_training=True)
             self.model.load_weights(path)
             _allele_model_cache[self.allele] = self.model
 
+    def _log_to_ic50(self, log_value):
+        """
+        Convert neural network output to IC50 values between 0.0 and 5000.0
+        """
+        return 5000.0 ** (1.0 - log_value)
+
+    def _predict_9mer_peptides(self, peptides):
+        """
+        Predict binding affinity for 9mer peptides
+        """
+        if any(len(peptide) != 9 for peptide in peptides):
+            raise ValueError("Can only predict 9mer peptides")
+        X = index_encoding(peptides, peptide_length=9)
+        return self.model.predict(X, verbose=False).flatten()
+
+    def _predict_9mer_peptides_ic50(self, peptides):
+        log_y = self._predict_9mer_peptides(peptides)
+        return self._log_to_ic50(log_y)
+
+    def _expand_peptides(self, peptides, length):
+        """
+        Expand non-9mer peptides using methods from
+           Accurate approximation method for prediction of class I MHC
+           affinities for peptides of length 8, 10 and 11 using prediction
+           tools trained on 9mers.
+        by Lundegaard et. al.
+        http://bioinformatics.oxfordjournals.org/content/24/11/1397
+
+        Difference from the paper: instead of taking the geometric mean,
+        we're taking the median of log-transformed IC50 values
+        """
+        if length == 8:
+            # extend each peptide by inserting every possible amino acid
+            # between base-1 positions 4-8
+            return [
+                peptide[:i] + extra_amino_acid + peptide[i:]
+                for peptide in peptides
+                for i in xrange(3, 8)
+                for extra_amino_acid in amino_acid_letters
+            ]
+        if length == 9:
+            return peptides
+        elif length == 10:
+            # drop interior residues between base-1 positions 4-9
+            return [
+                peptide[:i] + peptide[i + 1:]
+                for peptide in peptides
+                for i in range(3, 9)
+            ]
+        elif length == 11:
+            # drop pairs of amino acids from interior residues
+            return [
+                peptide[:i] + peptide[i + 2:]
+                for peptide in peptides
+                for i in range(3, 9)
+            ]
+        else:
+            raise ValueError(
+                "Only lengths 8-11 supported, can't predict %s (len=%d)" % (
+                    peptides[0],
+                    length))
+
     def predict_peptides(self, peptides):
         column_names = [
-            "allele",
-            "peptide",
-            "ic50",
+            "Allele",
+            "Peptide",
+            "Prediction",
         ]
         results = {}
         for column_name in column_names:
             results[column_name] = []
 
-        for length, group in groupby(peptides, lambda x: len(x)):
-            group_list = list(group)
-            if length != 9:
-                raise ValueError(
-                    "Invalid peptide length %d: %s" % (
-                        length, group_list[0]))
-            X = index_encoding(group_list, peptide_length=9)
-            y = self.model.predict(X)
-            ic50 = 5000.0 ** (1.0 - y)
-            results["allele"].extend([self.allele] * len(X))
-            results["peptide"].extend(group_list)
-            results["ic50"].extend(ic50.flatten())
+        for length, group_peptides in groupby(peptides, lambda x: len(x)):
+            group_peptides = list(group_peptides)
+            expanded_peptides = self._expand_peptides(group_peptides, length)
+            n_group = len(group_peptides)
+            n_expanded = len(expanded_peptides)
+            expansion_factor = int(n_expanded / n_group)
+            raw_y = self._predict_9mer_peptides(expanded_peptides)
+            median_y = np.zeros(n_group)
+            # take the median of each group of log(IC50) values
+            for i in xrange(n_group):
+                start = i * expansion_factor
+                end = (i + 1) * expansion_factor
+                median_y[i] = np.median(raw_y[start:end])
+            ic50 = self._log_to_ic50(median_y)
+            results["Allele"].extend([self.allele] * n_group)
+            results["Peptide"].extend(group_peptides)
+            results["Prediction"].extend(ic50)
         return pd.DataFrame(results, columns=column_names)

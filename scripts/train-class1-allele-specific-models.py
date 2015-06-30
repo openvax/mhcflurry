@@ -102,5 +102,9 @@ if __name__ == "__main__":
         if n_allele < 10:
             print("-- too few data points, skipping")
         model.set_weights(old_weights)
-        model.fit(allele_data.X, allele_data.Y, nb_epoch=N_EPOCHS)
+        model.fit(
+            allele_data.X,
+            allele_data.Y,
+            nb_epoch=N_EPOCHS,
+            show_accuracy=True)
         model.save_weights(path)

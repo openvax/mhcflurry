@@ -17,17 +17,25 @@
 
 import argparse
 
-from mhcflurry.common import parse_int_list, split_peptide_sequences
+import pandas as pd
+
+from mhcflurry.common import (
+    parse_int_list,
+    split_uppercase_sequences,
+    split_allele_names
+)
+from mhcflurry import Mhc1BindingPredictor
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--mhc",
     default="HLA-A*02:01",
+    type=split_allele_names,
     help="Comma separated list of MHC alleles")
 
 parser.add_argument("--sequence",
     required=True,
-    type=split_peptide_sequences,
+    type=split_uppercase_sequences,
     help="Comma separated list of protein sequences")
 
 parser.add_argument("--fasta-file",
@@ -40,3 +48,10 @@ parser.add_argument("--peptide-lengths",
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    allele_dataframes = []
+    for allele in args.mhc:
+        model = Mhc1BindingPredictor(allele=allele)
+        df = model.predict_peptides(args.sequence)
+        allele_dataframes.append(df)
+    combined = pd.concat(allele_dataframes)
+    print combined

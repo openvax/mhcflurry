@@ -15,5 +15,27 @@
 def parse_int_list(s):
     return [int(part.strip() for part in s.split(","))]
 
-def split_peptide_sequences(s):
+def split_uppercase_sequences(s):
     return [part.strip().upper() for part in s.split(",")]
+
+
+def normalize_allele_name(allele_name):
+    allele_name = allele_name.upper()
+    # old school HLA-C serotypes look like "Cw"
+    allele_name = allele_name.replace("CW", "C")
+    patterns = [
+        "HLA-",
+        "-",
+        "*",
+        ":"
+    ]
+    for pattern in patterns:
+        allele_name = allele_name.replace(pattern, "")
+    return allele_name
+
+def split_allele_names(s):
+    return [
+        normalize_allele_name(part.strip())
+        for part
+        in s.split(",")
+    ]

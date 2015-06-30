@@ -16,7 +16,8 @@ from collections import namedtuple
 import pandas as pd
 import numpy as np
 
-from pepdata.amino_acid import amino_acid_letter_indices
+from .common import normalize_allele_name
+from .amino_acid import amino_acid_letter_indices
 
 AlleleData = namedtuple("AlleleData", "X Y peptides ic50")
 
@@ -44,20 +45,6 @@ def index_encoding(peptides, peptide_length):
         for j, amino_acid in enumerate(peptide):
             X[i, j] = amino_acid_letter_indices[amino_acid]
     return X
-
-def normalize_allele_name(allele_name):
-    allele_name = allele_name.upper()
-    # old school HLA-C serotypes look like "Cw"
-    allele_name = allele_name.replace("CW", "C")
-    patterns = [
-        "HLA-",
-        "-",
-        "*",
-        ":"
-    ]
-    for pattern in patterns:
-        allele_name = allele_name.replace(pattern, "")
-    return allele_name
 
 def load_data(
         filename,
@@ -124,4 +111,3 @@ def load_data(
             ic50=ic50,
             peptides=peptides)
     return allele_groups, df
-
