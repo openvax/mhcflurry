@@ -98,7 +98,13 @@ class Mhc1BindingPredictor(object):
         Difference from the paper: instead of taking the geometric mean,
         we're taking the median of log-transformed IC50 values
         """
-        if length == 8:
+        assert len(peptides) > 0
+        if length < 8 or length > 15:
+            raise ValueError("Invalid peptide length: %d (%s)" % (
+                length, peptides[0]))
+        elif length == 9:
+            return peptides
+        elif length == 8:
             # extend each peptide by inserting every possible amino acid
             # between base-1 positions 4-8
             return [
@@ -107,27 +113,14 @@ class Mhc1BindingPredictor(object):
                 for i in xrange(3, 8)
                 for extra_amino_acid in amino_acid_letters
             ]
-        if length == 9:
-            return peptides
-        elif length == 10:
-            # drop interior residues between base-1 positions 4-9
-            return [
-                peptide[:i] + peptide[i + 1:]
-                for peptide in peptides
-                for i in range(3, 9)
-            ]
-        elif length == 11:
-            # drop pairs of amino acids from interior residues
-            return [
-                peptide[:i] + peptide[i + 2:]
-                for peptide in peptides
-                for i in range(3, 9)
-            ]
         else:
-            raise ValueError(
-                "Only lengths 8-11 supported, can't predict %s (len=%d)" % (
-                    peptides[0],
-                    length))
+            # drop interior residues between base-1 positions 4-9
+            n_skip = length - 9
+            return [
+                peptide[:i] + peptide[i + n_skip:]
+                for peptide in peptides
+                for i in range(3, 9)
+            ]
 
     def predict_peptides(self, peptides):
         column_names = [

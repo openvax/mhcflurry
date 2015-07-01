@@ -24,6 +24,7 @@ import argparse
 
 import numpy as np
 
+from mhcflurry.common import normalize_allele_name
 from mhcflurry.feedforward import make_network
 from mhcflurry.data_helpers import load_data
 from mhcflurry.class1_allele_specific_hyperparameters import (
@@ -88,10 +89,14 @@ if __name__ == "__main__":
         activation=ACTIVATION,
         init=INITIALIZATION_METHOD,
         dropout_probability=DROPOUT_PROBABILITY)
+    print("Model config: %s" % (model.get_config(),))
     model.fit(X_all, Y_all, nb_epoch=N_PRETRAIN_EPOCHS)
     old_weights = model.get_weights()
     for allele_name, allele_data in allele_groups.items():
-        allele_name = allele_name.replace("/", "_").replace("*", "").replace(":", "")
+        allele_name = normalize_allele_name(allele_name)
+        if allele_name.isdigit():
+            print("Skipping allele %s" % (allele_name,))
+            continue
         n_allele = len(allele_data.Y)
         print("%s: total count = %d" % (allele_name, n_allele))
         filename = allele_name + ".hdf"
@@ -101,10 +106,12 @@ if __name__ == "__main__":
             continue
         if n_allele < 10:
             print("-- too few data points, skipping")
+            continue
         model.set_weights(old_weights)
         model.fit(
             allele_data.X,
             allele_data.Y,
             nb_epoch=N_EPOCHS,
             show_accuracy=True)
+        print("Saving model for %s to %s" % (allele_name, path))
         model.save_weights(path)
