@@ -40,8 +40,12 @@ parser.add_argument("--debug", default=False, action="store_true")
 @post('/')
 def get_binding_value():
     peptides_string = request.forms.get('peptide')
+    if peptides_string is None:
+        return "ERROR: no peptide given"
     peptides_list = split_uppercase_sequences(peptides_string)
     alleles_string = request.forms.get('allele')
+    if alleles_string is None:
+        return "ERROR: no allele given"
     alleles_list = split_allele_names(alleles_string)
     result_df = predict(alleles=alleles_list, peptides=peptides_list)
     return result_df.to_csv(sep="\t", index=False)
