@@ -15,7 +15,11 @@
 """
 Allele specific MHC Class I binding affinity predictor
 """
-
+from __future__ import (
+    print_function,
+    division,
+    absolute_import,
+)
 from os import listdir
 from os.path import exists, join
 from itertools import groupby
@@ -110,7 +114,7 @@ class Mhc1BindingPredictor(object):
             return [
                 peptide[:i] + extra_amino_acid + peptide[i:]
                 for peptide in peptides
-                for i in xrange(3, 8)
+                for i in range(3, 8)
                 for extra_amino_acid in amino_acid_letters
             ]
         else:
@@ -141,7 +145,7 @@ class Mhc1BindingPredictor(object):
             raw_y = self._predict_9mer_peptides(expanded_peptides)
             median_y = np.zeros(n_group)
             # take the median of each group of log(IC50) values
-            for i in xrange(n_group):
+            for i in range(n_group):
                 start = i * expansion_factor
                 end = (i + 1) * expansion_factor
                 median_y[i] = np.median(raw_y[start:end])

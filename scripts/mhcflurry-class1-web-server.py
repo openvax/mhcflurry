@@ -14,17 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import (
     print_function,
     division,
     absolute_import,
-    # unicode_literals
+    unicode_literals
 )
 import argparse
 
+from bottle import post, request, run
+
 from mhcflurry.common import (
-    parse_int_list,
     split_uppercase_sequences,
     split_allele_names,
 )
@@ -32,25 +32,20 @@ from mhcflurry.class1 import predict
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--mhc",
-    default="HLA-A*02:01",
-    type=split_allele_names,
-    help="Comma separated list of MHC alleles")
+parser.add_argument("--host", default="0.0.0.0")
+parser.add_argument("--port", default=80, type=int)
+parser.add_argument("--debug", default=False, action="store_true")
 
-parser.add_argument("--sequence",
-    required=True,
-    type=split_uppercase_sequences,
-    help="Comma separated list of protein sequences")
 
-parser.add_argument("--fasta-file",
-    help="FASTA file of protein sequences to chop up into peptides")
-
-parser.add_argument("--peptide-lengths",
-    default=[9],
-    type=parse_int_list,
-    help="Comma separated list of peptide length, e.g. 8,9,10,11")
+@post('/')
+def get_binding_value():
+    peptides_string = request.forms.get('peptide')
+    peptides_list = split_uppercase_sequences(peptides_string)
+    alleles_string = request.forms.get('allele')
+    alleles_list = split_allele_names(alleles_string)
+    result_df = predict(alleles=alleles_list, peptides=peptides_list)
+    return result_df.to_csv(sep="\t", index=False)
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    df = predict(alleles=args.mhc, peptides=args.sequence)
-    print(df.to_csv(sep="\t", index=False), end="")
+    run(host=args.host, port=args.port, debug=args.debug)

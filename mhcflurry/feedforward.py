@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import (
+    print_function,
+    division,
+    absolute_import,
+)
+
 import keras
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Flatten, Dropout

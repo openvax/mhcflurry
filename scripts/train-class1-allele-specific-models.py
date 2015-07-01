@@ -17,6 +17,12 @@ Using the following hyperparameters:
 Nielsen 2009 dataset.
 """
 
+from __future__ import (
+    print_function,
+    division,
+    absolute_import,
+    unicode_literals
+)
 from shutil import rmtree
 from os import makedirs
 from os.path import exists, join

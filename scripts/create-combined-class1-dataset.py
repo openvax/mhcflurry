@@ -6,6 +6,12 @@ Combine 2013 Kim/Peters NetMHCpan dataset[*] with more recent IEDB entries
 * = "Dataset size and composition impact the reliability..."
 """
 
+from __future__ import (
+    print_function,
+    division,
+    absolute_import,
+    unicode_literals
+)
 from os.path import join
 import pickle
 from collections import Counter

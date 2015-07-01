@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import (
+    print_function,
+    division,
+    absolute_import,
+)
+
 def parse_int_list(s):
     return [int(part.strip() for part in s.split(","))]
 
