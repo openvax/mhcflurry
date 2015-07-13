@@ -21,13 +21,13 @@ from __future__ import (
 )
 import argparse
 
-from bottle import post, request, run
+from bottle import post, request, run, get
 
 from mhcflurry.common import (
     split_uppercase_sequences,
     split_allele_names,
 )
-from mhcflurry.class1 import predict
+from mhcflurry.class1 import predict, supported_alleles
 
 parser = argparse.ArgumentParser()
 
@@ -47,7 +47,16 @@ def get_binding_value():
         return "ERROR: no allele given"
     alleles_list = split_allele_names(alleles_string)
     result_df = predict(alleles=alleles_list, peptides=peptides_list)
-    return result_df.to_csv(sep="\t", index=False)
+    return result_df.to_csv(sep="\t", index=False, float_format="%0.4f")
+
+@get('/alleles')
+def get_supported_alleles():
+    peptide_lengths = "8,9,10,11,12"
+    strings = [
+        "%s\t%s" % (allele, peptide_lengths)
+        for allele in supported_alleles()
+    ]
+    return "\n".join(strings)
 
 if __name__ == "__main__":
     args = parser.parse_args()
