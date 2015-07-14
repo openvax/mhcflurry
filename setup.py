@@ -56,6 +56,8 @@ if __name__ == '__main__':
             'numpy>=1.7',
             'pandas>=0.13.1',
             'appdirs',
+            'theano',
+            'keras',
         ],
         long_description=readme,
         packages=['mhcflurry'],
