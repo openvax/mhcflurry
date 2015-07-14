@@ -23,9 +23,23 @@ scripts/create-iedb-class1-dataset.py
 scripts/create-combined-class1-dataset.py
 ```
 
-## Getting Started: Train Neural Network Models
+## Train Neural Network Models
 
 ```
 scripts/train-class1-allele-specific-models.py
 ```
 
+This will train separate models for each HLA type.
+
+## Making predictions
+
+```python
+from mhcflurry import Mhc1BindingPredictor
+predictor = Mhc1BindingPredictor('A0201')
+predictor.predict_peptides(['SIINFEKL'])
+```
+
+```
+  Allele   Peptide  Prediction
+0  A0201  SIINFEKL  586.730529
+```
