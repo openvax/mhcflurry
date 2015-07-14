@@ -1,7 +1,20 @@
 # mhcflurry
 Peptide-MHC binding affinity prediction
 
-## Getting Started: Download, Normalize, and Combine Training Data
+## Quickstart
+
+Set up the Python environment:
+
+```
+# (set up environment)
+pip install scipy Cython
+pip install h5py
+python setup.py develop
+```
+
+Download, Normalize, and Combine Training Data:
+
+(make sure you have `wget` available, e.g. `brew install wget` on Mac OS X)
 
 ```
 scripts/download-iedb.sh
