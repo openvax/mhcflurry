@@ -81,6 +81,11 @@ parser.add_argument(
     default=CSV_PATH,
     help="CSV file with 'mhc', 'peptide', 'peptide_length', 'meas' columns")
 
+parser.add_argument("--min-samples-per-allele",
+    default=5,
+    help="Don't train predictors for alleles with fewer samples than this",
+    type=int)
+
 if __name__ == "__main__":
     args = parser.parse_args()
 
@@ -124,7 +129,7 @@ if __name__ == "__main__":
         if exists(path) and not args.overwrite:
             print("-- already exists, skipping")
             continue
-        if n_allele < 10:
+        if n_allele < args.min_samples_per_allele:
             print("-- too few data points, skipping")
             continue
         model.set_weights(old_weights)

@@ -46,7 +46,10 @@ def get_binding_value():
     if alleles_string is None:
         return "ERROR: no allele given"
     alleles_list = split_allele_names(alleles_string)
-    result_df = predict(alleles=alleles_list, peptides=peptides_list)
+    try:
+        result_df = predict(alleles=alleles_list, peptides=peptides_list)
+    except ValueError as e:
+        return "ERROR: %s" % e.args[0]
     return result_df.to_csv(sep="\t", index=False, float_format="%0.4f")
 
 @get('/alleles')
