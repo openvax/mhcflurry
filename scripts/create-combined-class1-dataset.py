@@ -19,16 +19,13 @@ import argparse
 
 import pandas as pd
 
-from mhcflurry.paths import CLASS1_DATA_DIRECTORY
+from mhcflurry.paths import CLASS1_DATA_DIRECTORY, CLASS1_DATA_CSV_PATH
 
 IEDB_PICKLE_FILENAME = "iedb_human_class1_assay_datasets.pickle"
 IEDB_PICKLE_PATH = join(CLASS1_DATA_DIRECTORY, IEDB_PICKLE_FILENAME)
 
 PETERS_CSV_FILENAME = "bdata.20130222.mhci.public.1.txt"
 PETERS_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS_CSV_FILENAME)
-
-OUTPUT_CSV_FILENAME = "combined_human_class1_dataset.csv"
-OUTPUT_CSV_PATH = join(CLASS1_DATA_DIRECTORY, OUTPUT_CSV_FILENAME)
 
 parser = argparse.ArgumentParser()
 
@@ -59,7 +56,7 @@ parser.add_argument("--netmhcpan-csv-path",
     help="Path to CSV with NetMHCpan dataset from 2013 Peters paper")
 
 parser.add_argument("--output-csv-path",
-    default=OUTPUT_CSV_PATH,
+    default=CLASS1_DATA_CSV_PATH,
     help="Path to CSV of combined assay results")
 
 parser.add_argument("--extra-dataset-csv-path",
