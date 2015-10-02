@@ -333,6 +333,7 @@ if __name__ == "__main__":
 
     all_dataframes = []
     for i, config in enumerate(configs):
+        print("\n\n=== Config %d/%d: %s" % (i + 1, len(configs), config))
         if config.max_ic50 not in datasets_by_max_ic50:
             allele_datasets, _ = load_data(
                 args.binding_data_csv_path,
