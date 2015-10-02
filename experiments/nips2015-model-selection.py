@@ -86,7 +86,6 @@ parser.add_argument(
     type=float,
     help="Degree of dropout regularization to try in hyperparameter search")
 
-
 ModelConfig = namedtuple(
     "ModelConfig",
     [
@@ -119,7 +118,7 @@ ACTIVATIONS = [
 
 
 def generate_all_model_configs(
-        embedding_sizes=[0, 16, 64],
+        embedding_sizes=[0, 64],
         n_training_epochs=125,
         max_dropout=0.25):
     configurations = []
