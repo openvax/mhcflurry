@@ -138,10 +138,12 @@ def kfold_cross_validation_for_single_allele(
             nb_epoch=n_training_epochs,
             verbose=0)
 
-        pred = model.predict(X_test)
+        pred = model.predict(X_test).flatten()
         auc = sklearn.metrics.roc_auc_score(label_test, pred)
         ic50_pred = max_ic50 ** (1.0 - pred)
         label_pred = (ic50_pred <= 500)
+        print(ic50_pred)
+        print(ic50_test)
         print(label_pred)
         print(label_test)
         accuracy = np.mean(label_test == label_pred)
