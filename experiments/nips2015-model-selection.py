@@ -237,10 +237,11 @@ def leave_out_allele_cross_validation(
     ])
     initial_weights = [w.copy() for w in model.get_weights()]
     for allele_name, dataset in allele_datasets.items():
-        allele_name = normalize_allele_name(allele_name)
-        if allele_name.isdigit() or len(allele_name) < 4:
+        # Want alleles to be 4-digit + gene name e.g. C0401
+        if allele_name.isdigit() or len(allele_name) < 5:
             print("Skipping allele %s" % (allele_name,))
             continue
+        allele_name = normalize_allele_name(allele_name)
         X_allele = dataset.X
         n_samples_allele = X_allele.shape[0]
         if n_samples_allele < min_samples_per_allele:
