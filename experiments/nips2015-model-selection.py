@@ -159,20 +159,20 @@ def kfold_cross_validation_for_single_allele(
                 "!!! Conflicting accuracy estimates! (%0.5f vs. %0.5f)" % (
                     accuracy, accuracy_estimate2))
         print(
-            "-- AUC for fold #%d of %s: %0.5f" % (
+            "-- %d/%d: AUC: %0.5f" % (
                 cv_iter + 1,
-                allele_name,
+                cv_folds,
                 auc))
         print(
-            "-- Accuracy for fold #%d of %s: %0.5f (baseline %0.5f)" % (
+            "-- %d/%d Accuracy: %0.5f (baseline %0.5f)" % (
                 cv_iter + 1,
-                allele_name,
+                cv_folds,
                 accuracy,
                 max(label_test.mean(), 1.0 - label_test.mean())))
         print(
-            "-- F1-score for fold #%d of %s: %0.5f" % (
+            "-- %d/%d F1-score: %0.5f" % (
                 cv_iter + 1,
-                allele_name,
+                cv_folds,
                 f1_score))
 
         fold_aucs.append(auc)

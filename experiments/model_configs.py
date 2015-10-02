@@ -36,8 +36,8 @@ MAX_IC50_VALUES = [
 
 
 def generate_all_model_configs(
-        embedding_sizes=[0, 64],
-        n_training_epochs=125,
+        embedding_sizes=[0, 32],
+        n_training_epochs=100,
         max_dropout=0.25):
     configurations = []
     for activation in ACTIVATIONS:
