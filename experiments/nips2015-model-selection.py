@@ -146,9 +146,14 @@ def generate_all_model_configs(
 
 
 def kfold_cross_validation_for_single_allele(
-        allele_name, model, X, Y, ic50,
+        allele_name,
+        model,
+        X,
+        Y,
+        ic50,
         n_training_epochs=100,
-        cv_folds=5):
+        cv_folds=5,
+        max_ic50=5000):
     """
     Estimate the per-allele AUC score of a model via k-fold cross-validation.
     Returns the per-fold AUC scores and accuracies.
@@ -180,25 +185,17 @@ def kfold_cross_validation_for_single_allele(
             continue
         model.set_weights(initial_weights)
 
-        history = model.fit(
+        model.fit(
             X_train,
             Y_train,
             nb_epoch=n_training_epochs,
             verbose=0)
-        losses = history.history["loss"]
 
         pred = model.predict(X_test)
         auc = sklearn.metrics.roc_auc_score(label_test, pred)
-        ic50_pred = 5000 ** (1.0 - pred)
+        ic50_pred = max_ic50 ** (1.0 - pred)
         accuracy = np.mean(label_test == (ic50_pred <= 500))
 
-        print(
-            "-- Loss history for fold #%d of %s: [%0.5f -- %0.5f -- %0.5f]" % (
-                cv_iter + 1,
-                allele_name,
-                losses[0],
-                losses[int(len(losses) / 2)],
-                losses[-1]))
         print(
             "-- AUC for fold #%d of %s: %0.5f, Accuracy: %0.5f" % (
                 cv_iter + 1,
@@ -216,7 +213,8 @@ def leave_out_allele_cross_validation(
         binary_encoding=False,
         n_pretrain_epochs=0,
         min_samples_per_allele=5,
-        cv_folds=5):
+        cv_folds=5,
+        max_ic50=5000):
     """
     Fit the model for every allele in the dataset and return a DataFrame
     with the following columns:
@@ -292,7 +290,8 @@ def leave_out_allele_cross_validation(
             Y=Y_allele,
             ic50=ic50_allele,
             n_training_epochs=config.n_epochs,
-            cv_folds=cv_folds)
+            cv_folds=cv_folds,
+            max_ic50=max_ic50)
         if len(aucs) == 0:
             print("Skipping allele %s" % allele_name)
             continue
@@ -311,7 +310,8 @@ def evaluate_model_config(
         config,
         allele_datasets,
         min_samples_per_allele=5,
-        cv_folds=5):
+        cv_folds=5,
+        max_ic50=5000):
     print("===")
     print(config)
     if config.embedding_size:
@@ -337,7 +337,8 @@ def evaluate_model_config(
         binary_encoding=config.embedding_size == 0,
         n_pretrain_epochs=config.n_pretrain_epochs,
         min_samples_per_allele=min_samples_per_allele,
-        cv_folds=cv_folds)
+        cv_folds=cv_folds,
+        max_ic50=max_ic50)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -366,7 +367,8 @@ if __name__ == "__main__":
             config,
             allele_datasets,
             min_samples_per_allele=args.min_samples_per_allele,
-            cv_folds=args.cv_folds)
+            cv_folds=args.cv_folds,
+            max_ic50=config.max_ic50)
         n_rows = len(result_df)
         result_df["config_idx"] = [i] * n_rows
         for hyperparameter_name in config._fields:
