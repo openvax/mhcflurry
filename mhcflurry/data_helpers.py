@@ -69,7 +69,7 @@ def indices_to_hotshot_encoding(X, n_indices=None, first_index_value=0):
     for i, row in enumerate(X):
         for j, xij in enumerate(row):
             X_binary[i, n_indices * j + xij - first_index_value] = 1
-    return X_binary
+    return X_binary.astype(float)
 
 
 def _infer_csv_separator(filename):
