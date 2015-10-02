@@ -115,6 +115,11 @@ ACTIVATIONS = [
     "tanh",
 ]
 
+MAX_IC50_VALUES = [
+    5000,
+    20000,
+]
+
 
 def generate_all_model_configs(
         embedding_sizes=[0, 64],
@@ -128,7 +133,7 @@ def generate_all_model_configs(
                     for hidden_layer_size in HIDDEN1_LAYER_SIZES:
                         for embedding_size in embedding_sizes:
                             for dropout in [0, max_dropout]:
-                                for max_ic50 in [5000, 50000]:
+                                for max_ic50 in MAX_IC50_VALUES:
                                     config = ModelConfig(
                                         embedding_size=embedding_size,
                                         hidden_layer_size=hidden_layer_size,
