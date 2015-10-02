@@ -142,19 +142,18 @@ def kfold_cross_validation_for_single_allele(
         auc = sklearn.metrics.roc_auc_score(label_test, pred)
         ic50_pred = max_ic50 ** (1.0 - pred)
         label_pred = (ic50_pred <= 500)
-        print(ic50_pred)
-        print(ic50_test)
-        print(label_pred)
-        print(label_test)
+
         accuracy = np.mean(label_test == label_pred)
-        tp = ((label_test == 1) & (label_pred == 1)).sum()
-        fp = ((label_test == 0) & (label_pred == 1)).sum()
-        tn = ((label_test == 0) & (label_pred == 0)).sum()
-        fn = ((label_test == 1) & (label_pred == 0)).sum()
+        tp = (label_test & label_pred).sum()
+        fp = ((~label_test) & label_pred).sum()
+        tn = ((~label_test) & (~label_pred)).sum()
+        fn = (label_test & (~label_pred)).sum()
         sensitivity = tp / float(tp + fn)
         precision = tp / float(tp + fp)
         f1_score = precision * sensitivity
         # sanity check that we're computing accuracy correctly
+        print("Total = %d, TP = %d, FP = %d, TN = %d, FN = %d, computed total = %d" % (
+            len(ic50_pred), tp, fp, tn, fn, (tp + fp + tn + fn)))
         accuracy_estimate2 = (tp + tn) / float(tp + fp + tn + fp)
         assert abs(accuracy - accuracy_estimate2) < 0.00001, \
             "Conflicting accuracy estimates! (%0.5f vs. %0.5f)" % (
