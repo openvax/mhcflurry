@@ -91,7 +91,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--minibatch-size",
-    default=512,
+    default=256,
     type=int,
     help="How many samples to use in stochastic gradient estimation")
 
