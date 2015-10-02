@@ -16,7 +16,7 @@ ModelConfig = namedtuple(
 
 HIDDEN1_LAYER_SIZES = [
     64,
-    512,
+    256,
 ]
 
 INITILIZATION_METHODS = [
