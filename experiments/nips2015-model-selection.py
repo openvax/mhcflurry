@@ -353,7 +353,7 @@ if __name__ == "__main__":
             min_samples_per_allele=args.min_samples_per_allele,
             cv_folds=args.cv_folds,
             max_ic50=config.max_ic50,
-            minibatch_size=config.minibatch_size)
+            minibatch_size=args.minibatch_size)
         n_rows = len(result_df)
         result_df["config_idx"] = [i] * n_rows
         for hyperparameter_name in config._fields:
