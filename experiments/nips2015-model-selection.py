@@ -74,7 +74,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--training-epochs",
-    default=125,
+    default=100,
     type=int,
     help="Number of passes over the dataset to perform during model fitting")
 
@@ -242,7 +242,8 @@ def leave_out_allele_cross_validation(
         ("accuracy_max", [])
     ])
     initial_weights = [w.copy() for w in model.get_weights()]
-    for allele_name, dataset in allele_datasets.items():
+    for allele_name, dataset in sorted(
+            allele_datasets.items(), key=lambda pair: pair[0]):
         # Want alleles to be 4-digit + gene name e.g. C0401
         if allele_name.isdigit() or len(allele_name) < 5:
             print("Skipping allele %s" % (allele_name,))
