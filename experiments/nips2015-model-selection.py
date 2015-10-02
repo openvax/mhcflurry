@@ -108,7 +108,6 @@ HIDDEN1_LAYER_SIZES = [
 INITILIZATION_METHODS = [
     "glorot_uniform",
     "glorot_normal",
-    "uniform",
 ]
 
 ACTIVATIONS = [
