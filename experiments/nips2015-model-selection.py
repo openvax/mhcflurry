@@ -157,9 +157,12 @@ def kfold_cross_validation_for_single_allele(
         fp = ((~label_test) & label_pred).sum()
         tn = ((~label_test) & (~label_pred)).sum()
         fn = (label_test & (~label_pred)).sum()
-        sensitivity = tp / float(tp + fn)
-        precision = tp / float(tp + fp)
-        f1_score = precision * sensitivity
+        sensitivity = (tp / float(tp + fn)) if (tp + fn) > 0 else 0.0
+        precision = (tp / float(tp + fp)) if (tp + fp) > 0 else 0.0
+        if precision + sensitivity > 0:
+            f1_score = (2 * precision * sensitivity) / (precision + sensitivity)
+        else:
+            f1_score = 0.0
         # sanity check that we're computing accuracy correctly
         accuracy_estimate2 = (tp + tn) / float(tp + fp + tn + fn)
         if abs(accuracy - accuracy_estimate2) > 0.00001:
@@ -287,16 +290,12 @@ def leave_out_allele_cross_validation(
                 ("auc", aucs),
                 ("accuracy", accuracies),
                 ("f1", f1_scores)]:
-            print(name, values)
             result_dict["%s_mean" % name].append(np.mean(values))
             result_dict["%s_median" % name].append(np.median(values))
             result_dict["%s_std" % name].append(np.std(values))
             result_dict["%s_min" % name].append(np.min(values))
             result_dict["%s_max" % name].append(np.max(values))
-    print(result_dict)
-    df = pd.DataFrame(result_dict)
-    print(df)
-    return df
+    return pd.DataFrame(result_dict)
 
 
 def evaluate_model_config(
