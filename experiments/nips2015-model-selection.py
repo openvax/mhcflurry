@@ -199,7 +199,7 @@ def kfold_cross_validation_for_single_allele(
         accuracy = np.mean(label_test == (ic50_pred <= 500))
         ratios = ic50_pred / ic50_test
         print(
-            "-- median pred / test IC50 ratio: %0.4f" % (ratios.median(),))
+            "-- median pred / test IC50 ratio: %0.4f" % (np.median(ratios),))
         print(
             "-- AUC for fold #%d of %s: %0.5f, Accuracy: %0.5f" % (
                 cv_iter + 1,
