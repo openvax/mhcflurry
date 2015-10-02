@@ -101,8 +101,6 @@ ModelConfig = namedtuple(
 
 HIDDEN1_LAYER_SIZES = [
     64,
-    128,
-    256,
     512,
 ]
 
