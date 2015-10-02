@@ -159,6 +159,7 @@ def kfold_cross_validation_for_single_allele(
     initial_weights = [w.copy() for w in model.get_weights()]
     fold_aucs = []
     fold_accuracies = []
+    print("Cross-validation for %s:" % allele_name)
     for cv_iter, (train_idx, test_idx) in enumerate(KFold(
             n=n_samples,
             n_folds=cv_folds,
@@ -181,12 +182,13 @@ def kfold_cross_validation_for_single_allele(
             nb_epoch=n_training_epochs,
             verbose=0)
         losses = history.history["loss"]
-        print("-- CV iter #%d for %s: first=%0.4f, min=%0.4f, last=%0.4f" % (
-            cv_iter + 1,
-            allele_name,
-            losses[0],
-            min(losses),
-            losses[-1]))
+        print(
+            "-- CV iter #%d for %s: First loss=%0.4f, min=%0.4f, last=%0.4f" % (
+                cv_iter + 1,
+                allele_name,
+                losses[0],
+                min(losses),
+                losses[-1]))
 
         pred = model.predict(X_test)
         auc = sklearn.metrics.roc_auc_score(label_test, pred)
