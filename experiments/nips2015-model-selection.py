@@ -25,6 +25,7 @@ from collections import OrderedDict
 from os.path import join
 import argparse
 from time import time
+import logging
 
 import numpy as np
 import pandas as pd
@@ -152,12 +153,11 @@ def kfold_cross_validation_for_single_allele(
         precision = tp / float(tp + fp)
         f1_score = precision * sensitivity
         # sanity check that we're computing accuracy correctly
-        print("Total = %d, TP = %d, FP = %d, TN = %d, FN = %d, computed total = %d, n_same = %d" % (
-            len(ic50_pred), tp, fp, tn, fn, (tp + fp + tn + fn), same_mask.sum()))
-        accuracy_estimate2 = (tp + tn) / float(tp + fp + tn + fp)
-        assert abs(accuracy - accuracy_estimate2) < 0.00001, \
-            "Conflicting accuracy estimates! (%0.5f vs. %0.5f)" % (
-                accuracy, accuracy_estimate2)
+        accuracy_estimate2 = (tp + tn) / float(tp + fp + tn + fn)
+        if abs(accuracy - accuracy_estimate2) > 0.00001:
+            logging.warn(
+                "!!! Conflicting accuracy estimates! (%0.5f vs. %0.5f)" % (
+                    accuracy, accuracy_estimate2))
         print(
             "-- AUC for fold #%d of %s: %0.5f" % (
                 cv_iter + 1,
