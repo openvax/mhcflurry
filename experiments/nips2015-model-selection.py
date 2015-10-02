@@ -157,7 +157,6 @@ def kfold_cross_validation_for_single_allele(
     initial_weights = [w.copy() for w in model.get_weights()]
     fold_aucs = []
     fold_accuracies = []
-    print("Cross-validation for %s:" % allele_name)
     for cv_iter, (train_idx, test_idx) in enumerate(KFold(
             n=n_samples,
             n_folds=cv_folds,
@@ -278,6 +277,7 @@ def leave_out_allele_cross_validation(
                 X_other_alleles,
                 Y_other_alleles,
                 nb_epoch=n_pretrain_epochs)
+        print("Cross-validation for %s (%d):" % (allele_name, len(Y_allele)))
         aucs, accuracies = kfold_cross_validation_for_single_allele(
             allele_name=allele_name,
             model=model,
