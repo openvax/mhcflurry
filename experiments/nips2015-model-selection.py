@@ -158,15 +158,18 @@ def kfold_cross_validation_for_single_allele(
     initial_weights = [w.copy() for w in model.get_weights()]
     fold_aucs = []
     fold_accuracies = []
+    if not n_training_epochs:
+        target_number_updates = 0.25 * 10 ** 6
+        n_samples_per_fold = (cv_folds - 1) * n_samples / cv_folds
+        ratio = target_number_updates / n_samples_per_fold
+        n_training_epochs = int(math.ceil(ratio))
+        print("-- Using nb_epoch=%s for %s with %s samples" % (
+            n_training_epochs, allele_name, n_samples))
     for cv_iter, (train_idx, test_idx) in enumerate(KFold(
             n=n_samples,
             n_folds=cv_folds,
             shuffle=True,
             random_state=0)):
-        n_train = len(train_idx)
-        n_training_epochs = int(math.ceil(10 ** 6 / float(n_train)))
-        print("-- # training epochs for CV iter %d of %s: %d" % (
-            i + 1, allele_name, n_training_epochs))
         X_train, Y_train = X[train_idx, :], Y[train_idx]
         X_test = X[test_idx, :]
         ic50_test = ic50[test_idx]
