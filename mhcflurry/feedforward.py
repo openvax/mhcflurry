@@ -48,6 +48,7 @@ def compile_forward_predictor(model, theano_mode=None):
         allow_input_downcast=True,
         mode=theano_mode)
 
+
 def make_network(
         input_size,
         embedding_input_dim=None,
@@ -111,6 +112,7 @@ def make_network(
         compile_forward_predictor(model)
     return model
 
+
 def make_hotshot_network(
         peptide_length=9,
         layer_sizes=[500],
@@ -129,6 +131,7 @@ def make_hotshot_network(
         output_activation=output_activation,
         dropout_probability=dropout_probability,
         optimizer=optimizer)
+
 
 def make_embedding_network(
         peptide_length=9,

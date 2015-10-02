@@ -41,6 +41,7 @@ from .paths import CLASS1_MODEL_DIRECTORY
 
 _allele_model_cache = {}
 
+
 class Mhc1BindingPredictor(object):
     def __init__(
             self,
