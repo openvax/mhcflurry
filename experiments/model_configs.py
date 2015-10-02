@@ -20,8 +20,8 @@ HIDDEN1_LAYER_SIZES = [
 ]
 
 INITILIZATION_METHODS = [
+    "uniform",
     "glorot_uniform",
-    "glorot_normal",
 ]
 
 ACTIVATIONS = [
