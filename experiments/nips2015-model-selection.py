@@ -114,7 +114,6 @@ INITILIZATION_METHODS = [
 ACTIVATIONS = [
     "relu",
     "tanh",
-    "prelu",
 ]
 
 
