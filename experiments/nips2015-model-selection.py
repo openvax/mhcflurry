@@ -20,7 +20,6 @@ from __future__ import (
     absolute_import,
     unicode_literals
 )
-import math
 from collections import OrderedDict
 from os.path import join
 import argparse
@@ -96,6 +95,32 @@ parser.add_argument(
     help="How many samples to use in stochastic gradient estimation")
 
 
+def score_predictions(predicted_log_ic50, true_label, max_ic50):
+    """Computes accuracy, AUC, and F1 score of predictions"""
+    auc = sklearn.metrics.roc_auc_score(true_label, predicted_log_ic50)
+    ic50_pred = max_ic50 ** (1.0 - predicted_log_ic50)
+    label_pred = (ic50_pred <= 500)
+    same_mask = true_label == label_pred
+    accuracy = np.mean(same_mask)
+    tp = (true_label & label_pred).sum()
+    fp = ((~true_label) & label_pred).sum()
+    tn = ((~true_label) & (~label_pred)).sum()
+    fn = (true_label & (~label_pred)).sum()
+    sensitivity = (tp / float(tp + fn)) if (tp + fn) > 0 else 0.0
+    precision = (tp / float(tp + fp)) if (tp + fp) > 0 else 0.0
+    if precision + sensitivity > 0:
+        f1_score = (2 * precision * sensitivity) / (precision + sensitivity)
+    else:
+        f1_score = 0.0
+    # sanity check that we're computing accuracy correctly
+    accuracy_estimate2 = (tp + tn) / float(tp + fp + tn + fn)
+    if abs(accuracy - accuracy_estimate2) > 0.00001:
+        logging.warn(
+            "!!! Conflicting accuracy estimates! (%0.5f vs. %0.5f)" % (
+                accuracy, accuracy_estimate2))
+    return accuracy, auc, f1_score
+
+
 def kfold_cross_validation_for_single_allele(
         allele_name,
         model,
@@ -115,14 +140,6 @@ def kfold_cross_validation_for_single_allele(
     fold_aucs = []
     fold_accuracies = []
     fold_f1_scores = []
-
-    if not n_training_epochs:
-        target_number_updates = 0.25 * 10 ** 6
-        n_samples_per_fold = (cv_folds - 1) * n_samples / cv_folds
-        ratio = target_number_updates / n_samples_per_fold
-        n_training_epochs = int(math.ceil(ratio))
-        print("-- Using nb_epoch=%s for %s with %s samples" % (
-            n_training_epochs, allele_name, n_samples))
 
     for cv_iter, (train_idx, test_idx) in enumerate(KFold(
             n=n_samples,
@@ -148,27 +165,7 @@ def kfold_cross_validation_for_single_allele(
             batch_size=minibatch_size)
 
         pred = model.predict(X_test).flatten()
-        auc = sklearn.metrics.roc_auc_score(label_test, pred)
-        ic50_pred = max_ic50 ** (1.0 - pred)
-        label_pred = (ic50_pred <= 500)
-        same_mask = label_test == label_pred
-        accuracy = np.mean(same_mask)
-        tp = (label_test & label_pred).sum()
-        fp = ((~label_test) & label_pred).sum()
-        tn = ((~label_test) & (~label_pred)).sum()
-        fn = (label_test & (~label_pred)).sum()
-        sensitivity = (tp / float(tp + fn)) if (tp + fn) > 0 else 0.0
-        precision = (tp / float(tp + fp)) if (tp + fp) > 0 else 0.0
-        if precision + sensitivity > 0:
-            f1_score = (2 * precision * sensitivity) / (precision + sensitivity)
-        else:
-            f1_score = 0.0
-        # sanity check that we're computing accuracy correctly
-        accuracy_estimate2 = (tp + tn) / float(tp + fp + tn + fn)
-        if abs(accuracy - accuracy_estimate2) > 0.00001:
-            logging.warn(
-                "!!! Conflicting accuracy estimates! (%0.5f vs. %0.5f)" % (
-                    accuracy, accuracy_estimate2))
+        accuracy, auc, f1_score = score_predictions(pred, label_test, max_ic50)
         print(
             "-- %d/%d: AUC: %0.5f" % (
                 cv_iter + 1,
