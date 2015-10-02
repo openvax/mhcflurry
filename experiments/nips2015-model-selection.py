@@ -287,9 +287,6 @@ def leave_out_allele_cross_validation(
                 Y_other_alleles,
                 nb_epoch=n_pretrain_epochs)
         print("Cross-validation for %s (%d):" % (allele_name, len(Y_allele)))
-        print("-- min Y value: %0.4f, max Y value: %s" % (
-            Y_allele.min(),
-            Y_allele.max()))
         aucs, accuracies = kfold_cross_validation_for_single_allele(
             allele_name=allele_name,
             model=model,
