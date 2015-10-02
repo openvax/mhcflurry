@@ -162,6 +162,7 @@ def kfold_cross_validation_for_single_allele(
     initial_weights = [w.copy() for w in model.get_weights()]
     fold_aucs = []
     fold_accuracies = []
+
     if not n_training_epochs:
         target_number_updates = 0.25 * 10 ** 6
         n_samples_per_fold = (cv_folds - 1) * n_samples / cv_folds
@@ -169,6 +170,7 @@ def kfold_cross_validation_for_single_allele(
         n_training_epochs = int(math.ceil(ratio))
         print("-- Using nb_epoch=%s for %s with %s samples" % (
             n_training_epochs, allele_name, n_samples))
+
     for cv_iter, (train_idx, test_idx) in enumerate(KFold(
             n=n_samples,
             n_folds=cv_folds,
@@ -261,8 +263,9 @@ def leave_out_allele_cross_validation(
             continue
         if binary_encoding:
             X_allele = indices_to_hotshot_encoding(X_allele, n_indices=20)
-        Y_allele = dataset.Y
+
         ic50_allele = dataset.ic50
+        Y_allele = 1.0 - np.minimum(1.0, np.log(ic50_allele) / np.log(max_ic50))
         model.set_weights(initial_weights)
         if n_pretrain_epochs > 0:
             X_other_alleles = np.vstack([
@@ -272,17 +275,24 @@ def leave_out_allele_cross_validation(
             if binary_encoding:
                 X_other_alleles = indices_to_hotshot_encoding(
                     X_other_alleles, n_indices=20)
-            Y_other_alleles = np.concatenate([
-                other_allele.Y for (other_allele, other_dataset)
+            ic50_other_alleles = np.concatenate([
+                other_allele.ic50 for (other_allele, other_dataset)
                 in allele_datasets.items()
                 if normalize_allele_name(other_allele) != allele_name])
+            Y_other_alleles = 1.0 - np.minimum(
+                1.0,
+                np.log(ic50_other_alleles) / np.log(max_ic50))
             print("Pre-training X shape: %s" % (X_other_alleles.shape,))
             print("Pre-training Y shape: %s" % (Y_other_alleles.shape,))
+
             model.fit(
                 X_other_alleles,
                 Y_other_alleles,
                 nb_epoch=n_pretrain_epochs)
         print("Cross-validation for %s (%d):" % (allele_name, len(Y_allele)))
+        print("-- min Y value: %0.4f, max Y value: %s" % (
+            Y_allele.min(),
+            Y_allele.max()))
         aucs, accuracies = kfold_cross_validation_for_single_allele(
             allele_name=allele_name,
             model=model,
@@ -351,18 +361,13 @@ if __name__ == "__main__":
 
     all_dataframes = []
     all_elapsed_times = []
+    allele_datasets, _ = load_data(
+        args.binding_data_csv_path,
+        peptide_length=9,
+        binary_encoding=False)
     for i, config in enumerate(configs):
         t_start = time()
         print("\n\n=== Config %d/%d: %s" % (i + 1, len(configs), config))
-        if config.max_ic50 not in datasets_by_max_ic50:
-            allele_datasets, _ = load_data(
-                args.binding_data_csv_path,
-                peptide_length=9,
-                binary_encoding=False)
-            datasets_by_max_ic50[config.max_ic50] = allele_datasets
-        else:
-            allele_datasets = datasets_by_max_ic50[config.max_ic50]
-
         result_df = evaluate_model_config(
             config,
             allele_datasets,
