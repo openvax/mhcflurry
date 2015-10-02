@@ -68,7 +68,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("Reading %s..." % args.iedb_pickle_path)
-    with open(args.iedb_pickle_path, "r'") as f:
+    with open(args.iedb_pickle_path, "r") as f:
         iedb_datasets = pickle.load(f)
 
     print("Reading %s..." % args.netmhcpan_csv_path)
