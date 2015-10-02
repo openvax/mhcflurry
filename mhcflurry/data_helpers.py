@@ -174,6 +174,8 @@ def load_data(
                 X = X.reshape((X.shape[0], peptide_length * 20))
         else:
             X = index_encoding(peptides, peptide_length=peptide_length)
+        assert allele not in allele_groups, \
+            "Duplicate datasets for %s" % allele
         allele_groups[allele] = AlleleData(
             X=X,
             Y=Y,
