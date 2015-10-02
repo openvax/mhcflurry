@@ -104,7 +104,8 @@ def kfold_cross_validation_for_single_allele(
         ic50,
         n_training_epochs=100,
         cv_folds=5,
-        max_ic50=5000):
+        max_ic50=5000,
+        minibatch_size=128):
     """
     Estimate the per-allele AUC score of a model via k-fold cross-validation.
     Returns the per-fold AUC scores and accuracies.
@@ -143,7 +144,8 @@ def kfold_cross_validation_for_single_allele(
             X_train,
             Y_train,
             nb_epoch=n_training_epochs,
-            verbose=0)
+            verbose=0,
+            batch_size=minibatch_size)
 
         pred = model.predict(X_test).flatten()
         auc = sklearn.metrics.roc_auc_score(label_test, pred)
@@ -180,7 +182,6 @@ def kfold_cross_validation_for_single_allele(
                 cv_iter + 1,
                 cv_folds,
                 f1_score))
-
         fold_aucs.append(auc)
         fold_accuracies.append(accuracy)
         fold_f1_scores.append(f1_score)
@@ -275,7 +276,8 @@ def leave_out_allele_cross_validation(
             ic50=ic50_allele,
             n_training_epochs=config.n_epochs,
             cv_folds=cv_folds,
-            max_ic50=max_ic50)
+            max_ic50=max_ic50,
+            minibatch_size=minibatch_size)
         if len(aucs) == 0:
             print("Skipping allele %s" % allele_name)
             continue
