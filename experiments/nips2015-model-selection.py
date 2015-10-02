@@ -197,21 +197,15 @@ def kfold_cross_validation_for_single_allele(
         auc = sklearn.metrics.roc_auc_score(label_test, pred)
         ic50_pred = max_ic50 ** (1.0 - pred)
         accuracy = np.mean(label_test == (ic50_pred <= 500))
+        ratios = ic50_pred / ic50_test
         print(
-            "-- min true IC50: %0.4f, max : %0.4f" % (
-                ic50_test.min(),
-                ic50_test.max()))
-        print(
-            "-- min predicted IC50: %0.4f, max : %0.4f" % (
-                ic50_pred.min(),
-                ic50_pred.max()))
+            "-- median pred / test IC50 ratio: %0.4f" % (ratios.median(),))
         print(
             "-- AUC for fold #%d of %s: %0.5f, Accuracy: %0.5f" % (
                 cv_iter + 1,
                 allele_name,
                 auc,
                 accuracy))
-
         fold_aucs.append(auc)
         fold_accuracies.append(accuracy)
     return fold_aucs, fold_accuracies
