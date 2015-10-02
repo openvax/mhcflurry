@@ -183,11 +183,11 @@ def kfold_cross_validation_for_single_allele(
             verbose=0)
         losses = history.history["loss"]
         print(
-            "-- CV iter #%d for %s: First loss=%0.4f, min=%0.4f, last=%0.4f" % (
+            "-- CV iter #%d for %s, losses [%0.5f -- %0.5f -- %0.5f]" % (
                 cv_iter + 1,
                 allele_name,
                 losses[0],
-                min(losses),
+                losses[int(len(losses) / 2)],
                 losses[-1]))
 
         pred = model.predict(X_test)
