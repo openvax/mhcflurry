@@ -78,7 +78,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--training-epochs",
-    default=100,
+    default=200,
     type=int,
     help="Number of passes over the dataset to perform during model fitting")
 
@@ -105,7 +105,7 @@ def kfold_cross_validation_for_single_allele(
         n_training_epochs=100,
         cv_folds=5,
         max_ic50=5000,
-        minibatch_size=128):
+        minibatch_size=512):
     """
     Estimate the per-allele AUC score of a model via k-fold cross-validation.
     Returns the per-fold AUC scores and accuracies.
@@ -287,6 +287,7 @@ def leave_out_allele_cross_validation(
                 ("auc", aucs),
                 ("accuracy", accuracies),
                 ("f1", f1_scores)]:
+            print(name, values)
             result_dict["%s_mean" % name].append(np.mean(values))
             result_dict["%s_median" % name].append(np.median(values))
             result_dict["%s_std" % name].append(np.std(values))
