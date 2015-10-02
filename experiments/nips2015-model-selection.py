@@ -145,8 +145,8 @@ def kfold_cross_validation_for_single_allele(
         accuracy = np.mean(label_test == label_pred)
         tp = ((label_test == 1) & (label_pred == 1)).sum()
         fp = ((label_test == 0) & (label_pred == 1)).sum()
-        tn = ((label_test == 1) & (label_pred == 0)).sum()
-        fn = ((label_test == 0) & (label_pred == 1)).sum()
+        tn = ((label_test == 0) & (label_pred == 0)).sum()
+        fn = ((label_test == 1) & (label_pred == 0)).sum()
         sensitivity = tp / float(tp + fn)
         precision = tp / float(tp + fp)
         f1_score = precision * sensitivity
