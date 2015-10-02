@@ -108,7 +108,7 @@ def score_predictions(predicted_log_ic50, true_label, max_ic50):
     fn = (true_label & (~label_pred)).sum()
     sensitivity = (tp / float(tp + fn)) if (tp + fn) > 0 else 0.0
     precision = (tp / float(tp + fp)) if (tp + fp) > 0 else 0.0
-    if precision + sensitivity > 0:
+    if (precision + sensitivity) > 0:
         f1_score = (2 * precision * sensitivity) / (precision + sensitivity)
     else:
         f1_score = 0.0
