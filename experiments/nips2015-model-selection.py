@@ -181,18 +181,26 @@ def kfold_cross_validation_for_single_allele(
             nb_epoch=n_training_epochs,
             verbose=0)
         losses = history.history["loss"]
-        print(
-            "-- CV iter #%d for %s, losses [%0.5f -- %0.5f -- %0.5f]" % (
-                cv_iter + 1,
-                allele_name,
-                losses[0],
-                losses[int(len(losses) / 2)],
-                losses[-1]))
 
         pred = model.predict(X_test)
         auc = sklearn.metrics.roc_auc_score(label_test, pred)
         ic50_pred = 5000 ** (1.0 - pred)
         accuracy = np.mean(label_test == (ic50_pred <= 500))
+
+        print(
+            "-- Loss history for fold #%d of %s: [%0.5f -- %0.5f -- %0.5f]" % (
+                cv_iter + 1,
+                allele_name,
+                losses[0],
+                losses[int(len(losses) / 2)],
+                losses[-1]))
+        print(
+            "-- AUC for fold #%d of %s: %0.5f, Accuracy: %0.5f" % (
+                cv_iter + 1,
+                allele_name,
+                auc,
+                accuracy))
+
         fold_aucs.append(auc)
         fold_accuracies.append(accuracy)
     return fold_aucs, fold_accuracies
