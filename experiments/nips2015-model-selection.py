@@ -20,6 +20,7 @@ from __future__ import (
     absolute_import,
     unicode_literals
 )
+import math
 from collections import namedtuple, OrderedDict
 from os.path import join
 import argparse
@@ -162,6 +163,10 @@ def kfold_cross_validation_for_single_allele(
             n_folds=cv_folds,
             shuffle=True,
             random_state=0)):
+        n_train = len(train_idx)
+        n_training_epochs = int(math.ceil(10 ** 6 / float(n_train)))
+        print("-- # training epochs for CV iter %d of %s: %d" % (
+            i + 1, allele_name, n_training_epochs))
         X_train, Y_train = X[train_idx, :], Y[train_idx]
         X_test = X[test_idx, :]
         ic50_test = ic50[test_idx]
