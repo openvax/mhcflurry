@@ -142,6 +142,8 @@ def kfold_cross_validation_for_single_allele(
         auc = sklearn.metrics.roc_auc_score(label_test, pred)
         ic50_pred = max_ic50 ** (1.0 - pred)
         label_pred = (ic50_pred <= 500)
+        print(label_pred)
+        print(label_test)
         accuracy = np.mean(label_test == label_pred)
         tp = ((label_test == 1) & (label_pred == 1)).sum()
         fp = ((label_test == 0) & (label_pred == 1)).sum()
