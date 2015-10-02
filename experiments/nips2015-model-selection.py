@@ -21,7 +21,7 @@ from __future__ import (
     unicode_literals
 )
 import math
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 from os.path import join
 import argparse
 from time import time
@@ -39,6 +39,8 @@ from mhcflurry.data_helpers import load_data, indices_to_hotshot_encoding
 from mhcflurry.paths import (
     CLASS1_DATA_DIRECTORY
 )
+
+from model_configs import generate_all_model_configs
 
 PETERS2009_CSV_FILENAME = "bdata.2009.mhci.public.1.txt"
 PETERS2009_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS2009_CSV_FILENAME)
@@ -86,68 +88,6 @@ parser.add_argument(
     type=float,
     help="Degree of dropout regularization to try in hyperparameter search")
 
-ModelConfig = namedtuple(
-    "ModelConfig",
-    [
-        "embedding_size",
-        "hidden_layer_size",
-        "activation",
-        "loss",
-        "init",
-        "n_pretrain_epochs",
-        "n_epochs",
-        "dropout_probability",
-        "max_ic50",
-    ])
-
-HIDDEN1_LAYER_SIZES = [
-    64,
-    512,
-]
-
-INITILIZATION_METHODS = [
-    "glorot_uniform",
-    "glorot_normal",
-]
-
-ACTIVATIONS = [
-    "relu",
-    "tanh",
-]
-
-MAX_IC50_VALUES = [
-    5000,
-    20000,
-]
-
-
-def generate_all_model_configs(
-        embedding_sizes=[0, 64],
-        n_training_epochs=125,
-        max_dropout=0.25):
-    configurations = []
-    for activation in ACTIVATIONS:
-        for loss in ["mse"]:
-            for init in INITILIZATION_METHODS:
-                for n_pretrain_epochs in [0, 10]:
-                    for hidden_layer_size in HIDDEN1_LAYER_SIZES:
-                        for embedding_size in embedding_sizes:
-                            for dropout in [0, max_dropout]:
-                                for max_ic50 in MAX_IC50_VALUES:
-                                    config = ModelConfig(
-                                        embedding_size=embedding_size,
-                                        hidden_layer_size=hidden_layer_size,
-                                        activation=activation,
-                                        init=init,
-                                        loss=loss,
-                                        dropout_probability=dropout,
-                                        n_pretrain_epochs=n_pretrain_epochs,
-                                        n_epochs=n_training_epochs,
-                                        max_ic50=max_ic50)
-                                    print(config)
-                                    configurations.append(config)
-    return configurations
-
 
 def kfold_cross_validation_for_single_allele(
         allele_name,
@@ -166,6 +106,7 @@ def kfold_cross_validation_for_single_allele(
     initial_weights = [w.copy() for w in model.get_weights()]
     fold_aucs = []
     fold_accuracies = []
+    fold_f1_scores = []
 
     if not n_training_epochs:
         target_number_updates = 0.25 * 10 ** 6
@@ -200,16 +141,41 @@ def kfold_cross_validation_for_single_allele(
         pred = model.predict(X_test)
         auc = sklearn.metrics.roc_auc_score(label_test, pred)
         ic50_pred = max_ic50 ** (1.0 - pred)
-        accuracy = np.mean(label_test == (ic50_pred <= 500))
+        label_pred = (ic50_pred <= 500)
+        accuracy = np.mean(label_test == label_pred)
+        tp = ((label_test == 1) & (label_pred == 1)).sum()
+        fp = ((label_test == 0) & (label_pred == 1)).sum()
+        tn = ((label_test == 1) & (label_pred == 0)).sum()
+        fn = ((label_test == 0) & (label_pred == 1)).sum()
+        sensitivity = tp / float(tp + fn)
+        precision = tp / float(tp + fp)
+        f1_score = precision * sensitivity
+        # sanity check that we're computing accuracy correctly
+        accuracy_estimate2 = (tp + tn) / float(tp + fp + tn + fp)
+        assert abs(accuracy - accuracy_estimate2) < 0.00001, \
+            "Conflicting accuracy estimates! (%0.5f vs. %0.5f)" % (
+                accuracy, accuracy_estimate2)
         print(
-            "-- AUC for fold #%d of %s: %0.5f, Accuracy: %0.5f" % (
+            "-- AUC for fold #%d of %s: %0.5f" % (
                 cv_iter + 1,
                 allele_name,
-                auc,
-                accuracy))
+                auc))
+        print(
+            "-- Accuracy for fold #%d of %s: %0.5f (baseline %0.5f)" % (
+                cv_iter + 1,
+                allele_name,
+                accuracy,
+                max(label_test.mean(), 1.0 - label_test.mean())))
+        print(
+            "-- F1-score for fold #%d of %s: %0.5f" % (
+                cv_iter + 1,
+                allele_name,
+                f1_score))
+
         fold_aucs.append(auc)
         fold_accuracies.append(accuracy)
-    return fold_aucs, fold_accuracies
+        fold_f1_scores.append(f1_score)
+    return fold_aucs, fold_accuracies, fold_f1_scores
 
 
 def leave_out_allele_cross_validation(
@@ -234,21 +200,20 @@ def leave_out_allele_cross_validation(
             accuracy_std
             accuracy_min
             accuracy_max
+            f1_mean
+            f1_median
+            f1_std
+            f1_min
+            f1_max
     """
     result_dict = OrderedDict([
         ("allele_name", []),
         ("dataset_size", []),
-        ("auc_mean", []),
-        ("auc_median", []),
-        ("auc_std", []),
-        ("auc_min", []),
-        ("auc_max", []),
-        ("accuracy_mean", []),
-        ("accuracy_median", []),
-        ("accuracy_std", []),
-        ("accuracy_min", []),
-        ("accuracy_max", [])
     ])
+    for score_name in ["auc", "accuracy", "f1"]:
+        for statistic in ["mean", "median", "std", "min", "max"]:
+            result_dict["%s_%s" % (score_name, statistic)] = []
+
     initial_weights = [w.copy() for w in model.get_weights()]
     for allele_name, dataset in sorted(
             allele_datasets.items(), key=lambda pair: pair[0]):
@@ -292,7 +257,7 @@ def leave_out_allele_cross_validation(
                 Y_other_alleles,
                 nb_epoch=n_pretrain_epochs)
         print("Cross-validation for %s (%d):" % (allele_name, len(Y_allele)))
-        aucs, accuracies = kfold_cross_validation_for_single_allele(
+        aucs, accuracies, f1_scores = kfold_cross_validation_for_single_allele(
             allele_name=allele_name,
             model=model,
             X=X_allele,
@@ -306,7 +271,10 @@ def leave_out_allele_cross_validation(
             continue
         result_dict["allele_name"].append(allele_name)
         result_dict["dataset_size"].append(len(ic50_allele))
-        for (name, values) in [("auc", aucs), ("accuracy", accuracies)]:
+        for (name, values) in [
+                ("auc", aucs),
+                ("accuracy", accuracies),
+                ("f1", f1_scores)]:
             result_dict["%s_mean" % name].append(np.mean(values))
             result_dict["%s_median" % name].append(np.median(values))
             result_dict["%s_std" % name].append(np.std(values))
