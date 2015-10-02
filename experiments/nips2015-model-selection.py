@@ -293,7 +293,10 @@ def leave_out_allele_cross_validation(
             result_dict["%s_std" % name].append(np.std(values))
             result_dict["%s_min" % name].append(np.min(values))
             result_dict["%s_max" % name].append(np.max(values))
-    return pd.DataFrame(result_dict)
+    print(result_dict)
+    df = pd.DataFrame(result_dict)
+    print(df)
+    return df
 
 
 def evaluate_model_config(
@@ -386,15 +389,15 @@ if __name__ == "__main__":
         groups = combined_df.groupby(hyperparameter_name)
         for hyperparameter_value, group in groups:
             aucs = group["auc_mean"]
-            accuracies = group["accuracy_mean"]
+            f1_scores = group["f1_mean"]
             unique_configs = group["config_idx"].unique()
             print(
-                "-- %s (%d): AUC=%0.4f/%0.4f/%0.4f, Acc=%0.4f/%0.4f/%0.4f" % (
+                "-- %s (%d): AUC=%0.4f/%0.4f/%0.4f, F1=%0.4f/%0.4f/%0.4f" % (
                     hyperparameter_value,
                     len(unique_configs),
                     np.percentile(aucs, 25.0),
                     np.percentile(aucs, 50.0),
                     np.percentile(aucs, 75.0),
-                    np.percentile(accuracies, 25.0),
-                    np.percentile(accuracies, 50.0),
-                    np.percentile(accuracies, 75.0)))
+                    np.percentile(f1_scores, 25.0),
+                    np.percentile(f1_scores, 50.0),
+                    np.percentile(f1_scores, 75.0)))
