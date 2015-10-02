@@ -89,6 +89,12 @@ parser.add_argument(
     type=float,
     help="Degree of dropout regularization to try in hyperparameter search")
 
+parser.add_argument(
+    "--minibatch-size",
+    default=512,
+    type=int,
+    help="How many samples to use in stochastic gradient estimation")
+
 
 def kfold_cross_validation_for_single_allele(
         allele_name,
@@ -183,11 +189,12 @@ def kfold_cross_validation_for_single_allele(
 
 def leave_out_allele_cross_validation(
         model,
+        max_ic50,
         binary_encoding=False,
         n_pretrain_epochs=0,
         min_samples_per_allele=5,
         cv_folds=5,
-        max_ic50=5000):
+        minibatch_size=128):
     """
     Fit the model for every allele in the dataset and return a DataFrame
     with the following columns:
@@ -254,11 +261,11 @@ def leave_out_allele_cross_validation(
                 np.log(ic50_other_alleles) / np.log(max_ic50))
             print("Pre-training X shape: %s" % (X_other_alleles.shape,))
             print("Pre-training Y shape: %s" % (Y_other_alleles.shape,))
-
             model.fit(
                 X_other_alleles,
                 Y_other_alleles,
-                nb_epoch=n_pretrain_epochs)
+                nb_epoch=n_pretrain_epochs,
+                batch_size=minibatch_size)
         print("Cross-validation for %s (%d):" % (allele_name, len(Y_allele)))
         aucs, accuracies, f1_scores = kfold_cross_validation_for_single_allele(
             allele_name=allele_name,
@@ -289,9 +296,10 @@ def leave_out_allele_cross_validation(
 def evaluate_model_config(
         config,
         allele_datasets,
+        max_ic50,
         min_samples_per_allele=5,
         cv_folds=5,
-        max_ic50=5000):
+        minibatch_size=128):
     print("===")
     print(config)
     if config.embedding_size:
@@ -318,7 +326,8 @@ def evaluate_model_config(
         n_pretrain_epochs=config.n_pretrain_epochs,
         min_samples_per_allele=min_samples_per_allele,
         cv_folds=cv_folds,
-        max_ic50=max_ic50)
+        max_ic50=max_ic50,
+        minibatch_size=minibatch_size)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -343,7 +352,8 @@ if __name__ == "__main__":
             allele_datasets,
             min_samples_per_allele=args.min_samples_per_allele,
             cv_folds=args.cv_folds,
-            max_ic50=config.max_ic50)
+            max_ic50=config.max_ic50,
+            minibatch_size=config.minibatch_size)
         n_rows = len(result_df)
         result_df["config_idx"] = [i] * n_rows
         for hyperparameter_name in config._fields:
