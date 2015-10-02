@@ -23,6 +23,7 @@ from __future__ import (
 from collections import namedtuple, OrderedDict
 from os.path import join
 import argparse
+from time import time
 
 import numpy as np
 import pandas as pd
@@ -333,7 +334,9 @@ if __name__ == "__main__":
     datasets_by_max_ic50 = {}
 
     all_dataframes = []
+    all_elapsed_times = []
     for i, config in enumerate(configs):
+        t_start = time()
         print("\n\n=== Config %d/%d: %s" % (i + 1, len(configs), config))
         if config.max_ic50 not in datasets_by_max_ic50:
             allele_datasets, _ = load_data(
@@ -360,6 +363,16 @@ if __name__ == "__main__":
         with open(args.results_filename, file_mode) as f:
             result_df.to_csv(f, index=False)
         all_dataframes.append(result_df)
+        t_end = time()
+        t_elapsed = t_end - t_start
+        all_elapsed_times.append(t_elapsed)
+        mean_elapsed = sum(all_elapsed_times) / len(all_elapsed_times)
+        estimate_remaining = (len(configs) - i - 1) * mean_elapsed
+        print(
+            "-- Time for config = %0.2fs, estimated remaining: %0.2f" % (
+                t_elapsed,
+                estimate_remaining))
+
     combined_df = pd.concat(all_dataframes)
 
     print("\n=== Hyperparameters ===")
