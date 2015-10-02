@@ -385,9 +385,9 @@ if __name__ == "__main__":
         mean_elapsed = sum(all_elapsed_times) / len(all_elapsed_times)
         estimate_remaining = (len(configs) - i - 1) * mean_elapsed
         print(
-            "-- Time for config = %0.2fs, estimated remaining: %0.2f" % (
+            "-- Time for config = %0.2fs, estimated remaining: %0.2f hours" % (
                 t_elapsed,
-                estimate_remaining))
+                estimate_remaining / (60 * 60)))
 
     combined_df = pd.concat(all_dataframes)
 
