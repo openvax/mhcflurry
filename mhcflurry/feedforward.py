@@ -61,13 +61,17 @@ def make_network(
         dropout_probability=0.0,
         model=None,
         optimizer=None,
+        learning_rate=0.001,
         compile_for_training=True):
 
     if model is None:
         model = Sequential()
 
     if optimizer is None:
-        optimizer = keras.optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=1e-6)
+        optimizer = keras.optimizers.RMSprop(
+            lr=learning_rate,
+            rho=0.9,
+            epsilon=1e-6)
 
     if embedding_input_dim:
         if not embedding_output_dim:
@@ -121,7 +125,8 @@ def make_hotshot_network(
         loss="mse",
         output_activation="sigmoid",
         dropout_probability=0.0,
-        optimizer=None):
+        optimizer=None,
+        learning_rate=0.001):
     return make_network(
         input_size=peptide_length * 20,
         layer_sizes=layer_sizes,
@@ -130,7 +135,8 @@ def make_hotshot_network(
         loss=loss,
         output_activation=output_activation,
         dropout_probability=dropout_probability,
-        optimizer=optimizer)
+        optimizer=optimizer,
+        learning_rate=learning_rate)
 
 
 def make_embedding_network(
@@ -143,7 +149,8 @@ def make_embedding_network(
         loss="mse",
         output_activation="sigmoid",
         dropout_probability=0.0,
-        optimizer=None):
+        optimizer=None,
+        learning_rate=0.001):
     return make_network(
         input_size=peptide_length,
         embedding_input_dim=embedding_input_dim,
@@ -154,4 +161,5 @@ def make_embedding_network(
         loss=loss,
         output_activation=output_activation,
         dropout_probability=dropout_probability,
-        optimizer=optimizer)
+        optimizer=optimizer,
+        learning_rate=learning_rate)

@@ -41,6 +41,7 @@ from mhcflurry.paths import (
 )
 
 from model_configs import generate_all_model_configs
+from summarize_model_results import hyperparameter_performance
 
 PETERS2009_CSV_FILENAME = "bdata.2009.mhci.public.1.txt"
 PETERS2009_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS2009_CSV_FILENAME)
@@ -93,6 +94,11 @@ parser.add_argument(
     default=256,
     type=int,
     help="How many samples to use in stochastic gradient estimation")
+
+parser.add_argument(
+    "--learning-rate",
+    default=0.001,
+    help="Learning rate for RMSprop")
 
 
 def score_predictions(predicted_log_ic50, true_label, max_ic50):
@@ -301,7 +307,8 @@ def evaluate_model_config(
         max_ic50,
         min_samples_per_allele=5,
         cv_folds=5,
-        minibatch_size=128):
+        minibatch_size=128,
+        learning_rate=0.001):
     print("===")
     print(config)
     if config.embedding_size:
@@ -313,7 +320,8 @@ def evaluate_model_config(
             activation=config.activation,
             init=config.init,
             loss=config.loss,
-            dropout_probability=config.dropout_probability)
+            dropout_probability=config.dropout_probability,
+            learning_rate=learning_rate)
     else:
         model = make_hotshot_network(
             peptide_length=9,
@@ -321,7 +329,8 @@ def evaluate_model_config(
             activation=config.activation,
             init=config.init,
             loss=config.loss,
-            dropout_probability=config.dropout_probability)
+            dropout_probability=config.dropout_probability,
+            learning_rate=learning_rate)
     return leave_out_allele_cross_validation(
         model,
         binary_encoding=config.embedding_size == 0,
@@ -355,7 +364,8 @@ if __name__ == "__main__":
             min_samples_per_allele=args.min_samples_per_allele,
             cv_folds=args.cv_folds,
             max_ic50=config.max_ic50,
-            minibatch_size=args.minibatch_size)
+            minibatch_size=args.minibatch_size,
+            learning_rate=args.learning_rate)
         n_rows = len(result_df)
         result_df["config_idx"] = [i] * n_rows
         for hyperparameter_name in config._fields:
@@ -363,9 +373,11 @@ if __name__ == "__main__":
             result_df[hyperparameter_name] = [value] * n_rows
         # overwrite existing files for first config
         file_mode = "a" if i > 0 else "w"
+        # only write column names for first batch of data
+        header = (i == 0)
         # append results to CSV
         with open(args.results_filename, file_mode) as f:
-            result_df.to_csv(f, index=False)
+            result_df.to_csv(f, index=False, header=header)
         all_dataframes.append(result_df)
         t_end = time()
         t_elapsed = t_end - t_start
@@ -376,24 +388,5 @@ if __name__ == "__main__":
             "-- Time for config = %0.2fs, estimated remaining: %0.2f hours" % (
                 t_elapsed,
                 estimate_remaining / (60 * 60)))
-
     combined_df = pd.concat(all_dataframes)
-
-    print("\n=== Hyperparameters ===")
-    for hyperparameter_name in config._fields:
-        print("\n%s" % hyperparameter_name)
-        groups = combined_df.groupby(hyperparameter_name)
-        for hyperparameter_value, group in groups:
-            aucs = group["auc_mean"]
-            f1_scores = group["f1_mean"]
-            unique_configs = group["config_idx"].unique()
-            print(
-                "-- %s (%d): AUC=%0.4f/%0.4f/%0.4f, F1=%0.4f/%0.4f/%0.4f" % (
-                    hyperparameter_value,
-                    len(unique_configs),
-                    np.percentile(aucs, 25.0),
-                    np.percentile(aucs, 50.0),
-                    np.percentile(aucs, 75.0),
-                    np.percentile(f1_scores, 25.0),
-                    np.percentile(f1_scores, 50.0),
-                    np.percentile(f1_scores, 75.0)))
+    hyperparameter_performance(combined_df)
