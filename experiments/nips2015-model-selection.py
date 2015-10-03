@@ -260,7 +260,7 @@ def leave_out_allele_cross_validation(
                 X_other_alleles = indices_to_hotshot_encoding(
                     X_other_alleles, n_indices=20)
             ic50_other_alleles = np.concatenate([
-                other_allele.ic50 for (other_allele, other_dataset)
+                other_dataset.ic50 for (other_allele, other_dataset)
                 in allele_datasets.items()
                 if normalize_allele_name(other_allele) != allele_name])
             Y_other_alleles = 1.0 - np.minimum(
@@ -372,18 +372,16 @@ if __name__ == "__main__":
             value = getattr(config, hyperparameter_name)
             result_df[hyperparameter_name] = [value] * n_rows
         # overwrite existing files for first config
-        file_mode = "a" if i > 0 else "w"
         # only write column names for first batch of data
-        header = (i == 0)
         # append results to CSV
-        with open(args.results_filename, file_mode) as f:
-            result_df.to_csv(f, index=False, header=header)
+        with open(args.results_filename, mode=("a" if i > 0 else "w")) as f:
+            result_df.to_csv(f, index=False, header=(i == 0))
         all_dataframes.append(result_df)
         t_end = time()
         t_elapsed = t_end - t_start
         all_elapsed_times.append(t_elapsed)
-        mean_elapsed = sum(all_elapsed_times) / len(all_elapsed_times)
-        estimate_remaining = (len(configs) - i - 1) * mean_elapsed
+        median_elapsed_time = np.median(all_elapsed_times)
+        estimate_remaining = (len(configs) - i - 1) * median_elapsed_time
         print(
             "-- Time for config = %0.2fs, estimated remaining: %0.2f hours" % (
                 t_elapsed,
