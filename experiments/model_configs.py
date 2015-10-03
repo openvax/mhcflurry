@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # Copyright (c) 2015. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,8 +29,8 @@ ModelConfig = namedtuple(
     ])
 
 HIDDEN1_LAYER_SIZES = [
-    64,
-    256,
+    50,
+    400,
 ]
 
 INITILIZATION_METHODS = [
@@ -52,7 +50,7 @@ MAX_IC50_VALUES = [
 
 
 def generate_all_model_configs(
-        embedding_sizes=[0, 32],
+        embedding_sizes=[0, 64],
         n_training_epochs=100,
         max_dropout=0.25):
     configurations = []
