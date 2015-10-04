@@ -24,6 +24,9 @@ def hyperparameter_performance(df):
     print("\n=== Hyperparameter Score 25th/50th/75th Percentiles ===")
     for hyperparameter_name in ModelConfig._fields:
         print("\n%s" % hyperparameter_name)
+        if hyperparameter_name not in df.keys():
+            print("-- not found in results file!")
+            continue
         groups = df.groupby(hyperparameter_name)
         for hyperparameter_value, group in groups:
             aucs = list(group.groupby("config_idx")["auc_mean"].mean())
@@ -46,6 +49,9 @@ def hyperparameter_performance(df):
 def hyperparameter_score_difference_hypothesis_tests(df):
     for hyperparameter_name in ModelConfig._fields:
         print("\n%s" % hyperparameter_name)
+        if hyperparameter_name not in df.keys():
+            print("-- not found in results file!")
+            continue
         combined_scores_by_param = OrderedDict()
         groups = df.groupby(hyperparameter_name)
         for hyperparameter_value, group in groups:
