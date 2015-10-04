@@ -105,6 +105,12 @@ parser.add_argument(
     help="How many samples to use in stochastic gradient estimation")
 
 parser.add_argument(
+    "--embedding-size",
+    default=[0, 64],
+    type=parse_int_list,
+    help="Size of vector embedding dimension")
+
+parser.add_argument(
     "--learning-rate",
     default=0.001,
     type=float,
@@ -121,6 +127,7 @@ if __name__ == "__main__":
     configs = generate_all_model_configs(
         dropout_values=args.dropout,
         minibatch_sizes=args.minibatch_size,
+        embedding_sizes=args.embedding_size,
         n_pretrain_epochs_values=args.pretrain_epochs,
         n_training_epochs_values=args.training_epochs,
         hidden_layer_sizes=args.hidden_layer_size)
