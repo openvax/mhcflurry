@@ -58,6 +58,10 @@ def parse_float_list(string):
     substrings = [substring.strip() for substring in string.split(",")]
     return [float(substring) for substring in substrings if substring]
 
+
+def parse_string_list(string):
+    return [substring.strip() for substring in string.split(",")]
+
 parser.add_argument(
     "--binding-data-csv-path",
     default=PETERS2009_CSV_PATH,
@@ -100,7 +104,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--minibatch-size",
-    default=256,
+    default=[256],
     type=parse_int_list,
     help="How many samples to use in stochastic gradient estimation")
 
@@ -122,9 +126,24 @@ parser.add_argument(
     type=parse_int_list,
     help="Comma separated list of hidden layer sizes")
 
+parser.add_argument(
+    "--init",
+    default=["uniform", "glorot_uniform"],
+    type=parse_string_list,
+    help="Comma separated list of initialization methods")
+
+parser.add_argument(
+    "--activation",
+    default=["tanh", "relu", "prelu"],
+    type=parse_string_list,
+    help="Comma separated list of activation functions")
+
+
 if __name__ == "__main__":
     args = parser.parse_args()
     configs = generate_all_model_configs(
+        activations=args.activation,
+        init_methods=args.init,
         dropout_values=args.dropout,
         minibatch_sizes=args.minibatch_size,
         embedding_sizes=args.embedding_size,
