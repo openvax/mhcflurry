@@ -17,7 +17,10 @@ from argparse import ArgumentParser
 import pandas as pd
 import numpy as np
 
-from summarize_model_results import hyperparameter_performance
+from summarize_model_results import (
+    hyperparameter_performance,
+    hyperparameter_score_difference_hypothesis_tests
+)
 
 parser = ArgumentParser()
 
@@ -33,8 +36,10 @@ def infer_dtypes(df):
         column_values = np.array(df[column_name])
         if "object" in str(column_values.dtype):
             if any("." in value for value in column_values):
+                print("Converting %s to float" % column_name)
                 df[column_name] = column_values.astype(float)
             elif all(value.isdigit() for value in column_values):
+                print("Converting %s to int" % column_name)
                 df[column_name] = column_values.astype(int)
     return df
 
@@ -43,3 +48,4 @@ if __name__ == "__main__":
     results = pd.read_csv(args.results_filename, sep=",", header=0)
     results = infer_dtypes(results)
     hyperparameter_performance(results)
+    hyperparameter_score_difference_hypothesis_tests(results)
