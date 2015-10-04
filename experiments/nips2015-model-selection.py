@@ -126,6 +126,14 @@ parser.add_argument(
     type=parse_int_list,
     help="Comma separated list of hidden layer sizes")
 
+
+parser.add_argument(
+    "--max-ic50",
+    default=[5000, 20000],
+    type=parse_float_list,
+    help="Comma separated list of maximum predicted IC50 values")
+
+
 parser.add_argument(
     "--init",
     default=["uniform", "glorot_uniform"],
@@ -144,6 +152,7 @@ if __name__ == "__main__":
     configs = generate_all_model_configs(
         activations=args.activation,
         init_methods=args.init,
+        max_ic50_values=args.max_ic50,
         dropout_values=args.dropout,
         minibatch_sizes=args.minibatch_size,
         embedding_sizes=args.embedding_size,
