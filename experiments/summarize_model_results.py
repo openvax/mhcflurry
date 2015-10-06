@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 
 import numpy as np
 from scipy.stats import mannwhitneyu
@@ -45,15 +45,30 @@ def hyperparameter_performance(df):
                     auc_25th, auc_50th, auc_75th,
                     f1_25th, f1_50th, f1_75th))
 
+HyperparameterComparison = namedtuple(
+    "HyperparameterComparison",
+    [
+        "hyperparameter_name",
+        "better_value",
+        "worse_value",
+        "AUC",
+        "p"
+    ])
+
 
 def hyperparameter_score_difference_hypothesis_tests(df):
+    results = {}
     for hyperparameter_name in ModelConfig._fields:
-        print("\n%s" % hyperparameter_name)
         if hyperparameter_name not in df.keys():
-            print("-- not found in results file!")
+            print("\n%s not found in results file!" % hyperparameter_name)
             continue
         combined_scores_by_param = OrderedDict()
         groups = df.groupby(hyperparameter_name)
+        if groups.ngroups < 2:
+            print("Skipping %s" % hyperparameter_name)
+            # skip if there aren't multiple groups to compare
+            continue
+        print("\n%s" % hyperparameter_name)
         for hyperparameter_value, group in groups:
             raw_scores = group.groupby("config_idx")[["auc_mean", "f1_mean"]]
             combined_scores = []
@@ -83,18 +98,30 @@ def hyperparameter_score_difference_hypothesis_tests(df):
         done = set([])
         for (value1, scores1) in combined_scores_by_param.items():
             for (value2, scores2) in combined_scores_by_param.items():
-                if value1 == value2:
+                if value1 == value2 or frozenset({value1, value2}) in done:
                     continue
-                if frozenset({value1, value2}) in done:
-                    continue
+                done.add(frozenset({value1, value2}))
                 U, p = mannwhitneyu(scores1, scores2)
                 # AUC = Area under ROC curve
                 # probability of always first hyperparam
                 # causing us to correct rank a pair of classifiers
                 AUC = U / (len(scores1) * len(scores2))
+                left_is_better = AUC > 0.5
+                # want an AUC of using the *best* value, not just the
+                # left one
+                AUC = max(AUC, 1.0 - AUC)
                 print (">>> %s%s vs. %s%s, AUC=%0.4f, p=%0.20f" % (
-                    value1, "*" if AUC > 0.5 else "",
-                    value2, "*" if AUC < 0.5 else "",
+                    value1, "*" if left_is_better else "",
+                    value2, "*" if not left_is_better else "",
                     AUC,
                     p))
-                done.add(frozenset({value1, value2}))
+                if hyperparameter_name not in results:
+                    results[hyperparameter_name] = set([])
+                result = HyperparameterComparison(
+                    hyperparameter_name=hyperparameter_name,
+                    better_value=value1 if left_is_better else value2,
+                    worse_value=value2 if left_is_better else value1,
+                    AUC=AUC,
+                    p=p)
+                results[hyperparameter_name].add(result)
+    return results

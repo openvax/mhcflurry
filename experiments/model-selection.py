@@ -34,8 +34,12 @@ from mhcflurry.paths import (
 )
 
 from model_configs import generate_all_model_configs
-from model_selection import evaluate_model_config
+from model_selection import (
+    evaluate_model_config_by_cross_validation,
+    evaluate_model_config_train_vs_test
+)
 from summarize_model_results import hyperparameter_performance
+from arg_parsing import parse_int_list, parse_float_list, parse_string_list
 
 PETERS2009_CSV_FILENAME = "bdata.2009.mhci.public.1.txt"
 PETERS2009_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS2009_CSV_FILENAME)
@@ -43,24 +47,14 @@ PETERS2009_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS2009_CSV_FILENAME)
 PETERS2013_CSV_FILENAME = "bdata.20130222.mhci.public.1.txt"
 PETERS2013_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS2013_CSV_FILENAME)
 
+BLIND_2013_CSV_FILENAME = "bdata.2013.mhci.public.blind.1.txt"
+BLIND_2013_CSV_PATH = join(CLASS1_DATA_DIRECTORY, BLIND_2013_CSV_FILENAME)
+
 COMBINED_CSV_FILENAME = "combined_human_class1_dataset.csv"
 COMBINED_CSV_PATH = join(CLASS1_DATA_DIRECTORY, COMBINED_CSV_FILENAME)
 
 parser = argparse.ArgumentParser()
 
-
-def parse_int_list(string):
-    substrings = [substring.strip() for substring in string.split(",")]
-    return [int(substring) for substring in substrings if substring]
-
-
-def parse_float_list(string):
-    substrings = [substring.strip() for substring in string.split(",")]
-    return [float(substring) for substring in substrings if substring]
-
-
-def parse_string_list(string):
-    return [substring.strip() for substring in string.split(",")]
 
 parser.add_argument(
     "--binding-data-csv-path",
@@ -146,6 +140,37 @@ parser.add_argument(
     type=parse_string_list,
     help="Comma separated list of activation functions")
 
+parser.add_argument("--test-blind-data", default=False, action="store_true")
+
+
+def evaluate_model_configs(configs, results_filename, train_fn):
+    all_dataframes = []
+    all_elapsed_times = []
+    for i, config in enumerate(configs):
+        t_start = time()
+        print("\n\n=== Config %d/%d: %s" % (i + 1, len(configs), config))
+        result_df = train_fn(config)
+        n_rows = len(result_df)
+        result_df["config_idx"] = [i] * n_rows
+        for hyperparameter_name in config._fields:
+            value = getattr(config, hyperparameter_name)
+            result_df[hyperparameter_name] = [value] * n_rows
+        # overwrite existing files for first config
+        # only write column names for first batch of data
+        # append results to CSV
+        with open(results_filename, mode=("a" if i > 0 else "w")) as f:
+            result_df.to_csv(f, index=False, header=(i == 0))
+        all_dataframes.append(result_df)
+        t_end = time()
+        t_elapsed = t_end - t_start
+        all_elapsed_times.append(t_elapsed)
+        median_elapsed_time = np.median(all_elapsed_times)
+        estimate_remaining = (len(configs) - i - 1) * median_elapsed_time
+        print(
+            "-- Time for config = %0.2fs, estimated remaining: %0.2f hours" % (
+                t_elapsed,
+                estimate_remaining / (60 * 60)))
+    return pd.concat(all_dataframes)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -161,41 +186,25 @@ if __name__ == "__main__":
         hidden_layer_sizes=args.hidden_layer_size)
 
     print("Total # configurations = %d" % len(configs))
-
-    all_dataframes = []
-    all_elapsed_times = []
-    allele_datasets, _ = load_data(
+    training_datasets, _ = load_data(
         args.binding_data_csv_path,
         peptide_length=9,
         binary_encoding=False)
-    for i, config in enumerate(configs):
-        t_start = time()
-        print("\n\n=== Config %d/%d: %s" % (i + 1, len(configs), config))
-        result_df = evaluate_model_config(
-            config,
-            allele_datasets,
-            min_samples_per_allele=args.min_samples_per_allele,
-            cv_folds=args.cv_folds,
-            learning_rate=args.learning_rate)
-        n_rows = len(result_df)
-        result_df["config_idx"] = [i] * n_rows
-        for hyperparameter_name in config._fields:
-            value = getattr(config, hyperparameter_name)
-            result_df[hyperparameter_name] = [value] * n_rows
-        # overwrite existing files for first config
-        # only write column names for first batch of data
-        # append results to CSV
-        with open(args.results_filename, mode=("a" if i > 0 else "w")) as f:
-            result_df.to_csv(f, index=False, header=(i == 0))
-        all_dataframes.append(result_df)
-        t_end = time()
-        t_elapsed = t_end - t_start
-        all_elapsed_times.append(t_elapsed)
-        median_elapsed_time = np.median(all_elapsed_times)
-        estimate_remaining = (len(configs) - i - 1) * median_elapsed_time
-        print(
-            "-- Time for config = %0.2fs, estimated remaining: %0.2f hours" % (
-                t_elapsed,
-                estimate_remaining / (60 * 60)))
-    combined_df = pd.concat(all_dataframes)
+    if args.test_blind_data:
+        test_datasets, _ = load_data(
+            BLIND_2013_CSV_PATH,
+            peptide_length=9,
+            binary_encoding=False)
+
+    else:
+        combined_df = evaluate_model_configs(
+            configs=configs,
+            results_filename=args.results_filename,
+            train_fn=lambda config: evaluate_model_config_by_cross_validation(
+                config,
+                training_datasets,
+                min_samples_per_allele=args.min_samples_per_allele,
+                cv_folds=args.cv_folds,
+                learning_rate=args.learning_rate))
+
     hyperparameter_performance(combined_df)

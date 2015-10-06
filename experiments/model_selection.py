@@ -22,7 +22,6 @@ from collections import OrderedDict
 import logging
 
 import numpy as np
-import pandas as pd
 import sklearn
 import sklearn.metrics
 import sklearn.cross_validation
@@ -31,6 +30,8 @@ from sklearn.cross_validation import KFold
 from mhcflurry.common import normalize_allele_name
 from mhcflurry.feedforward import make_embedding_network, make_hotshot_network
 from mhcflurry.data_helpers import indices_to_hotshot_encoding
+
+from score_collection import ScoreCollection
 
 
 def score_predictions(predicted_log_ic50, true_label, max_ic50):
@@ -59,6 +60,29 @@ def score_predictions(predicted_log_ic50, true_label, max_ic50):
     return accuracy, auc, f1_score
 
 
+def train_model_and_return_scores(
+        model,
+        X_train,
+        log_ic50_train,
+        X_test,
+        binder_label_test,
+        n_training_epochs,
+        minibatch_size,
+        max_ic50):
+    model.fit(
+        X_train,
+        log_ic50_train,
+        nb_epoch=n_training_epochs,
+        verbose=0,
+        batch_size=minibatch_size)
+    pred = model.predict(X_test).flatten()
+    accuracy, auc, f1_score = score_predictions(
+        predicted_log_ic50=pred,
+        true_label=binder_label_test,
+        max_ic50=max_ic50)
+    return (accuracy, auc, f1_score)
+
+
 def kfold_cross_validation_for_single_allele(
         allele_name,
         model,
@@ -78,7 +102,6 @@ def kfold_cross_validation_for_single_allele(
     fold_aucs = []
     fold_accuracies = []
     fold_f1_scores = []
-
     for cv_iter, (train_idx, test_idx) in enumerate(KFold(
             n=n_samples,
             n_folds=cv_folds,
@@ -94,16 +117,15 @@ def kfold_cross_validation_for_single_allele(
                     cv_iter, allele_name))
             continue
         model.set_weights(initial_weights)
-
-        model.fit(
-            X_train,
-            Y_train,
-            nb_epoch=n_training_epochs,
-            verbose=0,
-            batch_size=minibatch_size)
-
-        pred = model.predict(X_test).flatten()
-        accuracy, auc, f1_score = score_predictions(pred, label_test, max_ic50)
+        (accuracy, auc, f1_score) = train_model_and_return_scores(
+            model,
+            X_train=X_train,
+            log_ic50_train=Y_train,
+            X_test=X_test,
+            binder_label_test=label_test,
+            n_training_epochs=n_training_epochs,
+            minibatch_size=minibatch_size,
+            max_ic50=max_ic50)
         print(
             "-- %d/%d: AUC: %0.5f" % (
                 cv_iter + 1,
@@ -124,6 +146,90 @@ def kfold_cross_validation_for_single_allele(
         fold_accuracies.append(accuracy)
         fold_f1_scores.append(f1_score)
     return fold_aucs, fold_accuracies, fold_f1_scores
+
+
+def filter_alleles(allele_datasets, min_samples_per_allele=5):
+    for (allele_name, dataset) in sorted(
+            allele_datasets.items(), key=lambda pair: pair[0]):
+        # Want alleles to be 4-digit + gene name e.g. C0401
+        if allele_name.isdigit() or len(allele_name) < 5:
+            print("Skipping allele %s" % (allele_name,))
+            continue
+        allele_name = normalize_allele_name(allele_name)
+        ic50_allele = dataset.ic50
+        n_samples_allele = len(ic50_allele)
+        if n_samples_allele < min_samples_per_allele:
+            print("Skipping allele %s due to too few samples: %d" % (
+                allele_name, n_samples_allele))
+            continue
+        binders = ic50_allele <= 500
+        if binders.all():
+            print("No negative examples for %s" % allele_name)
+            continue
+        if not binders.any():
+            print("No positive examples for %s" % allele_name)
+            continue
+        yield (allele_name, dataset)
+
+
+def encode_allele_dataset(
+        allele_dataset,
+        max_ic50,
+        binary_encoding=False):
+    """
+    Parameters
+    ----------
+    allele_dataset : AlleleDataset
+        Named tuple with fields "X" and "ic50"
+    max_ic50 : float
+        Largest IC50 value predictor should return
+    binary_encoding : bool (default = False)
+        If True, use a binary 1-of-k encoding of amino acids, otherwise
+        expect a vector embedding to use integer indices.
+
+    Returns (X, Y_log_ic50, binder_label)
+    """
+    X_allele = allele_dataset.X
+    ic50_allele = allele_dataset.ic50
+    if binary_encoding:
+        X_allele = indices_to_hotshot_encoding(X_allele, n_indices=20)
+    Y_allele = 1.0 - np.minimum(1.0, np.log(ic50_allele) / np.log(max_ic50))
+    return (X_allele, Y_allele, ic50_allele)
+
+
+def encode_allele_datasets(
+        allele_datasets,
+        max_ic50,
+        binary_encoding=False):
+    """
+    Parameters
+    ----------
+    allele_dataset : AlleleDataset
+        Named tuple with fields "X" and "ic50"
+    max_ic50 : float
+        Largest IC50 value predictor should return
+    binary_encoding : bool (default = False)
+        If True, use a binary 1-of-k encoding of amino acids, otherwise
+        expect a vector embedding to use integer indices.
+
+    Returns three dictionarys
+        - mapping from allele name to X (features)
+        - mapping from allele name to Y_log_ic50 (continuous outputs)
+        - mapping from allele name to binder_label (binary outputs)
+    """
+    X_dict = OrderedDict()
+    Y_log_ic50_dict = OrderedDict([])
+    ic50_dict = OrderedDict([])
+    for (allele_name, dataset) in allele_datasets.items():
+        allele_name = normalize_allele_name(allele_name)
+        (X, Y_log_ic50, Y_ic50) = encode_allele_dataset(
+            dataset,
+            max_ic50=max_ic50,
+            binary_encoding=binary_encoding)
+        X_dict[allele_name] = X
+        Y_log_ic50_dict[allele_name] = Y_log_ic50
+        ic50_dict[allele_name] = Y_ic50
+    return (X_dict, Y_log_ic50_dict, ic50_dict)
 
 
 def leave_out_allele_cross_validation(
@@ -157,49 +263,28 @@ def leave_out_allele_cross_validation(
             f1_min
             f1_max
     """
-    result_dict = OrderedDict([
-        ("allele_name", []),
-        ("dataset_size", []),
-    ])
-    for score_name in ["auc", "accuracy", "f1"]:
-        for statistic in ["mean", "median", "std", "min", "max"]:
-            result_dict["%s_%s" % (score_name, statistic)] = []
-
+    scores = ScoreCollection()
+    X_dict, Y_log_ic50_dict, ic50_dict = encode_allele_datasets(
+        allele_datasets=allele_datasets,
+        max_ic50=max_ic50,
+        binary_encoding=binary_encoding)
     initial_weights = [w.copy() for w in model.get_weights()]
-    for allele_name, dataset in sorted(
-            allele_datasets.items(), key=lambda pair: pair[0]):
-        # Want alleles to be 4-digit + gene name e.g. C0401
-        if allele_name.isdigit() or len(allele_name) < 5:
-            print("Skipping allele %s" % (allele_name,))
-            continue
-        allele_name = normalize_allele_name(allele_name)
-        X_allele = dataset.X
-        n_samples_allele = X_allele.shape[0]
-        if n_samples_allele < min_samples_per_allele:
-            print("Skipping allele %s due to too few samples: %d" % (
-                allele_name, n_samples_allele))
-            continue
-        if binary_encoding:
-            X_allele = indices_to_hotshot_encoding(X_allele, n_indices=20)
-
-        ic50_allele = dataset.ic50
-        Y_allele = 1.0 - np.minimum(1.0, np.log(ic50_allele) / np.log(max_ic50))
+    for allele_name, dataset in filter_alleles(
+            allele_datasets, min_samples_per_allele=min_samples_per_allele):
         model.set_weights(initial_weights)
+        X_allele = X_dict[allele_name]
+        Y_allele = Y_log_ic50_dict[allele_name]
+        ic50_allele = ic50_dict[allele_name]
         if n_pretrain_epochs > 0:
             X_other_alleles = np.vstack([
-                other_dataset.X
-                for (other_allele, other_dataset) in allele_datasets.items()
+                X
+                for (other_allele, X) in X_dict.items()
                 if normalize_allele_name(other_allele) != allele_name])
-            if binary_encoding:
-                X_other_alleles = indices_to_hotshot_encoding(
-                    X_other_alleles, n_indices=20)
-            ic50_other_alleles = np.concatenate([
-                other_dataset.ic50 for (other_allele, other_dataset)
-                in allele_datasets.items()
+            Y_other_alleles = np.concatenate([
+                y
+                for (other_allele, y)
+                in Y_log_ic50_dict.items()
                 if normalize_allele_name(other_allele) != allele_name])
-            Y_other_alleles = 1.0 - np.minimum(
-                1.0,
-                np.log(ic50_other_alleles) / np.log(max_ic50))
             print("Pre-training X shape: %s" % (X_other_alleles.shape,))
             print("Pre-training Y shape: %s" % (Y_other_alleles.shape,))
             model.fit(
@@ -222,32 +307,23 @@ def leave_out_allele_cross_validation(
         if len(aucs) == 0:
             print("Skipping allele %s" % allele_name)
             continue
-        result_dict["allele_name"].append(allele_name)
-        result_dict["dataset_size"].append(len(ic50_allele))
-        for (name, values) in [
-                ("auc", aucs),
-                ("accuracy", accuracies),
-                ("f1", f1_scores)]:
-            result_dict["%s_mean" % name].append(np.mean(values))
-            result_dict["%s_median" % name].append(np.median(values))
-            result_dict["%s_std" % name].append(np.std(values))
-            result_dict["%s_min" % name].append(np.min(values))
-            result_dict["%s_max" % name].append(np.max(values))
-    return pd.DataFrame(result_dict)
+        scores.add(allele_name, auc=aucs, accuracy=accuracies, f1=f1_scores)
+    return scores.dataframe()
 
 
-def evaluate_model_config(
+def make_model(
         config,
-        allele_datasets,
-
-        min_samples_per_allele=5,
-        cv_folds=5,
-        learning_rate=0.001):
+        peptide_length=9):
+    """
+    If we're using a learned vector embedding for amino acids
+    then generate a network that expects index inputs,
+    otherwise assume a 1-of-k binary encoding.
+    """
     print("===")
     print(config)
     if config.embedding_size:
-        model = make_embedding_network(
-            peptide_length=9,
+        return make_embedding_network(
+            peptide_length=peptide_length,
             embedding_input_dim=20,
             embedding_output_dim=config.embedding_size,
             layer_sizes=[config.hidden_layer_size],
@@ -255,16 +331,27 @@ def evaluate_model_config(
             init=config.init,
             loss=config.loss,
             dropout_probability=config.dropout_probability,
-            learning_rate=learning_rate)
+            learning_rate=config.learning_rate,
+            optimizer=config.optimizer)
     else:
-        model = make_hotshot_network(
-            peptide_length=9,
+        return make_hotshot_network(
+            peptide_length=peptide_length,
             layer_sizes=[config.hidden_layer_size],
             activation=config.activation,
             init=config.init,
             loss=config.loss,
             dropout_probability=config.dropout_probability,
-            learning_rate=learning_rate)
+            learning_rate=config.learning_rate,
+            optimizer=config.optimizer)
+
+
+def evaluate_model_config_by_cross_validation(
+        config,
+        allele_datasets,
+        min_samples_per_allele=5,
+        cv_folds=5,
+        learning_rate=0.001):
+    model = make_model(config, learning_rate=learning_rate)
     return leave_out_allele_cross_validation(
         model,
         allele_datasets=allele_datasets,
@@ -275,3 +362,82 @@ def evaluate_model_config(
         min_samples_per_allele=min_samples_per_allele,
         cv_folds=cv_folds,
         minibatch_size=config.minibatch_size)
+
+"""
+def evaluate_model_config_train_vs_test(
+        config,
+        training_allele_datasets,
+        test_allele_datasets,
+        min_samples_per_allele=5,
+        learning_rate=0.001):
+    model = make_model(config, learning_rate=learning_rate)
+    initial_weights = [w.copy() for w in model.get_weights()]
+
+    X_train_dict, Y_train_dict, ic50_train_dict = encode_allele_datasets(
+        allele_datasets=training_allele_datasets,
+        max_ic50=max_ic50,
+        binary_encoding=binary_encoding)
+    X_test_dict, Y_test_dict, ic50_test_dict = encode_allele_datasets(
+        allele_datasets=test_allele_datasets,
+        max_ic50=max_ic50,
+        binary_encoding=binary_encoding)
+    X_train_all = np.vstack(X_train_dict.values())
+    Y_train_all = np.concatenate(Y_train_dict.values())
+    ic50_train_all = np.concatenate(ic50_train_dict.values())
+
+    scores = ScoreCollection()
+    for allele_name, dataset in filter_alleles(
+            training_allele_datasets,
+            min_samples_per_allele=min_samples_per_allele):
+        if allele_name not in test_allele_datasets:
+            print("Skipping %s, missing from test datasets")
+            continue
+        model.set_weights(initial_weights)
+        X_allele = X_dict[allele_name]
+        Y_allele = Y_log_ic50_dict[allele_name]
+        ic50_allele = ic50_dict[allele_name]
+        if n_pretrain_epochs > 0:
+            X_other_alleles = np.vstack([
+                X
+                for (other_allele, X) in X_dict.items()
+                if normalize_allele_name(other_allele) != allele_name])
+            Y_other_alleles = np.concatenate([
+                y
+                for (other_allele, y)
+                in Y_log_ic50_dict.items()
+                if normalize_allele_name(other_allele) != allele_name])
+            print("Pre-training X shape: %s" % (X_other_alleles.shape,))
+            print("Pre-training Y shape: %s" % (Y_other_alleles.shape,))
+            model.fit(
+                X_other_alleles,
+                Y_other_alleles,
+                nb_epoch=n_pretrain_epochs,
+                batch_size=minibatch_size,
+                verbose=0)
+        print("Cross-validation for %s (%d):" % (allele_name, len(Y_allele)))
+        aucs, accuracies, f1_scores = kfold_cross_validation_for_single_allele(
+            allele_name=allele_name,
+            model=model,
+            X=X_allele,
+            Y=Y_allele,
+            ic50=ic50_allele,
+            n_training_epochs=n_training_epochs,
+            cv_folds=cv_folds,
+            max_ic50=max_ic50,
+            minibatch_size=minibatch_size)
+        if len(aucs) == 0:
+            print("Skipping allele %s" % allele_name)
+            continue
+        scores.add(allele_name, auc=aucs, accuracy=accuracies, f1=f1_scores)
+    return scores.dataframe()
+    return leave_out_allele_cross_validation(
+        model,
+        allele_datasets=allele_datasets,
+        max_ic50=config.max_ic50,
+        binary_encoding=config.embedding_size == 0,
+        n_pretrain_epochs=config.n_pretrain_epochs,
+        n_training_epochs=config.n_epochs,
+        min_samples_per_allele=min_samples_per_allele,
+        cv_folds=cv_folds,
+        minibatch_size=config.minibatch_size)
+"""

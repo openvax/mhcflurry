@@ -27,6 +27,8 @@ ModelConfig = namedtuple(
         "dropout_probability",
         "max_ic50",
         "minibatch_size",
+        "learning_rate",
+        "optimizer",
     ])
 
 HIDDEN_LAYER_SIZES = [
@@ -42,7 +44,6 @@ INITILIZATION_METHODS = [
 ACTIVATIONS = [
     "relu",
     "tanh",
-    "prelu",
 ]
 
 MAX_IC50_VALUES = [
@@ -55,18 +56,50 @@ EMBEDDING_SIZES = [
     64,
 ]
 
+N_TRAINING_EPOCHS = [
+    100,
+    200
+]
+
+N_PRETRAIN_EPOCHS = [
+    0,
+    10
+]
+
+MINIBATCH_SIZES = [
+    128,
+    256
+]
+
+DROPOUT_VALUES = [
+    0,
+    0.5,
+]
+
+LEARNING_RATES = [
+    0.001,
+    0.05,
+]
+
+OPTIMIZERS = [
+    "adam",
+    "rmsprop"
+]
+
 
 def generate_all_model_configs(
         hidden_layer_sizes=HIDDEN_LAYER_SIZES,
         embedding_sizes=EMBEDDING_SIZES,
         init_methods=INITILIZATION_METHODS,
         activations=ACTIVATIONS,
-        n_training_epochs_values=[100],
-        n_pretrain_epochs_values=[0, 10],
-        minibatch_sizes=[128],
-        dropout_values=[0.0, 0.25],
-        max_ic50_values=[5000, 20000],
-        losses=["mse"]):
+        n_training_epochs_values=N_TRAINING_EPOCHS,
+        n_pretrain_epochs_values=N_PRETRAIN_EPOCHS,
+        minibatch_sizes=MINIBATCH_SIZES,
+        dropout_values=DROPOUT_VALUES,
+        max_ic50_values=MAX_IC50_VALUES,
+        losses=["mse"],
+        optimizers=OPTIMIZERS,
+        learning_rates=LEARNING_RATES):
     configurations = []
     for activation in activations:
         for loss in losses:
@@ -78,17 +111,21 @@ def generate_all_model_configs(
                                 for dropout in dropout_values:
                                     for max_ic50 in max_ic50_values:
                                         for minibatch_size in minibatch_sizes:
-                                            config = ModelConfig(
-                                                embedding_size=embedding_size,
-                                                hidden_layer_size=hidden,
-                                                activation=activation,
-                                                init=init,
-                                                loss=loss,
-                                                dropout_probability=dropout,
-                                                n_pretrain_epochs=n_pretrain,
-                                                n_epochs=n_training_epochs,
-                                                max_ic50=max_ic50,
-                                                minibatch_size=minibatch_size)
-                                            print(config)
-                                            configurations.append(config)
+                                            for optimizer in optimizers:
+                                                for lr in learning_rates:
+                                                    config = ModelConfig(
+                                                        embedding_size=embedding_size,
+                                                        hidden_layer_size=hidden,
+                                                        activation=activation,
+                                                        init=init,
+                                                        loss=loss,
+                                                        dropout_probability=dropout,
+                                                        n_pretrain_epochs=n_pretrain,
+                                                        n_epochs=n_training_epochs,
+                                                        max_ic50=max_ic50,
+                                                        minibatch_size=minibatch_size,
+                                                        learning_rate=lr,
+                                                        optimizer=optimizer)
+                                                    print(config)
+                                                    configurations.append(config)
     return configurations
