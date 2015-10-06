@@ -78,7 +78,7 @@ DROPOUT_VALUES = [
 
 LEARNING_RATES = [
     0.001,
-    0.05,
+    0.005,
 ]
 
 OPTIMIZERS = [

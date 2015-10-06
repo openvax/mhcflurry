@@ -33,11 +33,25 @@ from mhcflurry.paths import (
     CLASS1_DATA_DIRECTORY
 )
 
-from model_configs import generate_all_model_configs
+from model_configs import (
+    generate_all_model_configs,
+    HIDDEN_LAYER_SIZES,
+    INITILIZATION_METHODS,
+    ACTIVATIONS,
+    MAX_IC50_VALUES,
+    EMBEDDING_SIZES,
+    N_TRAINING_EPOCHS,
+    N_PRETRAIN_EPOCHS,
+    MINIBATCH_SIZES,
+    DROPOUT_VALUES,
+    LEARNING_RATES,
+    OPTIMIZERS
+)
 from model_selection_helpers import (
     evaluate_model_config_by_cross_validation,
-    evaluate_model_config_train_vs_test
+    evaluate_model_config_train_vs_test,
 )
+
 from summarize_model_results import hyperparameter_performance
 from arg_parsing import parse_int_list, parse_float_list, parse_string_list
 
@@ -80,65 +94,72 @@ parser.add_argument(
 
 parser.add_argument(
     "--pretrain-epochs",
-    default=[0, 10],
+    default=N_PRETRAIN_EPOCHS,
     type=parse_int_list,
     help="Number of pre-training epochs which use all allele data combined")
 
 parser.add_argument(
     "--training-epochs",
-    default=[200],
+    default=N_TRAINING_EPOCHS,
     type=parse_int_list,
     help="Number of passes over the dataset to perform during model fitting")
 
 parser.add_argument(
     "--dropout",
-    default=[0.0, 0.25],
+    default=DROPOUT_VALUES,
     type=parse_float_list,
     help="Degree of dropout regularization to try in hyperparameter search")
 
 parser.add_argument(
     "--minibatch-size",
-    default=[256],
+    default=MINIBATCH_SIZES,
     type=parse_int_list,
     help="How many samples to use in stochastic gradient estimation")
 
 parser.add_argument(
     "--embedding-size",
-    default=[0, 64],
+    default=EMBEDDING_SIZES,
     type=parse_int_list,
     help="Size of vector embedding dimension")
 
 parser.add_argument(
     "--learning-rate",
-    default=[0.001],
+    default=LEARNING_RATES,
     type=parse_float_list,
     help="Learning rate for RMSprop")
 
 parser.add_argument(
     "--hidden-layer-size",
-    default=[50, 400],
+    default=HIDDEN_LAYER_SIZES,
     type=parse_int_list,
     help="Comma separated list of hidden layer sizes")
 
 
 parser.add_argument(
     "--max-ic50",
-    default=[5000, 20000],
+    default=MAX_IC50_VALUES,
     type=parse_float_list,
     help="Comma separated list of maximum predicted IC50 values")
 
 
 parser.add_argument(
     "--init",
-    default=["uniform", "glorot_uniform"],
+    default=INITILIZATION_METHODS,
     type=parse_string_list,
     help="Comma separated list of initialization methods")
 
 parser.add_argument(
     "--activation",
-    default=["tanh", "relu", "prelu"],
+    default=ACTIVATIONS,
     type=parse_string_list,
     help="Comma separated list of activation functions")
+
+parser.add_argument(
+    "--optimizer",
+    default=OPTIMIZERS,
+    type=parse_string_list,
+    help="Comma separated list of optimization methods")
+
 
 parser.add_argument("--test-blind-data", default=False, action="store_true")
 
@@ -184,7 +205,8 @@ if __name__ == "__main__":
         n_pretrain_epochs_values=args.pretrain_epochs,
         n_training_epochs_values=args.training_epochs,
         hidden_layer_sizes=args.hidden_layer_size,
-        learning_rates=args.learning_rate)
+        learning_rates=args.learning_rate,
+        optimizers=args.optimizer)
 
     print("Total # configurations = %d" % len(configs))
     training_datasets, _ = load_data(
