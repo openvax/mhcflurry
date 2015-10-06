@@ -34,7 +34,7 @@ from mhcflurry.paths import (
 )
 
 from model_configs import generate_all_model_configs
-from model_selection import (
+from model_selection_helpers import (
     evaluate_model_config_by_cross_validation,
     evaluate_model_config_train_vs_test
 )
@@ -110,8 +110,8 @@ parser.add_argument(
 
 parser.add_argument(
     "--learning-rate",
-    default=0.001,
-    type=float,
+    default=[0.001],
+    type=parse_float_list,
     help="Learning rate for RMSprop")
 
 parser.add_argument(
@@ -183,7 +183,8 @@ if __name__ == "__main__":
         embedding_sizes=args.embedding_size,
         n_pretrain_epochs_values=args.pretrain_epochs,
         n_training_epochs_values=args.training_epochs,
-        hidden_layer_sizes=args.hidden_layer_size)
+        hidden_layer_sizes=args.hidden_layer_size,
+        learning_rates=args.learning_rate)
 
     print("Total # configurations = %d" % len(configs))
     training_datasets, _ = load_data(
@@ -204,7 +205,6 @@ if __name__ == "__main__":
                 config,
                 training_datasets,
                 min_samples_per_allele=args.min_samples_per_allele,
-                cv_folds=args.cv_folds,
-                learning_rate=args.learning_rate))
+                cv_folds=args.cv_folds))
 
     hyperparameter_performance(combined_df)
