@@ -214,11 +214,18 @@ if __name__ == "__main__":
         peptide_length=9,
         binary_encoding=False)
     if args.test_blind_data:
-        test_datasets, _ = load_data(
+        testing_datasets, _ = load_data(
             BLIND_2013_CSV_PATH,
             peptide_length=9,
             binary_encoding=False)
-
+        combined_df = evaluate_model_configs(
+            configs=configs,
+            results_filename=args.results_filename,
+            train_fn=lambda config: evaluate_model_config_train_vs_test(
+                config,
+                training_allele_datasets=training_datasets,
+                testing_allele_datasets=testing_datasets,
+                min_samples_per_allele=5))
     else:
         combined_df = evaluate_model_configs(
             configs=configs,

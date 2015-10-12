@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+#
 # Copyright (c) 2015. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -55,8 +57,8 @@ def generate_latex_table(results_dict, caption="CAPTION", label="LABEL"):
             \\begin{center}
             \\begin{tabular}{cccc}
             \\multicolumn{1}{c}{\\bf Hyperparameter}  &
-                \\multicolumn{1}{c}{\\bf Values} &
-                \\multicolumn{1}{c}{\\bf AUC} &
+                \\multicolumn{1}{c}{\\bf Better} &
+                \\multicolumn{1}{c}{\\bf Worse} &
                 \\multicolumn{1}{c}{\\bf p-value}\\\\
             \hline \\\\
             %(content)s
@@ -77,11 +79,10 @@ def generate_latex_table(results_dict, caption="CAPTION", label="LABEL"):
             else:
                 p_str = "%0.4f" % result.p
             lines.append(
-                "\t\t%s &  {\\bf %s} vs. %s & $%0.4f$ & $%s$" % (
+                "\t\t%s &  {\\bf %s} & %s & $%s$" % (
                     hyperparameter_name.replace("_", " "),
                     str(result.better_value).replace("_", " "),
                     str(result.worse_value).replace("_", " "),
-                    result.AUC,
                     p_str))
     #
     # Input Encoding              & 1-of-k binary, vector embedding \\

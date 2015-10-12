@@ -366,77 +366,66 @@ def evaluate_model_config_by_cross_validation(
 def evaluate_model_config_train_vs_test(
         config,
         training_allele_datasets,
-        test_allele_datasets,
+        testing_allele_datasets,
         min_samples_per_allele=5):
-    model = make_model(config)
-    initial_weights = [w.copy() for w in model.get_weights()]
     binary_encoding = config.embedding_size == 0
+    print("=== Training Alleles ===")
+    for (allele_name, dataset) in sorted(training_allele_datasets.items()):
+        print("%s: count = %d" % (allele_name, len(dataset.Y)))
+    print("=== Testing Alleles ===")
+    for (allele_name, dataset) in sorted(testing_allele_datasets.items()):
+        print(" %s: count = %d" % (allele_name, len(dataset.Y)))
     X_train_dict, Y_train_dict, ic50_train_dict = encode_allele_datasets(
         allele_datasets=training_allele_datasets,
         max_ic50=config.max_ic50,
         binary_encoding=binary_encoding)
+
     X_test_dict, Y_test_dict, ic50_test_dict = encode_allele_datasets(
-        allele_datasets=test_allele_datasets,
+        allele_datasets=testing_allele_datasets,
         max_ic50=config.max_ic50,
         binary_encoding=binary_encoding)
-    X_train_all = np.vstack(X_train_dict.values())
-    Y_train_all = np.concatenate(Y_train_dict.values())
-    ic50_train_all = np.concatenate(ic50_train_dict.values())
+
+    X_train_combined = np.vstack(X_train_dict.values())
+    Y_train_combined = np.concatenate(list(Y_train_dict.values()))
+    model = make_model(config)
+    model.fit(
+        X_train_combined,
+        Y_train_combined,
+        nb_epoch=config.n_pretrain_epochs,
+        batch_size=config.minibatch_size,
+        verbose=1)
 
     scores = ScoreCollection()
-"""
-    for allele_name, dataset in filter_alleles(
+    initial_weights = [w.copy() for w in model.get_weights()]
+    for allele_name, training_dataset in filter_alleles(
             training_allele_datasets,
             min_samples_per_allele=min_samples_per_allele):
-        if allele_name not in test_allele_datasets:
-            print("Skipping %s, missing from test datasets")
+        if allele_name not in X_test_dict:
+            print("Skipping %s, missing from test datasets" % allele_name)
             continue
+        X_test_allele = X_test_dict[allele_name]
+        ic50_test_allele = ic50_test_dict[allele_name]
+        true_label = ic50_test_allele <= 500
+        if true_label.all():
+            print("Skipping %s since all affinities are <= 500nM" % allele_name)
+            continue
+        elif not true_label.any():
+            print("Skipping %s since all affinities are > 500nM" % allele_name)
+            continue
+
         model.set_weights(initial_weights)
-        X_allele = X_dict[allele_name]
-        Y_allele = Y_log_ic50_dict[allele_name]
-        ic50_allele = ic50_dict[allele_name]
-        if n_pretrain_epochs > 0:
-            X_other_alleles = np.vstack([
-                X
-                for (other_allele, X) in X_dict.items()
-                if normalize_allele_name(other_allele) != allele_name])
-            Y_other_alleles = np.concatenate([
-                y
-                for (other_allele, y)
-                in Y_log_ic50_dict.items()
-                if normalize_allele_name(other_allele) != allele_name])
-            print("Pre-training X shape: %s" % (X_other_alleles.shape,))
-            print("Pre-training Y shape: %s" % (Y_other_alleles.shape,))
-            model.fit(
-                X_other_alleles,
-                Y_other_alleles,
-                nb_epoch=n_pretrain_epochs,
-                batch_size=minibatch_size,
-                verbose=0)
-        print("Cross-validation for %s (%d):" % (allele_name, len(Y_allele)))
-        aucs, accuracies, f1_scores = kfold_cross_validation_for_single_allele(
-            allele_name=allele_name,
-            model=model,
-            X=X_allele,
-            Y=Y_allele,
-            ic50=ic50_allele,
-            n_training_epochs=n_training_epochs,
-            cv_folds=cv_folds,
-            max_ic50=max_ic50,
-            minibatch_size=minibatch_size)
-        if len(aucs) == 0:
-            print("Skipping allele %s" % allele_name)
-            continue
-        scores.add(allele_name, auc=aucs, accuracy=accuracies, f1=f1_scores)
+        model.fit(
+            training_dataset.X,
+            training_dataset.Y,
+            nb_epoch=config.n_epochs,
+            batch_size=config.minibatch_size,
+            verbose=0)
+        pred = model.predict(X_test_allele).flatten()
+        accuracy, auc, f1_score = score_predictions(
+            predicted_log_ic50=pred,
+            true_label=true_label,
+            max_ic50=config.max_ic50)
+        print("-- %s accuracy=%0.4f AUC = %0.4f F1 = %0.4f" % (
+            allele_name, accuracy, auc, f1_score))
+        scores.add(allele_name, auc=[auc], accuracy=[accuracy], f1=[f1_score])
     return scores.dataframe()
-    return leave_out_allele_cross_validation(
-        model,
-        allele_datasets=allele_datasets,
-        max_ic50=config.max_ic50,
-        binary_encoding=config.embedding_size == 0,
-        n_pretrain_epochs=config.n_pretrain_epochs,
-        n_training_epochs=config.n_epochs,
-        min_samples_per_allele=min_samples_per_allele,
-        cv_folds=cv_folds,
-        minibatch_size=config.minibatch_size)
-"""

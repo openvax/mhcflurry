@@ -46,7 +46,9 @@ class Mhc1BindingPredictor(object):
     def __init__(
             self,
             allele,
-            model_directory=CLASS1_MODEL_DIRECTORY):
+            model_directory=CLASS1_MODEL_DIRECTORY,
+            max_ic50=5000.0):
+        self.max_ic50 = max_ic50
         if not exists(model_directory) or len(listdir(model_directory)) == 0:
             raise ValueError(
                 "No MHC prediction models found in %s" % (model_directory,))
@@ -72,11 +74,20 @@ class Mhc1BindingPredictor(object):
             self.model.load_weights(path)
             _allele_model_cache[self.allele] = self.model
 
+    def __repr__(self):
+        return "Mhc1BindingPredictor(allele=%s, model_directory=%s)" % (
+            self.allele,
+            self.model_directory)
+
+    def __str__(self):
+        return repr(self)
+
     def _log_to_ic50(self, log_value):
         """
-        Convert neural network output to IC50 values between 0.0 and 5000.0
+        Convert neural network output to IC50 values between 0.0 and
+        self.max_ic50 (typically 5000, 20000 or 50000)
         """
-        return 5000.0 ** (1.0 - log_value)
+        return self.max_ic50 ** (1.0 - log_value)
 
     def _predict_9mer_peptides(self, peptides):
         """
