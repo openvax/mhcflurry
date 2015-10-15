@@ -20,6 +20,7 @@ from __future__ import (
     absolute_import,
     unicode_literals
 )
+from os import listdir
 from os.path import join
 import argparse
 from time import time
@@ -82,7 +83,7 @@ parser.add_argument(
     type=int)
 
 parser.add_argument(
-    "--results-filename",
+    "--output",
     required=True,
     help="Write all hyperparameter/allele results to this filename")
 
@@ -161,7 +162,16 @@ parser.add_argument(
     help="Comma separated list of optimization methods")
 
 
-parser.add_argument("--test-blind-data", default=False, action="store_true")
+parser.add_argument(
+    "--test-data-dir",
+    nargs='*',
+    type=str)
+
+parser.add_argument(
+    "--test-data-sep",
+    default="\s+",
+    help="Separator to use for loading test data CSV/TSV files",
+    type=str)
 
 
 def evaluate_model_configs(configs, results_filename, train_fn):
@@ -193,6 +203,40 @@ def evaluate_model_configs(configs, results_filename, train_fn):
                 estimate_remaining / (60 * 60)))
     return pd.concat(all_dataframes)
 
+
+def load_test_data(dirpaths, sep="\s+"):
+    """
+    Load all allele-specific datasets from the given path assuming filenames
+    have the form:
+        pred.PREDICTOR_NAME.CV_METHOD.ALLELE-LENGTH.xls
+    Example:
+        pred.netmhc.blind.HLA-A-3201-9.xls
+    where ALLELE could be HLA-A-0201 and LENGTH is an integer
+    """
+
+    dataframes = []
+    for dirpath in dirpaths:
+        for filename in listdir(dirpath):
+            dot_parts = filename.split(".")
+            if len(dot_parts) != 5:
+                continue
+            _, predictor_name, cv_method, suffix, ext = dot_parts
+            dash_parts = suffix.split("-")
+            if len(dash_parts) != 2:
+                continue
+            allele = "-".join(dash_parts[:-1])
+            length = int(dash_parts[-1])
+            filepath = join(dirpath, filename)
+            df = pd.read_csv(filepath, sep=sep)
+            df["dirpath"] = dirpath
+            df["predictor"] = predictor_name
+            df["cv_method"] = cv_method
+            df["allele"] = allele
+            df["length"] = length
+            dataframes.append(df)
+    return pd.concat(dataframes)
+
+
 if __name__ == "__main__":
     args = parser.parse_args()
     configs = generate_all_model_configs(
@@ -213,14 +257,20 @@ if __name__ == "__main__":
         args.binding_data_csv_path,
         peptide_length=9,
         binary_encoding=False)
-    if args.test_blind_data:
+    if args.test_data_dir:
+        test_dataframes = []
+        for subdir in args.test_data_dir:
+            test_dataframes.append(pd.read_csv(subdir, sep=args.test_data_sep))
+        test_data = pd.concat(test_dataframes)
+        print(test_data)
+        assert False
         testing_datasets, _ = load_data(
             BLIND_2013_CSV_PATH,
             peptide_length=9,
             binary_encoding=False)
         combined_df = evaluate_model_configs(
             configs=configs,
-            results_filename=args.results_filename,
+            results_filename=args.output,
             train_fn=lambda config: evaluate_model_config_train_vs_test(
                 config,
                 training_allele_datasets=training_datasets,
@@ -229,7 +279,7 @@ if __name__ == "__main__":
     else:
         combined_df = evaluate_model_configs(
             configs=configs,
-            results_filename=args.results_filename,
+            results_filename=args.output,
             train_fn=lambda config: evaluate_model_config_by_cross_validation(
                 config,
                 training_datasets,
