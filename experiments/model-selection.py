@@ -204,7 +204,7 @@ def evaluate_model_configs(configs, results_filename, train_fn):
     return pd.concat(all_dataframes)
 
 
-def load_test_data(dirpaths, sep="\s+"):
+def load_test_data(dirpaths, sep="\s+", column_per_predictor=True):
     """
     Load all allele-specific datasets from the given path assuming filenames
     have the form:
@@ -212,6 +212,11 @@ def load_test_data(dirpaths, sep="\s+"):
     Example:
         pred.netmhc.blind.HLA-A-3201-9.xls
     where ALLELE could be HLA-A-0201 and LENGTH is an integer
+
+    Combines all loaded files into a single DataFrame.
+
+    If `column_per_predictor` is True then reshape the DataFrame to have
+    multiple prediction columns, one per distinct predictor.
     """
 
     dataframes = []
@@ -234,8 +239,11 @@ def load_test_data(dirpaths, sep="\s+"):
             df["allele"] = allele
             df["length"] = length
             dataframes.append(df)
-    return pd.concat(dataframes)
-
+    combined = pd.concat(dataframes)
+    if column_per_predictor:
+        assert False
+    else:
+        return combined
 
 if __name__ == "__main__":
     args = parser.parse_args()
