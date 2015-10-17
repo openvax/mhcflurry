@@ -18,26 +18,44 @@ from __future__ import (
     absolute_import,
 )
 
+
 def parse_int_list(s):
     return [int(part.strip() for part in s.split(","))]
+
 
 def split_uppercase_sequences(s):
     return [part.strip().upper() for part in s.split(",")]
 
 
 def normalize_allele_name(allele_name):
+    """
+    Only works for mouse, human, and rhesus monkey alleles.
+
+    TODO: use the same logic as mhctools for MHC name parsing.
+    Possibly even worth its own small repo called something like "mhcnames"
+    """
     allele_name = allele_name.upper()
+    if allele_name.startswith("MAMU"):
+        prefix = "Mamu-"
+    elif allele_name.startswith("H-2") or allele_name.startswith("H2"):
+        prefix = "H-2-"
+    else:
+        prefix = ""
     # old school HLA-C serotypes look like "Cw"
     allele_name = allele_name.replace("CW", "C")
     patterns = [
         "HLA-",
+        "H-2",
+        "H2",
+        "MAMU",
         "-",
         "*",
         ":"
     ]
     for pattern in patterns:
         allele_name = allele_name.replace(pattern, "")
-    return allele_name
+    return "%s%s" % (prefix, allele_name)
+
 
 def split_allele_names(s):
     return [

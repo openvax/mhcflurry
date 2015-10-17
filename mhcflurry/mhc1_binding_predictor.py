@@ -85,7 +85,7 @@ class Mhc1BindingPredictor(object):
     def _log_to_ic50(self, log_value):
         """
         Convert neural network output to IC50 values between 0.0 and
-        self.max_ic50 (typically 5000, 20000 or 50000)
+        self.max_ic50 (typically 5000, 20000 or w0)
         """
         return self.max_ic50 ** (1.0 - log_value)
 
