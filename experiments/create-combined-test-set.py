@@ -51,18 +51,6 @@ if __name__ == "__main__":
     for (allele, df) in dataframes.items():
         df.index.name = "sequence"
         print("%s: %d results" % (allele, len(df)))
-        filename = "blind-%s.csv" % allele
+        filename = "%s.csv" % allele
         filepath = join(args.test_data_output_dir, filename)
         df.to_csv(filepath)
-
-    assert False
-    """
-    combined_df = evaluate_model_configs(
-        configs=configs,
-        results_filename=args.output,
-        train_fn=lambda config: evaluate_model_config_train_vs_test(
-            config,
-            training_allele_datasets=training_datasets,
-            testing_allele_datasets=testing_datasets,
-            min_samples_per_allele=5))
-    """

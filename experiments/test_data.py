@@ -20,13 +20,19 @@ import pandas as pd
 from mhcflurry.common import normalize_allele_name
 
 
-def load_test_data(dirpaths, sep="\s+", ic50_base=10.0, comment_char="B"):
+def load_test_data(
+        dirpaths,
+        sep="\s+",
+        ic50_base=10.0,
+        comment_char="B",
+        dataset_name="blind"):
     """
     Load all allele-specific datasets from the given path assuming filenames
     have the form:
         pred.PREDICTOR_NAME.CV_METHOD.ALLELE-LENGTH.xls
     Example:
         pred.netmhc.blind.HLA-A-3201-9.xls
+        pred.blind.smmpmbec_cpp.Mamu-A-02-9.xls
     where ALLELE could be HLA-A-0201 and LENGTH is an integer
 
     Combines all loaded files into a single DataFrame.
@@ -46,10 +52,21 @@ def load_test_data(dirpaths, sep="\s+", ic50_base=10.0, comment_char="B"):
         for filename in listdir(dirpath):
             filepath = join(dirpath, filename)
             dot_parts = filename.split(".")
+            dot_parts
             if len(dot_parts) != 5:
                 print("Skipping %s" % filepath)
                 continue
-            _, predictor_name, cv_method, suffix, ext = dot_parts
+            prefixes = dot_parts[:-2]
+            interesting_prefixes = {
+                substring
+                for substring in prefixes
+                if substring not in {"pred", "test", dataset_name}
+            }
+            if len(interesting_prefixes) != 1:
+                print("Can't infer predictor name for %s" % filepath)
+                continue
+            predictor_name = list(interesting_prefixes)[0]
+            suffix, ext = dot_parts[-2:]
             dash_parts = suffix.split("-")
             if len(dash_parts) < 2:
                 print("Skipping %s due to incorrect format" % filepath)
@@ -61,7 +78,6 @@ def load_test_data(dirpaths, sep="\s+", ic50_base=10.0, comment_char="B"):
             df = pd.read_csv(filepath, sep=sep, comment=comment_char)
             df["dirpath"] = dirpath
             df["predictor"] = predictor_name
-            df["cv_method"] = cv_method
             df["allele"] = allele
             df["length"] = length
             if ic50_base is not None:
