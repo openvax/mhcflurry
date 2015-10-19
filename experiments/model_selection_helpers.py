@@ -19,7 +19,6 @@ from __future__ import (
     unicode_literals
 )
 from collections import OrderedDict
-import logging
 
 import numpy as np
 import sklearn
@@ -34,6 +33,18 @@ from mhcflurry.data_helpers import indices_to_hotshot_encoding
 from score_collection import ScoreCollection
 
 
+def f1_score(true_label, label_pred, cutoff=500):
+    tp = (true_label & label_pred).sum()
+    fp = ((~true_label) & label_pred).sum()
+    fn = (true_label & (~label_pred)).sum()
+    sensitivity = (tp / float(tp + fn)) if (tp + fn) > 0 else 0.0
+    precision = (tp / float(tp + fp)) if (tp + fp) > 0 else 0.0
+    if (precision + sensitivity) > 0:
+        return (2 * precision * sensitivity) / (precision + sensitivity)
+    else:
+        return 0.0
+
+
 def score_predictions(predicted_log_ic50, true_label, max_ic50):
     """Computes accuracy, AUC, and F1 score of predictions"""
     auc = sklearn.metrics.roc_auc_score(true_label, predicted_log_ic50)
@@ -41,23 +52,8 @@ def score_predictions(predicted_log_ic50, true_label, max_ic50):
     label_pred = (ic50_pred <= 500)
     same_mask = true_label == label_pred
     accuracy = np.mean(same_mask)
-    tp = (true_label & label_pred).sum()
-    fp = ((~true_label) & label_pred).sum()
-    tn = ((~true_label) & (~label_pred)).sum()
-    fn = (true_label & (~label_pred)).sum()
-    sensitivity = (tp / float(tp + fn)) if (tp + fn) > 0 else 0.0
-    precision = (tp / float(tp + fp)) if (tp + fp) > 0 else 0.0
-    if (precision + sensitivity) > 0:
-        f1_score = (2 * precision * sensitivity) / (precision + sensitivity)
-    else:
-        f1_score = 0.0
-    # sanity check that we're computing accuracy correctly
-    accuracy_estimate2 = (tp + tn) / float(tp + fp + tn + fn)
-    if abs(accuracy - accuracy_estimate2) > 0.00001:
-        logging.warn(
-            "!!! Conflicting accuracy estimates! (%0.5f vs. %0.5f)" % (
-                accuracy, accuracy_estimate2))
-    return accuracy, auc, f1_score
+    f1 = f1_score(true_label, label_pred)
+    return accuracy, auc, f1
 
 
 def train_model_and_return_scores(
