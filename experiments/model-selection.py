@@ -160,6 +160,18 @@ parser.add_argument(
     type=parse_string_list,
     help="Comma separated list of optimization methods")
 
+parser.add_argument(
+    "--ensemble-size",
+    default=[0],
+    type=parse_int_list,
+    help="Number of classifiers in ensemble, default=0 (don't use an ensemble)")
+
+parser.add_argument(
+    "--ensemble-fraction-dataset",
+    default=[1.0],
+    type=parse_float_list,
+    help="Size of ensemble training sets (sampled with replacement)")
+
 
 def evaluate_model_configs(configs, results_filename, train_fn):
     all_dataframes = []

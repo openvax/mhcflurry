@@ -33,7 +33,7 @@ from mhcflurry.data_helpers import indices_to_hotshot_encoding
 from score_collection import ScoreCollection
 
 
-def f1_score(true_label, label_pred, cutoff=500):
+def f1_score(true_label, label_pred):
     tp = (true_label & label_pred).sum()
     fp = ((~true_label) & label_pred).sum()
     fn = (true_label & (~label_pred)).sum()
