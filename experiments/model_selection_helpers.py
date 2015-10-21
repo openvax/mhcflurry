@@ -37,10 +37,10 @@ def f1_score(true_label, label_pred):
     tp = (true_label & label_pred).sum()
     fp = ((~true_label) & label_pred).sum()
     fn = (true_label & (~label_pred)).sum()
-    sensitivity = (tp / float(tp + fn)) if (tp + fn) > 0 else 0.0
+    recall = (tp / float(tp + fn)) if (tp + fn) > 0 else 0.0
     precision = (tp / float(tp + fp)) if (tp + fp) > 0 else 0.0
-    if (precision + sensitivity) > 0:
-        return (2 * precision * sensitivity) / (precision + sensitivity)
+    if (precision + recall) > 0:
+        return (2 * precision * recall) / (precision + recall)
     else:
         return 0.0
 

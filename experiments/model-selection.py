@@ -20,7 +20,6 @@ from __future__ import (
     absolute_import,
     unicode_literals
 )
-from os.path import join
 import argparse
 from time import time
 
@@ -29,9 +28,7 @@ import numpy as np
 import pandas as pd
 
 from mhcflurry.data_helpers import load_data
-from mhcflurry.paths import (
-    CLASS1_DATA_DIRECTORY
-)
+
 
 from model_configs import (
     generate_all_model_configs,
@@ -53,19 +50,7 @@ from model_selection_helpers import (
 
 from summarize_model_results import hyperparameter_performance
 from arg_parsing import parse_int_list, parse_float_list, parse_string_list
-
-
-PETERS2009_CSV_FILENAME = "bdata.2009.mhci.public.1.txt"
-PETERS2009_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS2009_CSV_FILENAME)
-
-PETERS2013_CSV_FILENAME = "bdata.20130222.mhci.public.1.txt"
-PETERS2013_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS2013_CSV_FILENAME)
-
-BLIND_2013_CSV_FILENAME = "bdata.2013.mhci.public.blind.1.txt"
-BLIND_2013_CSV_PATH = join(CLASS1_DATA_DIRECTORY, BLIND_2013_CSV_FILENAME)
-
-COMBINED_CSV_FILENAME = "combined_human_class1_dataset.csv"
-COMBINED_CSV_PATH = join(CLASS1_DATA_DIRECTORY, COMBINED_CSV_FILENAME)
+from dataset_paths import PETERS2009_CSV_PATH
 
 parser = argparse.ArgumentParser()
 
@@ -159,18 +144,6 @@ parser.add_argument(
     default=OPTIMIZERS,
     type=parse_string_list,
     help="Comma separated list of optimization methods")
-
-parser.add_argument(
-    "--ensemble-size",
-    default=[0],
-    type=parse_int_list,
-    help="Number of classifiers in ensemble, default=0 (don't use an ensemble)")
-
-parser.add_argument(
-    "--ensemble-fraction-dataset",
-    default=[1.0],
-    type=parse_float_list,
-    help="Size of ensemble training sets (sampled with replacement)")
 
 
 def evaluate_model_configs(configs, results_filename, train_fn):
