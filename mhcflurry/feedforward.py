@@ -81,11 +81,13 @@ def make_network(
         model.add(Embedding(
             input_dim=embedding_input_dim,
             output_dim=embedding_output_dim,
+            input_length=input_size,
             init=init))
         model.add(Flatten())
         input_size = input_size * embedding_output_dim
 
     layer_sizes = (input_size,) + tuple(layer_sizes)
+
     for i, dim in enumerate(layer_sizes):
         if i == 0:
             # input is only conceptually a layer of the network,

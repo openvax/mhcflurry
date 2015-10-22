@@ -59,6 +59,7 @@ class Mhc1BindingPredictor(object):
         else:
             filename = self.allele + ".hdf"
             path = join(model_directory, filename)
+            print("HDF path: %s" % path)
             if not exists(path):
                 raise ValueError("Unsupported allele: %s" % (
                     original_allele_name,))
@@ -71,7 +72,9 @@ class Mhc1BindingPredictor(object):
                 init=INITIALIZATION_METHOD,
                 dropout_probability=DROPOUT_PROBABILITY,
                 compile_for_training=True)
+            print("before", len(self.model.get_weights()), self.model.get_weights()[0][0])
             self.model.load_weights(path)
+            print("after", len(self.model.get_weights()), self.model.get_weights()[0][0])
             _allele_model_cache[self.allele] = self.model
 
     def __repr__(self):
