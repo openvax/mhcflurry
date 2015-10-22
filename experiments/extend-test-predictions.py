@@ -162,7 +162,6 @@ if __name__ == "__main__":
         learning_rate=args.learning_rate,
         optimizer=args.optimizer)
 
-
     model = make_model(config)
     print(config)
     print(model)

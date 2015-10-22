@@ -18,65 +18,22 @@ from __future__ import (
     absolute_import,
     unicode_literals
 )
-from collections import OrderedDict
+from time import time
 
 import numpy as np
-import sklearn
-import sklearn.metrics
-import sklearn.cross_validation
+import pandas as pd
 from sklearn.cross_validation import KFold
 
 from mhcflurry.common import normalize_allele_name
 from mhcflurry.feedforward import make_embedding_network, make_hotshot_network
-from mhcflurry.data_helpers import indices_to_hotshot_encoding
+
 
 from score_collection import ScoreCollection
-
-
-def f1_score(true_label, label_pred):
-    tp = (true_label & label_pred).sum()
-    fp = ((~true_label) & label_pred).sum()
-    fn = (true_label & (~label_pred)).sum()
-    recall = (tp / float(tp + fn)) if (tp + fn) > 0 else 0.0
-    precision = (tp / float(tp + fp)) if (tp + fp) > 0 else 0.0
-    if (precision + recall) > 0:
-        return (2 * precision * recall) / (precision + recall)
-    else:
-        return 0.0
-
-
-def score_predictions(predicted_log_ic50, true_label, max_ic50):
-    """Computes accuracy, AUC, and F1 score of predictions"""
-    auc = sklearn.metrics.roc_auc_score(true_label, predicted_log_ic50)
-    ic50_pred = max_ic50 ** (1.0 - predicted_log_ic50)
-    label_pred = (ic50_pred <= 500)
-    same_mask = true_label == label_pred
-    accuracy = np.mean(same_mask)
-    f1 = f1_score(true_label, label_pred)
-    return accuracy, auc, f1
-
-
-def train_model_and_return_scores(
-        model,
-        X_train,
-        log_ic50_train,
-        X_test,
-        binder_label_test,
-        n_training_epochs,
-        minibatch_size,
-        max_ic50):
-    model.fit(
-        X_train,
-        log_ic50_train,
-        nb_epoch=n_training_epochs,
-        verbose=0,
-        batch_size=minibatch_size)
-    pred = model.predict(X_test).flatten()
-    accuracy, auc, f1_score = score_predictions(
-        predicted_log_ic50=pred,
-        true_label=binder_label_test,
-        max_ic50=max_ic50)
-    return (accuracy, auc, f1_score)
+from training_helpers import (
+    encode_allele_datasets,
+    train_model_and_return_scores,
+    score_predictions
+)
 
 
 def kfold_cross_validation_for_single_allele(
@@ -166,66 +123,6 @@ def filter_alleles(allele_datasets, min_samples_per_allele=5):
             print("No positive examples for %s" % allele_name)
             continue
         yield (allele_name, dataset)
-
-
-def encode_allele_dataset(
-        allele_dataset,
-        max_ic50,
-        binary_encoding=False):
-    """
-    Parameters
-    ----------
-    allele_dataset : AlleleDataset
-        Named tuple with fields "X" and "ic50"
-    max_ic50 : float
-        Largest IC50 value predictor should return
-    binary_encoding : bool (default = False)
-        If True, use a binary 1-of-k encoding of amino acids, otherwise
-        expect a vector embedding to use integer indices.
-
-    Returns (X, Y_log_ic50, binder_label)
-    """
-    X_allele = allele_dataset.X
-    ic50_allele = allele_dataset.ic50
-    if binary_encoding:
-        X_allele = indices_to_hotshot_encoding(X_allele, n_indices=20)
-    Y_allele = 1.0 - np.minimum(1.0, np.log(ic50_allele) / np.log(max_ic50))
-    return (X_allele, Y_allele, ic50_allele)
-
-
-def encode_allele_datasets(
-        allele_datasets,
-        max_ic50,
-        binary_encoding=False):
-    """
-    Parameters
-    ----------
-    allele_dataset : AlleleDataset
-        Named tuple with fields "X" and "ic50"
-    max_ic50 : float
-        Largest IC50 value predictor should return
-    binary_encoding : bool (default = False)
-        If True, use a binary 1-of-k encoding of amino acids, otherwise
-        expect a vector embedding to use integer indices.
-
-    Returns three dictionarys
-        - mapping from allele name to X (features)
-        - mapping from allele name to Y_log_ic50 (continuous outputs)
-        - mapping from allele name to binder_label (binary outputs)
-    """
-    X_dict = OrderedDict()
-    Y_log_ic50_dict = OrderedDict([])
-    ic50_dict = OrderedDict([])
-    for (allele_name, dataset) in allele_datasets.items():
-        allele_name = normalize_allele_name(allele_name)
-        (X, Y_log_ic50, Y_ic50) = encode_allele_dataset(
-            dataset,
-            max_ic50=max_ic50,
-            binary_encoding=binary_encoding)
-        X_dict[allele_name] = X
-        Y_log_ic50_dict[allele_name] = Y_log_ic50
-        ic50_dict[allele_name] = Y_ic50
-    return (X_dict, Y_log_ic50_dict, ic50_dict)
 
 
 def leave_out_allele_cross_validation(
@@ -425,3 +322,33 @@ def evaluate_model_config_train_vs_test(
             allele_name, accuracy, auc, f1_score))
         scores.add(allele_name, auc=[auc], accuracy=[accuracy], f1=[f1_score])
     return scores.dataframe()
+
+
+def evaluate_model_configs(configs, results_filename, train_fn):
+    all_dataframes = []
+    all_elapsed_times = []
+    for i, config in enumerate(configs):
+        t_start = time()
+        print("\n\n=== Config %d/%d: %s" % (i + 1, len(configs), config))
+        result_df = train_fn(config)
+        n_rows = len(result_df)
+        result_df["config_idx"] = [i] * n_rows
+        for hyperparameter_name in config._fields:
+            value = getattr(config, hyperparameter_name)
+            result_df[hyperparameter_name] = [value] * n_rows
+        # overwrite existing files for first config
+        # only write column names for first batch of data
+        # append results to CSV
+        with open(results_filename, mode=("a" if i > 0 else "w")) as f:
+            result_df.to_csv(f, index=False, header=(i == 0))
+        all_dataframes.append(result_df)
+        t_end = time()
+        t_elapsed = t_end - t_start
+        all_elapsed_times.append(t_elapsed)
+        median_elapsed_time = np.median(all_elapsed_times)
+        estimate_remaining = (len(configs) - i - 1) * median_elapsed_time
+        print(
+            "-- Time for config = %0.2fs, estimated remaining: %0.2f hours" % (
+                t_elapsed,
+                estimate_remaining / (60 * 60)))
+    return pd.concat(all_dataframes)
