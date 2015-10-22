@@ -21,11 +21,7 @@ from __future__ import (
     unicode_literals
 )
 import argparse
-from time import time
 
-
-import numpy as np
-import pandas as pd
 
 from mhcflurry.data_helpers import load_data
 
@@ -46,6 +42,7 @@ from model_configs import (
 )
 from model_selection_helpers import (
     evaluate_model_config_by_cross_validation,
+    evaluate_model_configs,
 )
 
 from summarize_model_results import hyperparameter_performance
@@ -144,36 +141,6 @@ parser.add_argument(
     default=OPTIMIZERS,
     type=parse_string_list,
     help="Comma separated list of optimization methods")
-
-
-def evaluate_model_configs(configs, results_filename, train_fn):
-    all_dataframes = []
-    all_elapsed_times = []
-    for i, config in enumerate(configs):
-        t_start = time()
-        print("\n\n=== Config %d/%d: %s" % (i + 1, len(configs), config))
-        result_df = train_fn(config)
-        n_rows = len(result_df)
-        result_df["config_idx"] = [i] * n_rows
-        for hyperparameter_name in config._fields:
-            value = getattr(config, hyperparameter_name)
-            result_df[hyperparameter_name] = [value] * n_rows
-        # overwrite existing files for first config
-        # only write column names for first batch of data
-        # append results to CSV
-        with open(results_filename, mode=("a" if i > 0 else "w")) as f:
-            result_df.to_csv(f, index=False, header=(i == 0))
-        all_dataframes.append(result_df)
-        t_end = time()
-        t_elapsed = t_end - t_start
-        all_elapsed_times.append(t_elapsed)
-        median_elapsed_time = np.median(all_elapsed_times)
-        estimate_remaining = (len(configs) - i - 1) * median_elapsed_time
-        print(
-            "-- Time for config = %0.2fs, estimated remaining: %0.2f hours" % (
-                t_elapsed,
-                estimate_remaining / (60 * 60)))
-    return pd.concat(all_dataframes)
 
 
 if __name__ == "__main__":
