@@ -38,7 +38,7 @@ from __future__ import (
     unicode_literals
 )
 from shutil import rmtree
-from os import makedirs
+from os import makedirs, remove
 from os.path import exists, join
 import argparse
 
@@ -81,7 +81,8 @@ parser.add_argument(
     default=CSV_PATH,
     help="CSV file with 'mhc', 'peptide', 'peptide_length', 'meas' columns")
 
-parser.add_argument("--min-samples-per-allele",
+parser.add_argument(
+    "--min-samples-per-allele",
     default=5,
     help="Don't train predictors for alleles with fewer samples than this",
     type=int)
@@ -124,19 +125,38 @@ if __name__ == "__main__":
             continue
         n_allele = len(allele_data.Y)
         print("%s: total count = %d" % (allele_name, n_allele))
-        filename = allele_name + ".hdf"
-        path = join(args.output_dir, filename)
-        if exists(path) and not args.overwrite:
+
+        json_filename = allele_name + ".json"
+        json_path = join(args.output_dir, json_filename)
+
+        hdf_filename = allele_name + ".hdf"
+        hdf_path = join(args.output_dir, hdf_filename)
+
+        if exists(json_path) and exists(hdf_path) and not args.overwrite:
             print("-- already exists, skipping")
             continue
+
         if n_allele < args.min_samples_per_allele:
             print("-- too few data points, skipping")
             continue
+
+        if exists(json_path):
+            print("-- removing old model description %s" % json_path)
+            remove(json_path)
+        if exists(hdf_path):
+            print("-- removing old weights file %s" % hdf_path)
+            remove(hdf_path)
+
         model.set_weights(old_weights)
         model.fit(
             allele_data.X,
             allele_data.Y,
             nb_epoch=N_EPOCHS,
             show_accuracy=True)
-        print("Saving model for %s to %s" % (allele_name, path))
-        model.save_weights(path)
+        print("Saving model description for %s to %s" % (
+            allele_name, json_path))
+        with open(json_path, "w") as f:
+            f.write(model.to_json())
+        print("Saving model weights for %s to %s" % (
+            allele_name, hdf_path))
+        model.save_weights(hdf_path)

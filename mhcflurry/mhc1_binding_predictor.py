@@ -23,10 +23,11 @@ from __future__ import (
 from os import listdir
 from os.path import exists, join
 from itertools import groupby
+import json
 
 import numpy as np
 import pandas as pd
-from keras.models import model_from_json
+from keras.models import model_from_config
 
 from .class1_allele_specific_hyperparameters import MAX_IC50
 from .data_helpers import index_encoding, normalize_allele_name
@@ -47,7 +48,7 @@ class Mhc1BindingPredictor(object):
             raise ValueError(
                 "No MHC prediction models found in %s" % (model_directory,))
         original_allele_name = allele
-        self.allele = normalize_allele_name(allele)
+        allele = self.allele = normalize_allele_name(allele)
         if self.allele not in _allele_model_cache:
             json_filename = self.allele + ".json"
             json_path = join(model_directory, json_filename)
@@ -62,10 +63,11 @@ class Mhc1BindingPredictor(object):
                 raise ValueError("Missing model weights for allele %s" % (
                     original_allele_name,))
 
-            with open(hdf_path, "r") as f:
-                self.model = model_from_json(f.read())
-
+            with open(json_path, "r") as f:
+                json_string = json.load(f)
+            self.model = model_from_config(json_string)
             self.model.load_weights(hdf_path)
+
             _allele_model_cache[self.allele] = self.model
         else:
             self.model = _allele_model_cache[self.allele]
