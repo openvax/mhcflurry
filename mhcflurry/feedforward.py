@@ -48,6 +48,7 @@ def compile_forward_predictor(model, theano_mode=None):
         allow_input_downcast=True,
         mode=theano_mode)
 
+
 def make_network(
         input_size,
         embedding_input_dim=None,
@@ -60,13 +61,17 @@ def make_network(
         dropout_probability=0.0,
         model=None,
         optimizer=None,
+        learning_rate=0.001,
         compile_for_training=True):
 
     if model is None:
         model = Sequential()
 
     if optimizer is None:
-        optimizer = keras.optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=1e-6)
+        optimizer = keras.optimizers.RMSprop(
+            lr=learning_rate,
+            rho=0.9,
+            epsilon=1e-6)
 
     if embedding_input_dim:
         if not embedding_output_dim:
@@ -76,11 +81,13 @@ def make_network(
         model.add(Embedding(
             input_dim=embedding_input_dim,
             output_dim=embedding_output_dim,
+            input_length=input_size,
             init=init))
         model.add(Flatten())
         input_size = input_size * embedding_output_dim
 
     layer_sizes = (input_size,) + tuple(layer_sizes)
+
     for i, dim in enumerate(layer_sizes):
         if i == 0:
             # input is only conceptually a layer of the network,
@@ -111,6 +118,7 @@ def make_network(
         compile_forward_predictor(model)
     return model
 
+
 def make_hotshot_network(
         peptide_length=9,
         layer_sizes=[500],
@@ -119,7 +127,8 @@ def make_hotshot_network(
         loss="mse",
         output_activation="sigmoid",
         dropout_probability=0.0,
-        optimizer=None):
+        optimizer=None,
+        learning_rate=0.001):
     return make_network(
         input_size=peptide_length * 20,
         layer_sizes=layer_sizes,
@@ -128,7 +137,9 @@ def make_hotshot_network(
         loss=loss,
         output_activation=output_activation,
         dropout_probability=dropout_probability,
-        optimizer=optimizer)
+        optimizer=optimizer,
+        learning_rate=learning_rate)
+
 
 def make_embedding_network(
         peptide_length=9,
@@ -140,7 +151,8 @@ def make_embedding_network(
         loss="mse",
         output_activation="sigmoid",
         dropout_probability=0.0,
-        optimizer=None):
+        optimizer=None,
+        learning_rate=0.001):
     return make_network(
         input_size=peptide_length,
         embedding_input_dim=embedding_input_dim,
@@ -151,4 +163,5 @@ def make_embedding_network(
         loss=loss,
         output_activation=output_activation,
         dropout_probability=dropout_probability,
-        optimizer=optimizer)
+        optimizer=optimizer,
+        learning_rate=learning_rate)

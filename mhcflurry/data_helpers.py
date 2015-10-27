@@ -27,6 +27,7 @@ from .amino_acid import amino_acid_letter_indices
 
 AlleleData = namedtuple("AlleleData", "X Y peptides ic50")
 
+
 def hotshot_encoding(peptides, peptide_length):
     """
     Encode a set of equal length peptides as a binary matrix,
@@ -41,6 +42,7 @@ def hotshot_encoding(peptides, peptide_length):
             X[i, j, k] = 1
     return X
 
+
 def index_encoding(peptides, peptide_length):
     """
     Encode a set of equal length peptides as a vector of their
@@ -52,16 +54,51 @@ def index_encoding(peptides, peptide_length):
             X[i, j] = amino_acid_letter_indices[amino_acid]
     return X
 
+
+def indices_to_hotshot_encoding(X, n_indices=None, first_index_value=0):
+    """
+    Given an (n_samples, peptide_length) integer matrix
+    convert it to a binary encoding of shape:
+        (n_samples, peptide_length * n_indices)
+    """
+    (n_samples, peptide_length) = X.shape
+    if not n_indices:
+        n_indices = X.max() - first_index_value + 1
+
+    X_binary = np.zeros((n_samples, peptide_length * n_indices), dtype=bool)
+    for i, row in enumerate(X):
+        for j, xij in enumerate(row):
+            X_binary[i, n_indices * j + xij - first_index_value] = 1
+    return X_binary.astype(float)
+
+
+def _infer_csv_separator(filename):
+    """
+    Determine if file is separated by comma, tab, or whitespace.
+    Default to whitespace if the others are not detected.
+
+    Returns (sep, delim_whitespace)
+    """
+    for candidate in [",", "\t"]:
+        with open(filename, "r") as f:
+            for line in f:
+                if line.startswith("#"):
+                    continue
+                if candidate in line:
+                    return candidate, False
+    return None, True
+
+
 def load_data(
         filename,
         peptide_length=9,
         max_ic50=5000.0,
         binary_encoding=True,
         flatten_binary_encoding=True,
-        sep="\t",
+        sep=None,
         species_column_name="species",
         allele_column_name="mhc",
-        peptide_column_name="sequence",
+        peptide_column_name=None,
         peptide_length_column_name="peptide_length",
         ic50_column_name="meas"):
     """
@@ -93,8 +130,34 @@ def load_data(
     flatten_features : bool
         If False, returns a (n_samples, peptide_length, 20) matrix, otherwise
         returns the 2D flattened version of the same data.
+
+    sep : str, optional
+        Separator in CSV file, default is to let Pandas infer
+
+    peptide_column_name : str, optional
+        Default behavior is to try {"sequence", "peptide", "peptide_sequence"}
     """
-    df = pd.read_csv(filename, sep=sep)
+    if sep is None:
+        sep, delim_whitespace = _infer_csv_separator(filename)
+    else:
+        delim_whitespace = False
+    df = pd.read_csv(
+        filename,
+        sep=sep,
+        delim_whitespace=delim_whitespace,
+        engine="c")
+    # hack: get around variability of column naming by checking if
+    # the peptide_column_name is actually present and if not try "peptide"
+    if peptide_column_name is None:
+        columns = set(df.keys())
+        for candidate in ["sequence", "peptide", "peptide_sequence"]:
+            if candidate in columns:
+                peptide_column_name = candidate
+                break
+        if peptide_column_name is None:
+            raise ValueError(
+                "Couldn't find peptide column name, candidates: %s" % (
+                    columns))
     human_mask = df[species_column_name] == "human"
     length_mask = df[peptide_length_column_name] == peptide_length
     df = df[human_mask & length_mask]
@@ -111,6 +174,8 @@ def load_data(
                 X = X.reshape((X.shape[0], peptide_length * 20))
         else:
             X = index_encoding(peptides, peptide_length=peptide_length)
+        assert allele not in allele_groups, \
+            "Duplicate datasets for %s" % allele
         allele_groups[allele] = AlleleData(
             X=X,
             Y=Y,

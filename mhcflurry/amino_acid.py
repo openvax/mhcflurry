@@ -35,6 +35,6 @@ amino_acids = {
     "V": "Valine",
 }
 
-amino_acid_letters = list(amino_acids.keys())
-amino_acid_names = list(amino_acids.values())
+amino_acid_letters = list(sorted(amino_acids.keys()))
+amino_acid_names = [amino_acids[k] for k in amino_acid_letters]
 amino_acid_letter_indices = {c: i for (i, c) in enumerate(amino_acid_letters)}
