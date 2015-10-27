@@ -65,7 +65,6 @@ class Mhc1BindingPredictor(object):
 
             with open(json_path, "r") as f:
                 config_dict = json.load(f)
-            print(config_dict)
             self.model = model_from_config(config_dict)
             self.model.load_weights(hdf_path)
             _allele_model_cache[self.allele] = self.model
@@ -92,16 +91,13 @@ class Mhc1BindingPredictor(object):
         """
         Predict binding affinity for 9mer peptides
         """
-        print("peptides", peptides)
         if any(len(peptide) != 9 for peptide in peptides):
             raise ValueError("Can only predict 9mer peptides")
         X = index_encoding(peptides, peptide_length=9)
-        print("X_index", X)
         return self.model.predict(X, verbose=False).flatten()
 
     def _predict_9mer_peptides_ic50(self, peptides):
         log_y = self._predict_9mer_peptides(peptides)
-        print("log_y", log_y)
         return self._log_to_ic50(log_y)
 
     def predict_peptides(self, peptides):
@@ -116,22 +112,18 @@ class Mhc1BindingPredictor(object):
 
         for length, group_peptides in groupby(peptides, lambda x: len(x)):
             group_peptides = list(group_peptides)
-            print("-- input", group_peptides)
             expanded_peptides = expand_9mer_peptides(group_peptides, length)
             n_group = len(group_peptides)
             n_expanded = len(expanded_peptides)
             expansion_factor = int(n_expanded / n_group)
             raw_y = self._predict_9mer_peptides(expanded_peptides)
-            print("raw_y", raw_y)
             median_y = np.zeros(n_group)
             # take the median of each group of log(IC50) values
             for i in range(n_group):
                 start = i * expansion_factor
                 end = (i + 1) * expansion_factor
                 median_y[i] = np.median(raw_y[start:end])
-            print("median_y", median_y)
             ic50 = self._log_to_ic50(median_y)
-            print("ic50", ic50)
             results["Allele"].extend([self.allele] * n_group)
             results["Peptide"].extend(group_peptides)
             results["Prediction"].extend(ic50)

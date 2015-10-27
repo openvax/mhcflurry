@@ -36,6 +36,7 @@ parser.add_argument(
     help="Separator to use for loading test data CSV/TSV files",
     type=str)
 
+
 parser.add_argument(
     "--test-data-output-dir",
     help="Save combined test datasets to this directory",
@@ -43,7 +44,9 @@ parser.add_argument(
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    dataframes, predictor_names = load_test_data(args.test_data_input_dirs)
+    dataframes, predictor_names = load_test_data(
+        args.test_data_input_dirs,
+        sep=args.test_data_input_sep)
     if not exists(args.test_data_output_dir):
         makedirs(args.test_data_output_dir)
 

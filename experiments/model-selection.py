@@ -161,6 +161,7 @@ if __name__ == "__main__":
     print("Total # configurations = %d" % len(configs))
     training_datasets, _ = load_data(
         args.binding_data_csv_path,
+        max_ic50=args.max_ic50,
         peptide_length=9,
         binary_encoding=False)
     combined_df = evaluate_model_configs(

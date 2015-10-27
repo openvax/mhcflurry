@@ -27,7 +27,7 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics import roc_auc_score
 
-from model_selection_helpers import f1_score
+from training_helpers import f1_score
 
 parser = ArgumentParser()
 

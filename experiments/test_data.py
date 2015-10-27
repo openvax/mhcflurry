@@ -61,6 +61,7 @@ def load_test_data(
                 substring
                 for substring in prefixes
                 if substring not in {"pred", "test", dataset_name}
+                and not substring.startswith("cv_")
             }
             if len(interesting_prefixes) != 1:
                 print("Can't infer predictor name for %s" % filepath)

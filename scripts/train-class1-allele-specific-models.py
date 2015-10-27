@@ -37,7 +37,6 @@ from __future__ import (
     absolute_import,
     unicode_literals
 )
-from shutil import rmtree
 from os import makedirs, remove
 from os.path import exists, join
 import argparse
@@ -90,10 +89,7 @@ parser.add_argument(
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    if exists(args.output_dir):
-        if args.overwrite:
-            rmtree(args.output_dir)
-    else:
+    if not exists(args.output_dir):
         makedirs(args.output_dir)
     allele_groups, _ = load_data(
         args.binding_data_csv_path,

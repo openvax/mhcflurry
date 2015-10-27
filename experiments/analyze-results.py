@@ -100,6 +100,48 @@ if __name__ == "__main__":
     args = parser.parse_args()
     results = pd.read_csv(args.filename, sep=",", header=0)
     results = infer_dtypes(results)
+    hyperparameter_columns = list(sorted({
+        name for name in results.columns
+        if "idx" not in name
+        and "_mean" not in name
+        and "_median" not in name
+        and "_min" not in name
+        and "_max" not in name
+        and "_iqr" not in name
+        and "_std" not in name
+        and "_amin" not in name
+        and "_amax" not in name
+        and "dataset_size" not in name
+        and "allele_name" not in name
+    }))
+    max_score = 0
+    best_f1 = 0
+    best_auc = 0
+    best_config = None
+    for _, group in results.groupby("config_idx"):
+        auc = group["auc_mean"]
+        f1 = group["f1_mean"]
+        auc_std = group["auc_std"]
+        f1_std = group["f1_std"]
+        score = np.mean(
+            np.sqrt(np.array(auc * f1)))
+        config_row = group[hyperparameter_columns].iloc[0]
+        print(config_row)
+        print("-- AUC: %0.4f +/- %0.4f (%0.4f), F1: %0.4f +/- %0.4f (%0.4f), combined: %0.4f" % (
+            auc.mean(),
+            auc.std(),
+            auc_std.median(),
+            f1.mean(),
+            f1.std(),
+            f1_std.median(),
+            score))
+        if score > max_score:
+            best_auc = auc.mean()
+            best_f1 = f1.mean()
+            max_score = score
+            best_config = config_row
+    print("Best score: %0.4f, AUC=%0.4f, f1=%0.4f, hyperparameters:\n%s" % (
+        max_score, best_auc, best_f1, best_config))
     print("=== Score Distributions For Hyperparameters ===")
     hyperparameter_performance(results)
     print("\n\n=== Hyperparameter Value Comparisons ===")

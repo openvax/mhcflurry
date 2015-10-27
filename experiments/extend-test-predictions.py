@@ -29,9 +29,9 @@ from os.path import join
 from argparse import ArgumentParser
 
 import pandas as pd
+from mhcflurry.data_helpers import load_data
 
 from dataset_paths import PETERS2009_CSV_PATH
-
 from model_configs import ModelConfig
 from model_selection_helpers import make_model
 """
@@ -73,7 +73,6 @@ parser.add_argument(
 parser.add_argument(
     "--peptide-sequence-column-name",
     default="sequence")
-
 
 parser.add_argument(
     "--predictor-name",
@@ -163,10 +162,13 @@ if __name__ == "__main__":
         optimizer=args.optimizer)
 
     model = make_model(config)
-    print(config)
-    print(model)
-    assert False
 
+    training_datasets = load_data(
+        filename=args.training_csv,
+        peptide_length=9,
+        max_ic50=args.max_ic50,
+        binary_encoding=args.embedding_size==0)
+    assert False
     # pre-train
     model.fit(None, None)
 
