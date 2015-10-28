@@ -96,5 +96,5 @@ def expand_9mer_peptides(peptides, length):
         return [
             peptide[:i] + peptide[i + n_skip:]
             for peptide in peptides
-            for i in range(3, length - 1)
+            for i in range(3, 9)
         ]

@@ -27,9 +27,12 @@ of the test set with mchflurry predictions (writing results to a new directory)
 from os import listdir
 from os.path import join
 from argparse import ArgumentParser
+from itertools import groupby
 
 import pandas as pd
-from mhcflurry.data_helpers import load_data
+import numpy as np
+from mhcflurry.data_helpers import load_data, index_encoding, hotshot_encoding
+from mhcflurry.common import normalize_allele_name, expand_9mer_peptides
 
 from dataset_paths import PETERS2009_CSV_PATH
 from model_configs import ModelConfig
@@ -80,7 +83,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--pretrain-epochs",
-    default=150,
+    default=10,
     type=int,
     help="Number of pre-training epochs which use all allele data combined")
 
@@ -162,19 +165,28 @@ if __name__ == "__main__":
         optimizer=args.optimizer)
 
     model = make_model(config)
-
-    training_datasets = load_data(
+    binary_encoding = (args.embedding_size == 0)
+    training_datasets, _ = load_data(
         filename=args.training_csv,
         peptide_length=9,
         max_ic50=args.max_ic50,
-        binary_encoding=args.embedding_size==0)
-    assert False
-    # pre-train
-    model.fit(None, None)
+        binary_encoding=binary_encoding)
 
+    X_all = np.vstack([dataset.X for dataset in training_datasets.values()])
+    Y_all = np.concatenate([
+        dataset.Y
+        for dataset in training_datasets.values()
+    ])
+    model.fit(
+        X_all,
+        Y_all,
+        nb_epoch=args.pretrain_epochs,
+        batch_size=args.minibatch_size,
+        shuffle=True)
     old_weights = model.get_weights()
-    for filename in listdir(args.test_data_dir):
-        filepath = join(args.test_data_dir, filename)
+
+    for filename in listdir(args.input_dir):
+        filepath = join(args.input_dir, filename)
         parts = filename.split(".")
         if len(parts) != 2:
             print("Skipping %s" % filepath)
@@ -183,6 +195,7 @@ if __name__ == "__main__":
         if ext != "csv":
             print("Skipping %s, only reading CSV files" % filepath)
             continue
+        print("Loading %s" % filepath)
         df = pd.read_csv(filepath)
 
         columns = set(df.columns)
@@ -190,10 +203,47 @@ if __name__ == "__main__":
             raise ValueError("Column '%s' already exists in %s" % (
                 args.predictor_name, filepath))
 
-        model.set_weights(old_weights)
-        allele_dataset = None
-        model.fit(allele_dataset.X, allele_dataset.Y)
+        peptide_sequences = list(df["sequence"])
+        true_ic50 = list(df["meas"])
 
-        X_test = encode(df[args.peptide_sequence_column_name])
-        Y_pred = model.predict(X_test)
-        Y_pred_ic50 = args.max_ic50 ** (1.0 - Y_pred)
+        model.set_weights(old_weights)
+        allele_name = normalize_allele_name(filename.split(".")[0])
+        allele_dataset = training_datasets[allele_name]
+        X_train = allele_dataset.X
+        Y_train = allele_dataset.Y
+        model.fit(
+            X_train,
+            Y_train,
+            nb_epoch=args.training_epochs,
+            batch_size=args.minibatch_size)
+
+        log_base_max_ic50 = np.log(true_ic50) / np.log(args.max_ic50)
+        true_y = 1.0 - np.maximum(1.0, log_base_max_ic50)
+        predictions = {}
+        for length, equal_length_sequences in groupby(
+                peptide_sequences,
+                lambda seq: len(seq)):
+            for peptide in equal_length_sequences:
+                expanded_peptides = expand_9mer_peptides(peptide, length=length)
+                if binary_encoding:
+                    X_test = hotshot_encoding(
+                        expanded_peptides,
+                        peptide_length=length)
+                    # collapse 3D input into 2D matrix
+                    X_test = X_test.reshape((X_test.shape[0], length * 20))
+                else:
+                    X_test = index_encoding(
+                        expanded_peptides,
+                        peptide_length=length)
+                Y_pred = model.predict(X_test)
+                assert len(X_test) == len(Y_pred)
+                Y_pred_mean = np.mean(Y_pred)
+
+                Y_pred_ic50 = args.max_ic50 ** (1.0 - Y_pred_mean)
+                predictions[peptide] = Y_pred_ic50
+
+        df[args.predictor_name] = [
+            predictions[peptide]
+            for peptide in peptide_sequences
+        ]
+        print((true_ic50 - df[args.predictor_name]).mean())
