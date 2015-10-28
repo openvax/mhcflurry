@@ -211,39 +211,39 @@ if __name__ == "__main__":
         allele_dataset = training_datasets[allele_name]
         X_train = allele_dataset.X
         Y_train = allele_dataset.Y
+
         model.fit(
             X_train,
             Y_train,
             nb_epoch=args.training_epochs,
-            batch_size=args.minibatch_size)
+            batch_size=args.minibatch_size,
+            shuffle=True)
 
-        log_base_max_ic50 = np.log(true_ic50) / np.log(args.max_ic50)
-        true_y = 1.0 - np.maximum(1.0, log_base_max_ic50)
         predictions = {}
         for length, equal_length_sequences in groupby(
                 peptide_sequences,
                 lambda seq: len(seq)):
             for peptide in equal_length_sequences:
-                expanded_peptides = expand_9mer_peptides(peptide, length=length)
+                expanded_peptides = expand_9mer_peptides([peptide], length=length)
                 if binary_encoding:
                     X_test = hotshot_encoding(
                         expanded_peptides,
-                        peptide_length=length)
+                        peptide_length=9)
                     # collapse 3D input into 2D matrix
-                    X_test = X_test.reshape((X_test.shape[0], length * 20))
+                    X_test = X_test.reshape((X_test.shape[0], 9 * 20))
                 else:
                     X_test = index_encoding(
                         expanded_peptides,
-                        peptide_length=length)
+                        peptide_length=9)
+
                 Y_pred = model.predict(X_test)
+
                 assert len(X_test) == len(Y_pred)
                 Y_pred_mean = np.mean(Y_pred)
-
                 Y_pred_ic50 = args.max_ic50 ** (1.0 - Y_pred_mean)
                 predictions[peptide] = Y_pred_ic50
-
         df[args.predictor_name] = [
             predictions[peptide]
             for peptide in peptide_sequences
         ]
-        print((true_ic50 - df[args.predictor_name]).mean())
+        print(df[["sequence", "meas", "mhcflurry"]])
