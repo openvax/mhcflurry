@@ -31,7 +31,7 @@ from itertools import groupby
 
 import pandas as pd
 import numpy as np
-from sklearn.cross_validation import KFold
+from sklearn.cross_validation import StratifiedKFold
 from mhcflurry.data_helpers import load_data, index_encoding, hotshot_encoding
 from mhcflurry.common import normalize_allele_name, expand_9mer_peptides
 
@@ -232,19 +232,31 @@ if __name__ == "__main__":
         if not training_epochs:
             training_epochs = max(1, int(10 ** 6 / len(Y_train)))
 
-        for i, (cv_train_indices, cv_test_indices) in KFold(args.ensemble_size):
+        for i, (cv_train_indices, cv_test_indices) in enumerate(StratifiedKFold(
+                y=(Y_train <= 500),
+                n_folds=args.ensemble_size,
+                shuffle=True)):
             for epoch in range(args.training_epochs):
                 models[i].fit(
-                    X_train[cv_train_indices],
+                    X_train[cv_train_indices, :],
                     Y_train[cv_train_indices],
                     nb_epoch=1,
                     batch_size=args.minibatch_size,
-                    shuffle=True)
-                fold_pred = models[i].predict(X_train[cv_test_indices])
-                print("Model #%d epoch #%d MSE=%0.4f" % (
+                    verbose=0)
+                cv_train_pred = models[i].predict(X_train[cv_train_indices, :])
+                cv_train_pred = cv_train_pred.flatten()
+                cv_train_mse = ((
+                    cv_train_pred - Y_train[cv_train_indices]) ** 2).mean()
+                cv_test_pred = models[i].predict(X_train[cv_test_indices, :])
+                cv_test_pred = cv_test_pred.flatten()
+                cv_test_mse = ((
+                    cv_test_pred - Y_train[cv_test_indices]) ** 2).mean()
+
+                print("Model #%d epoch #%d train MSE=%0.4f test MSE=%0.4f" % (
                     i + 1,
                     epoch + 1,
-                    ((fold_pred - Y_train[cv_test_indices]) ** 2).mean()
+                    cv_train_mse,
+                    cv_test_mse,
                 ))
 
         predictions = {}
