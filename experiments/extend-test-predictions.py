@@ -31,6 +31,7 @@ from itertools import groupby
 
 import pandas as pd
 import numpy as np
+from sklearn.cross_validation import KFold
 from mhcflurry.data_helpers import load_data, index_encoding, hotshot_encoding
 from mhcflurry.common import normalize_allele_name, expand_9mer_peptides
 
@@ -119,9 +120,9 @@ parser.add_argument(
 
 parser.add_argument(
     "--hidden-layer-size",
-    default=400,
+    default=200,
     type=int,
-    help="Hidden layer size")
+    help="Hidden layer size, default = multiple of 25 nearest n_samples/20")
 
 
 parser.add_argument(
@@ -146,6 +147,7 @@ parser.add_argument(
     default="rmsprop",
     help="Optimization methods")
 
+parser.add_argument("--ensemble-size", type=int, default=5)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -164,7 +166,8 @@ if __name__ == "__main__":
         learning_rate=args.learning_rate,
         optimizer=args.optimizer)
 
-    model = make_model(config)
+    models = [make_model(config) for _ in range(args.ensemble_size)]
+
     binary_encoding = (args.embedding_size == 0)
 
     training_datasets, _ = load_data(
@@ -178,13 +181,15 @@ if __name__ == "__main__":
         dataset.Y
         for dataset in training_datasets.values()
     ])
-    model.fit(
-        X_all,
-        Y_all,
-        nb_epoch=args.pretrain_epochs,
-        batch_size=args.minibatch_size,
-        shuffle=True)
-    old_weights = model.get_weights()
+
+    for model in models:
+        model.fit(
+            X_all,
+            Y_all,
+            nb_epoch=args.pretrain_epochs,
+            batch_size=args.minibatch_size,
+            shuffle=True)
+    old_weights = [model.get_weights() for model in models]
 
     if not exists(args.output_dir):
         makedirs(args.output_dir)
@@ -217,17 +222,30 @@ if __name__ == "__main__":
         peptide_sequences = list(df["sequence"])
         true_ic50 = list(df["meas"])
 
-        model.set_weights(old_weights)
+        for model_i, old_weights_i in zip(models, old_weights):
+            model_i.set_weights(old_weights_i)
+
         allele_dataset = training_datasets[allele_name]
         X_train = allele_dataset.X
         Y_train = allele_dataset.Y
+        training_epochs = args.training_epochs
+        if not training_epochs:
+            training_epochs = max(1, int(10 ** 6 / len(Y_train)))
 
-        model.fit(
-            X_train,
-            Y_train,
-            nb_epoch=args.training_epochs,
-            batch_size=args.minibatch_size,
-            shuffle=True)
+        for i, (cv_train_indices, cv_test_indices) in KFold(args.ensemble_size):
+            for epoch in range(args.training_epochs):
+                models[i].fit(
+                    X_train[cv_train_indices],
+                    Y_train[cv_train_indices],
+                    nb_epoch=1,
+                    batch_size=args.minibatch_size,
+                    shuffle=True)
+                fold_pred = models[i].predict(X_train[cv_test_indices])
+                print("Model #%d epoch #%d MSE=%0.4f" % (
+                    i + 1,
+                    epoch + 1,
+                    ((fold_pred - Y_train[cv_test_indices]) ** 2).mean()
+                ))
 
         predictions = {}
         for length, equal_length_sequences in groupby(
@@ -245,11 +263,8 @@ if __name__ == "__main__":
                     X_test = index_encoding(
                         expanded_peptides,
                         peptide_length=9)
-
-                Y_pred = model.predict(X_test)
-
-                assert len(X_test) == len(Y_pred)
-                Y_pred_mean = np.mean(Y_pred)
+                Y_preds = [model.predict(X_test) for model in models]
+                Y_pred_mean = np.mean(Y_preds)
                 Y_pred_ic50 = args.max_ic50 ** (1.0 - Y_pred_mean)
                 predictions[peptide] = Y_pred_ic50
 

@@ -123,18 +123,22 @@ if __name__ == "__main__":
         f1 = group["f1_mean"]
         auc_std = group["auc_std"]
         f1_std = group["f1_std"]
-        score = np.mean(
-            np.sqrt(np.array(auc * f1)))
+        combined_scores = np.sqrt(np.array(auc * f1))
+        score = np.mean(combined_scores)
+        score_std = np.std(combined_scores)
         config_row = group[hyperparameter_columns].iloc[0]
         print(config_row)
-        print("-- AUC: %0.4f +/- %0.4f (%0.4f), F1: %0.4f +/- %0.4f (%0.4f), combined: %0.4f" % (
+        print("--> AUC: %0.4f +/- %0.4f" % (
             auc.mean(),
-            auc.std(),
-            auc_std.median(),
+            auc.std()))
+        print("--> F1: %0.4f +/- %0.4f" % (
             f1.mean(),
-            f1.std(),
-            f1_std.median(),
-            score))
+            f1.std()))
+
+        print("--> combined: %0.4f +/- %0.4f" % (
+            score,
+            score_std))
+
         if score > max_score:
             best_auc = auc.mean()
             best_f1 = f1.mean()
