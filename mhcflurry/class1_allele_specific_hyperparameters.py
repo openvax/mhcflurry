@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-N_PRETRAIN_EPOCHS = 10
-N_EPOCHS = 125
-ACTIVATION = "relu"
+N_PRETRAIN_EPOCHS = 5
+N_EPOCHS = 150
+ACTIVATION = "tanh"
 INITIALIZATION_METHOD = "lecun_uniform"
-EMBEDDING_DIM = 64
-HIDDEN_LAYER_SIZE = 400
+EMBEDDING_DIM = 32
+HIDDEN_LAYER_SIZE = 200
 DROPOUT_PROBABILITY = 0.25
-MAX_IC50 = 5000.0
+MAX_IC50 = 20000.0

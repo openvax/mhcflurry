@@ -32,11 +32,13 @@ parser.add_argument(
     default=False,
     action="store_true")
 
-parser.add_argument("--with-dataset-size",
+parser.add_argument(
+    "--with-dataset-size",
     default=False,
     action="store_true")
 
-parser.add_argument("--all",
+parser.add_argument(
+    "--all",
     default=False,
     action="store_true",
     help="Include serotypes (like 'A2') which include multiple 4-digit types")

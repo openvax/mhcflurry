@@ -53,7 +53,8 @@ from mhcflurry.class1_allele_specific_hyperparameters import (
     INITIALIZATION_METHOD,
     EMBEDDING_DIM,
     HIDDEN_LAYER_SIZE,
-    DROPOUT_PROBABILITY
+    DROPOUT_PROBABILITY,
+    MAX_IC50
 )
 from mhcflurry.paths import (
     CLASS1_MODEL_DIRECTORY,
@@ -95,6 +96,7 @@ if __name__ == "__main__":
         args.binding_data_csv_path,
         peptide_length=9,
         binary_encoding=False,
+        max_ic50=MAX_IC50,
         sep=",",
         peptide_column_name="peptide")
     # concatenate datasets from all alleles to use for pre-training of

@@ -31,20 +31,24 @@ from mhcflurry.class1 import predict
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--mhc",
+parser.add_argument(
+    "--mhc",
     default="HLA-A*02:01",
     type=split_allele_names,
     help="Comma separated list of MHC alleles")
 
-parser.add_argument("--sequence",
+parser.add_argument(
+    "--sequence",
     required=True,
     type=split_uppercase_sequences,
     help="Comma separated list of protein sequences")
 
-parser.add_argument("--fasta-file",
+parser.add_argument(
+    "--fasta-file",
     help="FASTA file of protein sequences to chop up into peptides")
 
-parser.add_argument("--peptide-lengths",
+parser.add_argument(
+    "--peptide-lengths",
     default=[9],
     type=parse_int_list,
     help="Comma separated list of peptide length, e.g. 8,9,10,11")
