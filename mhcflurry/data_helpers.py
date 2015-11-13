@@ -89,7 +89,89 @@ def _infer_csv_separator(filename):
     return None, True
 
 
-def load_data(
+def load_dataframe(
+        filename,
+        peptide_length=None,
+        max_ic50=50000.0,
+        sep=None,
+        species_column_name="species",
+        allele_column_name="mhc",
+        peptide_column_name=None,
+        peptide_length_column_name="peptide_length",
+        ic50_column_name="meas",
+        only_human=True):
+    """
+    Load a dataframe of peptide-MHC affinity measurements
+
+    filename : str
+        TSV filename with columns:
+            - 'species'
+            - 'mhc'
+            - 'peptide_length'
+            - 'sequence'
+            - 'meas'
+
+     peptide_length : int, optional
+        Which length peptides to use (default=load all lengths)
+
+    max_ic50 : float
+        Treat IC50 scores above this value as all equally bad
+        (transform them to 0.0 in the regression output)
+
+    sep : str, optional
+        Separator in CSV file, default is to let Pandas infer
+
+    peptide_column_name : str, optional
+        Default behavior is to try  {"sequence", "peptide", "peptide_sequence"}
+
+    only_human : bool
+        Only load entries from human MHC alleles
+
+    Returns DataFrame augmented with extra columns:
+        - "log_ic50" : log(ic50) / log(max_ic50)
+        - "regression_output" : 1.0 - log(ic50)/log(max_ic50), limited to [0,1]
+    """
+    if sep is None:
+        sep, delim_whitespace = _infer_csv_separator(filename)
+    else:
+        delim_whitespace = False
+    df = pd.read_csv(
+        filename,
+        sep=sep,
+        delim_whitespace=delim_whitespace,
+        engine="c")
+    # hack: get around variability of column naming by checking if
+    # the peptide_column_name is actually present and if not try "peptide"
+    if peptide_column_name is None:
+        columns = set(df.keys())
+        for candidate in ["sequence", "peptide", "peptide_sequence"]:
+            if candidate in columns:
+                peptide_column_name = candidate
+                break
+        if peptide_column_name is None:
+            raise ValueError(
+                "Couldn't find peptide column name, candidates: %s" % (
+                    columns))
+    if only_human:
+        human_mask = df[species_column_name] == "human"
+        df = df[human_mask]
+    if peptide_length is not None:
+        length_mask = df[peptide_length_column_name] == peptide_length
+        df = df[length_mask]
+
+    df[allele_column_name] = df[allele_column_name].map(normalize_allele_name)
+    ic50 = np.array(df[ic50_column_name])
+    log_ic50 = np.log(ic50) / np.log(max_ic50)
+    df["log_ic50"] = log_ic50
+    regression_output = 1.0 - log_ic50
+    # clamp to values between 0, 1
+    regression_output = np.maximum(regression_output, 0.0)
+    regression_output = np.minimum(regression_output, 1.0)
+    df["regression_output"] = regression_output
+    return df
+
+
+def load_allele_datasets(
         filename,
         peptide_length=9,
         max_ic50=5000.0,
@@ -100,12 +182,12 @@ def load_data(
         allele_column_name="mhc",
         peptide_column_name=None,
         peptide_length_column_name="peptide_length",
-        ic50_column_name="meas"):
+        ic50_column_name="meas",
+        only_human=True):
     """
     Loads an IEDB dataset, extracts "hot-shot" encoding of fixed length peptides
-    and log-transforms the IC50 measurement. Returns (groups, df),
-    where groups is a dictionary mapping allele names to (X, Y, original_ic50)
-    and df is the full dataframe.
+    and log-transforms the IC50 measurement. Returns dictionary mapping allele
+    names to AlleleData objects (containing fields X, Y, ic50)
 
     Parameters
     ----------
@@ -136,36 +218,25 @@ def load_data(
 
     peptide_column_name : str, optional
         Default behavior is to try {"sequence", "peptide", "peptide_sequence"}
+
+    only_human : bool
+        Only load entries from human MHC alleles
     """
-    if sep is None:
-        sep, delim_whitespace = _infer_csv_separator(filename)
-    else:
-        delim_whitespace = False
-    df = pd.read_csv(
-        filename,
+    df = load_dataframe(
+        filename=filename,
+        max_ic50=max_ic50,
         sep=sep,
-        delim_whitespace=delim_whitespace,
-        engine="c")
-    # hack: get around variability of column naming by checking if
-    # the peptide_column_name is actually present and if not try "peptide"
-    if peptide_column_name is None:
-        columns = set(df.keys())
-        for candidate in ["sequence", "peptide", "peptide_sequence"]:
-            if candidate in columns:
-                peptide_column_name = candidate
-                break
-        if peptide_column_name is None:
-            raise ValueError(
-                "Couldn't find peptide column name, candidates: %s" % (
-                    columns))
-    human_mask = df[species_column_name] == "human"
-    length_mask = df[peptide_length_column_name] == peptide_length
-    df = df[human_mask & length_mask]
+        species_column_name=species_column_name,
+        allele_column_name=allele_column_name,
+        peptide_column_name=peptide_column_name,
+        peptide_length_column_name=peptide_length_column_name,
+        ic50_column_name=ic50_column_name,
+        only_human=only_human)
+
     allele_groups = {}
     for allele, group in df.groupby(allele_column_name):
-        allele = normalize_allele_name(allele)
         ic50 = np.array(group[ic50_column_name])
-        Y = np.maximum(0.0, 1.0 - np.log(ic50) / np.log(max_ic50))
+        Y = np.array(group["regression_output"])
         peptides = list(group[peptide_column_name])
         if binary_encoding:
             X = hotshot_encoding(peptides, peptide_length=peptide_length)
@@ -181,4 +252,4 @@ def load_data(
             Y=Y,
             ic50=ic50,
             peptides=peptides)
-    return allele_groups, df
+    return allele_groups

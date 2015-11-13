@@ -45,7 +45,7 @@ import numpy as np
 
 from mhcflurry.common import normalize_allele_name
 from mhcflurry.feedforward import make_network
-from mhcflurry.data_helpers import load_data
+from mhcflurry.data_helpers import load_allele_datasets
 from mhcflurry.class1_allele_specific_hyperparameters import (
     N_PRETRAIN_EPOCHS,
     N_EPOCHS,
@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
     if not exists(args.output_dir):
         makedirs(args.output_dir)
-    allele_groups, _ = load_data(
+    allele_groups = load_allele_datasets(
         args.binding_data_csv_path,
         peptide_length=9,
         binary_encoding=False,

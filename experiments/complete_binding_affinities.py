@@ -107,7 +107,7 @@ def create_matrix_completion_convex_problem(
     return A, problem
 
 if __name__ == "__main__":
-    train_datasets, df = mhcflurry.data_helpers.load_data(
+    train_datasets = mhcflurry.data_helpers.load_allele_datasets(
         dataset_paths.PETERS2009_CSV_PATH,
         binary_encoding=False,
         max_ic50=20000)
