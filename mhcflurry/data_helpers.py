@@ -171,6 +171,45 @@ def load_dataframe(
     return df
 
 
+def load_allele_dicts(
+        filename,
+        max_ic50=50000.0,
+        regression_output=False,
+        sep=None,
+        species_column_name="species",
+        allele_column_name="mhc",
+        peptide_column_name=None,
+        peptide_length_column_name="peptide_length",
+        ic50_column_name="meas",
+        only_human=True):
+    """
+    Parsing CSV of binding data into dictionary of dictionaries.
+    The outer key is an allele name, the inner key is a peptide sequence,
+    and the inner value is an IC50 or log-transformed value between [0,1]
+    """
+    binding_df = load_dataframe(
+        filename=filename,
+        max_ic50=max_ic50,
+        sep=sep,
+        species_column_name=species_column_name,
+        allele_column_name=allele_column_name,
+        peptide_column_name=peptide_column_name,
+        peptide_length_column_name=peptide_length_column_name,
+        ic50_column_name=ic50_column_name,
+        only_human=only_human)
+    return {
+        allele_name: {
+            row[peptide_column_name]: (
+                row["regression_output"]
+                if regression_output
+                else row[ic50_column_name]
+            )
+            for (_, row) in group.iterrows()
+        }
+        for (allele_name, group) in binding_df.groupby(allele_column_name)
+    }
+
+
 def load_allele_datasets(
         filename,
         peptide_length=9,

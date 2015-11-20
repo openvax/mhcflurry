@@ -32,7 +32,7 @@ from keras.models import model_from_config
 from .class1_allele_specific_hyperparameters import MAX_IC50
 from .data_helpers import index_encoding, normalize_allele_name
 from .paths import CLASS1_MODEL_DIRECTORY
-from .common import expand_9mer_peptides
+from .fixed_length_peptides import fixed_length_from_many_peptides
 
 _allele_model_cache = {}
 
@@ -111,8 +111,9 @@ class Mhc1BindingPredictor(object):
             results[column_name] = []
 
         for length, group_peptides in groupby(peptides, lambda x: len(x)):
-            group_peptides = list(group_peptides)
-            expanded_peptides = expand_9mer_peptides(group_peptides, length)
+            expanded_peptides, _, _ = fixed_length_from_many_peptides(
+                peptides=list(group_peptides),
+                desired_length=length)
             n_group = len(group_peptides)
             n_expanded = len(expanded_peptides)
             expansion_factor = int(n_expanded / n_group)
