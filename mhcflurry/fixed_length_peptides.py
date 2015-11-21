@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import itertools
+import logging
 
 from .amino_acid import amino_acid_letters
 
@@ -20,12 +21,23 @@ from .amino_acid import amino_acid_letters
 def all_kmers(k, alphabet=amino_acid_letters):
     """
     Generates all k-mer peptide sequences
+
+    Parameters
+    ----------
+    k : int
+
+    alphabet : str | list of characters
     """
+    alphabets = [alphabet] * k
     return [
         "".join(combination)
         for combination
-        in itertools.product(list(alphabet) * k)
+        in itertools.product(*alphabets)
     ]
+
+
+class CombinatorialExplosion(Exception):
+    pass
 
 
 def extend_peptide(
@@ -35,18 +47,37 @@ def extend_peptide(
         end_offset,
         alphabet=amino_acid_letters):
     """Extend peptide by inserting every possible amino acid combination
-    if we're trying to e.g. turn an 8mer into 9mers
+    if we're trying to e.g. turn an 8mer into 9mers.
+
+    Parameters
+    ----------
+    peptide : str
+
+    desired_length : int
+
+    start_offset : int
+        How many characters (from the position before the start of the string)
+        to skip before inserting characters.
+
+
+    end_offset : int
+        Last character position from the end where we insert new characters,
+        where 0 is the position after the last character.
+
+    alphabet : str | list of character
     """
     n = len(peptide)
-    assert n < desired_length
+    assert n < desired_length, \
+        "%s (length = %d) is too long! Must be shorter than %d" % (
+            peptide, n, desired_length)
     n_missing = desired_length - n
     if n_missing > 3:
-        raise ValueError(
+        raise CombinatorialExplosion(
             "Cannot transform %s of length %d into a %d-mer peptide" % (
                 peptide, n, desired_length))
     return [
         peptide[:i] + extra + peptide[i:]
-        for i in range(start_offset, n - end_offset)
+        for i in range(start_offset, n - end_offset + 1)
         for extra in all_kmers(n_missing, alphabet=alphabet)
     ]
 
@@ -57,9 +88,25 @@ def shorten_peptide(
         start_offset,
         end_offset,
         alphabet=amino_acid_letters):
-    """Shorten peptide if trying to e.g. turn 10mer into 9mers"""
+    """Shorten peptide if trying to e.g. turn 10mer into 9mers
+
+    Parameters
+    ----------
+
+    peptide : str
+
+    desired_length : int
+
+    start_offset : int
+
+    end_offset : int
+
+    alphabet : str | list of characters
+    """
     n = len(peptide)
-    assert n > desired_length
+    assert n > desired_length, \
+        "%s (length = %d) is too short! Must be longer than %d" % (
+            peptide, n, desired_length)
     n_skip = n - desired_length
     assert n_skip > 0, \
         "Expected length of peptide %s %d to be greater than %d" % (
@@ -69,50 +116,6 @@ def shorten_peptide(
         peptide[:i] + peptide[i + n_skip:]
         for i in range(start_offset, end_range)
     ]
-
-
-def fixed_length_from_single_peptide(
-        peptide,
-        desired_length,
-        start_offset_extend=2,
-        end_offset_extend=1,
-        start_offset_shorten=2,
-        end_offset_shorten=0,
-        alphabet=amino_acid_letters):
-    """
-    Create a set of fixed-length k-mer peptides from a single peptide of any
-    length. Shorter peptides are filled in using all possible amino acids at any
-    insertion site between (start_offset, -end_offset).
-
-    We can recreate the methods from:
-       Accurate approximation method for prediction of class I MHC
-       affinities for peptides of length 8, 10 and 11 using prediction
-       tools trained on 9mers.
-    by Lundegaard et. al. (http://bioinformatics.oxfordjournals.org/content/24/11/1397)
-    with the following settings:
-        - desired_length = 9
-        - start_offset_extend = 2
-        - end_offset_extend = 1
-        - start_offset_shorten = 2
-        - end_offset_shorten = 0
-    """
-    n = len(peptide)
-    if n == desired_length:
-        return [peptide]
-    elif n < desired_length:
-        return extend_peptide(
-            peptide=peptide,
-            desired_length=desired_length,
-            start_offset=start_offset_extend,
-            end_offset=end_offset_extend,
-            alphabet=alphabet)
-    else:
-        return shorten_peptide(
-            peptide=peptide,
-            desired_length=desired_length,
-            start_offset=start_offset_shorten,
-            end_offset=end_offset_shorten,
-            alphabet=alphabet)
 
 
 def fixed_length_from_many_peptides(
@@ -125,11 +128,19 @@ def fixed_length_from_many_peptides(
         alphabet=amino_acid_letters):
     """
     Create a set of fixed-length k-mer peptides from a collection of varying
-    length peptides. Shorter peptides are filled in using all possible amino
-    acids at any insertion site between
-        [start_offset_extend, length - end_offset_extend).
-    Longer peptides are made smaller by deleting contiguous residues between
-        [start_offset_shorten, length - end_offset_shorten)
+    length peptides.
+
+
+    Shorter peptides are filled in using all possible amino acids at any
+    insertion site between start_offset_shorten and -end_offset_shorten
+    where start_offset_extend=0 represents insertions before the string
+    and end_offset_extend=0 represents insertions after the string's ending.
+
+    Longer peptides are shortened by deleting contiguous residues, starting
+    from start_offset_shorten and ending with -end_offset_shorten. Unlike
+    peptide extensions, the offsets for shortening a peptide range between
+    the first and last positions (rather than between the positions *before*
+    the string starts and the position *after*).
 
     We can recreate the methods from:
        Accurate approximation method for prediction of class I MHC
@@ -138,10 +149,10 @@ def fixed_length_from_many_peptides(
     by Lundegaard et. al. (http://bioinformatics.oxfordjournals.org/content/24/11/1397)
     with the following settings:
         - desired_length = 9
-        - start_offset_extend = 2
-        - end_offset_extend = 1
-        - start_offset_shorten = 2
-        - end_offset_shorten = 0
+        - start_offset_extend = 3
+        - end_offset_extend = 2
+        - start_offset_shorten = 3
+        - end_offset_shorten = 1
 
     Returns three lists:
         - a list of fixed length peptides (all of length `desired_length`)
@@ -162,21 +173,52 @@ def fixed_length_from_many_peptides(
         kmers == ["BC", "AC", "AB", "AA", "BA", "CA", "AA", "AB", "AC"]
         original == ["ABC", "ABC", "ABC", "A", "A", "A", "A", "A", "A"]
         counts == [3, 3, 3, 6, 6, 6, 6, 6, 6]
+
+    Parameters
+    ----------
+    peptide : list of str
+
+    desired_length : int
+
+    start_offset_extend : int
+
+    end_offset_extend : int
+
+    start_offset_shorten : int
+
+    end_offset_shorten : int
+
+    alphabet : str | list of characters
     """
-    fixed_length_peptides = []
+    all_fixed_length_peptides = []
     original_peptide_sequences = []
-    number_expanded = []
+    counts = []
     for peptide in peptides:
-        fixed_length_peptides = fixed_length_from_single_peptide(
-            peptide,
-            desired_length=desired_length,
-            start_offset_extend=start_offset_extend,
-            end_offset_extend=end_offset_extend,
-            start_offset_shorten=start_offset_shorten,
-            end_offset_shorten=end_offset_shorten,
-            alphabet=alphabet)
+        n = len(peptide)
+        if n == desired_length:
+            fixed_length_peptides = [peptide]
+        elif n < desired_length:
+            try:
+                fixed_length_peptides = extend_peptide(
+                    peptide=peptide,
+                    desired_length=desired_length,
+                    start_offset=start_offset_extend,
+                    end_offset=end_offset_extend,
+                    alphabet=alphabet)
+            except CombinatorialExplosion:
+                logging.warn(
+                    "Peptide %s is too short to be extended to length %d" % (
+                        peptide, desired_length))
+                continue
+        else:
+            fixed_length_peptides = shorten_peptide(
+                peptide=peptide,
+                desired_length=desired_length,
+                start_offset=start_offset_shorten,
+                end_offset=end_offset_shorten,
+                alphabet=alphabet)
         n_fixed_length = len(fixed_length_peptides)
-        fixed_length_peptides.extend(fixed_length_peptides)
+        all_fixed_length_peptides.extend(fixed_length_peptides)
         original_peptide_sequences.extend([peptide] * n_fixed_length)
-        number_expanded.extend([n_fixed_length] * n_fixed_length)
-    return fixed_length_peptides, original_peptide_sequences, number_expanded
+        counts.extend([n_fixed_length] * n_fixed_length)
+    return all_fixed_length_peptides, original_peptide_sequences, counts

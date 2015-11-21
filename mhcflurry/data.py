@@ -23,53 +23,25 @@ import pandas as pd
 import numpy as np
 
 from .common import normalize_allele_name
-from .amino_acid import amino_acid_letter_indices
+from .peptide_encoding import (
+    fixed_length_index_encoding,
+    indices_to_hotshot_encoding,
+)
 
-AlleleData = namedtuple("AlleleData", "X Y peptides ic50")
-
-
-def hotshot_encoding(peptides, peptide_length):
-    """
-    Encode a set of equal length peptides as a binary matrix,
-    where each letter is transformed into a length 20 vector with a single
-    element that is 1 (and the others are 0).
-    """
-    shape = (len(peptides), peptide_length, 20)
-    X = np.zeros(shape, dtype=bool)
-    for i, peptide in enumerate(peptides):
-        for j, amino_acid in enumerate(peptide):
-            k = amino_acid_letter_indices[amino_acid]
-            X[i, j, k] = 1
-    return X
-
-
-def index_encoding(peptides, peptide_length):
-    """
-    Encode a set of equal length peptides as a vector of their
-    amino acid indices.
-    """
-    X = np.zeros((len(peptides), peptide_length), dtype=int)
-    for i, peptide in enumerate(peptides):
-        for j, amino_acid in enumerate(peptide):
-            X[i, j] = amino_acid_letter_indices[amino_acid]
-    return X
-
-
-def indices_to_hotshot_encoding(X, n_indices=None, first_index_value=0):
-    """
-    Given an (n_samples, peptide_length) integer matrix
-    convert it to a binary encoding of shape:
-        (n_samples, peptide_length * n_indices)
-    """
-    (n_samples, peptide_length) = X.shape
-    if not n_indices:
-        n_indices = X.max() - first_index_value + 1
-
-    X_binary = np.zeros((n_samples, peptide_length * n_indices), dtype=bool)
-    for i, row in enumerate(X):
-        for j, xij in enumerate(row):
-            X_binary[i, n_indices * j + xij - first_index_value] = 1
-    return X_binary.astype(float)
+AlleleData = namedtuple(
+    "AlleleData",
+    [
+        "X_index",    # index-based featue encoding of fixed length peptides
+        "X_binary",  # binary encoding of fixed length peptides
+        "Y",     # regression encoding of IC50 (log scaled between 0..1)
+        "peptides",  # list of fixed length peptide string
+        "ic50",      # IC50 value associated with each entry
+        "original_peptides",  # original peptides may be of different lengths
+        "original_length",  # len(original_peptide)
+        "substring_count",  # how many substrings were extracted from
+                            # each original peptide string
+        "weight",    # 1.0 / count
+    ])
 
 
 def _infer_csv_separator(filename):
@@ -213,8 +185,8 @@ def load_allele_dicts(
 def load_allele_datasets(
         filename,
         peptide_length=9,
-        max_ic50=5000.0,
-        binary_encoding=True,
+        use_multiple_peptide_lengths=True,
+        max_ic50=50000.0,
         flatten_binary_encoding=True,
         sep=None,
         species_column_name="species",
@@ -241,14 +213,18 @@ def load_allele_datasets(
     peptide_length : int
         Which length peptides to use (default=9)
 
+    use_multiple_peptide_lengths : bool
+        If a peptide is shorter than `peptide_length`, expand it into many
+        peptides of the appropriate length by inserting all combinations of
+        amino acids. Similarly, if a peptide is longer than `peptide_length`,
+        shorten it by deleting stretches of contiguous amino acids at all
+        peptide positions.
+
     max_ic50 : float
         Treat IC50 scores above this value as all equally bad
         (transform them to 0.0 in the rescaled output)
 
-    binary_encoding : bool
-        Encode amino acids of each peptide as indices or binary vectors
-
-    flatten_features : bool
+    flatten_binary_encoding : bool
         If False, returns a (n_samples, peptide_length, 20) matrix, otherwise
         returns the 2D flattened version of the same data.
 
@@ -275,21 +251,53 @@ def load_allele_datasets(
 
     allele_groups = {}
     for allele, group in df.groupby(allele_column_name):
-        ic50 = np.array(group[ic50_column_name])
-        Y = np.array(group["regression_output"])
-        peptides = list(group[peptide_column_name])
-        if binary_encoding:
-            X = hotshot_encoding(peptides, peptide_length=peptide_length)
-            if flatten_binary_encoding:
-                # collapse 3D input into 2D matrix
-                X = X.reshape((X.shape[0], peptide_length * 20))
-        else:
-            X = index_encoding(peptides, peptide_length=peptide_length)
         assert allele not in allele_groups, \
             "Duplicate datasets for %s" % allele
+
+        raw_peptides = group[peptide_column_name]
+
+        # filter lengths in case user wants to drop peptides that are longer
+        # or shorter than the desired fixed length
+        if not use_multiple_peptide_lengths:
+            drop_mask = raw_peptides.str.len() != peptide_length
+            group = group[~drop_mask]
+            raw_peptides = raw_peptides[~drop_mask]
+
+        # convert from a Pandas column to a list, since that's easier to
+        # interact with later
+        raw_peptides = list(raw_peptides)
+        # convert numberical values from a Pandas column to arrays
+        ic50 = np.array(group[ic50_column_name])
+        Y = np.array(group["regression_output"])
+
+        X_index, original_peptides, counts = fixed_length_index_encoding(
+            peptides=raw_peptides,
+            desired_length=peptide_length)
+
+        X_binary = indices_to_hotshot_encoding(X_index, n_indices=20)
+        assert X_binary.shape[0] == X_index.shape[0], \
+            ("Mismatch between number of samples for index encoding (%d)"
+             " vs. binary encoding (%d)") % (
+                X_binary.shape[0],
+                X_index.shape[0])
+        n_samples = X_binary.shape[0]
+
+        if flatten_binary_encoding:
+            # collapse 3D input into 2D matrix
+            n_binary_features = peptide_length * 20
+            X_binary = X_binary.reshape((n_samples, n_binary_features))
+
+        # easier to work with counts when they're an array instead of list
+        counts = np.array(counts)
+
         allele_groups[allele] = AlleleData(
-            X=X,
+            X_index=X_index,
+            X_binary=X_binary,
             Y=Y,
             ic50=ic50,
-            peptides=peptides)
+            peptides=raw_peptides,
+            original_peptides=original_peptides,
+            original_length=[len(peptide) for peptide in original_peptides],
+            substring_count=counts,
+            weight=1.0 / counts)
     return allele_groups

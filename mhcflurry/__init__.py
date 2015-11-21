@@ -13,17 +13,19 @@
 # limitations under the License.
 
 from . import paths
-from . import data_helpers
+from . import data
 from . import feedforward
 from . import common
 from . import fixed_length_peptides
+from . import peptide_encoding
 from .mhc1_binding_predictor import Mhc1BindingPredictor
 
 __all__ = [
     "paths",
-    "data_helpers",
+    "data",
     "feedforward",
     "fixed_length_peptides",
+    "peptide_encoding",
     "common",
     "Mhc1BindingPredictor"
 ]

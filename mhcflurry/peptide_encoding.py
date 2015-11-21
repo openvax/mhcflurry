@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import numpy as np
+
 from .amino_acid import amino_acid_letter_indices
+from .fixed_length_peptides import fixed_length_from_many_peptides
 
 
 def hotshot_encoding(peptides, peptide_length):
@@ -43,26 +45,6 @@ def index_encoding(peptides, peptide_length):
     return X
 
 
-def index_encoding_of_substrings(
-        peptides,
-        substring_length,
-        delete_exclude_start=0,
-        delete_exclude_end=0):
-    """
-    Take peptides of varying lengths, chop them into substrings of fixed
-    length and apply index encoding to these substrings.
-
-    If a string is longer than the substring length, then it's reduced to
-    the desired length by deleting characters at all possible positions.
-    If positions at the start or end of a string should be exempt from deletion
-    then the number of exempt characters can be controlled via
-    `delete_exclude_start` and `delete_exclude_end`.
-
-    Returns feature matrix X and a vector of substring counts.
-    """
-    pass
-
-
 def indices_to_hotshot_encoding(X, n_indices=None, first_index_value=0):
     """
     Given an (n_samples, peptide_length) integer matrix
@@ -78,3 +60,46 @@ def indices_to_hotshot_encoding(X, n_indices=None, first_index_value=0):
         for j, xij in enumerate(row):
             X_binary[i, n_indices * j + xij - first_index_value] = 1
     return X_binary.astype(float)
+
+
+def fixed_length_index_encoding(
+        peptides,
+        desired_length,
+        start_offset_shorten=0,
+        end_offset_shorten=0,
+        start_offset_extend=0,
+        end_offset_extend=0):
+    """
+    Take peptides of varying lengths, chop them into substrings of fixed
+    length and apply index encoding to these substrings.
+
+    If a string is longer than the desired length, then it's reduced to
+    the desired length by deleting characters at all possible positions. When
+    positions at the start or end of a string should be exempt from deletion
+    then the number of exempt characters can be controlled via
+    `start_offset_shorten` and `end_offset_shorten`.
+
+    If a string is shorter than the desired length then it is filled
+    with all possible characters of the alphabet at all positions. The
+    parameters `start_offset_extend` and `end_offset_extend` control whether
+    certain positions are excluded from insertion. The positions are
+    in a "inter-residue" coordinate system, where `start_offset_extend` = 0
+    refers to the position *before* the start of a peptide and, similarly,
+    `end_offset_extend` = 0 refers to the position *after* the peptide.
+
+    Returns feature matrix X, a list of original peptides for each feature
+    vector, and a list of integer counts indicating how many rows share a
+    particular original peptide. When two rows are expanded out of a single
+    original peptide, they will both have a count of 2. These counts can
+    be useful for down-weighting the importance of multiple feature vectors
+    which originate from the same sample.
+    """
+    fixed_length, original, counts = fixed_length_from_many_peptides(
+        peptides=peptides,
+        desired_length=desired_length,
+        start_offset_shorten=start_offset_shorten,
+        end_offset_shorten=end_offset_shorten,
+        start_offset_extend=start_offset_extend,
+        end_offset_extend=end_offset_extend)
+    X = index_encoding(fixed_length, desired_length)
+    return X, original, counts

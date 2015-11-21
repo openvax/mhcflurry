@@ -30,7 +30,8 @@ import pandas as pd
 from keras.models import model_from_config
 
 from .class1_allele_specific_hyperparameters import MAX_IC50
-from .data_helpers import index_encoding, normalize_allele_name
+from .common import normalize_allele_name
+from .peptide_encoding import index_encoding
 from .paths import CLASS1_MODEL_DIRECTORY
 from .fixed_length_peptides import fixed_length_from_many_peptides
 
