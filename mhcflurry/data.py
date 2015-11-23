@@ -37,10 +37,10 @@ AlleleData = namedtuple(
         "peptides",  # list of fixed length peptide string
         "ic50",      # IC50 value associated with each entry
         "original_peptides",  # original peptides may be of different lengths
-        "original_length",  # len(original_peptide)
-        "substring_count",  # how many substrings were extracted from
-                            # each original peptide string
-        "weight",    # 1.0 / count
+        "original_lengths",   # len(original_peptide)
+        "substring_counts",   # how many substrings were extracted from
+                              # each original peptide string
+        "weights",    # 1.0 / count
     ])
 
 
@@ -140,7 +140,7 @@ def load_dataframe(
     regression_output = np.maximum(regression_output, 0.0)
     regression_output = np.minimum(regression_output, 1.0)
     df["regression_output"] = regression_output
-    return df
+    return df, peptide_column_name
 
 
 def load_allele_dicts(
@@ -159,7 +159,7 @@ def load_allele_dicts(
     The outer key is an allele name, the inner key is a peptide sequence,
     and the inner value is an IC50 or log-transformed value between [0,1]
     """
-    binding_df = load_dataframe(
+    binding_df, peptide_column_name = load_dataframe(
         filename=filename,
         max_ic50=max_ic50,
         sep=sep,
@@ -237,7 +237,7 @@ def load_allele_datasets(
     only_human : bool
         Only load entries from human MHC alleles
     """
-    df = load_dataframe(
+    df, peptide_column_name = load_dataframe(
         filename=filename,
         max_ic50=max_ic50,
         sep=sep,
@@ -297,7 +297,7 @@ def load_allele_datasets(
             ic50=ic50,
             peptides=raw_peptides,
             original_peptides=original_peptides,
-            original_length=[len(peptide) for peptide in original_peptides],
-            substring_count=counts,
-            weight=1.0 / counts)
+            original_lengths=[len(peptide) for peptide in original_peptides],
+            substring_counts=counts,
+            weights=1.0 / counts)
     return allele_groups

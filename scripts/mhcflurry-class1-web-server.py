@@ -29,6 +29,7 @@ from mhcflurry.common import (
 )
 from mhcflurry.class1 import predict, supported_alleles
 
+
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--host", default="0.0.0.0")
@@ -52,6 +53,7 @@ def get_binding_value():
         return "ERROR: %s" % e.args[0]
     return result_df.to_csv(sep="\t", index=False, float_format="%0.4f")
 
+
 @get('/alleles')
 def get_supported_alleles():
     peptide_lengths = "8,9,10,11,12"
@@ -61,6 +63,7 @@ def get_supported_alleles():
     ]
     return "\n".join(strings)
 
+
 if __name__ == "__main__":
     args = parser.parse_args()
-    run(host=args.host, port=args.port, debug=args.debug)
+    run(host=args.host, port=args.port, debug=args.debug, server="cherrypy")
