@@ -23,15 +23,7 @@ from collections import defaultdict
 
 import pandas as pd
 
-
-def curry_dictionary(key_pair_dict, default_value=0.0):
-    """
-    Transform dictionary from pairs of keys to dict -> dict -> float
-    """
-    result = defaultdict(dict)
-    for (a, b), value in key_pair_dict.items():
-        result[a][b] = value
-    return result
+from common import curry_dictionary
 
 
 def load_sims_dict(csv_path, allele_pair_keys=True):

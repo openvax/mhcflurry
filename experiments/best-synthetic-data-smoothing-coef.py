@@ -30,11 +30,15 @@ import mhcflurry
 from scipy import stats
 import numpy as np
 
+from common import curry_dictionary
 from dataset_paths import PETERS2009_CSV_PATH
 from synthetic_data import (
     synthesize_affinities_for_single_allele,
     create_reverse_peptide_affinity_lookup_dict,
-    load_sims_dict
+)
+from allele_similarities import (
+    compute_pairwise_allele_similarities,
+    fill_in_similarities
 )
 
 
@@ -60,7 +64,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--smoothing-coefs",
-    default=[10.0 ** -power for power in np.arange(1.0, 5.0, 0.5)],
+    default=[10.0 ** -power for power in np.arange(0, 5.0, 0.25)],
     type=lambda s: [float(si.strip()) for si in s.split(",")],
     help="Smoothing value used for peptides with low weight across alleles")
 
@@ -124,34 +128,58 @@ def evaluate_smoothing_coef(
             for peptide in combined_peptide_list
         ]
         assert len(true_affinity_list) == len(synthetic_affinity_list)
+        if all(x == true_affinity_list[0] for x in true_affinity_list):
+            print(
+                "-- can't compute Kendall's tau for %s, all affinities same" % (
+                    allele,))
+            continue
+
         tau, _ = stats.kendalltau(
             synthetic_affinity_list,
             true_affinity_list)
-        if np.isnan(tau):
-            raise ValueError("Got tau=NaN for %s with affinities: %s" % (
-                allele,
-                synthetic_values))
-        print("%s: %d affinities, tau=%f" % (
-            allele,
-            len(true_affinity_list),
-            tau))
+        assert not np.isnan(tau)
         taus.append(tau)
     return np.median(taus)
+
+
+def create_curried_similarity_matrix(allele_to_peptide_to_affinity, min_weight=2.0):
+    raw_sims_dict, overlap_counts, overlap_weights = compute_pairwise_allele_similarities(
+        allele_to_peptide_to_affinity,
+        min_weight=min_weight)
+
+    complete_sims_dict = fill_in_similarities(
+        raw_sims_dict=raw_sims_dict,
+        allele_datasets=allele_to_peptide_to_affinity)
+    # the above dictionary has keys that are pairs of alleles,
+    # conver this to a dict -> dict -> sim layout
+    return curry_dictionary(complete_sims_dict)
 
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
-    curried_sims_dict = load_sims_dict(
-        args.allele_similarity_csv,
-        allele_pair_keys=False)
-
-    print("Loaded similarities between %d alleles" % len(curried_sims_dict))
 
     allele_datasets = mhcflurry.data.load_allele_datasets(
         args.binding_data_csv,
         max_ic50=args.max_ic50,
         only_human=args.only_human)
-    print("Loaded binding data for %d alleles" % len(allele_datasets))
+    n_binding_values = sum(
+        len(dataset.peptides)
+        for dataset in allele_datasets.values())
+    print("Loaded %d binding values for %d alleles" % (
+        n_binding_values, len(allele_datasets)))
+
+    allele_to_peptide_to_affinity = {
+        allele: {
+            peptide: normalized_affinity
+            for (peptide, normalized_affinity)
+            in zip(dataset.peptides, dataset.Y)
+        }
+        for (allele, dataset)
+        in allele_datasets.items()
+    }
+    curried_sims_dict = create_curried_similarity_matrix(allele_to_peptide_to_affinity)
+
+    print("Generated similarities between %d alleles" % len(curried_sims_dict))
 
     results = {}
     for smoothing_coef in args.smoothing_coefs:
