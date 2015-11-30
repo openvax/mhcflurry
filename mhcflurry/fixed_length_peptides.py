@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import (
+    print_function,
+    division,
+    absolute_import,
+)
 import itertools
 import logging
 
@@ -217,6 +222,7 @@ def fixed_length_from_many_peptides(
                 start_offset=start_offset_shorten,
                 end_offset=end_offset_shorten,
                 alphabet=alphabet)
+
         n_fixed_length = len(fixed_length_peptides)
         all_fixed_length_peptides.extend(fixed_length_peptides)
         original_peptide_sequences.extend([peptide] * n_fixed_length)

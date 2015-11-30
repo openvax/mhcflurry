@@ -93,6 +93,8 @@ def synthesize_affinities_for_single_allele(
         total = 0.0
         denom = 0.0
         for (allele, y, sample_weight) in affinities:
+            if allele in exclude_alleles:
+                continue
             sim = similarities.get(allele, 0)
             if sim == 0:
                 continue

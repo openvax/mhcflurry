@@ -24,8 +24,11 @@ import numpy as np
 
 from .common import normalize_allele_name
 from .peptide_encoding import (
-    fixed_length_index_encoding,
+    index_encoding,
     indices_to_hotshot_encoding,
+)
+from .fixed_length_peptides import (
+    fixed_length_from_many_peptides
 )
 
 AlleleData = namedtuple(
@@ -266,21 +269,44 @@ def load_allele_datasets(
         # convert from a Pandas column to a list, since that's easier to
         # interact with later
         raw_peptides = list(raw_peptides)
-        # convert numberical values from a Pandas column to arrays
-        ic50 = np.array(group[ic50_column_name])
-        Y = np.array(group["regression_output"])
+        # create dictionaries of outputs from which we can look up values
+        # after peptides have been expanded
+        ic50_dict = {
+            peptide: ic50
+            for (peptide, ic50)
+            in zip(raw_peptides, group[ic50_column_name])
+        }
+        Y_dict = {
+            peptide: y
+            for (peptide, y)
+            in zip(raw_peptides, group["regression_output"])
+        }
 
-        X_index, original_peptides, counts = fixed_length_index_encoding(
-            peptides=raw_peptides,
-            desired_length=peptide_length)
+        fixed_length_peptides, original_peptides, subsequence_counts = \
+            fixed_length_from_many_peptides(
+                peptides=raw_peptides,
+                desired_length=peptide_length,
+                start_offset_shorten=0,
+                end_offset_shorten=0,
+                start_offset_extend=0,
+                end_offset_extend=0)
+        n_samples = len(fixed_length_peptides)
+        assert n_samples == len(original_peptides), \
+            "Mismatch between # of samples (%d) and # of peptides (%d)" % (
+                n_samples, len(original_peptides))
+        assert n_samples == len(subsequence_counts), \
+            "Mismatch between # of samples (%d) and # of counts (%d)" % (
+                n_samples, len(subsequence_counts))
+
+        X_index = index_encoding(fixed_length_peptides, peptide_length)
 
         X_binary = indices_to_hotshot_encoding(X_index, n_indices=20)
+
         assert X_binary.shape[0] == X_index.shape[0], \
             ("Mismatch between number of samples for index encoding (%d)"
              " vs. binary encoding (%d)") % (
                 X_binary.shape[0],
                 X_index.shape[0])
-        n_samples = X_binary.shape[0]
 
         if flatten_binary_encoding:
             # collapse 3D input into 2D matrix
@@ -288,16 +314,27 @@ def load_allele_datasets(
             X_binary = X_binary.reshape((n_samples, n_binary_features))
 
         # easier to work with counts when they're an array instead of list
-        counts = np.array(counts)
+        subsequence_counts = np.array(subsequence_counts)
+
+        Y = np.array([Y_dict[p] for p in original_peptides])
+        ic50 = np.array([ic50_dict[p] for p in original_peptides])
+
+        assert n_samples == len(Y), \
+            "Mismatch between # peptides %d and # regression outputs %d" % (
+                n_samples, len(Y))
+
+        assert n_samples == len(ic50), \
+            "Mismatch between # of peptides %d and # IC50 outputs %d" % (
+                n_samples, len(ic50))
 
         allele_groups[allele] = AlleleData(
             X_index=X_index,
             X_binary=X_binary,
             Y=Y,
             ic50=ic50,
-            peptides=raw_peptides,
+            peptides=fixed_length_peptides,
             original_peptides=original_peptides,
             original_lengths=[len(peptide) for peptide in original_peptides],
-            substring_counts=counts,
-            weights=1.0 / counts)
+            substring_counts=subsequence_counts,
+            weights=1.0 / subsequence_counts)
     return allele_groups
