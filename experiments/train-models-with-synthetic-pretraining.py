@@ -22,7 +22,6 @@ import sklearn.metrics
 import mhcflurry
 from mhcflurry.data import (
     load_allele_datasets,
-    collapse_multiple_peptide_entries,
     encode_peptide_to_affinity_dict,
 )
 
@@ -65,7 +64,7 @@ parser.add_argument(
 parser.add_argument(
     "--training-epochs",
     type=int,
-    default=150)
+    default=5)
 
 
 def get_extra_data(allele, train_datasets, expanded_predictions):
@@ -164,35 +163,79 @@ if __name__ == "__main__":
         args.binding_data_csv,
         max_ic50=args.max_ic50,
         only_human=False)
-    actual_allele_to_peptide_to_ic50_dict = collapse_multiple_peptide_entries(
-        allele_datasets)
-
     print("Loading synthetic data from %s" % args.synthetic_data_csv)
     synthetic_allele_to_peptide_to_ic50_dict = load_csv_binding_data_as_dict(
         args.synthetic_data_csv)
+    synthetic_allele_to_peptide_to_y_dict = {
+        allele: {
+            peptide: max(
+                0.0,
+                min(
+                    1.0,
+                    1.0 - np.log(ic50) / np.log(args.max_ic50)))
+            for (peptide, ic50)
+            in allele_dict.items()
+        }
+        for (allele, allele_dict)
+        in synthetic_allele_to_peptide_to_ic50_dict.items()
+    }
 
-    combined_allele_set = set(
-        actual_allele_to_peptide_to_ic50_dict.keys()).union(
-        synthetic_allele_to_peptide_to_ic50_dict.keys())
+    combined_allele_set = set(allele_datasets.keys()).union(
+        synthetic_allele_to_peptide_to_y_dict.keys())
     combined_allele_list = list(sorted(combined_allele_set))
     for allele in combined_allele_list:
-        actual_dict = actual_allele_to_peptide_to_ic50_dict[allele]
-        synthetic_dict = synthetic_allele_to_peptide_to_ic50_dict[allele]
-        print("%s: %d real samples, %d synthetic samples" % (
-            allele,
-            len(actual_dict),
-            len(synthetic_dict)))
-        _, _, C_actual, X_actual, _, Y_actual = encode_peptide_to_affinity_dict(
-            actual_dict)
-        n_actual = len(Y_actual)
+        actual_dataset = allele_datasets[allele]
+        X_actual = actual_dataset.X_index
+        weights_actual = actual_dataset.weights
+        Y_actual = actual_dataset.Y
+
+        synthetic_dict = synthetic_allele_to_peptide_to_y_dict[allele]
+
         _, _, C_synth, X_synth, _, Y_synth = encode_peptide_to_affinity_dict(
             synthetic_dict)
 
+        n_actual_samples, n_actual_dims = X_actual.shape
+        n_synth_samples, n_synth_dims = X_synth.shape
+        assert n_actual_dims == n_synth_dims, \
+            "Mismatch between # of actual dims %d and synthetic dims %d" % (
+                n_actual_dims, n_synth_dims)
+        print("-- Using %d actual samples and %d synthetic samples for %s" % (
+            n_actual_samples, n_synth_samples, allele))
         X = np.vstack([X_actual, X_synth])
+        print("-- X.shape = %s, dtype = %s" % (X.shape, X.dtype))
+        n_samples = n_actual_samples + n_synth_samples
+        assert X.shape[0] == n_samples, \
+            "Expected %d samples but got data array with shape %s" % (
+                n_actual_samples + n_synth_samples, X.shape)
         Y = np.concatenate([Y_actual, Y_synth])
-        C = np.concatenate([C_actual, C_synth])
-        weights = 1.0 / C
+        print("-- Y.shape = %s, dtype = %s" % (Y.shape, Y.dtype))
+        assert Y.min() >= 0, \
+            "Y should not contain negative numbers! Y.min() = %f" % (Y.min(),)
+        assert Y.max() <= 1, \
+            "Y should have max value 1.0, got Y.max() = %f" % (Y.max(),)
+        weights_synth = 1.0 / C_synth
+        weights = np.concatenate([weights_actual, weights_synth])
+        assert len(weights) == n_samples
+        print("-- weights.shape = %s, dtype = %s" % (
+            weights.shape, weights.dtype))
+        model = mhcflurry.feedforward.make_embedding_network(
+            peptide_length=9,
+            embedding_input_dim=20,
+            embedding_output_dim=4,
+            layer_sizes=[4],
+            activation="tanh",
+            init="lecun_uniform",
+            loss="mse",
+            output_activation="sigmoid",
+            dropout_probability=0.0,
+            optimizer=None,
+            learning_rate=0.001)
         for epoch in range(args.training_epochs):
             # weights for synthetic points should shrink as ~ 1 / (1+epoch)**2
-            weights[n_actual:] = (1.0 / C[n_actual:]) * (1.0 / (1 + epoch)) ** 2
-
+            decay_factor = 1.0 / (1 + epoch) ** 2
+            print("Epoch %d, synth decay factor = %f" % (
+                epoch + 1, decay_factor))
+            weights[n_actual_samples:] = weights_synth * decay_factor
+            model.fit(X, Y, sample_weight=weights, nb_epoch=1)
+        Y_pred = model.predict(X_actual)
+        print("Training MSE %0.4f" % ((Y_actual - Y_pred) ** 2).mean())
