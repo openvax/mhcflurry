@@ -26,35 +26,37 @@ def parse_int_list(s):
 def split_uppercase_sequences(s):
     return [part.strip().upper() for part in s.split(",")]
 
+MHC_PREFIXES = [
+    "HLA",
+    "H-2",
+    "Mamu",
+    "Patr",
+    "Gogo",
+    "ELA",
+]
 
-def normalize_allele_name(allele_name):
+
+def normalize_allele_name(allele_name, default_prefix="HLA"):
     """
-    Only works for mouse, human, and rhesus monkey alleles.
+    Only works for a small number of species.
 
     TODO: use the same logic as mhctools for MHC name parsing.
     Possibly even worth its own small repo called something like "mhcnames"
     """
     allele_name = allele_name.upper()
-    if allele_name.startswith("MAMU"):
-        prefix = "Mamu-"
-    elif allele_name.startswith("H-2") or allele_name.startswith("H2"):
-        prefix = "H-2-"
-    else:
-        prefix = ""
     # old school HLA-C serotypes look like "Cw"
     allele_name = allele_name.replace("CW", "C")
-    patterns = [
-        "HLA-",
-        "H-2",
-        "H2",
-        "MAMU",
-        "-",
-        "*",
-        ":"
-    ]
-    for pattern in patterns:
+
+    prefix = default_prefix
+    for candidate in MHC_PREFIXES:
+        if (allele_name.startswith(candidate.upper()) or
+                allele_name.startswith(candidate.replace("-", "").upper())):
+            prefix = candidate
+            allele_name = allele_name[len(prefix):]
+            break
+    for pattern in MHC_PREFIXES + ["-", "*", ":"]:
         allele_name = allele_name.replace(pattern, "")
-    return "%s%s" % (prefix, allele_name)
+    return "%s%s" % (prefix + "-" if prefix else "", allele_name)
 
 
 def split_allele_names(s):

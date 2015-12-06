@@ -14,10 +14,58 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 
-import mhcflurry
 import numpy as np
 import sklearn.metrics
+
+import mhcflurry
+from mhcflurry.data import (
+    load_allele_datasets,
+    collapse_multiple_peptide_entries,
+    encode_peptide_to_affinity_dict,
+)
+
+
+from arg_parsing import parse_int_list
+from dataset_paths import PETERS2009_CSV_PATH
+from common import load_csv_binding_data_as_dict
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument(
+    "--binding-data-csv",
+    default=PETERS2009_CSV_PATH)
+
+parser.add_argument(
+    "--synthetic-data-csv",
+    required=True,
+    help="CSV with {mhc, sequence, ic50} columns of synthetic data")
+
+parser.add_argument(
+    "--max-ic50",
+    default=50000.0,
+    type=float)
+
+parser.add_argument(
+    "--embedding-dim-sizes",
+    default=[1, 2, 4, 8, 16, 32, 64],
+    type=parse_int_list)
+
+parser.add_argument(
+    "--hidden-layer-sizes",
+    default=[1, 2, 4, 8, 16, 32, 64, 128, 256],
+    type=parse_int_list)
+
+parser.add_argument(
+    "--activation-functions",
+    default=["tanh", "relu"],
+    type=lambda s: [si.strip() for si in s.split(",")])
+
+parser.add_argument(
+    "--training-epochs",
+    type=int,
+    default=150)
 
 
 def get_extra_data(allele, train_datasets, expanded_predictions):
@@ -105,3 +153,46 @@ def data_augmentation(
         aucs.append(auc)
         f1s.append(f1)
     return aucs, f1s, n_originals
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    print(args)
+
+    print("Loading binding data from %s" % args.binding_data_csv)
+    allele_datasets = load_allele_datasets(
+        args.binding_data_csv,
+        max_ic50=args.max_ic50,
+        only_human=False)
+    actual_allele_to_peptide_to_ic50_dict = collapse_multiple_peptide_entries(
+        allele_datasets)
+
+    print("Loading synthetic data from %s" % args.synthetic_data_csv)
+    synthetic_allele_to_peptide_to_ic50_dict = load_csv_binding_data_as_dict(
+        args.synthetic_data_csv)
+
+    combined_allele_set = set(
+        actual_allele_to_peptide_to_ic50_dict.keys()).union(
+        synthetic_allele_to_peptide_to_ic50_dict.keys())
+    combined_allele_list = list(sorted(combined_allele_set))
+    for allele in combined_allele_list:
+        actual_dict = actual_allele_to_peptide_to_ic50_dict[allele]
+        synthetic_dict = synthetic_allele_to_peptide_to_ic50_dict[allele]
+        print("%s: %d real samples, %d synthetic samples" % (
+            allele,
+            len(actual_dict),
+            len(synthetic_dict)))
+        _, _, C_actual, X_actual, _, Y_actual = encode_peptide_to_affinity_dict(
+            actual_dict)
+        n_actual = len(Y_actual)
+        _, _, C_synth, X_synth, _, Y_synth = encode_peptide_to_affinity_dict(
+            synthetic_dict)
+
+        X = np.vstack([X_actual, X_synth])
+        Y = np.concatenate([Y_actual, Y_synth])
+        C = np.concatenate([C_actual, C_synth])
+        weights = 1.0 / C
+        for epoch in range(args.training_epochs):
+            # weights for synthetic points should shrink as ~ 1 / (1+epoch)**2
+            weights[n_actual:] = (1.0 / C[n_actual:]) * (1.0 / (1 + epoch)) ** 2
+

@@ -21,7 +21,8 @@ import mhcflurry
 from dataset_paths import PETERS2009_CSV_PATH
 from allele_similarities import (
     compute_pairwise_allele_similarities,
-    fill_in_similarities
+    fill_in_similarities,
+    save_csv
 )
 
 parser = argparse.ArgumentParser()
@@ -61,15 +62,6 @@ parser.add_argument(
 parser.add_argument(
     "--complete-heatmap-output-path",
     help="PNG file to save heatmap of complete similarities matrix")
-
-
-def save_csv(filename, sims, overlap_counts, overlap_weights):
-    with open(filename, "w") as f:
-        f.write("allele_A,allele_B,similarity,count,weight\n")
-        for (a, b), s in sorted(sims.items()):
-            count = overlap_counts.get((a, b), 0)
-            weight = overlap_weights.get((a, b), 0.0)
-            f.write("%s,%s,%0.4f,%d,%0.4f\n" % (a, b, s, count, weight))
 
 
 def print_dataset_sizes(allele_groups):

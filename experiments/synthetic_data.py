@@ -43,20 +43,6 @@ def load_sims_dict(csv_path, allele_pair_keys=True):
         return sims_dict
 
 
-def create_reverse_peptide_affinity_lookup_dict(allele_datasets):
-    """
-    Create reverse-lookup dictionary mapping each peptide to a list of triplets:
-        [(allele, regression_output, weight), ...]
-    """
-    peptide_affinities_dict = defaultdict(list)
-    for allele, dataset in allele_datasets.items():
-        for peptide, y, weight in zip(
-                dataset.peptides, dataset.Y, dataset.weights):
-            entry = (allele, y, weight)
-            peptide_affinities_dict[peptide].append(entry)
-    return peptide_affinities_dict
-
-
 def synthesize_affinities_for_single_allele(
         similarities,
         peptide_to_affinities,
@@ -92,7 +78,14 @@ def synthesize_affinities_for_single_allele(
     for peptide, affinities in peptide_to_affinities.items():
         total = 0.0
         denom = 0.0
-        for (allele, y, sample_weight) in affinities:
+        for entry in affinities:
+
+            if len(entry) == 2:
+                (allele, y) = entry
+                sample_weight = 1.0
+            else:
+                assert len(entry) == 3
+                (allele, y, sample_weight) = entry
             if allele in exclude_alleles:
                 continue
             sim = similarities.get(allele, 0)
@@ -106,17 +99,42 @@ def synthesize_affinities_for_single_allele(
     return results
 
 
+def create_reverse_lookup_from_allele_data_objects(allele_datasets):
+    """
+    Given a dictionary mapping each allele name to an AlleleData object,
+    create reverse-lookup dictionary mapping each peptide to a list of triplets:
+        [(allele, regression_output, weight), ...]
+    """
+    peptide_affinities_dict = defaultdict(list)
+    for allele, dataset in allele_datasets.items():
+        for peptide, y, weight in zip(
+                dataset.peptides, dataset.Y, dataset.weights):
+            entry = (allele, y, weight)
+            peptide_affinities_dict[peptide].append(entry)
+    return peptide_affinities_dict
+
+
+def create_reverse_lookup_from_simple_dicts(affinities):
+    """
+    Create a lookup table from peptides to lists of (allele, affinity, weight)
+    """
+    reverse_lookup = defaultdict(list)
+    for allele, affinity_dict in affinities.items():
+        for (peptide, affinity) in affinity_dict.items():
+            reverse_lookup[peptide].append((allele, affinity, 1.0))
+    return reverse_lookup
+
+
 def synthesize_affinities_for_all_alleles(
-        allele_datasets,
+        peptide_to_affinities,
         pairwise_allele_similarities,
+        allele_pair_keys=True,
         smoothing=0.005,
         exponent=2.0):
     """
-    allele_datasets : dict
-        Maps each allele name to AlleleData object with fields
-            - peptides : list of strings
-            - Y : list of float affinities between 0 and 1
-            - weights : list of float sample weights between 0 and inf
+    peptide_to_affinities : dict
+        Maps each peptide to list of either
+        (allele, affinity) or (allele, affinity, weight)
 
     pairwise_allele_similarities : dict
         Dictionary from allele -> allele -> value between 0..1
@@ -125,9 +143,12 @@ def synthesize_affinities_for_all_alleles(
 
     exponent : float
     """
-    peptide_to_affinities = create_reverse_peptide_affinity_lookup_dict(
-        allele_datasets)
+    if allele_pair_keys:
+        pairwise_allele_similarities = curry_dictionary(
+            pairwise_allele_similarities)
+
     all_predictions = {}
+
     allele_names = set(pairwise_allele_similarities.keys())
     for allele in allele_names:
         all_predictions[allele] = synthesize_affinities_for_single_allele(

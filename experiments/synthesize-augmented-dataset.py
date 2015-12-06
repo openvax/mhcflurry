@@ -17,11 +17,17 @@
 from collections import OrderedDict
 import argparse
 
-import mhcflurry
 import pandas as pd
 
 from dataset_paths import PETERS2009_CSV_PATH
-from synthetic_data import synthesize_affinities_for_all_alleles, load_sims_dict
+from allele_similarities import compute_allele_similarities
+from synthetic_data import (
+    create_reverse_lookup_from_simple_dicts,
+    synthesize_affinities_for_all_alleles,
+    load_sims_dict
+)
+
+from mhcflurry.data import load_allele_dicts
 
 parser = argparse.ArgumentParser()
 
@@ -46,11 +52,11 @@ parser.add_argument(
 
 parser.add_argument(
     "--allele-similarity-csv",
-    required=True)
+    required=False)
 
 parser.add_argument(
     "--smoothing-coef",
-    default=0.01,
+    default=0.001,
     type=float,
     help="Smoothing value used for peptides with low weight across alleles")
 
@@ -64,18 +70,32 @@ parser.add_argument(
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
-    sims_dict = load_sims_dict(args.allele_similarity_csv)
-    print("Loaded similarities between %d allele pairs (%d unique)" % (
-        len(sims_dict), len(set(a for (a, _) in sims_dict.keys()))))
 
-    allele_datasets = mhcflurry.data.load_allele_datasets(
+    allele_to_peptide_to_affinity = load_allele_dicts(
         args.binding_data_csv,
         max_ic50=args.max_ic50,
-        only_human=args.only_human)
-    print("Loaded binding data for %d alleles" % len(allele_datasets))
+        only_human=args.only_human,
+        regression_output=True)
+
+    print("Loaded binding data for %d alleles" % (
+        len(allele_to_peptide_to_affinity),))
+
+    reverse_lookup = create_reverse_lookup_from_simple_dicts(
+        allele_to_peptide_to_affinity)
+    print("Created reverse lookup dictionary for %d peptides" % len(reverse_lookup))
+
+    if args.allele_similarity_csv:
+        sims_dict = load_sims_dict(args.allele_similarity_csv)
+        print("Loaded similarities between %d allele pairs (%d unique)" % (
+            len(sims_dict), len(set(a for (a, _) in sims_dict.keys()))))
+    else:
+        sims_dict, _, _ = \
+            compute_allele_similarities(
+                allele_to_peptide_to_affinity,
+                min_weight=0.1)
 
     synthetic_data = synthesize_affinities_for_all_alleles(
-        allele_datasets=allele_datasets,
+        peptide_to_affinities=reverse_lookup,
         pairwise_allele_similarities=sims_dict,
         smoothing=args.smoothing_coef,
         exponent=args.similarity_exponent)

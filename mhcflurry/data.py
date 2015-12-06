@@ -17,7 +17,7 @@ from __future__ import (
     division,
     absolute_import,
 )
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 
 import pandas as pd
 import numpy as np
@@ -172,17 +172,77 @@ def load_allele_dicts(
         peptide_length_column_name=peptide_length_column_name,
         ic50_column_name=ic50_column_name,
         only_human=only_human)
+    # map peptides to either the raw IC50 or rescaled log IC50 depending
+    # on the `regression_output` parameter
+    output_column_name = (
+        "regression_output"
+        if regression_output
+        else ic50_column_name
+    )
     return {
         allele_name: {
-            row[peptide_column_name]: (
-                row["regression_output"]
-                if regression_output
-                else row[ic50_column_name]
-            )
-            for (_, row) in group.iterrows()
+            peptide: output
+            for (peptide, output)
+            in zip(group[peptide_column_name], group[output_column_name])
         }
-        for (allele_name, group) in binding_df.groupby(allele_column_name)
+        for (allele_name, group)
+        in binding_df.groupby(allele_column_name)
     }
+
+
+def encode_peptide_to_affinity_dict(
+        peptide_to_affinity_dict,
+        peptide_length=9,
+        flatten_binary_encoding=True):
+    """
+    Given a dictionary mapping from peptide sequences to affinity values,
+    returns tuple with the following fields:
+        - kmer_peptides: fixed length peptide strings
+        - original_peptides: variable length peptide strings
+        - counts: how many fixed length peptides were made from this original
+        - X_index: index encoding of fixed length peptides
+        - X_binary: binary encoding of fixed length peptides
+        - Y: affinity values associated with original peptides
+    """
+    raw_peptides = list(sorted(peptide_to_affinity_dict.keys()))
+    kmer_peptides, original_peptides, counts = \
+        fixed_length_from_many_peptides(
+            peptides=raw_peptides,
+            desired_length=peptide_length,
+            start_offset_shorten=0,
+            end_offset_shorten=0,
+            start_offset_extend=0,
+            end_offset_extend=0)
+    n_samples = len(kmer_peptides)
+    assert n_samples == len(original_peptides), \
+        "Mismatch between # of samples (%d) and # of peptides (%d)" % (
+            n_samples, len(original_peptides))
+    assert n_samples == len(counts), \
+        "Mismatch between # of samples (%d) and # of counts (%d)" % (
+            n_samples, len(counts))
+
+    X_index = index_encoding(kmer_peptides, peptide_length)
+    X_binary = indices_to_hotshot_encoding(X_index, n_indices=20)
+
+    assert X_binary.shape[0] == X_index.shape[0], \
+        ("Mismatch between number of samples for index encoding (%d)"
+         " vs. binary encoding (%d)") % (
+            X_binary.shape[0],
+            X_index.shape[0])
+
+    if flatten_binary_encoding:
+        # collapse 3D input into 2D matrix
+        n_binary_features = peptide_length * 20
+        X_binary = X_binary.reshape((n_samples, n_binary_features))
+
+    # easier to work with counts when they're an array instead of list
+    counts = np.array(counts)
+
+    Y = np.array([peptide_to_affinity_dict[p] for p in original_peptides])
+    assert n_samples == len(Y), \
+        "Mismatch between # peptides %d and # regression outputs %d" % (
+            n_samples, len(Y))
+    return (kmer_peptides, original_peptides, counts, X_index, X_binary, Y)
 
 
 def load_allele_datasets(
@@ -269,6 +329,7 @@ def load_allele_datasets(
         # convert from a Pandas column to a list, since that's easier to
         # interact with later
         raw_peptides = list(raw_peptides)
+
         # create dictionaries of outputs from which we can look up values
         # after peptides have been expanded
         ic50_dict = {
@@ -276,65 +337,60 @@ def load_allele_datasets(
             for (peptide, ic50)
             in zip(raw_peptides, group[ic50_column_name])
         }
+
         Y_dict = {
             peptide: y
             for (peptide, y)
             in zip(raw_peptides, group["regression_output"])
         }
 
-        fixed_length_peptides, original_peptides, subsequence_counts = \
-            fixed_length_from_many_peptides(
-                peptides=raw_peptides,
-                desired_length=peptide_length,
-                start_offset_shorten=0,
-                end_offset_shorten=0,
-                start_offset_extend=0,
-                end_offset_extend=0)
-        n_samples = len(fixed_length_peptides)
-        assert n_samples == len(original_peptides), \
-            "Mismatch between # of samples (%d) and # of peptides (%d)" % (
-                n_samples, len(original_peptides))
-        assert n_samples == len(subsequence_counts), \
-            "Mismatch between # of samples (%d) and # of counts (%d)" % (
-                n_samples, len(subsequence_counts))
+        (kmer_peptides, original_peptides, counts, X_index, X_binary, Y) = \
+            encode_peptide_to_affinity_dict(
+                Y_dict,
+                peptide_length=peptide_length,
+                flatten_binary_encoding=flatten_binary_encoding)
 
-        X_index = index_encoding(fixed_length_peptides, peptide_length)
-
-        X_binary = indices_to_hotshot_encoding(X_index, n_indices=20)
-
-        assert X_binary.shape[0] == X_index.shape[0], \
-            ("Mismatch between number of samples for index encoding (%d)"
-             " vs. binary encoding (%d)") % (
-                X_binary.shape[0],
-                X_index.shape[0])
-
-        if flatten_binary_encoding:
-            # collapse 3D input into 2D matrix
-            n_binary_features = peptide_length * 20
-            X_binary = X_binary.reshape((n_samples, n_binary_features))
-
-        # easier to work with counts when they're an array instead of list
-        subsequence_counts = np.array(subsequence_counts)
-
-        Y = np.array([Y_dict[p] for p in original_peptides])
         ic50 = np.array([ic50_dict[p] for p in original_peptides])
 
-        assert n_samples == len(Y), \
-            "Mismatch between # peptides %d and # regression outputs %d" % (
-                n_samples, len(Y))
-
-        assert n_samples == len(ic50), \
+        assert len(kmer_peptides) == len(ic50), \
             "Mismatch between # of peptides %d and # IC50 outputs %d" % (
-                n_samples, len(ic50))
+                len(kmer_peptides), len(ic50))
 
         allele_groups[allele] = AlleleData(
             X_index=X_index,
             X_binary=X_binary,
             Y=Y,
             ic50=ic50,
-            peptides=fixed_length_peptides,
+            peptides=kmer_peptides,
             original_peptides=original_peptides,
             original_lengths=[len(peptide) for peptide in original_peptides],
-            substring_counts=subsequence_counts,
-            weights=1.0 / subsequence_counts)
+            substring_counts=counts,
+            weights=1.0 / counts)
     return allele_groups
+
+
+def collapse_multiple_peptide_entries(allele_datasets):
+    """
+    If an (allele, peptide) pair occurs multiple times then reduce it
+    to a single entry by taking the weighted average of affinity values.
+
+    Returns a dictionary of alleles, each of which maps to a dictionary of
+    peptides that map to affinity values.
+    """
+    allele_to_peptide_to_affinity = {}
+    for (allele, dataset) in allele_datasets.items():
+        multiple_affinities = defaultdict(list)
+        for (peptide, normalized_affinity, weight) in zip(
+                dataset.peptides, dataset.Y, dataset.weights):
+            multiple_affinities[peptide].append((normalized_affinity, weight))
+        weighted_averages = {}
+        for peptide, affinity_weight_tuples in multiple_affinities.items():
+            denom = 0.0
+            sum_weighted_affinities = 0.0
+            for affinity, weight in affinity_weight_tuples:
+                sum_weighted_affinities += affinity * weight
+                denom += weight
+            if denom > 0:
+                weighted_averages[peptide] = sum_weighted_affinities / denom
+        allele_to_peptide_to_affinity[allele] = weighted_averages
+    return allele_to_peptide_to_affinity

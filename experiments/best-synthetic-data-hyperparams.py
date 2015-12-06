@@ -26,7 +26,7 @@ averaged across all given alleles.
 
 import argparse
 
-import mhcflurry
+from mhcflurry.data import load_allele_dicts
 from scipy import stats
 import numpy as np
 import sklearn.metrics
@@ -35,12 +35,9 @@ from common import curry_dictionary
 from dataset_paths import PETERS2009_CSV_PATH
 from synthetic_data import (
     synthesize_affinities_for_single_allele,
-    create_reverse_peptide_affinity_lookup_dict,
+    create_reverse_lookup_from_simple_dicts
 )
-from allele_similarities import (
-    compute_pairwise_allele_similarities,
-    fill_in_similarities
-)
+from allele_similarities import save_csv, compute_allele_similarities
 
 
 parser = argparse.ArgumentParser()
@@ -60,18 +57,19 @@ parser.add_argument(
     action="store_true")
 
 parser.add_argument(
-    "--allele-similarity-csv",
-    required=True)
+    "--save-allele-similarity-csv",
+    help="Path to allele similarities",
+    required=False)
 
 parser.add_argument(
     "--smoothing-coefs",
-    default=[0.1, 0.025, 0.05, 0.01, 0.0025, 0.005, 0.001, 0.0005, 0.0001],
+    default=[0.05, 0.025, 0.01, 0.005, 0.0025, 0.001, 0.0005, 0.0001, 0],
     type=lambda s: [float(si.strip()) for si in s.split(",")],
     help="Smoothing value used for peptides with low weight across alleles")
 
 parser.add_argument(
     "--similarity-exponents",
-    default=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+    default=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
     type=lambda s: [float(si.strip()) for si in s.split(",")],
     help="Affinities are synthesized by adding up y_ip * sim(i,j) ** exponent")
 
@@ -85,11 +83,10 @@ def evaluate_synthetic_data(
     taus = []
     f1_scores = []
     aucs = []
-    peptide_to_affinities = create_reverse_peptide_affinity_lookup_dict(
-        true_data)
+    peptide_to_affinities = create_reverse_lookup_from_simple_dicts(true_data)
     for allele, dataset in true_data.items():
         this_allele_similarities = curried_allele_similarities[allele]
-        this_allele_peptides = set(dataset.peptides)
+        this_allele_peptides = set(dataset.keys())
         # create a peptide -> (allele, affinity, weight) dictionary restricted
         # only to the peptides for which we have data for this allele
         restricted_reverse_lookup = {
@@ -106,15 +103,18 @@ def evaluate_synthetic_data(
 
         synthetic_peptide_set = set(synthetic_values.keys())
         # set of peptides for which we have both true and synthetic
-        # affinity values and for which the "true" values were not derived
-        # from elongating or shortening the sequence of another sample
-        combined_peptide_set = {
-            peptide
-            for (peptide, original_peptide)
-            in zip(dataset.peptides, dataset.original_peptides)
-            if peptide in synthetic_peptide_set and peptide == original_peptide
-        }
+        # affinity values
+        combined_peptide_set = synthetic_peptide_set.intersection(
+            this_allele_peptides)
+
         combined_peptide_list = list(sorted(combined_peptide_set))
+
+        # print("-- allele = %s, n_actual = %d, n_synthetic = %d, intersection = %d" % (
+        #    allele,
+        #    len(dataset),
+        #    len(synthetic_peptide_set),
+        #    len(combined_peptide_list)))
+
         if len(combined_peptide_list) < 2:
             continue
 
@@ -123,17 +123,8 @@ def evaluate_synthetic_data(
             for peptide in combined_peptide_list
         ]
 
-        assert len(dataset.peptides) == len(dataset.Y), \
-            "Mismatch between # of peptides %d and # of outputs %d" % (
-                len(dataset.peptides), len(dataset.Y))
-        true_affinity_dict = {
-            peptide: yi
-            for (peptide, yi)
-            in zip(dataset.peptides, dataset.Y)
-        }
-
         true_affinity_list = [
-            true_affinity_dict[peptide]
+            dataset[peptide]
             for peptide in combined_peptide_list
         ]
         assert len(true_affinity_list) == len(synthetic_affinity_list)
@@ -146,8 +137,9 @@ def evaluate_synthetic_data(
         assert not np.isnan(tau)
         taus.append(tau)
 
-        true_ic50s = max_ic50 ** np.array(true_affinity_list)
-        predicted_ic50s = max_ic50 ** np.array(synthetic_affinity_list)
+        true_ic50s = max_ic50 ** (1.0 - np.array(true_affinity_list))
+        predicted_ic50s = max_ic50 ** (1.0 - np.array(synthetic_affinity_list))
+
         true_binding_label = true_ic50s <= 500
         if true_binding_label.all() or not true_binding_label.any():
             # can't compute AUC or F1 without both negative and positive cases
@@ -168,43 +160,39 @@ def evaluate_synthetic_data(
     return taus, aucs, f1_scores
 
 
-def create_curried_similarity_matrix(allele_to_peptide_to_affinity, min_weight=2.0):
-    raw_sims_dict, overlap_counts, overlap_weights = compute_pairwise_allele_similarities(
-        allele_to_peptide_to_affinity,
-        min_weight=min_weight)
-
-    complete_sims_dict = fill_in_similarities(
-        raw_sims_dict=raw_sims_dict,
-        allele_datasets=allele_to_peptide_to_affinity)
-    # the above dictionary has keys that are pairs of alleles,
-    # conver this to a dict -> dict -> sim layout
-    return curry_dictionary(complete_sims_dict)
-
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    allele_datasets = mhcflurry.data.load_allele_datasets(
+    allele_to_peptide_to_affinity = load_allele_dicts(
         args.binding_data_csv,
         max_ic50=args.max_ic50,
-        only_human=args.only_human)
-    n_binding_values = sum(
-        len(dataset.peptides)
-        for dataset in allele_datasets.values())
-    print("Loaded %d binding values for %d alleles" % (
-        n_binding_values, len(allele_datasets)))
+        only_human=args.only_human,
+        regression_output=True)
 
-    allele_to_peptide_to_affinity = {
-        allele: {
-            peptide: normalized_affinity
-            for (peptide, normalized_affinity)
-            in zip(dataset.peptides, dataset.Y)
-        }
-        for (allele, dataset)
-        in allele_datasets.items()
-    }
-    curried_sims_dict = create_curried_similarity_matrix(
-        allele_to_peptide_to_affinity)
+    n_binding_values = sum(
+        len(allele_dict)
+        for allele_dict in
+        allele_to_peptide_to_affinity.values()
+    )
+    print("Loaded %d binding values for %d alleles" % (
+        n_binding_values, len(allele_to_peptide_to_affinity)))
+
+    complete_sims_dict, overlap_counts, overlap_weights = \
+        compute_allele_similarities(
+            allele_to_peptide_to_affinity,
+            min_weight=0.1)
+
+    if args.save_allele_similarity_csv:
+        save_csv(
+            filename=args.save_allele_similarity_csv,
+            sims=complete_sims_dict,
+            overlap_counts=overlap_counts,
+            overlap_weights=overlap_weights)
+
+    # the above dictionary has keys that are pairs of alleles,
+    # conver this to a dict -> dict -> sim layout
+    curried_sims_dict = curry_dictionary(complete_sims_dict)
 
     print("Generated similarities between %d alleles" % len(curried_sims_dict))
 
@@ -212,7 +200,7 @@ if __name__ == "__main__":
     for smoothing_coef in args.smoothing_coefs:
         for exponent in args.similarity_exponents:
             taus, aucs, f1_scores = evaluate_synthetic_data(
-                true_data=allele_datasets,
+                true_data=allele_to_peptide_to_affinity,
                 curried_allele_similarities=curried_sims_dict,
                 smoothing_coef=smoothing_coef,
                 exponent=exponent,

@@ -16,6 +16,7 @@
 
 
 from collections import defaultdict
+import pandas as pd
 
 
 def curry_dictionary(key_pair_dict, default_value=0.0):
@@ -26,3 +27,34 @@ def curry_dictionary(key_pair_dict, default_value=0.0):
     for (a, b), value in key_pair_dict.items():
         result[a][b] = value
     return result
+
+
+def matrix_to_dictionary(sims, allele_list):
+    sims_dict = {}
+    for i in range(sims.shape[0]):
+        a = allele_list[i]
+        for j in range(sims.shape[1]):
+            b = allele_list[j]
+            sims_dict[a, b] = sims[i, j]
+    return sims_dict
+
+
+def load_csv_binding_data_as_dict(
+        csv_path,
+        mhc_column_name="mhc",
+        peptide_column_name="sequence",
+        ic50_column_name="ic50"):
+    """
+    Given a path to a CSV file containing peptide-MHC binding data,
+    load it as a dictionary mapping alleles to a dictionary peptide->IC50
+    """
+    df = pd.read_csv(csv_path)
+    print("-- Read %d rows from %s" % (len(df), csv_path))
+    return {
+        allele: {
+            peptide: ic50
+            for (peptide, ic50)
+            in zip(group[peptide_column_name], group[ic50_column_name])
+        }
+        for allele, group in df.groupby(mhc_column_name)
+    }

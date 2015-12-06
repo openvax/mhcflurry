@@ -18,7 +18,7 @@ from . import feedforward
 from . import common
 from . import fixed_length_peptides
 from . import peptide_encoding
-from .mhc1_binding_predictor import Mhc1BindingPredictor
+from .class1_binding_predictor import Class1BindingPredictor
 
 __all__ = [
     "paths",
@@ -27,5 +27,5 @@ __all__ = [
     "fixed_length_peptides",
     "peptide_encoding",
     "common",
-    "Mhc1BindingPredictor"
+    "Class1BindingPredictor"
 ]
