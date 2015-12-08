@@ -29,6 +29,18 @@ def curry_dictionary(key_pair_dict, default_value=0.0):
     return result
 
 
+def uncurry_dictionary(curried_dict):
+    """
+    Transform dictionary from (key_a -> key_b -> float) to
+    (key_a, key_b) -> float
+    """
+    result = {}
+    for a, a_dict in curried_dict.items():
+        for b, value in a_dict.items():
+            result[(a, b)] = value
+    return result
+
+
 def matrix_to_dictionary(sims, allele_list):
     sims_dict = {}
     for i in range(sims.shape[0]):

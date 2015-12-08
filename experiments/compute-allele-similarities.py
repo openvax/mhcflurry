@@ -20,7 +20,7 @@ import mhcflurry
 
 from dataset_paths import PETERS2009_CSV_PATH
 from allele_similarities import (
-    compute_pairwise_allele_similarities,
+    compute_partial_similarities_from_peptide_overlap,
     fill_in_similarities,
     save_csv
 )
@@ -81,22 +81,23 @@ def print_dataset_sizes(allele_groups):
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
-    df = mhcflurry.data_helpers.load_dataframe(
+    df, peptide_column_name = mhcflurry.data.load_dataframe(
         args.binding_data_csv,
         max_ic50=args.max_ic50,
         only_human=args.only_human)
     allele_groups = {
         allele_name: {
-            row["sequence"]: row["regression_output"]
+            row[peptide_column_name]: row["regression_output"]
             for (_, row) in group.iterrows()
         }
         for (allele_name, group) in df.groupby("mhc")
     }
     print_dataset_sizes(allele_groups)
 
-    raw_sims_dict, overlap_counts, overlap_weights = compute_pairwise_allele_similarities(
-        allele_groups,
-        min_weight=args.min_overlap_weight)
+    raw_sims_dict, overlap_counts, overlap_weights = \
+        compute_partial_similarities_from_peptide_overlap(
+            allele_groups,
+            min_weight=args.min_overlap_weight)
 
     if args.raw_similarities_output_path:
         save_csv(
@@ -106,8 +107,8 @@ if __name__ == "__main__":
             overlap_weights)
 
     complete_sims_dict = fill_in_similarities(
-        raw_sims_dict=raw_sims_dict,
-        allele_datasets=allele_groups,
+        curried_raw_sims_dict=raw_sims_dict,
+        allele_to_peptide_to_affinity=allele_groups,
         raw_sims_heatmap_path=args.raw_heatmap_output_path,
         complete_sims_heatmap_path=args.complete_heatmap_output_path)
 

@@ -125,3 +125,54 @@ def train_model_and_return_scores(
         true_label=binder_label_test,
         max_ic50=max_ic50)
     return (accuracy, auc, f1_score)
+
+
+def create_and_evaluate_model_with_synthetic_data(
+        X,
+        Y,
+        weights_synth,
+        weights_actual,
+        n_training_epochs,
+        dropout,
+        embedding_dim_size,
+        hidden_layer_size):
+    model = mhcflurry.feedforward.make_embedding_network(
+        peptide_length=9,
+        embedding_input_dim=20,
+        embedding_output_dim=4,
+        layer_sizes=[4],
+        activation="tanh",
+        init="lecun_uniform",
+        loss="mse",
+        output_activation="sigmoid",
+        dropout_probability=0.0,
+        optimizer=None,
+        learning_rate=0.001)
+    total_synth_weights = weights_synth.sum()
+    total_actual_weights = weights_actual.sum()
+    for epoch in range(n_training_epochs):
+        # weights for synthetic points can be shrunk as:
+        #  ~ 1 / (1+epoch)**2
+        # or
+        # 2.0 ** -epoch
+        decay_factor = 2.0 ** -epoch
+        # if the contribution of synthetic samples is less than a
+        # thousandth of the actual data, then stop using it
+        synth_contribution = total_synth_weights * decay_factor
+        if synth_contribution < total_actual_weights / 1000:
+            print("Epoch %d, using only actual data" % (epoch + 1,))
+            model.fit(
+                X_actual,
+                Y_actual,
+                sample_weight=weights_actual,
+                nb_epoch=1)
+        else:
+            print("Epoch %d, synth decay factor = %f" % (
+                epoch + 1, decay_factor))
+            weights[n_actual_samples:] = weights_synth * decay_factor
+            model.fit(X, Y, sample_weight=weights, nb_epoch=1)
+        Y_pred = model.predict(X_actual)
+        print("Training MSE %0.4f" % ((Y_actual - Y_pred) ** 2).mean())
+
+
+

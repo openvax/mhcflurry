@@ -25,45 +25,76 @@ from fancyimpute import ConvexSolver
 from common import matrix_to_dictionary
 
 
+def compute_similarities_for_single_allele_from_peptide_overlap(
+        allele_name,
+        allele_to_peptide_to_affinity,
+        allele_name_length=None,
+        min_weight=1.0):
+    """
+    Returns three dictionaries, mapping alleles to
+        - similarity
+        - number of overlapping peptides
+        - total weight of overlapping affinitie
+    """
+    sims = {}
+    overlaps = {}
+    weights = {}
+    dataset_a = allele_to_peptide_to_affinity[allele_name]
+    peptide_set_a = set(dataset_a.keys())
+    for other_allele, dataset_b in allele_to_peptide_to_affinity.items():
+        if allele_name_length and len(other_allele) != allele_name_length:
+            continue
+        peptide_set_b = set(dataset_b.keys())
+        intersection = peptide_set_a.intersection(peptide_set_b)
+        overlaps[other_allele] = len(intersection)
+        total = 0.0
+        weight = 0.0
+        for peptide in intersection:
+            ya = dataset_a[peptide]
+            yb = dataset_b[peptide]
+            minval = min(ya, yb)
+            maxval = max(ya, yb)
+            total += minval
+            weight += maxval
+        weights[other_allele] = weight
+        if weight > min_weight:
+            sims[other_allele] = total / weight
+    return sims, overlaps, weights
+
+
 def compute_partial_similarities_from_peptide_overlap(
         allele_to_peptide_to_affinity,
         min_weight=1.0,
         allele_name_length=None):
     """
     Determine similarity between pairs of alleles by examining
-    affinity values for overlapping peptides
+    affinity values for overlapping peptides. Returns curried dictionaries
+    mapping allele -> allele -> float, where the final value is one of:
+        - similarity between alleles
+        - # overlapping peptides
+        - sum weight of overlapping affinities
     """
     sims = {}
     overlaps = {}
     weights = {}
-    for a, da in allele_to_peptide_to_affinity.items():
-        if allele_name_length and len(a) != allele_name_length:
+    for allele_name in allele_to_peptide_to_affinity.keys():
+        if allele_name_length and len(allele_name) != allele_name_length:
             continue
-        peptide_set_a = set(da.keys())
-        for b, db in allele_to_peptide_to_affinity.items():
-            if allele_name_length and len(b) != allele_name_length:
-                continue
-            peptide_set_b = set(db.keys())
-            intersection = peptide_set_a.intersection(peptide_set_b)
-            overlaps[(a, b)] = len(intersection)
-            total = 0.0
-            weight = 0.0
-            for peptide in intersection:
-                ya = da[peptide]
-                yb = db[peptide]
-                minval = min(ya, yb)
-                maxval = max(ya, yb)
-                total += minval
-                weight += maxval
-            weights[(a, b)] = weight
-            if weight > min_weight:
-                sims[(a, b)] = total / weight
+        curr_sims, curr_overlaps, curr_weights = \
+            compute_similarities_for_single_allele_from_peptide_overlap(
+                allele_name=allele_name,
+                allele_to_peptide_to_affinity=allele_to_peptide_to_affinity,
+                allele_name_length=allele_name_length,
+                min_weight=min_weight)
+        sims[allele_name] = curr_sims
+        overlaps[allele_name] = curr_overlaps
+        weights[allele_name] = curr_weights
     return sims, overlaps, weights
 
 
 def build_incomplete_similarity_matrix(
         allele_to_peptide_to_affinity,
-        sims_dict):
+        curried_sims_dict):
     allele_list = list(sorted(allele_to_peptide_to_affinity.keys()))
     allele_order = {
         allele_name: i
@@ -76,7 +107,8 @@ def build_incomplete_similarity_matrix(
         for b, bi in allele_order.items():
             # if allele pair is missing from similarities dict then
             # fill its slot with NaN, indicating missing data
-            sims_incomplete_matrix[ai, bi] = sims_dict.get((a, b), np.nan)
+            similarity = curried_sims_dict.get(a, {}).get(b, np.nan)
+            sims_incomplete_matrix[(ai, bi)] = similarity
     return allele_list, allele_order, sims_incomplete_matrix
 
 
@@ -98,11 +130,11 @@ def save_heatmap(matrix, allele_names, filename):
 
 
 def fill_in_similarities(
-        raw_sims_dict,
+        curried_raw_sims_dict,
         allele_to_peptide_to_affinity,
         raw_sims_heatmap_path=None,
         complete_sims_heatmap_path=None,
-        overlap_weights=None,
+        curried_overlap_weights=None,
         scalar_error_tolerance=0.0001):
     """
     Given an incomplete dictionary of pairwise allele similarities and
@@ -111,16 +143,17 @@ def fill_in_similarities(
 
     allele_list, allele_order, sims_matrix = build_incomplete_similarity_matrix(
         allele_to_peptide_to_affinity,
-        sims_dict=raw_sims_dict)
+        curried_sims_dict=curried_raw_sims_dict)
 
     missing = np.isnan(sims_matrix)
 
-    if overlap_weights:
+    if curried_overlap_weights:
         error_tolerance = np.ones_like(sims_matrix)
-        for ((allele_a, allele_b), weight) in overlap_weights.items():
-            i = allele_order[allele_a]
-            j = allele_order[allele_b]
-            error_tolerance[i, j] = 2.0 ** -weight
+        for allele_a, a_dict in curried_overlap_weights.items():
+            for allele_b, weight in a_dict.items():
+                i = allele_order[allele_a]
+                j = allele_order[allele_b]
+                error_tolerance[i, j] = 2.0 ** -weight
         print(
             "-- Error tolerance distribution: min %f, max %f, median %f" % (
                 error_tolerance[~missing].min(),
@@ -161,14 +194,30 @@ def fill_in_similarities(
 
 def save_csv(filename, sims, overlap_counts, overlap_weights):
     """
-    Save pairwise allele similarities in CSV file
+    Save pairwise allele similarities in CSV file.
+
+    Assumes the dictionaries sims, overlap_counts, and overlap_weights are
+    'curried', meaning that their keys are single allele names which map
+    to nested dictionaries from other allele names to numeric values.
+    As a type signature, this means the dictionaries are of the form
+        (allele -> allele -> number)
+    and not
+        (allele, allele) -> number
     """
     with open(filename, "w") as f:
         f.write("allele_A,allele_B,similarity,count,weight\n")
-        for (a, b), s in sorted(sims.items()):
-            count = overlap_counts.get((a, b), 0)
-            weight = overlap_weights.get((a, b), 0.0)
-            f.write("%s,%s,%0.4f,%d,%0.4f\n" % (a, b, s, count, weight))
+        for (a, a_row) in sorted(sims.items()):
+            a_counts = overlap_counts.get(a, {})
+            a_weights = overlap_weights.get(a, {})
+            for (b, similarity) in sorted(a_row.items()):
+                count = a_counts.get(b, 0)
+                weight = a_weights.get(b, 0.0)
+                f.write("%s,%s,%0.4f,%d,%0.4f\n" % (
+                    a,
+                    b,
+                    similarity,
+                    count,
+                    weight))
 
 
 def compute_allele_similarities(allele_to_peptide_to_affinity, min_weight=0.1):
@@ -186,8 +235,8 @@ def compute_allele_similarities(allele_to_peptide_to_affinity, min_weight=0.1):
             min_weight=min_weight)
 
     complete_sims_dict = fill_in_similarities(
-        raw_sims_dict=raw_sims_dict,
+        curried_raw_sims_dict=raw_sims_dict,
         allele_to_peptide_to_affinity=allele_to_peptide_to_affinity,
-        overlap_weights=overlap_weights)
+        curried_overlap_weights=overlap_weights)
 
     return complete_sims_dict, overlap_counts, overlap_weights

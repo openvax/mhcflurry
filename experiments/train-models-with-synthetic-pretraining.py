@@ -26,7 +26,7 @@ from mhcflurry.data import (
 )
 
 
-from arg_parsing import parse_int_list
+from arg_parsing import parse_int_list, parse_float_list
 from dataset_paths import PETERS2009_CSV_PATH
 from common import load_csv_binding_data_as_dict
 
@@ -48,13 +48,18 @@ parser.add_argument(
 
 parser.add_argument(
     "--embedding-dim-sizes",
-    default=[1, 2, 4, 8, 16, 32, 64],
+    default=[4, 8, 16, 32, 64],
     type=parse_int_list)
 
 parser.add_argument(
     "--hidden-layer-sizes",
-    default=[1, 2, 4, 8, 16, 32, 64, 128, 256],
+    default=[4, 8, 16, 32, 64, 128, 256],
     type=parse_int_list)
+
+parser.add_argument(
+    "--dropouts",
+    default=[0.0, 0.25, 0.5],
+    type=parse_float_list)
 
 parser.add_argument(
     "--activation-functions",
@@ -64,7 +69,7 @@ parser.add_argument(
 parser.add_argument(
     "--training-epochs",
     type=int,
-    default=5)
+    default=150)
 
 
 def get_extra_data(allele, train_datasets, expanded_predictions):
@@ -154,6 +159,53 @@ def data_augmentation(
     return aucs, f1s, n_originals
 
 
+def evaluate_model(
+        X,
+        Y,
+        weights_synth,
+        weights_actual,
+        dropout,
+        embedding_dim_size,
+        hidden_layer_size):
+    model = mhcflurry.feedforward.make_embedding_network(
+        peptide_length=9,
+        embedding_input_dim=20,
+        embedding_output_dim=4,
+        layer_sizes=[4],
+        activation="tanh",
+        init="lecun_uniform",
+        loss="mse",
+        output_activation="sigmoid",
+        dropout_probability=0.0,
+        optimizer=None,
+        learning_rate=0.001)
+    total_synth_weights = weights_synth.sum()
+    total_actual_weights = weights_actual.sum()
+    for epoch in range(args.training_epochs):
+        # weights for synthetic points can be shrunk as:
+        #  ~ 1 / (1+epoch)**2
+        # or
+        # 2.0 ** -epoch
+        decay_factor = 2.0 ** -epoch
+        # if the contribution of synthetic samples is less than a
+        # thousandth of the actual data, then stop using it
+        synth_contribution = total_synth_weights * decay_factor
+        if synth_contribution < total_actual_weights / 1000:
+            print("Epoch %d, using only actual data" % (epoch + 1,))
+            model.fit(
+                X_actual,
+                Y_actual,
+                sample_weight=weights_actual,
+                nb_epoch=1)
+        else:
+            print("Epoch %d, synth decay factor = %f" % (
+                epoch + 1, decay_factor))
+            weights[n_actual_samples:] = weights_synth * decay_factor
+            model.fit(X, Y, sample_weight=weights, nb_epoch=1)
+        Y_pred = model.predict(X_actual)
+        print("Training MSE %0.4f" % ((Y_actual - Y_pred) ** 2).mean())
+
+
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
@@ -218,24 +270,19 @@ if __name__ == "__main__":
         assert len(weights) == n_samples
         print("-- weights.shape = %s, dtype = %s" % (
             weights.shape, weights.dtype))
-        model = mhcflurry.feedforward.make_embedding_network(
-            peptide_length=9,
-            embedding_input_dim=20,
-            embedding_output_dim=4,
-            layer_sizes=[4],
-            activation="tanh",
-            init="lecun_uniform",
-            loss="mse",
-            output_activation="sigmoid",
-            dropout_probability=0.0,
-            optimizer=None,
-            learning_rate=0.001)
-        for epoch in range(args.training_epochs):
-            # weights for synthetic points should shrink as ~ 1 / (1+epoch)**2
-            decay_factor = 1.0 / (1 + epoch) ** 2
-            print("Epoch %d, synth decay factor = %f" % (
-                epoch + 1, decay_factor))
-            weights[n_actual_samples:] = weights_synth * decay_factor
-            model.fit(X, Y, sample_weight=weights, nb_epoch=1)
-        Y_pred = model.predict(X_actual)
-        print("Training MSE %0.4f" % ((Y_actual - Y_pred) ** 2).mean())
+        scores = {}
+        for dropout in args.dropouts:
+            for embedding_dim_size in args.embedding_dim_sizes:
+                for hidden_layer_size in args.hidden_layer_sizes:
+                    params = (
+                        ("dropout", dropout),
+                        ("embedding_dim_size", embedding_dim_size),
+                        ("hidden_layer_size", hidden_layer_size),
+                    )
+                    tau, auc, f1 = evaluate_model(**dict(params))
+                    scores[params] = (tau, auc, f1)
+                    print("%s => tau=%f, AUC=%f, F1=%f" % (
+                        params,
+                        tau,
+                        auc,
+                        f1))
