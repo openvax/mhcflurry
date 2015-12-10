@@ -33,7 +33,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--min-overlap-weight",
-    default=1.0,
+    default=0.05,
     help="Minimum overlap weight between pair of alleles",
     type=float)
 
@@ -112,9 +112,12 @@ if __name__ == "__main__":
         raw_sims_heatmap_path=args.raw_heatmap_output_path,
         complete_sims_heatmap_path=args.complete_heatmap_output_path)
 
+    n_total_entries = sum(len(row) for row in complete_sims_dict.values())
+    n_original_entries = sum(len(row) for row in raw_sims_dict.values())
     print("-- Added %d/%d allele similarities" % (
-        len(complete_sims_dict) - len(raw_sims_dict),
-        len(complete_sims_dict)))
+        n_total_entries - n_original_entries,
+        n_total_entries
+    ))
 
     if args.complete_similarities_output_path:
         save_csv(

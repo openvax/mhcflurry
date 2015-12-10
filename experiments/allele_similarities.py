@@ -22,7 +22,7 @@ import numpy as np
 import seaborn
 from fancyimpute import ConvexSolver
 
-from common import matrix_to_dictionary
+from common import matrix_to_dictionary, curry_dictionary
 
 
 def compute_similarities_for_single_allele_from_peptide_overlap(
@@ -31,6 +31,13 @@ def compute_similarities_for_single_allele_from_peptide_overlap(
         allele_name_length=None,
         min_weight=1.0):
     """
+    Parameters
+    ----------
+    allele_name : str
+
+    allele_to_peptide_to_affinity : dict
+        Dictionary from allele anmes to a dictionary of (peptide -> affinity)
+
     Returns three dictionaries, mapping alleles to
         - similarity
         - number of overlapping peptides
@@ -118,7 +125,7 @@ def save_heatmap(matrix, allele_names, filename):
     with seaborn.plotting_context(font_scale=1):
         figure = seaborn.plt.figure(figsize=(20, 18))
         ax = figure.add_axes()
-        seaborn.heatmap(
+        heatmap = seaborn.heatmap(
             data=matrix,
             xticklabels=allele_names,
             yticklabels=allele_names,
@@ -126,6 +133,8 @@ def save_heatmap(matrix, allele_names, filename):
             annot=False,
             ax=ax,
             fmt=".2g")
+        heatmap.set_xticklabels(labels=allele_names, rotation=45)
+        heatmap.set_yticklabels(labels=allele_names, rotation=45)
         figure.savefig(filename)
 
 
@@ -186,9 +195,10 @@ def fill_in_similarities(
             allele_list,
             complete_sims_heatmap_path)
 
-    complete_sims_dict = matrix_to_dictionary(
-        sims=sims_complete_matrix,
-        allele_list=allele_list)
+    complete_sims_dict = curry_dictionary(
+        matrix_to_dictionary(
+            sims=sims_complete_matrix,
+            allele_list=allele_list))
     return complete_sims_dict
 
 
@@ -229,9 +239,12 @@ def compute_allele_similarities(allele_to_peptide_to_affinity, min_weight=0.1):
         - dictionary of # overlapping peptides between alleles
         - dictionary of "weight" of overlapping peptides between alleles
     """
+    assert isinstance(allele_to_peptide_to_affinity, dict), \
+        "Wrong type, expected dict but got %s" % (
+            type(allele_to_peptide_to_affinity),)
     raw_sims_dict, overlap_counts, overlap_weights = \
         compute_partial_similarities_from_peptide_overlap(
-            allele_to_peptide_to_affinity,
+            allele_to_peptide_to_affinity=allele_to_peptide_to_affinity,
             min_weight=min_weight)
 
     complete_sims_dict = fill_in_similarities(
