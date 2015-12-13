@@ -226,6 +226,7 @@ def load_allele_datasets(
         filename=filename,
         max_ic50=max_ic50,
         sep=sep,
+        peptide_length=peptide_length,
         species_column_name=species_column_name,
         allele_column_name=allele_column_name,
         peptide_column_name=peptide_column_name,
