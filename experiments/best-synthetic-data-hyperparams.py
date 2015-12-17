@@ -123,8 +123,6 @@ def generate_cross_validation_datasets(
                 this_allele_similarities,
                 test_peptide_set
             )
-        if allele.startswith("HLA"):
-            break
 
 
 def evaluate_synthetic_data(
@@ -285,6 +283,7 @@ if __name__ == "__main__":
             median_tau = np.median(tau_allele_means)
             median_f1 = np.median(f1_score_means)
             median_auc = np.median(auc_allele_means)
+            print("\n\n::::::\n")
             print(
                 "Exp=%f, Coef=%f, tau=%0.4f, AUC = %0.4f, F1 = %0.4f" % (
                     exponent,
@@ -292,6 +291,8 @@ if __name__ == "__main__":
                     median_tau,
                     median_auc,
                     median_f1))
+            print("\n^^^^^^\n")
+
             scores = (median_tau, median_auc, median_f1)
             results[(exponent, smoothing_coef)] = scores
 
