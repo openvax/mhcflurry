@@ -91,11 +91,9 @@ def generate_cross_validation_datasets(
             KFold(n_samples, n_folds=n_folds, shuffle=True))
 
         for fold_number, (train_indices, test_indices) in kfold_iterator:
-            print("-- Fold %d for %s" % (fold_number + 1, allele))
             train_peptides = [peptides[i] for i in train_indices]
             train_affinities = [affinities[i] for i in train_indices]
             test_peptide_set = set([peptides[i] for i in test_indices])
-            print("-- Test peptides = %s" % (list(test_peptide_set),))
             # copy the affinity data for all alleles other than this one
             fold_affinity_dict = {
                 allele_key: affinity_dict
@@ -297,9 +295,21 @@ if __name__ == "__main__":
             results[(exponent, smoothing_coef)] = scores
 
     print("===")
+
+    def combine_item_scores(x):
+        return x[1][0] * x[1][1] * x[1][2]
+    for ((best_exponent, best_coef), (median_tau, median_auc, median_f1)) in \
+            sorted(results.items(), key=combine_item_scores):
+        print("-- exponent = %f, coef = %f (tau=%0.4f, AUC=%0.4f, F1=%0.4f)" % (
+            best_exponent,
+            best_coef,
+            median_tau,
+            median_auc,
+            median_f1))
+
     ((best_exponent, best_coef), (median_tau, median_auc, median_f1)) = max(
         results.items(),
-        key=lambda x: x[1][0] * x[1][1] * x[1][2])
+        key=combine_item_scores)
     print("Best exponent = %f, coef = %f (tau=%0.4f, AUC=%0.4f, F1=%0.4f)" % (
         best_exponent,
         best_coef,
