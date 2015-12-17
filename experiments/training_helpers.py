@@ -17,6 +17,7 @@ from collections import OrderedDict
 import numpy as np
 from sklearn.metrics import roc_auc_score
 
+import mhcflurry
 from mhcflurry.common import normalize_allele_name
 from mhcflurry.data_helpers import indices_to_hotshot_encoding
 

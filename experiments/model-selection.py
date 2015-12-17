@@ -143,6 +143,8 @@ parser.add_argument(
     help="Comma separated list of optimization methods")
 
 
+
+
 if __name__ == "__main__":
     args = parser.parse_args()
     configs = generate_all_model_configs(
