@@ -265,14 +265,26 @@ if __name__ == "__main__":
                 exponent=exponent,
                 max_ic50=args.max_ic50)
             allele_keys = list(sorted(taus.keys()))
-            tau_values = [taus[allele] for allele in allele_keys]
-            auc_values = [aucs.get(allele, 0.5) for allele in allele_keys]
-            f1_score_values = [
-                f1_scores.get(allele, 0.0) for allele in allele_keys
+            tau_allele_means = [
+                np.mean(taus[allele])
+                for allele in allele_keys
+                if taus[allele]
             ]
-            median_tau = np.median(tau_values)
-            median_f1 = np.median(f1_score_values)
-            median_auc = np.median(auc_values)
+            auc_allele_means = [
+                np.mean(aucs[allele])
+                for allele in allele_keys
+                if aucs[allele]
+            ]
+
+            f1_score_means = [
+                np.mean(f1_scores[allele])
+                for allele in allele_keys
+                if f1_scores[allele]
+            ]
+
+            median_tau = np.median(tau_allele_means)
+            median_f1 = np.median(f1_score_means)
+            median_auc = np.median(auc_allele_means)
             print(
                 "Exp=%f, Coef=%f, tau=%0.4f, AUC = %0.4f, F1 = %0.4f" % (
                     exponent,
