@@ -128,29 +128,51 @@ def train_model_and_return_scores(
     return (accuracy, auc, f1_score)
 
 
-def create_and_evaluate_model_with_synthetic_data(
-        X,
-        Y,
-        weights_synth,
-        weights_actual,
+def train_model_with_synthetic_data(
+        model,
         n_training_epochs,
-        dropout,
-        embedding_dim_size,
-        hidden_layer_size):
-    model = mhcflurry.feedforward.make_embedding_network(
-        peptide_length=9,
-        embedding_input_dim=20,
-        embedding_output_dim=4,
-        layer_sizes=[4],
-        activation="tanh",
-        init="lecun_uniform",
-        loss="mse",
-        output_activation="sigmoid",
-        dropout_probability=0.0,
-        optimizer=None,
-        learning_rate=0.001)
-    total_synth_weights = weights_synth.sum()
-    total_actual_weights = weights_actual.sum()
+        max_ic50,
+        X_original,
+        Y_original,
+        X_synth,
+        Y_synth,
+        original_sample_weights,
+        synthetic_sample_weights):
+    total_synth_weights = synthetic_sample_weights.sum()
+    total_original_weights = original_sample_weights.sum()
+    print("Mean Y=%f, Y_synth=%f, weight=%f, weight_synth=%f" % (
+        np.mean(Y_original),
+        np.mean(Y_synth),
+        np.mean(original_sample_weights),
+        np.mean(synthetic_sample_weights)))
+    combined_weights = np.concatenate([
+        original_sample_weights,
+        synthetic_sample_weights
+    ])
+    n_actual_samples, n_actual_dims = X_original.shape
+    n_synth_samples, n_synth_dims = X_synth.shape
+    assert n_actual_dims == n_synth_dims, \
+        "Mismatch between # of actual dims %d and synthetic dims %d" % (
+            n_actual_dims, n_synth_dims)
+    X_combined = np.vstack([X_original, X_synth])
+    n_combined_samples = n_actual_samples + n_synth_samples
+    assert X_combined.shape[0] == n_combined_samples, \
+        "Expected %d samples but got data array with shape %s" % (
+            n_actual_samples + n_synth_samples, X_combined.shape)
+    Y_combined = np.concatenate([Y_original, Y_synth])
+    assert Y_combined.min() >= 0, \
+        "Y should not contain negative numbers! Y.min() = %f" % (
+            Y_combined.min(),)
+    assert Y_combined.max() <= 1, \
+        "Y should have max value 1.0, got Y.max() = %f" % (
+            Y_combined.max(),)
+    combined_weights = np.concatenate([
+        original_sample_weights,
+        synthetic_sample_weights
+    ])
+
+    assert len(combined_weights) == n_combined_samples
+
     for epoch in range(n_training_epochs):
         # weights for synthetic points can be shrunk as:
         #  ~ 1 / (1+epoch)**2
@@ -160,20 +182,69 @@ def create_and_evaluate_model_with_synthetic_data(
         # if the contribution of synthetic samples is less than a
         # thousandth of the actual data, then stop using it
         synth_contribution = total_synth_weights * decay_factor
-        if synth_contribution < total_actual_weights / 1000:
+        if synth_contribution < total_original_weights / 1000:
             print("Epoch %d, using only actual data" % (epoch + 1,))
             model.fit(
-                X_actual,
-                Y_actual,
-                sample_weight=weights_actual,
-                nb_epoch=1)
+                X_original,
+                Y_original,
+                sample_weight=original_sample_weights,
+                nb_epoch=1,
+                verbose=0)
         else:
             print("Epoch %d, synth decay factor = %f" % (
                 epoch + 1, decay_factor))
-            weights[n_actual_samples:] = weights_synth * decay_factor
-            model.fit(X, Y, sample_weight=weights, nb_epoch=1)
-        Y_pred = model.predict(X_actual)
-        print("Training MSE %0.4f" % ((Y_actual - Y_pred) ** 2).mean())
+            combined_weights[n_actual_samples:] = (
+                synthetic_sample_weights * decay_factor)
+            model.fit(
+                X_combined,
+                Y_combined,
+                sample_weight=combined_weights,
+                nb_epoch=1,
+                verbose=0)
+        Y_pred = model.predict(X_original)
+        training_mse = ((Y_original - Y_pred) ** 2).mean()
+        print(
+            "-- Epoch %d/%d Training MSE %0.4f" % (
+                epoch + 1,
+                n_training_epochs,
+                training_mse))
 
 
-
+def create_and_evaluate_model_with_synthetic_data(
+        X_original,
+        Y_original,
+        X_synth,
+        Y_synth,
+        original_sample_weights=None,
+        synthetic_sample_weights=None,
+        n_training_epochs=150,
+        embedding_dim_size=16,
+        hidden_layer_size=50,
+        dropout_probability=0.0,
+        max_ic50=50000.0):
+    if original_sample_weights is None:
+        original_sample_weights = np.ones(len(X_original), dtype=float)
+    if synthetic_sample_weights is None:
+        synthetic_sample_weights = np.ones(len(X_synth), dtype=float)
+    model = mhcflurry.feedforward.make_embedding_network(
+        peptide_length=9,
+        embedding_input_dim=20,
+        embedding_output_dim=embedding_dim_size,
+        layer_sizes=[hidden_layer_size],
+        activation="tanh",
+        init="lecun_uniform",
+        loss="mse",
+        output_activation="sigmoid",
+        dropout_probability=dropout_probability,
+        optimizer=None,
+        learning_rate=0.001)
+    train_model_with_synthetic_data(
+        model=model,
+        n_training_epochs=n_training_epochs,
+        max_ic50=max_ic50,
+        X_original=X_original,
+        Y_original=Y_original,
+        X_synth=X_synth,
+        Y_synth=Y_synth,
+        original_sample_weights=original_sample_weights,
+        synthetic_sample_weights=synthetic_sample_weights)

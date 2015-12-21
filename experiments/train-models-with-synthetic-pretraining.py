@@ -29,6 +29,7 @@ from mhcflurry.data import (
 from arg_parsing import parse_int_list, parse_float_list
 from dataset_paths import PETERS2009_CSV_PATH
 from common import load_csv_binding_data_as_dict
+from training_helpers import create_and_evaluate_model_with_synthetic_data
 
 parser = argparse.ArgumentParser()
 
@@ -159,6 +160,25 @@ def data_augmentation(
     return aucs, f1s, n_originals
 
 
+def rescale_ic50(ic50, max_ic50):
+    log_ic50 = np.log(ic50) / np.log(args.max_ic50)
+    return max(0.0, min(1.0, 1.0 - log_ic50))
+
+
+def load_synthetic_data(csv_path, max_ic50):
+    synthetic_allele_to_peptide_to_ic50_dict = load_csv_binding_data_as_dict(
+        csv_path)
+    return {
+        allele: {
+            peptide: rescale_ic50(ic50, max_ic50=max_ic50)
+            for (peptide, ic50)
+            in allele_dict.items()
+        }
+        for (allele, allele_dict)
+        in synthetic_allele_to_peptide_to_ic50_dict.items()
+    }
+
+
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
@@ -169,70 +189,39 @@ if __name__ == "__main__":
         max_ic50=args.max_ic50,
         only_human=False)
     print("Loading synthetic data from %s" % args.synthetic_data_csv)
-    synthetic_allele_to_peptide_to_ic50_dict = load_csv_binding_data_as_dict(
-        args.synthetic_data_csv)
-    synthetic_allele_to_peptide_to_y_dict = {
-        allele: {
-            peptide: max(
-                0.0,
-                min(
-                    1.0,
-                    1.0 - np.log(ic50) / np.log(args.max_ic50)))
-            for (peptide, ic50)
-            in allele_dict.items()
-        }
-        for (allele, allele_dict)
-        in synthetic_allele_to_peptide_to_ic50_dict.items()
-    }
+
+    synthetic_affinities = load_synthetic_data(
+        csv_path=args.synthetic_data_csv,
+        max_ic50=args.max_ic50)
 
     combined_allele_set = set(allele_datasets.keys()).union(
-        synthetic_allele_to_peptide_to_y_dict.keys())
+        synthetic_affinities.keys())
+
     combined_allele_list = list(sorted(combined_allele_set))
     for allele in combined_allele_list:
-        actual_dataset = allele_datasets[allele]
-        X_actual = actual_dataset.X_index
-        weights_actual = actual_dataset.weights
-        Y_actual = actual_dataset.Y
-
-        synthetic_dict = synthetic_allele_to_peptide_to_y_dict[allele]
-
-        _, _, C_synth, X_synth, _, Y_synth = encode_peptide_to_affinity_dict(
-            synthetic_dict)
-
-        n_actual_samples, n_actual_dims = X_actual.shape
-        n_synth_samples, n_synth_dims = X_synth.shape
-        assert n_actual_dims == n_synth_dims, \
-            "Mismatch between # of actual dims %d and synthetic dims %d" % (
-                n_actual_dims, n_synth_dims)
-        print("-- Using %d actual samples and %d synthetic samples for %s" % (
-            n_actual_samples, n_synth_samples, allele))
-        X = np.vstack([X_actual, X_synth])
-        print("-- X.shape = %s, dtype = %s" % (X.shape, X.dtype))
-        n_samples = n_actual_samples + n_synth_samples
-        assert X.shape[0] == n_samples, \
-            "Expected %d samples but got data array with shape %s" % (
-                n_actual_samples + n_synth_samples, X.shape)
-        Y = np.concatenate([Y_actual, Y_synth])
-        print("-- Y.shape = %s, dtype = %s" % (Y.shape, Y.dtype))
-        assert Y.min() >= 0, \
-            "Y should not contain negative numbers! Y.min() = %f" % (Y.min(),)
-        assert Y.max() <= 1, \
-            "Y should have max value 1.0, got Y.max() = %f" % (Y.max(),)
-        weights_synth = 1.0 / C_synth
-        weights = np.concatenate([weights_actual, weights_synth])
-        assert len(weights) == n_samples
-        print("-- weights.shape = %s, dtype = %s" % (
-            weights.shape, weights.dtype))
+        synthetic_allele_dict = synthetic_affinities[allele]
+        (_, _, Counts_synth, X_synth, _, Y_synth) = \
+            encode_peptide_to_affinity_dict(synthetic_allele_dict)
+        synthetic_sample_weights = 1.0 / Counts_synth
         scores = {}
         for dropout in args.dropouts:
             for embedding_dim_size in args.embedding_dim_sizes:
                 for hidden_layer_size in args.hidden_layer_sizes:
                     params = (
-                        ("dropout", dropout),
+                        ("dropout_probability", dropout),
                         ("embedding_dim_size", embedding_dim_size),
                         ("hidden_layer_size", hidden_layer_size),
                     )
-                    tau, auc, f1 = evaluate_model(**dict(params))
+                    tau, auc, f1 = create_and_evaluate_model_with_synthetic_data(
+                        X_original=allele_datasets[allele].X_index,
+                        Y_original=allele_datasets[allele].Y,
+                        X_synth=X_synth,
+                        Y_synth=Y_synth,
+                        original_sample_weights=allele_datasets[allele].weights,
+                        synthetic_sample_weights=synthetic_sample_weights,
+                        n_training_epochs=150,
+                        max_ic50=args.max_ic50,
+                        **dict(params))
                     scores[params] = (tau, auc, f1)
                     print("%s => tau=%f, AUC=%f, F1=%f" % (
                         params,
