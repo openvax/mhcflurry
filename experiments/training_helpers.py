@@ -222,9 +222,9 @@ def train_model_with_synthetic_data(
         # if the contribution of synthetic samples is less than a
         # thousandth of the actual data, then stop using it
         synth_contribution = total_synth_weights * decay_factor
-        # only use synthetic data if it contributes at least 1/1000th of
+        # only use synthetic data if it contributes at least 1/100th of
         # sample weight
-        use_synth_data = synth_contribution > (total_original_weights / 1000)
+        use_synth_data = synth_contribution > (total_original_weights / 100)
         if use_synth_data:
             combined_weights[n_actual_samples:] = (
                 synthetic_sample_weights * decay_factor)
