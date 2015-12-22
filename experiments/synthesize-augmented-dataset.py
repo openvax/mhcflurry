@@ -85,9 +85,13 @@ if __name__ == "__main__":
     print("Created reverse lookup dictionary for %d peptides" % len(reverse_lookup))
 
     if args.allele_similarity_csv:
-        sims_dict = load_sims_dict(args.allele_similarity_csv)
-        print("Loaded similarities between %d allele pairs (%d unique)" % (
-            len(sims_dict), len(set(a for (a, _) in sims_dict.keys()))))
+        sims_dict = load_sims_dict(
+            args.allele_similarity_csv,
+            allele_pair_keys=False)
+        allele_names = list(sims_dict.keys())
+        print("Loaded similarities between %d alleles from %s" % (
+            len(allele_names),
+            args.allele_similarity_csv))
     else:
         sims_dict, _, _ = \
             compute_allele_similarities(
@@ -98,7 +102,8 @@ if __name__ == "__main__":
         peptide_to_affinities=reverse_lookup,
         pairwise_allele_similarities=sims_dict,
         smoothing=args.smoothing_coef,
-        exponent=args.similarity_exponent)
+        exponent=args.similarity_exponent,
+        allele_pair_keys=False)
 
     synthetic_data_dict = OrderedDict([
         ("mhc", []),
