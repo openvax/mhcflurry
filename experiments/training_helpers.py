@@ -123,18 +123,7 @@ def score_predictions(
 
     auc = metrics.roc_auc_score(true_binding_label, predicted_log_ic50)
     predicted_binding_label = predicted_ic50s <= 500
-    if predicted_binding_label.all() or not predicted_binding_label.any():
-        logging.warn(
-            ("Can't compute AUC, F1, or accuracy without both"
-             " positive and negative predicted labels"))
-        return PredictionScores(
-            tau=tau,
-            auc=auc,
-            f1=0.0,
-            accuracy=0.0)
-
     f1_score = metrics.f1_score(true_binding_label, predicted_binding_label)
-
     same_mask = true_binding_label == predicted_binding_label
     accuracy = np.mean(same_mask)
     return PredictionScores(
@@ -217,16 +206,16 @@ def train_model_with_synthetic_data(
         # weights for synthetic points can be shrunk as:
         #  ~ 1 / (1+epoch)**2
         # or
-        # 2.0 ** -epoch
-        decay_factor = 2.0 ** -epoch
+        # e ** -epoch
+        decay_factor = np.exp(-epoch)
         # if the contribution of synthetic samples is less than a
         # thousandth of the actual data, then stop using it
         synth_contribution = total_synth_weights * decay_factor
         synth_fraction_contribution = synth_contribution / (
             synth_contribution + total_original_weights)
-        # only use synthetic data if it contributes at least 1/100th of
+        # only use synthetic data if it contributes at least 1/1000th of
         # sample weight
-        use_synth_data = synth_fraction_contribution > 0.01
+        use_synth_data = synth_fraction_contribution > 0.001
         if use_synth_data:
             combined_weights[n_actual_samples:] = (
                 synthetic_sample_weights * decay_factor)
@@ -246,14 +235,24 @@ def train_model_with_synthetic_data(
 
         Y_pred = model.predict(X_original)
         training_mse = ((Y_original - Y_pred) ** 2).mean()
+
+        synth_data_percent = (
+            ((1.0 - synth_fraction_contribution) * 100)
+            if use_synth_data
+            else 100
+        )
+        real_data_percent = (
+            (synth_fraction_contribution * 100)
+            if use_synth_data else 0
+        )
         print(
-            ("-- Epoch %d/%d real data weight %0.2f%%, "
+            ("-- Epoch %d/%d real data weight %0.2f%%,"
              " synth data weight %0.2f%%,"
              " Training MSE %0.4f") % (
                 epoch + 1,
                 n_training_epochs,
-                ((1.0 - synth_fraction_contribution) * 100) if use_synth_data else 100,
-                (synth_fraction_contribution * 100) if use_synth_data else 0,
+                real_data_percent,
+                synth_data_percent,
                 training_mse))
 
 
