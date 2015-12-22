@@ -111,8 +111,8 @@ if __name__ == "__main__":
         ("ic50", []),
     ])
 
-    for allele, allele_entries in synthetic_data.items():
-        print(allele, len(allele_entries))
+    for allele, allele_entries in sorted(synthetic_data.items()):
+        print("%s (n=%d)" % (allele, len(allele_entries)))
         for (peptide, regression_value) in allele_entries.items():
             synthetic_data_dict["mhc"].append(allele)
             synthetic_data_dict["sequence"].append(peptide)
