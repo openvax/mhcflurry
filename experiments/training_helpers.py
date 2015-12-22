@@ -222,9 +222,11 @@ def train_model_with_synthetic_data(
         # if the contribution of synthetic samples is less than a
         # thousandth of the actual data, then stop using it
         synth_contribution = total_synth_weights * decay_factor
+        synth_fraction_contribution = synth_contribution / (
+            synth_contribution + total_original_weights)
         # only use synthetic data if it contributes at least 1/100th of
         # sample weight
-        use_synth_data = synth_contribution > (total_original_weights / 100)
+        use_synth_data = synth_fraction_contribution > 0.01
         if use_synth_data:
             combined_weights[n_actual_samples:] = (
                 synthetic_sample_weights * decay_factor)
@@ -245,10 +247,13 @@ def train_model_with_synthetic_data(
         Y_pred = model.predict(X_original)
         training_mse = ((Y_original - Y_pred) ** 2).mean()
         print(
-            "-- Epoch %d/%d synth weight=%s, Training MSE %0.4f" % (
+            ("-- Epoch %d/%d real data weight %0.2f%%, "
+             " synth data weight %0.2f%%,"
+             " Training MSE %0.4f") % (
                 epoch + 1,
                 n_training_epochs,
-                decay_factor if use_synth_data else 0,
+                ((1.0 - synth_fraction_contribution) * 100) if use_synth_data else 100,
+                (synth_fraction_contribution * 100) if use_synth_data else 0,
                 training_mse))
 
 
