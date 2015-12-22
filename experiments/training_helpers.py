@@ -218,7 +218,7 @@ def train_model_with_synthetic_data(
         #  ~ 1 / (1+epoch)**2
         # or
         # 2.0 ** -epoch
-        decay_factor = 1.0 / (1 + epoch) ** 2
+        decay_factor = 2.0 ** -epoch
         # if the contribution of synthetic samples is less than a
         # thousandth of the actual data, then stop using it
         synth_contribution = total_synth_weights * decay_factor
