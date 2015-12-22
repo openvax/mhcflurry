@@ -29,7 +29,7 @@ from mhcflurry.data import (
 from arg_parsing import parse_int_list, parse_float_list
 from dataset_paths import PETERS2009_CSV_PATH
 from common import load_csv_binding_data_as_dict
-from training_helpers import create_and_evaluate_model_with_synthetic_data
+from training_helpers import kfold_cross_validation_of_model_params_with_synthetic_data
 
 parser = argparse.ArgumentParser()
 
@@ -71,6 +71,8 @@ parser.add_argument(
     "--training-epochs",
     type=int,
     default=150)
+
+parser.add_argument("--log-file")
 
 
 def get_extra_data(allele, train_datasets, expanded_predictions):
@@ -198,33 +200,75 @@ if __name__ == "__main__":
         synthetic_affinities.keys())
 
     combined_allele_list = list(sorted(combined_allele_set))
+
+    if args.log_file:
+        logfile = open(args.log_file, "w")
+        logfile.write("allele,n_samples,n_unique,n_synth")
+    else:
+        logfile = None
+    logfile_needs_header = True
+
     for allele in combined_allele_list:
         synthetic_allele_dict = synthetic_affinities[allele]
         (_, _, Counts_synth, X_synth, _, Y_synth) = \
             encode_peptide_to_affinity_dict(synthetic_allele_dict)
         synthetic_sample_weights = 1.0 / Counts_synth
         scores = {}
+        source_peptides = allele_datasets[allele].original_peptides
+        X_original = allele_datasets[allele].X_index
+        Y_original = allele_datasets[allele].Y
+        n_samples = len(X_original)
+        n_unique_samples = len(set(source_peptides))
+        n_synth_samples = len(synthetic_sample_weights)
         for dropout in args.dropouts:
             for embedding_dim_size in args.embedding_dim_sizes:
                 for hidden_layer_size in args.hidden_layer_sizes:
-                    params = (
-                        ("dropout_probability", dropout),
-                        ("embedding_dim_size", embedding_dim_size),
-                        ("hidden_layer_size", hidden_layer_size),
-                    )
-                    tau, auc, f1 = create_and_evaluate_model_with_synthetic_data(
-                        X_original=allele_datasets[allele].X_index,
-                        Y_original=allele_datasets[allele].Y,
-                        X_synth=X_synth,
-                        Y_synth=Y_synth,
-                        original_sample_weights=allele_datasets[allele].weights,
-                        synthetic_sample_weights=synthetic_sample_weights,
-                        n_training_epochs=150,
-                        max_ic50=args.max_ic50,
-                        **dict(params))
-                    scores[params] = (tau, auc, f1)
-                    print("%s => tau=%f, AUC=%f, F1=%f" % (
-                        params,
-                        tau,
-                        auc,
-                        f1))
+                    for activation in args.activation_functions:
+                        params = (
+                            ("dropout_probability", dropout),
+                            ("embedding_dim_size", embedding_dim_size),
+                            ("hidden_layer_size", hidden_layer_size),
+                            ("activation", activation),
+                        )
+
+                        print(
+                            "Evaluating allele %s (n=%d, unique=%d): %s" % (
+                                allele,
+                                n_samples,
+                                n_unique_samples,
+                                params))
+                        average_scores, _ = \
+                            kfold_cross_validation_of_model_params_with_synthetic_data(
+                                X_original=X_original,
+                                Y_original=Y_original,
+                                source_peptides_original=source_peptides,
+                                X_synth=X_synth,
+                                Y_synth=Y_synth,
+                                original_sample_weights=allele_datasets[allele].weights,
+                                synthetic_sample_weights=synthetic_sample_weights,
+                                n_training_epochs=200,
+                                max_ic50=args.max_ic50,
+                                **dict(params))
+                        if logfile:
+                            if logfile_needs_header:
+                                for param_name, _ in params:
+                                    logfile.write("%s," % param_name)
+                                for score_name in average_scores._fields:
+                                    logfile.write("%s," % score_name)
+                                logfile.write("param_id\n")
+                            logfile.write("%s,%d,%d,%d" % (
+                                allele,
+                                n_samples,
+                                n_unique_samples,
+                                n_synth_samples))
+                            for _, param_value in params:
+                                logfile.write("%s," % param_value)
+                            for score_name in average_scores._fields:
+                                score_value = average_scores.__dict__[score_name]
+                                logfile.write("%0.4f," % score_value)
+                            logfile.write("%d\n" % len(scores))
+
+                        scores[params] = average_scores
+                        print("%s => %s" % (params, average_scores))
+    if logfile:
+        logfile.close()
