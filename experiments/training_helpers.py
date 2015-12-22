@@ -222,14 +222,10 @@ def train_model_with_synthetic_data(
         # if the contribution of synthetic samples is less than a
         # thousandth of the actual data, then stop using it
         synth_contribution = total_synth_weights * decay_factor
-        if synth_contribution < total_original_weights / 1000:
-            model.fit(
-                X_original,
-                Y_original,
-                sample_weight=original_sample_weights,
-                nb_epoch=1,
-                verbose=0)
-        else:
+        # only use synthetic data if it contributes at least 1/1000th of
+        # sample weight
+        use_synth_data = synth_contribution > (total_original_weights / 1000)
+        if use_synth_data:
             combined_weights[n_actual_samples:] = (
                 synthetic_sample_weights * decay_factor)
             model.fit(
@@ -238,13 +234,21 @@ def train_model_with_synthetic_data(
                 sample_weight=combined_weights,
                 nb_epoch=1,
                 verbose=0)
+        else:
+            model.fit(
+                X_original,
+                Y_original,
+                sample_weight=original_sample_weights,
+                nb_epoch=1,
+                verbose=0)
+
         Y_pred = model.predict(X_original)
         training_mse = ((Y_original - Y_pred) ** 2).mean()
         print(
-            "-- Epoch %d/%d Decay=%f, Training MSE %0.4f" % (
+            "-- Epoch %d/%d synth weight=%s, Training MSE %0.4f" % (
                 epoch + 1,
                 n_training_epochs,
-                decay_factor,
+                decay_factor if use_synth_data else 0,
                 training_mse))
 
 
@@ -329,11 +333,12 @@ def kfold_cross_validation_of_model_fn_with_synthetic_data(
     # samples may be extracted from the same longer peptide.
     # To avoid training vs. test contamination we do k-fold cross validation
     # stratified by the "source" peptides of each sample.
-    cv_iterator = LabelKFold(
-        labels=source_peptides_train,
-        n_folds=n_cross_validation_folds)
+    cv_iterator = enumerate(
+        LabelKFold(
+            labels=source_peptides_train,
+            n_folds=n_cross_validation_folds))
     results = []
-    for i, (fold_train_index, fold_test_index) in enumerate(cv_iterator):
+    for fold_number, (fold_train_index, fold_test_index) in cv_iterator:
         model = make_model_fn()
         X_train_fold, X_test_fold = \
             X_train[fold_train_index], X_train[fold_test_index]
@@ -374,7 +379,7 @@ def kfold_cross_validation_of_model_fn_with_synthetic_data(
             true_log_ic50=collapsed_true_values,
             max_ic50=max_ic50)
         print("::: CV fold %d/%d (n_samples=%d, n_unique=%d): %s\n\n" % (
-            i + 1,
+            fold_number + 1,
             n_cross_validation_folds,
             len(peptides_train_fold),
             len(set(peptides_train_fold)),

@@ -70,7 +70,7 @@ parser.add_argument(
 parser.add_argument(
     "--training-epochs",
     type=int,
-    default=150)
+    default=250)
 
 parser.add_argument("--log-file")
 
@@ -246,7 +246,7 @@ if __name__ == "__main__":
                                 Y_synth=Y_synth,
                                 original_sample_weights=allele_datasets[allele].weights,
                                 synthetic_sample_weights=synthetic_sample_weights,
-                                n_training_epochs=200,
+                                n_training_epochs=args.training_epochs,
                                 max_ic50=args.max_ic50,
                                 **dict(params))
                         if logfile:
