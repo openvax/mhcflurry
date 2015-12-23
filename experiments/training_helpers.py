@@ -314,7 +314,8 @@ def kfold_cross_validation_of_model_fn_with_synthetic_data(
         original_sample_weights,
         synthetic_sample_weights,
         n_cross_validation_folds,
-        combine_multiple_predictions_fn=np.median):
+        combine_multiple_predictions_fn=np.median,
+        random_seed=0):
     """
     Given a function which generates fresh copies of a model, use k-fold
     cross validation (stratified by the list of source peptide sequences) to
@@ -328,6 +329,7 @@ def kfold_cross_validation_of_model_fn_with_synthetic_data(
     assert len(source_peptides_train) == len(X_train)
     # randomly shuffle the training data first
     indices = np.arange(len(X_train))
+    np.random.seed(random_seed)
     np.random.shuffle(indices)
     X_train, Y_train, weights_train = \
         X_train[indices], Y_train[indices], original_sample_weights[indices]
