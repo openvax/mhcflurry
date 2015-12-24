@@ -106,7 +106,9 @@ def score_predictions(
     Returns PredictionScores object with fields (tau, auc, f1, accuracy)
     """
     tau, _ = stats.kendalltau(predicted_log_ic50, true_log_ic50)
-    assert not np.isnan(tau)
+    if np.isnan(tau):
+        logging.warn("Kendall tau was NaN!")
+        tau = 0.0
     true_ic50s = max_ic50 ** (1.0 - np.array(true_log_ic50))
     predicted_ic50s = max_ic50 ** (1.0 - np.array(predicted_log_ic50))
 

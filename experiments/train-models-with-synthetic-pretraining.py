@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
     if args.log_file:
         logfile = open(args.log_file, "w")
-        logfile.write("allele,n_samples,n_unique,n_synth")
+        logfile.write("allele,n_samples,n_unique,n_synth,")
     else:
         logfile = None
     logfile_needs_header = True
@@ -184,7 +184,8 @@ if __name__ == "__main__":
                                 for score_name in average_scores._fields:
                                     logfile.write("%s," % score_name)
                                 logfile.write("param_id\n")
-                            logfile.write("%s,%d,%d,%d" % (
+                                logfile_needs_header = False
+                            logfile.write("%s,%d,%d,%d," % (
                                 allele,
                                 n_samples,
                                 n_unique_samples,
