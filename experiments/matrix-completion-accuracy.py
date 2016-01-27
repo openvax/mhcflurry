@@ -138,7 +138,12 @@ imputation_methods = {
         verbose=VERBOSE),
     "meanFill": SimpleFill("mean"),
     "zeroFill": SimpleFill("zero"),
-    "MICE": MICE(n_burn_in=5, n_imputations=20, verbose=VERBOSE),
+    "MICE": MICE(
+        n_burn_in=5,
+        n_imputations=20,
+        min_value=0,
+        max_value=1,
+        verbose=VERBOSE),
     "knnImpute-3": KNN(3, orientation="columns", verbose=VERBOSE, print_interval=1),
     "knnImpute-7": KNN(7, orientation="columns", verbose=VERBOSE, print_interval=1),
     "knnImpute-15": KNN(15, orientation="columns", verbose=VERBOSE, print_interval=1),
