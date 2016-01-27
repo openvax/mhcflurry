@@ -128,27 +128,6 @@ def evaluate_predictions(
 
 VERBOSE = False
 
-imputation_methods = {
-    "softImpute": SoftImpute(verbose=VERBOSE),
-    "svdImpute-5": IterativeSVD(5, verbose=VERBOSE),
-    "svdImpute-10": IterativeSVD(10, verbose=VERBOSE),
-    "svdImpute-20": IterativeSVD(20, verbose=VERBOSE),
-    "similarityWeightedAveraging": SimilarityWeightedAveraging(
-        orientation="columns",
-        verbose=VERBOSE),
-    "meanFill": SimpleFill("mean"),
-    "zeroFill": SimpleFill("zero"),
-    "MICE": MICE(
-        n_burn_in=5,
-        n_imputations=20,
-        min_value=0,
-        max_value=1,
-        verbose=VERBOSE),
-    "knnImpute-3": KNN(3, orientation="columns", verbose=VERBOSE, print_interval=1),
-    "knnImpute-7": KNN(7, orientation="columns", verbose=VERBOSE, print_interval=1),
-    "knnImpute-15": KNN(15, orientation="columns", verbose=VERBOSE, print_interval=1),
-}
-
 
 class ScoreSet(object):
     """
@@ -212,6 +191,27 @@ class ScoreSet(object):
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
+
+    imputation_methods = {
+        "softImpute": SoftImpute(verbose=VERBOSE),
+        "svdImpute-5": IterativeSVD(5, verbose=VERBOSE),
+        "svdImpute-10": IterativeSVD(10, verbose=VERBOSE),
+        "svdImpute-20": IterativeSVD(20, verbose=VERBOSE),
+        "similarityWeightedAveraging": SimilarityWeightedAveraging(
+            orientation="columns",
+            verbose=VERBOSE),
+        "meanFill": SimpleFill("mean"),
+        "zeroFill": SimpleFill("zero"),
+        "MICE": MICE(
+            n_burn_in=5,
+            n_imputations=20,
+            min_value=None if args.normalize_rows or args.normalize_columns else 0,
+            max_value=None if args.normalize_rows or args.normalize_columns else 1,
+            verbose=VERBOSE),
+        "knnImpute-3": KNN(3, orientation="columns", verbose=VERBOSE, print_interval=1),
+        "knnImpute-7": KNN(7, orientation="columns", verbose=VERBOSE, print_interval=1),
+        "knnImpute-15": KNN(15, orientation="columns", verbose=VERBOSE, print_interval=1),
+    }
 
     allele_to_peptide_to_affinity = load_allele_dicts(
         args.binding_data_csv,
