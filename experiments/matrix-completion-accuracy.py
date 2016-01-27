@@ -21,7 +21,7 @@ from fancyimpute import (
     SoftImpute,
     IterativeSVD,
     SimilarityWeightedAveraging,
-    DenseKNN,
+    KNN,
     MICE,
     BiScaler,
     SimpleFill,
@@ -60,10 +60,17 @@ parser.add_argument(
     default="matrix-completion-accuracy-results.csv")
 
 parser.add_argument(
-    "--biscale",
+    "--normalize-columns",
     default=False,
     action="store_true",
-    help="Normalize rows and columns of affinity matrix simultaneously")
+    help="Center and rescale columns of affinity matrix")
+
+
+parser.add_argument(
+    "--normalize-rows",
+    default=False,
+    action="store_true",
+    help="Center and rescale rows of affinity matrix")
 
 parser.add_argument(
     "--n-folds",
@@ -113,22 +120,22 @@ def evaluate_predictions(
 
     return mae, tau, auc, f1_score
 
-VERBOSE = True
+VERBOSE = False
 
 imputation_methods = {
-    #"softImpute": SoftImpute(verbose=VERBOSE),
-    #"svdImpute-5": IterativeSVD(5, verbose=VERBOSE),
-    #"svdImpute-10": IterativeSVD(10, verbose=VERBOSE),
-    #"svdImpute-20": IterativeSVD(20, verbose=VERBOSE),
-    # "colSims": SimilarityWeightedAveraging(
-    #    orientation="columns",
-    #    verbose=VERBOSE),
+    "softImpute": SoftImpute(verbose=VERBOSE),
+    "svdImpute-5": IterativeSVD(5, verbose=VERBOSE),
+    "svdImpute-10": IterativeSVD(10, verbose=VERBOSE),
+    "svdImpute-20": IterativeSVD(20, verbose=VERBOSE),
+    "colSims": SimilarityWeightedAveraging(
+        orientation="columns",
+        verbose=VERBOSE),
     "meanFill": SimpleFill("mean"),
     "zeroFill": SimpleFill("zero"),
-    # "MICE": MICE(verbose=VERBOSE),
-    "knnImpute-3": DenseKNN(3, orientation="columns", verbose=VERBOSE, print_interval=1),
-    "knnImpute-7": DenseKNN(7, orientation="columns", verbose=VERBOSE, print_interval=1),
-    "knnImpute-15": DenseKNN(15, orientation="columns", verbose=VERBOSE, print_interval=1),
+    "MICE": MICE(verbose=VERBOSE),
+    "knnImpute-3": KNN(3, orientation="columns", verbose=VERBOSE, print_interval=1),
+    "knnImpute-7": KNN(7, orientation="columns", verbose=VERBOSE, print_interval=1),
+    "knnImpute-15": KNN(15, orientation="columns", verbose=VERBOSE, print_interval=1),
 }
 
 
@@ -229,7 +236,11 @@ if __name__ == "__main__":
     assert len(observed_indices) == n_observed
 
     kfold = StratifiedKFold(observed_y, n_folds=5, shuffle=True)
-    biscaler = BiScaler(scale_rows=args.biscale, center_rows=args.biscale)
+    biscaler = BiScaler(
+        scale_rows=args.normalize_rows,
+        center_rows=args.normalize_rows,
+        scale_columns=args.normalize_columns,
+        center_columns=args.normalize_rows)
 
     for fold_idx, (_, indirect_test_indices) in enumerate(kfold):
 
