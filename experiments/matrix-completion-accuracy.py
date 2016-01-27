@@ -35,6 +35,7 @@ import sklearn.metrics
 from sklearn.cross_validation import StratifiedKFold
 from scipy import stats
 import numpy as np
+import pandas as pd
 
 from dataset_paths import PETERS2009_CSV_PATH
 
@@ -49,6 +50,11 @@ parser.add_argument(
     "--max-ic50",
     default=50000.0,
     type=float)
+
+parser.add_argument(
+    "--save-incomplete-affinity-matrix",
+    default=None,
+    help="Path to CSV which will contains the incomplete affinity matrix")
 
 parser.add_argument(
     "--only-human",
@@ -127,12 +133,12 @@ imputation_methods = {
     "svdImpute-5": IterativeSVD(5, verbose=VERBOSE),
     "svdImpute-10": IterativeSVD(10, verbose=VERBOSE),
     "svdImpute-20": IterativeSVD(20, verbose=VERBOSE),
-    "colSims": SimilarityWeightedAveraging(
+    "similarityWeightedAveraging": SimilarityWeightedAveraging(
         orientation="columns",
         verbose=VERBOSE),
     "meanFill": SimpleFill("mean"),
     "zeroFill": SimpleFill("zero"),
-    "MICE": MICE(verbose=VERBOSE),
+    "MICE": MICE(n_burn_in=5, n_imputations=20, verbose=VERBOSE),
     "knnImpute-3": KNN(3, orientation="columns", verbose=VERBOSE, print_interval=1),
     "knnImpute-7": KNN(7, orientation="columns", verbose=VERBOSE, print_interval=1),
     "knnImpute-15": KNN(15, orientation="columns", verbose=VERBOSE, print_interval=1),
@@ -221,6 +227,17 @@ if __name__ == "__main__":
     X, peptide_order, allele_order = \
         dense_matrix_from_nested_dictionary(peptide_to_allele_to_affinity)
 
+    if args.save_incomplete_affinity_matrix:
+        print("Saving incomplete data to %s" % args.save_incomplete_affinity_matrix)
+        column_names = [None] * len(allele_order)
+        for (name, position) in allele_order.items():
+            column_names[position] = name
+        row_names = [None] * len(peptide_order)
+        for (name, position) in peptide_order.items():
+            row_names[position] = name
+        df = pd.DataFrame(X, columns=column_names, index=row_names)
+        df.to_csv(args.save_incomplete_affinity_matrix, index_label="peptide")
+
     scores = ScoreSet()
 
     missing_mask = np.isnan(X)
@@ -236,11 +253,6 @@ if __name__ == "__main__":
     assert len(observed_indices) == n_observed
 
     kfold = StratifiedKFold(observed_y, n_folds=5, shuffle=True)
-    biscaler = BiScaler(
-        scale_rows=args.normalize_rows,
-        center_rows=args.normalize_rows,
-        scale_columns=args.normalize_columns,
-        center_columns=args.normalize_rows)
 
     for fold_idx, (_, indirect_test_indices) in enumerate(kfold):
 
@@ -268,6 +280,11 @@ if __name__ == "__main__":
             empty_col_mask.sum()))
 
         X_fold_reduced = X_fold[ok_mesh]
+        biscaler = BiScaler(
+            scale_rows=args.normalize_rows,
+            center_rows=args.normalize_rows,
+            scale_columns=args.normalize_columns,
+            center_columns=args.normalize_columns)
         X_fold_reduced_scaled = biscaler.fit_transform(X=X_fold_reduced)
         for (method_name, solver) in sorted(imputation_methods.items()):
             print("CV fold %d/%d, running %s" % (
