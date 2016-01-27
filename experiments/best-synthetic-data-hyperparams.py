@@ -31,7 +31,6 @@ from mhcflurry.data import load_allele_dicts
 from scipy import stats
 import numpy as np
 import sklearn.metrics
-from sklearn.cross_validation import KFold
 
 from dataset_paths import PETERS2009_CSV_PATH
 from synthetic_data import (

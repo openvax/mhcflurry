@@ -20,7 +20,7 @@ Helper functions for computing pairwise similarities between alleles
 
 import numpy as np
 import seaborn
-from fancyimpute import ConvexSolver
+from fancyimpute import NuclearNormMinimization
 
 from common import matrix_to_dictionary, curry_dictionary
 
@@ -181,7 +181,7 @@ def fill_in_similarities(
         sims_matrix.shape,
         missing.sum()))
 
-    solver = ConvexSolver(
+    solver = NuclearNormMinimization(
         require_symmetric_solution=True,
         min_value=0.0,
         max_value=1.0,
