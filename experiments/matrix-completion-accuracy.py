@@ -80,7 +80,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--n-folds",
-    default=5,
+    default=10,
     type=int,
     help="Number of cross-validation folds")
 
