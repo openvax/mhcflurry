@@ -131,36 +131,56 @@ def evaluate_predictions(
     return mae, tau, auc, f1_score
 
 
-if __name__ == "__main__":
-    args = parser.parse_args()
-    print(args)
-
-    imputation_methods = {
-        "softImpute": SoftImpute(verbose=args.verbose),
-        "svdImpute-5": IterativeSVD(5, verbose=args.verbose),
-        "svdImpute-10": IterativeSVD(10, verbose=args.verbose),
-        "svdImpute-20": IterativeSVD(20, verbose=args.verbose),
-        "similarityWeightedAveraging": SimilarityWeightedAveraging(
-            orientation="columns",
-            verbose=args.verbose),
+def create_imputation_methods(
+        verbose=False,
+        clip_imputed_values=False,
+        knn_print_interval=20,
+        knn_params=[1, 3, 5],
+        softimpute_params=[1, 5, 10],
+        svd_params=[5, 10, 20]):
+    min_value = 0 if clip_imputed_values else None
+    max_value = 1 if clip_imputed_values else None
+    result_dict = {
         "meanFill": SimpleFill("mean"),
         "zeroFill": SimpleFill("zero"),
-        "MICE": MICE(
+        "mice": MICE(
             n_burn_in=5,
             n_imputations=25,
-            min_value=None if args.normalize_rows or args.normalize_columns else 0,
-            max_value=None if args.normalize_rows or args.normalize_columns else 1,
-            verbose=args.verbose),
-        "knnImpute-3": KNN(3, orientation="columns", verbose=args.verbose, print_interval=20),
-        "knnImpute-7": KNN(7, orientation="columns", verbose=args.verbose, print_interval=20),
-        "knnImpute-15": KNN(15, orientation="columns", verbose=args.verbose, print_interval=20),
+            min_value=min_value,
+            max_value=max_value,
+            verbose=verbose),
+        "similarityWeightedAveraging": SimilarityWeightedAveraging(
+            orientation="columns",
+            verbose=verbose),
     }
+    for threshold in softimpute_params:
+        result_dict["softImpute-%d" % threshold] = SoftImpute(
+            threshold,
+            verbose=verbose,
+            min_value=min_value,
+            max_value=max_value)
+    for rank in svd_params:
+        result_dict["svdImpute-%d" % rank] = IterativeSVD(
+            rank,
+            verbose=verbose,
+            min_value=min_value,
+            max_value=max_value)
+    for k in knn_params:
+        result_dict["knnImpute-%d" % k] = KNN(
+            k,
+            orientation="columns",
+            verbose=verbose,
+            print_interval=knn_print_interval)
+    return result_dict
 
+
+def load_data(binding_data_csv, max_ic50, only_human=False, min_allele_size=1):
     allele_to_peptide_to_affinity = load_allele_dicts(
-        args.binding_data_csv,
-        max_ic50=args.max_ic50,
-        only_human=args.only_human,
-        regression_output=True)
+        binding_data_csv,
+        max_ic50=max_ic50,
+        only_human=only_human,
+        regression_output=True,
+        min_allele_size=min_allele_size)
     peptide_to_allele_to_affinity = transpose_nested_dictionary(
         allele_to_peptide_to_affinity)
     n_binding_values = sum(
@@ -172,25 +192,40 @@ if __name__ == "__main__":
         n_binding_values,
         len(allele_to_peptide_to_affinity)))
 
-    X, peptide_order, allele_order = \
+    X, peptide_list, allele_list = \
         dense_matrix_from_nested_dictionary(peptide_to_allele_to_affinity)
-
-    if args.save_incomplete_affinity_matrix:
-        print("Saving incomplete data to %s" % args.save_incomplete_affinity_matrix)
-        column_names = [None] * len(allele_order)
-        for (name, position) in allele_order.items():
-            column_names[position] = name
-        row_names = [None] * len(peptide_order)
-        for (name, position) in peptide_order.items():
-            row_names[position] = name
-        df = pd.DataFrame(X, columns=column_names, index=row_names)
-        df.to_csv(args.save_incomplete_affinity_matrix, index_label="peptide")
-
-    scores = ScoreSet()
 
     missing_mask = np.isnan(X)
     observed_mask = ~missing_mask
 
+    n_observed_per_peptide = observed_mask.sum(axis=1)
+    min_observed_per_peptide = n_observed_per_peptide.min()
+    min_peptide_indices = np.where(
+        n_observed_per_peptide == min_observed_per_peptide)[0]
+    print("%d peptides with %d observations" % (
+        len(min_peptide_indices),
+        min_observed_per_peptide))
+
+    n_observed_per_allele = observed_mask.sum(axis=0)
+    min_observed_per_allele = n_observed_per_allele.min()
+    min_allele_indices = np.where(
+        n_observed_per_allele == min_observed_per_allele)[0]
+    print("%d alleles with %d observations: %s" % (
+        len(min_allele_indices),
+        min_observed_per_allele,
+        [allele_list[i] for i in min_allele_indices]))
+    return X, missing_mask, observed_mask, peptide_list, allele_list
+
+
+def index_counts(indices):
+    max_index = indices.max()
+    counts = np.zeros(max_index + 1, dtype=int)
+    for index in indices:
+        counts[index] += 1
+    return counts
+
+
+def stratified_cross_validation(X, observed_mask, n_folds=10):
     n_observed = observed_mask.sum()
 
     (observed_peptide_index, observed_allele_index) = np.where(observed_mask)
@@ -200,18 +235,26 @@ if __name__ == "__main__":
 
     assert len(observed_indices) == n_observed
 
+    observed_allele_counts = observed_mask.sum(axis=0)
+    print("# observed per allele: %s" % (observed_allele_counts,))
+    assert (index_counts(observed_allele_index) == observed_allele_counts).all()
+
     kfold = StratifiedKFold(
         observed_allele_index,
-        n_folds=args.n_folds,
+        n_folds=n_folds,
         shuffle=True)
 
-    for fold_idx, (_, indirect_test_indices) in enumerate(kfold):
-
+    for (_, indirect_test_indices) in kfold:
         test_linear_indices = observed_indices[indirect_test_indices]
         test_coords = np.unravel_index(
             test_linear_indices,
             dims=observed_mask.shape)
-        y_true = X[test_coords]
+
+        test_allele_counts = index_counts(test_coords[1])
+        allele_fractions = test_allele_counts / observed_allele_counts.astype(float)
+        print("Fraction of each allele in this CV fold: %s" % (allele_fractions,))
+
+        X_test_vector = X[test_coords]
 
         X_fold = X.copy()
         X_fold[test_coords] = np.nan
@@ -229,7 +272,34 @@ if __name__ == "__main__":
         print("Dropping %d empty rows, %d empty columns" % (
             empty_row_mask.sum(),
             empty_col_mask.sum()))
+        yield (X_fold, ok_mesh, test_coords, X_test_vector)
 
+if __name__ == "__main__":
+    args = parser.parse_args()
+    print(args)
+    imputation_methods = create_imputation_methods(
+        verbose=args.verbose,
+        clip_imputed_values=not (args.normalize_rows or args.normalize_rows),
+    )
+    print("Imputation methods: %s" % imputation_methods)
+
+    X, missing_mask, observed_mask, peptide_list, allele_list = load_data(
+        binding_data_csv=args.binding_data_csv,
+        max_ic50=args.max_ic50,
+        only_human=args.only_human,
+        min_allele_size=args.n_folds)
+
+    if args.save_incomplete_affinity_matrix:
+        print("Saving incomplete data to %s" % args.save_incomplete_affinity_matrix)
+        df = pd.DataFrame(X, columns=allele_list, index=peptide_list)
+        df.to_csv(args.save_incomplete_affinity_matrix, index_label="peptide")
+
+    scores = ScoreSet()
+    kfold = stratified_cross_validation(
+        X=X,
+        observed_mask=observed_mask,
+        n_folds=args.n_folds)
+    for fold_idx, (X_fold, ok_mesh, test_coords, X_test_vector) in enumerate(kfold):
         X_fold_reduced = X_fold[ok_mesh]
         biscaler = BiScaler(
             scale_rows=args.normalize_rows,
@@ -248,15 +318,12 @@ if __name__ == "__main__":
             X_completed = np.zeros_like(X)
             X_completed[ok_mesh] = X_completed_reduced
             y_pred = X_completed[test_coords]
-
             mae, tau, auc, f1_score = evaluate_predictions(
-                y_true=y_true, y_pred=y_pred, max_ic50=args.max_ic50)
-
+                y_true=X_test_vector, y_pred=y_pred, max_ic50=args.max_ic50)
             scores.add_many(
                 method_name,
                 mae=mae,
                 tau=tau,
                 f1_score=f1_score,
                 auc=auc)
-
     scores.to_csv(args.output_file)

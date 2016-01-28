@@ -156,7 +156,8 @@ def load_allele_dicts(
         peptide_column_name=None,
         peptide_length_column_name="peptide_length",
         ic50_column_name="meas",
-        only_human=True):
+        only_human=True,
+        min_allele_size=1):
     """
     Parsing CSV of binding data into dictionary of dictionaries.
     The outer key is an allele name, the inner key is a peptide sequence,
@@ -187,6 +188,7 @@ def load_allele_dicts(
         }
         for (allele_name, group)
         in binding_df.groupby(allele_column_name)
+        if len(group) >= min_allele_size
     }
 
 
