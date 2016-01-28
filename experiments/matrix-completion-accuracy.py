@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import argparse
-from collections import OrderedDict
 
 from fancyimpute import (
     SoftImpute,
@@ -38,7 +37,7 @@ import numpy as np
 import pandas as pd
 
 from dataset_paths import PETERS2009_CSV_PATH
-
+from score_set import ScoreSet
 
 parser = argparse.ArgumentParser()
 
@@ -84,6 +83,11 @@ parser.add_argument(
     type=int,
     help="Number of cross-validation folds")
 
+parser.add_argument(
+    "--verbose",
+    default=False,
+    action="store_true")
+
 
 def evaluate_predictions(
         y_true,
@@ -126,98 +130,19 @@ def evaluate_predictions(
 
     return mae, tau, auc, f1_score
 
-VERBOSE = False
-
-
-class ScoreSet(object):
-    """
-    Useful for keeping a collection of score dictionaries
-    which map name->score type->list of values.
-    """
-    def __init__(self, verbose=True):
-        self.groups = {}
-        self.verbose = verbose
-
-    def add_many(self, group, **kwargs):
-        for (k, v) in sorted(kwargs.items()):
-            self.add(group, k, v)
-
-    def add(self, group, score_type, value):
-        if group not in self.groups:
-            self.groups[group] = {}
-        if score_type not in self.groups[group]:
-            self.groups[group][score_type] = []
-        self.groups[group][score_type].append(value)
-        if self.verbose:
-            print("--> %s:%s %0.4f" % (group, score_type, value))
-
-    def score_types(self):
-        result = set([])
-        for (g, d) in sorted(self.groups.items()):
-            for score_type in sorted(d.keys()):
-                result.add(score_type)
-        return list(sorted(result))
-
-    def _reduce_scores(self, reduce_fn):
-        score_types = self.score_types()
-        return {
-            group:
-                OrderedDict([
-                    (score_type, reduce_fn(score_dict[score_type]))
-                    for score_type
-                    in score_types
-                ])
-            for (group, score_dict)
-            in self.groups.items()
-        }
-
-    def averages(self):
-        return self._reduce_scores(np.mean)
-
-    def stds(self):
-        return self._reduce_scores(np.std)
-
-    def to_csv(self, filename):
-        with open(filename, "w") as f:
-            header_list = ["name"]
-            score_types = self.score_types()
-            for score_type in score_types:
-                header_list.append(score_type)
-                header_list.append(score_type + "_std")
-
-            header_line = ",".join(header_list) + "\n"
-            if self.verbose:
-                print(header_line)
-            f.write(header_line)
-
-            score_averages = self.averages()
-            score_stds = self.stds()
-
-            for name in sorted(score_averages.keys()):
-                line_elements = [name]
-                for score_type in score_types:
-                    line_elements.append(
-                        "%0.4f" % score_averages[name][score_type])
-                    line_elements.append(
-                        "%0.4f" % score_stds[name][score_type])
-                line = ",".join(line_elements) + "\n"
-                if self.verbose:
-                    print(line)
-                f.write(line)
-
 
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
     imputation_methods = {
-        "softImpute": SoftImpute(verbose=VERBOSE),
-        "svdImpute-5": IterativeSVD(5, verbose=VERBOSE),
-        "svdImpute-10": IterativeSVD(10, verbose=VERBOSE),
-        "svdImpute-20": IterativeSVD(20, verbose=VERBOSE),
+        "softImpute": SoftImpute(verbose=args.verbose),
+        "svdImpute-5": IterativeSVD(5, verbose=args.verbose),
+        "svdImpute-10": IterativeSVD(10, verbose=args.verbose),
+        "svdImpute-20": IterativeSVD(20, verbose=args.verbose),
         "similarityWeightedAveraging": SimilarityWeightedAveraging(
             orientation="columns",
-            verbose=VERBOSE),
+            verbose=args.verbose),
         "meanFill": SimpleFill("mean"),
         "zeroFill": SimpleFill("zero"),
         "MICE": MICE(
@@ -225,10 +150,10 @@ if __name__ == "__main__":
             n_imputations=25,
             min_value=None if args.normalize_rows or args.normalize_columns else 0,
             max_value=None if args.normalize_rows or args.normalize_columns else 1,
-            verbose=VERBOSE),
-        "knnImpute-3": KNN(3, orientation="columns", verbose=VERBOSE, print_interval=1),
-        "knnImpute-7": KNN(7, orientation="columns", verbose=VERBOSE, print_interval=1),
-        "knnImpute-15": KNN(15, orientation="columns", verbose=VERBOSE, print_interval=1),
+            verbose=args.verbose),
+        "knnImpute-3": KNN(3, orientation="columns", verbose=args.verbose, print_interval=20),
+        "knnImpute-7": KNN(7, orientation="columns", verbose=args.verbose, print_interval=20),
+        "knnImpute-15": KNN(15, orientation="columns", verbose=args.verbose, print_interval=20),
     }
 
     allele_to_peptide_to_affinity = load_allele_dicts(
@@ -268,14 +193,17 @@ if __name__ == "__main__":
 
     n_observed = observed_mask.sum()
 
-    (observed_x, observed_y) = np.where(observed_mask)
+    (observed_peptide_index, observed_allele_index) = np.where(observed_mask)
     observed_indices = np.ravel_multi_index(
-        (observed_x, observed_y),
+        (observed_peptide_index, observed_allele_index),
         dims=observed_mask.shape)
 
     assert len(observed_indices) == n_observed
 
-    kfold = StratifiedKFold(observed_y, n_folds=5, shuffle=True)
+    kfold = StratifiedKFold(
+        observed_allele_index,
+        n_folds=args.n_folds,
+        shuffle=True)
 
     for fold_idx, (_, indirect_test_indices) in enumerate(kfold):
 
