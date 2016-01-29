@@ -25,19 +25,16 @@ from fancyimpute import (
     BiScaler,
     SimpleFill,
 )
-from fancyimpute.dictionary_helpers import (
-    dense_matrix_from_nested_dictionary,
-    transpose_nested_dictionary,
-)
-from mhcflurry.data import load_allele_dicts
-import sklearn.metrics
-from sklearn.cross_validation import StratifiedKFold
-from scipy import stats
 import numpy as np
 import pandas as pd
 
 from dataset_paths import PETERS2009_CSV_PATH
 from score_set import ScoreSet
+from matrix_completion_helpers import (
+    load_data,
+    evaluate_predictions,
+    stratified_cross_validation
+)
 
 parser = argparse.ArgumentParser()
 
@@ -78,6 +75,12 @@ parser.add_argument(
     help="Center and rescale rows of affinity matrix")
 
 parser.add_argument(
+    "--min-observations-per-peptide",
+    type=int,
+    default=2,
+    help="Drop peptide entries with fewer than this number of measured affinities")
+
+parser.add_argument(
     "--n-folds",
     default=10,
     type=int,
@@ -87,48 +90,6 @@ parser.add_argument(
     "--verbose",
     default=False,
     action="store_true")
-
-
-def evaluate_predictions(
-        y_true,
-        y_pred,
-        max_ic50):
-    """
-    Return mean absolute error, Kendall tau, AUC and F1 score
-    """
-    if len(y_pred) != len(y_true):
-        raise ValueError("y_pred must have same number of elements as y_true")
-
-    mae = np.mean(np.abs(y_true - y_pred))
-
-    # if all predictions are the same
-    if (y_pred[0] == y_pred).all():
-        return (mae, 0, 0.5, 0)
-
-    tau, _ = stats.kendalltau(
-        y_pred,
-        y_true)
-
-    true_ic50s = max_ic50 ** (1.0 - np.array(y_true))
-    predicted_ic50s = max_ic50 ** (1.0 - np.array(y_pred))
-
-    true_binding_label = true_ic50s <= 500
-    if true_binding_label.all() or not true_binding_label.any():
-        # can't compute AUC or F1 without both negative and positive cases
-        return (mae, tau, 0.5, 0)
-
-    auc = sklearn.metrics.roc_auc_score(true_binding_label, y_pred)
-
-    predicted_binding_label = predicted_ic50s <= 500
-    if predicted_binding_label.all() or not predicted_binding_label.any():
-        # can't compute F1 without both positive and negative predictions
-        return (mae, tau, auc, 0)
-
-    f1_score = sklearn.metrics.f1_score(
-        true_binding_label,
-        predicted_binding_label)
-
-    return mae, tau, auc, f1_score
 
 
 def create_imputation_methods(
@@ -174,106 +135,6 @@ def create_imputation_methods(
     return result_dict
 
 
-def load_data(binding_data_csv, max_ic50, only_human=False, min_allele_size=1):
-    allele_to_peptide_to_affinity = load_allele_dicts(
-        binding_data_csv,
-        max_ic50=max_ic50,
-        only_human=only_human,
-        regression_output=True,
-        min_allele_size=min_allele_size)
-    peptide_to_allele_to_affinity = transpose_nested_dictionary(
-        allele_to_peptide_to_affinity)
-    n_binding_values = sum(
-        len(allele_dict)
-        for allele_dict in
-        allele_to_peptide_to_affinity.values()
-    )
-    print("Loaded %d binding values for %d alleles" % (
-        n_binding_values,
-        len(allele_to_peptide_to_affinity)))
-
-    X, peptide_list, allele_list = \
-        dense_matrix_from_nested_dictionary(peptide_to_allele_to_affinity)
-
-    missing_mask = np.isnan(X)
-    observed_mask = ~missing_mask
-
-    n_observed_per_peptide = observed_mask.sum(axis=1)
-    min_observed_per_peptide = n_observed_per_peptide.min()
-    min_peptide_indices = np.where(
-        n_observed_per_peptide == min_observed_per_peptide)[0]
-    print("%d peptides with %d observations" % (
-        len(min_peptide_indices),
-        min_observed_per_peptide))
-
-    n_observed_per_allele = observed_mask.sum(axis=0)
-    min_observed_per_allele = n_observed_per_allele.min()
-    min_allele_indices = np.where(
-        n_observed_per_allele == min_observed_per_allele)[0]
-    print("%d alleles with %d observations: %s" % (
-        len(min_allele_indices),
-        min_observed_per_allele,
-        [allele_list[i] for i in min_allele_indices]))
-    return X, missing_mask, observed_mask, peptide_list, allele_list
-
-
-def index_counts(indices):
-    max_index = indices.max()
-    counts = np.zeros(max_index + 1, dtype=int)
-    for index in indices:
-        counts[index] += 1
-    return counts
-
-
-def stratified_cross_validation(X, observed_mask, n_folds=10):
-    n_observed = observed_mask.sum()
-
-    (observed_peptide_index, observed_allele_index) = np.where(observed_mask)
-    observed_indices = np.ravel_multi_index(
-        (observed_peptide_index, observed_allele_index),
-        dims=observed_mask.shape)
-
-    assert len(observed_indices) == n_observed
-
-    observed_allele_counts = observed_mask.sum(axis=0)
-    print("# observed per allele: %s" % (observed_allele_counts,))
-    assert (index_counts(observed_allele_index) == observed_allele_counts).all()
-
-    kfold = StratifiedKFold(
-        observed_allele_index,
-        n_folds=n_folds,
-        shuffle=True)
-
-    for (_, indirect_test_indices) in kfold:
-        test_linear_indices = observed_indices[indirect_test_indices]
-        test_coords = np.unravel_index(
-            test_linear_indices,
-            dims=observed_mask.shape)
-
-        test_allele_counts = index_counts(test_coords[1])
-        allele_fractions = test_allele_counts / observed_allele_counts.astype(float)
-        print("Fraction of each allele in this CV fold: %s" % (allele_fractions,))
-
-        X_test_vector = X[test_coords]
-
-        X_fold = X.copy()
-        X_fold[test_coords] = np.nan
-
-        empty_row_mask = np.isfinite(X_fold).sum(axis=1) == 0
-        ok_row_mask = ~empty_row_mask
-        ok_row_indices = np.where(ok_row_mask)[0]
-
-        empty_col_mask = np.isfinite(X_fold).sum(axis=0) == 0
-        ok_col_mask = ~empty_col_mask
-        ok_col_indices = np.where(ok_col_mask)[0]
-
-        ok_mesh = np.ix_(ok_row_indices, ok_col_indices)
-
-        print("Dropping %d empty rows, %d empty columns" % (
-            empty_row_mask.sum(),
-            empty_col_mask.sum()))
-        yield (X_fold, ok_mesh, test_coords, X_test_vector)
-
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
@@ -283,12 +144,17 @@ if __name__ == "__main__":
     )
     print("Imputation methods: %s" % imputation_methods)
 
-    X, missing_mask, observed_mask, peptide_list, allele_list = load_data(
+    X, observed_mask, peptide_list, allele_list = load_data(
         binding_data_csv=args.binding_data_csv,
         max_ic50=args.max_ic50,
         only_human=args.only_human,
-        min_allele_size=args.n_folds)
-
+        min_observations_per_allele=args.n_folds,
+        min_observations_per_peptide=args.min_observations_per_peptide)
+    print("Loaded binding data, shape: %s, n_observed=%d/%d (%0.2f%%)" % (
+        X.shape,
+        observed_mask.sum(),
+        X.size,
+        100.0 * observed_mask.sum() / X.size))
     if args.save_incomplete_affinity_matrix:
         print("Saving incomplete data to %s" % args.save_incomplete_affinity_matrix)
         df = pd.DataFrame(X, columns=allele_list, index=peptide_list)
