@@ -65,7 +65,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--output-file",
-    default="matrix-completion-accuracy-results.csv")
+    default="hyperparameter-matrix-completion-results.csv")
 
 parser.add_argument(
     "--n-folds",
@@ -85,12 +85,12 @@ parser.add_argument(
 
 parser.add_argument(
     "--embedding-dim-sizes",
-    default=[5, 10, 20, 40],
+    default=[10, 20, 40],
     type=parse_int_list)
 
 parser.add_argument(
     "--hidden-layer-sizes",
-    default=[5, 10, 20, 40, 80, 160],
+    default=[10, 20, 40, 80],
     type=parse_int_list)
 
 parser.add_argument(
@@ -106,7 +106,7 @@ parser.add_argument(
 parser.add_argument(
     "--training-epochs",
     type=int,
-    default=20)
+    default=100)
 
 parser.add_argument(
     "--use-mice",
