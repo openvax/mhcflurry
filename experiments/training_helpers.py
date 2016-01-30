@@ -26,7 +26,7 @@ from mhcflurry.common import normalize_allele_name
 from mhcflurry.data import indices_to_hotshot_encoding
 
 
-PredictionScores = namedtuple("PredictionScores", "tau auc f1 accuracy")
+PredictionScores = namedtuple("PredictionScores", "tau auc f1 accuracy mae")
 
 
 def encode_allele_dataset(
@@ -105,10 +105,12 @@ def score_predictions(
 
     Returns PredictionScores object with fields (tau, auc, f1, accuracy)
     """
+    mae = np.abs(predicted_log_ic50 - true_log_ic50).mean()
     tau, _ = stats.kendalltau(predicted_log_ic50, true_log_ic50)
     if np.isnan(tau):
         logging.warn("Kendall tau was NaN!")
         tau = 0.0
+
     true_ic50s = max_ic50 ** (1.0 - np.array(true_log_ic50))
     predicted_ic50s = max_ic50 ** (1.0 - np.array(predicted_log_ic50))
 
@@ -121,7 +123,8 @@ def score_predictions(
             tau=tau,
             auc=0.5,
             f1=0.0,
-            accuracy=0.0)
+            accuracy=0.0,
+            mae=mae)
 
     auc = metrics.roc_auc_score(true_binding_label, predicted_log_ic50)
     predicted_binding_label = predicted_ic50s <= 500
@@ -132,7 +135,8 @@ def score_predictions(
         tau=tau,
         auc=auc,
         f1=f1_score,
-        accuracy=accuracy)
+        accuracy=accuracy,
+        mae=mae)
 
 
 def train_model_and_return_scores(
@@ -164,8 +168,16 @@ def train_model_with_synthetic_data(
         Y_original,
         X_synth,
         Y_synth,
-        original_sample_weights,
-        synthetic_sample_weights):
+        original_sample_weights=None,
+        synthetic_sample_weights=None):
+    n_actual_samples, n_actual_dims = X_original.shape
+    n_synth_samples, n_synth_dims = X_synth.shape
+    if original_sample_weights is None:
+        original_sample_weights = np.ones_like(Y_original)
+
+    if synthetic_sample_weights is None:
+        synthetic_sample_weights = np.ones_like(Y_synth)
+
     total_synth_weights = synthetic_sample_weights.sum()
     total_original_weights = original_sample_weights.sum()
     print("Mean Y=%f, Y_synth=%f, weight=%f, weight_synth=%f" % (
@@ -178,8 +190,7 @@ def train_model_with_synthetic_data(
         original_sample_weights,
         synthetic_sample_weights
     ])
-    n_actual_samples, n_actual_dims = X_original.shape
-    n_synth_samples, n_synth_dims = X_synth.shape
+
     assert n_actual_dims == n_synth_dims, \
         "Mismatch between # of actual dims %d and synthetic dims %d" % (
             n_actual_dims, n_synth_dims)
@@ -479,5 +490,4 @@ def kfold_cross_validation_of_model_params_with_synthetic_data(
         original_sample_weights=original_sample_weights,
         synthetic_sample_weights=synthetic_sample_weights,
         n_cross_validation_folds=n_cross_validation_folds)
-    average_scores = average_prediction_scores_list(model_scores_list)
-    return average_scores, model_scores_list
+    return model_scores_list

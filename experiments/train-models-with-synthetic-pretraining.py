@@ -28,7 +28,10 @@ from mhcflurry.data import (
 from arg_parsing import parse_int_list, parse_float_list
 from dataset_paths import PETERS2009_CSV_PATH
 from common import load_csv_binding_data_as_dict
-from training_helpers import kfold_cross_validation_of_model_params_with_synthetic_data
+from training_helpers import (
+    kfold_cross_validation_of_model_params_with_synthetic_data,
+    average_prediction_scores_list
+)
 
 parser = argparse.ArgumentParser()
 
@@ -165,7 +168,7 @@ if __name__ == "__main__":
                                 n_samples,
                                 n_unique_samples,
                                 params))
-                        average_scores, _ = \
+                        fold_scores = \
                             kfold_cross_validation_of_model_params_with_synthetic_data(
                                 X_original=X_original,
                                 Y_original=Y_original,
@@ -177,6 +180,7 @@ if __name__ == "__main__":
                                 n_training_epochs=args.training_epochs,
                                 max_ic50=args.max_ic50,
                                 **dict(params))
+                        average_scores = average_prediction_scores_list(fold_scores)
                         if logfile:
                             if logfile_needs_header:
                                 for param_name, _ in params:

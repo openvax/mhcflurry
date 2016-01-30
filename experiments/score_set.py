@@ -27,15 +27,20 @@ class ScoreSet(object):
     Useful for keeping a collection of score dictionaries
     which map name->score type->list of values.
     """
-    def __init__(self, verbose=True):
+    def __init__(self, verbose=True, index="name"):
         self.groups = {}
         self.verbose = verbose
+        if isinstance(index, (list, tuple)):
+            index = ",".join("%s" % item for item in index)
+        self.index = index
 
     def add_many(self, group, **kwargs):
         for (k, v) in sorted(kwargs.items()):
             self.add(group, k, v)
 
     def add(self, group, score_type, value):
+        if isinstance(group, (list, tuple)):
+            group = ",".join("%s" % item for item in group)
         if group not in self.groups:
             self.groups[group] = {}
         if score_type not in self.groups[group]:
@@ -72,7 +77,7 @@ class ScoreSet(object):
 
     def to_csv(self, filename):
         with open(filename, "w") as f:
-            header_list = ["name"]
+            header_list = [self.index]
             score_types = self.score_types()
             for score_type in score_types:
                 header_list.append(score_type)
