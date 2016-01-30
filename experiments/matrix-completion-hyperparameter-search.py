@@ -244,7 +244,7 @@ if __name__ == "__main__":
                 min_observations_per_peptide=2,
                 min_observations_per_allele=min(10, min_samples_per_cv_fold))
             if args.use_mice:
-                imputer = MICE(n_burn_in=5, n_imputations=20)
+                imputer = MICE(n_burn_in=5, n_imputations=20, min_value=0, max_value=1)
             else:
                 imputer = KNN(k=1, orientation="columns")
 
