@@ -91,17 +91,17 @@ parser.add_argument(
 
 parser.add_argument(
     "--hidden-layer-sizes",
-    default=[10, 20, 40, 80],
+    default=[10, 25, 50, 100],
     type=parse_int_list)
 
 parser.add_argument(
     "--dropouts",
-    default=[0.0, 0.25],
+    default=[0.0],
     type=parse_float_list)
 
 parser.add_argument(
     "--activation-functions",
-    default=["tanh", "relu"],
+    default=["tanh"],
     type=lambda s: [si.strip() for si in s.split(",")])
 
 parser.add_argument(
@@ -199,6 +199,36 @@ if __name__ == "__main__":
         imputer = SimpleFill("mean")
     else:
         raise ValueError("Invalid imputation method: %s" % impute_method_name)
+
+    # to avoid recompiling and initializing a lot of neural networks
+    # just save all the models up front along with their initial
+    # weight matrices
+    predictors = {}
+    initial_weights = {}
+    for dropout in args.dropouts:
+        for embedding_dim_size in args.embedding_dim_sizes:
+            for hidden_layer_size in args.hidden_layer_sizes:
+                for activation in args.activation_functions:
+                    key = "%f,%d,%d,%s" % (
+                        dropout,
+                        embedding_dim_size,
+                        hidden_layer_size,
+                        activation
+                    )
+                    if args.verbose:
+                        print("-- Creating predictor for hyperparameters: %s" % key)
+                    predictor = Class1BindingPredictor.from_hyperparameters(
+                        embedding_output_dim=embedding_dim_size,
+                        layer_sizes=[hidden_layer_size],
+                        activation=activation,
+                        output_activation="sigmoid",
+                        dropout_probability=dropout,
+                        verbose=args.verbose,
+                        allow_unknown_amino_acids=args.unknown_amino_acids,
+                        embedding_input_dim=21 if args.unknown_amino_acids else 20,
+                    )
+                    predictors[key] = predictor
+                    initial_weights[key] = predictor.model.get_weights()
 
     # want at least 5 samples in each fold of CV
     # to make meaningful estimates of accuracy
@@ -304,58 +334,40 @@ if __name__ == "__main__":
             training_sample_weights = 1.0 / np.array(training_counts)
             Y_train = np.array([
                 train_dict[p] for p in training_row_peptides])
+            for key, predictor in predictors.items():
 
-            for dropout in args.dropouts:
-                for embedding_dim_size in args.embedding_dim_sizes:
-                    for hidden_layer_size in args.hidden_layer_sizes:
-                        for activation in args.activation_functions:
-                            key = "%f,%d,%d,%s" % (
-                                dropout,
-                                embedding_dim_size,
-                                hidden_layer_size,
-                                activation
-                            )
-                            print("\n-----")
-                            print(
-                                ("Training model for %s (# peptides = %d, # samples=%d)"
-                                 " with parameters: %s") % (
-                                    allele,
-                                    len(train_peptides),
-                                    len(X_train),
-                                    key))
-                            print("-----")
-                            predictor = Class1BindingPredictor.from_hyperparameters(
-                                embedding_output_dim=embedding_dim_size,
-                                layer_sizes=[hidden_layer_size],
-                                activation=activation,
-                                output_activation="sigmoid",
-                                dropout_probability=dropout,
-                                verbose=args.verbose,
-                                allow_unknown_amino_acids=args.unknown_amino_acids,
-                                embedding_input_dim=21 if args.unknown_amino_acids else 20,
-                            )
-                            predictor.fit(
-                                X=X_train,
-                                Y=Y_train,
-                                sample_weights=training_sample_weights,
-                                X_pretrain=X_pretrain,
-                                Y_pretrain=Y_pretrain,
-                                n_training_epochs=args.training_epochs,
-                                verbose=args.verbose)
-                            y_pred = predictor.predict_peptides_log_ic50(test_peptides)
-                            if args.verbose:
-                                print("-- mean(Y) = %f, mean(Y_pred) = %f" % (
-                                    Y_train.mean(),
-                                    y_pred.mean()))
-                            mae, tau, auc, f1_score = evaluate_predictions(
-                                y_true=test_values,
-                                y_pred=y_pred,
-                                max_ic50=args.max_ic50)
-                            scores.add_many(
-                                key,
-                                mae=mae,
-                                tau=tau,
-                                f1_score=f1_score,
-                                auc=auc)
+                print("\n-----")
+                print(
+                    ("Training model for %s (# peptides = %d, # samples=%d)"
+                     " with parameters: %s") % (
+                        allele,
+                        len(train_peptides),
+                        len(X_train),
+                        key))
+                print("-----")
+                predictor.model.set_weights(initial_weights[key])
+                predictor.fit(
+                    X=X_train,
+                    Y=Y_train,
+                    sample_weights=training_sample_weights,
+                    X_pretrain=X_pretrain,
+                    Y_pretrain=Y_pretrain,
+                    n_training_epochs=args.training_epochs,
+                    verbose=args.verbose)
+                y_pred = predictor.predict_peptides_log_ic50(test_peptides)
+                if args.verbose:
+                    print("-- mean(Y) = %f, mean(Y_pred) = %f" % (
+                        Y_train.mean(),
+                        y_pred.mean()))
+                mae, tau, auc, f1_score = evaluate_predictions(
+                    y_true=test_values,
+                    y_pred=y_pred,
+                    max_ic50=args.max_ic50)
+                scores.add_many(
+                    key,
+                    mae=mae,
+                    tau=tau,
+                    f1_score=f1_score,
+                    auc=auc)
 
     scores.to_csv(args.output_file)
