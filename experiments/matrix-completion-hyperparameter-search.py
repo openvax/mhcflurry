@@ -86,17 +86,17 @@ parser.add_argument(
 
 parser.add_argument(
     "--embedding-dim-sizes",
-    default=[10, 20, 40],
+    default=[5, 10, 20],
     type=parse_int_list)
 
 parser.add_argument(
     "--hidden-layer-sizes",
-    default=[10, 25, 50, 100],
+    default=[5, 20, 80],
     type=parse_int_list)
 
 parser.add_argument(
     "--dropouts",
-    default=[0.0],
+    default=[0.0, 0.25],
     type=parse_float_list)
 
 parser.add_argument(
