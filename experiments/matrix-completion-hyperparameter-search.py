@@ -230,7 +230,7 @@ if __name__ == "__main__":
                     )
                     predictors[key] = predictor
                     initial_weights[key] = predictor.model.get_weights()
-                    initial_optimizer_states[key] = predictor.optimizer.get_state()
+                    initial_optimizer_states[key] = predictor.model.optimizer.get_state()
 
     # want at least 5 samples in each fold of CV
     # to make meaningful estimates of accuracy
@@ -348,7 +348,7 @@ if __name__ == "__main__":
                         key))
                 print("-----")
                 predictor.model.set_weights(initial_weights[key])
-                predictor.optimizer.set_state(initial_optimizer_states[key])
+                predictor.model.optimizer.set_state(initial_optimizer_states[key])
                 predictor.fit(
                     X=X_train,
                     Y=Y_train,
