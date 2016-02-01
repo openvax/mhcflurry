@@ -205,6 +205,7 @@ if __name__ == "__main__":
     # weight matrices
     predictors = {}
     initial_weights = {}
+    initial_optimizer_states = {}
     for dropout in args.dropouts:
         for embedding_dim_size in args.embedding_dim_sizes:
             for hidden_layer_size in args.hidden_layer_sizes:
@@ -229,6 +230,7 @@ if __name__ == "__main__":
                     )
                     predictors[key] = predictor
                     initial_weights[key] = predictor.model.get_weights()
+                    initial_optimizer_states[key] = predictor.optimizer.get_state()
 
     # want at least 5 samples in each fold of CV
     # to make meaningful estimates of accuracy
@@ -346,6 +348,7 @@ if __name__ == "__main__":
                         key))
                 print("-----")
                 predictor.model.set_weights(initial_weights[key])
+                predictor.optimizer.set_state(initial_optimizer_states[key])
                 predictor.fit(
                     X=X_train,
                     Y=Y_train,
