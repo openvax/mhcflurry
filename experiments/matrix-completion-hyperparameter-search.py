@@ -86,13 +86,20 @@ parser.add_argument(
 
 parser.add_argument(
     "--embedding-dim-sizes",
-    default=[5, 10, 20],
+    default=[10, 20, 40],
     type=parse_int_list)
 
 parser.add_argument(
-    "--hidden-layer-sizes",
-    default=[5, 20, 80],
+    "--first-hidden-layer-sizes",
+    default=[25, 50, 100],
     type=parse_int_list)
+
+
+parser.add_argument(
+    "--second-hidden-layer-sizes",
+    default=[0, 50],
+    type=parse_int_list)
+
 
 parser.add_argument(
     "--dropouts",
@@ -181,7 +188,8 @@ if __name__ == "__main__":
         index=[
             "dropout_probability",
             "embedding_dim_size",
-            "hidden_layer_size",
+            "hidden_layer_size1",
+            "hidden_layer_size2",
             "activation"
         ])
 
@@ -208,29 +216,34 @@ if __name__ == "__main__":
     initial_optimizer_states = {}
     for dropout in args.dropouts:
         for embedding_dim_size in args.embedding_dim_sizes:
-            for hidden_layer_size in args.hidden_layer_sizes:
-                for activation in args.activation_functions:
-                    key = "%f,%d,%d,%s" % (
-                        dropout,
-                        embedding_dim_size,
-                        hidden_layer_size,
-                        activation
-                    )
-                    if args.verbose:
-                        print("-- Creating predictor for hyperparameters: %s" % key)
-                    predictor = Class1BindingPredictor.from_hyperparameters(
-                        embedding_output_dim=embedding_dim_size,
-                        layer_sizes=[hidden_layer_size],
-                        activation=activation,
-                        output_activation="sigmoid",
-                        dropout_probability=dropout,
-                        verbose=args.verbose,
-                        allow_unknown_amino_acids=args.unknown_amino_acids,
-                        embedding_input_dim=21 if args.unknown_amino_acids else 20,
-                    )
-                    predictors[key] = predictor
-                    initial_weights[key] = predictor.model.get_weights()
-                    initial_optimizer_states[key] = predictor.model.optimizer.get_state()
+            for hidden_layer_size1 in args.first_hidden_layer_sizes:
+                for hidden_layer_size2 in args.second_hidden_layer_sizes:
+                    for activation in args.activation_functions:
+                        key = "%f,%d,%d,%s" % (
+                            dropout,
+                            embedding_dim_size,
+                            hidden_layer_size1,
+                            hidden_layer_size2,
+                            activation
+                        )
+                        layer_sizes = [hidden_layer_size1]
+                        if hidden_layer_size2:
+                            layer_sizes.append(hidden_layer_size2)
+                        if args.verbose:
+                            print("-- Creating predictor for hyperparameters: %s" % key)
+                        predictor = Class1BindingPredictor.from_hyperparameters(
+                            embedding_output_dim=embedding_dim_size,
+                            layer_sizes=layer_sizes,
+                            activation=activation,
+                            output_activation="sigmoid",
+                            dropout_probability=dropout,
+                            verbose=args.verbose,
+                            allow_unknown_amino_acids=args.unknown_amino_acids,
+                            embedding_input_dim=21 if args.unknown_amino_acids else 20,
+                        )
+                        predictors[key] = predictor
+                        initial_weights[key] = predictor.model.get_weights()
+                        initial_optimizer_states[key] = predictor.model.optimizer.get_state()
 
     # want at least 5 samples in each fold of CV
     # to make meaningful estimates of accuracy
