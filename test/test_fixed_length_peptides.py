@@ -1,4 +1,4 @@
-from mhcflurry.fixed_length_peptides import (
+from mhcflurry.peptide_encoding import (
     all_kmers,
     extend_peptide,
     shorten_peptide,
@@ -26,7 +26,7 @@ def test_extend_peptide_all_positions():
         desired_length=4,
         start_offset=0,
         end_offset=0,
-        alphabet="01")
+        insert_amino_acid_letters="01")
 
     expected = [
         "0111",
@@ -48,7 +48,7 @@ def test_shorten_peptide_all_positions():
         desired_length=2,
         start_offset=0,
         end_offset=0,
-        alphabet="012")
+        insert_amino_acid_letters="012")
 
     expected = [
         "12",
@@ -65,7 +65,7 @@ def test_shorten_peptide_all_positions_except_first():
         desired_length=2,
         start_offset=1,
         end_offset=0,
-        alphabet="012")
+        insert_amino_acid_letters="012")
 
     expected = [
         "02",
@@ -81,7 +81,7 @@ def test_shorten_peptide_all_positions_except_last():
         desired_length=2,
         start_offset=0,
         end_offset=1,
-        alphabet="012")
+        insert_amino_acid_letters="012")
 
     expected = [
         "12",
@@ -98,7 +98,7 @@ def test_fixed_length_from_many_peptides():
         end_offset_extend=0,
         start_offset_shorten=0,
         end_offset_shorten=0,
-        alphabet="ABC")
+        insert_amino_acid_letters="ABC")
     print(kmers)
     print(original)
     print(counts)

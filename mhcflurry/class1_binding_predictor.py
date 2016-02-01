@@ -29,21 +29,34 @@ import json
 import numpy as np
 from keras.models import model_from_config
 
+from .amino_acid import (
+    common_amino_acids,
+    amino_acids_with_unknown,
+)
 from .class1_allele_specific_hyperparameters import MAX_IC50
 from .common import normalize_allele_name
-from .peptide_encoding import index_encoding
 from .paths import CLASS1_MODEL_DIRECTORY
 from .feedforward import make_embedding_network
-from .fixed_length_peptides import fixed_length_from_many_peptides
+from .peptide_encoding import fixed_length_from_many_peptides
 
 _allele_predictor_cache = {}
 
+common_amino_acid_letters = common_amino_acids.letters()
+
 
 class Class1BindingPredictor(object):
-    def __init__(self, model, name=None, max_ic50=MAX_IC50):
+    def __init__(
+            self,
+            model,
+            name=None,
+            max_ic50=MAX_IC50,
+            allow_unknown_amino_acids=False,
+            verbose=False):
         self.model = model
         self.max_ic50 = max_ic50
         self.name = name
+        self.allow_unknown_amino_acids = allow_unknown_amino_acids
+        self.verbose = verbose
 
     @classmethod
     def from_disk(
@@ -92,7 +105,8 @@ class Class1BindingPredictor(object):
             loss="mse",
             output_activation="sigmoid",
             dropout_probability=0,
-            learning_rate=0.001):
+            learning_rate=0.001,
+            **kwargs):
         """
         Create untrained predictor with the given hyperparameters.
         """
@@ -110,7 +124,8 @@ class Class1BindingPredictor(object):
         return cls(
             name=name,
             max_ic50=max_ic50,
-            model=model)
+            model=model,
+            **kwargs)
 
     def _combine_training_data(
             self,
@@ -197,8 +212,8 @@ class Class1BindingPredictor(object):
         X_combined = np.vstack([X_pretrain, X])
         Y_combined = np.concatenate([Y_pretrain, Y])
         combined_weights = np.concatenate([
+            pretrain_sample_weights,
             sample_weights,
-            pretrain_sample_weights
         ])
         return X_combined, Y_combined, combined_weights, n_pretrain_samples
 
@@ -252,6 +267,13 @@ class Class1BindingPredictor(object):
         total_combined_sample_weight = (
             total_pretrain_sample_weight + total_train_sample_weight)
 
+        if self.verbose:
+            print("-- Total pretrain weight = %f (%f%%), sample weight = %f (%f%%)" % (
+                total_pretrain_sample_weight,
+                100 * total_pretrain_sample_weight / total_combined_sample_weight,
+                total_train_sample_weight,
+                100 * total_train_sample_weight / total_combined_sample_weight))
+
         for epoch in range(n_training_epochs):
             # weights for synthetic points can be shrunk as:
             #  ~ 1 / (1+epoch)**2
@@ -304,42 +326,6 @@ class Class1BindingPredictor(object):
                     sample_weight=combined_weights[n_pretrain:],
                     nb_epoch=1,
                     verbose=0)
-
-    """
-    def fit_peptides(
-            self,
-            peptides,
-            affinity_values,
-            sample_weights=None,
-            pretrain_peptides=None,
-            pretrain_affinity_values=None,
-            pretrain_sample_weights=None,
-            n_training_epochs=200,
-            verbose=False):
-        '''
-        Train model from peptide sequences, expanding shorter or longer
-        peptides to make 9mers.
-        '''
-        X, original_peptides, counts = \
-                fixed_length_index_encoding(
-                    peptides=peptides,
-                    desired_length=9)
-        lookup = {k: v for (k, v) in zip}
-        Y = np.asarray(Y)
-        if sample_weights is None:
-            sample_weights = np.ones_like(Y)
-        else:
-            sample_weights = np.asarray(Y)
-
-        if pretrain_peptides is None:
-
-        if Y_pretrain
-        Y_pretrain = np.asarray(Y_pretrain)
-        if pretrain_sample_weights is None:
-            pretrain_sample_weights = np.ones_like(Y_pretrain)
-
-        train_weights = 1.0 / np.array(expanded_train_counts)
-    """
 
     def to_disk(self, model_json_path, weights_hdf_path, overwrite=False):
         if exists(model_json_path) and overwrite:
@@ -435,13 +421,22 @@ class Class1BindingPredictor(object):
         """
         return self.max_ic50 ** (1.0 - log_value)
 
+    def encode_peptides(self, peptides):
+        if self.allow_unknown_amino_acids:
+            return amino_acids_with_unknown.index_encoding(peptides, 9)
+        else:
+            return common_amino_acids.index_encoding(peptides, 9)
+
     def _predict_9mer_peptides(self, peptides):
         """
         Predict binding affinity for 9mer peptides
         """
         if any(len(peptide) != 9 for peptide in peptides):
             raise ValueError("Can only predict 9mer peptides")
-        X = index_encoding(peptides, peptide_length=9)
+        X = self.encode_peptides(peptides)
+        max_expected_index = 20 if self.allow_unknown_amino_acids else 19
+        assert X.max() <= max_expected_index, \
+            "Got index %d in peptide encoding" % (X.max(),)
         return self.model.predict(X, verbose=False).flatten()
 
     def _predict_9mer_peptides_ic50(self, peptides):
@@ -457,9 +452,19 @@ class Class1BindingPredictor(object):
             group_peptides = list(group_peptides)
             expanded_peptides, _, _ = fixed_length_from_many_peptides(
                 peptides=group_peptides,
-                desired_length=9)
+                desired_length=9,
+                insert_amino_acid_letters=(
+                    ["X"] if self.allow_unknown_amino_acids
+                    else common_amino_acid_letters))
+
             n_group = len(group_peptides)
             n_expanded = len(expanded_peptides)
+            if self.verbose:
+                print(
+                    "[Class1BindingPredictor] Expanded %d peptides of length %d => %d" % (
+                        n_group,
+                        length,
+                        n_expanded))
             expansion_factor = int(n_expanded / n_group)
             raw_y = self._predict_9mer_peptides(expanded_peptides)
             if expansion_factor == 1:

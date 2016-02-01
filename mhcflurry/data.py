@@ -23,13 +23,13 @@ import pandas as pd
 import numpy as np
 
 from .common import normalize_allele_name
+from .amino_acid import common_amino_acids
 from .peptide_encoding import (
-    index_encoding,
     indices_to_hotshot_encoding,
-)
-from .fixed_length_peptides import (
     fixed_length_from_many_peptides
 )
+
+index_encoding = common_amino_acids.index_encoding
 
 AlleleData = namedtuple(
     "AlleleData",

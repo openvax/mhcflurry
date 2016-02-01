@@ -24,12 +24,13 @@ For each allele, perform 5-fold cross validation to
 import argparse
 from collections import defaultdict
 
-from fancyimpute import MICE, KNN
+from fancyimpute import MICE, KNN, SimpleFill
 import numpy as np
 import pandas as pd
-from mhcflurry.peptide_encoding import (
-    fixed_length_index_encoding,
-    index_encoding,
+from mhcflurry.peptide_encoding import fixed_length_index_encoding
+from mhcflurry.amino_acid import (
+    common_amino_acids,
+    amino_acids_with_unknown,
 )
 from mhcflurry import Class1BindingPredictor
 from sklearn.cross_validation import StratifiedKFold
@@ -109,10 +110,15 @@ parser.add_argument(
     default=100)
 
 parser.add_argument(
-    "--use-mice",
+    "--impute",
+    default="mice",
+    help="Use {'mice', 'knn', 'meanfill'} for imputing pre-training data")
+
+parser.add_argument(
+    "--unknown-amino-acids",
     default=False,
     action="store_true",
-    help="Use MICE for imputation instead of KNN")
+    help="When expanding 8mers into 9mers use 'X' instead of all possible AAs")
 
 
 def print_length_distribution(peptides, values, name):
@@ -179,6 +185,21 @@ if __name__ == "__main__":
             "activation"
         ])
 
+    if args.unknown_amino_acids:
+        index_encoding = amino_acids_with_unknown.index_encoding
+    else:
+        index_encoding = common_amino_acids.index_encoding
+
+    impute_method_name = args.impute.lower()
+    if impute_method_name.startswith("mice"):
+        imputer = MICE(n_burn_in=5, n_imputations=20, min_value=0, max_value=1)
+    elif impute_method_name.startswith("knn"):
+        imputer = KNN(k=1, orientation="columns", print_interval=10)
+    elif impute_method_name.startswith("mean"):
+        imputer = SimpleFill("mean")
+    else:
+        raise ValueError("Invalid imputation method: %s" % impute_method_name)
+
     # want at least 5 samples in each fold of CV
     # to make meaningful estimates of accuracy
     min_samples_per_cv_fold = 5 * args.n_folds
@@ -243,10 +264,6 @@ if __name__ == "__main__":
                 allele_list=allele_list,
                 min_observations_per_peptide=2,
                 min_observations_per_allele=min(10, min_samples_per_cv_fold))
-            if args.use_mice:
-                imputer = MICE(n_burn_in=5, n_imputations=20, min_value=0, max_value=1)
-            else:
-                imputer = KNN(k=1, orientation="columns")
 
             pMHC_affinity_matrix_fold_completed = imputer.complete(pMHC_affinity_matrix_fold)
             # keep synthetic data for 9mer peptides,
@@ -276,7 +293,8 @@ if __name__ == "__main__":
             X_train, training_row_peptides, training_counts = \
                 fixed_length_index_encoding(
                     peptides=train_peptides,
-                    desired_length=9)
+                    desired_length=9,
+                    allow_unknown_amino_acids=args.unknown_amino_acids)
             most_common_peptide_idx = np.argmax(training_counts)
             if args.verbose:
                 print("-- Most common peptide in training data: %s (length=%d, count=%d)" % (
@@ -298,9 +316,13 @@ if __name__ == "__main__":
                                 activation
                             )
                             print("\n-----")
-                            print("Training model for %s with hyperparameters: %s" % (
-                                allele,
-                                key))
+                            print(
+                                ("Training model for %s (# peptides = %d, # samples=%d)"
+                                 " with parameters: %s") % (
+                                    allele,
+                                    len(train_peptides),
+                                    len(X_train),
+                                    key))
                             print("-----")
                             predictor = Class1BindingPredictor.from_hyperparameters(
                                 embedding_output_dim=embedding_dim_size,
@@ -308,6 +330,9 @@ if __name__ == "__main__":
                                 activation=activation,
                                 output_activation="sigmoid",
                                 dropout_probability=dropout,
+                                verbose=args.verbose,
+                                allow_unknown_amino_acids=args.unknown_amino_acids,
+                                embedding_input_dim=21 if args.unknown_amino_acids else 20,
                             )
                             predictor.fit(
                                 X=X_train,

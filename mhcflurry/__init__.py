@@ -16,16 +16,16 @@ from . import paths
 from . import data
 from . import feedforward
 from . import common
-from . import fixed_length_peptides
 from . import peptide_encoding
+from . import amino_acid
 from .class1_binding_predictor import Class1BindingPredictor
 
 __all__ = [
     "paths",
     "data",
     "feedforward",
-    "fixed_length_peptides",
     "peptide_encoding",
+    "amino_acid",
     "common",
     "Class1BindingPredictor"
 ]

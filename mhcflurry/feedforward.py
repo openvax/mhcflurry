@@ -128,9 +128,10 @@ def make_hotshot_network(
         output_activation="sigmoid",
         dropout_probability=0.0,
         optimizer=None,
-        learning_rate=0.001):
+        learning_rate=0.001,
+        n_amino_acids=20):
     return make_network(
-        input_size=peptide_length * 20,
+        input_size=peptide_length * n_amino_acids,
         layer_sizes=layer_sizes,
         activation=activation,
         init=init,
