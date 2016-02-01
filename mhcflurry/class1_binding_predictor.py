@@ -459,12 +459,6 @@ class Class1BindingPredictor(object):
 
             n_group = len(group_peptides)
             n_expanded = len(expanded_peptides)
-            if self.verbose:
-                print(
-                    "[Class1BindingPredictor] Expanded %d peptides of length %d => %d" % (
-                        n_group,
-                        length,
-                        n_expanded))
             expansion_factor = int(n_expanded / n_group)
             raw_y = self._predict_9mer_peptides(expanded_peptides)
             if expansion_factor == 1:
