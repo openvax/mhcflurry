@@ -219,7 +219,7 @@ if __name__ == "__main__":
             for hidden_layer_size1 in args.first_hidden_layer_sizes:
                 for hidden_layer_size2 in args.second_hidden_layer_sizes:
                     for activation in args.activation_functions:
-                        key = "%f,%d,%d,%s" % (
+                        key = "%f,%d,%d,%d,%s" % (
                             dropout,
                             embedding_dim_size,
                             hidden_layer_size1,
