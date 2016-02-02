@@ -226,7 +226,8 @@ class Class1BindingPredictor(object):
             Y_pretrain=None,
             pretrain_sample_weights=None,
             n_training_epochs=200,
-            verbose=False):
+            verbose=False,
+            batch_size=128):
         """
         Train predictive model from index encoding of fixed length 9mer peptides.
 
@@ -256,6 +257,8 @@ class Class1BindingPredictor(object):
         n_training_epochs : int
 
         verbose : bool
+
+        batch_size : int
         """
         X_combined, Y_combined, combined_weights, n_pretrain = \
             self._combine_training_data(
@@ -318,14 +321,16 @@ class Class1BindingPredictor(object):
                     Y_combined,
                     sample_weight=combined_weights,
                     nb_epoch=1,
-                    verbose=0)
+                    verbose=0,
+                    batch_size=batch_size)
             else:
                 self.model.fit(
                     X_combined[n_pretrain:],
                     Y_combined[n_pretrain:],
                     sample_weight=combined_weights[n_pretrain:],
                     nb_epoch=1,
-                    verbose=0)
+                    verbose=0,
+                    batch_size=batch_size)
 
     def to_disk(self, model_json_path, weights_hdf_path, overwrite=False):
         if exists(model_json_path) and overwrite:

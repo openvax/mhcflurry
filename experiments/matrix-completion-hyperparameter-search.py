@@ -121,6 +121,8 @@ parser.add_argument(
     default="mice",
     help="Use {'mice', 'knn', 'meanfill'} for imputing pre-training data")
 
+parser.add_argument("--batch-size", type=int, default=64)
+
 parser.add_argument(
     "--unknown-amino-acids",
     default=False,
@@ -179,6 +181,12 @@ if __name__ == "__main__":
         observed_mask.sum(),
         pMHC_affinity_matrix.size,
         100.0 * observed_mask.sum() / pMHC_affinity_matrix.size))
+
+    if args.verbose:
+        print("\n----\n# observed per allele:")
+        for allele_idx, allele in sorted(enumerate(allele_list), key=lambda x: x[1]):
+            print("--- %s: %d" % (allele, n_observed_per_allele[allele_idx]))
+
     if args.save_incomplete_affinity_matrix:
         print("Saving incomplete data to %s" % args.save_incomplete_affinity_matrix)
         df = pd.DataFrame(pMHC_affinity_matrix, columns=allele_list, index=peptide_list)
@@ -247,13 +255,14 @@ if __name__ == "__main__":
 
     # want at least 5 samples in each fold of CV
     # to make meaningful estimates of accuracy
-    min_samples_per_cv_fold = 5 * args.n_folds
+    min_samples_per_cv_fold = 5
+    min_samples_per_allele = min_samples_per_cv_fold * args.n_folds
     for allele_idx, allele in enumerate(allele_list):
-        if n_observed_per_allele[allele_idx] < min_samples_per_cv_fold:
+        if n_observed_per_allele[allele_idx] < min_samples_per_allele:
             print("-- Skipping allele %s which only has %d samples (need %d)" % (
                 allele,
                 n_observed_per_allele[allele_idx],
-                min_samples_per_cv_fold))
+                min_samples_per_allele))
             continue
         column = pMHC_affinity_matrix[:, allele_idx]
         observed_row_indices = np.where(observed_mask[:, allele_idx])[0]
@@ -303,23 +312,29 @@ if __name__ == "__main__":
 
             # drop peptides with fewer than 2 measurements and alleles
             # with fewer than 10 peptides
-            pMHC_affinity_matrix_fold, all_peptides_fold, all_alleles_fold = prune_data(
-                X=pMHC_affinity_matrix_fold,
-                peptide_list=peptide_list,
-                allele_list=allele_list,
-                min_observations_per_peptide=2,
-                min_observations_per_allele=min(10, min_samples_per_cv_fold))
+            pMHC_affinity_matrix_fold_pruned, pruned_peptides_fold, pruned_alleles_fold = \
+                prune_data(
+                    X=pMHC_affinity_matrix_fold,
+                    peptide_list=peptide_list,
+                    allele_list=allele_list,
+                    min_observations_per_peptide=2,
+                    min_observations_per_allele=min_samples_per_cv_fold)
 
-            pMHC_affinity_matrix_fold_completed = imputer.complete(pMHC_affinity_matrix_fold)
+            pMHC_affinity_matrix_fold_completed = imputer.complete(
+                pMHC_affinity_matrix_fold_pruned)
+
             # keep synthetic data for 9mer peptides,
             # otherwise we can an explosion of low weight samples
             # that are expanded from e.g. 11mers
             # In the future: we'll use an neural network that
             # takes multiple input lengths
-            ninemer_mask = np.array([len(p) == 9 for p in all_peptides_fold])
+            ninemer_mask = np.array([len(p) == 9 for p in pruned_peptides_fold])
             ninemer_indices = np.where(ninemer_mask)[0]
             pMHC_affinity_matrix_fold_completed_9mers = \
                 pMHC_affinity_matrix_fold_completed[ninemer_indices]
+            pretrain_peptides = [pruned_peptides_fold[i] for i in ninemer_indices]
+            X_pretrain = index_encoding(pretrain_peptides, 9)
+
             if args.verbose:
                 print("-- pMHC matrix for all peptides shape = %s" % (
                     pMHC_affinity_matrix_fold_completed.shape,))
@@ -327,25 +342,29 @@ if __name__ == "__main__":
                     pMHC_affinity_matrix_fold_completed_9mers.shape,))
                 print("-- 9mer indices n=%d max=%d" % (
                     len(ninemer_indices), ninemer_indices.max()))
+                print("-- X_pretrain.shape = %s" % (X_pretrain.shape,))
 
-            pretrain_peptides = [
-                all_peptides_fold[i] for i in ninemer_indices
-            ]
-            X_pretrain = index_encoding(pretrain_peptides, 9)
-            Y_pretrain = pMHC_affinity_matrix_fold_completed_9mers[
-                :, allele_idx]
+            # since we may have dropped some of the columns in the completed
+            # pMHC matrix need to find which column corresponds to the
+            # same name we're currently predicting
+            if allele in pruned_alleles_fold:
+                pMHC_fold_allele_idx = pruned_alleles_fold.index(allele)
+                Y_pretrain = pMHC_affinity_matrix_fold_completed_9mers[
+                    :, pMHC_fold_allele_idx]
+            else:
+                print(
+                    "WARNING: Couldn't find allele %s in pre-training matrix" % allele)
+                column = pMHC_affinity_matrix_fold[:, allele_idx]
+                column_mean = np.nanmean(column)
+                print("-- Setting pre-training target value to nanmean = %f" % column_mean)
+                n_pretrain = len(pretrain_peptides)
+                Y_pretrain = np.ones(n_pretrain) * column_mean
 
             X_train, training_row_peptides, training_counts = \
                 fixed_length_index_encoding(
                     peptides=train_peptides,
                     desired_length=9,
                     allow_unknown_amino_acids=args.unknown_amino_acids)
-            most_common_peptide_idx = np.argmax(training_counts)
-            if args.verbose:
-                print("-- Most common peptide in training data: %s (length=%d, count=%d)" % (
-                    training_row_peptides[most_common_peptide_idx],
-                    len(training_row_peptides[most_common_peptide_idx]),
-                    training_counts[most_common_peptide_idx]))
             training_sample_weights = 1.0 / np.array(training_counts)
             Y_train = np.array([
                 train_dict[p] for p in training_row_peptides])
@@ -369,7 +388,8 @@ if __name__ == "__main__":
                     X_pretrain=X_pretrain,
                     Y_pretrain=Y_pretrain,
                     n_training_epochs=args.training_epochs,
-                    verbose=args.verbose)
+                    verbose=args.verbose,
+                    batch_size=args.batch_size)
                 y_pred = predictor.predict_peptides_log_ic50(test_peptides)
                 if args.verbose:
                     print("-- mean(Y) = %f, mean(Y_pred) = %f" % (
@@ -385,5 +405,4 @@ if __name__ == "__main__":
                     tau=tau,
                     f1_score=f1_score,
                     auc=auc)
-
-    scores.to_csv(args.output_file)
+        scores.to_csv(args.output_file)
