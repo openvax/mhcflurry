@@ -97,13 +97,13 @@ parser.add_argument(
 
 parser.add_argument(
     "--second-hidden-layer-sizes",
-    default=[0, 50],
+    default=[0],
     type=parse_int_list)
 
 
 parser.add_argument(
     "--dropouts",
-    default=[0.0, 0.25],
+    default=[0.0],
     type=parse_float_list)
 
 parser.add_argument(
@@ -194,6 +194,7 @@ if __name__ == "__main__":
 
     scores = ScoreSet(
         index=[
+            "allele",
             "dropout_probability",
             "embedding_dim_size",
             "hidden_layer_size1",
@@ -250,8 +251,8 @@ if __name__ == "__main__":
                             embedding_input_dim=21 if args.unknown_amino_acids else 20,
                         )
                         predictors[key] = predictor
-                        initial_weights[key] = predictor.model.get_weights()
-                        initial_optimizer_states[key] = predictor.model.optimizer.get_state()
+                        initial_weights[key] = predictor.model.get_weights().copy()
+                        initial_optimizer_states[key] = predictor.model.optimizer.get_state().copy()
 
     # want at least 5 samples in each fold of CV
     # to make meaningful estimates of accuracy
@@ -368,7 +369,7 @@ if __name__ == "__main__":
             training_sample_weights = 1.0 / np.array(training_counts)
             Y_train = np.array([
                 train_dict[p] for p in training_row_peptides])
-            for key, predictor in predictors.items():
+            for key, predictor in sorted(predictors.items()):
 
                 print("\n-----")
                 print(
@@ -400,7 +401,7 @@ if __name__ == "__main__":
                     y_pred=y_pred,
                     max_ic50=args.max_ic50)
                 scores.add_many(
-                    key,
+                    ("%s," % allele) + key,
                     mae=mae,
                     tau=tau,
                     f1_score=f1_score,

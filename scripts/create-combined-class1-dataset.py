@@ -137,7 +137,7 @@ if __name__ == "__main__":
     for (allele, count) in new_allele_counts.most_common():
         print("%s: %d" % (allele, count))
     print("Combined DataFrame size: %d (+%d)" % (
-            len(combined_df),
-            len(combined_df) - len(nielsen_data)))
+        len(combined_df),
+        len(combined_df) - len(nielsen_data)))
     print("Writing %s..." % args.output_csv_path)
     combined_df.to_csv(args.output_csv_path, index=False)
