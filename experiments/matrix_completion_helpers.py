@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from fancyimpute.dictionary_helpers import (
     dense_matrix_from_nested_dictionary,
     transpose_nested_dictionary,
@@ -37,24 +39,36 @@ def evaluate_predictions(
 
     # if all predictions are the same
     if (y_pred[0] == y_pred).all():
+        logging.warn("All predicted values were the same: %f" % y_pred[0])
         return (mae, 0, 0.5, 0)
 
     tau, _ = stats.kendalltau(
         y_pred,
         y_true)
+    if np.isnan(tau):
+        logging.warn("Value for Kendall's tau was NaN (n=%d)" % (len(y_true),))
+        tau = 0.0
 
     true_ic50s = max_ic50 ** (1.0 - np.array(y_true))
     predicted_ic50s = max_ic50 ** (1.0 - np.array(y_pred))
 
     true_binding_label = true_ic50s <= 500
-    if true_binding_label.all() or not true_binding_label.any():
+    if true_binding_label.all():
+        logging.warn("All true labels are binders, can't compute AUC")
+        return (mae, tau, 0.5, 0)
+    elif not true_binding_label.any():
+        logging.warn("No true labels are binders, can't compute AUC")
         # can't compute AUC or F1 without both negative and positive cases
         return (mae, tau, 0.5, 0)
 
     auc = sklearn.metrics.roc_auc_score(true_binding_label, y_pred)
 
     predicted_binding_label = predicted_ic50s <= 500
-    if predicted_binding_label.all() or not predicted_binding_label.any():
+    if predicted_binding_label.all():
+        logging.warn("All predicted labels are binders, can't compute F1")
+        return (mae, tau, auc, 0)
+    elif not predicted_binding_label.any():
+        logging.warn("No predicted labels are binders, can't compute F1")
         # can't compute F1 without both positive and negative predictions
         return (mae, tau, auc, 0)
 
