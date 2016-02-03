@@ -251,10 +251,8 @@ if __name__ == "__main__":
                             embedding_input_dim=21 if args.unknown_amino_acids else 20,
                         )
                         predictors[key] = predictor
-                        initial_weights = predictor.model.get_weights()
-                        initial_weights[key] = [x.copy() for x in initial_weights]
-                        initial_state = predictor.model.optimizer.get_state()
-                        initial_optimizer_states[key] = [x.copy() for x in initial_state]
+                        initial_weights[key] = predictor.model.get_weights()
+                        initial_optimizer_states[key] = predictor.model.optimizer.get_state()
 
     # want at least 5 samples in each fold of CV
     # to make meaningful estimates of accuracy
@@ -382,8 +380,10 @@ if __name__ == "__main__":
                         len(X_train),
                         key))
                 print("-----")
-                predictor.model.set_weights(initial_weights[key])
-                predictor.model.optimizer.set_state(initial_optimizer_states[key])
+                predictor.model.set_weights([
+                    w.copy() for w in initial_weights[key]])
+                predictor.model.optimizer.set_state([
+                    s.copy() for s in initial_optimizer_states[key]])
                 predictor.fit(
                     X=X_train,
                     Y=Y_train,
