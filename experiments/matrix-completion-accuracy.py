@@ -59,7 +59,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--output-file",
-    default="matrix-completion-accuracy-results.csv")
+    default="imputation-accuracy-comparison.csv")
 
 parser.add_argument(
     "--normalize-columns",
@@ -144,12 +144,13 @@ if __name__ == "__main__":
     )
     print("Imputation methods: %s" % imputation_methods)
 
-    X, observed_mask, peptide_list, allele_list = load_data(
+    X, peptide_list, allele_list = load_data(
         binding_data_csv=args.binding_data_csv,
         max_ic50=args.max_ic50,
         only_human=args.only_human,
         min_observations_per_allele=args.n_folds,
         min_observations_per_peptide=args.min_observations_per_peptide)
+    observed_mask = np.isfinite(X)
     print("Loaded binding data, shape: %s, n_observed=%d/%d (%0.2f%%)" % (
         X.shape,
         observed_mask.sum(),
