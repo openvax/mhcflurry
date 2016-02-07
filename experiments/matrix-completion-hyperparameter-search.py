@@ -290,7 +290,8 @@ if __name__ == "__main__":
 
     min_samples_per_allele = args.min_samples_per_cv_fold * args.n_folds
     for allele_idx, allele in enumerate(allele_list):
-        if args.alleles and allele not in args.alleles:
+        if args.alleles and not any(
+                pattern in allele for pattern in args.alleles):
             # if user specifies an allele list then skip anything which isn't included
             continue
         if n_observed_per_allele[allele_idx] < min_samples_per_allele:
@@ -411,7 +412,6 @@ if __name__ == "__main__":
                 column_mean = np.nanmean(column)
                 print("-- Setting pre-training target value to nanmean = %f" % column_mean)
                 pMHC_allele_values = np.ones(len(pruned_peptides_fold)) * column_mean
-                assert False
 
             assert len(pruned_peptides_fold) == len(pMHC_allele_values)
 
