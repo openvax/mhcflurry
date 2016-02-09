@@ -23,40 +23,40 @@ from __future__ import (
 import logging
 from os import listdir, remove
 from os.path import exists, join
-from itertools import groupby
+
 import json
 
 import numpy as np
 from keras.models import model_from_config
 
-from .amino_acid import (
-    common_amino_acids,
-    amino_acids_with_unknown,
-)
-from .class1_allele_specific_hyperparameters import MAX_IC50
+
 from .common import normalize_allele_name
 from .paths import CLASS1_MODEL_DIRECTORY
 from .feedforward import make_embedding_network
-from .peptide_encoding import fixed_length_from_many_peptides
+from .predictor_base import PredictorBase
 
 _allele_predictor_cache = {}
 
-common_amino_acid_letters = common_amino_acids.letters()
+
+from .class1_allele_specific_hyperparameters import MAX_IC50
 
 
-class Class1BindingPredictor(object):
+class Class1BindingPredictor(PredictorBase):
     def __init__(
             self,
             model,
-            name=None,
+            allele=None,
             max_ic50=MAX_IC50,
             allow_unknown_amino_acids=False,
             verbose=False):
+        PredictorBase.__init__(
+            self,
+            name=allele,
+            max_ic50=max_ic50,
+            allow_unknown_amino_acids=allow_unknown_amino_acids,
+            verbose=verbose)
+        self.allele = allele
         self.model = model
-        self.max_ic50 = max_ic50
-        self.name = name
-        self.allow_unknown_amino_acids = allow_unknown_amino_acids
-        self.verbose = verbose
 
     @classmethod
     def from_disk(
@@ -419,20 +419,7 @@ class Class1BindingPredictor(object):
     def __str__(self):
         return repr(self)
 
-    def _log_to_ic50(self, log_value):
-        """
-        Convert neural network output to IC50 values between 0.0 and
-        self.max_ic50 (typically 5000, 20000 or 50000)
-        """
-        return self.max_ic50 ** (1.0 - log_value)
-
-    def encode_peptides(self, peptides):
-        if self.allow_unknown_amino_acids:
-            return amino_acids_with_unknown.index_encoding(peptides, 9)
-        else:
-            return common_amino_acids.index_encoding(peptides, 9)
-
-    def _predict_9mer_peptides(self, peptides):
+    def predict_9mer_peptides(self, peptides):
         """
         Predict binding affinity for 9mer peptides
         """
@@ -443,46 +430,3 @@ class Class1BindingPredictor(object):
         assert X.max() <= max_expected_index, \
             "Got index %d in peptide encoding" % (X.max(),)
         return self.model.predict(X, verbose=False).flatten()
-
-    def _predict_9mer_peptides_ic50(self, peptides):
-        log_y = self._predict_9mer_peptides(peptides)
-        return self._log_to_ic50(log_y)
-
-    def predict_peptides_log_ic50(self, peptides):
-        """
-        Given a list of peptides, returns an array of predicted values
-        """
-        results_dict = {}
-        for length, group_peptides in groupby(peptides, lambda x: len(x)):
-            group_peptides = list(group_peptides)
-            expanded_peptides, _, _ = fixed_length_from_many_peptides(
-                peptides=group_peptides,
-                desired_length=9,
-                insert_amino_acid_letters=(
-                    ["X"] if self.allow_unknown_amino_acids
-                    else common_amino_acid_letters))
-
-            n_group = len(group_peptides)
-            n_expanded = len(expanded_peptides)
-            expansion_factor = int(n_expanded / n_group)
-            raw_y = self._predict_9mer_peptides(expanded_peptides)
-            if expansion_factor == 1:
-                log_ic50s = raw_y
-            else:
-                # if peptides were a different length than the predictor's
-                # expected input length, then let's take the median prediction
-                # of each expanded peptide set
-                log_ic50s = np.zeros(n_group)
-                # take the median of each group of log(IC50) values
-                for i in range(n_group):
-                    start = i * expansion_factor
-                    end = (i + 1) * expansion_factor
-                    log_ic50s[i] = np.mean(raw_y[start:end])
-            assert len(group_peptides) == len(log_ic50s)
-            for peptide, log_ic50 in zip(group_peptides, log_ic50s):
-                results_dict[peptide] = log_ic50
-        return np.array([results_dict[p] for p in peptides])
-
-    def predict_peptides(self, peptides):
-        log_affinities = self.predict_peptides_log_ic50(peptides)
-        return self._log_to_ic50(log_affinities)

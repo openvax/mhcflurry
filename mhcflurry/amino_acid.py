@@ -108,6 +108,8 @@ common_amino_acids = Alphabet(**{
     "Y": "Tyrosine",
     "V": "Valine",
 })
+common_amino_acid_letters = common_amino_acids.letters()
 
 amino_acids_with_unknown = common_amino_acids.copy()
 amino_acids_with_unknown.add("X", "Unknown")
+amino_acids_with_unknown_letters = amino_acids_with_unknown.letters()
