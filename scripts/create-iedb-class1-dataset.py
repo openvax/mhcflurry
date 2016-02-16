@@ -84,5 +84,5 @@ if __name__ == "__main__":
                 "percent_positive",
                 "count"])
         print("# distinct pMHC entries: %d" % len(columns["mhc"]))
-    with open(OUTPUT_PATH, "w") as f:
+    with open(OUTPUT_PATH, "wb") as f:
         pickle.dump(assay_dataframes, f, pickle.HIGHEST_PROTOCOL)
