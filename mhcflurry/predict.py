@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import paths
-from . import data
-from . import feedforward
-from . import common
-from . import peptide_encoding
-from . import amino_acid
-from .class1_binding_predictor import Class1BindingPredictor
+import os
+from collections import OrderedDict
 
-__all__ = [
-    "paths",
-    "data",
-    "feedforward",
-    "peptide_encoding",
-    "amino_acid",
-    "common",
-    "Class1BindingPredictor"
-]
+import pandas as pd
+
+from .paths import CLASS1_MODEL_DIRECTORY
+from .mhc1_binding_predictor import Mhc1BindingPredictor
+
+def predict(alleles, peptides):
+    allele_dataframes = OrderedDict([])
+    for allele in alleles:
+        model = Mhc1BindingPredictor(allele=allele)
+        result_dictionary = model.predict_peptides(peptides)
+        allele_dataframes.append(df)
+    return pd.concat(allele_dataframes)

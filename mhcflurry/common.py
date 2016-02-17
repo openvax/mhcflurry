@@ -17,7 +17,6 @@ from __future__ import (
     division,
     absolute_import,
 )
-from .amino_acid import amino_acid_letters
 
 
 def parse_int_list(s):
@@ -27,35 +26,37 @@ def parse_int_list(s):
 def split_uppercase_sequences(s):
     return [part.strip().upper() for part in s.split(",")]
 
+MHC_PREFIXES = [
+    "HLA",
+    "H-2",
+    "Mamu",
+    "Patr",
+    "Gogo",
+    "ELA",
+]
 
-def normalize_allele_name(allele_name):
+
+def normalize_allele_name(allele_name, default_prefix="HLA"):
     """
-    Only works for mouse, human, and rhesus monkey alleles.
+    Only works for a small number of species.
 
     TODO: use the same logic as mhctools for MHC name parsing.
     Possibly even worth its own small repo called something like "mhcnames"
     """
     allele_name = allele_name.upper()
-    if allele_name.startswith("MAMU"):
-        prefix = "Mamu-"
-    elif allele_name.startswith("H-2") or allele_name.startswith("H2"):
-        prefix = "H-2-"
-    else:
-        prefix = ""
     # old school HLA-C serotypes look like "Cw"
     allele_name = allele_name.replace("CW", "C")
-    patterns = [
-        "HLA-",
-        "H-2",
-        "H2",
-        "MAMU",
-        "-",
-        "*",
-        ":"
-    ]
-    for pattern in patterns:
+
+    prefix = default_prefix
+    for candidate in MHC_PREFIXES:
+        if (allele_name.startswith(candidate.upper()) or
+                allele_name.startswith(candidate.replace("-", "").upper())):
+            prefix = candidate
+            allele_name = allele_name[len(prefix):]
+            break
+    for pattern in MHC_PREFIXES + ["-", "*", ":"]:
         allele_name = allele_name.replace(pattern, "")
-    return "%s%s" % (prefix, allele_name)
+    return "%s%s" % (prefix + "-" if prefix else "", allele_name)
 
 
 def split_allele_names(s):
@@ -64,37 +65,3 @@ def split_allele_names(s):
         for part
         in s.split(",")
     ]
-
-
-def expand_9mer_peptides(peptides, length):
-    """
-    Expand non-9mer peptides using methods from
-       Accurate approximation method for prediction of class I MHC
-       affinities for peptides of length 8, 10 and 11 using prediction
-       tools trained on 9mers.
-    by Lundegaard et. al.
-    http://bioinformatics.oxfordjournals.org/content/24/11/1397
-    """
-    assert len(peptides) > 0
-    if length < 8:
-        raise ValueError("Invalid peptide length: %d (%s)" % (
-            length, peptides[0]))
-    elif length == 9:
-        return peptides
-    elif length == 8:
-        # extend each peptide by inserting every possible amino acid
-        # between base-1 positions 4-8
-        return [
-            peptide[:i] + extra_amino_acid + peptide[i:]
-            for peptide in peptides
-            for i in range(3, 8)
-            for extra_amino_acid in amino_acid_letters
-        ]
-    else:
-        # drop interior residues between base-1 positions 4 to last
-        n_skip = length - 9
-        return [
-            peptide[:i] + peptide[i + n_skip:]
-            for peptide in peptides
-            for i in range(3, 9)
-        ]

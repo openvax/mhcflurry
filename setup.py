@@ -58,6 +58,8 @@ if __name__ == '__main__':
             'appdirs',
             'theano',
             'keras',
+            # using for multi-threaded web server
+            'cherrypy'
         ],
         long_description=readme,
         packages=['mhcflurry'],

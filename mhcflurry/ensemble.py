@@ -1,4 +1,4 @@
-# Copyright (c) 2015. Mount Sinai School of Medicine
+# Copyright (c) 2016. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import paths
-from . import data
-from . import feedforward
-from . import common
-from . import peptide_encoding
-from . import amino_acid
-from .class1_binding_predictor import Class1BindingPredictor
+import os
 
-__all__ = [
-    "paths",
-    "data",
-    "feedforward",
-    "peptide_encoding",
-    "amino_acid",
-    "common",
-    "Class1BindingPredictor"
-]
+class Ensemble(object):
+    def __init__(self, models, name=None):
+        self.name = name
+        self.models = models
+
+    @classmethod
+    def from_directory(cls, directory_path):
+        files = os.listdir(directory_path)
+
+
+

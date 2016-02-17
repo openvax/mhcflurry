@@ -29,33 +29,39 @@ PETERS_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS_CSV_FILENAME)
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--ic50-fraction-tolerance",
+parser.add_argument(
+    "--ic50-fraction-tolerance",
     default=0.01,
     type=float,
     help=(
         "How much can the IEDB and NetMHCpan IC50 differ and still be"
         " considered compatible (as a fraction of the NetMHCpan value)"))
 
-parser.add_argument("--min-assay-overlap-size",
+parser.add_argument(
+    "--min-assay-overlap-size",
     type=int,
     default=1,
     help="Minimum number of entries overlapping between IEDB assay and NetMHCpan data")
 
 
-parser.add_argument("--min-assay-fraction-same",
+parser.add_argument(
+    "--min-assay-fraction-same",
     type=float,
     help="Minimum fraction of peptides whose IC50 values agree with the NetMHCpan data",
     default=0.9)
 
-parser.add_argument("--iedb-pickle-path",
+parser.add_argument(
+    "--iedb-pickle-path",
     default=IEDB_PICKLE_PATH,
     help="Path to .pickle file containing dictionary of IEDB assay datasets")
 
-parser.add_argument("--netmhcpan-csv-path",
+parser.add_argument(
+    "--netmhcpan-csv-path",
     default=PETERS_CSV_PATH,
     help="Path to CSV with NetMHCpan dataset from 2013 Peters paper")
 
-parser.add_argument("--output-csv-path",
+parser.add_argument(
+    "--output-csv-path",
     default=CLASS1_DATA_CSV_PATH,
     help="Path to CSV of combined assay results")
 
@@ -137,7 +143,7 @@ if __name__ == "__main__":
     for (allele, count) in new_allele_counts.most_common():
         print("%s: %d" % (allele, count))
     print("Combined DataFrame size: %d (+%d)" % (
-            len(combined_df),
-            len(combined_df) - len(nielsen_data)))
+        len(combined_df),
+        len(combined_df) - len(nielsen_data)))
     print("Writing %s..." % args.output_csv_path)
     combined_df.to_csv(args.output_csv_path, index=False)
