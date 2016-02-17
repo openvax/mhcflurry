@@ -217,7 +217,7 @@ if __name__ == "__main__":
             "embedding_dim_size",
             "hidden_layer_size1",
             "hidden_layer_size2",
-            "activation"
+            "activation",
             "mae",
             "tau",
             "auc",
@@ -473,7 +473,7 @@ if __name__ == "__main__":
                     n_training_epochs=args.training_epochs,
                     verbose=args.verbose,
                     batch_size=args.batch_size)
-                y_pred = predictor.predict_peptides_log_ic50(test_peptides)
+                y_pred = predictor.predict_peptides(test_peptides)
                 if args.verbose:
                     print("-- mean(Y) = %f, mean(Y_pred) = %f" % (
                         Y_train.mean(),
@@ -503,5 +503,5 @@ if __name__ == "__main__":
                 )
                 print("CV fold result: %s" % output_line)
                 if output_file:
-                    output_file.write(output_line + "\n")
+                    output_file.write(output_line)
                     output_file.flush()
