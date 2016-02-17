@@ -36,7 +36,7 @@ from mhcflurry import Class1BindingPredictor
 from sklearn.cross_validation import StratifiedKFold
 
 from dataset_paths import PETERS2009_CSV_PATH
-from score_set import ScoreSet
+
 from matrix_completion_helpers import load_data, evaluate_predictions
 
 from arg_parsing import parse_int_list, parse_float_list, parse_string_list
@@ -206,9 +206,11 @@ if __name__ == "__main__":
         df = pd.DataFrame(pMHC_affinity_matrix, columns=allele_list, index=peptide_list)
         df.to_csv(args.save_incomplete_affinity_matrix, index_label="peptide")
 
-    scores = ScoreSet(
-        index=[
+    if args.output_file:
+        output_file = open(args.output_file, "w")
+        fields = [
             "allele",
+            "cv_fold",
             "peptide_count",
             "sample_count",
             "dropout_probability",
@@ -216,8 +218,15 @@ if __name__ == "__main__":
             "hidden_layer_size1",
             "hidden_layer_size2",
             "activation"
-        ])
-
+            "mae",
+            "tau",
+            "auc",
+            "f1"
+        ]
+        header_line = ",".join(fields)
+        output_file.write(header_line + "\n")
+    else:
+        output_file = None
     if args.unknown_amino_acids:
         index_encoding = amino_acids_with_unknown.index_encoding
     else:
@@ -256,7 +265,7 @@ if __name__ == "__main__":
                 for hidden_layer_size1 in args.first_hidden_layer_sizes:
                     for hidden_layer_size2 in args.second_hidden_layer_sizes:
                         for activation in args.activation_functions:
-                            key = "%f,%d,%d,%d,%s" % (
+                            key = "%0.2f,%d,%d,%d,%s" % (
                                 dropout,
                                 embedding_dim_size,
                                 hidden_layer_size1,
@@ -353,25 +362,13 @@ if __name__ == "__main__":
             train_values_fold = [observed_values[i] for i in train_indices]
             train_dict_fold = {k: v for (k, v) in zip(train_peptides_fold, train_values_fold)}
 
-            """
-            if args.verbose:
-                print("Training peptides for CV fold %d/%d:" % (
-                    fold_idx + 1,
-                    args.n_folds))
-                for p in train_peptides_fold:
-                    aff = train_dict_fold[p]
-                    print("-- %s: %f (%f nM)" % (
-                        p,
-                        aff,
-                        args.max_ic50 ** (1 - aff)))
-            """
             test_peptides = [observed_peptides[i] for i in test_indices]
             test_values = [observed_values[i] for i in test_indices]
             test_dict = {k: v for (k, v) in zip(test_peptides, test_values)}
             if imputer is None:
-                X_pretrain = None
-                Y_pretrain = None
-                pretrain_sample_weights = None
+                X_pretrain = np.array([], dtype=int).reshape((0, 9))
+                Y_pretrain = np.array([], dtype=float)
+                pretrain_sample_weights = np.array([], dtype=float)
             else:
                 # drop the test peptides from the full matrix and then
                 # run completion on it to get synthesized affinities
@@ -485,10 +482,26 @@ if __name__ == "__main__":
                     y_true=test_values,
                     y_pred=y_pred,
                     max_ic50=args.max_ic50)
-                scores.add_many(
-                    ("%s,%d,%d," % (allele, n_train_unique, n_train)) + key,
-                    mae=mae,
-                    tau=tau,
-                    f1_score=f1_score,
-                    auc=auc)
-        scores.to_csv(args.output_file)
+
+                cv_fold_field_values = [
+                    allele,
+                    str(fold_idx),
+                    str(n_train_unique),
+                    str(n_train),
+                ]
+                accuracy_field_values = [
+                    "%0.4f" % mae,
+                    "%0.4f" % tau,
+                    "%0.4f" % auc,
+                    "%0.4f" % f1_score
+                ]
+                output_line = (
+                    ",".join(cv_fold_field_values) +
+                    "," + key +
+                    "," + ",".join(accuracy_field_values) +
+                    "\n"
+                )
+                print("CV fold result: %s" % output_line)
+                if output_file:
+                    output_file.write(output_line + "\n")
+                    output_file.flush()

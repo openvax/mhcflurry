@@ -35,27 +35,25 @@ from .paths import CLASS1_MODEL_DIRECTORY
 from .feedforward import make_embedding_network
 from .predictor_base import PredictorBase
 
-_allele_predictor_cache = {}
-
-
 from .class1_allele_specific_hyperparameters import MAX_IC50
 
+_allele_predictor_cache = {}
 
 class Class1BindingPredictor(PredictorBase):
     def __init__(
             self,
             model,
-            allele=None,
+            name=None,
             max_ic50=MAX_IC50,
             allow_unknown_amino_acids=False,
             verbose=False):
         PredictorBase.__init__(
             self,
-            name=allele,
+            name=name,
             max_ic50=max_ic50,
             allow_unknown_amino_acids=allow_unknown_amino_acids,
             verbose=verbose)
-        self.allele = allele
+        self.name = name
         self.model = model
 
     @classmethod
@@ -411,21 +409,15 @@ class Class1BindingPredictor(PredictorBase):
         return list(sorted(alleles))
 
     def __repr__(self):
-        return "Class1BindingPredictor(allele=%s, model=%s, max_ic50=%f)" % (
-            self.allele,
+        return "Class1BindingPredictor(name=%s, model=%s, max_ic50=%f)" % (
+            self.name,
             self.model,
             self.max_ic50)
 
     def __str__(self):
         return repr(self)
 
-    def predict_9mer_peptides(self, peptides):
-        """
-        Predict binding affinity for 9mer peptides
-        """
-        if any(len(peptide) != 9 for peptide in peptides):
-            raise ValueError("Can only predict 9mer peptides")
-        X = self.encode_peptides(peptides)
+    def predict_encoded(self, X):
         max_expected_index = 20 if self.allow_unknown_amino_acids else 19
         assert X.max() <= max_expected_index, \
             "Got index %d in peptide encoding" % (X.max(),)

@@ -12,5 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 class Ensemble(object):
-    
+    def __init__(self, models, name=None):
+        self.name = name
+        self.models = models
+
+    @classmethod
+    def from_directory(cls, directory_path):
+        files = os.listdir(directory_path)
+
+
+

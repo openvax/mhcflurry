@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import defaultdict
+
 import numpy as np
 
-from itertools import groupby
-
-from .peptide_encoding import fixed_length_from_many_peptides
+from .peptide_encoding import fixed_length_index_encoding
 from .amino_acid import (
-    common_amino_acid_letters,
     amino_acids_with_unknown,
     common_amino_acids
 )
@@ -53,6 +52,42 @@ class PredictorBase(object):
         else:
             return common_amino_acids.index_encoding(peptides, 9)
 
+    def encode_peptides(self, peptides):
+        """
+        Parameters
+        ----------
+        peptides : str list
+            Peptide strings of any length
+
+        Encode peptides of any length into fixed length vectors.
+        Returns 2d array of encoded peptides and 1d array indicating the
+        original peptide index for each row.
+        """
+        indices = []
+        encoded_matrices = []
+        for i, peptide in enumerate(peptides):
+            matrix, _, _ = fixed_length_index_encoding(
+                peptides=[peptide],
+                desired_length=9,
+                allow_unknown_amino_acids=self.allow_unknown_amino_acids)
+            encoded_matrices.append(matrix)
+            indices.extend([i] * len(matrix))
+        combined_matrix = np.concatenate(encoded_matrices)
+        index_array = np.array(indices)
+        expected_shape = (len(index_array), 9)
+        assert combined_matrix.shape == expected_shape, \
+            "Expected shape %s but got %s" % (expected_shape, combined_matrix.shape)
+        return combined_matrix, index_array
+
+    def predict_9mer_peptides(self, peptides):
+        """
+        Predict binding affinity for 9mer peptides
+        """
+        if any(len(peptide) != 9 for peptide in peptides):
+            raise ValueError("Can only predict 9mer peptides")
+        X, _ = self.encode_peptides(peptides)
+        return self.predict_encoded(X)
+
     def predict_9mer_peptides_ic50(self, peptides):
         return self.log_to_ic50(self.predict_9mer_peptides(peptides))
 
@@ -62,6 +97,10 @@ class PredictorBase(object):
         """
         return self.log_to_ic50(
             self.predict_peptides(peptides))
+
+    def predict_encoded(self, X):
+        raise ValueError("Not yet implemented for %s!" % (
+            self.__class__.__name__,))
 
     def predict_peptides(
             self,
@@ -75,33 +114,18 @@ class PredictorBase(object):
         amino acid characters. The prediction for a single peptide will be
         the average of expanded 9mers.
         """
-        results_dict = {}
-        for length, group_peptides in groupby(peptides, lambda x: len(x)):
-            group_peptides = list(group_peptides)
-            expanded_peptides, _, _ = fixed_length_from_many_peptides(
-                peptides=group_peptides,
-                desired_length=9,
-                insert_amino_acid_letters=(
-                    ["X"] if self.allow_unknown_amino_acids
-                    else common_amino_acid_letters))
+        input_matrix, original_peptide_indices = self.encode_peptides(peptides)
+        # non-9mer peptides get multiple predictions, which are then combined
+        # with the combine_fn argument
+        multiple_predictions_dict = defaultdict(list)
+        fixed_length_predictions = self.predict_encoded(input_matrix)
+        for i, yi in enumerate(fixed_length_predictions):
+            original_peptide_index = original_peptide_indices[i]
+            original_peptide = peptides[original_peptide_index]
+            multiple_predictions_dict[original_peptide].append(yi)
 
-            n_group = len(group_peptides)
-            n_expanded = len(expanded_peptides)
-            expansion_factor = int(n_expanded / n_group)
-            raw_y = self.predict_9mer_peptides(expanded_peptides)
-            if expansion_factor == 1:
-                log_ic50s = raw_y
-            else:
-                # if peptides were a different length than the predictor's
-                # expected input length, then let's take the median prediction
-                # of each expanded peptide set
-                log_ic50s = np.zeros(n_group)
-                # take the median of each group of log(IC50) values
-                for i in range(n_group):
-                    start = i * expansion_factor
-                    end = (i + 1) * expansion_factor
-                    log_ic50s[i] = combine_fn(raw_y[start:end])
-            assert len(group_peptides) == len(log_ic50s)
-            for peptide, log_ic50 in zip(group_peptides, log_ic50s):
-                results_dict[peptide] = log_ic50
-        return np.array([results_dict[p] for p in peptides])
+        combined_predictions_dict = {
+            p: combine_fn(ys)
+            for (p, ys) in multiple_predictions_dict.items()
+        }
+        return np.array([combined_predictions_dict[p] for p in peptides])

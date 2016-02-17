@@ -82,7 +82,13 @@ def test_encode_peptides_9mer():
     predictor = Class1BindingPredictor(
         model=Dummy9merIndexEncodingModel(),
         allow_unknown_amino_acids=True)
-    X = predictor.encode_peptides(["AAASSSYYY"])
+    X = predictor.encode_9mer_peptides(["AAASSSYYY"])
+    assert X.shape[0] == 1, X.shape
+    assert X.shape[1] == 9, X.shape
+
+    X, indices = predictor.encode_peptides(["AAASSSYYY"])
+    assert len(indices) == 1
+    assert indices[0] == 0
     assert X.shape[0] == 1, X.shape
     assert X.shape[1] == 9, X.shape
 
@@ -91,7 +97,9 @@ def test_encode_peptides_8mer():
     predictor = Class1BindingPredictor(
         model=Dummy9merIndexEncodingModel(),
         allow_unknown_amino_acids=True)
-    X = predictor.encode_peptides(["AAASSSYY"])
+    X, indices = predictor.encode_peptides(["AAASSSYY"])
+    assert len(indices) == 9
+    assert (indices == 0).all()
     assert X.shape[0] == 9, (X.shape, X)
     assert X.shape[1] == 9, (X.shape, X)
 
@@ -100,6 +108,8 @@ def test_encode_peptides_10mer():
     predictor = Class1BindingPredictor(
         model=Dummy9merIndexEncodingModel(),
         allow_unknown_amino_acids=True)
-    X = predictor.encode_peptides(["AAASSSYYFF"])
+    X, indices = predictor.encode_peptides(["AAASSSYYFF"])
+    assert len(indices) == 10
+    assert (indices == 0).all()
     assert X.shape[0] == 10, (X.shape, X)
     assert X.shape[1] == 9, (X.shape, X)

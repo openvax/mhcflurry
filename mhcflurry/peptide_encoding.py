@@ -240,7 +240,6 @@ def indices_to_hotshot_encoding(X, n_indices=None, first_index_value=0):
     (n_samples, peptide_length) = X.shape
     if not n_indices:
         n_indices = X.max() - first_index_value + 1
-
     X_binary = np.zeros((n_samples, peptide_length * n_indices), dtype=bool)
     for i, row in enumerate(X):
         for j, xij in enumerate(row):
@@ -285,7 +284,7 @@ def fixed_length_index_encoding(
         insert_letters = ["X"]
         index_encoding = amino_acids_with_unknown.index_encoding
     else:
-        insert_letters = common_amino_acids.letters()
+        insert_letters = common_amino_acid_letters
         index_encoding = common_amino_acids.index_encoding
 
     fixed_length, original, counts = fixed_length_from_many_peptides(

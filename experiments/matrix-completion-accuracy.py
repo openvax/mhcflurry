@@ -59,7 +59,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--output-file",
-    default="imputation-accuracy-comparison.csv")
+    default="matrix-completion-accuracy-results.csv")
 
 parser.add_argument(
     "--normalize-columns",
