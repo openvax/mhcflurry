@@ -1,25 +1,11 @@
 import numpy as np
 
-from mhcflurry import Class1BindingPredictor
-
-
-class Dummy9merIndexEncodingModel(object):
-    """
-    Dummy molde used for testing the pMHC binding predictor.
-    """
-    def predict(self, X, verbose=False):
-        assert isinstance(X, np.ndarray)
-        assert len(X.shape) == 2
-        n_rows, n_cols = X.shape
-        n_cols == 9, "Expected 9mer index input input, got %d columns" % (
-            n_cols,)
-        return np.zeros(n_rows, dtype=float)
+import dummy_predictors
+import dummy_predictors.always_zero_predictor_with_unknown_AAs as predictor
 
 
 def test_always_zero_9mer_inputs():
-    predictor = Class1BindingPredictor(
-        model=Dummy9merIndexEncodingModel(),
-        allow_unknown_amino_acids=True)
+
     test_9mer_peptides = [
         "SIISIISII",
         "AAAAAAAAA",
@@ -41,9 +27,6 @@ def test_always_zero_9mer_inputs():
 
 
 def test_always_zero_8mer_inputs():
-    predictor = Class1BindingPredictor(
-        model=Dummy9merIndexEncodingModel(),
-        allow_unknown_amino_acids=True)
     test_8mer_peptides = [
         "SIISIISI",
         "AAAAAAAA",
@@ -60,9 +43,7 @@ def test_always_zero_8mer_inputs():
 
 
 def test_always_zero_10mer_inputs():
-    predictor = Class1BindingPredictor(
-        model=Dummy9merIndexEncodingModel(),
-        allow_unknown_amino_acids=True)
+
     test_10mer_peptides = [
         "SIISIISIYY",
         "AAAAAAAAYY",
@@ -79,9 +60,6 @@ def test_always_zero_10mer_inputs():
 
 
 def test_encode_peptides_9mer():
-    predictor = Class1BindingPredictor(
-        model=Dummy9merIndexEncodingModel(),
-        allow_unknown_amino_acids=True)
     X = predictor.encode_9mer_peptides(["AAASSSYYY"])
     assert X.shape[0] == 1, X.shape
     assert X.shape[1] == 9, X.shape
@@ -94,9 +72,6 @@ def test_encode_peptides_9mer():
 
 
 def test_encode_peptides_8mer():
-    predictor = Class1BindingPredictor(
-        model=Dummy9merIndexEncodingModel(),
-        allow_unknown_amino_acids=True)
     X, indices = predictor.encode_peptides(["AAASSSYY"])
     assert len(indices) == 9
     assert (indices == 0).all()
@@ -105,9 +80,6 @@ def test_encode_peptides_8mer():
 
 
 def test_encode_peptides_10mer():
-    predictor = Class1BindingPredictor(
-        model=Dummy9merIndexEncodingModel(),
-        allow_unknown_amino_acids=True)
     X, indices = predictor.encode_peptides(["AAASSSYYFF"])
     assert len(indices) == 10
     assert (indices == 0).all()

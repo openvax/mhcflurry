@@ -86,7 +86,7 @@ class PredictorBase(object):
         if any(len(peptide) != 9 for peptide in peptides):
             raise ValueError("Can only predict 9mer peptides")
         X, _ = self.encode_peptides(peptides)
-        return self.predict_encoded(X)
+        return self.predict(X)
 
     def predict_9mer_peptides_ic50(self, peptides):
         return self.log_to_ic50(self.predict_9mer_peptides(peptides))
@@ -98,8 +98,8 @@ class PredictorBase(object):
         return self.log_to_ic50(
             self.predict_peptides(peptides))
 
-    def predict_encoded(self, X):
-        raise ValueError("Not yet implemented for %s!" % (
+    def predict(self, X):
+        raise ValueError("Method 'predict' not yet implemented for %s!" % (
             self.__class__.__name__,))
 
     def predict_peptides(
@@ -118,7 +118,7 @@ class PredictorBase(object):
         # non-9mer peptides get multiple predictions, which are then combined
         # with the combine_fn argument
         multiple_predictions_dict = defaultdict(list)
-        fixed_length_predictions = self.predict_encoded(input_matrix)
+        fixed_length_predictions = self.predict(input_matrix)
         for i, yi in enumerate(fixed_length_predictions):
             original_peptide_index = original_peptide_indices[i]
             original_peptide = peptides[original_peptide_index]
