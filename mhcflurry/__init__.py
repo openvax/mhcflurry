@@ -19,6 +19,7 @@ from . import common
 from . import peptide_encoding
 from . import amino_acid
 from .class1_binding_predictor import Class1BindingPredictor
+from .ensemble import Ensemble
 
 __all__ = [
     "paths",
@@ -27,5 +28,6 @@ __all__ = [
     "peptide_encoding",
     "amino_acid",
     "common",
-    "Class1BindingPredictor"
+    "Class1BindingPredictor",
+    "Ensemble",
 ]

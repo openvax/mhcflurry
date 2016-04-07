@@ -1,4 +1,4 @@
-# Copyright (c) 2015. Mount Sinai School of Medicine
+# Copyright (c) 2016. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,32 +20,37 @@ from __future__ import (
     division,
     absolute_import,
 )
-import logging
-from os import listdir, remove
+
+from os import listdir
 from os.path import exists, join
 
-import json
-
 import numpy as np
-from keras.models import model_from_config
-
 
 from .common import normalize_allele_name
 from .paths import CLASS1_MODEL_DIRECTORY
 from .feedforward import make_embedding_network
 from .predictor_base import PredictorBase
+from .serialization_helpers import (
+    load_keras_model_from_disk,
+    save_keras_model_to_disk
+)
 
 from .class1_allele_specific_hyperparameters import MAX_IC50
 
 _allele_predictor_cache = {}
 
 class Class1BindingPredictor(PredictorBase):
+    """
+    Allele-specific Class I MHC binding predictor which uses
+    fixed-length (9mer) index encoding for inputs and outputs
+    a value between 0 and 1 (where 1 is the strongest binder).
+    """
     def __init__(
             self,
             model,
             name=None,
             max_ic50=MAX_IC50,
-            allow_unknown_amino_acids=False,
+            allow_unknown_amino_acids=True,
             verbose=False):
         PredictorBase.__init__(
             self,
@@ -61,33 +66,24 @@ class Class1BindingPredictor(PredictorBase):
             cls,
             model_json_path,
             weights_hdf_path=None,
-            name=None,
-            max_ic50=MAX_IC50):
+            **kwargs):
         """
         Load model from stored JSON representation of network and
         (optionally) load weights from HDF5 file.
         """
-        if not exists(model_json_path):
-            raise ValueError("Model file %s (name = %s) not found" % (
-                model_json_path, name,))
+        model = load_keras_model_from_disk(
+            model_json_path,
+            weights_hdf_path,
+            name=None)
+        return cls(model=model, **kwargs)
 
-        with open(model_json_path, "r") as f:
-            config_dict = json.load(f)
-
-        model = model_from_config(config_dict)
-
-        if weights_hdf_path:
-            if not exists(weights_hdf_path):
-                raise ValueError(
-                    "Missing model weights file %s (name = %s)" % (
-                        weights_hdf_path, name))
-
-            model.load_weights(weights_hdf_path)
-
-        return cls.__init__(
-            model=model,
-            max_ic50=max_ic50,
-            name=name)
+    def to_disk(self, model_json_path, weights_hdf_path, overwrite=False):
+        save_keras_model_to_disk(
+            self.model,
+            model_json_path,
+            weights_hdf_path,
+            overwrite=overwrite,
+            name=self.name)
 
     @classmethod
     def from_hyperparameters(
@@ -330,38 +326,6 @@ class Class1BindingPredictor(PredictorBase):
                     verbose=0,
                     batch_size=batch_size)
 
-    def to_disk(self, model_json_path, weights_hdf_path, overwrite=False):
-        if exists(model_json_path) and overwrite:
-            logging.info(
-                "Removing existing model JSON file '%s'" % (
-                    model_json_path,))
-            remove(model_json_path)
-
-        if exists(model_json_path):
-            logging.warn(
-                "Model JSON file '%s' already exists" % (model_json_path,))
-        else:
-            logging.info(
-                "Saving model file %s (name=%s)" % (model_json_path, self.name))
-            with open(model_json_path, "w") as f:
-                f.write(self.model.to_json())
-
-        if exists(weights_hdf_path) and overwrite:
-            logging.info(
-                "Removing existing model weights HDF5 file '%s'" % (
-                    weights_hdf_path,))
-            remove(weights_hdf_path)
-
-        if exists(weights_hdf_path):
-            logging.warn(
-                "Model weights HDF5 file '%s' already exists" % (
-                    weights_hdf_path,))
-        else:
-            logging.info(
-                "Saving model weights HDF5 file %s (name=%s)" % (
-                    weights_hdf_path, self.name))
-            self.model.save_weights(weights_hdf_path)
-
     @classmethod
     def from_allele_name(
             cls,
@@ -417,7 +381,7 @@ class Class1BindingPredictor(PredictorBase):
     def __str__(self):
         return repr(self)
 
-    def predict_encoded(self, X):
+    def predict(self, X):
         max_expected_index = 20 if self.allow_unknown_amino_acids else 19
         assert X.max() <= max_expected_index, \
             "Got index %d in peptide encoding" % (X.max(),)
