@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-N_PRETRAIN_EPOCHS = 5
 N_EPOCHS = 250
 ACTIVATION = "tanh"
 INITIALIZATION_METHOD = "lecun_uniform"
@@ -20,3 +19,51 @@ EMBEDDING_DIM = 32
 HIDDEN_LAYER_SIZE = 200
 DROPOUT_PROBABILITY = 0.25
 MAX_IC50 = 50000.0
+
+def add_hyperparameter_arguments_to_parser(parser):
+    """
+    Extend an argument parser with the following options:
+        --training-epochs
+        --activation
+        --initialization
+        --embedding-size
+        --hidden-layer-size
+        --dropout
+        --max-ic50
+    """
+    parser.add_argument(
+        "--training-epochs",
+        default=N_EPOCHS,
+        help="Number of training epochs")
+
+    parser.add_argument(
+        "--initialization",
+        default=INITIALIZATION_METHOD,
+        help="Initialization for neural network weights")
+
+    parser.add_argument(
+        "--activation",
+        default=ACTIVATION,
+        help="Activation function for neural network layers")
+
+    parser.add_argument(
+        "--embedding-size",
+        default=EMBEDDING_DIM,
+        help="Size of vector representations for embedding amino acids")
+
+    parser.add_argument(
+        "--hidden-layer-size",
+        default=HIDDEN_LAYER_SIZE,
+        help="Size of hidden neural network layer")
+
+    parser.add_argument(
+        "--dropout",
+        default=DROPOUT_PROBABILITY,
+        help="Dropout probability after neural network layers")
+
+    parser.add_argument(
+        "--max-ic50",
+        default=MAX_IC50,
+        help="Largest IC50 represented by neural network output")
+
+    return parser
