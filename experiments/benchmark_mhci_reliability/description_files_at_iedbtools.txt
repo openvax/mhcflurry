@@ -1,0 +1,24 @@
+
+
+Dataset size and composition impact the reliability of performance benchmarks for peptide-MHC binding predictions.
+Kim Y, Sidney J, Buus S, Sette A, Nielsen M, Peters B.
+BMC Bioinformatics, 2014.
+http://www.ncbi.nlm.nih.gov/pubmed/25017736
+
+Description of the dataset: 
+    1) All binding data used in the paper: BD2009, BD2013, and Blind.
+    2) For BD2009 data set, three cross-validation data partitions were generated: cv_rnd, cv_sr, and cv_gs.
+    3) Predictions made by the three methods for the cross-validation and blind data sets.
+    4) FILE_S1: Prediction performances for SMMPMBEC, NetMHC, and NetMHCpan against cv_rnd, cv_sr, cv_gs, and Blind data sets. An R script that constructs logistic regression models of deviations (i.e. |cv - blind|) is also included.
+
+
+Date of the dataset generation: 2014
+
+Details on the dataset generation: 
+    BD2009 and BD2013 refer to MHC-I binding data files compiled in 2009 and 2013. Blind data sets refer to data resulting after subtracting BD2009 from BD2013.
+
+    In the paper, different cross-validation strategies (i.e. cv_rnd, cv_sr, and cv_gs) were tested. Please see the Methods section for details of the cross-validation strategies.
+
+Data format: Text 
+
+Dataset availability: tools.iedb.org/benchmark

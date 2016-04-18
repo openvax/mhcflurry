@@ -92,6 +92,7 @@ if __name__ == "__main__":
 
     if not exists(args.output_dir):
         makedirs(args.output_dir)
+
     allele_groups = load_allele_datasets(
         args.binding_data_csv_path,
         peptide_length=9,
@@ -99,6 +100,7 @@ if __name__ == "__main__":
         max_ic50=MAX_IC50,
         sep=",",
         peptide_column_name="peptide")
+
     # concatenate datasets from all alleles to use for pre-training of
     # allele-specific predictors
     X_all = np.vstack([group.X for group in allele_groups.values()])
