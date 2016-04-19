@@ -382,7 +382,18 @@ class Class1BindingPredictor(PredictorBase):
         return repr(self)
 
     def predict(self, X):
+        """
+        Given an encoded array of amino acid indices, returns a vector
+        of predicted log IC50 values.
+        """
+        X = np.asarray(X)
+        if len(X.shape) != 2:
+            raise ValueError("Expected 2d input, got array with shape %s" % (
+                X.shape,))
         max_expected_index = 20 if self.allow_unknown_amino_acids else 19
-        assert X.max() <= max_expected_index, \
-            "Got index %d in peptide encoding" % (X.max(),)
+        if X.max() > max_expected_index:
+            raise ValueError(
+                "Got index %d in peptide encoding, max expected %d" % (
+                    X.max(),
+                    max_expected_index))
         return self.model.predict(X, verbose=False).flatten()
