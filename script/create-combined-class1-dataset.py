@@ -26,20 +26,20 @@ from __future__ import (
     absolute_import,
     unicode_literals
 )
-from os.path import join
+from os import makedirs
+from os.path import join, exists
 import pickle
 from collections import Counter
 import argparse
 
 import pandas as pd
 
-from mhcflurry.paths import CLASS1_DATA_DIRECTORY, CLASS1_DATA_CSV_PATH
+from mhcflurry.paths import CLASS1_DATA_DIRECTORY, CLASS1_DATA_CSV_FILENAME
 
 IEDB_PICKLE_FILENAME = "iedb_human_class1_assay_datasets.pickle"
 IEDB_PICKLE_PATH = join(CLASS1_DATA_DIRECTORY, IEDB_PICKLE_FILENAME)
 
-PETERS_CSV_FILENAME = "bdata.20130222.mhci.public.1.txt"
-PETERS_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS_CSV_FILENAME)
+KIM_2013_CSV_FILENAME = "bdata.20130222.mhci.public.1.txt"
 
 parser = argparse.ArgumentParser()
 
@@ -71,13 +71,18 @@ parser.add_argument(
 
 parser.add_argument(
     "--netmhcpan-csv-path",
-    default=PETERS_CSV_PATH,
+    default=KIM_2013_CSV_FILENAME,
     help="Path to CSV with NetMHCpan dataset from 2013 Peters paper")
 
 parser.add_argument(
-    "--output-csv-path",
-    default=CLASS1_DATA_CSV_PATH,
-    help="Path to CSV of combined assay results")
+    "--output-dir",
+    default=CLASS1_DATA_DIRECTORY,
+    help="Path to directory where output CSV should be written")
+
+parser.add_argument(
+    "--output-csv-filename",
+    default=CLASS1_DATA_CSV_FILENAME,
+    help="Name of combined CSV file")
 
 parser.add_argument(
     "--extra-dataset-csv-path",
@@ -87,6 +92,9 @@ parser.add_argument(
 
 if __name__ == "__main__":
     args = parser.parse_args()
+
+    if not exists(args.output_dir):
+        makedirs(args.output_dir)
 
     print("Reading %s..." % args.iedb_pickle_path)
     with open(args.iedb_pickle_path, "rb") as f:

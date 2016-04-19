@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright (c) 2015. Mount Sinai School of Medicine
+# Copyright (c) 2016. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,3 @@
 rm -f mhc_ligand_full*
 wget http://www.iedb.org/doc/mhc_ligand_full.zip
 unzip mhc_ligand_full.zip
-DATA_DIR=`python -c "import mhcflurry; print(mhcflurry.paths.CLASS1_DATA_DIRECTORY)"`
-mkdir -p -- "$DATA_DIR"
-mv mhc_ligand_full.csv "$DATA_DIR"

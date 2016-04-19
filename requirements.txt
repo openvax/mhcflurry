@@ -3,3 +3,4 @@ pandas>=0.13.1
 appdirs
 theano
 keras<1.0
+h5py

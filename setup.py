@@ -14,6 +14,7 @@
 
 import os
 import logging
+import re
 
 from setuptools import setup
 
@@ -34,10 +35,17 @@ except:
     logging.warn("Conversion of long_description from MD to RST failed")
     pass
 
+
+with open('mhcflurry/package_metadata.py', 'r') as f:
+    version = re.search(
+        r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
+        f.read(),
+        re.MULTILINE).group(1)
+
 if __name__ == '__main__':
     setup(
         name='mhcflurry',
-        version="0.0.1",
+        version=version,
         description="MHC Binding Predictor",
         author="Alex Rubinsteyn",
         author_email="alex {dot} rubinsteyn {at} mssm {dot} edu",
@@ -58,6 +66,7 @@ if __name__ == '__main__':
             'appdirs',
             'theano',
             'keras',
+            'h5py',
             # using for multi-threaded web server
             'cherrypy'
         ],

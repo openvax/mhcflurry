@@ -14,3 +14,5 @@
 
 from .class1_binding_predictor import Class1BindingPredictor
 from .predict import predict
+from .ensemble import Ensemble
+from .package_metadata import __version__
