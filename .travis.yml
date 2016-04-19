@@ -36,6 +36,11 @@ install:
   - pip install .
   - pip install coveralls
 script:
+  # download training data
+  - script/download-kim-2013-dataset.sh
+  - script/download-iedb.sh
+  - script/create-iedb-class1-dataset.py
+  - script/create-combined-class1-dataset.py
   # only installing A0101 and A0201 for testing purposes and with very limited
   # training
   - >
