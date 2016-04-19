@@ -26,7 +26,7 @@ scripts/create-combined-class1-dataset.py
 ## Train Neural Network Models
 
 ```
-scripts/train-class1-allele-specific-models.py
+mhcflurry-train-class1-allele-specific-models.py
 ```
 
 This will train separate models for each HLA type.
@@ -34,9 +34,8 @@ This will train separate models for each HLA type.
 ## Making predictions
 
 ```python
-from mhcflurry import Mhc1BindingPredictor
-predictor = Mhc1BindingPredictor('A0201')
-predictor.predict_peptides(['SIINFEKL'])
+from mhcflurry import predict
+predict(alleles=['A0201'], peptides=['SIINFEKL'])
 ```
 
 ```
