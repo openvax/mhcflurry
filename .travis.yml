@@ -36,6 +36,14 @@ install:
   - pip install .
   - pip install coveralls
 script:
+  # only installing A0101 and A0201 for testing purposes and with very limited
+  # training
+  - >
+      mhcflurry-train-class1-allele-specific-models.py
+      --alleles HLA-A0101 HLA-A0101
+      --embedding-size 4
+      --hidden-layer-size 4
+      --training-epochs 5
   # run tests
   - nosetests test --with-coverage --cover-package=mhcflurry  && ./lint.sh
 after_success:
