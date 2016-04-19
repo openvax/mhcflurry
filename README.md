@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/hammerlab/mhcflurry.svg?branch=master)](https://travis-ci.org/hammerlab/mhcflurry)
 # mhcflurry
 Peptide-MHC binding affinity prediction
 
