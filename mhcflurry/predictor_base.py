@@ -15,6 +15,7 @@
 from collections import defaultdict
 
 import numpy as np
+from six import string_types
 
 from .peptide_encoding import fixed_length_index_encoding
 from .amino_acid import (
@@ -114,6 +115,10 @@ class PredictorBase(object):
         amino acid characters. The prediction for a single peptide will be
         the average of expanded 9mers.
         """
+        if isinstance(peptides, string_types):
+            raise TypeError("Input must be a list of peptides, not %s : %s" % (
+                peptides, type(peptides)))
+
         input_matrix, original_peptide_indices = self.encode_peptides(peptides)
         # non-9mer peptides get multiple predictions, which are then combined
         # with the combine_fn argument
