@@ -65,7 +65,7 @@ if __name__ == '__main__':
         packages=['mhcflurry'],
         scripts=[
             "script/mhcflurry-train-class1-allele-specific-models.py",
-            "script/mhcflurry-predict-class1",
-            "script/mhcflurry-class1-web-server",
+            "script/mhcflurry-predict-class1.py",
+            "script/mhcflurry-class1-web-server.py",
         ],
     )
