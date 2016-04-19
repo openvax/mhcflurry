@@ -19,6 +19,7 @@ EMBEDDING_DIM = 32
 HIDDEN_LAYER_SIZE = 200
 DROPOUT_PROBABILITY = 0.25
 MAX_IC50 = 50000.0
+LEARNING_RATE = 0.001
 
 def add_hyperparameter_arguments_to_parser(parser):
     """
@@ -33,6 +34,7 @@ def add_hyperparameter_arguments_to_parser(parser):
     """
     parser.add_argument(
         "--training-epochs",
+        type=int,
         default=N_EPOCHS,
         help="Number of training epochs")
 
@@ -48,22 +50,32 @@ def add_hyperparameter_arguments_to_parser(parser):
 
     parser.add_argument(
         "--embedding-size",
+        type=int,
         default=EMBEDDING_DIM,
         help="Size of vector representations for embedding amino acids")
 
     parser.add_argument(
         "--hidden-layer-size",
+        type=int,
         default=HIDDEN_LAYER_SIZE,
         help="Size of hidden neural network layer")
 
     parser.add_argument(
         "--dropout",
+        type=float,
         default=DROPOUT_PROBABILITY,
         help="Dropout probability after neural network layers")
 
     parser.add_argument(
         "--max-ic50",
+        type=float,
         default=MAX_IC50,
         help="Largest IC50 represented by neural network output")
+
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=0.001,
+        help="Learning rate for training neural network")
 
     return parser

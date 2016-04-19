@@ -44,10 +44,10 @@ import argparse
 import numpy as np
 
 from mhcflurry.common import normalize_allele_name
-from mhcflurry.feedforward import make_network
-from mhcflurry.data_helpers import load_allele_datasets
+from mhcflurry.data import load_allele_datasets
+from mhcflurry.class1_binding_predictor import Class1BindingPredictor
 from mhcflurry.class1_allele_specific_hyperparameters import (
-    add_hyperparamer_arguments_to_parser
+    add_hyperparameter_arguments_to_parser
 )
 from mhcflurry.paths import (
     CLASS1_MODEL_DIRECTORY,
@@ -59,10 +59,14 @@ CSV_PATH = join(CLASS1_DATA_DIRECTORY, CSV_FILENAME)
 parser = argparse.ArgumentParser()
 
 parser.add_argument(
+    "--binding-data-csv",
+    default=CSV_PATH,
+    help="CSV file with 'mhc', 'peptide', 'peptide_length', 'meas' columns")
+
+parser.add_argument(
     "--output-dir",
     default=CLASS1_MODEL_DIRECTORY,
     help="Output directory for allele-specific predictor HDF weights files")
-
 
 parser.add_argument(
     "--overwrite",
@@ -71,18 +75,13 @@ parser.add_argument(
     help="Overwrite existing output directory")
 
 parser.add_argument(
-    "--binding-data-csv-path",
-    default=CSV_PATH,
-    help="CSV file with 'mhc', 'peptide', 'peptide_length', 'meas' columns")
-
-parser.add_argument(
     "--min-samples-per-allele",
     default=5,
     help="Don't train predictors for alleles with fewer samples than this",
     type=int)
 
 # add options for neural network hyperparameters
-parser = add_hyperparamer_arguments_to_parser(parser)
+parser = add_hyperparameter_arguments_to_parser(parser)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -91,28 +90,31 @@ if __name__ == "__main__":
         makedirs(args.output_dir)
 
     allele_groups = load_allele_datasets(
-        args.binding_data_csv_path,
+        filename=args.binding_data_csv,
         peptide_length=9,
-        binary_encoding=False,
+        use_multiple_peptide_lengths=True,
         max_ic50=args.max_ic50,
         sep=",",
         peptide_column_name="peptide")
 
     # concatenate datasets from all alleles to use for pre-training of
     # allele-specific predictors
-    X_all = np.vstack([group.X for group in allele_groups.values()])
+    X_all = np.vstack([group.X_index for group in allele_groups.values()])
     Y_all = np.concatenate([group.Y for group in allele_groups.values()])
     print("Total Dataset size = %d" % len(Y_all))
 
     for allele_name, allele_data in allele_groups.items():
-        model = make_network(
-            input_size=9,
+        model = Class1BindingPredictor.from_hyperparameters(
+            name=allele_name,
+            peptide_length=9,
+            max_ic50=args.max_ic50,
             embedding_input_dim=20,
             embedding_output_dim=args.embedding_size,
             layer_sizes=(args.hidden_layer_size,),
             activation=args.activation,
             init=args.initialization,
-            dropout_probability=args.dropout)
+            dropout_probability=args.dropout,
+            learning_rate=args.learning_rate)
         allele_name = normalize_allele_name(allele_name)
         if allele_name.isdigit():
             print("Skipping allele %s" % (allele_name,))
