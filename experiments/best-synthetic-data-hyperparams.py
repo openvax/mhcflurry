@@ -38,7 +38,7 @@ from synthetic_data import (
     create_reverse_lookup_from_simple_dicts
 )
 from allele_similarities import compute_allele_similarities
-
+from sklearn.cross_validation import KFold
 
 parser = argparse.ArgumentParser()
 

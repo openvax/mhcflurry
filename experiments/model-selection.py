@@ -22,8 +22,7 @@ from __future__ import (
 )
 import argparse
 
-
-from mhcflurry.data_helpers import load_data
+from mhcflurry.data import load_allele_datasets
 
 
 from model_configs import (
@@ -143,8 +142,6 @@ parser.add_argument(
     help="Comma separated list of optimization methods")
 
 
-
-
 if __name__ == "__main__":
     args = parser.parse_args()
     configs = generate_all_model_configs(
@@ -161,11 +158,10 @@ if __name__ == "__main__":
         optimizers=args.optimizer)
 
     print("Total # configurations = %d" % len(configs))
-    training_datasets, _ = load_data(
+    training_datasets = load_allele_datasets(
         args.binding_data_csv_path,
         max_ic50=args.max_ic50,
-        peptide_length=9,
-        binary_encoding=False)
+        peptide_length=9)
     combined_df = evaluate_model_configs(
         configs=configs,
         results_filename=args.output,

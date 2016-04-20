@@ -254,7 +254,7 @@ def fixed_length_index_encoding(
         end_offset_shorten=0,
         start_offset_extend=0,
         end_offset_extend=0,
-        allow_unknown_amino_acids=False):
+        allow_unknown_amino_acids=True):
     """
     Take peptides of varying lengths, chop them into substrings of fixed
     length and apply index encoding to these substrings.

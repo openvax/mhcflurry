@@ -75,7 +75,7 @@ def kfold_cross_validation_for_single_allele(
             X_train=X_train,
             log_ic50_train=Y_train,
             X_test=X_test,
-            binder_label_test=label_test,
+            log_ic50_test=label_test,
             n_training_epochs=n_training_epochs,
             minibatch_size=minibatch_size,
             max_ic50=max_ic50)
@@ -298,6 +298,9 @@ def evaluate_model_config_train_vs_test(
             continue
         X_test_allele = X_test_dict[allele_name]
         ic50_test_allele = ic50_test_dict[allele_name]
+        true_log_ic50 = np.log(ic50_test_allele) / np.log(config.max_ic50)
+        true_log_ic50 = np.maximum(0, 1.0 - true_log_ic50)
+
         true_label = ic50_test_allele <= 500
         if true_label.all():
             print("Skipping %s since all affinities are <= 500nM" % allele_name)
@@ -316,7 +319,7 @@ def evaluate_model_config_train_vs_test(
         pred = model.predict(X_test_allele).flatten()
         accuracy, auc, f1_score = score_predictions(
             predicted_log_ic50=pred,
-            true_label=true_label,
+            true_log_ic50=true_log_ic50,
             max_ic50=config.max_ic50)
         print("-- %s accuracy=%0.4f AUC = %0.4f F1 = %0.4f" % (
             allele_name, accuracy, auc, f1_score))

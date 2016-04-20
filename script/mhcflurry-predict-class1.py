@@ -27,7 +27,7 @@ from mhcflurry.common import (
     split_uppercase_sequences,
     split_allele_names,
 )
-from mhcflurry.class1 import predict
+from mhcflurry.predict import predict
 
 parser = argparse.ArgumentParser()
 

@@ -14,6 +14,8 @@
 
 from sklearn.cross_validation import KFold
 
+from allele_similarities import compute_allele_similarities
+
 
 def generate_cross_validation_datasets(
         allele_to_peptide_to_affinity,
