@@ -4,3 +4,7 @@ appdirs
 theano
 keras<1.0
 h5py
+cherrypy
+bottle
+fancyimpute
+scikit-learn

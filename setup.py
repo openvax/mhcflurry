@@ -66,9 +66,12 @@ if __name__ == '__main__':
             'appdirs',
             'theano',
             'keras',
+            'fancyimpute',
+            'scikit-learn',
             'h5py',
             # using for multi-threaded web server
-            'cherrypy'
+            'cherrypy',
+            'bottle',
         ],
         long_description=readme,
         packages=['mhcflurry'],
