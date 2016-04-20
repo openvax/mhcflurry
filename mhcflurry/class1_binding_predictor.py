@@ -34,7 +34,7 @@ from .serialization_helpers import (
     load_keras_model_from_disk,
     save_keras_model_to_disk
 )
-
+from .peptide_encoding import check_valid_index_encoding_array
 from .class1_allele_specific_hyperparameters import MAX_IC50
 
 _allele_predictor_cache = {}
@@ -386,14 +386,7 @@ class Class1BindingPredictor(PredictorBase):
         Given an encoded array of amino acid indices, returns a vector
         of predicted log IC50 values.
         """
-        X = np.asarray(X)
-        if len(X.shape) != 2:
-            raise ValueError("Expected 2d input, got array with shape %s" % (
-                X.shape,))
-        max_expected_index = 20 if self.allow_unknown_amino_acids else 19
-        if X.max() > max_expected_index:
-            raise ValueError(
-                "Got index %d in peptide encoding, max expected %d" % (
-                    X.max(),
-                    max_expected_index))
+        X = check_valid_index_encoding_array(
+            X,
+            allow_unknown_amino_acids=self.allow_unknown_amino_acids)
         return self.model.predict(X, verbose=False).flatten()

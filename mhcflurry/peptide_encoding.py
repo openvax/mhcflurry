@@ -273,12 +273,16 @@ def fixed_length_index_encoding(
     refers to the position *before* the start of a peptide and, similarly,
     `end_offset_extend` = 0 refers to the position *after* the peptide.
 
-    Returns feature matrix X, a list of original peptides for each feature
-    vector, and a list of integer counts indicating how many rows share a
-    particular original peptide. When two rows are expanded out of a single
-    original peptide, they will both have a count of 2. These counts can
-    be useful for down-weighting the importance of multiple feature vectors
-    which originate from the same sample.
+    Returns tuple with the following fields:
+        - index encoded feature matrix X
+        - list of fixed length peptides
+        - list of "original" peptides of varying lengths
+        - list of integer counts indicating how many rows came from
+          that original peptide.
+
+    When two rows are expanded out of a single original peptide, they will both
+    have a count of 2. These counts can be useful for down-weighting the
+    importance of multiple feature vectors which originate from the same sample.
     """
     if allow_unknown_amino_acids:
         insert_letters = ["X"]
@@ -295,5 +299,18 @@ def fixed_length_index_encoding(
         start_offset_extend=start_offset_extend,
         end_offset_extend=end_offset_extend,
         insert_amino_acid_letters=insert_letters)
-    X = index_encoding(fixed_length, desired_length)
-    return X, original, counts
+    X_index = index_encoding(fixed_length, desired_length)
+    return X_index, fixed_length, original, counts
+
+def check_valid_index_encoding_array(X, allow_unknown_amino_acids=True):
+        X = np.asarray(X)
+        if len(X.shape) != 2:
+            raise ValueError("Expected 2d input, got array with shape %s" % (
+                X.shape,))
+        max_expected_index = 20 if allow_unknown_amino_acids else 19
+        if X.max() > max_expected_index:
+            raise ValueError(
+                "Got index %d in peptide encoding, max expected %d" % (
+                    X.max(),
+                    max_expected_index))
+        return X

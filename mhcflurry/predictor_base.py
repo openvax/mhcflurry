@@ -67,7 +67,7 @@ class PredictorBase(object):
         indices = []
         encoded_matrices = []
         for i, peptide in enumerate(peptides):
-            matrix, _, _ = fixed_length_index_encoding(
+            matrix, _, _, _ = fixed_length_index_encoding(
                 peptides=[peptide],
                 desired_length=9,
                 allow_unknown_amino_acids=self.allow_unknown_amino_acids)
