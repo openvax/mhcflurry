@@ -168,5 +168,8 @@ if __name__ == "__main__":
     print("Combined DataFrame size: %d (+%d)" % (
         len(combined_df),
         len(combined_df) - len(nielsen_data)))
-    print("Writing %s..." % args.output_csv_path)
-    combined_df.to_csv(args.output_csv_path, index=False)
+    if not exists(args.output_dir):
+        makedirs(args.output_dir)
+    output_csv_path = join(args.output_dir, args.output_csv_filename)
+    print("Writing %s..." % output_csv_path)
+    combined_df.to_csv(output_csv_path, index=False)
