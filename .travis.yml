@@ -39,13 +39,14 @@ script:
   # download training data
   - script/download-kim-2013-dataset.sh
   - script/download-iedb.sh
-  - script/create-iedb-class1-dataset.py
+  # only install data for A*01:01 and A*02:01 for testing
+  - script/create-iedb-class1-dataset.py --alleles HLA-A*01:01 HLA-A*02:01
   - script/create-combined-class1-dataset.py
   # only installing A0101 and A0201 for testing purposes and with very limited
   # training
   - >
       mhcflurry-train-class1-allele-specific-models.py
-      --alleles HLA-A0101 HLA-A0101
+      --alleles HLA-A0101 HLA-A0201
       --embedding-size 4
       --hidden-layer-size 4
       --training-epochs 5
