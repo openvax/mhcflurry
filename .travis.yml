@@ -29,7 +29,7 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib h5py
+      numpy scipy nose pandas matplotlib h5py pylint
   - source activate test-environment
   - pip install pypandoc
   - pip install -r requirements.txt
