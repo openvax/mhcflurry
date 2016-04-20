@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from collections import OrderedDict
 
 import pandas as pd
 
-from .paths import CLASS1_MODEL_DIRECTORY
-from .mhc1_binding_predictor import Mhc1BindingPredictor
+from .class1_binding_predictor import Class1BindingPredictor
 
 def predict(alleles, peptides):
-    allele_dataframes = OrderedDict([])
+    allele_results = OrderedDict([])
     for allele in alleles:
-        model = Mhc1BindingPredictor(allele=allele)
+        model = Class1BindingPredictor.from_allele_name(allele)
         result_dictionary = model.predict_peptides(peptides)
-        allele_dataframes.append(df)
-    return pd.concat(allele_dataframes)
+        allele_results.append(result_dictionary)
+    return pd.concat(allele_results)

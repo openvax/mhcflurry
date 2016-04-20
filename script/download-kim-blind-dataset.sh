@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright (c) 2015. Mount Sinai School of Medicine
+# Copyright (c) 2016. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Download dataset from Kim/Peters 2013 "Dataset size and composition" paper
-rm -f bdata.20130222.mhci.public*
-wget https://dl.dropboxusercontent.com/u/3967524/bdata.20130222.mhci.public.1.txt
-DATA_DIR=`python -c "import mhcflurry; print(mhcflurry.paths.CLASS1_DATA_DIRECTORY)"`
-mkdir -p -- "$DATA_DIR"
-mv bdata.20130222.mhci.public.1.txt "$DATA_DIR"
+# Download BLIND 2013 dataset from Kim/Peters 2013
+# "Dataset size and composition" paper
+rm -f bdata.2013.mhci.public.blind*
+wget https://dl.dropboxusercontent.com/u/3967524/bdata.2013.mhci.public.blind.1.txt

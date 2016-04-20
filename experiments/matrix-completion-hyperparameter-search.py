@@ -429,22 +429,22 @@ if __name__ == "__main__":
                     in zip(pruned_peptides_fold, pMHC_allele_values)
                 }
 
-                X_pretrain, pretrain_row_peptides, pretrain_counts = \
+                X_pretrain, pretrain_ninemer_peptides, pretrain_full_peptides, pretrain_counts = \
                     fixed_length_index_encoding(
                         peptides=pruned_peptides_fold,
                         desired_length=9,
                         allow_unknown_amino_acids=args.unknown_amino_acids)
                 pretrain_sample_weights = 1.0 / np.array(pretrain_counts)
                 Y_pretrain = np.array(
-                    [pretrain_dict[p] for p in pretrain_row_peptides])
+                    [pretrain_dict[p] for p in pretrain_full_peptides])
 
-            X_train, training_row_peptides, training_counts = \
+            X_train, training_ninemer_peptides, training_full_peptides, training_counts = \
                 fixed_length_index_encoding(
                     peptides=train_peptides_fold,
                     desired_length=9,
                     allow_unknown_amino_acids=args.unknown_amino_acids)
             training_sample_weights = 1.0 / np.array(training_counts)
-            Y_train = np.array([train_dict_fold[p] for p in training_row_peptides])
+            Y_train = np.array([train_dict_fold[p] for p in training_full_peptides])
 
             n_pretrain = len(X_pretrain)
             n_train_unique = len(train_peptides_fold)

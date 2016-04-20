@@ -15,7 +15,10 @@
 from os.path import join
 from appdirs import user_data_dir
 
-BASE_DIRECTORY = user_data_dir("mhcflurry", version="0.1")
+
+# increase the version of the base directory every time we make a breaking change
+# in how the data is represented or how the models are serialized
+BASE_DIRECTORY = user_data_dir("mhcflurry", version="2")
 CLASS1_DATA_DIRECTORY = join(BASE_DIRECTORY, "class1_data")
 CLASS1_MODEL_DIRECTORY = join(BASE_DIRECTORY, "class1_models")
 

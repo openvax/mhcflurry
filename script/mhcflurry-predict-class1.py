@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015. Mount Sinai School of Medicine
+# Copyright (c) 2016. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ from mhcflurry.common import (
     split_uppercase_sequences,
     split_allele_names,
 )
-from mhcflurry.class1 import predict
+from mhcflurry.predict import predict
 
 parser = argparse.ArgumentParser()
 

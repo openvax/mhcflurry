@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015. Mount Sinai School of Medicine
+# Copyright (c) 2016. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,17 +44,10 @@ import argparse
 import numpy as np
 
 from mhcflurry.common import normalize_allele_name
-from mhcflurry.feedforward import make_network
-from mhcflurry.data_helpers import load_allele_datasets
+from mhcflurry.data import load_allele_datasets
+from mhcflurry.class1_binding_predictor import Class1BindingPredictor
 from mhcflurry.class1_allele_specific_hyperparameters import (
-    N_PRETRAIN_EPOCHS,
-    N_EPOCHS,
-    ACTIVATION,
-    INITIALIZATION_METHOD,
-    EMBEDDING_DIM,
-    HIDDEN_LAYER_SIZE,
-    DROPOUT_PROBABILITY,
-    MAX_IC50
+    add_hyperparameter_arguments_to_parser
 )
 from mhcflurry.paths import (
     CLASS1_MODEL_DIRECTORY,
@@ -64,6 +57,11 @@ CSV_FILENAME = "combined_human_class1_dataset.csv"
 CSV_PATH = join(CLASS1_DATA_DIRECTORY, CSV_FILENAME)
 
 parser = argparse.ArgumentParser()
+
+parser.add_argument(
+    "--binding-data-csv",
+    default=CSV_PATH,
+    help="CSV file with 'mhc', 'peptide', 'peptide_length', 'meas' columns")
 
 parser.add_argument(
     "--output-dir",
@@ -77,54 +75,80 @@ parser.add_argument(
     help="Overwrite existing output directory")
 
 parser.add_argument(
-    "--binding-data-csv-path",
-    default=CSV_PATH,
-    help="CSV file with 'mhc', 'peptide', 'peptide_length', 'meas' columns")
-
-parser.add_argument(
     "--min-samples-per-allele",
     default=5,
     help="Don't train predictors for alleles with fewer samples than this",
     type=int)
 
+parser.add_argument(
+    "--alleles",
+    default=[],
+    nargs="+",
+    type=normalize_allele_name)
+
+# add options for neural network hyperparameters
+parser = add_hyperparameter_arguments_to_parser(parser)
+
 if __name__ == "__main__":
     args = parser.parse_args()
-
+    print(args)
     if not exists(args.output_dir):
         makedirs(args.output_dir)
 
     allele_groups = load_allele_datasets(
-        args.binding_data_csv_path,
+        filename=args.binding_data_csv,
         peptide_length=9,
-        binary_encoding=False,
-        max_ic50=MAX_IC50,
+        use_multiple_peptide_lengths=True,
+        max_ic50=args.max_ic50,
         sep=",",
         peptide_column_name="peptide")
 
     # concatenate datasets from all alleles to use for pre-training of
     # allele-specific predictors
-    X_all = np.vstack([group.X for group in allele_groups.values()])
+    X_all = np.vstack([group.X_index for group in allele_groups.values()])
     Y_all = np.concatenate([group.Y for group in allele_groups.values()])
     print("Total Dataset size = %d" % len(Y_all))
 
-    model = make_network(
-        input_size=9,
-        embedding_input_dim=20,
-        embedding_output_dim=EMBEDDING_DIM,
-        layer_sizes=(HIDDEN_LAYER_SIZE,),
-        activation=ACTIVATION,
-        init=INITIALIZATION_METHOD,
-        dropout_probability=DROPOUT_PROBABILITY)
-    print("Model config: %s" % (model.get_config(),))
-    model.fit(X_all, Y_all, nb_epoch=N_PRETRAIN_EPOCHS)
-    old_weights = model.get_weights()
-    for allele_name, allele_data in allele_groups.items():
+    # if user didn't specify alleles then train models for all available alleles
+    alleles = args.alleles
+
+    if not alleles:
+        alleles = sorted(allele_groups.keys())
+
+    for allele_name in alleles:
         allele_name = normalize_allele_name(allele_name)
         if allele_name.isdigit():
             print("Skipping allele %s" % (allele_name,))
             continue
+
+        allele_data = allele_groups[allele_name]
+        X = allele_data.X_index
+        Y = allele_data.Y
+
         n_allele = len(allele_data.Y)
-        print("%s: total count = %d" % (allele_name, n_allele))
+        assert len(X) == n_allele
+
+        print("\n=== Training predictor for %s: %d samples, %d unique" % (
+            allele_name,
+            n_allele,
+            len(set(allele_data.original_peptides))))
+
+        model = Class1BindingPredictor.from_hyperparameters(
+            name=allele_name,
+            peptide_length=9,
+            max_ic50=args.max_ic50,
+            # 21 instead of 20 amino acids since we're also allowing
+            # an explicit unknown "X"
+            embedding_input_dim=21,
+            embedding_output_dim=args.embedding_size,
+            layer_sizes=(args.hidden_layer_size,),
+            activation=args.activation,
+            init=args.initialization,
+            dropout_probability=args.dropout,
+            learning_rate=args.learning_rate,
+            # this argument isn't a model hyperparameter but gets passed on to
+            # the initializer method
+            allow_unknown_amino_acids=True)
 
         json_filename = allele_name + ".json"
         json_path = join(args.output_dir, json_filename)
@@ -143,20 +167,18 @@ if __name__ == "__main__":
         if exists(json_path):
             print("-- removing old model description %s" % json_path)
             remove(json_path)
+
         if exists(hdf_path):
             print("-- removing old weights file %s" % hdf_path)
             remove(hdf_path)
 
-        model.set_weights(old_weights)
         model.fit(
-            allele_data.X,
+            allele_data.X_index,
             allele_data.Y,
-            nb_epoch=N_EPOCHS,
-            show_accuracy=True)
-        print("Saving model description for %s to %s" % (
-            allele_name, json_path))
-        with open(json_path, "w") as f:
-            f.write(model.to_json())
-        print("Saving model weights for %s to %s" % (
-            allele_name, hdf_path))
-        model.save_weights(hdf_path)
+            n_training_epochs=args.training_epochs,
+            verbose=True)
+
+        model.to_disk(
+            model_json_path=json_path,
+            weights_hdf_path=hdf_path,
+            overwrite=args.overwrite)

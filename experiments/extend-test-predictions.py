@@ -32,31 +32,16 @@ from itertools import groupby
 import pandas as pd
 import numpy as np
 from sklearn.cross_validation import StratifiedKFold
-from mhcflurry.data_helpers import load_data, index_encoding, hotshot_encoding
-from mhcflurry.common import normalize_allele_name, expand_9mer_peptides
+from mhcflurry.data import load_allele_datasets
+from mhcflurry.peptide_encoding import (
+    fixed_length_index_encoding,
+    indices_to_hotshot_encoding
+)
+from mhcflurry.common import normalize_allele_name
 
 from dataset_paths import PETERS2009_CSV_PATH
 from model_configs import ModelConfig
 from model_selection_helpers import make_model
-"""
-namedtuple(
-    "ModelConfig",
-    [
-        "embedding_size",
-        "hidden_layer_size",
-        "activation",
-        "loss",
-        "init",
-        "n_pretrain_epochs",
-        "n_epochs",
-        "dropout_probability",
-        "max_ic50",
-        "minibatch_size",
-        "learning_rate",
-        "optimizer",
-    ])
-"""
-
 
 parser = ArgumentParser()
 
@@ -170,13 +155,12 @@ if __name__ == "__main__":
 
     binary_encoding = (args.embedding_size == 0)
 
-    training_datasets, _ = load_data(
+    training_datasets = load_allele_datasets(
         filename=args.training_csv,
         peptide_length=9,
-        max_ic50=args.max_ic50,
-        binary_encoding=binary_encoding)
+        max_ic50=args.max_ic50)
 
-    X_all = np.vstack([dataset.X for dataset in training_datasets.values()])
+    X_all = np.vstack([dataset.X_index for dataset in training_datasets.values()])
     Y_all = np.concatenate([
         dataset.Y
         for dataset in training_datasets.values()
@@ -264,17 +248,15 @@ if __name__ == "__main__":
                 peptide_sequences,
                 lambda seq: len(seq)):
             for peptide in equal_length_sequences:
-                expanded_peptides = expand_9mer_peptides([peptide], length=length)
+                n_indices = 21
+                X_test_index = fixed_length_index_encoding(
+                    peptides=[peptide],
+                    desired_length=length,
+                    allow_unknown_amino_acids=True)
                 if binary_encoding:
-                    X_test = hotshot_encoding(
-                        expanded_peptides,
-                        peptide_length=9)
-                    # collapse 3D input into 2D matrix
-                    X_test = X_test.reshape((X_test.shape[0], 9 * 20))
+                    X_test = indices_to_hotshot_encoding(X_test_index, n_indices=n_indices)
                 else:
-                    X_test = index_encoding(
-                        expanded_peptides,
-                        peptide_length=9)
+                    X_test = X_test_index
                 Y_preds = [model.predict(X_test) for model in models]
                 Y_pred_mean = np.mean(Y_preds)
                 Y_pred_ic50 = args.max_ic50 ** (1.0 - Y_pred_mean)

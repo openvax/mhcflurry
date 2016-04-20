@@ -26,7 +26,6 @@ Will return 'OK' if everything passes.
 
 """
 
-import sys
 
 def get_peptide(line):
     delimiter = '\t'
@@ -50,58 +49,58 @@ def seq_identity(pepa, pepb):
     Two peptides will be considered similar if 80% sequence identity is observed.
     """
     assert len(pepa) == len(pepb)
-    num_identity = sum([1 for (a,b) in zip(pepa,pepb) if a==b])
-    fraction_identity = float(num_identity)/len(pepa)
-    #print 'fraction_identity', fraction_identity, pepa, pepb
+    num_identity = sum([1 for (a, b) in zip(pepa, pepb) if a == b])
+    fraction_identity = float(num_identity) / len(pepa)
+    # print 'fraction_identity', fraction_identity, pepa, pepb
     return fraction_identity
 
 def is_similar(pepa, pepb, sim_cutoff=0.80):
     """
     """
     is_sim = False
-    s = seq_identity(pepa,pepb)
-    if s >= sim_cutoff: is_sim =  True
-    #print 'is_similar', is_sim, s, pepa, pepb
+    s = seq_identity(pepa, pepb)
+    if s >= sim_cutoff:
+        is_sim = True
+    # print 'is_similar', is_sim, s, pepa, pepb
     return is_sim
 
 def count_peptides_similar(fname_cv, debug=False):
-    #fname_bdata = sys.argv[1]
-    print 'DEBUG INPUT cross-validation data set =', fname_cv
-    
-    lines = open(fname_cv,'r').readlines()
-    
+    # fname_bdata = sys.argv[1]
+    print('DEBUG INPUT cross-validation data set =', fname_cv)
+
+    lines = open(fname_cv, 'r').readlines()
+
     count_sim_peptides = 0
-    for i in range(1, len(lines)-1):
+    for i in range(1, len(lines) - 1):
         line_a = lines[i]
-        line_b = lines[i+1]
+        line_b = lines[i + 1]
         (pep_a, cv_a, mhc_a, plen_a, ineq_a, meas_ic50_a) = get_peptide(line_a)
         (pep_b, cv_b, mhc_b, plen_b, ineq_b, meas_ic50_b) = get_peptide(line_b)
         if cv_a != cv_b:
-            #calculate similarity:
-            if (len(pep_a) == len(pep_b)) and (mhc_a==mhc_b):
-                x = is_similar(pep_a, pep_b, sim_cutoff=0.80)
-                identity = seq_identity(pep_a, pep_b)
-                #print identity, '\t', pep_a, pep_b
-                if x == True: 
+            # calculate similarity:
+            if (len(pep_a) == len(pep_b)) and (mhc_a == mhc_b):
+                # identity = seq_identity(pep_a, pep_b)
+                # print identity, '\t', pep_a, pep_b
+                if is_similar(pep_a, pep_b, sim_cutoff=0.80):
                     count_sim_peptides = count_sim_peptides + 1
-                    if debug==True:
-                        print line_a.strip()
-                        print line_b.strip()
-                        print 'Warning: similar peptides between cv-groups', pep_a, pep_b
-                        print '\n'
+                    if debug:
+                        print(line_a.strip())
+                        print(line_b.strip())
+                        print('Warning: similar peptides between cv-groups', pep_a, pep_b)
+                        print('\n')
     return count_sim_peptides
 
 def count_faulty_meas(fname_cv, debug=False):
-    #fname_bdata = sys.argv[1]
-    print 'DEBUG INPUT cross-validation data set =', fname_cv
-    lines = open(fname_cv,'r').readlines()
+    # fname_bdata = sys.argv[1]
+    print('DEBUG INPUT cross-validation data set =', fname_cv)
+    lines = open(fname_cv, 'r').readlines()
     count_faulty_meas = 0
     for i in range(1, len(lines)):
         line = lines[i]
         (pep, cv, mhc, plen, ineq, meas_ic50) = get_peptide(line)
-        if is_faulty_meas(ineq, meas_ic50) == True:
+        if is_faulty_meas(ineq, meas_ic50):
             count_faulty_meas = count_faulty_meas + 1
-       
+
     return count_faulty_meas
 
 def is_faulty_meas(inequality, meas_ic50):
@@ -116,9 +115,9 @@ def is_faulty_meas(inequality, meas_ic50):
 def test_check_cv_data_sets():
     """
     Make sure there are no similar peptides between cv-partitions for cv_gs.
-    
+
     To run the test, issue the following command:
-    
+
     nosetests quick-check-cv-data.py
     """
     fname_cv_rnd = 'bdata.2009.mhci.public.1.cv_rnd.txt'
@@ -128,38 +127,35 @@ def test_check_cv_data_sets():
     count_sr = count_peptides_similar(fname_cv_sr)
     count_gs = count_peptides_similar(fname_cv_gs)
 
-    print 'count_rnd', count_rnd
-    print 'count_sr',  count_sr
-    print 'count_gs',  count_gs
-        
+    print('count_rnd', count_rnd)
+    print('count_sr', count_sr)
+    print('count_gs', count_gs)
+
     assert count_gs == 0
     assert count_sr < count_rnd
-    #assert False
 
 def test_faulty_meas():
     """
     Make sure there are no 'faulty' measurements. See 'is_faulty_meas' for definition.
-    
+
     To run the test, issue the following command:
-    
+
     nosetests quick-check-cv-data.py
     """
     fname_cv_rnd = 'bdata.2009.mhci.public.1.cv_rnd.txt'
     fname_cv_sr = 'bdata.2009.mhci.public.1.cv_sr.txt'
     fname_cv_gs = 'bdata.2009.mhci.public.1.cv_gs.txt'
-    
-    #fname_cv_gs = '../bd2009/bdata.2009.mhci.public.txt'
-    
+
+    # fname_cv_gs = '../bd2009/bdata.2009.mhci.public.txt'
+
     count_rnd = count_faulty_meas(fname_cv_rnd)
     count_sr = count_faulty_meas(fname_cv_sr)
     count_gs = count_faulty_meas(fname_cv_gs)
 
-    print 'count_rnd', count_rnd
-    print 'count_sr',  count_sr
-    print 'count_gs',  count_gs
-        
+    print('count_rnd', count_rnd)
+    print('count_sr', count_sr)
+    print('count_gs', count_gs)
+
     assert count_rnd == 0
     assert count_sr == 0
     assert count_gs == 0
-    #assert False
-    

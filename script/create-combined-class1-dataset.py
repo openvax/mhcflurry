@@ -1,5 +1,19 @@
 #!/usr/bin/env python
 
+# Copyright (c) 2016. Mount Sinai School of Medicine
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Combine 2013 Kim/Peters NetMHCpan dataset[*] with more recent IEDB entries
 
@@ -12,20 +26,20 @@ from __future__ import (
     absolute_import,
     unicode_literals
 )
-from os.path import join
+from os import makedirs
+from os.path import join, exists
 import pickle
 from collections import Counter
 import argparse
 
 import pandas as pd
 
-from mhcflurry.paths import CLASS1_DATA_DIRECTORY, CLASS1_DATA_CSV_PATH
+from mhcflurry.paths import CLASS1_DATA_DIRECTORY, CLASS1_DATA_CSV_FILENAME
 
 IEDB_PICKLE_FILENAME = "iedb_human_class1_assay_datasets.pickle"
 IEDB_PICKLE_PATH = join(CLASS1_DATA_DIRECTORY, IEDB_PICKLE_FILENAME)
 
-PETERS_CSV_FILENAME = "bdata.20130222.mhci.public.1.txt"
-PETERS_CSV_PATH = join(CLASS1_DATA_DIRECTORY, PETERS_CSV_FILENAME)
+KIM_2013_CSV_FILENAME = "bdata.20130222.mhci.public.1.txt"
 
 parser = argparse.ArgumentParser()
 
@@ -57,21 +71,30 @@ parser.add_argument(
 
 parser.add_argument(
     "--netmhcpan-csv-path",
-    default=PETERS_CSV_PATH,
+    default=KIM_2013_CSV_FILENAME,
     help="Path to CSV with NetMHCpan dataset from 2013 Peters paper")
 
 parser.add_argument(
-    "--output-csv-path",
-    default=CLASS1_DATA_CSV_PATH,
-    help="Path to CSV of combined assay results")
+    "--output-dir",
+    default=CLASS1_DATA_DIRECTORY,
+    help="Path to directory where output CSV should be written")
 
-parser.add_argument("--extra-dataset-csv-path",
+parser.add_argument(
+    "--output-csv-filename",
+    default=CLASS1_DATA_CSV_FILENAME,
+    help="Name of combined CSV file")
+
+parser.add_argument(
+    "--extra-dataset-csv-path",
     default=[],
     action="append",
     help="Additional CSV data source with columns (species, mhc, peptide, meas)")
 
 if __name__ == "__main__":
     args = parser.parse_args()
+
+    if not exists(args.output_dir):
+        makedirs(args.output_dir)
 
     print("Reading %s..." % args.iedb_pickle_path)
     with open(args.iedb_pickle_path, "rb") as f:
@@ -145,5 +168,8 @@ if __name__ == "__main__":
     print("Combined DataFrame size: %d (+%d)" % (
         len(combined_df),
         len(combined_df) - len(nielsen_data)))
-    print("Writing %s..." % args.output_csv_path)
-    combined_df.to_csv(args.output_csv_path, index=False)
+    if not exists(args.output_dir):
+        makedirs(args.output_dir)
+    output_csv_path = join(args.output_dir, args.output_csv_filename)
+    print("Writing %s..." % output_csv_path)
+    combined_df.to_csv(output_csv_path, index=False)

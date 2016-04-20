@@ -26,8 +26,10 @@ from .common import normalize_allele_name
 from .amino_acid import common_amino_acids
 from .peptide_encoding import (
     indices_to_hotshot_encoding,
-    fixed_length_from_many_peptides
+    fixed_length_index_encoding,
+    check_valid_index_encoding_array,
 )
+from .class1_allele_specific_hyperparameters import MAX_IC50
 
 index_encoding = common_amino_acids.index_encoding
 
@@ -67,7 +69,7 @@ def _infer_csv_separator(filename):
 def load_dataframe(
         filename,
         peptide_length=None,
-        max_ic50=50000.0,
+        max_ic50=MAX_IC50,
         sep=None,
         species_column_name="species",
         allele_column_name="mhc",
@@ -148,7 +150,7 @@ def load_dataframe(
 
 def load_allele_dicts(
         filename,
-        max_ic50=50000.0,
+        max_ic50=MAX_IC50,
         regression_output=False,
         sep=None,
         species_column_name="species",
@@ -195,10 +197,32 @@ def load_allele_dicts(
 def encode_peptide_to_affinity_dict(
         peptide_to_affinity_dict,
         peptide_length=9,
-        flatten_binary_encoding=True):
+        flatten_binary_encoding=True,
+        allow_unknown_amino_acids=True):
     """
-    Given a dictionary mapping from peptide sequences to affinity values,
-    returns tuple with the following fields:
+    Given a dictionary mapping from peptide sequences to affinity values, return
+    both index and binary encodings of fixed length peptides, and
+    a vector of their affinities.
+
+    Parameters
+    ----------
+    peptide_to_affinity_dict : dict
+        Keys are peptide strings (of multiple lengths), each mapping to a
+        continuous affinity value.
+
+    peptide_length : int
+        Length of vector encoding
+
+    flatten_binary_encoding : bool
+        Should the binary encoding of a peptide be two-dimensional (9x20)
+        or a flattened 1d vector
+
+    allow_unknown_amino_acids : bool
+        When extending a short vector to the desired peptide length, should
+        we insert every possible amino acid or a designated character "X"
+        indicating an unknown amino acid.
+
+    Returns tuple with the following fields:
         - kmer_peptides: fixed length peptide strings
         - original_peptides: variable length peptide strings
         - counts: how many fixed length peptides were made from this original
@@ -207,24 +231,32 @@ def encode_peptide_to_affinity_dict(
         - Y: affinity values associated with original peptides
     """
     raw_peptides = list(sorted(peptide_to_affinity_dict.keys()))
-    kmer_peptides, original_peptides, counts = \
-        fixed_length_from_many_peptides(
+    X_index, kmer_peptides, original_peptides, counts = \
+        fixed_length_index_encoding(
             peptides=raw_peptides,
             desired_length=peptide_length,
             start_offset_shorten=0,
             end_offset_shorten=0,
             start_offset_extend=0,
-            end_offset_extend=0)
+            end_offset_extend=0,
+            allow_unknown_amino_acids=allow_unknown_amino_acids)
+
     n_samples = len(kmer_peptides)
+
     assert n_samples == len(original_peptides), \
         "Mismatch between # of samples (%d) and # of peptides (%d)" % (
             n_samples, len(original_peptides))
     assert n_samples == len(counts), \
         "Mismatch between # of samples (%d) and # of counts (%d)" % (
             n_samples, len(counts))
-
-    X_index = index_encoding(kmer_peptides, peptide_length)
-    X_binary = indices_to_hotshot_encoding(X_index, n_indices=20)
+    assert n_samples == len(X_index), \
+        "Mismatch between # of sample (%d) and index feature vectors (%d)" % (
+            n_samples, len(X_index))
+    X_index = check_valid_index_encoding_array(X_index, allow_unknown_amino_acids)
+    n_indices = 20 + allow_unknown_amino_acids
+    X_binary = indices_to_hotshot_encoding(
+        X_index,
+        n_indices=n_indices)
 
     assert X_binary.shape[0] == X_index.shape[0], \
         ("Mismatch between number of samples for index encoding (%d)"
@@ -234,7 +266,7 @@ def encode_peptide_to_affinity_dict(
 
     if flatten_binary_encoding:
         # collapse 3D input into 2D matrix
-        n_binary_features = peptide_length * 20
+        n_binary_features = peptide_length * n_indices
         X_binary = X_binary.reshape((n_samples, n_binary_features))
 
     # easier to work with counts when they're an array instead of list
@@ -251,7 +283,7 @@ def load_allele_datasets(
         filename,
         peptide_length=9,
         use_multiple_peptide_lengths=True,
-        max_ic50=50000.0,
+        max_ic50=MAX_IC50,
         flatten_binary_encoding=True,
         sep=None,
         species_column_name="species",
@@ -259,7 +291,7 @@ def load_allele_datasets(
         peptide_column_name=None,
         peptide_length_column_name="peptide_length",
         ic50_column_name="meas",
-        only_human=True):
+        only_human=False):
     """
     Loads an IEDB dataset, extracts "hot-shot" encoding of fixed length peptides
     and log-transforms the IC50 measurement. Returns dictionary mapping allele

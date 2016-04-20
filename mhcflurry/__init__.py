@@ -12,22 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import paths
-from . import data
-from . import feedforward
-from . import common
-from . import peptide_encoding
-from . import amino_acid
 from .class1_binding_predictor import Class1BindingPredictor
+from .predict import predict
 from .ensemble import Ensemble
-
-__all__ = [
-    "paths",
-    "data",
-    "feedforward",
-    "peptide_encoding",
-    "amino_acid",
-    "common",
-    "Class1BindingPredictor",
-    "Ensemble",
-]
+from .package_metadata import __version__
