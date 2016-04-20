@@ -49,7 +49,7 @@ script:
       --alleles HLA-A0101 HLA-A0201
       --embedding-size 10
       --hidden-layer-size 10
-      --training-epochs 20
+      --training-epochs 100
   # run tests
   - nosetests test --with-coverage --cover-package=mhcflurry  && ./lint.sh
 after_success:
