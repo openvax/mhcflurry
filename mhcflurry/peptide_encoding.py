@@ -300,7 +300,7 @@ def fixed_length_index_encoding(
         end_offset_extend=end_offset_extend,
         insert_amino_acid_letters=insert_letters)
     X_index = index_encoding(fixed_length, desired_length)
-    return X_index, fixed_length, original, counts
+    return (X_index, fixed_length, original, counts)
 
 def check_valid_index_encoding_array(X, allow_unknown_amino_acids=True):
         X = np.asarray(X)

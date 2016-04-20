@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 from dataset_paths import PETERS2009_CSV_PATH
-from score_set import ScoreSet
+from mhcflurry.score_set import ScoreSet
 from matrix_completion_helpers import (
     load_data,
     evaluate_predictions,
