@@ -128,9 +128,10 @@ if __name__ == "__main__":
         n_allele = len(allele_data.Y)
         assert len(X) == n_allele
 
-        print("\n=== Training predictor for %s: %d samples" % (
+        print("\n=== Training predictor for %s: %d samples, %d unique" % (
             allele_name,
-            n_allele))
+            n_allele,
+            len(set(allele_data.original_peptides))))
 
         model = Class1BindingPredictor.from_hyperparameters(
             name=allele_name,

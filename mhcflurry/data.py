@@ -28,6 +28,7 @@ from .peptide_encoding import (
     indices_to_hotshot_encoding,
     fixed_length_from_many_peptides
 )
+from .class1_allele_specific_hyperparameters import MAX_IC50
 
 index_encoding = common_amino_acids.index_encoding
 
@@ -67,7 +68,7 @@ def _infer_csv_separator(filename):
 def load_dataframe(
         filename,
         peptide_length=None,
-        max_ic50=50000.0,
+        max_ic50=MAX_IC50,
         sep=None,
         species_column_name="species",
         allele_column_name="mhc",
@@ -148,7 +149,7 @@ def load_dataframe(
 
 def load_allele_dicts(
         filename,
-        max_ic50=50000.0,
+        max_ic50=MAX_IC50,
         regression_output=False,
         sep=None,
         species_column_name="species",
@@ -251,7 +252,7 @@ def load_allele_datasets(
         filename,
         peptide_length=9,
         use_multiple_peptide_lengths=True,
-        max_ic50=50000.0,
+        max_ic50=MAX_IC50,
         flatten_binary_encoding=True,
         sep=None,
         species_column_name="species",

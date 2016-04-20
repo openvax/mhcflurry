@@ -47,9 +47,9 @@ script:
   - >
       mhcflurry-train-class1-allele-specific-models.py
       --alleles HLA-A0101 HLA-A0201
-      --embedding-size 4
-      --hidden-layer-size 4
-      --training-epochs 5
+      --embedding-size 10
+      --hidden-layer-size 10
+      --training-epochs 20
   # run tests
   - nosetests test --with-coverage --cover-package=mhcflurry  && ./lint.sh
 after_success:
