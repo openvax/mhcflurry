@@ -136,13 +136,18 @@ if __name__ == "__main__":
             name=allele_name,
             peptide_length=9,
             max_ic50=args.max_ic50,
-            embedding_input_dim=20,
+            # 21 instead of 20 amino acids since we're also allowing
+            # an explicit unknown "X"
+            embedding_input_dim=21,
             embedding_output_dim=args.embedding_size,
             layer_sizes=(args.hidden_layer_size,),
             activation=args.activation,
             init=args.initialization,
             dropout_probability=args.dropout,
-            learning_rate=args.learning_rate)
+            learning_rate=args.learning_rate,
+            # this argument isn't a model hyperparameter but gets passed on to
+            # the initializer method
+            allow_unknown_amino_acids=True)
 
         json_filename = allele_name + ".json"
         json_path = join(args.output_dir, json_filename)
