@@ -76,7 +76,7 @@ def load_dataframe(
         peptide_column_name=None,
         peptide_length_column_name="peptide_length",
         ic50_column_name="meas",
-        only_human=True):
+        only_human=False):
     """
     Load a dataframe of peptide-MHC affinity measurements
 
@@ -158,7 +158,7 @@ def load_allele_dicts(
         peptide_column_name=None,
         peptide_length_column_name="peptide_length",
         ic50_column_name="meas",
-        only_human=True,
+        only_human=False,
         min_allele_size=1):
     """
     Parsing CSV of binding data into dictionary of dictionaries.
