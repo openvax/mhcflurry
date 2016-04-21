@@ -19,10 +19,10 @@ Download, Normalize, and Combine Training Data:
 (make sure you have `wget` available, e.g. `brew install wget` on Mac OS X)
 
 ```
-scripts/download-iedb.sh
-scripts/download-peters-2013-dataset.sh
-scripts/create-iedb-class1-dataset.py
-scripts/create-combined-class1-dataset.py
+script/download-iedb.sh
+script/download-peters-2013-dataset.sh
+script/create-iedb-class1-dataset.py
+script/create-combined-class1-dataset.py
 ```
 
 ## Train Neural Network Models
