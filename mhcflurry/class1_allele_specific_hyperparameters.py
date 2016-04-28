@@ -36,46 +36,50 @@ def add_hyperparameter_arguments_to_parser(parser):
         "--training-epochs",
         type=int,
         default=N_EPOCHS,
-        help="Number of training epochs")
+        help="Number of training epochs. Default: %(default)s")
 
     parser.add_argument(
         "--initialization",
         default=INITIALIZATION_METHOD,
-        help="Initialization for neural network weights")
+        help="Initialization for neural network weights Default: %(default)s")
 
     parser.add_argument(
         "--activation",
         default=ACTIVATION,
-        help="Activation function for neural network layers")
+        help="Activation function for neural network layers. "
+        "Default: %(default)s")
 
     parser.add_argument(
         "--embedding-size",
         type=int,
         default=EMBEDDING_DIM,
-        help="Size of vector representations for embedding amino acids")
+        help="Size of vector representations for embedding amino acids. "
+        "Default: %(default)s")
 
     parser.add_argument(
         "--hidden-layer-size",
         type=int,
         default=HIDDEN_LAYER_SIZE,
-        help="Size of hidden neural network layer")
+        help="Size of hidden neural network layer. Default: %(default)s")
 
     parser.add_argument(
         "--dropout",
         type=float,
         default=DROPOUT_PROBABILITY,
-        help="Dropout probability after neural network layers")
+        help="Dropout probability after neural network layers. "
+        "Default: %(default)s")
 
     parser.add_argument(
         "--max-ic50",
         type=float,
         default=MAX_IC50,
-        help="Largest IC50 represented by neural network output")
+        help="Largest IC50 represented by neural network output. "
+        "Default: %(default)s")
 
     parser.add_argument(
         "--learning-rate",
         type=float,
         default=0.001,
-        help="Learning rate for training neural network")
+        help="Learning rate for training neural network. Default: %(default)s")
 
     return parser

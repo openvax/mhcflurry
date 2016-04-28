@@ -41,7 +41,7 @@ IEDB_PICKLE_PATH = join(CLASS1_DATA_DIRECTORY, IEDB_PICKLE_FILENAME)
 
 KIM_2013_CSV_FILENAME = "bdata.20130222.mhci.public.1.txt"
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(usage=__doc__)
 
 parser.add_argument(
     "--ic50-fraction-tolerance",
@@ -49,40 +49,46 @@ parser.add_argument(
     type=float,
     help=(
         "How much can the IEDB and NetMHCpan IC50 differ and still be"
-        " considered compatible (as a fraction of the NetMHCpan value)"))
+        " considered compatible (as a fraction of the NetMHCpan value). "
+        "Default: %(default)s"))
 
 parser.add_argument(
     "--min-assay-overlap-size",
     type=int,
     default=1,
-    help="Minimum number of entries overlapping between IEDB assay and NetMHCpan data")
+    help="Minimum number of entries overlapping between IEDB assay and "
+    "NetMHCpan data. Default: %(default)s")
 
 
 parser.add_argument(
     "--min-assay-fraction-same",
     type=float,
-    help="Minimum fraction of peptides whose IC50 values agree with the NetMHCpan data",
+    help="Minimum fraction of peptides whose IC50 values agree with the "
+    "NetMHCpan data. Default: %(default)s",
     default=0.9)
 
 parser.add_argument(
     "--iedb-pickle-path",
     default=IEDB_PICKLE_PATH,
-    help="Path to .pickle file containing dictionary of IEDB assay datasets")
+    help="Path to .pickle file containing dictionary of IEDB assay datasets. "
+    "Default: %(default)s")
 
 parser.add_argument(
     "--netmhcpan-csv-path",
     default=KIM_2013_CSV_FILENAME,
-    help="Path to CSV with NetMHCpan dataset from 2013 Peters paper")
+    help="Path to CSV with NetMHCpan dataset from 2013 Peters paper. "
+    "Default: %(default)s")
 
 parser.add_argument(
     "--output-dir",
     default=CLASS1_DATA_DIRECTORY,
-    help="Path to directory where output CSV should be written")
+    help="Path to directory where output CSV should be written. "
+    "Default: %(default)s")
 
 parser.add_argument(
     "--output-csv-filename",
     default=CLASS1_DATA_CSV_FILENAME,
-    help="Name of combined CSV file")
+    help="Name of combined CSV file. Default: %(default)s")
 
 parser.add_argument(
     "--extra-dataset-csv-path",

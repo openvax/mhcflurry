@@ -61,12 +61,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--binding-data-csv",
     default=CSV_PATH,
-    help="CSV file with 'mhc', 'peptide', 'peptide_length', 'meas' columns")
+    help="CSV file with 'mhc', 'peptide', 'peptide_length', 'meas' columns. "
+    "Default: %(default)s")
 
 parser.add_argument(
     "--output-dir",
     default=CLASS1_MODEL_DIRECTORY,
-    help="Output directory for allele-specific predictor HDF weights files")
+    help="Output directory for allele-specific predictor HDF weights files. "
+    "Default: %(default)s")
 
 parser.add_argument(
     "--overwrite",
@@ -77,11 +79,15 @@ parser.add_argument(
 parser.add_argument(
     "--min-samples-per-allele",
     default=5,
-    help="Don't train predictors for alleles with fewer samples than this",
+    metavar="N",
+    help="Don't train predictors for alleles with fewer than N samples. "
+    "Default: %(default)s",
     type=int)
 
 parser.add_argument(
     "--alleles",
+    metavar="ALLELE",
+    help="Alleles to train",
     default=[],
     nargs="+",
     type=normalize_allele_name)

@@ -33,25 +33,27 @@ from mhcflurry.paths import CLASS1_DATA_DIRECTORY
 IEDB_SOURCE_FILENAME = "mhc_ligand_full.csv"
 PICKLE_OUTPUT_FILENAME = "iedb_human_class1_assay_datasets.pickle"
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(usage=__doc__)
 
 parser.add_argument(
     "--input-csv",
     default=IEDB_SOURCE_FILENAME,
-    help="CSV file with IEDB's MHC binding data")
+    help="CSV file with IEDB's MHC binding data. Default: %(default)s")
 
 parser.add_argument(
     "--output-dir",
     default=CLASS1_DATA_DIRECTORY,
-    help="Directory to write output pickle file")
+    help="Directory to write output pickle file. Default: %(default)s")
 
 parser.add_argument(
     "--output-pickle-filename",
     default=PICKLE_OUTPUT_FILENAME,
-    help="Path to .pickle file containing dictionary of IEDB assay datasets")
+    help="Path to .pickle file containing dictionary of IEDB assay datasets. "
+    "Default: %(default)s")
 
 parser.add_argument(
     "--alleles",
+    metavar="ALLELE",
     nargs="+",
     default=[],
     help="Restrict dataset to specified alleles")
