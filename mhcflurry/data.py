@@ -21,6 +21,7 @@ from collections import namedtuple, defaultdict
 
 import pandas as pd
 import numpy as np
+from fancyimpute.dictionary_helpers import dense_matrix_from_nested_dictionary
 
 from .common import normalize_allele_name, ic50_to_regression_target
 from .amino_acid import common_amino_acids
