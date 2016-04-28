@@ -20,6 +20,8 @@ from __future__ import (
 from collections import defaultdict
 import numpy as np
 
+from .data import create_allele_data_from_peptide_to_ic50_dict
+
 def prune_dense_matrix_and_labels(
         X,
         peptide_list,
@@ -77,7 +79,7 @@ def prune_dense_matrix_and_labels(
         allele_list = [allele_list[i] for i in keep_allele_indices]
     return X, peptide_list, allele_list
 
-def create_incompelte_dense_pMHC_matrix(
+def create_incomplete_dense_pMHC_matrix(
         allele_data_dict,
         min_observations_per_peptide=1,
         min_observations_per_allele=1):
@@ -126,8 +128,20 @@ def create_incompelte_dense_pMHC_matrix(
         min_observations_per_peptide=min_observations_per_peptide,
         min_observations_per_allele=min_observations_per_allele)
 
+def dense_pMHC_matrix_to_nested_dict(X, peptide_list, allele_list):
+    """
+    Converts a dense matrix of (n_peptides, n_alleles) floats to a nested
+    dictionary from allele -> peptide -> affinity.
+    """
+    allele_to_peptide_to_ic50_dict = defaultdict(dict)
+    for row_index, peptide in enumerate(peptide_list):
+        for column_index, allele_name in enumerate(allele_list):
+            affinity = X_complete[row_index, column_index]
+            if np.isfinite(affinity):
+                allele_to_peptide_to_ic50_dict[allele_name][peptide] = affinity
+    return allele_to_peptide_to_affinity
 
-def create_imputed_dataset(
+def create_imputed_datasets(
         allele_data_dict,
         imputer,
         min_observations_per_peptide=1,
@@ -147,9 +161,21 @@ def create_imputed_dataset(
 
     min_observations_per_allele : int
         Drop allele columns with fewer than this number of observed values.
+
+    Returns dictionary mapping allele names to AlleleData objects containing
+    imputed affinity values.
     """
-    X_incomplete, peptide_list, allele_list = create_incompelte_dense_pMHC_matrix(
+    X_incomplete, peptide_list, allele_list = create_incomplete_dense_pMHC_matrix(
         allele_data_dict=allele_data_dict,
         min_observations_per_peptide=min_observations_per_peptide,
         min_observations_per_allele=min_observations_per_allele)
     X_complete = impute.complete(X_incomplete)
+    allele_to_peptide_to_affinity_dict = dense_pMHC_matrix_to_nested_dict(
+        X=X_complete,
+        peptide_list=peptide_list,
+        allele_list=allele_list)
+    return {
+        allele_name: create_allele_data_from_peptide_to_ic50_dict(allele_dict)
+        for (allele_name, allele_dict)
+        in allele_to_peptide_to_affinity_dict.items()
+    }
