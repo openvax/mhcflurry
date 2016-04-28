@@ -17,6 +17,7 @@ from __future__ import (
     division,
     absolute_import,
 )
+from math import log, exp
 
 import numpy as np
 
@@ -38,63 +39,6 @@ def infer_csv_separator(filename):
                     return candidate, False
     return None, True
 
-def prepare_peptides(cls, peptides):
-    require_iterable_of(peptides, string_types)
-    peptides = np.asarray(peptides)
-    n_peptides = len(peptides)
-    if len(peptides) == 0:
-        raise ValueError("No peptides given")
-    return np.asarray(peptides)
-
-def prepare_ic50_values(cls, ic50_values, n_peptides):
-    ic50_values = np.asarray(ic50_values)
-    if len(ic50_values) == 0:
-        raise ValueError("No IC50 values given")
-    elif len(ic50_values) != n_peptides:
-        raise ValueError(
-            "Number of IC50 values (%d) must match number of peptides (%d)" % (
-                len(ic50_values), n_peptides))
-    n_negative_values = (ic50_values < 0).sum()
-    if n_negative_values > 0:
-        raise ValueError(
-            "Found %d invalid negative IC50 values" % n_negative_values)
-    return ic50_values
-
-def prepare_alleles(cls, alleles, n_peptides):
-    if isinstance(alleles, string_types):
-        # if we're given a single allele, then assume that's the allele
-        # for every pMHC entry
-        single_allele_name = normalize_allele_name(alleles)
-        return np.asarray([single_allele_name] * n_peptides)
-
-    require_iterable_of(alleles, string_types)
-    if len(alleles) == 0:
-        raise ValueError("No alleles given")
-    elif len(alleles) != n_peptides:
-        raise ValueError(
-            "Number of alleles (%d) must match number of peptides (%d)" % (
-                len(alleles), n_peptides))
-    return np.asarray(
-        [normalize_allele_name(allele) for allele in alleles])
-
-def normalize_ic50(ic50_values, max_ic50):
-    """
-    Rescale IC50 values, assumed to be between (0, infinity)
-    to the range [0,1] where 0 indicates non-binding and 1 indicates
-    strong binding.
-
-    Parameters
-    ----------
-    ic50_values : numpy.ndarray of float
-
-    max_ic50 : float
-
-    Returns numpy.ndarray of float
-    """
-    log_ic50 = np.log(ic50) / np.log(max_ic50)
-    result = 1.0 - log_ic50
-    # clamp to values between 0, 1
-    return  np.minimum(1.0, np.maximum(0.0, result))
 
 def load_dataframe(
         filename,
@@ -147,6 +91,91 @@ def load_dataframe(
                     columns))
     return df, peptide_column_name
 
+def prepare_peptides_array(peptides):
+    """
+    Parameters
+    ----------
+    peptides : sequence of str
+
+    Returns an array of strings
+    """
+    require_iterable_of(peptides, string_types)
+    peptides = np.asarray(peptides)
+    n_peptides = len(peptides)
+    if len(peptides) == 0:
+        raise ValueError("No peptides given")
+    return np.asarray(peptides)
+
+def prepare_ic50_values_array(ic50_values,  required_count=None):
+    """
+    Parameters
+    ----------
+    ic50_values : List, tuple or array float
+
+    required_count : int, optional
+
+    Checks that all IC50 values are valid and returns an array.
+    """
+    ic50_values = np.asarray(ic50_values)
+    if len(ic50_values) == 0:
+        raise ValueError("No IC50 values given")
+    elif required_count is not None and len(ic50_values) != required_count:
+        raise ValueError(
+            "Number of IC50 values (%d) must match number of peptides (%d)" % (
+                len(ic50_values),
+                required_count))
+    n_negative_values = (ic50_values < 0).sum()
+    if n_negative_values > 0:
+        raise ValueError(
+            "Found %d invalid negative IC50 values" % n_negative_values)
+    return ic50_values
+
+def prepare_alleles_array(alleles, required_count=None):
+    """
+    Parameters
+    ----------
+    alleles : list of str
+
+    required_count : int, optional
+
+    Returns array of normalized MHC allele names.
+    """
+    require_iterable_of(alleles, string_types)
+    if len(alleles) == 0:
+        raise ValueError("No alleles given")
+    elif required_count is not None and len(alleles) != required_count:
+        raise ValueError(
+            "Number of alleles (%d) must match number of peptides (%d)" % (
+                len(alleles),
+                required_count))
+    return np.asarray(
+        [normalize_allele_name(allele) for allele in alleles])
+
+def transform_ic50_values_into_regression_targets(ic50_values, max_ic50):
+    """
+    Rescale IC50 values, assumed to be between (0, infinity)
+    to the range [0,1] where 0 indicates non-binding and 1 indicates
+    strong binding.
+
+    Parameters
+    ----------
+    ic50_values : numpy.ndarray of float
+
+    max_ic50 : float
+
+    Returns numpy.ndarray of float
+    """
+    log_ic50 = np.log(ic50) / np.log(max_ic50)
+    result = 1.0 - log_ic50
+    # clamp to values between 0, 1
+    return  np.minimum(1.0, np.maximum(0.0, result))
+
+def transform_regression_targets_into_ic50_values(y, max_ic50):
+    """
+    Given a value between [0,1] transform it into a nM IC50 measurment in the
+    range [0, max_ic50]
+    """
+    return max_ic50 ** (1 - y)
 
 def combine_multiple_peptide_ic50_measurements(
         peptides,
@@ -170,18 +199,47 @@ def combine_multiple_peptide_ic50_measurements(
     if weights is None:
         weights = np.ones(len(peptides), dtype=float)
 
-    measurements = defaultdict(list)
-    for (peptide, normalized_affinity, weight) in zip(
-            dataset.peptides, dataset.Y, dataset.weights):
-        multiple_affinities[peptide].append((normalized_affinity, weight))
-    weighted_averages = {}
-    for peptide, affinity_weight_tuples in multiple_affinities.items():
-        denom = 0.0
-        sum_weighted_affinities = 0.0
-        for affinity, weight in affinity_weight_tuples:
-            sum_weighted_affinities += affinity * weight
-            denom += weight
-        if denom > 0:
-            weighted_averages[peptide] = sum_weighted_affinities / denom
-    allele_to_peptide_to_affinity[allele] = weighted_averages
-return allele_to_peptide_to_affinity
+    if len(peptides) != len(ic50_values):
+        raise ValueError("Expected same number of peptides (%d) as IC50 values (%d)" % (
+            len(peptides),
+            len(ic50_values)))
+
+    if len(peptides) != len(weights):
+        raise ValueError("Expected same number of peptides (%d) as weights (%d)" % (
+            len(peptides),
+            len(weights)))
+
+    # each peptide mapping to a list of log(IC50) paired with a weight
+    measurements_with_weights = defaultdict(list)
+    for (i, peptide) in enumerate(peptides):
+        ic50 = ic50_values[i]
+        weights = weights[i]
+        measurements_with_weights.append((ic50, weight))
+
+    result_peptides = []
+    result_ic50_values = []
+    for peptide, affinity_tuples in measurements_with_weights.items():
+        if len(affinity_tuples) == 1:
+            # special case when there's only one entry
+            combined_ic50 = affinity_tuples[0][0]
+        else:
+            denom = 0.0
+            total = 0.0
+            for ic50, weight in affinity_tuples:
+                total += log(log_ic50) * weight
+                denom += weight
+
+            if denom > 0:
+                combined_log_ic50 = total / denom
+                combined_ic50 = exp(log_ic50)
+            else:
+                # if none of the samples had non-zero weight then don't use them
+                continue
+        result_peptides.append(peptide)
+        result_ic50_values.append(combined_ic50)
+    n_combined = len(result_peptides)
+    assert len(result_ic50_values) == n_combined
+    peptides_array = prepare_peptides_array(result_peptides)
+    ic50_values_array = prepare_ic50_values_array(
+        ic50_values=result_ic50_values, required_count=n_combined)
+    return peptides_array, ic50_values_array

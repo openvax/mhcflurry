@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from __future__ import (
     print_function,
     division,
@@ -36,25 +37,25 @@ from .dataset_helpers import (
 from .class1_allele_specific_hyperparameters import MAX_IC50
 from .common import normalize_allele_name
 
-
 class SingleAlleleDataset(object):
     """
-
-AlleleData = namedtuple(
-    "AlleleData",
-    [
-        "X_index",    # index-based featue encoding of fixed length peptides
-        "X_binary",  # binary encoding of fixed length peptides
-        "Y",     # regression encoding of IC50 (log scaled between 0..1)
-        "peptides",  # list of fixed length peptide string
-        "ic50",      # IC50 value associated with each entry
-        "original_peptides",  # original peptides may be of different lengths
-        "original_lengths",   # len(original_peptide)
-        "substring_counts",   # how many substrings were extracted from
-                              # each original peptide string
-        "weights",    # 1.0 / count
-    ])
+    Meant to expand on the functionality of this namedtuple:
+    AlleleData = namedtuple(
+        "AlleleData",
+        [
+            "X_index",    # index-based featue encoding of fixed length peptides
+            "X_binary",  # binary encoding of fixed length peptides
+            "Y",     # regression encoding of IC50 (log scaled between 0..1)
+            "peptides",  # list of fixed length peptide string
+            "ic50",      # IC50 value associated with each entry
+            "original_peptides",  # original peptides may be of different lengths
+            "original_lengths",   # len(original_peptide)
+            "substring_counts",   # how many substrings were extracted from
+                                  # each original peptide string
+            "weights",    # 1.0 / count
+        ])
     """
+
     def __init__(
             self,
             allele_name,
@@ -104,12 +105,19 @@ AlleleData = namedtuple(
                 peptides=self.original_peptides,
                 ic50_values=self.original_ic50_values)
 
-    def __len__(self):
+        self.regression_targets = transform_ic50_values_into_regression_outputs(
+            ic50_values=self.ic50_values,
+            max_ic50=self.max_ic50)
+
+    def peptide_count(self):
         """
         Returns number of distinct peptides in this dataset
         (not k-mers extracted from peptides)
         """
         return len(self.peptides)
+
+    def kmer_count(self):
+        return len(self.kmers)
 
     @property
     def peptide_to_ic50_dict(self):
@@ -122,93 +130,13 @@ AlleleData = namedtuple(
     @property
     def peptide_to_rescaled_affinity_dict(self):
         """
-        Returns dictionary mapping each
+        Returns dictionary mapping each peptide to a value between [0, 1]
+        where 0 means the IC50 was self.max_ic50 or greater and 1 means a strong
+        binder.
+        """
+        affinities =
+        return OrderedDict([
+            p, tran])
+
     @property
     def kmers(self):
-
-
-class MultipleAlleleDataset(object):
-    """
-    Dataset consisting with pMHC affinities for multiple alleles.
-    """
-    def __init__(self, single_allele_datasets):
-        """
-        Parameters
-        ----------
-        single_allele_datasets : dict
-            Dictionary mapping allele names to SingleAlleleDataset objects.
-        """
-        self.single_allele_datasets = {
-            normalize_allele_name(k): v
-            for (k, v) in single_allele_datasets.items()
-        }
-
-
-    def allele_names(self):
-        return list(sorted(single_allele_datasets.keys()))
-
-    def __getitem__(self, allele_name):
-        """
-        Use this object as a dict by looking up a SingleAlleleDataset from
-        its allele name.
-        """
-        allele_name = normalize_allele_name(allele_name)
-        return self.single_allele_datasets[allele_name]
-
-    def items(self):
-        """
-        Generates sequence of pair containing (allele_name, SingleAlleleDataset)
-        """
-        for allele_name in self.allele_names():
-            yield (allele_name, self[allele_name])
-
-    def counts(self):
-        """
-        Returns the number of pMHC binding values for each allele.
-        """
-        return OrderedDict( (k, len(v)) for (k, v) in self.items())
-
-    def to_dataframe(self):
-        columns = [
-            ("allele", []),
-            ("peptide", []),
-            ("ic50", []),
-        ]
-        columns_dict = OrderedDict(columns)
-        for i, kmer in self.kmers:
-            original_peptide =
-        df["allele"] = []
-        df["peptide"] = self.peptides
-        df["ic50"] = self.ic50_values
-
-        return pd.DataFrame(columns_dict)
-        return df
-
-    def to_dense_matrix(self):
-        pass
-
-    def impute_missing_values(self):
-        pass
-
-    def missing_mask_array(self):
-        pass
-
-
-    def missing_mask_dict(self):
-        """
-        Returns dictionary from allele names to boolean masks of missing values.
-        """
-        pass
-
-    def filter_by_allele_dict(self):
-
-
-    @classmethod
-    def from_csv(cls):
-        df = load_
-        return cls(peptides=None, alleles=None, ic50_values=None)
-
-    @classmethpd
-    def from_iedb_csv(cls):
-        return cls(peptides=None, alleles=None, ic50_values=None)
-
