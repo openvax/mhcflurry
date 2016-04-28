@@ -61,10 +61,8 @@ class SingleAlleleDataset(object):
             allele_name,
             peptides,
             ic50_values,
-            weights=None,
             max_ic50=50000,
-            kmer_size=9,
-            combine_redundant_measurements=False):
+            kmer_size=9):
         """
         Parameters
         ----------
@@ -85,15 +83,15 @@ class SingleAlleleDataset(object):
         kmer_size : int
             When building fixed length representations of the peptides,
             which length encoding to use.
-
-        combine_redundant_measurements : bool
-            If the same peptide has two measured values, should they
-            both be included in the dataset or should they be combined
-            into the geometric mean of their IC50 values?
         """
         self.allele_name = normalize_allele_name(allele_name)
+
+        require_instance(max_ic50, float)
         self.max_ic50 = max_ic50
+
+        require_instance(kmer_size, integer_types)
         self.kmer_size = kmer_size
+
         self.original_peptides = prepare_peptides_array(peptides=peptides)
         self.original_ic50_values = prepare_ic50_values_array(
             ic50_values=ic50_values,
@@ -108,6 +106,60 @@ class SingleAlleleDataset(object):
         self.regression_targets = transform_ic50_values_into_regression_outputs(
             ic50_values=self.ic50_values,
             max_ic50=self.max_ic50)
+
+    @classmethod
+    def concat(cls, datasets, max_ic50=None, kmer_size=None):
+        """
+        Combine multiple allele-specific dataset objects into single dataset.
+
+        Parameters
+        ----------
+        datasets : sequence of SingleAlleleDataset
+
+        max_ic50 : float, optional
+            Use this value for encoding regression targets, if not given
+            then all datasets expected to have the same value.
+
+        kmer_size : int, optional
+            Use this k-mer size for encoding vector representations of peptide
+            substrings.
+        """
+        require_iterable_of(datasets, SingleAlleleDataset)
+
+        if len(datasets) == 0:
+            raise ValueError("List of datasets cannot be empty")
+
+        if max_ic50 is None:
+            # if no override max_ic50 given then infer it from the datasets and
+            # make sure they all agree
+            max_ic50 = datasets[0].max_ic50
+            if any(dataset.max_ic50 != max_ic50 for dataset in datasets):
+                raise ValueError("Datasets must all have the same IC50 value: %f" % (max_ic50,))
+
+
+        if kmer_size is None:
+            # if no override kmer_size given then infer it from the datasets and
+            # make sure they all agree
+            kmer_size = datasets[0].kmer_size
+            if any(dataset.kmer_size != kmer_size for dataset in datasets):
+                raise ValueError("Datasets must all have the same kmer_size: %d" % (kmer_size,))
+
+        allele_name = datasets[0].allele_name
+        if any(dataset.allele_name != allele_name for dataset in datasets):
+            raise ValueError("Datasets must all have the same allele name: '%s'" % (allele_name,))
+
+        combined_peptide_list = []
+        combined_ic50_list = []
+        for dataset in datasets:
+            combined_peptide_list.extend(dataset.original_peptides)
+            combined_ic50_list.extend(dataset.original_ic50_values)
+
+        return cls(
+            allele_name=allele_name,
+            peptides=combined_peptide_list,
+            ic50_values=combined_ic50_list,
+            max_ic50=max_ic50,
+            kmer_size=kmer_size)
 
     def peptide_count(self):
         """

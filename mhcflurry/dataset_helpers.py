@@ -43,17 +43,14 @@ def infer_csv_separator(filename):
 def load_dataframe(
         filename,
         sep=None,
-        species_column_name="species",
         allele_column_name="mhc",
         peptide_column_name=None,
-        peptide_length_column_name="peptide_length",
         ic50_column_name="meas"):
     """
     Load a dataframe of peptide-MHC affinity measurements
 
     filename : str
         CSV/TSV filename with columns:
-            - 'species'
             - 'mhc'
             - 'sequence'
             - 'meas'
