@@ -92,10 +92,13 @@ class SingleAlleleDataset(object):
         require_instance(kmer_size, integer_types)
         self.kmer_size = kmer_size
 
+        # "original" entries might contain multiple measurements for the same
+        # peptide
         self.original_peptides = prepare_peptides_array(peptides=peptides)
         self.original_ic50_values = prepare_ic50_values_array(
             ic50_values=ic50_values,
             required_count=len(self.peptides))
+
         # since data may contain multiple measurements for the same pMHC,
         # combine them using the geometric mean of the measured IC50 values
         self.peptides, self.ic50_values = \
@@ -161,15 +164,20 @@ class SingleAlleleDataset(object):
             max_ic50=max_ic50,
             kmer_size=kmer_size)
 
-    def peptide_count(self):
+    def count(self):
         """
         Returns number of distinct peptides in this dataset
         (not k-mers extracted from peptides)
         """
         return len(self.peptides)
 
-    def kmer_count(self):
-        return len(self.kmers)
+    def count_before_combining_measurements(self):
+        """
+        How many entries are the in dataset before combining measurements
+        from identical peptide sequences?
+        """
+        return len(self.original_peptides)
+
 
     @property
     def peptide_to_ic50_dict(self):
@@ -180,15 +188,16 @@ class SingleAlleleDataset(object):
             (p, ic50) for (p, ic50) in zip(self.peptides, self.ic50_values)])
 
     @property
-    def peptide_to_rescaled_affinity_dict(self):
+    def peptide_to_regression_target_dict(self):
         """
         Returns dictionary mapping each peptide to a value between [0, 1]
         where 0 means the IC50 was self.max_ic50 or greater and 1 means a strong
         binder.
         """
-        affinities =
         return OrderedDict([
-            p, tran])
+            (p, y)
+            for (p, y)
+            in zip(self.peptides, self.regression_targets)])
 
     @property
     def kmers(self):
