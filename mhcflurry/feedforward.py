@@ -27,28 +27,6 @@ import theano
 theano.config.exception_verbosity = 'high'
 
 
-def compile_forward_predictor(model, theano_mode=None):
-    """
-    In cases where we want to get predictions from a model that hasn't
-    been compiled (to avoid overhead of compiling training code),
-    use this helper to only compile the subset of Theano needed for
-    forward-propagation/predictions.
-    """
-
-    model.X_test = model.get_input(train=False)
-    model.y_test = model.get_output(train=False)
-    if type(model.X_test) == list:
-        predict_ins = model.X_test
-    else:
-        predict_ins = [model.X_test]
-
-    model._predict = theano.function(
-        predict_ins,
-        model.y_test,
-        allow_input_downcast=True,
-        mode=theano_mode)
-
-
 def make_network(
         input_size,
         embedding_input_dim=None,
@@ -61,8 +39,7 @@ def make_network(
         dropout_probability=0.0,
         model=None,
         optimizer=None,
-        learning_rate=0.001,
-        compile_for_training=True):
+        learning_rate=0.001):
 
     if model is None:
         model = Sequential()
@@ -112,16 +89,13 @@ def make_network(
         output_dim=1,
         init=init))
     model.add(Activation(output_activation))
-    if compile_for_training:
-        model.compile(loss=loss, optimizer=optimizer)
-    else:
-        compile_forward_predictor(model)
+    model.compile(loss=loss, optimizer=optimizer)
     return model
 
 
 def make_hotshot_network(
         peptide_length=9,
-        layer_sizes=[500],
+        layer_sizes=[100],
         activation="relu",
         init="lecun_uniform",
         loss="mse",
@@ -146,7 +120,7 @@ def make_embedding_network(
         peptide_length=9,
         embedding_input_dim=20,
         embedding_output_dim=20,
-        layer_sizes=[500],
+        layer_sizes=[100],
         activation="relu",
         init="lecun_uniform",
         loss="mse",

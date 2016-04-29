@@ -25,7 +25,6 @@ from .data import (
     create_allele_data_from_peptide_to_ic50_dict,
 )
 
-
 def prune_dense_matrix_and_labels(
         X,
         peptide_list,
