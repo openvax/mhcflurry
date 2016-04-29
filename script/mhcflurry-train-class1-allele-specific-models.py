@@ -141,7 +141,7 @@ if __name__ == "__main__":
     else:
         imputed_data_dict = create_imputed_datasets(
             allele_data_dict,
-            args.imputation_method)
+            imputer)
 
     for allele_name in alleles:
         allele_data = allele_data_dict[allele_name]
