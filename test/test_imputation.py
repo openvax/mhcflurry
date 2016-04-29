@@ -31,15 +31,13 @@ def test_create_imputed_datasets_two_alleles():
     eq_(set(result.keys()), {"HLA-A*02:01", "HLA-A*02:05"})
     expected_peptides = {"A" * 9, "C" * 9, "S" * 9}
     for allele_name, allele_data in result.items():
-        print(allele_name)
-        print(allele_data)
+        print(allele_name, allele_data.peptides)
         eq_(set(allele_data.peptides), expected_peptides)
 
 def test_performance_improves_for_A0205_with_pretraining():
     # test to make sure that imputation improves predictive accuracy after a
     # small number of training iterations (5 epochs)
-    allele_data_dict = load_allele_datasets(
-        CLASS1_DATA_CSV_PATH)
+    allele_data_dict = load_allele_datasets(CLASS1_DATA_CSV_PATH)
 
     print("Available alleles: %s" % (set(allele_data_dict.keys()),))
 
@@ -57,6 +55,7 @@ def test_performance_improves_for_A0205_with_pretraining():
         len(a0205_data_without_imputation.peptides),
         len(set(a0205_data_without_imputation.original_peptides))))
 
+    print(set(a0205_data_without_imputation.original_peptides))
     X_index = a0205_data_without_imputation.X_index
     Y_true = a0205_data_without_imputation.Y
     sample_weights = a0205_data_without_imputation.weights
@@ -64,9 +63,11 @@ def test_performance_improves_for_A0205_with_pretraining():
     predictor_without_imputation.fit(
         X=X_index,
         Y=Y_true,
-        sample_weights=sample_weights)
+        sample_weights=sample_weights,
+        n_training_epochs=10)
 
     Y_pred_without_imputation = predictor_without_imputation.predict(X_index)
+    print("Y_pred without imputation: %s" % (Y_pred_without_imputation,))
     mse_without_imputation = np.mean((Y_true - Y_pred_without_imputation) ** 2)
     print("MSE w/out imputation: %f" % mse_without_imputation)
 
@@ -89,11 +90,13 @@ def test_performance_improves_for_A0205_with_pretraining():
         sample_weights=sample_weights,
         X_pretrain=X_index_imputed,
         Y_pretrain=Y_imputed,
-        pretrain_sample_weights=sample_weights_imputed)
+        pretrain_sample_weights=sample_weights_imputed,
+        n_training_epochs=10)
 
     Y_pred_with_imputation = predictor_with_imputation.predict(X_index)
     mse_with_imputation = np.mean((Y_true - Y_pred_with_imputation) ** 2)
     print("MSE w/ imputation: %f" % (mse_with_imputation,))
+
     assert mse_with_imputation < mse_without_imputation, \
         "Expected MSE with imputation (%f) to be less than (%f) without imputation" % (
             mse_with_imputation, mse_without_imputation)

@@ -46,6 +46,7 @@ AlleleData = namedtuple(
         "substring_counts",   # how many substrings were extracted from
                               # each original peptide string
         "weights",    # 1.0 / count
+        "max_ic50",   # maximum IC50 value used for encoding Y
     ])
 
 
@@ -320,7 +321,9 @@ def create_allele_data_from_peptide_to_ic50_dict(
         original_lengths=np.array(
             [len(peptide) for peptide in original_peptides]),
         substring_counts=counts,
-        weights=1.0 / counts)
+        weights=1.0 / counts,
+        max_ic50=max_ic50)
+
 
 def load_allele_datasets(
         filename,
