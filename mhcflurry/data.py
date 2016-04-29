@@ -68,13 +68,12 @@ def _infer_csv_separator(filename):
 
 def load_dataframe(
         filename,
-        peptide_length=None,
         max_ic50=MAX_IC50,
         sep=None,
         species_column_name="species",
         allele_column_name="mhc",
         peptide_column_name=None,
-        peptide_length_column_name="peptide_length",
+        filter_peptide_length=None,
         ic50_column_name="meas",
         only_human=False):
     """
@@ -88,9 +87,6 @@ def load_dataframe(
             - 'sequence'
             - 'meas'
 
-     peptide_length : int, optional
-        Which length peptides to use (default=load all lengths)
-
     max_ic50 : float
         Treat IC50 scores above this value as all equally bad
         (transform them to 0.0 in the regression output)
@@ -100,6 +96,9 @@ def load_dataframe(
 
     peptide_column_name : str, optional
         Default behavior is to try  {"sequence", "peptide", "peptide_sequence"}
+
+    filter_peptide_length : int, optional
+        Which length peptides to use (default=load all lengths)
 
     only_human : bool
         Only load entries from human MHC alleles
@@ -131,8 +130,9 @@ def load_dataframe(
     if only_human:
         human_mask = df[species_column_name] == "human"
         df = df[human_mask]
-    if peptide_length is not None:
-        length_mask = df[peptide_length_column_name] == peptide_length
+
+    if filter_peptide_length:
+        length_mask = df[peptide_column_name].str.len() == filter_peptide_length
         df = df[length_mask]
 
     df[allele_column_name] = df[allele_column_name].map(normalize_allele_name)
@@ -383,11 +383,10 @@ def load_allele_datasets(
         filename=filename,
         max_ic50=max_ic50,
         sep=sep,
-        peptide_length=peptide_length,
         species_column_name=species_column_name,
         allele_column_name=allele_column_name,
         peptide_column_name=peptide_column_name,
-        peptide_length_column_name=peptide_length_column_name,
+        filter_peptide_length=None if use_multiple_peptide_lengths else peptide_length,
         ic50_column_name=ic50_column_name,
         only_human=only_human)
 

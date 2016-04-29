@@ -53,6 +53,8 @@ from mhcflurry.paths import (
     CLASS1_MODEL_DIRECTORY,
     CLASS1_DATA_DIRECTORY
 )
+from mhcflurry.imputation import imputer_from_name, create_imputed_datasets
+
 CSV_FILENAME = "combined_human_class1_dataset.csv"
 CSV_PATH = join(CLASS1_DATA_DIRECTORY, CSV_FILENAME)
 
@@ -92,16 +94,24 @@ parser.add_argument(
     nargs="+",
     type=normalize_allele_name)
 
+parser.add_argument(
+    "--imputation-method",
+    default=None,
+    choices=("mice", "knn", "softimpute", "svd", "mean"),
+    type=imputer_from_name,
+    help="Use the given imputation method to generate data for pre-training models")
+
 # add options for neural network hyperparameters
 parser = add_hyperparameter_arguments_to_parser(parser)
 
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
+
     if not exists(args.output_dir):
         makedirs(args.output_dir)
 
-    allele_groups = load_allele_datasets(
+    allele_data_dict = load_allele_datasets(
         filename=args.binding_data_csv,
         peptide_length=9,
         use_multiple_peptide_lengths=True,
@@ -111,15 +121,21 @@ if __name__ == "__main__":
 
     # concatenate datasets from all alleles to use for pre-training of
     # allele-specific predictors
-    X_all = np.vstack([group.X_index for group in allele_groups.values()])
-    Y_all = np.concatenate([group.Y for group in allele_groups.values()])
+    X_all = np.vstack([group.X_index for group in allele_data_dict.values()])
+    Y_all = np.concatenate([group.Y for group in allele_data_dict.values()])
     print("Total Dataset size = %d" % len(Y_all))
+
+    if args.imputation_method is not None:
+        # TODO: use imputed data for training
+        imputed_data_dict = create_imputed_datasets(
+            allele_data_dict,
+            args.imputation_method)
 
     # if user didn't specify alleles then train models for all available alleles
     alleles = args.alleles
 
     if not alleles:
-        alleles = sorted(allele_groups.keys())
+        alleles = sorted(allele_data_dict.keys())
 
     for allele_name in alleles:
         allele_name = normalize_allele_name(allele_name)
@@ -127,7 +143,7 @@ if __name__ == "__main__":
             print("Skipping allele %s" % (allele_name,))
             continue
 
-        allele_data = allele_groups[allele_name]
+        allele_data = allele_data_dict[allele_name]
         X = allele_data.X_index
         Y = allele_data.Y
 

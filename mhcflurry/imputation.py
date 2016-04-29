@@ -19,7 +19,16 @@ from __future__ import (
 )
 from collections import defaultdict
 import numpy as np
-from fancyimpute.dictionary_helpers import dense_matrix_from_nested_dictionary
+from fancyimpute.dictionary_helpers import (
+    dense_matrix_from_nested_dictionary
+)
+from fancyimpute import (
+    KNN,
+    IterativeSVD,
+    SimpleFill,
+    SoftImpute,
+    MICE
+)
 
 from .data import (
     create_allele_data_from_peptide_to_ic50_dict,
@@ -190,3 +199,32 @@ def create_imputed_datasets(
         for (allele_name, allele_dict)
         in allele_to_peptide_to_affinity_dict.items()
     }
+
+def imputer_from_name(imputation_method_name, **kwargs):
+    """
+    Helper function for constructing an imputation object from a name given
+    typically from a commandline argument.
+    """
+    imputation_method_name = imputation_method_name.strip().lower()
+    if imputation_method_name == "mice":
+        kwargs["n_burn_in"] = kwargs.get("n_burn_in", 5)
+        kwargs["n_imputations"] = kwargs.get("n_imputations", 25)
+        kwargs["min_value"] = kwargs.get("min_value", 0)
+        kwargs["max_value"] = kwargs.get("max_value", 1)
+        return MICE(**kwargs)
+    elif imputation_method_name == "knn":
+        kwargs["k"] = kwargs.get("k", 3)
+        kwargs["orientation"] = kwargs.get("orientation", "columns")
+        kwargs["print_interval"] = kwargs.get("print_interval", 10)
+        return KNN(**kwargs)
+    elif imputation_method_name == "svd":
+        kwargs["rank"] = kwargs.get("rank", 10)
+        return IterativeSVD(**kwargs)
+    elif imputation_method_name == "svt" or imputation_method_name == "softimpute":
+        return SoftImpute(**kwargs)
+    elif imputation_method_name == "mean":
+        return SimpleFill("mean", **kwargs)
+    elif imputation_method_name == "none":
+        return None
+    else:
+        raise ValueError("Invalid imputation method: %s" % imputation_method_name)
