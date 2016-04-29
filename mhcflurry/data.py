@@ -22,7 +22,7 @@ from collections import namedtuple, defaultdict
 import pandas as pd
 import numpy as np
 
-from .common import normalize_allele_name
+from .common import normalize_allele_name, ic50_to_regression_target
 from .amino_acid import common_amino_acids
 from .peptide_encoding import (
     indices_to_hotshot_encoding,
@@ -104,8 +104,7 @@ def load_dataframe(
     only_human : bool
         Only load entries from human MHC alleles
 
-    Returns DataFrame augmented with extra columns:
-        - "log_ic50" : log(ic50) / log(max_ic50)
+    Returns DataFrame augmented with extra column:
         - "regression_output" : 1.0 - log(ic50)/log(max_ic50), limited to [0,1]
     """
     if sep is None:
@@ -138,13 +137,7 @@ def load_dataframe(
 
     df[allele_column_name] = df[allele_column_name].map(normalize_allele_name)
     ic50 = np.array(df[ic50_column_name])
-    log_ic50 = np.log(ic50) / np.log(max_ic50)
-    df["log_ic50"] = log_ic50
-    regression_output = 1.0 - log_ic50
-    # clamp to values between 0, 1
-    regression_output = np.maximum(regression_output, 0.0)
-    regression_output = np.minimum(regression_output, 1.0)
-    df["regression_output"] = regression_output
+    df["regression_output"] = ic50_to_regression_target(ic50, max_ic50=max_ic50)
     return df, peptide_column_name
 
 
@@ -278,6 +271,57 @@ def encode_peptide_to_affinity_dict(
             n_samples, len(Y))
     return (kmer_peptides, original_peptides, counts, X_index, X_binary, Y)
 
+def create_allele_data_from_peptide_to_ic50_dict(
+        peptide_to_ic50_dict,
+        max_ic50=MAX_IC50,
+        kmer_length=9,
+        flatten_binary_encoding=True):
+    """
+    Parameters
+    ----------
+    peptide_to_ic50_dict : dict
+        Dictionary mapping peptides of different lengths to IC50 binding
+        affinity values.
+
+    max_ic50 : float
+        Maximum IC50 value used as the cutoff for affinity of 0.0 when
+        transforming from IC50 to regression targets.
+
+    kmer_length : int
+        What length substrings will be fed to a fixed-length predictor?
+
+    flatten_binary_encoding : bool
+        Should hotshot encodings of amino acid inputs be flattened into a 1D
+        vector or have two dimensions (where the first represents position)?
+
+    Return an AlleleData object.
+    """
+    Y_dict = {
+        peptide: ic50_to_regression_target(ic50, max_ic50)
+        for (peptide, ic50)
+        in peptide_to_ic50_dict.items()
+    }
+    (kmer_peptides, original_peptides, counts, X_index, X_binary, Y_kmer) = \
+        encode_peptide_to_affinity_dict(
+            Y_dict,
+            peptide_length=kmer_length,
+            flatten_binary_encoding=flatten_binary_encoding)
+
+    ic50_array = np.array([peptide_to_ic50_dict[p] for p in original_peptides])
+    assert len(kmer_peptides) == len(ic50_array), \
+        "Mismatch between # of peptides %d and # IC50 outputs %d" % (
+            len(kmer_peptides), len(ic50_array))
+
+    return AlleleData(
+        X_index=X_index,
+        X_binary=X_binary,
+        Y=Y_kmer,
+        ic50=ic50_array,
+        peptides=kmer_peptides,
+        original_peptides=original_peptides,
+        original_lengths=[len(peptide) for peptide in original_peptides],
+        substring_counts=counts,
+        weights=1.0 / counts)
 
 def load_allele_datasets(
         filename,
@@ -371,35 +415,9 @@ def load_allele_datasets(
             for (peptide, ic50)
             in zip(raw_peptides, group[ic50_column_name])
         }
-
-        Y_dict = {
-            peptide: y
-            for (peptide, y)
-            in zip(raw_peptides, group["regression_output"])
-        }
-
-        (kmer_peptides, original_peptides, counts, X_index, X_binary, Y) = \
-            encode_peptide_to_affinity_dict(
-                Y_dict,
-                peptide_length=peptide_length,
-                flatten_binary_encoding=flatten_binary_encoding)
-
-        ic50 = np.array([ic50_dict[p] for p in original_peptides])
-
-        assert len(kmer_peptides) == len(ic50), \
-            "Mismatch between # of peptides %d and # IC50 outputs %d" % (
-                len(kmer_peptides), len(ic50))
-
-        allele_groups[allele] = AlleleData(
-            X_index=X_index,
-            X_binary=X_binary,
-            Y=Y,
-            ic50=ic50,
-            peptides=kmer_peptides,
-            original_peptides=original_peptides,
-            original_lengths=[len(peptide) for peptide in original_peptides],
-            substring_counts=counts,
-            weights=1.0 / counts)
+        allele_groups[allele] = create_allele_data_from_peptide_to_ic50_dict(
+            ic50_dict,
+            max_ic50=max_ic50)
     return allele_groups
 
 

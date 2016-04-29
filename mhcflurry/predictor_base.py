@@ -22,6 +22,7 @@ from .amino_acid import (
     amino_acids_with_unknown,
     common_amino_acids
 )
+from .common import regression_target_to_ic50
 
 
 class PredictorBase(object):
@@ -39,13 +40,6 @@ class PredictorBase(object):
         self.max_ic50 = max_ic50
         self.allow_unknown_amino_acids = allow_unknown_amino_acids
         self.verbose = verbose
-
-    def log_to_ic50(self, log_value):
-        """
-        Convert neural network output to IC50 values between 0.0 and
-        self.max_ic50 (typically 5000, 20000 or 50000)
-        """
-        return self.max_ic50 ** (1.0 - log_value)
 
     def encode_9mer_peptides(self, peptides):
         if self.allow_unknown_amino_acids:
@@ -90,14 +84,15 @@ class PredictorBase(object):
         return self.predict(X)
 
     def predict_9mer_peptides_ic50(self, peptides):
-        return self.log_to_ic50(self.predict_9mer_peptides(peptides))
+        scores = self.predict_9mer_peptides(peptides)
+        return regression_target_to_ic50(scores, max_ic50=self.max_ic50)
 
     def predict_peptides_ic50(self, peptides):
         """
         Predict IC50 affinities for peptides of any length
         """
-        return self.log_to_ic50(
-            self.predict_peptides(peptides))
+        scores = self.predict_peptides(peptides)
+        return regression_target_to_ic50(scores, max_ic50=self.max_ic50)
 
     def predict(self, X):
         raise ValueError("Method 'predict' not yet implemented for %s!" % (
