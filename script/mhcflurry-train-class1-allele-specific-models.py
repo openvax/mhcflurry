@@ -41,8 +41,6 @@ from os import makedirs, remove
 from os.path import exists, join
 import argparse
 
-import numpy as np
-
 from mhcflurry.common import normalize_allele_name
 from mhcflurry.data import load_allele_datasets
 from mhcflurry.class1_binding_predictor import Class1BindingPredictor
@@ -119,11 +117,19 @@ if __name__ == "__main__":
         sep=",",
         peptide_column_name="peptide")
 
-    # concatenate datasets from all alleles to use for pre-training of
-    # allele-specific predictors
-    X_all = np.vstack([group.X_index for group in allele_data_dict.values()])
-    Y_all = np.concatenate([group.Y for group in allele_data_dict.values()])
-    print("Total Dataset size = %d" % len(Y_all))
+    # if user didn't specify alleles then train models for all available alleles
+    alleles = args.alleles
+
+    if not alleles:
+        alleles = sorted(allele_data_dict.keys())
+
+    # restrict the data dictionary to only the specified alleles
+    # this also propagates to the imputation logic below, so we don't
+    # impute from other alleles
+    allele_data_dict = {
+        allele: allele_data_dict[allele]
+        for allele in alleles
+    }
 
     if args.imputation_method is None:
         imputer = None
@@ -136,12 +142,6 @@ if __name__ == "__main__":
         imputed_data_dict = create_imputed_datasets(
             allele_data_dict,
             args.imputation_method)
-
-    # if user didn't specify alleles then train models for all available alleles
-    alleles = args.alleles
-
-    if not alleles:
-        alleles = sorted(allele_data_dict.keys())
 
     for allele_name in alleles:
         allele_data = allele_data_dict[allele_name]
