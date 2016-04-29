@@ -46,6 +46,7 @@ AlleleData = namedtuple(
         "substring_counts",   # how many substrings were extracted from
                               # each original peptide string
         "weights",    # 1.0 / count
+        "max_ic50",   # maximum IC50 value used for encoding Y
     ])
 
 
@@ -149,7 +150,6 @@ def load_allele_dicts(
         species_column_name="species",
         allele_column_name="mhc",
         peptide_column_name=None,
-        peptide_length_column_name="peptide_length",
         ic50_column_name="meas",
         only_human=False,
         min_allele_size=1):
@@ -165,7 +165,6 @@ def load_allele_dicts(
         species_column_name=species_column_name,
         allele_column_name=allele_column_name,
         peptide_column_name=peptide_column_name,
-        peptide_length_column_name=peptide_length_column_name,
         ic50_column_name=ic50_column_name,
         only_human=only_human)
     # map peptides to either the raw IC50 or rescaled log IC50 depending
@@ -322,7 +321,9 @@ def create_allele_data_from_peptide_to_ic50_dict(
         original_lengths=np.array(
             [len(peptide) for peptide in original_peptides]),
         substring_counts=counts,
-        weights=1.0 / counts)
+        weights=1.0 / counts,
+        max_ic50=max_ic50)
+
 
 def load_allele_datasets(
         filename,

@@ -6,5 +6,5 @@ keras<1.0
 h5py
 cherrypy
 bottle
-fancyimpute
+fancyimpute>=0.0.12
 scikit-learn

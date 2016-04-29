@@ -66,7 +66,7 @@ if __name__ == '__main__':
             'appdirs',
             'theano>=0.8.2',
             'keras',
-            'fancyimpute',
+            'fancyimpute>=0.0.12',
             'scikit-learn',
             'h5py',
             # using for multi-threaded web server
