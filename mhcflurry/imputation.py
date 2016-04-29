@@ -21,16 +21,12 @@ from collections import defaultdict
 import logging
 
 import numpy as np
-from fancyimpute.dictionary_helpers import (
-    dense_matrix_from_nested_dictionary
-)
-from fancyimpute import (
-    KNN,
-    IterativeSVD,
-    SimpleFill,
-    SoftImpute,
-    MICE
-)
+from fancyimpute.knn import KNN
+from fancyimpute.iterative_svd import IterativeSVD
+from fancyimpute.simple_fill import SimpleFill
+from fancyimpute.soft_impute import SoftImpute
+from fancyimpute.mice import MICE
+from fancyimpute.dictionary_helpers import dense_matrix_from_nested_dictionary
 
 from .data import (
     create_allele_data_from_peptide_to_ic50_dict,
@@ -142,15 +138,6 @@ def create_incomplete_dense_pMHC_matrix(
                 allele_data.Y):
             if allele_name not in peptide_to_allele_to_affinity_dict[peptide]:
                 peptide_to_allele_to_affinity_dict[peptide][allele_name] = affinity
-
-    n_binding_values = sum(
-        len(allele_dict)
-        for allele_dict in
-        allele_data_dict.values()
-    )
-    print("Collected %d binding values for %d alleles" % (
-        n_binding_values,
-        len(peptide_to_allele_to_affinity_dict)))
 
     X, peptide_list, allele_list = \
         dense_matrix_from_nested_dictionary(peptide_to_allele_to_affinity_dict)

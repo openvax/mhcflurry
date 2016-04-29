@@ -28,7 +28,10 @@ import json
 
 from keras.models import model_from_config
 
-def load_keras_model_from_disk(model_json_path, weights_hdf_path, name=None):
+def load_keras_model_from_disk(
+        model_json_path,
+        weights_hdf_path,
+        name=None):
 
     if not exists(model_json_path):
         raise ValueError("Model file %s (name = %s) not found" % (

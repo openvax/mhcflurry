@@ -131,7 +131,7 @@ class Class1BindingPredictor(PredictorBase):
             sample_weights,
             X_pretrain,
             Y_pretrain,
-            pretrain_sample_weights,
+            sample_weights_pretrain,
             verbose=False):
         """
         Make sure the shapes of given training and pre-training data
@@ -198,18 +198,18 @@ class Class1BindingPredictor(PredictorBase):
             raise ValueError("Maximum value of Y_pretrain can't be greater than 1, got %f" % (
                 Y.max()))
 
-        if pretrain_sample_weights is None:
-            pretrain_sample_weights = np.ones_like(Y_pretrain)
+        if sample_weights_pretrain is None:
+            sample_weights_pretrain = np.ones_like(Y_pretrain)
         else:
-            pretrain_sample_weights = np.asarray(pretrain_sample_weights)
+            sample_weights_pretrain = np.asarray(sample_weights_pretrain)
         if verbose:
             print("sample weights mean = %f, pretrain weights mean = %f" % (
                 sample_weights.mean(),
-                pretrain_sample_weights.mean()))
+                sample_weights_pretrain.mean()))
         X_combined = np.vstack([X_pretrain, X])
         Y_combined = np.concatenate([Y_pretrain, Y])
         combined_weights = np.concatenate([
-            pretrain_sample_weights,
+            sample_weights_pretrain,
             sample_weights,
         ])
         return X_combined, Y_combined, combined_weights, n_pretrain_samples
@@ -221,7 +221,7 @@ class Class1BindingPredictor(PredictorBase):
             sample_weights=None,
             X_pretrain=None,
             Y_pretrain=None,
-            pretrain_sample_weights=None,
+            sample_weights_pretrain=None,
             n_training_epochs=200,
             verbose=False,
             batch_size=128):
@@ -247,7 +247,7 @@ class Class1BindingPredictor(PredictorBase):
         Y_pretrain : array
             Labels for extra samples, shape
 
-        pretrain_sample_weights : array
+        sample_weights_pretrain : array
             Initial weights for the rows of X_pretrain. If not specified then
             initialized to ones.
 
@@ -259,7 +259,8 @@ class Class1BindingPredictor(PredictorBase):
         """
         X_combined, Y_combined, combined_weights, n_pretrain = \
             self._combine_training_data(
-                X, Y, sample_weights, X_pretrain, Y_pretrain, pretrain_sample_weights,
+                X, Y, sample_weights,
+                X_pretrain, Y_pretrain, sample_weights_pretrain,
                 verbose=verbose)
 
         total_pretrain_sample_weight = combined_weights[:n_pretrain].sum()

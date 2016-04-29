@@ -41,8 +41,6 @@ from os import makedirs, remove
 from os.path import exists, join
 import argparse
 
-import numpy as np
-
 from mhcflurry.common import normalize_allele_name
 from mhcflurry.data import load_allele_datasets
 from mhcflurry.class1_binding_predictor import Class1BindingPredictor
@@ -53,7 +51,7 @@ from mhcflurry.paths import (
     CLASS1_MODEL_DIRECTORY,
     CLASS1_DATA_DIRECTORY
 )
-from mhcflurry.imputation import imputer_from_name, create_imputed_datasets
+from mhcflurry.imputation import create_imputed_datasets, imputer_from_name
 
 CSV_FILENAME = "combined_human_class1_dataset.csv"
 CSV_PATH = join(CLASS1_DATA_DIRECTORY, CSV_FILENAME)
@@ -98,7 +96,7 @@ parser.add_argument(
     "--imputation-method",
     default=None,
     choices=("mice", "knn", "softimpute", "svd", "mean"),
-    type=imputer_from_name,
+    type=lambda s: s.strip().lower(),
     help="Use the given imputation method to generate data for pre-training models")
 
 # add options for neural network hyperparameters
@@ -119,36 +117,57 @@ if __name__ == "__main__":
         sep=",",
         peptide_column_name="peptide")
 
-    # concatenate datasets from all alleles to use for pre-training of
-    # allele-specific predictors
-    X_all = np.vstack([group.X_index for group in allele_data_dict.values()])
-    Y_all = np.concatenate([group.Y for group in allele_data_dict.values()])
-    print("Total Dataset size = %d" % len(Y_all))
-
-    if args.imputation_method is not None:
-        # TODO: use imputed data for training
-        imputed_data_dict = create_imputed_datasets(
-            allele_data_dict,
-            args.imputation_method)
-
     # if user didn't specify alleles then train models for all available alleles
     alleles = args.alleles
 
     if not alleles:
         alleles = sorted(allele_data_dict.keys())
 
+    # restrict the data dictionary to only the specified alleles
+    # this also propagates to the imputation logic below, so we don't
+    # impute from other alleles
+    allele_data_dict = {
+        allele: allele_data_dict[allele]
+        for allele in alleles
+    }
+
+    if args.imputation_method is None:
+        imputer = None
+    else:
+        imputer = imputer_from_name(args.imputation_method)
+
+    if imputer is None:
+        imputed_data_dict = {}
+    else:
+        imputed_data_dict = create_imputed_datasets(
+            allele_data_dict,
+            imputer)
+
     for allele_name in alleles:
+        allele_data = allele_data_dict[allele_name]
+        X = allele_data.X_index
+        Y = allele_data.Y
+        weights = allele_data.weights
+
+        n_allele = len(allele_data.Y)
+        assert len(X) == n_allele
+        assert len(weights) == n_allele
+
+        if allele_name in imputed_data_dict:
+            imputed_data = imputed_data_dict[allele_name]
+            X_pretrain = imputed_data.X_index
+            Y_pretrain = imputed_data.Y
+            weights_pretrain = imputed_data.weights
+        else:
+            X_pretrain = None
+            Y_pretrain = None
+            weights_pretrain = None
+
+        # normalize allele name to check if it's just
         allele_name = normalize_allele_name(allele_name)
         if allele_name.isdigit():
             print("Skipping allele %s" % (allele_name,))
             continue
-
-        allele_data = allele_data_dict[allele_name]
-        X = allele_data.X_index
-        Y = allele_data.Y
-
-        n_allele = len(allele_data.Y)
-        assert len(X) == n_allele
 
         print("\n=== Training predictor for %s: %d samples, %d unique" % (
             allele_name,
@@ -189,8 +208,12 @@ if __name__ == "__main__":
             remove(hdf_path)
 
         model.fit(
-            allele_data.X_index,
-            allele_data.Y,
+            X=allele_data.X_index,
+            Y=allele_data.Y,
+            sample_weights=weights,
+            X_pretrain=X_pretrain,
+            Y_pretrain=Y_pretrain,
+            sample_weights_pretrain=weights_pretrain,
             n_training_epochs=args.training_epochs,
             verbose=True)
 

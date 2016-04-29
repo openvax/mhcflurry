@@ -84,13 +84,14 @@ def test_performance_improves_for_A0205_with_pretraining():
 
     predictor_with_imputation = \
         Class1BindingPredictor.from_hyperparameters(name="A0205-impute")
+
     predictor_with_imputation.fit(
         X=X_index,
         Y=Y_true,
         sample_weights=sample_weights,
         X_pretrain=X_index_imputed,
         Y_pretrain=Y_imputed,
-        pretrain_sample_weights=sample_weights_imputed,
+        sample_weights_pretrain=sample_weights_imputed,
         n_training_epochs=10)
 
     Y_pred_with_imputation = predictor_with_imputation.predict(X_index)
