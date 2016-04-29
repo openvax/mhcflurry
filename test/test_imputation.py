@@ -1,7 +1,12 @@
 from mhcflurry.imputation import (
     create_imputed_datasets,
 )
-from mhcflurry.data import create_allele_data_from_peptide_to_ic50_dict
+from mhcflurry.data import (
+    create_allele_data_from_peptide_to_ic50_dict,
+    load_allele_datasets
+)
+from mhcflurry.paths import CLASS1_DATA_CSV_PATH
+from mhcflurry import Class1BindingPredictor
 
 from fancyimpute import MICE
 from nose.tools import eq_
@@ -28,3 +33,20 @@ def test_create_imputed_datasets_two_alleles():
         print(allele_name)
         print(allele_data)
         eq_(set(allele_data.peptides), expected_peptides)
+
+def test_performance_improves_for_A0205_with_pretraining():
+    # test to make sure that imputation improves predictive accuracy after a
+    # small number of training iterations (5 epochs)
+    allele_data_dict = load_allele_datasets(CLASS1_DATA_CSV_PATH)
+    a0205_data_without_imputation = allele_data_dict["A0205"]
+    predictor_without_imputation = \
+        Class1BindingPredictor.from_hyperparameters(name="A0205-no-impute")
+    predictor_without_imputation.fit(
+        X=a0205_data_without_imputation.X_index,
+        Y=a0205_data_without_imputation.Y)
+
+    predictor_with_imputation = \
+        Class1BindingPredictor.from_hyperparameters(name="A0205-impute")
+    predictor_with_imputation.fit(
+        X=a0205_data_without_imputation.X_index,
+        Y=a0205_data_without_imputation.Y)

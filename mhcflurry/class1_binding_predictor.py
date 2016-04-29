@@ -91,7 +91,8 @@ class Class1BindingPredictor(PredictorBase):
             name=None,
             max_ic50=MAX_IC50,
             peptide_length=9,
-            embedding_input_dim=20,
+            n_amino_acids=20,
+            allow_unknown_amino_acids=True,
             embedding_output_dim=20,
             layer_sizes=[50],
             activation="tanh",
@@ -104,6 +105,7 @@ class Class1BindingPredictor(PredictorBase):
         """
         Create untrained predictor with the given hyperparameters.
         """
+        embedding_input_dim = n_amino_acids + int(allow_unknown_amino_acids)
         model = make_embedding_network(
             peptide_length=peptide_length,
             embedding_input_dim=embedding_input_dim,
@@ -119,6 +121,7 @@ class Class1BindingPredictor(PredictorBase):
             name=name,
             max_ic50=max_ic50,
             model=model,
+            allow_unknown_amino_acids=allow_unknown_amino_acids,
             **kwargs)
 
     def _combine_training_data(
