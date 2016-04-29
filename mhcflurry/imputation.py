@@ -1,4 +1,4 @@
-# Copyright (c) 2015. Mount Sinai School of Medicine
+# Copyright (c) 2016. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ from __future__ import (
     absolute_import,
 )
 from collections import defaultdict
+import logging
+
 import numpy as np
 from fancyimpute.dictionary_helpers import (
     dense_matrix_from_nested_dictionary
@@ -33,6 +35,21 @@ from fancyimpute import (
 from .data import (
     create_allele_data_from_peptide_to_ic50_dict,
 )
+
+def _check_dense_pMHC_array(X, peptide_list, allele_list):
+    if len(peptide_list) != len(set(peptide_list)):
+        raise ValueError("Duplicate peptides detected in peptide list")
+    if len(allele_list) != len(set(allele_list)):
+        raise ValueError("Duplicate alleles detected in allele list")
+    n_rows, n_cols = X.shape
+    if n_rows != len(peptide_list):
+        raise ValueError(
+            "Expected dense array with shape %s to have %d rows" % (
+                X.shape, len(peptide_list)))
+    if n_cols != len(allele_list):
+        raise ValueError(
+            "Expected dense array with shape %s to have %d columns" % (
+                X.shape, len(allele_list)))
 
 def prune_dense_matrix_and_labels(
         X,
@@ -89,6 +106,7 @@ def prune_dense_matrix_and_labels(
         X = X[:, keep_allele_indices]
         observed_mask = observed_mask[:, keep_allele_indices]
         allele_list = [allele_list[i] for i in keep_allele_indices]
+    _check_dense_pMHC_array(X, peptide_list, allele_list)
     return X, peptide_list, allele_list
 
 
@@ -135,6 +153,8 @@ def create_incomplete_dense_pMHC_matrix(
 
     X, peptide_list, allele_list = \
         dense_matrix_from_nested_dictionary(peptide_to_allele_to_affinity_dict)
+    _check_dense_pMHC_array(X, peptide_list, allele_list)
+
     return prune_dense_matrix_and_labels(
         X,
         peptide_list,
@@ -187,6 +207,7 @@ def create_imputed_datasets(
         # if all entries in the matrix are already filled in then don't
         # try using an imputation algorithm since it might raise an
         # exception.
+        logging.warn("No missing values, using original data instead of imputation")
         X_complete = X_incomplete
     else:
         X_complete = imputer.complete(X_incomplete)
