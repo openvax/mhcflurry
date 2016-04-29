@@ -139,15 +139,6 @@ def create_incomplete_dense_pMHC_matrix(
             if allele_name not in peptide_to_allele_to_affinity_dict[peptide]:
                 peptide_to_allele_to_affinity_dict[peptide][allele_name] = affinity
 
-    n_binding_values = sum(
-        len(allele_dict)
-        for allele_dict in
-        allele_data_dict.values()
-    )
-    print("Collected %d binding values for %d alleles" % (
-        n_binding_values,
-        len(peptide_to_allele_to_affinity_dict)))
-
     X, peptide_list, allele_list = \
         dense_matrix_from_nested_dictionary(peptide_to_allele_to_affinity_dict)
     _check_dense_pMHC_array(X, peptide_list, allele_list)
