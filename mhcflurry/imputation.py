@@ -21,16 +21,12 @@ from collections import defaultdict
 import logging
 
 import numpy as np
-from fancyimpute.dictionary_helpers import (
-    dense_matrix_from_nested_dictionary
-)
-from fancyimpute import (
-    KNN,
-    IterativeSVD,
-    SimpleFill,
-    SoftImpute,
-    MICE
-)
+from fancyimpute.knn import KNN
+from fancyimpute.iterative_svd import IterativeSVD
+from fancyimpute.simple_fill import SimpleFill
+from fancyimpute.soft_impute import SoftImpute
+from fancyimpute.mice import MICE
+from fancyimpute.dictionary_helpers import dense_matrix_from_nested_dictionary
 
 from .data import (
     create_allele_data_from_peptide_to_ic50_dict,
