@@ -10,6 +10,7 @@ from mhcflurry import Class1BindingPredictor
 
 from fancyimpute import MICE
 from nose.tools import eq_
+import numpy as np
 
 def test_create_imputed_datasets_empty():
     result = create_imputed_datasets({}, imputer=MICE(n_imputations=25))
@@ -37,16 +38,67 @@ def test_create_imputed_datasets_two_alleles():
 def test_performance_improves_for_A0205_with_pretraining():
     # test to make sure that imputation improves predictive accuracy after a
     # small number of training iterations (5 epochs)
-    allele_data_dict = load_allele_datasets(CLASS1_DATA_CSV_PATH)
-    a0205_data_without_imputation = allele_data_dict["A0205"]
+    allele_data_dict = load_allele_datasets(
+        CLASS1_DATA_CSV_PATH)
+
+    print("Available alleles: %s" % (set(allele_data_dict.keys()),))
+
+    # restrict to just three alleles
+    allele_data_dict = {
+        key: allele_data_dict[key]
+        for key in ["HLA-A0205", "HLA-A0201", "HLA-A0101"]
+    }
+
+    a0205_data_without_imputation = allele_data_dict["HLA-A0205"]
     predictor_without_imputation = \
         Class1BindingPredictor.from_hyperparameters(name="A0205-no-impute")
+
+    print("Without imputation, # samples = %d, # original peptides = %d" % (
+        len(a0205_data_without_imputation.peptides),
+        len(set(a0205_data_without_imputation.original_peptides))))
+
+    X_index = a0205_data_without_imputation.X_index
+    Y_true = a0205_data_without_imputation.Y
+    sample_weights = a0205_data_without_imputation.weights
+
     predictor_without_imputation.fit(
-        X=a0205_data_without_imputation.X_index,
-        Y=a0205_data_without_imputation.Y)
+        X=X_index,
+        Y=Y_true,
+        sample_weights=sample_weights)
+
+    Y_pred_without_imputation = predictor_without_imputation.predict(X_index)
+    mse_without_imputation = np.mean((Y_true - Y_pred_without_imputation) ** 2)
+    print("MSE w/out imputation: %f" % mse_without_imputation)
+
+    imputed_data_dict = create_imputed_datasets(
+        allele_data_dict, MICE(n_imputations=25))
+    a0205_data_with_imputation = imputed_data_dict["HLA-A0205"]
+    print("Imputed data, # samples = %d, # original peptides = %d" % (
+        len(a0205_data_with_imputation.peptides),
+        len(set(a0205_data_with_imputation.original_peptides))))
+
+    X_index_imputed = a0205_data_with_imputation.X_index
+    Y_imputed = a0205_data_with_imputation.Y
+    sample_weights_imputed = a0205_data_with_imputation.weights
 
     predictor_with_imputation = \
         Class1BindingPredictor.from_hyperparameters(name="A0205-impute")
     predictor_with_imputation.fit(
-        X=a0205_data_without_imputation.X_index,
-        Y=a0205_data_without_imputation.Y)
+        X=X_index,
+        Y=Y_true,
+        sample_weights=sample_weights,
+        X_pretrain=X_index_imputed,
+        Y_pretrain=Y_imputed,
+        pretrain_sample_weights=sample_weights_imputed)
+
+    Y_pred_with_imputation = predictor_with_imputation.predict(X_index)
+    mse_with_imputation = np.mean((Y_true - Y_pred_with_imputation) ** 2)
+    print("MSE w/ imputation: %f" % (mse_with_imputation,))
+    assert mse_with_imputation < mse_without_imputation, \
+        "Expected MSE with imputation (%f) to be less than (%f) without imputation" % (
+            mse_with_imputation, mse_without_imputation)
+
+if __name__ == "__main__":
+    test_create_imputed_datasets_empty()
+    test_create_imputed_datasets_two_alleles()
+    test_performance_improves_for_A0205_with_pretraining()

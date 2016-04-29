@@ -20,16 +20,27 @@ from .class1_binding_predictor import Class1BindingPredictor
 from .common import normalize_allele_name
 
 def predict(alleles, peptides):
+    """
+    Parameters
+    ----------
+    alleles : list of str
+        Names of alleles to make predictions for.
+
+    peptides : list of str
+        Peptide amino acid sequences.
+
+    Returns DataFrame with columns "Allele", "Peptide", and "Prediction"
+    """
     result_dict = OrderedDict([
-        ("allele", []),
-        ("peptide", []),
-        ("ic50", []),
+        ("Allele", []),
+        ("Peptide", []),
+        ("Prediction", []),
     ])
     for allele in alleles:
         allele = normalize_allele_name(allele)
         model = Class1BindingPredictor.from_allele_name(allele)
         for i, ic50 in enumerate(model.predict_peptides_ic50(peptides)):
-            result_dict["allele"].append(allele)
-            result_dict["peptide"].append(peptides[i])
-            result_dict["ic50"].append(ic50)
+            result_dict["Allele"].append(allele)
+            result_dict["Peptide"].append(peptides[i])
+            result_dict["Prediction"].append(ic50)
     return pd.DataFrame(result_dict)
