@@ -317,9 +317,10 @@ def create_allele_data_from_peptide_to_ic50_dict(
         X_binary=X_binary,
         Y=Y_kmer,
         ic50=ic50_array,
-        peptides=kmer_peptides,
-        original_peptides=original_peptides,
-        original_lengths=[len(peptide) for peptide in original_peptides],
+        peptides=np.array(kmer_peptides),
+        original_peptides=np.array(original_peptides),
+        original_lengths=np.array(
+            [len(peptide) for peptide in original_peptides]),
         substring_counts=counts,
         weights=1.0 / counts)
 
