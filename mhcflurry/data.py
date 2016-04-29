@@ -149,7 +149,6 @@ def load_allele_dicts(
         species_column_name="species",
         allele_column_name="mhc",
         peptide_column_name=None,
-        peptide_length_column_name="peptide_length",
         ic50_column_name="meas",
         only_human=False,
         min_allele_size=1):
@@ -165,7 +164,6 @@ def load_allele_dicts(
         species_column_name=species_column_name,
         allele_column_name=allele_column_name,
         peptide_column_name=peptide_column_name,
-        peptide_length_column_name=peptide_length_column_name,
         ic50_column_name=ic50_column_name,
         only_human=only_human)
     # map peptides to either the raw IC50 or rescaled log IC50 depending
