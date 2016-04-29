@@ -17,11 +17,19 @@ from collections import OrderedDict
 import pandas as pd
 
 from .class1_binding_predictor import Class1BindingPredictor
+from .common import normalize_allele_name
 
 def predict(alleles, peptides):
-    allele_results = OrderedDict([])
+    result_dict = OrderedDict([
+        ("allele", []),
+        ("peptide", []),
+        ("ic50", []),
+    ])
     for allele in alleles:
+        allele = normalize_allele_name(allele)
         model = Class1BindingPredictor.from_allele_name(allele)
-        result_dictionary = model.predict_peptides(peptides)
-        allele_results.append(result_dictionary)
-    return pd.concat(allele_results)
+        for i, ic50 in enumerate(model.predict_peptides_ic50(peptides)):
+            result_dict["allele"].append(allele)
+            result_dict["peptide"].append(peptides[i])
+            result_dict["ic50"].append(ic50)
+    return pd.DataFrame(result_dict)
