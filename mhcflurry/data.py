@@ -21,7 +21,6 @@ from collections import namedtuple, defaultdict
 
 import pandas as pd
 import numpy as np
-from fancyimpute.dictionary_helpers import dense_matrix_from_nested_dictionary
 
 from .common import normalize_allele_name, ic50_to_regression_target
 from .amino_acid import common_amino_acids
@@ -416,10 +415,9 @@ def load_allele_datasets(
             for (peptide, ic50)
             in zip(raw_peptides, group[ic50_column_name])
         }
-        allele_date = create_allele_data_from_peptide_to_ic50_dict(
+        allele_groups[allele] = create_allele_data_from_peptide_to_ic50_dict(
             ic50_dict,
             max_ic50=max_ic50)
-        allele_groups[allele] = allele_data
     return allele_groups
 
 
