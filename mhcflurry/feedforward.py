@@ -61,6 +61,10 @@ def make_network(
             input_length=input_size,
             init=init))
         model.add(Flatten())
+
+        if dropout_probability > 0:
+            model.add(Dropout(dropout_probability))
+
         input_size = input_size * embedding_output_dim
 
     layer_sizes = (input_size,) + tuple(layer_sizes)
