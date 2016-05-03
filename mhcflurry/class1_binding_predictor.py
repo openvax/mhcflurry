@@ -224,7 +224,7 @@ class Class1BindingPredictor(PredictorBase):
             sample_weights_pretrain=None,
             n_training_epochs=200,
             verbose=False,
-            batch_size=128):
+            batch_size=32):
         """
         Train predictive model from index encoding of fixed length 9mer peptides.
 
@@ -320,7 +320,8 @@ class Class1BindingPredictor(PredictorBase):
                     sample_weight=combined_weights,
                     nb_epoch=1,
                     verbose=0,
-                    batch_size=batch_size)
+                    batch_size=batch_size,
+                    shuffle=True)
             else:
                 self.model.fit(
                     X_combined[n_pretrain:],
@@ -328,7 +329,8 @@ class Class1BindingPredictor(PredictorBase):
                     sample_weight=combined_weights[n_pretrain:],
                     nb_epoch=1,
                     verbose=0,
-                    batch_size=batch_size)
+                    batch_size=batch_size,
+                    shuffle=True)
 
     @classmethod
     def from_allele_name(

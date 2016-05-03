@@ -1,7 +1,14 @@
+import os
+from os.path import join
 from mhcflurry.data import load_allele_datasets
 
+def load_csv(filename):
+    dirpath = os.path.dirname(os.path.realpath(__file__))
+    full_path = join(dirpath, filename)
+    return load_allele_datasets(full_path)
+
 def test_load_allele_datasets_8mer():
-    allele_dict = load_allele_datasets("data_8mer.csv")
+    allele_dict = load_csv("data_8mer.csv")
     assert len(allele_dict) == 1
     assert set(allele_dict.keys()) == {"HLA-A0201"}
     dataset = allele_dict["HLA-A0201"]
@@ -13,7 +20,7 @@ def test_load_allele_datasets_8mer():
     assert len(dataset.peptides[0]) == 9
 
 def test_load_allele_datasets_9mer():
-    allele_dict = load_allele_datasets("data_9mer.csv")
+    allele_dict = load_csv("data_9mer.csv")
     assert len(allele_dict) == 1
     assert set(allele_dict.keys()) == {"HLA-A0201"}
     dataset = allele_dict["HLA-A0201"]
@@ -24,7 +31,7 @@ def test_load_allele_datasets_9mer():
     assert dataset.original_peptides[0] == dataset.peptides[0]
 
 def test_load_allele_datasets_10mer():
-    allele_dict = load_allele_datasets("data_10mer.csv")
+    allele_dict = load_csv("data_10mer.csv")
     assert len(allele_dict) == 1
     assert set(allele_dict.keys()) == {"HLA-A0201"}
     dataset = allele_dict["HLA-A0201"]
