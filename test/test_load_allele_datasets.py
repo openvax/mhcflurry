@@ -1,10 +1,10 @@
-import os
-from os.path import join
+from os.path import join, dirname, realpath
 from mhcflurry.data import load_allele_datasets
 
 def load_csv(filename):
-    dirpath = os.path.dirname(os.path.realpath(__file__))
-    full_path = join(dirpath, filename)
+    base_dir = dirname(realpath(__file__))
+    data_dir = join(base_dir, "data")
+    full_path = join(data_dir, filename)
     return load_allele_datasets(full_path)
 
 def test_load_allele_datasets_8mer():
