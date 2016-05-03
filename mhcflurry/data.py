@@ -337,7 +337,8 @@ def load_allele_datasets(
         peptide_column_name=None,
         peptide_length_column_name="peptide_length",
         ic50_column_name="meas",
-        only_human=False):
+        only_human=False,
+        shuffle=True):
     """
     Loads an IEDB dataset, extracts "hot-shot" encoding of fixed length peptides
     and log-transforms the IC50 measurement. Returns dictionary mapping allele
