@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .regression_target import MAX_IC50
+
 N_EPOCHS = 250
 ACTIVATION = "tanh"
 INITIALIZATION_METHOD = "lecun_uniform"
 EMBEDDING_DIM = 32
 HIDDEN_LAYER_SIZE = 100
 DROPOUT_PROBABILITY = 0.1
-MAX_IC50 = 50000.0
 LEARNING_RATE = 0.001
+OPTIMIZER = "rmsprop"
+LOSS = "mse"
 
 def add_hyperparameter_arguments_to_parser(parser):
     """
@@ -31,6 +34,9 @@ def add_hyperparameter_arguments_to_parser(parser):
         --hidden-layer-size
         --dropout
         --max-ic50
+        --random-negative-samples
+        --imputation-method
+        --learning-rate
     """
     parser.add_argument(
         "--training-epochs",
@@ -81,5 +87,18 @@ def add_hyperparameter_arguments_to_parser(parser):
         type=float,
         default=0.001,
         help="Learning rate for training neural network. Default: %(default)s")
+
+    parser.add_argument(
+        "--random-negative-samples",
+        type=int,
+        default=0,
+        help="Number of random negtive samples to generate each training epoch")
+
+    parser.add_argument(
+        "--imputation-method",
+        default="none",
+        choices=("mice", "knn", "softimpute", "svd", "mean", "none"),
+        type=lambda s: s.strip().lower(),
+        help="Use the given imputation method to generate data for pre-training models")
 
     return parser

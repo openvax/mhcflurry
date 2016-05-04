@@ -41,6 +41,8 @@ from os import makedirs, remove
 from os.path import exists, join
 import argparse
 
+from keras.optimizers import RMSprop
+
 from mhcflurry.common import normalize_allele_name
 from mhcflurry.data import load_allele_datasets
 from mhcflurry.class1_binding_predictor import Class1BindingPredictor
@@ -91,13 +93,6 @@ parser.add_argument(
     default=[],
     nargs="+",
     type=normalize_allele_name)
-
-parser.add_argument(
-    "--imputation-method",
-    default=None,
-    choices=("mice", "knn", "softimpute", "svd", "mean"),
-    type=lambda s: s.strip().lower(),
-    help="Use the given imputation method to generate data for pre-training models")
 
 # add options for neural network hyperparameters
 parser = add_hyperparameter_arguments_to_parser(parser)
@@ -183,7 +178,7 @@ if __name__ == "__main__":
             activation=args.activation,
             init=args.initialization,
             dropout_probability=args.dropout,
-            learning_rate=args.learning_rate)
+            optimizer=RMSprop(learning_rate=args.learning_rate))
 
         json_filename = allele_name + ".json"
         json_path = join(args.output_dir, json_filename)
@@ -215,6 +210,7 @@ if __name__ == "__main__":
             Y_pretrain=Y_pretrain,
             sample_weights_pretrain=weights_pretrain,
             n_training_epochs=args.training_epochs,
+            n_random_negative_samples=args.random_negative_samples,
             verbose=True)
 
         model.to_disk(

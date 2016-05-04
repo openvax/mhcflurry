@@ -22,14 +22,14 @@ from collections import namedtuple, defaultdict
 import pandas as pd
 import numpy as np
 
-from .common import normalize_allele_name, ic50_to_regression_target
+from .common import normalize_allele_name
 from .amino_acid import common_amino_acids
 from .peptide_encoding import (
     indices_to_hotshot_encoding,
     fixed_length_index_encoding,
     check_valid_index_encoding_array,
 )
-from .class1_allele_specific_hyperparameters import MAX_IC50
+from .regression_target import MAX_IC50, ic50_to_regression_target
 
 index_encoding = common_amino_acids.index_encoding
 

@@ -17,38 +17,42 @@ from __future__ import (
     division,
     absolute_import,
 )
+import logging
 
-import keras
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Flatten, Dropout
 from keras.layers.embeddings import Embedding
-
 import theano
+
+from .feedforward_hyperparameters import OPTIMIZER, LOSS, ACTIVATION
+
 theano.config.exception_verbosity = 'high'
 
+
+def compile_network(model, optimizer=OPTIMIZER, loss=LOSS):
+    """
+    Compile a keras network and return it.
+    """
+    logging.info("Compiling %s with optimizer=%s, loss=%s" % (
+        model, optimizer, loss))
+    model.compile(loss=loss, optimizer=optimizer)
+    return model
 
 def make_network(
         input_size,
         embedding_input_dim=None,
         embedding_output_dim=None,
         layer_sizes=[100],
-        activation="relu",
+        activation=ACTIVATION,
         init="lecun_uniform",
-        loss="mse",
         output_activation="sigmoid",
         dropout_probability=0.0,
         model=None,
-        optimizer=None,
-        learning_rate=0.001):
+        optimizer=OPTIMIZER,
+        loss=LOSS):
 
     if model is None:
         model = Sequential()
-
-    if optimizer is None:
-        optimizer = keras.optimizers.RMSprop(
-            lr=learning_rate,
-            rho=0.9,
-            epsilon=1e-6)
 
     if embedding_input_dim:
         if not embedding_output_dim:
@@ -93,20 +97,18 @@ def make_network(
         output_dim=1,
         init=init))
     model.add(Activation(output_activation))
-    model.compile(loss=loss, optimizer=optimizer)
-    return model
+    return compile_network(model, optimizer=optimizer, loss=loss)
 
 
 def make_hotshot_network(
         peptide_length=9,
         layer_sizes=[100],
-        activation="relu",
+        activation=ACTIVATION,
         init="lecun_uniform",
-        loss="mse",
         output_activation="sigmoid",
         dropout_probability=0.0,
-        optimizer=None,
-        learning_rate=0.001,
+        optimizer=OPTIMIZER,
+        loss=LOSS,
         n_amino_acids=20):
     return make_network(
         input_size=peptide_length * n_amino_acids,
@@ -116,8 +118,7 @@ def make_hotshot_network(
         loss=loss,
         output_activation=output_activation,
         dropout_probability=dropout_probability,
-        optimizer=optimizer,
-        learning_rate=learning_rate)
+        optimizer=optimizer)
 
 
 def make_embedding_network(
@@ -125,13 +126,12 @@ def make_embedding_network(
         embedding_input_dim=20,
         embedding_output_dim=20,
         layer_sizes=[100],
-        activation="relu",
+        activation=ACTIVATION,
         init="lecun_uniform",
-        loss="mse",
         output_activation="sigmoid",
         dropout_probability=0.0,
-        optimizer=None,
-        learning_rate=0.001):
+        loss=LOSS,
+        optimizer=OPTIMIZER):
     return make_network(
         input_size=peptide_length,
         embedding_input_dim=embedding_input_dim,
@@ -142,5 +142,4 @@ def make_embedding_network(
         loss=loss,
         output_activation=output_activation,
         dropout_probability=dropout_probability,
-        optimizer=optimizer,
-        learning_rate=learning_rate)
+        optimizer=optimizer)

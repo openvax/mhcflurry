@@ -17,7 +17,7 @@ from os.path import splitext, join
 
 import numpy as np
 
-from .class1_allele_specific_hyperparameters import MAX_IC50
+from .regression_target import MAX_IC50
 from .predictor_base import PredictorBase
 
 class Ensemble(PredictorBase):

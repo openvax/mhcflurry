@@ -2,6 +2,7 @@ from mhcflurry.feedforward import (
     make_embedding_network,
     make_hotshot_network,
 )
+from keras.optimizers import RMSprop
 import numpy as np
 
 def test_make_embedding_network():
@@ -11,7 +12,7 @@ def test_make_embedding_network():
         activation="tanh",
         embedding_input_dim=3,
         embedding_output_dim=20,
-        learning_rate=0.05)
+        optimizer=RMSprop(learning_rate=0.05))
 
     X_negative = np.array([
         [0] * 3,
@@ -33,7 +34,7 @@ def test_make_embedding_network():
     ])
     X_index = np.vstack([X_negative, X_positive])
     Y = np.array([0.0] * len(X_negative) + [1.0] * len(X_positive))
-    nn.fit(X_index, Y, nb_epoch=20)
+    nn.fit(X_index, Y, nb_epoch=30)
     Y_pred = nn.predict(X_index)
     print(Y)
     print(Y_pred)
@@ -46,7 +47,7 @@ def test_make_hotshot_network():
         activation="relu",
         layer_sizes=[4],
         n_amino_acids=2,
-        learning_rate=0.05)
+        optimizer=RMSprop(learning_rate=0.05))
     X_binary = np.array([
         [True, False, True, False, True, False],
         [True, False, True, False, False, True],
@@ -56,7 +57,7 @@ def test_make_hotshot_network():
         [False, True, True, False, False, True],
     ], dtype=bool)
     Y = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0])
-    nn.fit(X_binary, Y, nb_epoch=20)
+    nn.fit(X_binary, Y, nb_epoch=30)
     Y_pred = nn.predict(X_binary)
     print(Y)
     print(Y_pred)
