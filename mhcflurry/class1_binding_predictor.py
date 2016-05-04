@@ -28,7 +28,7 @@ import numpy as np
 
 from .common import normalize_allele_name
 from .paths import CLASS1_MODEL_DIRECTORY
-from .feedforward import make_embedding_network, compile_network
+from .feedforward import make_embedding_network
 from .predictor_base import PredictorBase
 from .serialization_helpers import (
     load_keras_model_from_disk,
@@ -82,7 +82,9 @@ class Class1BindingPredictor(PredictorBase):
             model_json_path,
             weights_hdf_path,
             name=name)
-        compile_network(model, loss=loss, optimizer=optimizer)
+        # In some cases I haven't been able to use a model after loading it
+        # without compiling it first.
+        model.compile(optimizer=optimizer, loss=loss)
         return cls(model=model, **kwargs)
 
     def to_disk(self, model_json_path, weights_hdf_path, overwrite=False):

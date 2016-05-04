@@ -28,8 +28,6 @@ import json
 
 from keras.models import model_from_config
 
-from .feedforward import compile_network
-
 def load_keras_model_from_disk(
         model_json_path,
         weights_hdf_path,
@@ -62,10 +60,6 @@ def load_keras_model_from_disk(
             raise ValueError(
                 "Missing model weights file %s (name = %s)" % (weights_hdf_path, name))
         model.load_weights(weights_hdf_path)
-
-    # In some cases I haven't been able to use a model after loading it
-    # without compiling it first.
-    compile_network(model)
     return model
 
 

@@ -17,7 +17,6 @@ from __future__ import (
     division,
     absolute_import,
 )
-import logging
 
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Flatten, Dropout
@@ -28,15 +27,6 @@ from .feedforward_hyperparameters import OPTIMIZER, LOSS, ACTIVATION
 
 theano.config.exception_verbosity = 'high'
 
-
-def compile_network(model, optimizer=OPTIMIZER, loss=LOSS):
-    """
-    Compile a keras network and return it.
-    """
-    logging.info("Compiling %s with optimizer=%s, loss=%s" % (
-        model, repr(optimizer), loss))
-    model.compile(loss=loss, optimizer=optimizer)
-    return model
 
 def make_network(
         input_size,
@@ -97,9 +87,8 @@ def make_network(
         output_dim=1,
         init=init))
     model.add(Activation(output_activation))
-    print(model.get_config())
-    return compile_network(model, optimizer=optimizer, loss=loss)
-
+    model.compile(loss=loss, optimizer=optimizer)
+    return model
 
 def make_hotshot_network(
         peptide_length=9,
