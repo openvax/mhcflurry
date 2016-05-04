@@ -12,6 +12,7 @@ from mhcflurry import Class1BindingPredictor
 from fancyimpute import MICE, KNN, SoftImpute, IterativeSVD
 from nose.tools import eq_
 import numpy as np
+from sklearn.cross_validation import KFold
 
 def test_create_imputed_datasets_empty():
     result = create_imputed_datasets({}, imputer=MICE(n_imputations=25))
@@ -103,6 +104,89 @@ def test_performance_improves_for_A0205_with_pretraining():
         "Expected MSE with imputation (%f) to be less than (%f) without imputation" % (
             mse_with_imputation, mse_without_imputation)
 
+def slice_of_allele_data(allele_data, indices):
+    """
+    Slice through all the array fields of an AlleleData object using an array
+    of indices. Eventually this should just be a member function of AlleleData
+    or whatever Dataset object replaces it.
+    """
+    kwargs = {}
+    for field_name in allele_data._fields:
+        x = getattr(allele_data, field_name)
+        if isinstance(x, (list, np.ndarray)):
+            x = x[indices]
+        kwargs[field_name] = x
+    return allele_data.__class__(**kwargs)
+
+
+def test_MICE_accuracy_on_A0205_imputing_from_A0201_and_A0101():
+    # test to make sure that imputation improves predictive accuracy after a
+    # small number of training iterations (5 epochs)
+    allele_data_dict = load_allele_datasets(CLASS1_DATA_CSV_PATH)
+
+    alleles = ["HLA-A0205", "HLA-A0201", "HLA-A0101", "HLA-B0702", "H-2-KD"]
+
+    # restrict to just three alleles
+    allele_data_dict = {
+        key: allele_data_dict[key]
+        for key in alleles
+    }
+
+    a0205_data = allele_data_dict["HLA-A0205"]
+    n_a0205 = len(a0205_data.Y)
+    n_overlap = 0
+    n_missing = 0
+    tp = 0
+    fp = 0
+    tn = 0
+    fn = 0
+    for (train_indices, test_indices) in KFold(
+            n=n_a0205, n_folds=3, shuffle=True, random_state=0):
+        a0205_data_train = slice_of_allele_data(a0205_data, train_indices)
+        print("Training data: %s" % (a0205_data_train,))
+        a0205_data_test = slice_of_allele_data(a0205_data, test_indices)
+        print("Test data: %s" % (a0205_data_test,))
+        cv_dict = {
+            allele: allele_data_dict[allele]
+            for allele in alleles
+            if allele != "HLA-A0205"
+        }
+        cv_dict["HLA-A0205"] = a0205_data_train
+
+        imputed = create_imputed_datasets(cv_dict, MICE(n_imputations=20, n_burn_in=5))
+        a0205_imputed = imputed["HLA-A0205"]
+        a0205_imputed_peptide_to_ic50 = {
+            p: ic50
+            for (p, ic50)
+            in zip(a0205_imputed.original_peptides, a0205_imputed.ic50)
+        }
+        a0205_test_peptide_to_ic50 = {
+            p: ic50
+            for (p, ic50)
+            in zip(a0205_data_test.original_peptides, a0205_imputed.ic50)
+        }
+
+        for (p, ic50) in a0205_test_peptide_to_ic50.items():
+            if p not in a0205_imputed_peptide_to_ic50:
+                n_missing += 1
+                print("-- missing imputed value for peptide %s" % p)
+                continue
+            imputed_ic50 = a0205_imputed_peptide_to_ic50[p]
+            print("-- Peptide %s has test IC50 of %f and imputed %f" % (
+                p, ic50, imputed_ic50))
+            n_overlap += 1
+            tp += (ic50 <= 500 and imputed_ic50 <= 500)
+            tn += (ic50 > 500 and imputed_ic50 > 500)
+            fp += (ic50 > 500 and imputed_ic50 <= 500)
+            fn += (ic50 <= 500 and imputed_ic50 > 500)
+    recall = tp / float(tp + fn)
+    precision = tp / float(tp + fp)
+    print("TP: %d TN: %d FP: %d FN: %d" % (
+        tp, tn, fp, fn))
+    print("Precision %f, Recall %f" % (precision, recall))
+    assert precision > 0.75, precision
+    assert recall > 0.75, recall
+
 def test_imputer_from_name():
     mice = imputer_from_name("mice")
     assert isinstance(mice, MICE)
@@ -115,7 +199,8 @@ def test_imputer_from_name():
 
 
 if __name__ == "__main__":
+    test_imputer_from_name()
+    test_MICE_accuracy_on_A0205_imputing_from_A0201_and_A0101()
     test_create_imputed_datasets_empty()
     test_create_imputed_datasets_two_alleles()
     test_performance_improves_for_A0205_with_pretraining()
-    test_imputer_from_name()

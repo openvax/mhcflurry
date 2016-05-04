@@ -104,6 +104,11 @@ def prune_dense_matrix_and_labels(
         observed_mask = observed_mask[:, keep_allele_indices]
         allele_list = [allele_list[i] for i in keep_allele_indices]
     _check_dense_pMHC_array(X, peptide_list, allele_list)
+    print("After pruning")
+    print(X.shape)
+    print(peptide_list[:100])
+    print(allele_list[:100])
+    print(X[:100, :100])
     return X, peptide_list, allele_list
 
 
@@ -141,6 +146,10 @@ def create_incomplete_dense_pMHC_matrix(
 
     X, peptide_list, allele_list = \
         dense_matrix_from_nested_dictionary(peptide_to_allele_to_affinity_dict)
+    print(X.shape)
+    print(peptide_list[:100])
+    print(allele_list[:100])
+    print(X[:100, :100])
     _check_dense_pMHC_array(X, peptide_list, allele_list)
 
     return prune_dense_matrix_and_labels(
@@ -166,8 +175,9 @@ def dense_pMHC_matrix_to_nested_dict(X, peptide_list, allele_list):
 def create_imputed_datasets(
         allele_data_dict,
         imputer,
-        min_observations_per_peptide=1,
-        min_observations_per_allele=1):
+        min_observations_per_peptide=2,
+        min_observations_per_allele=2,
+        logit_transform=True):
     """
     Parameters
     ----------
@@ -183,6 +193,10 @@ def create_imputed_datasets(
 
     min_observations_per_allele : int
         Drop allele columns with fewer than this number of observed values.
+
+    logit_transform : bool
+        Transform the regression targets to logits before performing
+        matrix completion.
 
     Returns dictionary mapping allele names to AlleleData objects containing
     imputed affinity values.
@@ -210,6 +224,9 @@ def create_imputed_datasets(
         X_complete = X_incomplete
     else:
         X_complete = imputer.complete(X_incomplete)
+
+    X_complete[X_complete < 0] = 0
+    X_complete[X_complete > 1] = 1
 
     allele_to_peptide_to_affinity_dict = dense_pMHC_matrix_to_nested_dict(
         X=X_complete,
