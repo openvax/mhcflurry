@@ -34,7 +34,7 @@ def compile_network(model, optimizer=OPTIMIZER, loss=LOSS):
     Compile a keras network and return it.
     """
     logging.info("Compiling %s with optimizer=%s, loss=%s" % (
-        model, optimizer, loss))
+        model, repr(optimizer), loss))
     model.compile(loss=loss, optimizer=optimizer)
     return model
 
@@ -97,49 +97,34 @@ def make_network(
         output_dim=1,
         init=init))
     model.add(Activation(output_activation))
+    print(model.get_config())
     return compile_network(model, optimizer=optimizer, loss=loss)
 
 
 def make_hotshot_network(
         peptide_length=9,
-        layer_sizes=[100],
-        activation=ACTIVATION,
-        init="lecun_uniform",
-        output_activation="sigmoid",
-        dropout_probability=0.0,
-        optimizer=OPTIMIZER,
-        loss=LOSS,
-        n_amino_acids=20):
+        n_amino_acids=20,
+        **kwargs):
+    """
+    Construct a feed-forward neural network whose inputs are binary vectors
+    representing a "one-hot" or "hot-shot" encoding of a fixed length amino
+    acid sequence.
+    """
     return make_network(
         input_size=peptide_length * n_amino_acids,
-        layer_sizes=layer_sizes,
-        activation=activation,
-        init=init,
-        loss=loss,
-        output_activation=output_activation,
-        dropout_probability=dropout_probability,
-        optimizer=optimizer)
-
+        **kwargs)
 
 def make_embedding_network(
         peptide_length=9,
-        embedding_input_dim=20,
+        n_amino_acids=20,
         embedding_output_dim=20,
-        layer_sizes=[100],
-        activation=ACTIVATION,
-        init="lecun_uniform",
-        output_activation="sigmoid",
-        dropout_probability=0.0,
-        loss=LOSS,
-        optimizer=OPTIMIZER):
+        **kwargs):
+    """
+    Construct a feed-forward neural network whose inputs are vectors of integer
+    indices.
+    """
     return make_network(
         input_size=peptide_length,
-        embedding_input_dim=embedding_input_dim,
+        embedding_input_dim=n_amino_acids,
         embedding_output_dim=embedding_output_dim,
-        layer_sizes=layer_sizes,
-        activation=activation,
-        init=init,
-        loss=loss,
-        output_activation=output_activation,
-        dropout_probability=dropout_probability,
-        optimizer=optimizer)
+        **kwargs)

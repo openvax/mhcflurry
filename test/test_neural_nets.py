@@ -10,6 +10,7 @@ def test_make_embedding_network():
         peptide_length=3,
         layer_sizes=[3],
         activation="tanh",
+        loss="mse",
         embedding_input_dim=3,
         embedding_output_dim=20,
         optimizer=RMSprop(learning_rate=0.05))
@@ -34,7 +35,7 @@ def test_make_embedding_network():
     ])
     X_index = np.vstack([X_negative, X_positive])
     Y = np.array([0.0] * len(X_negative) + [1.0] * len(X_positive))
-    nn.fit(X_index, Y, nb_epoch=30)
+    nn.fit(X_index, Y, nb_epoch=20)
     Y_pred = nn.predict(X_index)
     print(Y)
     print(Y_pred)
@@ -45,6 +46,7 @@ def test_make_hotshot_network():
     nn = make_hotshot_network(
         peptide_length=3,
         activation="relu",
+        loss="mse",
         layer_sizes=[4],
         n_amino_acids=2,
         optimizer=RMSprop(learning_rate=0.05))
@@ -57,7 +59,7 @@ def test_make_hotshot_network():
         [False, True, True, False, False, True],
     ], dtype=bool)
     Y = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0])
-    nn.fit(X_binary, Y, nb_epoch=30)
+    nn.fit(X_binary, Y, nb_epoch=20)
     Y_pred = nn.predict(X_binary)
     print(Y)
     print(Y_pred)

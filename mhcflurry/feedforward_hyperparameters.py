@@ -21,7 +21,7 @@ EMBEDDING_DIM = 32
 HIDDEN_LAYER_SIZE = 100
 DROPOUT_PROBABILITY = 0.1
 LEARNING_RATE = 0.001
-OPTIMIZER = "rmsprop"
+OPTIMIZER = "adam"
 LOSS = "mse"
 
 def add_hyperparameter_arguments_to_parser(parser):

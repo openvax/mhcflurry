@@ -90,8 +90,7 @@ class Class1BindingPredictor(PredictorBase):
             self.model,
             model_json_path,
             weights_hdf_path,
-            overwrite=overwrite,
-            name=self.name)
+            overwrite=overwrite)
 
     @classmethod
     def from_hyperparameters(
@@ -113,10 +112,9 @@ class Class1BindingPredictor(PredictorBase):
         """
         Create untrained predictor with the given hyperparameters.
         """
-        embedding_input_dim = n_amino_acids + int(allow_unknown_amino_acids)
         model = make_embedding_network(
             peptide_length=peptide_length,
-            embedding_input_dim=embedding_input_dim,
+            n_amino_acids=n_amino_acids + int(allow_unknown_amino_acids),
             embedding_output_dim=embedding_output_dim,
             layer_sizes=layer_sizes,
             activation=activation,
@@ -417,7 +415,8 @@ class Class1BindingPredictor(PredictorBase):
         return list(sorted(alleles))
 
     def __repr__(self):
-        return "Class1BindingPredictor(name=%s, model=%s, max_ic50=%f)" % (
+        return "%s(name=%s, model=%s, max_ic50=%f)" % (
+            self.__class__.__name__,
             self.name,
             self.model,
             self.max_ic50)
