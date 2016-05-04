@@ -8,10 +8,10 @@ import numpy as np
 def test_make_embedding_network():
     nn = make_embedding_network(
         peptide_length=3,
+        n_amino_acids=3,
         layer_sizes=[3],
         activation="tanh",
         loss="mse",
-        embedding_input_dim=3,
         embedding_output_dim=20,
         optimizer=RMSprop(learning_rate=0.05))
 
@@ -45,10 +45,10 @@ def test_make_embedding_network():
 def test_make_hotshot_network():
     nn = make_hotshot_network(
         peptide_length=3,
+        n_amino_acids=2,
         activation="relu",
         loss="mse",
         layer_sizes=[4],
-        n_amino_acids=2,
         optimizer=RMSprop(learning_rate=0.05))
     X_binary = np.array([
         [True, False, True, False, True, False],
