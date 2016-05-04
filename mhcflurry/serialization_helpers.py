@@ -26,7 +26,7 @@ from os.path import exists
 from os import remove
 import json
 
-from keras.models import model_from_config
+from keras.models import Sequential, model_from_config
 
 def load_keras_model_from_disk(
         model_json_path,
@@ -53,7 +53,13 @@ def load_keras_model_from_disk(
     with open(model_json_path, "r") as f:
         config_dict = json.load(f)
 
-    model = model_from_config(config_dict)
+    if isinstance(config_dict, list):
+        # not sure if this is a Keras bug but depending on the model I get back
+        # either a list or a dict, the list is only usable with a Sequential
+        # model
+        model = Sequential.from_config(config_dict)
+    else:
+        model = model_from_config(config_dict)
 
     if weights_hdf_path is not None:
         if not exists(weights_hdf_path):
