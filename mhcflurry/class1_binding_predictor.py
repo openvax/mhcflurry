@@ -230,7 +230,7 @@ class Class1BindingPredictor(PredictorBase):
         X_random = np.random.randint(
             low=min_value,
             high=max_value + 1,
-            shape=(n_random_negative_samples, n_cols)).astype(X.dtype)
+            size=(n_random_negative_samples, n_cols)).astype(X.dtype)
         Y_random = np.zeros(n_random_negative_samples, dtype=float)
         weights_random = np.ones(n_random_negative_samples, dtype=float)
         X_with_negative = np.vstack([X, X_random])
@@ -330,7 +330,6 @@ class Class1BindingPredictor(PredictorBase):
             # only use synthetic data if it contributes at least 1/1000th of
             # sample weight
             if verbose:
-
                 real_data_percent = (
                     ((1.0 - pretrain_fraction_contribution) * 100)
                     if use_pretrain_data
@@ -364,7 +363,8 @@ class Class1BindingPredictor(PredictorBase):
                 self._extend_with_negative_random_samples(
                     X_curr_iter,
                     Y_curr_iter,
-                    weights_curr_iter)
+                    weights_curr_iter,
+                    n_random_negative_samples)
 
             self.model.fit(
                 X_curr_iter,
