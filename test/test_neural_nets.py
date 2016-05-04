@@ -36,7 +36,9 @@ def test_make_hotshot_network_properties():
     eq_(nn.loss, mse)
     assert np.allclose(nn.optimizer.lr.eval(), 0.7)
     print(nn.layers)
-    eq_(len(nn.layers), 2 + 2 * (1 + len(layer_sizes)))
+    # since the hotshot network doesn't have an embedding layer + flatten
+    # we expect two fewer total layers than the embedding network.
+    eq_(len(nn.layers), 2 * (1 + len(layer_sizes)))
 
 def test_make_embedding_network_small_dataset():
     nn = make_embedding_network(
