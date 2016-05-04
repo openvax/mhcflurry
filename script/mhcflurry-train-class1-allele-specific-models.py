@@ -178,7 +178,7 @@ if __name__ == "__main__":
             activation=args.activation,
             init=args.initialization,
             dropout_probability=args.dropout,
-            optimizer=RMSprop(learning_rate=args.learning_rate))
+            optimizer=RMSprop(lr=args.learning_rate))
 
         json_filename = allele_name + ".json"
         json_path = join(args.output_dir, json_filename)

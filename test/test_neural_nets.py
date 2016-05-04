@@ -2,7 +2,7 @@ from mhcflurry.feedforward import (
     make_embedding_network,
     make_hotshot_network,
 )
-from keras.optimizers import RMSprop, Adam
+from keras.optimizers import RMSprop
 from keras.objectives import mse
 import numpy as np
 from nose.tools import eq_
@@ -14,10 +14,10 @@ def test_make_embedding_network_properties():
         n_amino_acids=3,
         layer_sizes=layer_sizes,
         loss=mse,
-        optimizer=RMSprop(learning_rate=0.7, rho=0.9, epsilon=1e-6))
+        optimizer=RMSprop(lr=0.7, rho=0.9, epsilon=1e-6))
     eq_(nn.layers[0].input_dim, 3)
     eq_(nn.loss, mse)
-    eq_(nn.optimizer.learning_rate, 0.7)
+    eq_(nn.optimizer.lr, 0.7)
     print(nn.layers)
     # embedding + flatten + (dense->activation) * hidden layers and last layer
     eq_(len(nn.layers), 2 + 2 * (1 + len(layer_sizes)))
@@ -31,10 +31,10 @@ def test_make_hotshot_network_properties():
         init="lecun_uniform",
         loss=mse,
         layer_sizes=layer_sizes,
-        optimizer=RMSprop(learning_rate=0.7, rho=0.9, epsilon=1e-6))
+        optimizer=RMSprop(lr=0.7, rho=0.9, epsilon=1e-6))
     eq_(nn.layers[0].input_dim, 6)
     eq_(nn.loss, mse)
-    eq_(nn.optimizer.learning_rate, 0.7)
+    eq_(nn.optimizer.lr, 0.7)
     print(nn.layers)
     eq_(len(nn.layers), 2 + 2 * (1 + len(layer_sizes)))
 
@@ -47,8 +47,7 @@ def test_make_embedding_network_small_dataset():
         init="lecun_uniform",
         loss="mse",
         embedding_output_dim=20,
-        optimizer=Adam(),  # RMSprop(learning_rate=0.05, rho=0.9, epsilon=1e-6))
-    )
+        optimizer=RMSprop(lr=0.05, rho=0.9, epsilon=1e-6))
     X_negative = np.array([
         [0] * 3,
         [1] * 3,
@@ -84,8 +83,7 @@ def test_make_hotshot_network_small_dataset():
         init="lecun_uniform",
         loss="mse",
         layer_sizes=[4],
-        optimizer=Adam(),  # RMSprop(learning_rate=0.05, rho=0.9, epsilon=1e-6))
-    )
+        optimizer=RMSprop(lr=0.05, rho=0.9, epsilon=1e-6))
     X_binary = np.array([
         [True, False, True, False, True, False],
         [True, False, True, False, False, True],
