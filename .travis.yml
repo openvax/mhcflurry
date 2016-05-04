@@ -51,6 +51,7 @@ script:
       --hidden-layer-size 10
       --training-epochs 100
       --imputation-method mice
+      --random-negative-samples 100
   # run tests
   - nosetests test --with-coverage --cover-package=mhcflurry  && ./lint.sh
 after_success:
