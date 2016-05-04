@@ -2,17 +2,54 @@ from mhcflurry.feedforward import (
     make_embedding_network,
     make_hotshot_network,
 )
+from keras.optimizers import RMSprop
+from keras.objectives import mse
 import numpy as np
+from nose.tools import eq_
 
-def test_make_embedding_network():
+def test_make_embedding_network_properties():
+    layer_sizes = [3, 4]
     nn = make_embedding_network(
         peptide_length=3,
+        n_amino_acids=3,
+        layer_sizes=layer_sizes,
+        loss=mse,
+        optimizer=RMSprop(lr=0.7, rho=0.9, epsilon=1e-6))
+    eq_(nn.layers[0].input_dim, 3)
+    eq_(nn.loss, mse)
+    assert np.allclose(nn.optimizer.lr.eval(), 0.7)
+    print(nn.layers)
+    # embedding + flatten + (dense->activation) * hidden layers and last layer
+    eq_(len(nn.layers), 2 + 2 * (1 + len(layer_sizes)))
+
+def test_make_hotshot_network_properties():
+    layer_sizes = [3, 4]
+    nn = make_hotshot_network(
+        peptide_length=3,
+        n_amino_acids=2,
+        activation="relu",
+        init="lecun_uniform",
+        loss=mse,
+        layer_sizes=layer_sizes,
+        optimizer=RMSprop(lr=0.7, rho=0.9, epsilon=1e-6))
+    eq_(nn.layers[0].input_dim, 6)
+    eq_(nn.loss, mse)
+    assert np.allclose(nn.optimizer.lr.eval(), 0.7)
+    print(nn.layers)
+    # since the hotshot network doesn't have an embedding layer + flatten
+    # we expect two fewer total layers than the embedding network.
+    eq_(len(nn.layers), 2 * (1 + len(layer_sizes)))
+
+def test_make_embedding_network_small_dataset():
+    nn = make_embedding_network(
+        peptide_length=3,
+        n_amino_acids=3,
         layer_sizes=[3],
         activation="tanh",
-        embedding_input_dim=3,
+        init="lecun_uniform",
+        loss="mse",
         embedding_output_dim=20,
-        learning_rate=0.05)
-
+        optimizer=RMSprop(lr=0.05, rho=0.9, epsilon=1e-6))
     X_negative = np.array([
         [0] * 3,
         [1] * 3,
@@ -40,13 +77,15 @@ def test_make_embedding_network():
     for (Y_i, Y_pred_i) in zip(Y, Y_pred):
         assert abs(Y_i - Y_pred_i) <= 0.25, (Y_i, Y_pred_i)
 
-def test_make_hotshot_network():
+def test_make_hotshot_network_small_dataset():
     nn = make_hotshot_network(
         peptide_length=3,
-        activation="relu",
-        layer_sizes=[4],
         n_amino_acids=2,
-        learning_rate=0.05)
+        activation="relu",
+        init="lecun_uniform",
+        loss="mse",
+        layer_sizes=[4],
+        optimizer=RMSprop(lr=0.05, rho=0.9, epsilon=1e-6))
     X_binary = np.array([
         [True, False, True, False, True, False],
         [True, False, True, False, False, True],
@@ -67,5 +106,7 @@ def test_make_hotshot_network():
             assert Y_pred_i <= 0.4, "Expected lower value than %f" % Y_pred_i
 
 if __name__ == "__main__":
-    test_make_hotshot_network()
-    test_make_embedding_network()
+    test_make_embedding_network_properties()
+    test_make_hotshot_network_properties()
+    test_make_embedding_network_small_dataset()
+    test_make_hotshot_network_small_dataset()

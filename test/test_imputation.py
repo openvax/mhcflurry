@@ -1,5 +1,6 @@
 from mhcflurry.imputation import (
     create_imputed_datasets,
+    imputer_from_name,
 )
 from mhcflurry.data import (
     create_allele_data_from_peptide_to_ic50_dict,
@@ -8,7 +9,7 @@ from mhcflurry.data import (
 from mhcflurry.paths import CLASS1_DATA_CSV_PATH
 from mhcflurry import Class1BindingPredictor
 
-from fancyimpute import MICE
+from fancyimpute import MICE, KNN, SoftImpute, IterativeSVD
 from nose.tools import eq_
 import numpy as np
 
@@ -102,7 +103,19 @@ def test_performance_improves_for_A0205_with_pretraining():
         "Expected MSE with imputation (%f) to be less than (%f) without imputation" % (
             mse_with_imputation, mse_without_imputation)
 
+def test_imputer_from_name():
+    mice = imputer_from_name("mice")
+    assert isinstance(mice, MICE)
+    softimpute = imputer_from_name("softimpute")
+    assert isinstance(softimpute, SoftImpute)
+    svdimpute = imputer_from_name("svd")
+    assert isinstance(svdimpute, IterativeSVD)
+    knnimpute = imputer_from_name("knn")
+    assert isinstance(knnimpute, KNN)
+
+
 if __name__ == "__main__":
     test_create_imputed_datasets_empty()
     test_create_imputed_datasets_two_alleles()
     test_performance_improves_for_A0205_with_pretraining()
+    test_imputer_from_name()

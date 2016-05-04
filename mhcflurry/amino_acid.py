@@ -53,6 +53,9 @@ class Alphabet(object):
     def __setitem__(self, k, v):
         self.add(k, v)
 
+    def __len__(self):
+        return len(self.letters_to_names)
+
     def index_encoding_list(self, peptides):
         index_dict = self.index_dict()
         return [

@@ -31,7 +31,7 @@ from fancyimpute.dictionary_helpers import dense_matrix_from_nested_dictionary
 from .data import (
     create_allele_data_from_peptide_to_ic50_dict,
 )
-from .common import regression_target_to_ic50
+from .regression_target import regression_target_to_ic50
 
 def _check_dense_pMHC_array(X, peptide_list, allele_list):
     if len(peptide_list) != len(set(peptide_list)):

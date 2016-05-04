@@ -1,4 +1,4 @@
-from mhcflurry.common import (
+from mhcflurry.regression_target import (
     ic50_to_regression_target,
     regression_target_to_ic50,
 )

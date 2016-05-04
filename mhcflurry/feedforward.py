@@ -18,12 +18,13 @@ from __future__ import (
     absolute_import,
 )
 
-import keras
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Flatten, Dropout
 from keras.layers.embeddings import Embedding
-
 import theano
+
+from .feedforward_hyperparameters import OPTIMIZER, LOSS, ACTIVATION
+
 theano.config.exception_verbosity = 'high'
 
 
@@ -32,23 +33,16 @@ def make_network(
         embedding_input_dim=None,
         embedding_output_dim=None,
         layer_sizes=[100],
-        activation="relu",
+        activation=ACTIVATION,
         init="lecun_uniform",
-        loss="mse",
         output_activation="sigmoid",
         dropout_probability=0.0,
         model=None,
-        optimizer=None,
-        learning_rate=0.001):
+        optimizer=OPTIMIZER,
+        loss=LOSS):
 
     if model is None:
         model = Sequential()
-
-    if optimizer is None:
-        optimizer = keras.optimizers.RMSprop(
-            lr=learning_rate,
-            rho=0.9,
-            epsilon=1e-6)
 
     if embedding_input_dim:
         if not embedding_output_dim:
@@ -96,51 +90,28 @@ def make_network(
     model.compile(loss=loss, optimizer=optimizer)
     return model
 
-
 def make_hotshot_network(
         peptide_length=9,
-        layer_sizes=[100],
-        activation="relu",
-        init="lecun_uniform",
-        loss="mse",
-        output_activation="sigmoid",
-        dropout_probability=0.0,
-        optimizer=None,
-        learning_rate=0.001,
-        n_amino_acids=20):
-    return make_network(
-        input_size=peptide_length * n_amino_acids,
-        layer_sizes=layer_sizes,
-        activation=activation,
-        init=init,
-        loss=loss,
-        output_activation=output_activation,
-        dropout_probability=dropout_probability,
-        optimizer=optimizer,
-        learning_rate=learning_rate)
-
+        n_amino_acids=20,
+        **kwargs):
+    """
+    Construct a feed-forward neural network whose inputs are binary vectors
+    representing a "one-hot" or "hot-shot" encoding of a fixed length amino
+    acid sequence.
+    """
+    return make_network(input_size=peptide_length * n_amino_acids, **kwargs)
 
 def make_embedding_network(
         peptide_length=9,
-        embedding_input_dim=20,
+        n_amino_acids=20,
         embedding_output_dim=20,
-        layer_sizes=[100],
-        activation="relu",
-        init="lecun_uniform",
-        loss="mse",
-        output_activation="sigmoid",
-        dropout_probability=0.0,
-        optimizer=None,
-        learning_rate=0.001):
+        **kwargs):
+    """
+    Construct a feed-forward neural network whose inputs are vectors of integer
+    indices.
+    """
     return make_network(
         input_size=peptide_length,
-        embedding_input_dim=embedding_input_dim,
+        embedding_input_dim=n_amino_acids,
         embedding_output_dim=embedding_output_dim,
-        layer_sizes=layer_sizes,
-        activation=activation,
-        init=init,
-        loss=loss,
-        output_activation=output_activation,
-        dropout_probability=dropout_probability,
-        optimizer=optimizer,
-        learning_rate=learning_rate)
+        **kwargs)

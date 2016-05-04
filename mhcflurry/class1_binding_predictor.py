@@ -35,14 +35,16 @@ from .serialization_helpers import (
     save_keras_model_to_disk
 )
 from .peptide_encoding import check_valid_index_encoding_array
-from .class1_allele_specific_hyperparameters import MAX_IC50
+from .feedforward_hyperparameters import LOSS, OPTIMIZER
+from .regression_target import MAX_IC50
+from .training_helpers import check_training_data_shapes
 
 _allele_predictor_cache = {}
 
 class Class1BindingPredictor(PredictorBase):
     """
     Allele-specific Class I MHC binding predictor which uses
-    fixed-length (9mer) index encoding for inputs and outputs
+    fixed-length (k-mer) index encoding for inputs and outputs
     a value between 0 and 1 (where 1 is the strongest binder).
     """
     def __init__(
@@ -51,13 +53,15 @@ class Class1BindingPredictor(PredictorBase):
             name=None,
             max_ic50=MAX_IC50,
             allow_unknown_amino_acids=True,
-            verbose=False):
+            verbose=False,
+            kmer_size=9):
         PredictorBase.__init__(
             self,
             name=name,
             max_ic50=max_ic50,
             allow_unknown_amino_acids=allow_unknown_amino_acids,
-            verbose=verbose)
+            verbose=verbose,
+            kmer_size=kmer_size)
         self.name = name
         self.model = model
 
@@ -66,6 +70,9 @@ class Class1BindingPredictor(PredictorBase):
             cls,
             model_json_path,
             weights_hdf_path=None,
+            name=None,
+            optimizer=OPTIMIZER,
+            loss=LOSS,
             **kwargs):
         """
         Load model from stored JSON representation of network and
@@ -74,7 +81,10 @@ class Class1BindingPredictor(PredictorBase):
         model = load_keras_model_from_disk(
             model_json_path,
             weights_hdf_path,
-            name=None)
+            name=name)
+        # In some cases I haven't been able to use a model after loading it
+        # without compiling it first.
+        model.compile(optimizer=optimizer, loss=loss)
         return cls(model=model, **kwargs)
 
     def to_disk(self, model_json_path, weights_hdf_path, overwrite=False):
@@ -82,8 +92,7 @@ class Class1BindingPredictor(PredictorBase):
             self.model,
             model_json_path,
             weights_hdf_path,
-            overwrite=overwrite,
-            name=self.name)
+            overwrite=overwrite)
 
     @classmethod
     def from_hyperparameters(
@@ -97,31 +106,31 @@ class Class1BindingPredictor(PredictorBase):
             layer_sizes=[50],
             activation="tanh",
             init="lecun_uniform",
-            loss="mse",
             output_activation="sigmoid",
             dropout_probability=0,
-            learning_rate=0.001,
+            loss=LOSS,
+            optimizer=OPTIMIZER,
             **kwargs):
         """
         Create untrained predictor with the given hyperparameters.
         """
-        embedding_input_dim = n_amino_acids + int(allow_unknown_amino_acids)
         model = make_embedding_network(
             peptide_length=peptide_length,
-            embedding_input_dim=embedding_input_dim,
+            n_amino_acids=n_amino_acids + int(allow_unknown_amino_acids),
             embedding_output_dim=embedding_output_dim,
             layer_sizes=layer_sizes,
             activation=activation,
             init=init,
             loss=loss,
+            optimizer=optimizer,
             output_activation=output_activation,
-            dropout_probability=dropout_probability,
-            learning_rate=learning_rate)
+            dropout_probability=dropout_probability)
         return cls(
             name=name,
             max_ic50=max_ic50,
             model=model,
             allow_unknown_amino_acids=allow_unknown_amino_acids,
+            kmer_size=peptide_length,
             **kwargs)
 
     def _combine_training_data(
@@ -143,32 +152,12 @@ class Class1BindingPredictor(PredictorBase):
         X = np.asarray(X)
         Y = np.asarray(Y)
 
-        if verbose:
-            print("X.shape = %s" % (X.shape,))
-
-        n_samples, n_dims = X.shape
-
-        if len(Y) != n_samples:
-            raise ValueError("Mismatch between len(X) = %d and len(Y) = %d" % (
-                n_samples, len(Y)))
-
-        if Y.min() < 0:
-            raise ValueError("Minimum value of Y can't be negative, got %f" % (
-                Y.min()))
-        if Y.max() > 1:
-            raise ValueError("Maximum value of Y can't be greater than 1, got %f" % (
-                Y.max()))
-
         if sample_weights is None:
             sample_weights = np.ones_like(Y)
         else:
             sample_weights = np.asarray(sample_weights)
 
-        if len(sample_weights) != n_samples:
-            raise ValueError(
-                "Length of sample_weights (%d) doesn't match number of samples (%d)" % (
-                    len(sample_weights),
-                    n_samples))
+        n_samples, n_dims = check_training_data_shapes(X, Y, sample_weights)
 
         if X_pretrain is None or Y_pretrain is None:
             X_pretrain = np.empty((0, n_dims), dtype=X.dtype)
@@ -177,35 +166,29 @@ class Class1BindingPredictor(PredictorBase):
             X_pretrain = np.asarray(X_pretrain)
             Y_pretrain = np.asarray(Y_pretrain)
 
-        if verbose:
-            print("X_pretrain.shape = %s" % (X_pretrain.shape,))
-        n_pretrain_samples, n_pretrain_dims = X_pretrain.shape
-        if n_pretrain_dims != n_dims:
-            raise ValueError(
-                "# of dims for pretraining data (%d) doesn't match X.shape[1] = %d" % (
-                    n_pretrain_dims, n_dims))
-
-        if len(Y_pretrain) != n_pretrain_samples:
-            raise ValueError(
-                "length of Y_pretrain (%d) != length of X_pretrain (%d)" % (
-                    len(Y_pretrain),
-                    len(X_pretrain)))
-
-        if len(Y_pretrain) > 0 and Y_pretrain.min() < 0:
-            raise ValueError("Minimum value of Y_pretrain can't be negative, got %f" % (
-                Y.min()))
-        if len(Y_pretrain) > 0 and Y_pretrain.max() > 1:
-            raise ValueError("Maximum value of Y_pretrain can't be greater than 1, got %f" % (
-                Y.max()))
-
         if sample_weights_pretrain is None:
             sample_weights_pretrain = np.ones_like(Y_pretrain)
         else:
             sample_weights_pretrain = np.asarray(sample_weights_pretrain)
-        if verbose:
-            print("sample weights mean = %f, pretrain weights mean = %f" % (
-                sample_weights.mean(),
-                sample_weights_pretrain.mean()))
+
+        n_pretrain_samples, n_pretrain_dims = check_training_data_shapes(
+            X_pretrain, Y_pretrain, sample_weights_pretrain)
+
+        if Y.min() < 0:
+            raise ValueError("Minimum value of Y can't be negative, got %f" % (
+                Y.min()))
+        if Y.max() > 1:
+            raise ValueError("Maximum value of Y can't be greater than 1, got %f" % (
+                Y.max()))
+
+        if len(Y_pretrain) > 0 and Y_pretrain.min() < 0:
+            raise ValueError("Minimum value of Y_pretrain can't be negative, got %f" % (
+                Y.min()))
+
+        if len(Y_pretrain) > 0 and Y_pretrain.max() > 1:
+            raise ValueError("Maximum value of Y_pretrain can't be greater than 1, got %f" % (
+                Y.max()))
+
         X_combined = np.vstack([X_pretrain, X])
         Y_combined = np.concatenate([Y_pretrain, Y])
         combined_weights = np.concatenate([
@@ -220,16 +203,30 @@ class Class1BindingPredictor(PredictorBase):
         Extend training data with randomly generated negative samples.
         This only works since most random peptides will not bind to a
         particular allele.
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            2d array of integer amino acid encodings
+
+        Y : numpy.ndarray
+            1d array of regression targets
+
+        weights : numpy.ndarray
+            1d array of sample weights (must be same length as X and Y)
+
+        n_random_negative_samples : int
+            Number of random negative samplex to create
+
+        Returns X, Y, weights (extended with random negative samples)
         """
         assert len(X) == len(Y) == len(weights)
         if n_random_negative_samples == 0:
             return X, Y, weights
-        min_value = X.min()
-        max_value = X.max()
         n_cols = X.shape[1]
         X_random = np.random.randint(
-            low=min_value,
-            high=max_value + 1,
+            low=0,
+            high=self.max_amino_acid_encoding_value,
             size=(n_random_negative_samples, n_cols)).astype(X.dtype)
         Y_random = np.zeros(n_random_negative_samples, dtype=float)
         weights_random = np.ones(n_random_negative_samples, dtype=float)
@@ -257,7 +254,8 @@ class Class1BindingPredictor(PredictorBase):
             verbose=False,
             batch_size=128):
         """
-        Train predictive model from index encoding of fixed length 9mer peptides.
+        Train predictive model from index encoding of fixed length k-mer
+        peptides.
 
         Parameters
         ----------
@@ -419,7 +417,8 @@ class Class1BindingPredictor(PredictorBase):
         return list(sorted(alleles))
 
     def __repr__(self):
-        return "Class1BindingPredictor(name=%s, model=%s, max_ic50=%f)" % (
+        return "%s(name=%s, model=%s, max_ic50=%f)" % (
+            self.__class__.__name__,
             self.name,
             self.model,
             self.max_ic50)
