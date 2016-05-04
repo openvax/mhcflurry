@@ -17,7 +17,7 @@ def test_make_embedding_network_properties():
         optimizer=RMSprop(lr=0.7, rho=0.9, epsilon=1e-6))
     eq_(nn.layers[0].input_dim, 3)
     eq_(nn.loss, mse)
-    eq_(nn.optimizer.lr, 0.7)
+    eq_(nn.optimizer.lr.eval(), 0.7)
     print(nn.layers)
     # embedding + flatten + (dense->activation) * hidden layers and last layer
     eq_(len(nn.layers), 2 + 2 * (1 + len(layer_sizes)))
@@ -34,7 +34,7 @@ def test_make_hotshot_network_properties():
         optimizer=RMSprop(lr=0.7, rho=0.9, epsilon=1e-6))
     eq_(nn.layers[0].input_dim, 6)
     eq_(nn.loss, mse)
-    eq_(nn.optimizer.lr, 0.7)
+    eq_(nn.optimizer.lr.eval(), 0.7)
     print(nn.layers)
     eq_(len(nn.layers), 2 + 2 * (1 + len(layer_sizes)))
 

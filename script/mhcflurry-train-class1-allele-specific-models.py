@@ -46,13 +46,8 @@ from keras.optimizers import RMSprop
 from mhcflurry.common import normalize_allele_name
 from mhcflurry.data import load_allele_datasets
 from mhcflurry.class1_binding_predictor import Class1BindingPredictor
-from mhcflurry.class1_allele_specific_hyperparameters import (
-    add_hyperparameter_arguments_to_parser
-)
-from mhcflurry.paths import (
-    CLASS1_MODEL_DIRECTORY,
-    CLASS1_DATA_DIRECTORY
-)
+from mhcflurry.feedforward_hyperparameters import add_hyperparameter_arguments_to_parser
+from mhcflurry.paths import (CLASS1_MODEL_DIRECTORY, CLASS1_DATA_DIRECTORY)
 from mhcflurry.imputation import create_imputed_datasets, imputer_from_name
 
 CSV_FILENAME = "combined_human_class1_dataset.csv"
