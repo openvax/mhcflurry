@@ -224,7 +224,7 @@ class Class1BindingPredictor(PredictorBase):
             sample_weights_pretrain=None,
             n_training_epochs=200,
             verbose=False,
-            batch_size=32):
+            batch_size=128):
         """
         Train predictive model from index encoding of fixed length 9mer peptides.
 
@@ -279,8 +279,11 @@ class Class1BindingPredictor(PredictorBase):
             # weights for synthetic points can be shrunk as:
             #  ~ 1 / (1+epoch)**2
             # or
-            # e ** -epoch
-            decay_factor = np.exp(-epoch)
+            # 2 ** -epoch
+            #
+            # TODO: explore the best scheme for shrinking imputation weight
+            #
+            decay_factor = 2.0 ** -epoch
             # if the contribution of synthetic samples is less than a
             # thousandth of the actual data, then stop using it
             pretrain_contribution = total_pretrain_sample_weight * decay_factor
