@@ -99,9 +99,7 @@ def make_hotshot_network(
     representing a "one-hot" or "hot-shot" encoding of a fixed length amino
     acid sequence.
     """
-    return make_network(
-        input_size=peptide_length * n_amino_acids,
-        **kwargs)
+    return make_network(input_size=peptide_length * n_amino_acids, **kwargs)
 
 def make_embedding_network(
         peptide_length=9,
