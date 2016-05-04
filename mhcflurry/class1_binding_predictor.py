@@ -214,6 +214,35 @@ class Class1BindingPredictor(PredictorBase):
         ])
         return X_combined, Y_combined, combined_weights, n_pretrain_samples
 
+    def _extend_with_negative_random_samples(
+            self, X, Y, weights, n_random_negative_samples):
+        """
+        Extend training data with randomly generated negative samples.
+        This only works since most random peptides will not bind to a
+        particular allele.
+        """
+        assert len(X) == len(Y) == len(weights)
+        if n_random_negative_samples == 0:
+            return X, Y, weights
+        min_value = X.min()
+        max_value = X.max()
+        n_cols = X.shape[1]
+        X_random = np.random.randint(
+            low=min_value,
+            high=max_value + 1,
+            shape=(n_random_negative_samples, n_cols)).astype(X.dtype)
+        Y_random = np.zeros(n_random_negative_samples, dtype=float)
+        weights_random = np.ones(n_random_negative_samples, dtype=float)
+        X_with_negative = np.vstack([X, X_random])
+        Y_with_negative = np.concatenate([Y, Y_random])
+        weights_with_negative = np.concatenate([
+            weights,
+            weights_random])
+        assert len(X_with_negative) == len(X) + n_random_negative_samples
+        assert len(Y_with_negative) == len(Y) + n_random_negative_samples
+        assert len(weights_with_negative) == len(weights) + n_random_negative_samples
+        return X_with_negative, Y_with_negative, weights_with_negative
+
     def fit(
             self,
             X,
@@ -222,6 +251,7 @@ class Class1BindingPredictor(PredictorBase):
             X_pretrain=None,
             Y_pretrain=None,
             sample_weights_pretrain=None,
+            n_random_negative_samples=0,
             n_training_epochs=200,
             verbose=False,
             batch_size=128):
@@ -250,6 +280,9 @@ class Class1BindingPredictor(PredictorBase):
         sample_weights_pretrain : array
             Initial weights for the rows of X_pretrain. If not specified then
             initialized to ones.
+
+        n_random_negative_samples : int
+            Number of random samples to generate as negative examples.
 
         n_training_epochs : int
 
@@ -280,6 +313,8 @@ class Class1BindingPredictor(PredictorBase):
             #  ~ 1 / (1+epoch)**2
             # or
             # 2 ** -epoch
+            # or
+            # e ** -epoch
             #
             # TODO: explore the best scheme for shrinking imputation weight
             #
@@ -317,23 +352,28 @@ class Class1BindingPredictor(PredictorBase):
 
             if use_pretrain_data:
                 combined_weights[:n_pretrain] *= decay_factor
-                self.model.fit(
-                    X_combined,
-                    Y_combined,
-                    sample_weight=combined_weights,
-                    nb_epoch=1,
-                    verbose=0,
-                    batch_size=batch_size,
-                    shuffle=True)
+                X_curr_iter = X_combined
+                Y_curr_iter = Y_combined
+                weights_curr_iter = combined_weights
             else:
-                self.model.fit(
-                    X_combined[n_pretrain:],
-                    Y_combined[n_pretrain:],
-                    sample_weight=combined_weights[n_pretrain:],
-                    nb_epoch=1,
-                    verbose=0,
-                    batch_size=batch_size,
-                    shuffle=True)
+                X_curr_iter = X_combined[n_pretrain:]
+                Y_curr_iter = Y_combined[n_pretrain:]
+                weights_curr_iter = combined_weights[n_pretrain:]
+
+            X_curr_iter, Y_curr_iter, weights_curr_iter = \
+                self._extend_with_negative_random_samples(
+                    X_curr_iter,
+                    Y_curr_iter,
+                    weights_curr_iter)
+
+            self.model.fit(
+                X_curr_iter,
+                Y_curr_iter,
+                sample_weight=weights_curr_iter,
+                nb_epoch=1,
+                verbose=0,
+                batch_size=batch_size,
+                shuffle=True)
 
     @classmethod
     def from_allele_name(
