@@ -37,7 +37,8 @@ from .serialization_helpers import (
 from .peptide_encoding import check_valid_index_encoding_array
 from .feedforward_hyperparameters import LOSS, OPTIMIZER
 from .regression_target import MAX_IC50
-from .training_helpers import check_training_data_shapes
+from .dataset import Dataset
+from .training_helpers import combine_training_arrays
 
 _allele_predictor_cache = {}
 
@@ -133,70 +134,6 @@ class Class1BindingPredictor(PredictorBase):
             kmer_size=peptide_length,
             **kwargs)
 
-    def _combine_training_data(
-            self,
-            X,
-            Y,
-            sample_weights,
-            X_pretrain,
-            Y_pretrain,
-            sample_weights_pretrain,
-            verbose=False):
-        """
-        Make sure the shapes of given training and pre-training data
-        conform with each other. Then concatenate the pre-training and the
-        training data.
-
-        Returns (X_combined, Y_combined, weights_combined, n_pretrain_samples)
-        """
-        X = np.asarray(X)
-        Y = np.asarray(Y)
-
-        if sample_weights is None:
-            sample_weights = np.ones_like(Y)
-        else:
-            sample_weights = np.asarray(sample_weights)
-
-        n_samples, n_dims = check_training_data_shapes(X, Y, sample_weights)
-
-        if X_pretrain is None or Y_pretrain is None:
-            X_pretrain = np.empty((0, n_dims), dtype=X.dtype)
-            Y_pretrain = np.empty((0,), dtype=Y.dtype)
-        else:
-            X_pretrain = np.asarray(X_pretrain)
-            Y_pretrain = np.asarray(Y_pretrain)
-
-        if sample_weights_pretrain is None:
-            sample_weights_pretrain = np.ones_like(Y_pretrain)
-        else:
-            sample_weights_pretrain = np.asarray(sample_weights_pretrain)
-
-        n_pretrain_samples, n_pretrain_dims = check_training_data_shapes(
-            X_pretrain, Y_pretrain, sample_weights_pretrain)
-
-        if Y.min() < 0:
-            raise ValueError("Minimum value of Y can't be negative, got %f" % (
-                Y.min()))
-        if Y.max() > 1:
-            raise ValueError("Maximum value of Y can't be greater than 1, got %f" % (
-                Y.max()))
-
-        if len(Y_pretrain) > 0 and Y_pretrain.min() < 0:
-            raise ValueError("Minimum value of Y_pretrain can't be negative, got %f" % (
-                Y.min()))
-
-        if len(Y_pretrain) > 0 and Y_pretrain.max() > 1:
-            raise ValueError("Maximum value of Y_pretrain can't be greater than 1, got %f" % (
-                Y.max()))
-
-        X_combined = np.vstack([X_pretrain, X])
-        Y_combined = np.concatenate([Y_pretrain, Y])
-        combined_weights = np.concatenate([
-            sample_weights_pretrain,
-            sample_weights,
-        ])
-        return X_combined, Y_combined, combined_weights, n_pretrain_samples
-
     def _extend_with_negative_random_samples(
             self, X, Y, weights, n_random_negative_samples):
         """
@@ -240,7 +177,7 @@ class Class1BindingPredictor(PredictorBase):
         assert len(weights_with_negative) == len(weights) + n_random_negative_samples
         return X_with_negative, Y_with_negative, weights_with_negative
 
-    def fit(
+    def fit_kmer_encoded_arrays(
             self,
             X,
             Y,
@@ -294,10 +231,9 @@ class Class1BindingPredictor(PredictorBase):
         batch_size : int
         """
         X_combined, Y_combined, combined_weights, n_pretrain = \
-            self._combine_training_data(
+            combine_training_arrays(
                 X, Y, sample_weights,
-                X_pretrain, Y_pretrain, sample_weights_pretrain,
-                verbose=verbose)
+                X_pretrain, Y_pretrain, sample_weights_pretrain)
 
         total_pretrain_sample_weight = combined_weights[:n_pretrain].sum()
         total_train_sample_weight = combined_weights[n_pretrain:].sum()
@@ -426,7 +362,7 @@ class Class1BindingPredictor(PredictorBase):
     def __str__(self):
         return repr(self)
 
-    def predict(self, X):
+    def predict_from_kmer_encoding(self, X):
         """
         Given an encoded array of amino acid indices, returns a vector
         of predicted log IC50 values.
