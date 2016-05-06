@@ -23,7 +23,11 @@ from six import string_types
 import pandas as pd
 import numpy as np
 
-from .dataset_helpers import prepare_pMHC_affinity_arrays, geometric_mean
+from .common import geometric_mean
+from .dataset_helpers import (
+    prepare_pMHC_affinity_arrays,
+    load_dataframe
+)
 
 class Dataset(object):
 
@@ -249,6 +253,27 @@ class Dataset(object):
         """
         return cls.from_allele_to_peptide_to_affinity_dictionary(
             {allele_name: peptide_to_affinity_dict})
+
+    @classmethod
+    def from_csv(
+            cls,
+            filename,
+            sep=None,
+            allele_column_name=None,
+            peptide_column_name=None,
+            affinity_column_name=None):
+        df, allele_column_name, peptide_column_name, affinity_column_name = \
+            load_dataframe(
+                filename=filename,
+                sep=sep,
+                allele_column_name=allele_column_name,
+                peptide_column_name=peptide_column_name,
+                affinity_column_name=affinity_column_name)
+        df = df.rename(columns={
+            allele_column_name: "allele",
+            peptide_column_name: "peptide",
+            affinity_column_name: "affinity"})
+        return cls(df)
 
     def get_allele(self, allele_name):
         """
