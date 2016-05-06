@@ -28,6 +28,7 @@ from .dataset_helpers import (
     prepare_pMHC_affinity_arrays,
     load_dataframe
 )
+from .peptide_encoding import fixed_length_index_encoding
 
 class Dataset(object):
 
@@ -341,6 +342,47 @@ class Dataset(object):
                     new_data_dict["original_peptide"].append((peptide,))
         df = pd.DataFrame(new_data_dict)
         return self.__class__(df)
+
+    def kmer_index_encoding(
+            self,
+            kmer_size=9,
+            allow_unknown_amino_acids=True):
+        """
+        Encode peptides in this dataset using a fixed-length vector
+        representation.
+
+        Parameters
+        ----------
+        kmer_size : int
+            Length of encoding for each peptide
+
+        allow_unknown_amino_acids : bool
+            If True, then extend shorter amino acids using "X" character,
+            otherwise fill in all possible combinations of real amino acids.
+
+        Returns:
+            - 2d array of encoded kmers
+            - 1d array of affinity value corresponding to the source
+              peptide for each kmer
+            - sample_weights (1 / kmer count per peptide)
+            - indices of original peptides from which kmers were extracted
+        """
+        X_index, _, original_peptide_indices, counts = \
+            fixed_length_index_encoding(
+                peptides=self.peptides,
+                desired_length=kmer_size,
+                start_offset_shorten=0,
+                end_offset_shorten=0,
+                start_offset_extend=0,
+                end_offset_extend=0,
+                allow_unknown_amino_acids=allow_unknown_amino_acids)
+        original_peptide_indices = np.asarray(original_peptide_indices)
+        counts = np.asarray(counts)
+        assert len(original_peptide_indices) == len(self.affinities)
+        assert len(counts) == len(self.affinities)
+        kmer_affinities = self.affinities[original_peptide_indices]
+        sample_weights = 1.0 / counts
+        return X_index, kmer_affinities, sample_weights, original_peptide_indices
 
     def imputed_missing_values(
             self,

@@ -28,10 +28,7 @@ from fancyimpute.soft_impute import SoftImpute
 from fancyimpute.mice import MICE
 from fancyimpute.dictionary_helpers import dense_matrix_from_nested_dictionary
 
-from .data import (
-    create_allele_data_from_peptide_to_ic50_dict,
-)
-from .regression_target import regression_target_to_ic50
+from .dataset import Dataset
 
 def _check_dense_pMHC_array(X, peptide_list, allele_list):
     if len(peptide_list) != len(set(peptide_list)):
@@ -164,15 +161,14 @@ def dense_pMHC_matrix_to_nested_dict(X, peptide_list, allele_list):
     return allele_to_peptide_to_ic50_dict
 
 def create_imputed_datasets(
-        allele_data_dict,
+        dataset,
         imputer,
-        min_observations_per_peptide=1,
-        min_observations_per_allele=1):
+        min_observations_per_peptide=2,
+        min_observations_per_allele=2):
     """
     Parameters
     ----------
-    allele_data_dict : dict
-        Dictionary mapping allele names to AlleleData objects
+    allele_data_dict : Dataset
 
     imputer : object
         Expected to have a method imputer.complete(X) which takes an array
@@ -187,51 +183,27 @@ def create_imputed_datasets(
     Returns dictionary mapping allele names to AlleleData objects containing
     imputed affinity values.
     """
-    if len(allele_data_dict) == 0:
-        return {}
-
-    # pick the max IC50 associated with a random AlleleData object and then
-    # make sure that they all agree
-    allele_data_objects = list(allele_data_dict.values())
-    max_ic50 = allele_data_objects[0].max_ic50
-    if not all(allele_data.max_ic50 == max_ic50 for allele_data in allele_data_objects):
-        raise ValueError("AlleleData objects must all use the same max IC50 (%f)" % (
-            max_ic50,))
     X_incomplete, peptide_list, allele_list = create_incomplete_dense_pMHC_matrix(
         allele_data_dict=allele_data_dict,
         min_observations_per_peptide=min_observations_per_peptide,
         min_observations_per_allele=min_observations_per_allele)
+
+    X_incomplete_log = np.log(X_incomplete)
 
     if np.isnan(X_incomplete).sum() == 0:
         # if all entries in the matrix are already filled in then don't
         # try using an imputation algorithm since it might raise an
         # exception.
         logging.warn("No missing values, using original data instead of imputation")
-        X_complete = X_incomplete
+        X_complete_log = X_incomplete_log
     else:
-        X_complete = imputer.complete(X_incomplete)
-
+        X_complete_log = imputer.complete(X_incomplete_log)
+    X_complete = np.exp(X_complete_log)
     allele_to_peptide_to_affinity_dict = dense_pMHC_matrix_to_nested_dict(
         X=X_complete,
         peptide_list=peptide_list,
         allele_list=allele_list)
-
-    # map all the normalized regression targets to IC50 values
-    allele_to_peptide_to_ic50_dict = {
-        allele: {
-            peptide: regression_target_to_ic50(y, max_ic50=max_ic50)
-            for (peptide, y)
-            in allele_dict.items()
-        }
-        for (allele, allele_dict)
-        in allele_to_peptide_to_affinity_dict.items()
-    }
-
-    return {
-        allele_name: create_allele_data_from_peptide_to_ic50_dict(allele_dict)
-        for (allele_name, allele_dict)
-        in allele_to_peptide_to_ic50_dict.items()
-    }
+    return Dataset.from_nested_dictionary(allele_to_peptide_to_affinity_dict)
 
 def imputer_from_name(imputation_method_name, **kwargs):
     """

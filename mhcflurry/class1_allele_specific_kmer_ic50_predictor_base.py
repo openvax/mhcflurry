@@ -158,8 +158,17 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
             Extra arguments are passed on to the fit_encoded_kmer_arrays()
             method.
         """
-        X, Y, sample_weights = dataset.encode()
-        X_pretrain, Y_pretrain, sample_weights_pretrain = pretraining_dataset.encode()
+        X, Y, sample_weights, _ = dataset.kmer_index_encoding(
+            kmer_size=self.kmer_size,
+            allow_unknown_amino_acids=self.allow_unknown_amino_acids)
+
+        if pretraining_dataset is None:
+            X_pretrain = Y_pretrain = sample_weights_pretrain = None
+        else:
+            X_pretrain, Y_pretrain, sample_weights_pretrain = \
+                pretraining_dataset.kmer_index_encoding(
+                    kmer_size=self.kmer_size,
+                    allow_unknown_amino_acids=self.allow_unknown_amino_acids)
         return self.fit_arrays(
             X=X,
             Y=Y,

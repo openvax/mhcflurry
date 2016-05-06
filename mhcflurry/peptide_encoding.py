@@ -128,7 +128,6 @@ def shorten_peptide(
         for i in range(start_offset, end_range)
     ]
 
-
 def fixed_length_from_many_peptides(
         peptides,
         desired_length,
@@ -140,7 +139,6 @@ def fixed_length_from_many_peptides(
     """
     Create a set of fixed-length k-mer peptides from a collection of varying
     length peptides.
-
 
     Shorter peptides are filled in using all possible amino acids at any
     insertion site between start_offset_shorten and -end_offset_shorten
@@ -167,10 +165,10 @@ def fixed_length_from_many_peptides(
 
     Returns three lists:
         - a list of fixed length peptides (all of length `desired_length`)
-        - a list of the original peptides from which subsequences were
-          contracted or lengthened
-        - a list of integers indicating the number of fixed length peptides
-         generated from each variable length peptide.
+        - a list of indices of the original peptides from which subsequences
+          were contracted or lengthened
+        - a list of counts for each fixed length peptide indicating the
+          number extracted from its corresponding shorter/longer peptide
 
     Example:
         kmers, original, counts = fixed_length_from_many_peptides(
@@ -187,7 +185,7 @@ def fixed_length_from_many_peptides(
 
     Parameters
     ----------
-    peptide : list of str
+    peptides : list of str
 
     desired_length : int
 
@@ -202,9 +200,9 @@ def fixed_length_from_many_peptides(
     insert_amino_acid_letters : str | list of characters
     """
     all_fixed_length_peptides = []
-    original_peptide_sequences = []
+    indices = []
     counts = []
-    for peptide in peptides:
+    for i, peptide in enumerate(peptides):
         n = len(peptide)
         if n == desired_length:
             fixed_length_peptides = [peptide]
@@ -228,12 +226,11 @@ def fixed_length_from_many_peptides(
                 start_offset=start_offset_shorten,
                 end_offset=end_offset_shorten,
                 insert_amino_acid_letters=insert_amino_acid_letters)
-
         n_fixed_length = len(fixed_length_peptides)
         all_fixed_length_peptides.extend(fixed_length_peptides)
-        original_peptide_sequences.extend([peptide] * n_fixed_length)
+        indices.extend([i] * n_fixed_length)
         counts.extend([n_fixed_length] * n_fixed_length)
-    return all_fixed_length_peptides, original_peptide_sequences, counts
+    return all_fixed_length_peptides, indices, counts
 
 
 def indices_to_hotshot_encoding(X, n_indices=None, first_index_value=0):
@@ -296,16 +293,17 @@ def fixed_length_index_encoding(
         insert_letters = common_amino_acid_letters
         index_encoding = common_amino_acids.index_encoding
 
-    fixed_length, original, counts = fixed_length_from_many_peptides(
-        peptides=peptides,
-        desired_length=desired_length,
-        start_offset_shorten=start_offset_shorten,
-        end_offset_shorten=end_offset_shorten,
-        start_offset_extend=start_offset_extend,
-        end_offset_extend=end_offset_extend,
-        insert_amino_acid_letters=insert_letters)
-    X_index = index_encoding(fixed_length, desired_length)
-    return (X_index, fixed_length, original, counts)
+    fixed_length, original_peptide_indices, counts = \
+        fixed_length_from_many_peptides(
+            peptides=peptides,
+            desired_length=desired_length,
+            start_offset_shorten=start_offset_shorten,
+            end_offset_shorten=end_offset_shorten,
+            start_offset_extend=start_offset_extend,
+            end_offset_extend=end_offset_extend,
+            insert_amino_acid_letters=insert_letters)
+    X = index_encoding(fixed_length, desired_length)
+    return (X, fixed_length, original_peptide_indices, counts)
 
 def check_valid_index_encoding_array(X, allow_unknown_amino_acids=True):
         X = np.asarray(X)

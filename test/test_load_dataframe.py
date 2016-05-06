@@ -18,24 +18,20 @@ Testing dataframe loading from CSV:
     load_dataframe
     Input:
         filename,
-        peptide_length=None,
-        max_ic50=MAX_IC50,
-        sep=None,
-        species_column_name="species",
-        allele_column_name="mhc",
-        peptide_column_name=None,
-        peptide_length_column_name="peptide_length",
-        ic50_column_name="meas",
-        only_human=True
     Outputs:
-        Tuple with dataframe and name of peptide column
+        Tuple with following elements:
+            - dataframe
+            - name of allele column
+            - name of peptide column
+            - name of affinity column
 """
 
 
-from mhcflurry.data import load_dataframe
+from mhcflurry.dataset_helpers import load_dataframe
 import numpy as np
 from tempfile import NamedTemporaryFile
 from pandas import DataFrame
+from nose.tools import eq_
 
 def make_dummy_dataframe():
     dummy_ic50_values = np.array([
@@ -62,48 +58,13 @@ def test_load_dataframe():
         binding_data_path = f.name
         df_expected.to_csv(binding_data_path, index=False)
 
-        for max_ic50 in [500.0, 50000.0]:
-            df, peptide_column_name = load_dataframe(
-                filename=binding_data_path,
-                max_ic50=max_ic50,
-                only_human=False)
-            assert peptide_column_name == "sequence"
-            assert len(df) == n_expected, \
-                "Expected %d entries in DataFrame but got %d in %s" % (
-                    n_expected,
-                    len(df),
-                    df)
-            assert "regression_output" in df, df.columns
-            expected_values = np.minimum(
-                0,
-                np.log(df["meas"]) / np.log(max_ic50)
-            )
-            np.allclose(df["regression_output"], expected_values)
-
-def test_load_dataframe_human():
-    df_expected = make_dummy_dataframe()
-    human_mask = df_expected["species"] == "human"
-    df_expected = df_expected[human_mask]
-    n_expected = len(df_expected)
-
-    with NamedTemporaryFile(mode="w") as f:
-        binding_data_path = f.name
-        df_expected.to_csv(binding_data_path, index=False)
-
-        for max_ic50 in [500.0, 50000.0]:
-            df, peptide_column_name = load_dataframe(
-                filename=binding_data_path,
-                max_ic50=max_ic50,
-                only_human=True)
-            assert peptide_column_name == "sequence"
-            assert len(df) == n_expected, \
-                "Expected %d entries in DataFrame but got %d in %s" % (
-                    n_expected,
-                    len(df),
-                    df)
-            assert "regression_output" in df, df.columns
-            expected_values = np.minimum(
-                0,
-                np.log(df["meas"]) / np.log(max_ic50)
-            )
-            np.allclose(df["regression_output"], expected_values)
+        df, allele_column_name, peptide_column_name, affinity_column_name = \
+            load_dataframe(filename=binding_data_path)
+        eq_(allele_column_name, "mhc")
+        eq_(peptide_column_name, "sequence")
+        eq_(affinity_column_name, "meas")
+        assert len(df) == n_expected, \
+            "Expected %d entries in DataFrame but got %d in %s" % (
+                n_expected,
+                len(df),
+                df)

@@ -7,7 +7,6 @@ import numpy as np
 
 
 def class1_binding_predictor_A0205_training_accuracy():
-
     dataset = Dataset.from_csv(CLASS1_DATA_CSV_PATH)
     dataset_a0205 = dataset.get_allele("HLA-A0205")
 
