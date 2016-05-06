@@ -62,7 +62,7 @@ class Dataset(object):
         # make allele and peptide columns the index, and copy it
         # so we can add a column without any observable side-effect in
         # the calling code
-        df = df.set_index(["allele", "peptide"])
+        df = df.set_index(["allele", "peptide"], drop=False)
 
         if "sample_weight" not in columns:
             df["sample_weight"] = np.ones(len(df), dtype=float)
@@ -209,6 +209,7 @@ class Dataset(object):
                     "Wrong length for column '%s', expected %d but got %d" % (
                         column_name, column))
             df[column_name] = np.asarray(column)
+        print(df)
         return cls(df)
 
     @classmethod

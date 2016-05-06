@@ -109,7 +109,7 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
         if any(len(peptide) != self.kmer_size for peptide in peptides):
             raise ValueError("Can only predict 9mer peptides")
         X, _ = self.encode_peptides(peptides)
-        return self.predict_scores_for_kmer_array(X)
+        return self.predict_scores_for_kmer_encoded_array(X)
 
     def predict_kmer_peptides_ic50(self, peptides):
         scores = self.predict_scores_for_kmer_peptides(peptides)
@@ -132,7 +132,8 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
         # peptides of lengths other than self.kmer_size get multiple predictions,
         # which are then combined with the combine_fn argument
         multiple_predictions_dict = defaultdict(list)
-        fixed_length_predictions = self.predict(input_matrix)
+        fixed_length_predictions = \
+            self.predict_scores_for_kmer_encoded_array(input_matrix)
         for i, yi in enumerate(fixed_length_predictions):
             original_peptide_index = original_peptide_indices[i]
             original_peptide = peptides[original_peptide_index]

@@ -314,7 +314,7 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
         alleles = alleles_with_models.intersection(alleles_with_weights)
         return list(sorted(alleles))
 
-    def predict_scores_for_kmer_array(self, X):
+    def predict_scores_for_kmer_encoded_array(self, X):
         """
         Given an encoded array of amino acid indices, returns a vector
         of predicted log IC50 values.
