@@ -12,17 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dummy_predictors import (
+from dummy_models import (
     always_zero_predictor_with_unknown_AAs,
     always_one_predictor_with_unknown_AAs,
 )
 from mhcflurry import Ensemble
+from nose.tools import eq_
 
 def test_ensemble_of_dummy_predictors():
     ensemble = Ensemble([
         always_one_predictor_with_unknown_AAs,
         always_zero_predictor_with_unknown_AAs])
     peptides = ["SYYFFYLLY"]
-    y = ensemble.predict(peptides)
-    assert len(y) == len(peptides)
-    assert all(yi == 0.5 for yi in y)
+    y = ensemble.predict_scores(peptides)
+    eq_(len(y), len(peptides))
+    assert all(yi == 0.5 for yi in y), y

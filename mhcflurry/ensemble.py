@@ -22,7 +22,7 @@ from os.path import splitext, join
 
 import numpy as np
 
-from .regression_target import MAX_IC50
+from .regression_target import MAX_IC50, regression_target_to_ic50
 
 class Ensemble(object):
     def __init__(self, predictors):
@@ -66,16 +66,22 @@ class Ensemble(object):
             raise ValueError("Base name for serialized models required")
         raise ValueError("Not yet implemented")
 
+    def predict_scores(self, peptides):
+        """
+        Returns the average score across all predictors.
+        """
+        n = len(peptides)
+        y_combined = np.zeros(n)
+        for predictor in self.predictors:
+            y = predictor.predict_scores(peptides)
+            assert len(y) == len(y_combined)
+            y_combined += y
+        return y_combined / len(self.predictors)
+
     def predict(self, peptides):
         """
         Returns the geometric mean of predictions from all predictors in
         the ensemble
         """
-        n = len(peptides)
-        y_combined = np.zeros(n)
-        for predictor in self.predictors:
-            y = predictor.predict(peptides)
-            assert len(y) == len(y_combined)
-            y_combined += np.log(y)
-        y_combined /= len(self.predictors)
-        return np.exp(y_combined)
+        average_scores = self.predict_scores(peptides)
+        return regression_target_to_ic50(average_scores, max_ic50=self.max_ic50)
