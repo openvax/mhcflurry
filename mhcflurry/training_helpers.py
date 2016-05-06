@@ -109,3 +109,49 @@ def combine_training_arrays(
     ])
     return X_combined, Y_combined, combined_weights, n_pretrain_samples
 
+
+def extend_with_negative_random_samples(
+        X, Y, weights, n_random_negative_samples, max_amino_acid_encoding_value):
+    """
+    Extend training data with randomly generated negative samples. Assumes that
+    X is an integer array of amino acid indices for fixed length peptides.
+
+    Parameters
+    ----------
+    X : numpy.ndarray
+        2d array of integer amino acid encodings
+
+    Y : numpy.ndarray
+        1d array of regression targets
+
+    weights : numpy.ndarray
+        1d array of sample weights (must be same length as X and Y)
+
+    n_random_negative_samples : int
+        Number of random negative samplex to create
+
+    max_amino_acid_encoding_value : int
+        Typically 20 for the standard set of amino acids or 21 if we're
+        including the null character "X" used to extend 8mers into 9mers
+
+    Returns X, Y, weights (extended with random negative samples)
+    """
+    assert len(X) == len(Y) == len(weights)
+    if n_random_negative_samples == 0:
+        return X, Y, weights
+    n_cols = X.shape[1]
+    X_random = np.random.randint(
+        low=0,
+        high=max_amino_acid_encoding_value,
+        size=(n_random_negative_samples, n_cols)).astype(X.dtype)
+    Y_random = np.zeros(n_random_negative_samples, dtype=float)
+    weights_random = np.ones(n_random_negative_samples, dtype=float)
+    X_with_negative = np.vstack([X, X_random])
+    Y_with_negative = np.concatenate([Y, Y_random])
+    weights_with_negative = np.concatenate([
+        weights,
+        weights_random])
+    assert len(X_with_negative) == len(X) + n_random_negative_samples
+    assert len(Y_with_negative) == len(Y) + n_random_negative_samples
+    assert len(weights_with_negative) == len(weights) + n_random_negative_samples
+    return X_with_negative, Y_with_negative, weights_with_negative

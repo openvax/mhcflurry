@@ -17,7 +17,8 @@ from __future__ import (
     division,
     absolute_import,
 )
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
+from six import string_types
 
 import pandas as pd
 import numpy as np
@@ -53,21 +54,24 @@ class Dataset(object):
         ----------
         df : pandas.DataFrame
         """
-        # since we're going to be modifying the DataFrame, first make a copy of it
-        df = df.copy()
+        columns = set(df.columns)
 
-        if "sample_weight" in df.columns:
+        for expected_column_name in {"allele", "peptide", "affinity"}:
+            if expected_column_name not in columns:
+                raise ValueError("Missing column '%s' from DataFrame")
+        # make allele and peptide columns the index, and copy it
+        # so we can add a column without any observable side-effect in
+        # the calling code
+        df = df.set_index(["allele", "peptide"])
+
+        if "sample_weight" not in columns:
             df["sample_weight"] = np.ones(len(df), dtype=float)
 
-        if set(df.columns) != {"allele", "peptide", "affinity", "sample_weight"}:
-            raise ValueError("Wrong columns in DataFrame: %s" % (df.columns,))
-
-        df.set_index(["allele", "peptide"])
         self._df = df
-        self._alleles = df["allele"]
-        self._peptides = df["peptide"]
-        self._affinities = df["affinity"]
-        self._sample_weights = df["sample_weight"]
+        self._alleles = np.asarray(df["allele"])
+        self._peptides = np.asarray(df["peptide"])
+        self._affinities = np.asarray(df["affinity"])
+        self._sample_weights = np.asarray(df["sample_weight"])
 
     def to_dataframe(self):
         """
@@ -106,16 +110,16 @@ class Dataset(object):
     def __len__(self):
         return len(self.to_dataframe())
 
-    def itertuples(self):
+    def iterrows(self):
         """
-        Iterates through the pMHC entries, returning a tuple for each one
-        with the following elements:
-            - allele
-            - peptide
-            - affinity
-            - sample_weight
+        Iterate over tuples containing: (allele, peptide), other_fields
+        for each pMHC measurement.
         """
-        return zip(self.alleles, self.peptides, self.affinities, self.sample_weights)
+        return self.to_dataframe().iterrows()
+
+    @property
+    def columns(self):
+        return self.to_dataframe().columns
 
     def unique_alleles(self):
         return set(self.alleles)
@@ -163,20 +167,30 @@ class Dataset(object):
             }
 
     @classmethod
-    def from_sequences(cls, alleles, peptides, affinities, sample_weights=None):
+    def from_sequences(
+            cls,
+            alleles,
+            peptides,
+            affinities,
+            sample_weights=None,
+            extra_columns={}):
         """
         Parameters
         ----------
-        alleles : numpy.ndarray or list
+        alleles : numpy.ndarray, pandas.Series, or list
             Name of allele for that pMHC measurement
 
-        peptides : numpy.ndarray or list
+        peptides : numpy.ndarray, pandas.Series, or list
             Sequence of peptide in that pMHC measurement.
 
-        affinities : numpy.ndarray or list
+        affinities : numpy.ndarray, pandas.Series, or list
             Affinity value (typically IC50 concentration) for that pMHC
 
         sample_weights : numpy.ndarray of float, optional
+
+        extra_columns : dict
+            Dictionary of any extra properties associated with a
+            pMHC measurement
         """
         alleles, peptides, affinities, sample_weights = \
             prepare_pMHC_affinity_arrays(
@@ -189,6 +203,12 @@ class Dataset(object):
         df["peptide"] = peptides
         df["affinity"] = affinities
         df["sample_weight"] = sample_weights
+        for column_name, column in extra_columns.items():
+            if len(column) != len(alleles):
+                raise ValueError(
+                    "Wrong length for column '%s', expected %d but got %d" % (
+                        column_name, column))
+            df[column_name] = np.asarray(column)
         return cls(df)
 
     @classmethod
@@ -257,30 +277,44 @@ class Dataset(object):
         new peptides is identical to the original, but sample weights are
         divided across the number of new peptides.
         """
-        alleles = []
-        peptides = []
-        affinities = []
-        sample_weights = []
-        for (allele, peptide, affinity, weight) in self.itertuples():
+        columns = self.to_dataframe().columns
+        new_data_dict = OrderedDict(
+            (column_name, [])
+            for column_name in columns
+        )
+        if "original_peptide" not in new_data_dict:
+            create_original_peptide_column = True
+            new_data_dict["original_peptide"] = []
+
+        for (allele, peptide), row in self.iterrows():
             new_peptides = peptide_fn(peptide)
             n = len(new_peptides)
+            weight = row["sample_weight"]
+            # we're either going to create a fresh original peptide column
+            # or extend the existing original peptide tuple that tracks
+            # the provenance of entries in the new Dataset
+            original_peptide = row.get("original_peptide")
+            if original_peptide is None:
+                original_peptide = ()
+            elif isinstance(original_peptide, string_types):
+                original_peptide = (original_peptide,)
+            else:
+                original_peptide = tuple(original_peptide)
+
             for new_peptide in new_peptides:
-                alleles.append(allele)
-                peptides.append(new_peptide)
-                affinities.append(affinity)
-                sample_weights.append(weight / n)
-        return self.from_sequences(
-            alleles=alleles,
-            peptides=peptides,
-            affinities=affinities,
-            sample_weights=sample_weights)
-
-    def __getitem__(self, allele_name):
-        return self.get_allele(allele_name)
-
-    def __setitem__(self, allele_name, new_dataset):
-        raise ValueError(
-            "Cannot modify Dataset, use replace_allele() to get a new Dataset object")
+                for column_name in columns:
+                    if column_name == "peptide":
+                        new_data_dict["peptide"].append(new_peptide)
+                    elif column_name == "sample_weight":
+                        new_data_dict["sample_weight"].append(weight / n)
+                    elif column_name == "original_peptide":
+                        new_data_dict["original_peptide"] = original_peptide + (peptide,)
+                    else:
+                        new_data_dict[column_name].append(row[column_name])
+                if create_original_peptide_column:
+                    new_data_dict["original_peptide"].append((peptide,))
+        df = pd.DataFrame(new_data_dict)
+        return self.__class__(df)
 
     def imputed_missing_values(
             self,

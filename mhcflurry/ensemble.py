@@ -23,22 +23,9 @@ from os.path import splitext, join
 import numpy as np
 
 from .regression_target import MAX_IC50
-from .predictor_base import PredictorBase
 
-class Ensemble(PredictorBase):
-    def __init__(
-            self,
-            predictors,
-            name=None,
-            max_ic50=MAX_IC50,
-            allow_unknown_amino_acids=True,
-            verbose=False):
-        PredictorBase.__init__(
-            self,
-            name=name,
-            max_ic50=max_ic50,
-            allow_unknown_amino_acids=allow_unknown_amino_acids,
-            verbose=verbose)
+class Ensemble(object):
+    def __init__(self, predictors):
         self.predictors = predictors
 
     @classmethod
@@ -49,7 +36,8 @@ class Ensemble(PredictorBase):
             name=None,
             allow_unknown_amino_acids=True,
             max_ic50=MAX_IC50,
-            verbose=False):
+            verbose=False,
+            **kwargs):
         filenames = listdir(directory_path)
         filename_set = set(filenames)
         predictors = []
@@ -66,14 +54,10 @@ class Ensemble(PredictorBase):
                         name=name + ("_%d" % (len(predictors))),
                         max_ic50=max_ic50,
                         allow_unknown_amino_acids=allow_unknown_amino_acids,
-                        verbose=verbose)
+                        verbose=verbose,
+                        **kwargs)
                     predictors.append(predictor)
-        return cls(
-            predictors,
-            name=name,
-            max_ic50=max_ic50,
-            allow_unknown_amino_acids=allow_unknown_amino_acids,
-            verbose=verbose)
+        return cls(predictors)
 
     def to_directory(self, directory_path, base_name=None):
         if not base_name:
@@ -82,16 +66,16 @@ class Ensemble(PredictorBase):
             raise ValueError("Base name for serialized models required")
         raise ValueError("Not yet implemented")
 
-    def predict(self, X):
-        X = np.asarray(X)
-        if len(X.shape) != 2:
-            raise ValueError("Expected encoded peptides to be 2d, got %s array" % (
-                X.shape,))
-        n = len(X)
+    def predict(self, peptides):
+        """
+        Returns the geometric mean of predictions from all predictors in
+        the ensemble
+        """
+        n = len(peptides)
         y_combined = np.zeros(n)
         for predictor in self.predictors:
-            y = predictor.predict(X)
+            y = predictor.predict(peptides)
             assert len(y) == len(y_combined)
-            y_combined += y
+            y_combined += np.log(y)
         y_combined /= len(self.predictors)
-        return y_combined
+        return np.exp(y_combined)

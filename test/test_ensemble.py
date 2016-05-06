@@ -23,6 +23,6 @@ def test_ensemble_of_dummy_predictors():
         always_one_predictor_with_unknown_AAs,
         always_zero_predictor_with_unknown_AAs])
     peptides = ["SYYFFYLLY"]
-    y = ensemble.predict_peptides(peptides)
+    y = ensemble.predict(peptides)
     assert len(y) == len(peptides)
     assert all(yi == 0.5 for yi in y)

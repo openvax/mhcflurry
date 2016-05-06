@@ -29,7 +29,9 @@ import numpy as np
 from .common import normalize_allele_name
 from .paths import CLASS1_MODEL_DIRECTORY
 from .feedforward import make_embedding_network
-from .predictor_base import PredictorBase
+from .class1_allele_specific_kmer_ic50_predictor_base import (
+    Class1AlleleSpecificKmerIC50PredictorBase,
+)
 from .serialization_helpers import (
     load_keras_model_from_disk,
     save_keras_model_to_disk
@@ -37,12 +39,14 @@ from .serialization_helpers import (
 from .peptide_encoding import check_valid_index_encoding_array
 from .feedforward_hyperparameters import LOSS, OPTIMIZER
 from .regression_target import MAX_IC50
-from .dataset import Dataset
-from .training_helpers import combine_training_arrays
+from .training_helpers import (
+    combine_training_arrays,
+    extend_with_negative_random_samples,
+)
 
 _allele_predictor_cache = {}
 
-class Class1BindingPredictor(PredictorBase):
+class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
     """
     Allele-specific Class I MHC binding predictor which uses
     fixed-length (k-mer) index encoding for inputs and outputs
@@ -56,7 +60,7 @@ class Class1BindingPredictor(PredictorBase):
             allow_unknown_amino_acids=True,
             verbose=False,
             kmer_size=9):
-        PredictorBase.__init__(
+        Class1AlleleSpecificKmerIC50PredictorBase.__init__(
             self,
             name=name,
             max_ic50=max_ic50,
@@ -133,49 +137,6 @@ class Class1BindingPredictor(PredictorBase):
             allow_unknown_amino_acids=allow_unknown_amino_acids,
             kmer_size=peptide_length,
             **kwargs)
-
-    def _extend_with_negative_random_samples(
-            self, X, Y, weights, n_random_negative_samples):
-        """
-        Extend training data with randomly generated negative samples.
-        This only works since most random peptides will not bind to a
-        particular allele.
-
-        Parameters
-        ----------
-        X : numpy.ndarray
-            2d array of integer amino acid encodings
-
-        Y : numpy.ndarray
-            1d array of regression targets
-
-        weights : numpy.ndarray
-            1d array of sample weights (must be same length as X and Y)
-
-        n_random_negative_samples : int
-            Number of random negative samplex to create
-
-        Returns X, Y, weights (extended with random negative samples)
-        """
-        assert len(X) == len(Y) == len(weights)
-        if n_random_negative_samples == 0:
-            return X, Y, weights
-        n_cols = X.shape[1]
-        X_random = np.random.randint(
-            low=0,
-            high=self.max_amino_acid_encoding_value,
-            size=(n_random_negative_samples, n_cols)).astype(X.dtype)
-        Y_random = np.zeros(n_random_negative_samples, dtype=float)
-        weights_random = np.ones(n_random_negative_samples, dtype=float)
-        X_with_negative = np.vstack([X, X_random])
-        Y_with_negative = np.concatenate([Y, Y_random])
-        weights_with_negative = np.concatenate([
-            weights,
-            weights_random])
-        assert len(X_with_negative) == len(X) + n_random_negative_samples
-        assert len(Y_with_negative) == len(Y) + n_random_negative_samples
-        assert len(weights_with_negative) == len(weights) + n_random_negative_samples
-        return X_with_negative, Y_with_negative, weights_with_negative
 
     def fit_kmer_encoded_arrays(
             self,
@@ -291,11 +252,12 @@ class Class1BindingPredictor(PredictorBase):
                 weights_curr_iter = combined_weights[n_pretrain:]
 
             X_curr_iter, Y_curr_iter, weights_curr_iter = \
-                self._extend_with_negative_random_samples(
+                extend_with_negative_random_samples(
                     X_curr_iter,
                     Y_curr_iter,
                     weights_curr_iter,
-                    n_random_negative_samples)
+                    n_random_negative_samples,
+                    max_amino_acid_encoding_value=self.max_amino_acid_encoding_value)
 
             self.model.fit(
                 X_curr_iter,
@@ -352,17 +314,7 @@ class Class1BindingPredictor(PredictorBase):
         alleles = alleles_with_models.intersection(alleles_with_weights)
         return list(sorted(alleles))
 
-    def __repr__(self):
-        return "%s(name=%s, model=%s, max_ic50=%f)" % (
-            self.__class__.__name__,
-            self.name,
-            self.model,
-            self.max_ic50)
-
-    def __str__(self):
-        return repr(self)
-
-    def predict_from_kmer_encoding(self, X):
+    def predict_scores_for_kmer_array(self, X):
         """
         Given an encoded array of amino acid indices, returns a vector
         of predicted log IC50 values.

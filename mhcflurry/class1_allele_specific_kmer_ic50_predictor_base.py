@@ -28,15 +28,13 @@ from .amino_acid import (
     common_amino_acids
 )
 from .regression_target import regression_target_to_ic50, MAX_IC50
-from .dataset import Dataset
+from .ic50_predictor_base import IC50PredictorBase
 
-
-class PredictorBase(object):
+class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
     """
     Base class for all mhcflurry predictors which used fixed-length
-    k-mer representation of peptides. Eventually will need to move this code
-    to something like FixedLengthPredictor to fit RNN-based sequence
-    predictors into the inheritance hierarchy.
+    k-mer representation of peptides and don't require scanning over
+    a longer sequence to find a binding core (like you might for Class II).
     """
     def __init__(
             self,
@@ -50,6 +48,17 @@ class PredictorBase(object):
         self.allow_unknown_amino_acids = allow_unknown_amino_acids
         self.verbose = verbose
         self.kmer_size = kmer_size
+
+    def __repr__(self):
+        return "%s(name=%s, max_ic50=%f, allow_unknown_amino_acids=%s, kmer_size=%d)" % (
+            self.__class__.__name__,
+            self.name,
+            self.max_ic50,
+            self.allow_unknown_amino_acids,
+            self.kmer_size)
+
+    def __str__(self):
+        return repr(self)
 
     @property
     def amino_acids(self):
@@ -93,17 +102,17 @@ class PredictorBase(object):
             "Expected shape %s but got %s" % (expected_shape, combined_matrix.shape)
         return combined_matrix, index_array
 
-    def _predict_kmer_peptides(self, peptides):
+    def predict_scores_for_kmer_peptides(self, peptides):
         """
         Predict binding affinity for 9mer peptides
         """
         if any(len(peptide) != self.kmer_size for peptide in peptides):
             raise ValueError("Can only predict 9mer peptides")
         X, _ = self.encode_peptides(peptides)
-        return self.predict(X)
+        return self.predict_scores_for_kmer_array(X)
 
-    def _predict_kmer_peptides_ic50(self, peptides):
-        scores = self.predict_kmer_peptides(peptides)
+    def predict_kmer_peptides_ic50(self, peptides):
+        scores = self.predict_scores_for_kmer_peptides(peptides)
         return regression_target_to_ic50(scores, max_ic50=self.max_ic50)
 
     def predict_scores(self, peptides, combine_fn=np.mean):
@@ -134,28 +143,6 @@ class PredictorBase(object):
         }
         return np.array([combined_predictions_dict[p] for p in peptides])
 
-    def predict(self, peptides):
-        """
-        Predict IC50 affinities for peptides of any length
-        """
-        scores = self.predict_peptides(peptides)
-        return regression_target_to_ic50(scores, max_ic50=self.max_ic50)
-
-    def fit_dictionary(self, peptide_to_ic50_dict, **kwargs):
-        """
-        Fit the model parameters using the given peptide->IC50 dictionary,
-        all samples are given the same weight.
-
-        Parameters
-        ----------
-        peptide_to_ic50_dict : dict
-            Dictionary that maps peptides to IC50 values.
-        """
-        dataset = Dataset.from_peptide_to_affinity_dictionary(
-            allele_name=self.name,
-            peptide_to_affinity_dict=peptide_to_ic50_dict)
-        return self.fit_dataset(dataset, **kwargs)
-
     def fit_dataset(self, dataset, pretraining_dataset=None, *args, **kwargs):
         """
         Fit the model parameters on the given training data.
@@ -180,12 +167,3 @@ class PredictorBase(object):
             Y_pretrain=Y_pretrain,
             sample_weights_pretrain=sample_weights,
             **kwargs)
-
-    def fit_sequences(self, peptides, affinities, sample_weights=None, **kwargs):
-        alleles = [self.name] * len(peptides)
-        dataset = Dataset.from_sequences(
-            alleles=alleles,
-            peptides=peptides,
-            affinities=affinities,
-            sample_weights=sample_weights)
-        return self.fit_dataset(dataset, **kwargs)

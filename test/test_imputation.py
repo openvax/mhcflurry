@@ -61,13 +61,14 @@ def test_performance_improves_for_A0205_with_pretraining():
     Y_true = a0205_data_without_imputation.Y
     sample_weights = a0205_data_without_imputation.weights
 
-    predictor_without_imputation.fit(
+    predictor_without_imputation.fit_kmer_encoded_arrays(
         X=X_index,
         Y=Y_true,
         sample_weights=sample_weights,
         n_training_epochs=10)
 
-    Y_pred_without_imputation = predictor_without_imputation.predict(X_index)
+    Y_pred_without_imputation = \
+        predictor_without_imputation.predict_scores_for_kmer_array(X_index)
     print("Y_pred without imputation: %s" % (Y_pred_without_imputation,))
     mse_without_imputation = np.mean((Y_true - Y_pred_without_imputation) ** 2)
     print("MSE w/out imputation: %f" % mse_without_imputation)
@@ -86,7 +87,7 @@ def test_performance_improves_for_A0205_with_pretraining():
     predictor_with_imputation = \
         Class1BindingPredictor.from_hyperparameters(name="A0205-impute")
 
-    predictor_with_imputation.fit(
+    predictor_with_imputation.fit_kmer_encoded_arrays(
         X=X_index,
         Y=Y_true,
         sample_weights=sample_weights,
@@ -95,7 +96,8 @@ def test_performance_improves_for_A0205_with_pretraining():
         sample_weights_pretrain=sample_weights_imputed,
         n_training_epochs=10)
 
-    Y_pred_with_imputation = predictor_with_imputation.predict(X_index)
+    Y_pred_with_imputation = \
+        predictor_with_imputation.predict_scores_for_kmer_array(X_index)
     mse_with_imputation = np.mean((Y_true - Y_pred_with_imputation) ** 2)
     print("MSE w/ imputation: %f" % (mse_with_imputation,))
 
