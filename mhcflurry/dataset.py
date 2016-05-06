@@ -115,6 +115,33 @@ class Dataset(object):
     def __len__(self):
         return len(self.to_dataframe())
 
+    def __str__(self):
+        return "Dataset(n=%d, alleles=%s)" % (
+            len(self), self.unique_alleles())
+
+    def __eq__(self, other):
+        """
+        Two datasets are equal if they contain the same number of samples
+        with the same properties and values.
+        """
+        if len(self) != len(other):
+            return False
+
+        if len(self.columns) != len(other.columns):
+            return False
+
+        for ci, cj in zip(self.columns, other.columns):
+            if ci != cj:
+                return False
+
+        self_df = self.to_dataframe()
+        other_df = other.to_dataframe()
+
+        for column_name in self.columns:
+            if not (self_df[column_name] == other_df[column_name]).all():
+                return False
+        return True
+
     def iterrows(self):
         """
         Iterate over tuples containing: (allele, peptide), other_fields
@@ -137,7 +164,6 @@ class Dataset(object):
         Returns a dictionary mapping each allele name to a Dataset containing
         just that allele's data.
         """
-
         return {
             allele_name: Dataset(group_df)
             for (allele_name, group_df)
@@ -227,7 +253,7 @@ class Dataset(object):
         return cls(df)
 
     @classmethod
-    def from_allele_to_peptide_to_affinity_dictionary(
+    def from_nested_dictionary(
             cls, allele_to_peptide_to_affinity_dict):
         """
         Given nested dictionaries mapping allele -> peptide -> affinity,
@@ -247,7 +273,10 @@ class Dataset(object):
             affinities=affinities)
 
     @classmethod
-    def from_peptide_to_affinity_dictionary(cls, allele_name, peptide_to_affinity_dict):
+    def from_single_allele_dictionary(
+            cls,
+            allele_name,
+            peptide_to_affinity_dict):
         """
         Given a peptide->affinity dictionary for a single allele,
         create a Dataset.
@@ -285,6 +314,23 @@ class Dataset(object):
         df = self.to_dataframe()
         df_allele = df[df.allele == allele_name]
         return self.__class__(df_allele)
+
+    def get_alleles(self, allele_names):
+        """
+        Restrict Dataset to several allele names.
+        """
+        datasets = []
+        for allele_name in allele_names:
+            datasets.append(self.get_allele(allele_name))
+        return self.concat(datasets)
+
+    @classmethod
+    def concat(cls, datasets):
+        """
+        Concatenate several datasets into a single object.
+        """
+        dataframes = [dataset.to_dataframe() for dataset in datasets]
+        return cls(pd.concat(dataframes))
 
     def replace_allele(self, allele_name, new_dataset):
         """
@@ -383,6 +429,27 @@ class Dataset(object):
         kmer_affinities = self.affinities[original_peptide_indices]
         sample_weights = 1.0 / counts
         return X_index, kmer_affinities, sample_weights, original_peptide_indices
+
+    def to_dense_pMHC_affinity_matrix(self):
+        """
+        Returns a tuple with a dense matrix of affinities, a dense matrix of
+        sample weights, a list of peptide labels for each row and a list of
+        allele labels for each column.
+        """
+        allele_to_peptide_to_affinity_dict = self.to_nested_dictionary()
+        peptides_list = list(sorted(self.unique_peptides()))
+        peptide_order = {p: i for (i, p) in enumerate(peptides_list)}
+        n_peptides = len(peptides_list)
+        alleles_list = list(sorted(self.unique_alleles()))
+        allele_order = {a: i for (i, a) in enumerate(alleles_list)}
+        n_alleles = alleles_list
+        X = np.ones((n_peptides, n_alleles))
+        for (allele, allele_dict) in allele_to_peptide_to_affinity_dict.items():
+            column_index = allele_order[allele]
+            for (peptide, affinity) in allele_dict.items():
+                row_index = peptide_order[peptide]
+                X[row_index, column_index] = affinity
+        return X, peptides_list, alleles_list
 
     def imputed_missing_values(
             self,

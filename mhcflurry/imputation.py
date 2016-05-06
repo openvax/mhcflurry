@@ -26,7 +26,6 @@ from fancyimpute.iterative_svd import IterativeSVD
 from fancyimpute.simple_fill import SimpleFill
 from fancyimpute.soft_impute import SoftImpute
 from fancyimpute.mice import MICE
-from fancyimpute.dictionary_helpers import dense_matrix_from_nested_dictionary
 
 from .dataset import Dataset
 
@@ -103,50 +102,6 @@ def prune_dense_matrix_and_labels(
     _check_dense_pMHC_array(X, peptide_list, allele_list)
     return X, peptide_list, allele_list
 
-
-def create_incomplete_dense_pMHC_matrix(
-        allele_data_dict,
-        min_observations_per_peptide=1,
-        min_observations_per_allele=1):
-    """
-    Given a dictionary mapping each allele name onto an AlleleData object,
-    returns a tuple with a dense matrix of affinities, a list of peptide labels
-    for each row and a list of allele labels for each column.
-
-    Parameters
-    ----------
-    allele_data_dict : dict
-        Dictionary mapping allele names to AlleleData objects
-
-    imputer : object
-        Expected to have a method imputer.complete(X) which takes an array
-        with missing entries marked by NaN and returns a completed array.
-
-    min_observations_per_peptide : int
-        Drop peptide rows with fewer than this number of observed values.
-
-    min_observations_per_allele : int
-        Drop allele columns with fewer than this number of observed values.
-    """
-    peptide_to_allele_to_affinity_dict = defaultdict(dict)
-    for (allele_name, allele_data) in allele_data_dict.items():
-        for peptide, affinity in zip(
-                allele_data.original_peptides,
-                allele_data.Y):
-            if allele_name not in peptide_to_allele_to_affinity_dict[peptide]:
-                peptide_to_allele_to_affinity_dict[peptide][allele_name] = affinity
-
-    X, peptide_list, allele_list = \
-        dense_matrix_from_nested_dictionary(peptide_to_allele_to_affinity_dict)
-    _check_dense_pMHC_array(X, peptide_list, allele_list)
-
-    return prune_dense_matrix_and_labels(
-        X,
-        peptide_list,
-        allele_list,
-        min_observations_per_peptide=min_observations_per_peptide,
-        min_observations_per_allele=min_observations_per_allele)
-
 def dense_pMHC_matrix_to_nested_dict(X, peptide_list, allele_list):
     """
     Converts a dense matrix of (n_peptides, n_alleles) floats to a nested
@@ -183,11 +138,15 @@ def create_imputed_datasets(
     Returns dictionary mapping allele names to AlleleData objects containing
     imputed affinity values.
     """
-    X_incomplete, peptide_list, allele_list = create_incomplete_dense_pMHC_matrix(
-        allele_data_dict=allele_data_dict,
+    X_incomplete, peptide_list, allele_list = dataset.to_dense_pMHC_affinity_matrix()
+
+    _check_dense_pMHC_array(X_incomplete, peptide_list, allele_list)
+
+    # drop alleles and peptides with small amounts of data
+    X_incomplete, peptide_list, allele_list = prune_dense_matrix_and_labels(
+        X_incomplete, peptide_list, allele_list,
         min_observations_per_peptide=min_observations_per_peptide,
         min_observations_per_allele=min_observations_per_allele)
-
     X_incomplete_log = np.log(X_incomplete)
 
     if np.isnan(X_incomplete).sum() == 0:
