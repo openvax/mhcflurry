@@ -144,7 +144,7 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
         }
         return np.array([combined_predictions_dict[p] for p in peptides])
 
-    def fit_dataset(self, dataset, pretraining_dataset=None, *args, **kwargs):
+    def fit_dataset(self, dataset, pretraining_dataset=None, **kwargs):
         """
         Fit the model parameters on the given training data.
 
@@ -158,22 +158,22 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
             Extra arguments are passed on to the fit_encoded_kmer_arrays()
             method.
         """
-        X, Y, sample_weights, _ = dataset.kmer_index_encoding(
+        X, ic50, sample_weights, _ = dataset.kmer_index_encoding(
             kmer_size=self.kmer_size,
             allow_unknown_amino_acids=self.allow_unknown_amino_acids)
 
         if pretraining_dataset is None:
-            X_pretrain = Y_pretrain = sample_weights_pretrain = None
+            X_pretrain = ic50_pretrain = sample_weights_pretrain = None
         else:
-            X_pretrain, Y_pretrain, sample_weights_pretrain = \
+            X_pretrain, ic50_pretrain, sample_weights_pretrain, _ = \
                 pretraining_dataset.kmer_index_encoding(
                     kmer_size=self.kmer_size,
                     allow_unknown_amino_acids=self.allow_unknown_amino_acids)
-        return self.fit_arrays(
+        return self.fit_kmer_encoded_arrays(
             X=X,
-            Y=Y,
+            ic50=ic50,
             sample_weights=sample_weights,
             X_pretrain=X_pretrain,
-            Y_pretrain=Y_pretrain,
+            ic50_pretrain=ic50_pretrain,
             sample_weights_pretrain=sample_weights,
             **kwargs)

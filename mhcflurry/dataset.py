@@ -435,6 +435,14 @@ class Dataset(object):
             - sample_weights (1 / kmer count per peptide)
             - indices of original peptides from which kmers were extracted
         """
+        if len(self.peptides) == 0:
+            return (
+                np.array([[]], dtype=int),
+                np.array([], dtype=float),
+                np.array([], dtype=float),
+                np.array([], dtype=int)
+            )
+
         X_index, _, original_peptide_indices, counts = \
             fixed_length_index_encoding(
                 peptides=self.peptides,
@@ -445,6 +453,7 @@ class Dataset(object):
                 end_offset_extend=0,
                 allow_unknown_amino_acids=allow_unknown_amino_acids)
         original_peptide_indices = np.asarray(original_peptide_indices)
+
         counts = np.asarray(counts)
         kmer_affinities = self.affinities[original_peptide_indices]
         kmer_sample_weights = self.sample_weights[original_peptide_indices]

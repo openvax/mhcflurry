@@ -44,11 +44,11 @@ import argparse
 from keras.optimizers import RMSprop
 
 from mhcflurry.common import normalize_allele_name
-from mhcflurry.data import load_allele_datasets
+from mhcflurry.dataset import Dataset
 from mhcflurry.class1_binding_predictor import Class1BindingPredictor
 from mhcflurry.feedforward_hyperparameters import add_hyperparameter_arguments_to_parser
 from mhcflurry.paths import (CLASS1_MODEL_DIRECTORY, CLASS1_DATA_DIRECTORY)
-from mhcflurry.imputation import create_imputed_datasets, imputer_from_name
+from mhcflurry.imputation_helpers import imputer_from_name
 
 CSV_FILENAME = "combined_human_class1_dataset.csv"
 CSV_PATH = join(CLASS1_DATA_DIRECTORY, CSV_FILENAME)
@@ -99,11 +99,8 @@ if __name__ == "__main__":
     if not exists(args.output_dir):
         makedirs(args.output_dir)
 
-    allele_data_dict = load_allele_datasets(
+    dataset = Dataset.from_csv(
         filename=args.binding_data_csv,
-        peptide_length=9,
-        use_multiple_peptide_lengths=True,
-        max_ic50=args.max_ic50,
         sep=",",
         peptide_column_name="peptide")
 
@@ -111,15 +108,9 @@ if __name__ == "__main__":
     alleles = args.alleles
 
     if not alleles:
-        alleles = sorted(allele_data_dict.keys())
-
-    # restrict the data dictionary to only the specified alleles
-    # this also propagates to the imputation logic below, so we don't
-    # impute from other alleles
-    allele_data_dict = {
-        allele: allele_data_dict[allele]
-        for allele in alleles
-    }
+        alleles = list(sorted(dataset.unique_alleles()))
+    else:
+        dataset = dataset.get_alleles(alleles)
 
     if args.imputation_method is None:
         imputer = None
@@ -127,31 +118,19 @@ if __name__ == "__main__":
         imputer = imputer_from_name(args.imputation_method)
 
     if imputer is None:
-        imputed_data_dict = {}
+        imputed_dataset = Dataset.create_empty()
     else:
-        imputed_data_dict = create_imputed_datasets(
-            allele_data_dict,
-            imputer)
+        imputed_dataset = dataset.impute_missing_values(imputer)
 
     for allele_name in alleles:
-        allele_data = allele_data_dict[allele_name]
-        X = allele_data.X_index
-        Y = allele_data.Y
-        weights = allele_data.weights
+        allele_dataset = dataset.get_allele(allele_name)
 
-        n_allele = len(allele_data.Y)
-        assert len(X) == n_allele
-        assert len(weights) == n_allele
+        n_allele = len(allele_dataset)
 
-        if allele_name in imputed_data_dict:
-            imputed_data = imputed_data_dict[allele_name]
-            X_pretrain = imputed_data.X_index
-            Y_pretrain = imputed_data.Y
-            weights_pretrain = imputed_data.weights
+        if allele_name in imputed_dataset.unique_alleles():
+            imputed_dataset_allele = imputed_dataset.get_allele(allele_name)
         else:
-            X_pretrain = None
-            Y_pretrain = None
-            weights_pretrain = None
+            imputed_dataset_allele = Dataset.create_empty()
 
         # normalize allele name to check if it's just
         allele_name = normalize_allele_name(allele_name)
@@ -159,10 +138,9 @@ if __name__ == "__main__":
             print("Skipping allele %s" % (allele_name,))
             continue
 
-        print("\n=== Training predictor for %s: %d samples, %d unique" % (
+        print("\n=== Training predictor for %s: %d samples" % (
             allele_name,
-            n_allele,
-            len(set(allele_data.original_peptides))))
+            n_allele))
 
         model = Class1BindingPredictor.from_hyperparameters(
             name=allele_name,
@@ -197,13 +175,9 @@ if __name__ == "__main__":
             print("-- removing old weights file %s" % hdf_path)
             remove(hdf_path)
 
-        model.fit(
-            X=allele_data.X_index,
-            Y=allele_data.Y,
-            sample_weights=weights,
-            X_pretrain=X_pretrain,
-            Y_pretrain=Y_pretrain,
-            sample_weights_pretrain=weights_pretrain,
+        model.fit_dataset(
+            allele_dataset,
+            pretraining_dataset=imputed_dataset_allele,
             n_training_epochs=args.training_epochs,
             n_random_negative_samples=args.random_negative_samples,
             verbose=True)
