@@ -138,6 +138,7 @@ def create_imputed_datasets(
     Returns dictionary mapping allele names to AlleleData objects containing
     imputed affinity values.
     """
+    assert isinstance(dataset, Dataset), "Expected Dataset, got %s" % (type(dataset),)
     X_incomplete, peptide_list, allele_list = dataset.to_dense_pMHC_affinity_matrix()
 
     _check_dense_pMHC_array(X_incomplete, peptide_list, allele_list)
