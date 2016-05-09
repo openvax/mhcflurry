@@ -18,8 +18,10 @@ from __future__ import (
     absolute_import,
 )
 from collections import defaultdict, OrderedDict
-from six import string_types
+import logging
 
+
+from six import string_types
 import pandas as pd
 import numpy as np
 
@@ -29,6 +31,12 @@ from .dataset_helpers import (
     load_dataframe
 )
 from .peptide_encoding import fixed_length_index_encoding
+from .imputation_helpers import (
+    check_dense_pMHC_array,
+    prune_dense_matrix_and_labels,
+    dense_pMHC_matrix_to_nested_dict,
+)
+
 
 class Dataset(object):
 
@@ -248,7 +256,6 @@ class Dataset(object):
                     "Wrong length for column '%s', expected %d but got %d" % (
                         column_name, column))
             df[column_name] = np.asarray(column)
-        print(df)
         return cls(df)
 
     @classmethod
@@ -468,19 +475,18 @@ class Dataset(object):
         shape = (n_peptides, n_alleles)
         X = np.ones(shape, dtype=float)
         for (allele, allele_dict) in allele_to_peptide_to_affinity_dict.items():
-            print(allele, allele_dict)
             column_index = allele_order[allele]
             for (peptide, affinity) in allele_dict.items():
-                print(peptide, affinity)
                 row_index = peptide_order[peptide]
                 X[row_index, column_index] = affinity
         return X, peptides_list, alleles_list
 
-    def imputed_missing_values(
+    def impute_missing_values(
             self,
             imputation_method,
             log_transform=True,
-            synthetic_sample_weight=1.0):
+            min_observations_per_peptide=2,
+            min_observations_per_allele=3):
         """
         Synthesize new measurements for missing pMHC pairs using the given
         imputation_method.
@@ -496,10 +502,37 @@ class Dataset(object):
             Transform affinities with to log10 values before imputation
             (and then transform back afterward).
 
-        synthetic_sample_weight : float
-            Default weight to give newly synthesized samples.
+        min_observations_per_peptide : int
+            Drop peptide rows with fewer than this number of observed values.
+
+        min_observations_per_allele : int
+            Drop allele columns with fewer than this number of observed values.
 
         Returns Dataset with original pMHC affinities and additional
         synthetic samples.
         """
-        pass
+        X_incomplete, peptide_list, allele_list = self.to_dense_pMHC_affinity_matrix()
+
+        check_dense_pMHC_array(X_incomplete, peptide_list, allele_list)
+
+        # drop alleles and peptides with small amounts of data
+        X_incomplete, peptide_list, allele_list = prune_dense_matrix_and_labels(
+            X_incomplete, peptide_list, allele_list,
+            min_observations_per_peptide=min_observations_per_peptide,
+            min_observations_per_allele=min_observations_per_allele)
+        X_incomplete_log = np.log(X_incomplete)
+
+        if np.isnan(X_incomplete).sum() == 0:
+            # if all entries in the matrix are already filled in then don't
+            # try using an imputation algorithm since it might raise an
+            # exception.
+            logging.warn("No missing values, using original data instead of imputation")
+            X_complete_log = X_incomplete_log
+        else:
+            X_complete_log = imputation_method.complete(X_incomplete_log)
+        X_complete = np.exp(X_complete_log)
+        allele_to_peptide_to_affinity_dict = dense_pMHC_matrix_to_nested_dict(
+            X=X_complete,
+            peptide_list=peptide_list,
+            allele_list=allele_list)
+        return self.from_nested_dictionary(allele_to_peptide_to_affinity_dict)

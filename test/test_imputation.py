@@ -1,8 +1,5 @@
 
-from mhcflurry.imputation import (
-    create_imputed_datasets,
-    imputer_from_name,
-)
+from mhcflurry.imputation_helpers import imputer_from_name
 from mhcflurry.dataset import Dataset
 from mhcflurry.paths import CLASS1_DATA_CSV_PATH
 from mhcflurry import Class1BindingPredictor
@@ -13,9 +10,7 @@ from nose.tools import eq_
 
 def test_create_imputed_datasets_empty():
     empty_dataset = Dataset.create_empty()
-    result = create_imputed_datasets(
-        empty_dataset,
-        imputer=MICE(n_imputations=25))
+    result = empty_dataset.impute_missing_values(MICE(n_imputations=25))
     eq_(result, empty_dataset)
 
 def test_create_imputed_datasets_two_alleles():
@@ -29,7 +24,7 @@ def test_create_imputed_datasets_two_alleles():
             "A" * 9: 25.0,
         },
     })
-    imputed_dataset = create_imputed_datasets(dataset, imputer=MICE(n_imputations=25))
+    imputed_dataset = dataset.impute_missing_values(MICE(n_imputations=25))
     eq_(imputed_dataset.unique_alleles(), {"HLA-A*02:01", "HLA-A*02:05"})
     expected_peptides = {"A" * 9, "C" * 9, "S" * 9}
     for allele_name, allele_data in imputed_dataset.groupby_allele():
@@ -39,16 +34,24 @@ def test_performance_improves_for_A0205_with_pretraining():
     # test to make sure that imputation improves predictive accuracy after a
     # small number of training iterations (5 epochs)
     dataset = Dataset.from_csv(CLASS1_DATA_CSV_PATH)
+    print("Full dataset: %d pMHC entries" % len(dataset))
 
-    print("Available alleles: %s" % (set(dataset.unique_alleles()),))
+    limited_alleles = ["HLA-A0205", "HLA-A0201", "HLA-A0101", "HLA-B0702"]
+
     # restrict to just five alleles
-    dataset = dataset.get_alleles([
-        "HLA-A0205", "HLA-A0201", "HLA-A0101", "HLA-B0702"])
+    dataset = dataset.get_alleles(limited_alleles)
+    print("After filtering to %s, # entries: %d" % (limited_alleles, len(dataset)))
+
     a0205_data_without_imputation = dataset.get_allele("HLA-A0205")
+
+    print("Dataset with only A0205, # entries: %d" % len(a0205_data_without_imputation))
+
     predictor_without_imputation = \
         Class1BindingPredictor.from_hyperparameters(name="A0205-no-impute")
+
     X_index, Y_true, sample_weights, _ = \
         a0205_data_without_imputation.kmer_index_encoding()
+
     predictor_without_imputation.fit_kmer_encoded_arrays(
         X=X_index,
         Y=Y_true,
@@ -56,13 +59,16 @@ def test_performance_improves_for_A0205_with_pretraining():
         n_training_epochs=10)
 
     Y_pred_without_imputation = \
-        predictor_without_imputation.predict_scores_for_kmer_array(X_index)
+        predictor_without_imputation.predict_scores_for_kmer_encoded_array(X_index)
     diff_squared = (Y_true - Y_pred_without_imputation) ** 2
+
     mse_without_imputation = (diff_squared * sample_weights) / sample_weights.sum()
 
-    imputed_datset = dataset.impute(MICE(n_imputations=25))
+    imputed_datset = dataset.impute_missing_values(MICE(n_imputations=25))
+    print("After imputation, dataset for %s has %d entries" % (
+        limited_alleles, len(imputed_datset)))
     a0205_data_with_imputation = imputed_datset.get_allele("HLA-A0205")
-
+    print("Limited to just A0205, # entries: %d" % (len(a0205_data_with_imputation)))
     X_index_imputed, Y_imputed, sample_weights_imputed, _ = \
         a0205_data_with_imputation.kmer_index_encoding()
 
@@ -79,7 +85,7 @@ def test_performance_improves_for_A0205_with_pretraining():
         n_training_epochs=10)
 
     Y_pred_with_imputation = \
-        predictor_with_imputation.predict_scores_for_kmer_array(X_index)
+        predictor_with_imputation.predict_scores_for_kmer_encoded_array(X_index)
 
     diff_squared = (Y_true - Y_pred_with_imputation) ** 2
     mse_with_imputation = (diff_squared * sample_weights_imputed) / sample_weights_imputed.sum()
