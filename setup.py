@@ -69,6 +69,7 @@ if __name__ == '__main__':
             'fancyimpute>=0.0.12',
             'scikit-learn',
             'h5py',
+            'typechecks',
             # using for multi-threaded web server
             'cherrypy',
             'bottle',
