@@ -38,11 +38,12 @@ from .serialization_helpers import (
 )
 from .peptide_encoding import check_valid_index_encoding_array
 from .feedforward_hyperparameters import LOSS, OPTIMIZER
-from .regression_target import MAX_IC50
+from .regression_target import MAX_IC50, ic50_to_regression_target
 from .training_helpers import (
     combine_training_arrays,
     extend_with_negative_random_samples,
 )
+from .regression_target import regression_target_to_ic50
 
 _allele_predictor_cache = {}
 
@@ -141,10 +142,10 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
     def fit_kmer_encoded_arrays(
             self,
             X,
-            Y,
+            ic50,
             sample_weights=None,
             X_pretrain=None,
-            Y_pretrain=None,
+            ic50_pretrain=None,
             sample_weights_pretrain=None,
             n_random_negative_samples=0,
             pretrain_decay=lambda epoch: np.exp(-epoch),
@@ -160,8 +161,8 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
         X : array
             Training data with shape (n_samples, n_dims)
 
-        Y : array
-            Training labels with shape (n_samples,)
+        ic50 : array
+            Training IC50 values with shape (n_samples,)
 
         sample_weights : array
             Weight of each training sample with shape (n_samples,)
@@ -171,8 +172,8 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             should have same number of dimensions as X. During training the weights
             of these samples will decay after each epoch.
 
-        Y_pretrain : array
-            Labels for extra samples, shape
+        ic50_pretrain : array
+            IC50 values for extra samples, shape
 
         pretrain_decay : int -> float function
             decay function for pretraining, mapping epoch number to decay
@@ -191,22 +192,16 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
 
         batch_size : int
         """
-        X_combined, Y_combined, combined_weights, n_pretrain = \
+        X_combined, ic50_combined, combined_weights, n_pretrain = \
             combine_training_arrays(
-                X, Y, sample_weights,
-                X_pretrain, Y_pretrain, sample_weights_pretrain)
-
+                X, ic50, sample_weights,
+                X_pretrain, ic50_pretrain, sample_weights_pretrain)
+        Y_combined = ic50_to_regression_target(
+            ic50_combined, max_ic50=self.max_ic50)
         total_pretrain_sample_weight = combined_weights[:n_pretrain].sum()
         total_train_sample_weight = combined_weights[n_pretrain:].sum()
         total_combined_sample_weight = (
             total_pretrain_sample_weight + total_train_sample_weight)
-
-        if self.verbose:
-            print("-- Total pretrain weight = %f (%f%%), sample weight = %f (%f%%)" % (
-                total_pretrain_sample_weight,
-                100 * total_pretrain_sample_weight / total_combined_sample_weight,
-                total_train_sample_weight,
-                100 * total_train_sample_weight / total_combined_sample_weight))
 
         for epoch in range(n_training_epochs):
             decay_factor = pretrain_decay(epoch)
@@ -217,31 +212,9 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             pretrain_fraction_contribution = (
                 pretrain_contribution / total_combined_sample_weight)
 
-            use_pretrain_data = pretrain_fraction_contribution > 0.001
-
             # only use synthetic data if it contributes at least 1/1000th of
             # sample weight
-            if verbose:
-                real_data_percent = (
-                    ((1.0 - pretrain_fraction_contribution) * 100)
-                    if use_pretrain_data
-                    else 100
-                )
-                pretrain_data_percent = (
-                    (pretrain_fraction_contribution * 100)
-                    if use_pretrain_data else 0
-                )
-                print(
-                    ("-- Epoch %d/%d decay=%f, real data weight=%0.2f%%,"
-                     " synth data weight=%0.2f%% (use_pretrain=%s)") % (
-                        epoch + 1,
-                        n_training_epochs,
-                        decay_factor,
-                        real_data_percent,
-                        pretrain_data_percent,
-                        use_pretrain_data))
-
-            if use_pretrain_data:
+            if pretrain_fraction_contribution > 0.001:
                 combined_weights[:n_pretrain] *= decay_factor
                 X_curr_iter = X_combined
                 Y_curr_iter = Y_combined
@@ -251,13 +224,14 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
                 Y_curr_iter = Y_combined[n_pretrain:]
                 weights_curr_iter = combined_weights[n_pretrain:]
 
-            X_curr_iter, Y_curr_iter, weights_curr_iter = \
-                extend_with_negative_random_samples(
-                    X_curr_iter,
-                    Y_curr_iter,
-                    weights_curr_iter,
-                    n_random_negative_samples,
-                    max_amino_acid_encoding_value=self.max_amino_acid_encoding_value)
+            if n_random_negative_samples > 0:
+                X_curr_iter, Y_curr_iter, weights_curr_iter = \
+                    extend_with_negative_random_samples(
+                        X_curr_iter,
+                        Y_curr_iter,
+                        weights_curr_iter,
+                        n_random_negative_samples,
+                        max_amino_acid_encoding_value=self.max_amino_acid_encoding_value)
 
             self.model.fit(
                 X_curr_iter,
@@ -317,9 +291,17 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
     def predict_scores_for_kmer_encoded_array(self, X):
         """
         Given an encoded array of amino acid indices, returns a vector
-        of predicted log IC50 values.
+        of affinity scores (values between 0 and 1).
         """
         X = check_valid_index_encoding_array(
             X,
             allow_unknown_amino_acids=self.allow_unknown_amino_acids)
         return self.model.predict(X, verbose=False).flatten()
+
+    def predict_ic50_for_kmer_encoded_array(self, X):
+        """
+        Given an encoded array of amino acid indices,
+        returns a vector of IC50 predictions.
+        """
+        scores = self.predict_scores_for_kmer_encoded_array(X)
+        return regression_target_to_ic50(scores, max_ic50=self.max_ic50)

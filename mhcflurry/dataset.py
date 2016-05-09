@@ -473,7 +473,7 @@ class Dataset(object):
         allele_order = {a: i for (i, a) in enumerate(alleles_list)}
         n_alleles = len(alleles_list)
         shape = (n_peptides, n_alleles)
-        X = np.ones(shape, dtype=float)
+        X = np.ones(shape, dtype=float) * np.nan
         for (allele, allele_dict) in allele_to_peptide_to_affinity_dict.items():
             column_index = allele_order[allele]
             for (peptide, affinity) in allele_dict.items():
@@ -485,8 +485,8 @@ class Dataset(object):
             self,
             imputation_method,
             log_transform=True,
-            min_observations_per_peptide=2,
-            min_observations_per_allele=3):
+            min_observations_per_peptide=1,
+            min_observations_per_allele=1):
         """
         Synthesize new measurements for missing pMHC pairs using the given
         imputation_method.
@@ -520,17 +520,22 @@ class Dataset(object):
             X_incomplete, peptide_list, allele_list,
             min_observations_per_peptide=min_observations_per_peptide,
             min_observations_per_allele=min_observations_per_allele)
-        X_incomplete_log = np.log(X_incomplete)
+
+        if log_transform:
+            X_incomplete = np.log(X_incomplete)
 
         if np.isnan(X_incomplete).sum() == 0:
             # if all entries in the matrix are already filled in then don't
             # try using an imputation algorithm since it might raise an
             # exception.
             logging.warn("No missing values, using original data instead of imputation")
-            X_complete_log = X_incomplete_log
+            X_complete = X_incomplete
         else:
-            X_complete_log = imputation_method.complete(X_incomplete_log)
-        X_complete = np.exp(X_complete_log)
+            X_complete = imputation_method.complete(X_incomplete)
+
+        if log_transform:
+            X_complete = np.exp(X_complete)
+
         allele_to_peptide_to_affinity_dict = dense_pMHC_matrix_to_nested_dict(
             X=X_complete,
             peptide_list=peptide_list,

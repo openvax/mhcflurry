@@ -111,7 +111,7 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
         X, _ = self.encode_peptides(peptides)
         return self.predict_scores_for_kmer_encoded_array(X)
 
-    def predict_kmer_peptides_ic50(self, peptides):
+    def predict_ic50_for_kmer_peptides(self, peptides):
         scores = self.predict_scores_for_kmer_peptides(peptides)
         return regression_target_to_ic50(scores, max_ic50=self.max_ic50)
 
