@@ -175,5 +175,5 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
             sample_weights=sample_weights,
             X_pretrain=X_pretrain,
             ic50_pretrain=ic50_pretrain,
-            sample_weights_pretrain=sample_weights,
+            sample_weights_pretrain=sample_weights_pretrain,
             **kwargs)

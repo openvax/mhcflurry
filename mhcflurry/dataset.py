@@ -437,10 +437,10 @@ class Dataset(object):
         """
         if len(self.peptides) == 0:
             return (
-                np.array([[]], dtype=int),
-                np.array([], dtype=float),
-                np.array([], dtype=float),
-                np.array([], dtype=int)
+                np.empty((0, kmer_size), dtype=int),
+                np.empty((0,), dtype=float),
+                np.empty((0,), dtype=float),
+                np.empty((0,), dtype=int)
             )
 
         X_index, _, original_peptide_indices, counts = \

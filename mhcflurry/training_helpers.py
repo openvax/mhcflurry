@@ -49,7 +49,6 @@ def check_encoded_array_shapes(X, Y, sample_weights):
             sample_weights.shape,))
 
     n_samples, n_dims = X.shape
-
     if len(Y) != n_samples:
         raise ValueError("Mismatch between len(X) = %d and len(Y) = %d" % (
             n_samples, len(Y)))
@@ -78,7 +77,6 @@ def combine_training_arrays(
     """
     X = np.asarray(X)
     Y = np.asarray(Y)
-
     if sample_weights is None:
         sample_weights = np.ones_like(Y)
     else:
@@ -87,8 +85,8 @@ def combine_training_arrays(
     n_samples, n_dims = check_encoded_array_shapes(X, Y, sample_weights)
 
     if X_pretrain is None or Y_pretrain is None:
-        X_pretrain = np.empty((0, n_dims), dtype=X.dtype)
-        Y_pretrain = np.empty((0,), dtype=Y.dtype)
+        X_pretrain = np.zeros((0, n_dims), dtype=X.dtype)
+        Y_pretrain = np.zeros((0,), dtype=Y.dtype)
     else:
         X_pretrain = np.asarray(X_pretrain)
         Y_pretrain = np.asarray(Y_pretrain)
