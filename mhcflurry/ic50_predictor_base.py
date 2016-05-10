@@ -32,7 +32,7 @@ class IC50PredictorBase(object):
     def __init__(
             self,
             name,
-            verbose,
+            verbose=False,
             max_ic50=MAX_IC50):
         self.name = name
         self.max_ic50 = max_ic50
@@ -42,7 +42,6 @@ class IC50PredictorBase(object):
         return "%s(name=%s, max_ic50=%f)" % (
             self.__class__.__name__,
             self.name,
-            self.model,
             self.max_ic50)
 
     def __str__(self):

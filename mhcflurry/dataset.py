@@ -254,7 +254,9 @@ class Dataset(object):
             if len(column) != len(alleles):
                 raise ValueError(
                     "Wrong length for column '%s', expected %d but got %d" % (
-                        column_name, column))
+                        column_name,
+                        len(alleles),
+                        len(column)))
             df[column_name] = np.asarray(column)
         return cls(df)
 

@@ -21,11 +21,12 @@ Plot AUC and F1 score of predictors as a function of dataset size
 from argparse import ArgumentParser
 
 import numpy as np
-import mhcflurry
 import sklearn
 import sklearn.metrics
-from sklearn.linear_model import LinearRegression
 import seaborn
+
+from mhcflurry.dataset import Dataset
+from mhcflurry.class1_binding_predictor import Class1BindingPredictor
 
 from dataset_paths import PETERS2009_CSV_PATH
 
@@ -42,13 +43,19 @@ parser.add_argument(
 parser.add_argument(
     "--max-ic50",
     type=float,
-    default=20000.0)
+    default=50000.0)
 
 parser.add_argument(
     "--hidden-layer-size",
     type=int,
     default=10,
     help="Hidden layer size for neural network, if 0 use linear regression")
+
+parser.add_argument(
+    "--embedding-dim",
+    type=int,
+    default=50,
+    help="Number of dimensions for vector embedding of amino acids")
 
 parser.add_argument(
     "--activation",
@@ -71,35 +78,41 @@ parser.add_argument(
     help="How many times to train model for same dataset size")
 
 
-def binary_encode(X, n_indices=20):
-    n_cols = X.shape[1]
-    X_encode = np.zeros((len(X), n_indices * n_cols), dtype=float)
-    for i in range(len(X)):
-        for col_idx in range(n_cols):
-            X_encode[i, col_idx * n_indices + X[i, col_idx]] = True
-    return X_encode
-
-
 def subsample_performance(
-        X,
-        Y,
-        max_ic50,
+        dataset,
+        allele,
+        pretraining=False,
         model_fn=None,
-        fractions=np.arange(0.01, 1, 0.03),
+        n_training_samples=[
+            25,
+            50,
+            100,
+            200,
+            300,
+            400,
+            500,
+            600,
+            800,
+            1000,
+            1200,
+            1400,
+            1600,
+            1800,
+            2000],
         niters=10,
-        fraction_test=0.2,
-        nb_epoch=50,
+        n_training_epochs=200,
         batch_size=32):
-    n = len(Y)
+    n_total = len(dataset)
+
     xs = []
     aucs = []
     f1s = []
+
     for iternum in range(niters):
-        if model_fn is None:
-            model = LinearRegression()
-        else:
-            model = model_fn()
-            initial_weights = model.get_weights()
+
+        model = model_fn()
+        initial_weights = model.get_weights()
+
         mask = np.random.rand(n) > fraction_test
         X_train = X[mask]
         X_test = X[~mask]
@@ -139,22 +152,21 @@ def subsample_performance(
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    print(args)
-    datasets, _ = mhcflurry.data_helpers.load_data(
-        args.training_csv,
-        binary_encoding=True,
-        flatten_binary_encoding=True,
-        max_ic50=args.max_ic50)
-    dataset = datasets[args.allele]
+    dataset = Dataset.load_csv(args.training_csv)
     X = dataset.X
     Y = dataset.Y
     print("Total # of samples for %s: %d" % (args.allele, len(Y)))
-    if args.hidden_layer_size > 0:
-        model_fn = lambda: mhcflurry.feedforward.make_hotshot_network(
-            layer_sizes=[args.hidden_layer_size],
-            activation=args.activation)
+    if args.hidden_layer_size == 0:
+        hidden_layer_sizes = []
     else:
-        model_fn = None
+        hidden_layer_sizes = [args.hidden_layer_size]
+
+    def make_model():
+        return Class1BindingPredictor.from_hyperparameters(
+            layer_sizes=[args.hidden_layer_size],
+            activation=args.activation,
+            embedding_dim=args.embedding_dim)
+
     xs, aucs, f1s = subsample_performance(
         X=X,
         Y=Y,

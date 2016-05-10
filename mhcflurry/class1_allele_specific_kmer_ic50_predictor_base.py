@@ -43,10 +43,11 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
             verbose,
             max_ic50=MAX_IC50,
             kmer_size=9):
-        self.name = name
-        self.max_ic50 = max_ic50
+        IC50PredictorBase.__init__(
+            name=name,
+            max_ic50=max_ic50,
+            verbose=verbose)
         self.allow_unknown_amino_acids = allow_unknown_amino_acids
-        self.verbose = verbose
         self.kmer_size = kmer_size
 
     def __repr__(self):

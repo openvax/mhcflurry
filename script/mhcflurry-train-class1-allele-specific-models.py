@@ -167,6 +167,13 @@ if __name__ == "__main__":
             print("-- too few data points, skipping")
             continue
 
+        model.fit_dataset(
+            allele_dataset,
+            pretraining_dataset=imputed_dataset_allele,
+            n_training_epochs=args.training_epochs,
+            n_random_negative_samples=args.random_negative_samples,
+            verbose=True)
+
         if exists(json_path):
             print("-- removing old model description %s" % json_path)
             remove(json_path)
@@ -174,13 +181,6 @@ if __name__ == "__main__":
         if exists(hdf_path):
             print("-- removing old weights file %s" % hdf_path)
             remove(hdf_path)
-
-        model.fit_dataset(
-            allele_dataset,
-            pretraining_dataset=imputed_dataset_allele,
-            n_training_epochs=args.training_epochs,
-            n_random_negative_samples=args.random_negative_samples,
-            verbose=True)
 
         model.to_disk(
             model_json_path=json_path,
