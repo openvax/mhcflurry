@@ -44,6 +44,7 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
             max_ic50=MAX_IC50,
             kmer_size=9):
         IC50PredictorBase.__init__(
+            self,
             name=name,
             max_ic50=max_ic50,
             verbose=verbose)

@@ -97,28 +97,28 @@ class Dataset(object):
         """
         Array of peptides from pMHC measurements.
         """
-        return self._peptides
+        return self._df["peptide"].values
 
     @property
     def alleles(self):
         """
         Array of MHC allele names from pMHC measurements.
         """
-        return self._alleles
+        return self.to_dataframe()["allele"].values
 
     @property
     def affinities(self):
         """
         Array of affinities from pMHC measurements.
         """
-        return self._affinities
+        return self.to_dataframe()["affinity"].values
 
     @property
     def sample_weights(self):
         """
         Array of sample weights for each pMHC measurement.
         """
-        return self._sample_weights
+        return self.to_dataframe()["sample_weight"].values
 
     def __len__(self):
         return len(self.to_dataframe())
@@ -136,18 +136,14 @@ class Dataset(object):
             return False
         elif len(self) != len(other):
             return False
-        elif len(self.columns) != len(other.columns):
+        elif list(self.columns) != list(other.columns):
             return False
-
-        for ci, cj in zip(self.columns, other.columns):
-            if ci != cj:
-                return False
 
         self_df = self.to_dataframe()
         other_df = other.to_dataframe()
 
         for column_name in self.columns:
-            if not (self_df[column_name] == other_df[column_name]).all():
+            if (self_df[column_name] != other_df[column_name]).any():
                 return False
         return True
 
@@ -373,6 +369,11 @@ class Dataset(object):
         Create zero or more peptides from each pMHC entry. The affinity of all
         new peptides is identical to the original, but sample weights are
         divided across the number of new peptides.
+
+        Parameters
+        ----------
+        peptide_fn : function
+            Maps each peptide to a list of peptides.
         """
         columns = self.to_dataframe().columns
         new_data_dict = OrderedDict(

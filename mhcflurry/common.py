@@ -75,7 +75,7 @@ def geometric_mean(xs, weights=None):
     if len(xs) == 1:
         return xs[0]
     elif weights is None:
-        return exp(sum(log(xi) for xi in xs))
+        return exp(sum(log(xi) for xi in xs) / len(xs))
     sum_weighted_log = sum(log(xi) * wi for (xi, wi) in zip(xs, weights))
     denom = sum(weights)
     return exp(sum_weighted_log / denom)
