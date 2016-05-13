@@ -493,6 +493,117 @@ class Dataset(object):
                 X[row_index, column_index] = affinity
         return X, peptides_list, alleles_list
 
+    def slice(self, indices):
+        """
+        Create a new Dataset by slicing through all columns of this dataset
+        with the given indices.
+        """
+        max_index = indices.max()
+        n_total = len(self)
+        if max_index >= len(self):
+            raise ValueError("Invalid index %d for Dataset of size %d" % (
+                max_index, n_total))
+
+        df = self.to_dataframe()
+        df_subset = pd.DataFrame()
+        for column_name in df.columns:
+            df_subset[column_name] = np.asarray(df[column_name].values)[indices]
+        return self.__class__(df_subset)
+
+    def random_split(self, n=None):
+        """
+        Randomly split the Dataset into smaller Dataset objects.
+
+        Parameters
+        ----------
+        n : int, optional
+            Size of the left split, half of the dataset if omitted.
+
+        Returns a pair of Dataset objects.
+        """
+        n_total = len(self)
+        if n is None:
+            n = n_total // 2
+        elif n >= n_total:
+            raise ValueError(
+                "Training subset can't have more than %d samples (given n=%d)" % (
+                    n_total - 1,
+                    n))
+        all_indices = np.arange(n_total)
+        np.random.shuffle(all_indices)
+        left = self.slice(all_indices[:n])
+        right = self.slice(all_indices[n:])
+        return left, right
+
+    def drop_pMHCs(self, alleles, peptides):
+        """
+        Drop all allele-peptide combinations in the given sequences.
+
+        Parameters
+        ----------
+        alleles : sequence of str
+
+        peptides : sequence of str
+
+        The two arguments are assumed to be the same length.
+
+        Returns Dataset of equal or smaller size.
+        """
+        if len(alleles) != len(peptides):
+            raise ValueError(
+                "Expected alleles to be same length (%d) as peptides (%d)" % (
+                    len(alleles), len(peptides)))
+        my_keys = list(zip(self.alleles, self.peptides))
+        keys_to_remove = set(zip(alleles, peptides))
+        remove_mask = np.array([k in keys_to_remove for k in my_keys])
+        keep_mask = ~remove_mask
+        return self.slice(keep_mask)
+
+    def difference(self, other_dataset):
+        """
+        Remove all pMHC pairs in the other dataset from this one.
+
+        Parameters
+        ----------
+        other_dataset : Dataset
+
+        Returns a new Dataset object of equal or lesser size.
+        """
+        return self.drop_pMHCs(other_dataset.alleles, other_dataset.peptides)
+
+    def split_allele_randomly_and_impute_training_set(
+            self, allele, n_training_samples=None, **kwargs):
+        """
+        Split an allele into training and test sets, and then impute values
+        for peptides missing from the training set using data from other alleles
+        in this Dataset.
+
+        (apologies for the wordy name, this turns out to be a common operation)
+
+        Parameters
+        ----------
+        allele : str
+            Name of allele
+
+        n_training_samples : int, optional
+            Size of the training set to return for this allele.
+
+        **kwargs : dict
+            Extra keyword arguments passed to Dataset.impute_missing_values
+
+        Returns three Dataset objects:
+            - training set with original pMHC affinities for given allele
+            - larger imputed training set for given allele
+            - test set
+        """
+        dataset_allele = self.get_allele(allele)
+        dataset_allele_train, dataset_allele_test = dataset_allele.random_split(
+            n=n_training_samples)
+        full_dataset_without_test_samples = self.difference(dataset_allele_test)
+        imputed_dataset = full_dataset_without_test_samples.impute_missing_values(**kwargs)
+        imputed_dataset_allele = imputed_dataset.get_allele(allele)
+        return dataset_allele_train, imputed_dataset_allele, dataset_allele_test
+
     def impute_missing_values(
             self,
             imputation_method,
@@ -553,3 +664,4 @@ class Dataset(object):
             peptide_list=peptide_list,
             allele_list=allele_list)
         return self.from_nested_dictionary(allele_to_peptide_to_affinity_dict)
+

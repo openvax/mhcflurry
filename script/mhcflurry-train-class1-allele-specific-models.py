@@ -41,14 +41,13 @@ from os import makedirs, remove
 from os.path import exists, join
 import argparse
 
-from keras.optimizers import RMSprop
-
 from mhcflurry.common import normalize_allele_name
 from mhcflurry.dataset import Dataset
-from mhcflurry.class1_binding_predictor import Class1BindingPredictor
-from mhcflurry.feedforward_hyperparameters import add_hyperparameter_arguments_to_parser
+
+from mhcflurry.args import (
+    add_arguments_to_parser, predictor_from_args, imputer_from_args
+)
 from mhcflurry.paths import (CLASS1_MODEL_DIRECTORY, CLASS1_DATA_DIRECTORY)
-from mhcflurry.imputation_helpers import imputer_from_name
 
 CSV_FILENAME = "combined_human_class1_dataset.csv"
 CSV_PATH = join(CLASS1_DATA_DIRECTORY, CSV_FILENAME)
@@ -90,7 +89,7 @@ parser.add_argument(
     type=normalize_allele_name)
 
 # add options for neural network hyperparameters
-parser = add_hyperparameter_arguments_to_parser(parser)
+parser = add_arguments_to_parser(parser)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -112,10 +111,7 @@ if __name__ == "__main__":
     else:
         dataset = dataset.get_alleles(alleles)
 
-    if args.imputation_method is None:
-        imputer = None
-    else:
-        imputer = imputer_from_name(args.imputation_method)
+    imputer = imputer_from_args(args)
 
     if imputer is None:
         imputed_dataset = Dataset.create_empty()
@@ -142,16 +138,7 @@ if __name__ == "__main__":
             allele_name,
             n_allele))
 
-        model = Class1BindingPredictor.from_hyperparameters(
-            name=allele_name,
-            peptide_length=9,
-            max_ic50=args.max_ic50,
-            embedding_output_dim=args.embedding_size,
-            layer_sizes=(args.hidden_layer_size,),
-            activation=args.activation,
-            init=args.initialization,
-            dropout_probability=args.dropout,
-            optimizer=RMSprop(lr=args.learning_rate))
+        model = predictor_from_args(args, allele_name)
 
         json_filename = allele_name + ".json"
         json_path = join(args.output_dir, json_filename)
