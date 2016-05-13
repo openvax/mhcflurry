@@ -84,12 +84,12 @@ def subsample_performance(
         allele,
         model_fn,
         imputer=None,
-        pretraining=False,
         min_training_samples=20,
         max_training_samples=3000,
         n_subsample_sizes=5,
         n_repeats_per_size=3,
         n_training_epochs=200,
+        n_random_negative_samples=100,
         batch_size=32):
 
     dataset_allele = dataset.get_allele(allele)
@@ -131,7 +131,8 @@ def subsample_performance(
             model.fit_dataset(
                 dataset_train,
                 dataset_imputed,
-                n_training_epochs=n_training_epochs)
+                n_training_epochs=n_training_epochs,
+                n_random_negative_samples=n_random_negative_samples)
             pred_ic50 = model.predict(dataset_test.peptides)
             true_ic50 = dataset_test.affinities
             true_label = true_ic50 <= 500

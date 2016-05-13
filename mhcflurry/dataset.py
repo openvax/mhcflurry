@@ -664,4 +664,3 @@ class Dataset(object):
             peptide_list=peptide_list,
             allele_list=allele_list)
         return self.from_nested_dictionary(allele_to_peptide_to_affinity_dict)
-
