@@ -36,6 +36,7 @@ def add_imputation_argument_to_parser(parser):
         choices=("mice", "knn", "softimpute", "svd", "mean", "none"),
         type=lambda s: s.strip().lower(),
         help="Use the given imputation method to generate data for pre-training models")
+    return parser
 
 def add_max_ic50_argument_to_parser(parser):
     """
@@ -48,6 +49,7 @@ def add_max_ic50_argument_to_parser(parser):
         default=MAX_IC50,
         help="Largest IC50 represented by neural network output. "
         "Default: %(default)s")
+    return parser
 
 def add_hyperparameter_arguments_to_parser(parser):
     """
@@ -119,7 +121,7 @@ def add_training_arguments_to_parser(parser):
         type=int,
         default=N_EPOCHS,
         help="Number of training epochs. Default: %(default)s")
-
+    return parser
 
 def add_arguments_to_parser(parser):
     """
@@ -136,10 +138,15 @@ def add_arguments_to_parser(parser):
         --learning-rate
         --kmer-size
     """
-    add_hyperparameter_arguments_to_parser(parser)
-    add_training_arguments_to_parser(parser)
-    add_max_ic50_argument_to_parser(parser)
-    add_imputation_argument_to_parser(parser)
+    functions = [
+        add_hyperparameter_arguments_to_parser,
+        add_training_arguments_to_parser,
+        add_max_ic50_argument_to_parser,
+        add_imputation_argument_to_parser,
+    ]
+    for fn in functions:
+        parser = fn(parser)
+    return parser
 
 
 def predictor_from_args(args, allele_name):
