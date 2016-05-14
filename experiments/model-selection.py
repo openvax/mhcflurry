@@ -22,9 +22,6 @@ from __future__ import (
 )
 import argparse
 
-from mhcflurry.data import load_allele_datasets
-
-
 from model_configs import (
     generate_all_model_configs,
     HIDDEN_LAYER_SIZES,
@@ -158,10 +155,11 @@ if __name__ == "__main__":
         optimizers=args.optimizer)
 
     print("Total # configurations = %d" % len(configs))
-    training_datasets = load_allele_datasets(
-        args.binding_data_csv_path,
-        max_ic50=args.max_ic50,
-        peptide_length=9)
+    # training_datasets = load_allele_datasets(
+    #    args.binding_data_csv_path,
+    #    max_ic50=args.max_ic50,
+    #    peptide_length=9)
+    training_datasets = {}
     combined_df = evaluate_model_configs(
         configs=configs,
         results_filename=args.output,
