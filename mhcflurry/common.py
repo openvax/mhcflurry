@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
+from __future__ import print_function, division, absolute_import
 from math import exp, log
+import itertools
 
 def parse_int_list(s):
     return [int(part.strip() for part in s.split(","))]
@@ -79,3 +76,15 @@ def geometric_mean(xs, weights=None):
     sum_weighted_log = sum(log(xi) * wi for (xi, wi) in zip(xs, weights))
     denom = sum(weights)
     return exp(sum_weighted_log / denom)
+
+
+def all_combinations(**dict_of_lists):
+    """
+    Iterator that generates all combinations of parameters given in the
+    kwargs dictionary which is expected to map argument names to lists
+    of possible values.
+    """
+    arg_names = dict_of_lists.keys()
+    value_lists = dict_of_lists.values()
+    for combination_of_values in itertools.product(*value_lists):
+        yield dict(zip(arg_names, combination_of_values))
