@@ -21,5 +21,34 @@ def test_create_allele_data_from_single_allele_dict():
     for pi, pj in zip(sorted(expected_peptides), sorted(dataset.unique_peptides())):
         eq_(pi, pj)
 
+def test_dataset_random_split():
+    dataset = Dataset.from_nested_dictionary({
+        "H-2-Kb": {
+            "SIINFEKL": 10.0,
+            "FEKLSIIN": 20000.0,
+            "SIFEKLIN": 50000.0,
+        }})
+    left, right = dataset.random_split(n=2)
+    assert len(left) == 2
+    assert len(right) == 1
+
+def test_dataset_difference():
+    dataset1 = Dataset.from_nested_dictionary({
+        "H-2-Kb": {
+            "SIINFEKL": 10.0,
+            "FEKLSIIN": 20000.0,
+            "SIFEKLIN": 50000.0,
+        }})
+    dataset2 = Dataset.from_nested_dictionary({"H-2-Kb": {"SIINFEKL": 10.0}})
+    dataset_diff = dataset1.difference(dataset2)
+    expected_result = Dataset.from_nested_dictionary({
+        "H-2-Kb": {
+            "FEKLSIIN": 20000.0,
+            "SIFEKLIN": 50000.0,
+        }})
+    eq_(dataset_diff, expected_result)
+
 if __name__ == "__main__":
     test_create_allele_data_from_single_allele_dict()
+    test_dataset_random_split()
+    test_dataset_difference()
