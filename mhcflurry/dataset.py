@@ -471,11 +471,22 @@ class Dataset(object):
         combined_sample_weights = kmer_sample_weights * (1.0 / counts)
         return X_index, kmer_affinities, combined_sample_weights, original_peptide_indices
 
-    def to_dense_pMHC_affinity_matrix(self):
+    def to_dense_pMHC_affinity_matrix(
+            self,
+            min_observations_per_peptide=1,
+            min_observations_per_allele=1):
         """
         Returns a tuple with a dense matrix of affinities, a dense matrix of
         sample weights, a list of peptide labels for each row and a list of
         allele labels for each column.
+
+        Parameters
+        ----------
+        min_observations_per_peptide : int
+            Drop peptide rows with fewer than this number of observed values.
+
+        min_observations_per_allele : int
+            Drop allele columns with fewer than this number of observed values.
         """
         allele_to_peptide_to_affinity_dict = self.to_nested_dictionary()
         peptides_list = list(sorted(self.unique_peptides()))
@@ -491,7 +502,14 @@ class Dataset(object):
             for (peptide, affinity) in allele_dict.items():
                 row_index = peptide_order[peptide]
                 X[row_index, column_index] = affinity
-        return X, peptides_list, alleles_list
+
+        check_dense_pMHC_array(X, peptides_list, alleles_list)
+
+        # drop alleles and peptides with small amounts of data
+        return prune_dense_matrix_and_labels(
+            X, peptides_list, alleles_list,
+            min_observations_per_peptide=min_observations_per_peptide,
+            min_observations_per_allele=min_observations_per_allele)
 
     def slice(self, indices):
         """
@@ -634,13 +652,7 @@ class Dataset(object):
         Returns Dataset with original pMHC affinities and additional
         synthetic samples.
         """
-        X_incomplete, peptide_list, allele_list = self.to_dense_pMHC_affinity_matrix()
-
-        check_dense_pMHC_array(X_incomplete, peptide_list, allele_list)
-
-        # drop alleles and peptides with small amounts of data
-        X_incomplete, peptide_list, allele_list = prune_dense_matrix_and_labels(
-            X_incomplete, peptide_list, allele_list,
+        X_incomplete, peptide_list, allele_list = self.to_dense_pMHC_affinity_matrix(
             min_observations_per_peptide=min_observations_per_peptide,
             min_observations_per_allele=min_observations_per_allele)
 
