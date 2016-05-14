@@ -14,11 +14,7 @@
 
 import logging
 
-from fancyimpute.dictionary_helpers import (
-    dense_matrix_from_nested_dictionary,
-    transpose_nested_dictionary,
-)
-from mhcflurry.data import load_allele_dicts
+
 import sklearn.metrics
 from sklearn.cross_validation import StratifiedKFold
 from scipy import stats
@@ -114,37 +110,6 @@ def prune_data(
         observed_mask = observed_mask[:, keep_allele_indices]
         allele_list = [allele_list[i] for i in keep_allele_indices]
     return X, peptide_list, allele_list
-
-
-def load_data(
-        binding_data_csv,
-        max_ic50,
-        only_human=False,
-        min_observations_per_allele=1,
-        min_observations_per_peptide=1):
-    allele_to_peptide_to_affinity = load_allele_dicts(
-        binding_data_csv,
-        max_ic50=max_ic50,
-        only_human=only_human,
-        regression_output=True)
-    peptide_to_allele_to_affinity = transpose_nested_dictionary(
-        allele_to_peptide_to_affinity)
-    n_binding_values = sum(
-        len(allele_dict)
-        for allele_dict in
-        allele_to_peptide_to_affinity.values()
-    )
-    print("Loaded %d binding values for %d alleles" % (
-        n_binding_values,
-        len(allele_to_peptide_to_affinity)))
-    X, peptide_list, allele_list = \
-        dense_matrix_from_nested_dictionary(peptide_to_allele_to_affinity)
-    return prune_data(
-        X,
-        peptide_list,
-        allele_list,
-        min_observations_per_peptide=min_observations_per_peptide,
-        min_observations_per_allele=min_observations_per_allele)
 
 
 def index_counts(indices):

@@ -28,13 +28,14 @@ from .amino_acid import (
     common_amino_acids
 )
 from .regression_target import regression_target_to_ic50, MAX_IC50
+from .ic50_predictor_base import IC50PredictorBase
 
-
-class PredictorBase(object):
+class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
     """
-    Base class for all mhcflurry predictors (including the Ensemble class)
+    Base class for all mhcflurry predictors which used fixed-length
+    k-mer representation of peptides and don't require scanning over
+    a longer sequence to find a binding core (like you might for Class II).
     """
-
     def __init__(
             self,
             name,
@@ -42,11 +43,24 @@ class PredictorBase(object):
             verbose,
             max_ic50=MAX_IC50,
             kmer_size=9):
-        self.name = name
-        self.max_ic50 = max_ic50
+        IC50PredictorBase.__init__(
+            self,
+            name=name,
+            max_ic50=max_ic50,
+            verbose=verbose)
         self.allow_unknown_amino_acids = allow_unknown_amino_acids
-        self.verbose = verbose
         self.kmer_size = kmer_size
+
+    def __repr__(self):
+        return "%s(name=%s, max_ic50=%f, allow_unknown_amino_acids=%s, kmer_size=%d)" % (
+            self.__class__.__name__,
+            self.name,
+            self.max_ic50,
+            self.allow_unknown_amino_acids,
+            self.kmer_size)
+
+    def __str__(self):
+        return repr(self)
 
     @property
     def amino_acids(self):
@@ -90,34 +104,20 @@ class PredictorBase(object):
             "Expected shape %s but got %s" % (expected_shape, combined_matrix.shape)
         return combined_matrix, index_array
 
-    def _predict_kmer_peptides(self, peptides):
+    def predict_scores_for_kmer_peptides(self, peptides):
         """
         Predict binding affinity for 9mer peptides
         """
         if any(len(peptide) != self.kmer_size for peptide in peptides):
             raise ValueError("Can only predict 9mer peptides")
         X, _ = self.encode_peptides(peptides)
-        return self.predict(X)
+        return self.predict_scores_for_kmer_encoded_array(X)
 
-    def _predict_kmer_peptides_ic50(self, peptides):
-        scores = self.predict_kmer_peptides(peptides)
+    def predict_ic50_for_kmer_peptides(self, peptides):
+        scores = self.predict_scores_for_kmer_peptides(peptides)
         return regression_target_to_ic50(scores, max_ic50=self.max_ic50)
 
-    def predict_peptides_ic50(self, peptides):
-        """
-        Predict IC50 affinities for peptides of any length
-        """
-        scores = self.predict_peptides(peptides)
-        return regression_target_to_ic50(scores, max_ic50=self.max_ic50)
-
-    def predict(self, X):
-        raise ValueError("Method 'predict' not yet implemented for %s!" % (
-            self.__class__.__name__,))
-
-    def predict_peptides(
-            self,
-            peptides,
-            combine_fn=np.mean):
+    def predict_scores(self, peptides, combine_fn=np.mean):
         """
         Given a list of peptides of any length, returns an array of predicted
         normalized affinity values. Unlike IC50, a higher value here
@@ -134,7 +134,8 @@ class PredictorBase(object):
         # peptides of lengths other than self.kmer_size get multiple predictions,
         # which are then combined with the combine_fn argument
         multiple_predictions_dict = defaultdict(list)
-        fixed_length_predictions = self.predict(input_matrix)
+        fixed_length_predictions = \
+            self.predict_scores_for_kmer_encoded_array(input_matrix)
         for i, yi in enumerate(fixed_length_predictions):
             original_peptide_index = original_peptide_indices[i]
             original_peptide = peptides[original_peptide_index]
@@ -144,3 +145,37 @@ class PredictorBase(object):
             for (p, ys) in multiple_predictions_dict.items()
         }
         return np.array([combined_predictions_dict[p] for p in peptides])
+
+    def fit_dataset(self, dataset, pretraining_dataset=None, **kwargs):
+        """
+        Fit the model parameters on the given training data.
+
+        Parameters
+        ----------
+        dataset : Dataset
+
+        pretraining_dataset : Dataset
+
+        **kwargs : dict
+            Extra arguments are passed on to the fit_encoded_kmer_arrays()
+            method.
+        """
+        X, ic50, sample_weights, _ = dataset.kmer_index_encoding(
+            kmer_size=self.kmer_size,
+            allow_unknown_amino_acids=self.allow_unknown_amino_acids)
+
+        if pretraining_dataset is None:
+            X_pretrain = ic50_pretrain = sample_weights_pretrain = None
+        else:
+            X_pretrain, ic50_pretrain, sample_weights_pretrain, _ = \
+                pretraining_dataset.kmer_index_encoding(
+                    kmer_size=self.kmer_size,
+                    allow_unknown_amino_acids=self.allow_unknown_amino_acids)
+        return self.fit_kmer_encoded_arrays(
+            X=X,
+            ic50=ic50,
+            sample_weights=sample_weights,
+            X_pretrain=X_pretrain,
+            ic50_pretrain=ic50_pretrain,
+            sample_weights_pretrain=sample_weights_pretrain,
+            **kwargs)

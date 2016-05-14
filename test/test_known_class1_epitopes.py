@@ -20,7 +20,7 @@ def test_A1_Titin_epitope():
     #   as a Cross-Reactive Target for Engineered MAGE A3-Directed
     #   T Cells
     model = Class1BindingPredictor.from_allele_name("HLA-A*01:01")
-    ic50s = model.predict_peptides_ic50(["ESDPIVAQY"])
+    ic50s = model.predict(["ESDPIVAQY"])
     print(ic50s)
     assert len(ic50s) == 1
     ic50 = ic50s[0]
@@ -32,7 +32,7 @@ def test_A1_MAGE_epitope():
     #   as a Cross-Reactive Target for Engineered MAGE A3-Directed
     #   T Cells
     model = Class1BindingPredictor.from_allele_name("HLA-A*01:01")
-    ic50s = model.predict_peptides_ic50(["EVDPIGHLY"])
+    ic50s = model.predict(["EVDPIGHLY"])
     print(ic50s)
     assert len(ic50s) == 1
     ic50 = ic50s[0]
@@ -42,7 +42,7 @@ def test_A2_HIV_epitope():
     # Test the A2 HIV epitope SLYNTVATL from
     #    The HIV-1 HLA-A2-SLYNTVATL Is a Help-Independent CTL Epitope
     model = Class1BindingPredictor.from_allele_name("HLA-A*02:01")
-    ic50s = model.predict_peptides_ic50(["SLYNTVATL"])
+    ic50s = model.predict(["SLYNTVATL"])
     print(ic50s)
     assert len(ic50s) == 1
     ic50 = ic50s[0]

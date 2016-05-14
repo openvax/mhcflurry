@@ -105,7 +105,7 @@ def test_shorten_peptide_all_positions_except_last():
 
 
 def test_fixed_length_from_many_peptides():
-    kmers, original, counts = fixed_length_from_many_peptides(
+    kmers, original_indices, counts = fixed_length_from_many_peptides(
         peptides=["ABC", "A"],
         desired_length=2,
         start_offset_extend=0,
@@ -114,10 +114,10 @@ def test_fixed_length_from_many_peptides():
         end_offset_shorten=0,
         insert_amino_acid_letters="ABC")
     print(kmers)
-    print(original)
+    print(original_indices)
     print(counts)
-    eq_(len(kmers), len(original))
+    eq_(len(kmers), len(original_indices))
     eq_(len(kmers), len(counts))
     eq_(kmers, ["BC", "AC", "AB", "AA", "BA", "CA", "AA", "AB", "AC"])
-    eq_(original, ["ABC", "ABC", "ABC", "A", "A", "A", "A", "A", "A"])
+    eq_(original_indices, [0] * 3 + [1] * 6)
     eq_(counts, [3, 3, 3, 6, 6, 6, 6, 6, 6])

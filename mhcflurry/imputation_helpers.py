@@ -18,7 +18,6 @@ from __future__ import (
     absolute_import,
 )
 from collections import defaultdict
-import logging
 
 import numpy as np
 from fancyimpute.knn import KNN
@@ -26,14 +25,9 @@ from fancyimpute.iterative_svd import IterativeSVD
 from fancyimpute.simple_fill import SimpleFill
 from fancyimpute.soft_impute import SoftImpute
 from fancyimpute.mice import MICE
-from fancyimpute.dictionary_helpers import dense_matrix_from_nested_dictionary
 
-from .data import (
-    create_allele_data_from_peptide_to_ic50_dict,
-)
-from .regression_target import regression_target_to_ic50
 
-def _check_dense_pMHC_array(X, peptide_list, allele_list):
+def check_dense_pMHC_array(X, peptide_list, allele_list):
     if len(peptide_list) != len(set(peptide_list)):
         raise ValueError("Duplicate peptides detected in peptide list")
     if len(allele_list) != len(set(allele_list)):
@@ -103,52 +97,8 @@ def prune_dense_matrix_and_labels(
         X = X[:, keep_allele_indices]
         observed_mask = observed_mask[:, keep_allele_indices]
         allele_list = [allele_list[i] for i in keep_allele_indices]
-    _check_dense_pMHC_array(X, peptide_list, allele_list)
+    check_dense_pMHC_array(X, peptide_list, allele_list)
     return X, peptide_list, allele_list
-
-
-def create_incomplete_dense_pMHC_matrix(
-        allele_data_dict,
-        min_observations_per_peptide=1,
-        min_observations_per_allele=1):
-    """
-    Given a dictionary mapping each allele name onto an AlleleData object,
-    returns a tuple with a dense matrix of affinities, a list of peptide labels
-    for each row and a list of allele labels for each column.
-
-    Parameters
-    ----------
-    allele_data_dict : dict
-        Dictionary mapping allele names to AlleleData objects
-
-    imputer : object
-        Expected to have a method imputer.complete(X) which takes an array
-        with missing entries marked by NaN and returns a completed array.
-
-    min_observations_per_peptide : int
-        Drop peptide rows with fewer than this number of observed values.
-
-    min_observations_per_allele : int
-        Drop allele columns with fewer than this number of observed values.
-    """
-    peptide_to_allele_to_affinity_dict = defaultdict(dict)
-    for (allele_name, allele_data) in allele_data_dict.items():
-        for peptide, affinity in zip(
-                allele_data.original_peptides,
-                allele_data.Y):
-            if allele_name not in peptide_to_allele_to_affinity_dict[peptide]:
-                peptide_to_allele_to_affinity_dict[peptide][allele_name] = affinity
-
-    X, peptide_list, allele_list = \
-        dense_matrix_from_nested_dictionary(peptide_to_allele_to_affinity_dict)
-    _check_dense_pMHC_array(X, peptide_list, allele_list)
-
-    return prune_dense_matrix_and_labels(
-        X,
-        peptide_list,
-        allele_list,
-        min_observations_per_peptide=min_observations_per_peptide,
-        min_observations_per_allele=min_observations_per_allele)
 
 def dense_pMHC_matrix_to_nested_dict(X, peptide_list, allele_list):
     """
@@ -163,75 +113,6 @@ def dense_pMHC_matrix_to_nested_dict(X, peptide_list, allele_list):
                 allele_to_peptide_to_ic50_dict[allele_name][peptide] = affinity
     return allele_to_peptide_to_ic50_dict
 
-def create_imputed_datasets(
-        allele_data_dict,
-        imputer,
-        min_observations_per_peptide=1,
-        min_observations_per_allele=1):
-    """
-    Parameters
-    ----------
-    allele_data_dict : dict
-        Dictionary mapping allele names to AlleleData objects
-
-    imputer : object
-        Expected to have a method imputer.complete(X) which takes an array
-        with missing entries marked by NaN and returns a completed array.
-
-    min_observations_per_peptide : int
-        Drop peptide rows with fewer than this number of observed values.
-
-    min_observations_per_allele : int
-        Drop allele columns with fewer than this number of observed values.
-
-    Returns dictionary mapping allele names to AlleleData objects containing
-    imputed affinity values.
-    """
-    if len(allele_data_dict) == 0:
-        return {}
-
-    # pick the max IC50 associated with a random AlleleData object and then
-    # make sure that they all agree
-    allele_data_objects = list(allele_data_dict.values())
-    max_ic50 = allele_data_objects[0].max_ic50
-    if not all(allele_data.max_ic50 == max_ic50 for allele_data in allele_data_objects):
-        raise ValueError("AlleleData objects must all use the same max IC50 (%f)" % (
-            max_ic50,))
-    X_incomplete, peptide_list, allele_list = create_incomplete_dense_pMHC_matrix(
-        allele_data_dict=allele_data_dict,
-        min_observations_per_peptide=min_observations_per_peptide,
-        min_observations_per_allele=min_observations_per_allele)
-
-    if np.isnan(X_incomplete).sum() == 0:
-        # if all entries in the matrix are already filled in then don't
-        # try using an imputation algorithm since it might raise an
-        # exception.
-        logging.warn("No missing values, using original data instead of imputation")
-        X_complete = X_incomplete
-    else:
-        X_complete = imputer.complete(X_incomplete)
-
-    allele_to_peptide_to_affinity_dict = dense_pMHC_matrix_to_nested_dict(
-        X=X_complete,
-        peptide_list=peptide_list,
-        allele_list=allele_list)
-
-    # map all the normalized regression targets to IC50 values
-    allele_to_peptide_to_ic50_dict = {
-        allele: {
-            peptide: regression_target_to_ic50(y, max_ic50=max_ic50)
-            for (peptide, y)
-            in allele_dict.items()
-        }
-        for (allele, allele_dict)
-        in allele_to_peptide_to_affinity_dict.items()
-    }
-
-    return {
-        allele_name: create_allele_data_from_peptide_to_ic50_dict(allele_dict)
-        for (allele_name, allele_dict)
-        in allele_to_peptide_to_ic50_dict.items()
-    }
 
 def imputer_from_name(imputation_method_name, **kwargs):
     """

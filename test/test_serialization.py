@@ -8,7 +8,7 @@ def test_predict_after_saving_model_to_disk():
     # and check we get the same predictions back afterward
     model = Class1BindingPredictor.from_hyperparameters(name="rando")
     peptides = ["A" * 9, "C" * 9]
-    original_predictions = model.predict_peptides_ic50(peptides)
+    original_predictions = model.predict(peptides)
     json_filename = NamedTemporaryFile("w", delete=False).name
     hdf_filename = NamedTemporaryFile("w+b", delete=False).name
     print("JSON: %s" % json_filename)
@@ -19,7 +19,7 @@ def test_predict_after_saving_model_to_disk():
     deserialized_model = Class1BindingPredictor.from_disk(json_filename, hdf_filename)
     assert deserialized_model.model is not None
 
-    deserialized_predictions = deserialized_model.predict_peptides_ic50(peptides)
+    deserialized_predictions = deserialized_model.predict(peptides)
 
     assert np.allclose(original_predictions, deserialized_predictions), (
         peptides, original_predictions, deserialized_predictions)

@@ -17,6 +17,7 @@ from __future__ import (
     division,
     absolute_import,
 )
+from math import exp, log
 
 def parse_int_list(s):
     return [int(part.strip() for part in s.split(","))]
@@ -64,3 +65,17 @@ def split_allele_names(s):
         for part
         in s.split(",")
     ]
+
+
+def geometric_mean(xs, weights=None):
+    """
+    Geometric mean of a collection of affinity measurements, with optional
+    sample weights.
+    """
+    if len(xs) == 1:
+        return xs[0]
+    elif weights is None:
+        return exp(sum(log(xi) for xi in xs) / len(xs))
+    sum_weighted_log = sum(log(xi) * wi for (xi, wi) in zip(xs, weights))
+    denom = sum(weights)
+    return exp(sum_weighted_log / denom)

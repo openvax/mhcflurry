@@ -15,22 +15,21 @@
 
 import numpy as np
 
-from dummy_predictors import always_zero_predictor_with_unknown_AAs
+from dummy_models import always_zero_predictor_with_unknown_AAs
 
 
 def test_always_zero_9mer_inputs():
-
     test_9mer_peptides = [
         "SIISIISII",
         "AAAAAAAAA",
     ]
 
     n_expected = len(test_9mer_peptides)
-    y = always_zero_predictor_with_unknown_AAs.predict_peptides(test_9mer_peptides)
+    y = always_zero_predictor_with_unknown_AAs.predict_scores(test_9mer_peptides)
     assert len(y) == n_expected
     assert np.all(y == 0)
 
-    ic50 = always_zero_predictor_with_unknown_AAs.predict_peptides_ic50(test_9mer_peptides)
+    ic50 = always_zero_predictor_with_unknown_AAs.predict(test_9mer_peptides)
     assert len(y) == n_expected
     assert np.all(ic50 == always_zero_predictor_with_unknown_AAs.max_ic50), ic50
 
@@ -42,11 +41,11 @@ def test_always_zero_8mer_inputs():
     ]
 
     n_expected = len(test_8mer_peptides)
-    y = always_zero_predictor_with_unknown_AAs.predict_peptides(test_8mer_peptides)
+    y = always_zero_predictor_with_unknown_AAs.predict_scores(test_8mer_peptides)
     assert len(y) == n_expected
     assert np.all(y == 0)
 
-    ic50 = always_zero_predictor_with_unknown_AAs.predict_peptides_ic50(test_8mer_peptides)
+    ic50 = always_zero_predictor_with_unknown_AAs.predict(test_8mer_peptides)
     assert len(y) == n_expected
     assert np.all(ic50 == always_zero_predictor_with_unknown_AAs.max_ic50), ic50
 
@@ -59,11 +58,11 @@ def test_always_zero_10mer_inputs():
     ]
 
     n_expected = len(test_10mer_peptides)
-    y = always_zero_predictor_with_unknown_AAs.predict_peptides(test_10mer_peptides)
+    y = always_zero_predictor_with_unknown_AAs.predict_scores(test_10mer_peptides)
     assert len(y) == n_expected
     assert np.all(y == 0)
 
-    ic50 = always_zero_predictor_with_unknown_AAs.predict_peptides_ic50(test_10mer_peptides)
+    ic50 = always_zero_predictor_with_unknown_AAs.predict(test_10mer_peptides)
     assert len(y) == n_expected
     assert np.all(ic50 == always_zero_predictor_with_unknown_AAs.max_ic50), ic50
 

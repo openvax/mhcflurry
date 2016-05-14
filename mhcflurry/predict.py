@@ -39,7 +39,7 @@ def predict(alleles, peptides):
     for allele in alleles:
         allele = normalize_allele_name(allele)
         model = Class1BindingPredictor.from_allele_name(allele)
-        for i, ic50 in enumerate(model.predict_peptides_ic50(peptides)):
+        for i, ic50 in enumerate(model.predict(peptides)):
             result_dict["Allele"].append(allele)
             result_dict["Peptide"].append(peptides[i])
             result_dict["Prediction"].append(ic50)

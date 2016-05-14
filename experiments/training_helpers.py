@@ -23,7 +23,7 @@ from scipy import stats
 
 import mhcflurry
 from mhcflurry.common import normalize_allele_name
-from mhcflurry.data import indices_to_hotshot_encoding
+from mhcflurry.dataset_helpers import indices_to_hotshot_encoding
 
 
 PredictionScores = namedtuple("PredictionScores", "tau auc f1 accuracy mae")
