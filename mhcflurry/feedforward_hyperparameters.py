@@ -17,18 +17,6 @@ from collections import namedtuple
 
 from .common import all_combinations
 
-Params = namedtuple("Params", [
-    "activation",
-    "initialization_method",
-    "embedding_dim",
-    "dropout_probability",
-    "learning_rate",
-    "hidden_layer_size",
-    "loss",
-    "optimizer",
-    "n_training_epochs",
-])
-
 
 # keeping these for compatibility with old code
 N_EPOCHS = 250
@@ -41,6 +29,18 @@ LEARNING_RATE = 0.001
 OPTIMIZER = "adam"
 LOSS = "mse"
 
+Params = namedtuple("Params", [
+    "activation",
+    "initialization_method",
+    "embedding_dim",
+    "dropout_probability",
+    "learning_rate",
+    "hidden_layer_size",
+    "loss",
+    "optimizer",
+    "n_training_epochs",
+])
+
 default_hyperparameters = Params(
     activation=ACTIVATION,
     initialization_method=INITIALIZATION_METHOD,
@@ -51,7 +51,6 @@ default_hyperparameters = Params(
     loss=LOSS,
     optimizer=OPTIMIZER,
     n_training_epochs=N_EPOCHS)
-
 
 def all_combinations_of_hyperparameters(**kwargs):
     # enusre that all parameters are members of the Params object
