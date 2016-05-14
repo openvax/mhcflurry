@@ -30,8 +30,8 @@ import pandas as pd
 
 from dataset_paths import PETERS2009_CSV_PATH
 from mhcflurry.score_set import ScoreSet
+from mhcflurry.dataset import Dataset
 from matrix_completion_helpers import (
-    load_data,
     evaluate_predictions,
     stratified_cross_validation
 )
@@ -144,10 +144,8 @@ if __name__ == "__main__":
     )
     print("Imputation methods: %s" % imputation_methods)
 
-    X, peptide_list, allele_list = load_data(
-        binding_data_csv=args.binding_data_csv,
-        max_ic50=args.max_ic50,
-        only_human=args.only_human,
+    dataset = Dataset.from_csv(args.binding_data_csv)
+    X, peptide_list, allele_list = dataset.to_dense_pMHC_affinity_matrix(
         min_observations_per_allele=args.n_folds,
         min_observations_per_peptide=args.min_observations_per_peptide)
     observed_mask = np.isfinite(X)
