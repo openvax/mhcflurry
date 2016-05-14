@@ -61,7 +61,7 @@ def all_combinations_of_hyperparameters(**kwargs):
     # element list containing the default value
     for arg_name in Params._fields:
         if arg_name not in kwargs:
-            default_value = default_hyperparameters.__dict__[arg_name]
+            default_value = getattr(default_hyperparameters, arg_name)
             kwargs[arg_name] = [default_value]
     for d in all_combinations(**kwargs):
         yield Params(**d)
