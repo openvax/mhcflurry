@@ -12,8 +12,9 @@ def test_all_combinations_of_hyperparameters():
     results = list(all_combinations_of_hyperparameters(**combinations_dict))
     eq_(len(results), 4)
     for params in results:
-        for name, default_value in default_hyperparameters.__dict__.items():
-            curr_value = params.__dict__[name]
+        for name in default_hyperparameters._fields:
+            default_value = getattr(default_hyperparameters, name)
+            curr_value = getattr(params, name)
             if name not in combinations_dict:
                 eq_(curr_value, default_value)
             else:
