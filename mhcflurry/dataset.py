@@ -126,7 +126,7 @@ class Dataset(object):
 
     def __str__(self):
         return "Dataset(n=%d, alleles=%s)" % (
-            len(self), self.unique_alleles())
+            len(self), list(sorted(self.unique_alleles())))
 
     def __repr__(self):
         return str(self)
@@ -190,6 +190,12 @@ class Dataset(object):
         """
         return set(self.peptides)
 
+    def unique_allele_peptide_pairs(self):
+        """
+        Returns set of every unique pMHC pairing in the dataset.
+        """
+        return set(zip(self.alleles, self.peptides))
+
     def groupby_allele(self):
         """
         Yields a sequence of tuples of allele names with Datasets containing
@@ -204,6 +210,24 @@ class Dataset(object):
         only entries from that allele.
         """
         return dict(self.groupby_allele())
+
+    def allele_counts_dictionary(self):
+        """
+        Returns a dictionary mapping each allele name to the number of entries
+        associated with it.
+        """
+        return {
+            allele_name: len(allele_dataset)
+            for allele_name, allele_dataset
+            in self.groupby_allele()
+        }
+
+    def filter_alleles_by_count(self, min_peptides_per_allele=0):
+        return self.concat([
+            allele_dataset
+            for (_, allele_dataset)
+            in self.groupby_allele()
+            if len(allele_dataset) >= min_peptides_per_allele])
 
     def to_nested_dictionary(self, combine_fn=geometric_mean):
         """
