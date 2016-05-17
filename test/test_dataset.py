@@ -48,6 +48,25 @@ def test_dataset_difference():
         }})
     eq_(dataset_diff, expected_result)
 
+def test_dataset_cross_validation():
+    dataset = Dataset.from_nested_dictionary({
+        "H-2-Kb": {
+            "SIINFEKL": 10.0,
+            "FEKLSIIN": 20000.0,
+            "SIFEKLIN": 50000.0,
+        },
+        "HLA-A*02:01": {"ASASAS": 1.0, "CCC": 0.0}})
+
+    fold_count = 0
+    for train_dataset, test_dataset in dataset.cross_validation_iterator(
+            test_allele="HLA-A*02:01",
+            n_folds=2):
+        assert train_dataset.unique_alleles() == {"H-2-Kb", "HLA-A*02:01"}
+        assert test_dataset.unique_alleles() == {"HLA-A*02:01"}
+        assert len(test_dataset) == 1
+        fold_count += 1
+    assert fold_count == 2
+
 if __name__ == "__main__":
     test_create_allele_data_from_single_allele_dict()
     test_dataset_random_split()

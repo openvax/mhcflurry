@@ -25,6 +25,7 @@ from six import string_types
 import pandas as pd
 import numpy as np
 from typechecks import require_iterable_of
+from sklearn.cross_validation import KFold
 
 from .common import geometric_mean
 from .dataset_helpers import (
@@ -603,6 +604,69 @@ class Dataset(object):
         right = self.slice(all_indices[n:])
         return left, right
 
+    def cross_validation_iterator(
+            self, test_allele=None, n_folds=3, shuffle=True):
+        """
+        Yields a sequence of training/test splits of this dataset.
+
+        If test_allele is None then split across all pMHC entries, otherwise
+        only split the measurements of the specified allele (other alleles
+        will then always be included in the training datasets).
+        """
+        if test_allele is None:
+            candidate_test_indices = np.arange(len(self))
+        elif test_allele not in self.unique_alleles():
+            raise ValueError("Allele '%s' not in Dataset" % test_allele)
+        else:
+            candidate_test_indices = np.where(self.alleles == test_allele)[0]
+
+        n_candidate_test_samples = len(candidate_test_indices)
+        n_total = len(self)
+
+        for _, subindices in KFold(
+                n=n_candidate_test_samples,
+                n_folds=n_folds,
+                shuffle=shuffle):
+            test_indices = candidate_test_indices[subindices]
+            train_mask = np.ones(n_total, dtype=bool)
+            train_mask[test_indices] = False
+            train_data = self.slice(train_mask)
+            test_data = self.slice(test_indices)
+            yield train_data, test_data
+
+    def split_allele_randomly_and_impute_training_set(
+            self, allele, n_training_samples=None, **kwargs):
+        """
+        Split an allele into training and test sets, and then impute values
+        for peptides missing from the training set using data from other alleles
+        in this Dataset.
+
+        (apologies for the wordy name, this turns out to be a common operation)
+
+        Parameters
+        ----------
+        allele : str
+            Name of allele
+
+        n_training_samples : int, optional
+            Size of the training set to return for this allele.
+
+        **kwargs : dict
+            Extra keyword arguments passed to Dataset.impute_missing_values
+
+        Returns three Dataset objects:
+            - training set with original pMHC affinities for given allele
+            - larger imputed training set for given allele
+            - test set
+        """
+        dataset_allele = self.get_allele(allele)
+        dataset_allele_train, dataset_allele_test = dataset_allele.random_split(
+            n=n_training_samples)
+        full_dataset_without_test_samples = self.difference(dataset_allele_test)
+        imputed_dataset = full_dataset_without_test_samples.impute_missing_values(**kwargs)
+        imputed_dataset_allele = imputed_dataset.get_allele(allele)
+        return dataset_allele_train, imputed_dataset_allele, dataset_allele_test
+
     def drop_allele_peptide_lists(self, alleles, peptides):
         """
         Drop all allele-peptide pairs in the given lists.
@@ -656,39 +720,6 @@ class Dataset(object):
         return self.drop_allele_peptide_lists(
             alleles=other_dataset.alleles,
             peptides=other_dataset.peptides)
-
-    def split_allele_randomly_and_impute_training_set(
-            self, allele, n_training_samples=None, **kwargs):
-        """
-        Split an allele into training and test sets, and then impute values
-        for peptides missing from the training set using data from other alleles
-        in this Dataset.
-
-        (apologies for the wordy name, this turns out to be a common operation)
-
-        Parameters
-        ----------
-        allele : str
-            Name of allele
-
-        n_training_samples : int, optional
-            Size of the training set to return for this allele.
-
-        **kwargs : dict
-            Extra keyword arguments passed to Dataset.impute_missing_values
-
-        Returns three Dataset objects:
-            - training set with original pMHC affinities for given allele
-            - larger imputed training set for given allele
-            - test set
-        """
-        dataset_allele = self.get_allele(allele)
-        dataset_allele_train, dataset_allele_test = dataset_allele.random_split(
-            n=n_training_samples)
-        full_dataset_without_test_samples = self.difference(dataset_allele_test)
-        imputed_dataset = full_dataset_without_test_samples.impute_missing_values(**kwargs)
-        imputed_dataset_allele = imputed_dataset.get_allele(allele)
-        return dataset_allele_train, imputed_dataset_allele, dataset_allele_test
 
     def impute_missing_values(
             self,
