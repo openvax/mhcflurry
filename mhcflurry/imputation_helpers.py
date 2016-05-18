@@ -123,8 +123,6 @@ def imputer_from_name(imputation_method_name, **kwargs):
     if imputation_method_name == "mice":
         kwargs["n_burn_in"] = kwargs.get("n_burn_in", 5)
         kwargs["n_imputations"] = kwargs.get("n_imputations", 25)
-        kwargs["min_value"] = kwargs.get("min_value", 0)
-        kwargs["max_value"] = kwargs.get("max_value", 1)
         return MICE(**kwargs)
     elif imputation_method_name == "knn":
         kwargs["k"] = kwargs.get("k", 3)

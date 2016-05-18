@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
+from __future__ import print_function, division, absolute_import
 from collections import defaultdict, OrderedDict
 import logging
 
@@ -720,6 +716,10 @@ class Dataset(object):
         return self.drop_allele_peptide_lists(
             alleles=other_dataset.alleles,
             peptides=other_dataset.peptides)
+
+    def intersection(self, other_dataset):
+        not_in_other = self.difference(other_dataset)
+        return self.difference(not_in_other)
 
     def impute_missing_values(
             self,

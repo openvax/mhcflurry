@@ -48,6 +48,20 @@ def test_dataset_difference():
         }})
     eq_(dataset_diff, expected_result)
 
+
+def test_dataset_intersection():
+    dataset1 = Dataset.from_nested_dictionary({
+        "H-2-Kb": {
+            "SIINFEKL": 10.0,
+            "FEKLSIIN": 20000.0,
+            "SIFEKLIN": 50000.0,
+        }})
+    dataset2 = Dataset.from_nested_dictionary({"H-2-Kb": {"SIINFEKL": 30.0}})
+    dataset_intersection = dataset1.intersection(dataset2)
+    expected_result = Dataset.from_nested_dictionary({
+        "H-2-Kb": {"SIINFEKL": 10.0}})
+    eq_(dataset_intersection, expected_result)
+
 def test_dataset_cross_validation():
     dataset = Dataset.from_nested_dictionary({
         "H-2-Kb": {
