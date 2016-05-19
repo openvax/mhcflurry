@@ -113,7 +113,7 @@ def subsample_performance(
     for i, n_train in enumerate(sample_sizes):
         for _ in range(n_repeats_per_size):
             if imputer is None:
-                dataset_train, dataset_test = dataset.random_split(n_train)
+                dataset_train, dataset_test = dataset_allele.random_split(n_train)
                 dataset_imputed = None
             else:
                 dataset_train, dataset_imputed, dataset_test = \
@@ -128,6 +128,9 @@ def subsample_performance(
                 allele,
                 n_train,
                 n_total))
+            print("-- Train", dataset_train)
+            print("-- Imputed", dataset_imputed)
+            print("-- Test", dataset_test)
 
             # pick a fraction on a log-scale from the minimum to maximum number
             # of samples

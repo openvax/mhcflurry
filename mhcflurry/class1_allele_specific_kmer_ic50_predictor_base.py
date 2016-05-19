@@ -171,6 +171,16 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
             Extra arguments are passed on to the fit_encoded_kmer_arrays()
             method.
         """
+        if len(dataset.unique_alleles()) > 1:
+            raise ValueError(
+                "Allele-specific predictor can't be trained on multi-allele data: %s" % (
+                    dataset,))
+
+        if pretraining_dataset and len(pretraining_dataset.unique_alleles()) > 1:
+            raise ValueError(
+                "Allele-specific predictor can't pretrain on data from multiple alleles: %s" %
+                (pretraining_dataset,))
+
         X, ic50, sample_weights, original_peptide_indices = \
             dataset.kmer_index_encoding(
                 kmer_size=self.kmer_size,

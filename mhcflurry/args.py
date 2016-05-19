@@ -39,18 +39,6 @@ def add_imputation_argument_to_parser(parser):
         help="Use the given imputation method to generate data for pre-training models")
     return parser
 
-def add_max_ic50_argument_to_parser(parser):
-    """
-    Extends an argument parser with --max-ic50
-    """
-
-    parser.add_argument(
-        "--max-ic50",
-        type=float,
-        default=MAX_IC50,
-        help="Largest IC50 represented by neural network output. "
-        "Default: %(default)s")
-    return parser
 
 def add_hyperparameter_arguments_to_parser(parser):
     """
@@ -104,8 +92,8 @@ def add_hyperparameter_arguments_to_parser(parser):
         "--max-ic50",
         type=float,
         default=MAX_IC50,
-        help="Largest IC50 value representable as output of neural network")
-
+        help="Largest IC50 represented by neural network output. "
+        "Default: %(default)s")
     return parser
 
 def add_training_arguments_to_parser(parser):
@@ -160,7 +148,6 @@ def add_arguments_to_parser(parser):
     functions = [
         add_hyperparameter_arguments_to_parser,
         add_training_arguments_to_parser,
-        add_max_ic50_argument_to_parser,
         add_imputation_argument_to_parser,
     ]
     for fn in functions:
