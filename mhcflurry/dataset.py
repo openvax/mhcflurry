@@ -238,23 +238,28 @@ class Dataset(object):
             How to combine multiple measurements for the same pMHC complex.
             Takes affinities and optional `weights` argument.
         """
-        allele_to_peptide_to_affinity_dict = {}
-        for allele, allele_dataset in self.groupby_allele():
+        allele_to_peptide_to_affinities_dict = defaultdict(dict)
+        allele_to_peptide_to_weights_dict = defaultdict(dict)
+        key_pairs = set([])
+        for allele, peptide, affinity, weight in zip(
+                self.alleles, self.peptides, self.affinities, self.sample_weights):
             # dictionary mapping each peptide to a list of affinities
-            peptide_to_affinity_dict = defaultdict(list)
-            peptide_to_weight_dict = defaultdict(list)
-            for (allele, peptide), row in allele_dataset.iterrows():
-                affinity = row["affinity"]
-                sample_weight = row["sample_weight"]
-                peptide_to_affinity_dict[peptide].append(affinity)
-                peptide_to_weight_dict[peptide].append(sample_weight)
-            allele_to_peptide_to_affinity_dict[allele] = {
+            if peptide not in allele_to_peptide_to_affinities_dict[allele]:
+                allele_to_peptide_to_affinities_dict[allele][peptide] = [affinity]
+                allele_to_peptide_to_weights_dict[allele][peptide] = [weight]
+            else:
+                allele_to_peptide_to_affinities_dict[allele][peptide].append(affinity)
+                allele_to_peptide_to_weights_dict[allele][peptide].append(weight)
+            key_pairs.add((allele, peptide))
+        return {
+            allele: {
                 peptide: combine_fn(
-                    peptide_to_affinity_dict[peptide],
-                    peptide_to_weight_dict[peptide])
-                for peptide in peptide_to_affinity_dict.keys()
+                    allele_to_peptide_to_affinities_dict[allele][peptide],
+                    allele_to_peptide_to_weights_dict[allele][peptide])
+                for peptide in allele_to_peptide_to_affinities_dict[allele].keys()
             }
-        return allele_to_peptide_to_affinity_dict
+            for allele in allele_to_peptide_to_affinities_dict.keys()
+        }
 
     @classmethod
     def from_sequences(
