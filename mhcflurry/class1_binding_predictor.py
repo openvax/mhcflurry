@@ -144,6 +144,7 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             X,
             ic50,
             sample_weights=None,
+            right_censoring_mask=None,
             X_pretrain=None,
             ic50_pretrain=None,
             sample_weights_pretrain=None,
@@ -167,10 +168,17 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
         sample_weights : array
             Weight of each training sample with shape (n_samples,)
 
+        right_censoring_mask : array, optional
+            Boolean array which indicates whether each IC50 value is actually
+            right censored (a lower bound on the true value). Censored values
+            are transformed during training by sampling between the observed
+            and maximum values on each iteration.
+
         X_pretrain : array
             Extra samples used for soft pretraining of the predictor,
-            should have same number of dimensions as X. During training the weights
-            of these samples will decay after each epoch.
+            should have same number of dimensions as X.
+            During training the weights of these samples will decay after
+            each epoch.
 
         ic50_pretrain : array
             IC50 values for extra samples, shape
@@ -196,8 +204,27 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             combine_training_arrays(
                 X, ic50, sample_weights,
                 X_pretrain, ic50_pretrain, sample_weights_pretrain)
+
         Y_combined = ic50_to_regression_target(
             ic50_combined, max_ic50=self.max_ic50)
+
+        # create a censored IC50 mask for all combined samples and then fill
+        # in the training censoring mask if it's given
+        right_censoring_mask_combined = np.zeros(len(Y_combined), dtype=bool)
+        if right_censoring_mask is not None:
+            right_censoring_mask = np.asarray(right_censoring_mask)
+            if len(right_censoring_mask.shape) != 1:
+                raise ValueError("Expected 1D censor mask, got shape %s" % (
+                    right_censoring_mask.shape,))
+            if len(right_censoring_mask) != len(ic50):
+                raise ValueError(
+                    "Wrong length for censoring mask, expected %d but got %d" % (
+                        len(ic50),
+                        len(right_censoring_mask)))
+            right_censoring_mask_combined[n_pretrain:] = right_censoring_mask
+
+        n_censored = right_censoring_mask_combined.sum()
+
         total_pretrain_sample_weight = combined_weights[:n_pretrain].sum()
         total_train_sample_weight = combined_weights[n_pretrain:].sum()
         total_combined_sample_weight = (
@@ -212,16 +239,26 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             pretrain_fraction_contribution = (
                 pretrain_contribution / total_combined_sample_weight)
 
+            if n_censored > 0:
+                # shrink the output values by a uniform amount to some value
+                # between the lowest representable affinity and the observed
+                # censored value
+                Y_adjusted_for_censoring = Y_combined.copy()
+                Y_adjusted_for_censoring[right_censoring_mask_combined] *= (
+                    np.random.rand(n_censored))
+            else:
+                Y_adjusted_for_censoring = Y_combined
+
             # only use synthetic data if it contributes at least 1/1000th of
             # sample weight
             if pretrain_fraction_contribution > 0.001:
                 combined_weights[:n_pretrain] *= decay_factor
                 X_curr_iter = X_combined
-                Y_curr_iter = Y_combined
+                Y_curr_iter = Y_adjusted_for_censoring
                 weights_curr_iter = combined_weights
             else:
                 X_curr_iter = X_combined[n_pretrain:]
-                Y_curr_iter = Y_combined[n_pretrain:]
+                Y_curr_iter = Y_adjusted_for_censoring[n_pretrain:]
                 weights_curr_iter = combined_weights[n_pretrain:]
 
             if n_random_negative_samples > 0:

@@ -146,7 +146,12 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
         }
         return np.array([combined_predictions_dict[p] for p in peptides])
 
-    def fit_dataset(self, dataset, pretraining_dataset=None, **kwargs):
+    def fit_dataset(
+            self,
+            dataset,
+            pretraining_dataset=None,
+            sample_censored_affinities=False,
+            **kwargs):
         """
         Fit the model parameters on the given training data.
 
@@ -156,14 +161,20 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
 
         pretraining_dataset : Dataset
 
+        sample_censored_affinities : bool
+            If a column named 'inequality' is in the Dataset then every
+            peptide with a value of '>' on each training epoch, gets a
+            randomly sampled IC50 between its observed value and the
+            max_ic50 of the predictor. Default is False.
+
         **kwargs : dict
             Extra arguments are passed on to the fit_encoded_kmer_arrays()
             method.
         """
-        X, ic50, sample_weights, _ = dataset.kmer_index_encoding(
-            kmer_size=self.kmer_size,
-            allow_unknown_amino_acids=self.allow_unknown_amino_acids)
-
+        X, ic50, sample_weights, original_peptide_indices = \
+            dataset.kmer_index_encoding(
+                kmer_size=self.kmer_size,
+                allow_unknown_amino_acids=self.allow_unknown_amino_acids)
         if pretraining_dataset is None:
             X_pretrain = ic50_pretrain = sample_weights_pretrain = None
         else:
@@ -171,10 +182,21 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
                 pretraining_dataset.kmer_index_encoding(
                     kmer_size=self.kmer_size,
                     allow_unknown_amino_acids=self.allow_unknown_amino_acids)
+
+        if sample_censored_affinities and 'inequality' in dataset.columns:
+            df = dataset.to_dataframe()
+            inequalities = df["inequality"]
+            censored_mask_for_variable_length_peptides = (inequalities == ">")
+            censored_mask_for_kmers = censored_mask_for_variable_length_peptides[
+                original_peptide_indices]
+        else:
+            censored_mask_for_kmers = None
+
         return self.fit_kmer_encoded_arrays(
             X=X,
             ic50=ic50,
             sample_weights=sample_weights,
+            right_censoring_mask=censored_mask_for_kmers,
             X_pretrain=X_pretrain,
             ic50_pretrain=ic50_pretrain,
             sample_weights_pretrain=sample_weights_pretrain,
