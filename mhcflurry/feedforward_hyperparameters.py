@@ -26,8 +26,9 @@ EMBEDDING_DIM = 32
 HIDDEN_LAYER_SIZE = 100
 DROPOUT_PROBABILITY = 0.1
 LEARNING_RATE = 0.001
-OPTIMIZER = "adam"
+OPTIMIZER = "rmsprop"
 LOSS = "mse"
+BATCH_SIZE = 32
 
 Params = namedtuple("Params", [
     "activation",
@@ -39,6 +40,7 @@ Params = namedtuple("Params", [
     "loss",
     "optimizer",
     "n_training_epochs",
+    "batch_size",
 ])
 
 default_hyperparameters = Params(
@@ -50,7 +52,8 @@ default_hyperparameters = Params(
     hidden_layer_size=HIDDEN_LAYER_SIZE,
     loss=LOSS,
     optimizer=OPTIMIZER,
-    n_training_epochs=N_EPOCHS)
+    n_training_epochs=N_EPOCHS,
+    batch_size=BATCH_SIZE)
 
 def all_combinations_of_hyperparameters(**kwargs):
     # enusre that all parameters are members of the Params object

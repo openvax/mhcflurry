@@ -26,8 +26,13 @@ import sklearn.metrics
 import seaborn
 
 from mhcflurry.dataset import Dataset
-from mhcflurry.class1_binding_predictor import Class1BindingPredictor
-from mhcflurry.args import add_imputation_argument_to_parser, imputer_from_args
+from mhcflurry.args import (
+    add_imputation_argument_to_parser,
+    add_hyperparameter_arguments_to_parser,
+    add_training_arguments_to_parser,
+    imputer_from_args,
+    predictor_from_args,
+)
 
 parser = ArgumentParser()
 
@@ -39,45 +44,42 @@ parser.add_argument(
     "--allele",
     default="A0201")
 
-parser.add_argument(
-    "--max-ic50",
-    type=float,
-    default=50000.0)
-
-parser.add_argument(
-    "--hidden-layer-size",
-    type=int,
-    default=10,
-    help="Hidden layer size for neural network, if 0 use linear regression")
-
-parser.add_argument(
-    "--embedding-dim",
-    type=int,
-    default=50,
-    help="Number of dimensions for vector embedding of amino acids")
-
-parser.add_argument(
-    "--activation",
-    default="tanh")
-
-parser.add_argument(
-    "--training-epochs",
-    type=int,
-    default=100)
-
-parser.add_argument(
-    "--minibatch-size",
-    type=int,
-    default=128)
 
 parser.add_argument(
     "--repeat",
     type=int,
-    default=10,
+    default=1,
     help="How many times to train model for same dataset size")
 
-add_imputation_argument_to_parser(parser)
+parser.add_argument(
+    "--number-dataset-sizes",
+    type=int,
+    default=10)
 
+parser.add_argument(
+    "--min-training-samples",
+    type=int,
+    default=20)
+
+
+parser.add_argument(
+    "--max-training-samples",
+    type=int,
+    default=2000)
+
+"""
+parser.add_argument(
+    "--remove-similar-peptides-from-test-data",
+    action="store_true",
+    default=False,
+    help=(
+        "Use a 4 letter reduced amino acid alphabet to identify and "
+        "remove correlated peptides from the test data."))
+"""
+
+add_imputation_argument_to_parser(parser)
+add_hyperparameter_arguments_to_parser(parser)
+add_training_arguments_to_parser(parser)
 
 def subsample_performance(
         dataset,
@@ -86,8 +88,8 @@ def subsample_performance(
         imputer=None,
         min_training_samples=20,
         max_training_samples=3000,
-        n_subsample_sizes=5,
-        n_repeats_per_size=3,
+        n_subsample_sizes=10,
+        n_repeats_per_size=1,
         n_training_epochs=200,
         n_random_negative_samples=100,
         batch_size=32):
@@ -105,10 +107,10 @@ def subsample_performance(
     log_min_samples = np.log(min_training_samples)
     log_max_samples = np.log(max_training_samples)
 
-    log_sample_sizes = np.linspace(log_min_samples, log_max_samples)
-    sample_sizes = np.exp(log_sample_sizes).astype(int)
+    log_sample_sizes = np.linspace(log_min_samples, log_max_samples, num=n_subsample_sizes)
+    sample_sizes = np.exp(log_sample_sizes).astype(int) + 1
 
-    for n_train in sample_sizes:
+    for i, n_train in enumerate(sample_sizes):
         for _ in range(n_repeats_per_size):
             if imputer is None:
                 dataset_train, dataset_test = dataset.random_split(n_train)
@@ -120,7 +122,9 @@ def subsample_performance(
                         n_training_samples=n_train,
                         imputation_method=imputer,
                         min_observations_per_peptide=2)
-            print("=== Training model for %s with sample_size = %d/%d" % (
+            print("=== #%d/%d: Training model for %s with sample_size = %d/%d" % (
+                i + 1,
+                len(sample_sizes),
                 allele,
                 n_train,
                 n_total))
@@ -157,10 +161,7 @@ if __name__ == "__main__":
     imputer = imputer_from_args(args)
 
     def make_model():
-        return Class1BindingPredictor.from_hyperparameters(
-            layer_sizes=[args.hidden_layer_size] if args.hidden_layer_size > 0 else [],
-            activation=args.activation,
-            embedding_output_dim=args.embedding_dim)
+        return predictor_from_args(allele_name=args.allele, args=args)
 
     xs, aucs, f1s = subsample_performance(
         dataset=dataset,
@@ -169,7 +170,11 @@ if __name__ == "__main__":
         model_fn=make_model,
         n_repeats_per_size=args.repeat,
         n_training_epochs=args.training_epochs,
-        batch_size=args.minibatch_size)
+        batch_size=args.batch_size,
+        min_training_samples=args.min_training_samples,
+        max_training_samples=args.max_training_samples,
+        n_subsample_sizes=args.number_dataset_sizes,
+        n_random_negative_samples=args.random_negative_samples)
 
     for (name, values) in [("AUC", aucs), ("F1", f1s)]:
         figure = seaborn.plt.figure(figsize=(10, 8))
@@ -184,14 +189,10 @@ if __name__ == "__main__":
             scatter_kws=dict(alpha=0.5, s=50))
         seaborn.plt.xlabel("# samples (subset of %s)" % args.allele)
         seaborn.plt.ylabel(name)
-        if args.hidden_layer_size:
-            filename = "%s-%s-vs-nsamples-hidden-%s-activation-%s.png" % (
-                args.allele,
-                name,
-                args.hidden_layer_size,
-                args.activation)
-        else:
-            filename = "%s-%s-vs-nsamples-linear.png" % (
-                args.allele,
-                name)
+        filename = "%s-%s-vs-nsamples-hidden-%s-activation-%s-impute-%s.png" % (
+            args.allele,
+            name,
+            args.hidden_layer_size,
+            args.activation,
+            args.imputation_method)
         figure.savefig(filename)

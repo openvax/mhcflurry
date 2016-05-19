@@ -20,6 +20,7 @@ from .feedforward_hyperparameters import (
     INITIALIZATION_METHOD,
     ACTIVATION,
     DROPOUT_PROBABILITY,
+    BATCH_SIZE
 )
 from .class1_binding_predictor import Class1BindingPredictor
 from .imputation_helpers import imputer_from_name
@@ -92,11 +93,19 @@ def add_hyperparameter_arguments_to_parser(parser):
         default=DROPOUT_PROBABILITY,
         help="Dropout probability after neural network layers. "
         "Default: %(default)s")
+
     parser.add_argument(
         "--kmer-size",
         type=int,
         default=9,
         help="Size of input vector for neural network")
+
+    parser.add_argument(
+        "--max-ic50",
+        type=float,
+        default=MAX_IC50,
+        help="Largest IC50 value representable as output of neural network")
+
     return parser
 
 def add_training_arguments_to_parser(parser):
@@ -105,22 +114,32 @@ def add_training_arguments_to_parser(parser):
         --training-epochs
         --random-negative-samples
         --learning-rate
+        --batch-size
     """
     parser.add_argument(
         "--random-negative-samples",
         type=int,
         default=0,
         help="Number of random negtive samples to generate each training epoch")
+
     parser.add_argument(
         "--learning-rate",
         type=float,
         default=0.001,
         help="Learning rate for training neural network. Default: %(default)s")
+
     parser.add_argument(
         "--training-epochs",
         type=int,
         default=N_EPOCHS,
         help="Number of training epochs. Default: %(default)s")
+
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=BATCH_SIZE,
+        help="Number of samples in SGD mini-batch")
+
     return parser
 
 def add_arguments_to_parser(parser):
@@ -153,12 +172,13 @@ def predictor_from_args(args, allele_name):
     """
     Given parsed arguments returns a Class1BindingPredictor
     """
+    layer_sizes = (args.hidden_layer_size,) if args.hidden_layer_size > 0 else ()
     return Class1BindingPredictor.from_hyperparameters(
         name=allele_name,
         peptide_length=args.kmer_size,
         max_ic50=args.max_ic50,
         embedding_output_dim=args.embedding_size,
-        layer_sizes=(args.hidden_layer_size,),
+        layer_sizes=layer_sizes,
         activation=args.activation,
         init=args.initialization,
         dropout_probability=args.dropout,
