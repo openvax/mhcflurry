@@ -123,6 +123,7 @@ def imputer_from_name(imputation_method_name, **kwargs):
     if imputation_method_name == "mice":
         kwargs["n_burn_in"] = kwargs.get("n_burn_in", 5)
         kwargs["n_imputations"] = kwargs.get("n_imputations", 25)
+        kwargs["n_nearest_columns"] = kwargs.get("n_nearest_columns", 25)
         return MICE(**kwargs)
     elif imputation_method_name == "knn":
         kwargs["k"] = kwargs.get("k", 3)

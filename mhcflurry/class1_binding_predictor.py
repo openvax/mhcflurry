@@ -100,6 +100,18 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             weights_hdf_path,
             overwrite=overwrite)
 
+    def get_weights(self):
+        """
+        Returns weights, which can be passed to set_weights later.
+        """
+        return [x.copy() for x in self.model.get_weights()]
+
+    def set_weights(self, weights):
+        """
+        Reset the model weights.
+        """
+        self.model.set_weights(weights)
+
     @classmethod
     def from_hyperparameters(
             cls,

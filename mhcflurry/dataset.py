@@ -568,6 +568,7 @@ class Dataset(object):
         Create a new Dataset by slicing through all columns of this dataset
         with the given indices.
         """
+        indices = np.asarray(indices)
         max_index = indices.max()
         n_total = len(self)
         if max_index >= len(self):
@@ -580,7 +581,7 @@ class Dataset(object):
             df_subset[column_name] = np.asarray(df[column_name].values)[indices]
         return self.__class__(df_subset)
 
-    def random_split(self, n=None):
+    def random_split(self, n=None, stratify_fn=None):
         """
         Randomly split the Dataset into smaller Dataset objects.
 
@@ -588,6 +589,10 @@ class Dataset(object):
         ----------
         n : int, optional
             Size of the left split, half of the dataset if omitted.
+
+        stratify_fn : function, optional
+            Function that takes a row and returns bool, stratifying sampling
+            into two groups.
 
         Returns a pair of Dataset objects.
         """
@@ -599,14 +604,51 @@ class Dataset(object):
                 "Training subset can't have more than %d samples (given n=%d)" % (
                     n_total - 1,
                     n))
-        all_indices = np.arange(n_total)
-        np.random.shuffle(all_indices)
-        left = self.slice(all_indices[:n])
-        right = self.slice(all_indices[n:])
+
+        stratify_values = []
+        all_indices = []
+        for i, (_, row) in enumerate(self.iterrows()):
+            if stratify_fn is None:
+                stratify_values.append(None)
+            else:
+                stratify_values.append(stratify_fn(row))
+            all_indices.append(i)
+        stratify_values = np.asarray(stratify_values)
+        all_indices = np.asarray(all_indices)
+
+        index_groups = defaultdict(list)
+
+        for stratify_value, index in zip(stratify_values, all_indices):
+            index_groups[stratify_value].append(index)
+
+        fraction = float(n) / n_total
+
+        left_indices = []
+        right_indices = []
+
+        for _, group_indices in index_groups.items():
+            n_group = len(group_indices)
+            group_indices = np.asarray(group_indices)
+            np.random.shuffle(group_indices)
+
+            left_count = int(np.ceil(fraction * len(group_indices)))
+            if n_group > 1 and left_count == 0:
+                left_count = 1
+            elif n_group > 1 and left_count == n_group:
+                left_count = n_group - 1
+
+            left_indices.extend(group_indices[:left_count])
+            right_indices.extend(group_indices[left_count:])
+
+        left = self.slice(left_indices)
+        right = self.slice(right_indices)
         return left, right
 
     def cross_validation_iterator(
-            self, test_allele=None, n_folds=3, shuffle=True):
+            self,
+            test_allele=None,
+            n_folds=3,
+            shuffle=True):
         """
         Yields a sequence of training/test splits of this dataset.
 
@@ -616,8 +658,10 @@ class Dataset(object):
         """
         if test_allele is None:
             candidate_test_indices = np.arange(len(self))
+
         elif test_allele not in self.unique_alleles():
             raise ValueError("Allele '%s' not in Dataset" % test_allele)
+
         else:
             candidate_test_indices = np.where(self.alleles == test_allele)[0]
 
@@ -636,7 +680,11 @@ class Dataset(object):
             yield train_data, test_data
 
     def split_allele_randomly_and_impute_training_set(
-            self, allele, n_training_samples=None, **kwargs):
+            self,
+            allele,
+            n_training_samples=None,
+            stratify_fn=None,
+            **kwargs):
         """
         Split an allele into training and test sets, and then impute values
         for peptides missing from the training set using data from other alleles
@@ -652,6 +700,10 @@ class Dataset(object):
         n_training_samples : int, optional
             Size of the training set to return for this allele.
 
+        stratify_fn : function
+            Function mapping from rows of the Dataset to booleans for stratifying
+            by two groups.
+
         **kwargs : dict
             Extra keyword arguments passed to Dataset.impute_missing_values
 
@@ -662,7 +714,7 @@ class Dataset(object):
         """
         dataset_allele = self.get_allele(allele)
         dataset_allele_train, dataset_allele_test = dataset_allele.random_split(
-            n=n_training_samples)
+            n=n_training_samples, stratify_fn=stratify_fn)
         full_dataset_without_test_samples = self.difference(dataset_allele_test)
         imputed_dataset = full_dataset_without_test_samples.impute_missing_values(**kwargs)
         imputed_dataset_allele = imputed_dataset.get_allele(allele)

@@ -27,13 +27,13 @@ from .imputation_helpers import imputer_from_name
 
 from keras.optimizers import RMSprop
 
-def add_imputation_argument_to_parser(parser):
+def add_imputation_argument_to_parser(parser, default="none"):
     """
     Extends an argument parser with --imputation-method
     """
     parser.add_argument(
         "--imputation-method",
-        default="none",
+        default=default,
         choices=("mice", "knn", "softimpute", "svd", "mean", "none"),
         type=lambda s: s.strip().lower(),
         help="Use the given imputation method to generate data for pre-training models")
