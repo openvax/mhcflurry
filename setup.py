@@ -80,5 +80,6 @@ if __name__ == '__main__':
             "script/mhcflurry-train-class1-allele-specific-models.py",
             "script/mhcflurry-predict-class1.py",
             "script/mhcflurry-class1-web-server.py",
+            "script/mhcflurry-dataset-size-sensitivity.py",
         ],
     )

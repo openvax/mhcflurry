@@ -23,9 +23,12 @@ from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
+import scipy
 import sklearn
 import sklearn.metrics
 import seaborn
+from matplotlib import pyplot
+
 
 from mhcflurry.dataset import Dataset
 from mhcflurry.args import (
@@ -55,22 +58,33 @@ parser.add_argument(
 parser.add_argument(
     "--number-dataset-sizes",
     type=int,
-    default=10)
+    default=20)
 
 parser.add_argument(
     "--min-training-samples",
     type=int,
-    default=20)
+    default=5)
 
 parser.add_argument(
     "--max-training-samples",
     type=int,
-    default=2000)
+    default=500)
 
 parser.add_argument(
     "--sample-censored-affinities",
     default=False,
     action="store_true")
+
+parser.add_argument(
+    "--load-existing-data",
+    action="store_true",
+    default=False,
+    help="Skip computationally intensive data generation by loading from existing CSV")
+
+parser.add_argument(
+    "--seaborn-lmplot",
+    action="store_true",
+    default=False)
 
 """
 parser.add_argument(
@@ -85,6 +99,10 @@ parser.add_argument(
 add_imputation_argument_to_parser(parser, default="mice")
 add_hyperparameter_arguments_to_parser(parser)
 add_training_arguments_to_parser(parser)
+
+def stratify_by_binder_label(row):
+    return row["affinity"] <= 500
+
 
 def subsample_performance(
         dataset,
@@ -111,20 +129,21 @@ def subsample_performance(
         ("idx", []),
         ("auc", []),
         ("f1", []),
+        ("tau", []),
         ("impute", []),
     ])
+    sample_sizes = np.exp(np.linspace(
+        np.log(min_training_samples),
+        np.log(max_training_samples),
+        num=n_subsample_sizes)).astype(int) + 1
 
-    log_min_samples = np.log(min_training_samples)
-    log_max_samples = np.log(max_training_samples)
-
-    log_sample_sizes = np.linspace(log_min_samples, log_max_samples, num=n_subsample_sizes)
-    sample_sizes = np.exp(log_sample_sizes).astype(int) + 1
-
-    for i, n_train in enumerate(sample_sizes):
+    i = 0
+    for n_train in sample_sizes:
         for _ in range(n_repeats_per_size):
+            i += 1
             if imputer is None:
                 dataset_train, dataset_test = dataset_allele.random_split(
-                    n_train, stratify_fn=lambda row: row["affinity"] <= 500)
+                    n_train, stratify_fn=stratify_by_binder_label)
                 dataset_imputed = None
             else:
                 dataset_train, dataset_imputed, dataset_test = \
@@ -132,12 +151,12 @@ def subsample_performance(
                         allele=allele,
                         n_training_samples=n_train,
                         imputation_method=imputer,
-                        min_observations_per_peptide=2,
+                        min_observations_per_peptide=3,
                         min_observations_per_allele=1,
-                        stratify_fn=lambda row: row["affinity"] <= 500)
+                        stratify_fn=stratify_by_binder_label)
             print("=== #%d/%d: Training model for %s with sample_size = %d/%d" % (
                 i + 1,
-                len(sample_sizes),
+                len(sample_sizes) * n_repeats_per_size,
                 allele,
                 n_train,
                 n_total))
@@ -165,14 +184,15 @@ def subsample_performance(
                 n_random_negative_samples=n_random_negative_samples)
             pred_ic50 = model.predict(dataset_test.peptides)
             auc = sklearn.metrics.roc_auc_score(true_label, -pred_ic50)
-
+            tau = scipy.stats.kendalltau(true_ic50, pred_ic50).correlation
             f1 = sklearn.metrics.f1_score(true_label, pred_ic50 <= 500)
-            print("%s (impute=none) n=%d, AUC=%0.4f, F1=%0.4f" % (
-                allele, n_train, auc, f1))
+            print("%s (impute=none) n=%d, AUC=%0.4f, F1=%0.4f, tau=%0.4f" % (
+                allele, n_train, auc, f1, tau))
             results["num_samples"].append(n_train)
             results["idx"].append(i)
             results["auc"].append(auc)
             results["f1"].append(f1)
+            results["tau"].append(tau)
             results["impute"].append(False)
 
             if dataset_imputed is None:
@@ -188,13 +208,16 @@ def subsample_performance(
                 sample_censored_affinities=sample_censored_affinities)
             pred_ic50 = model.predict(dataset_test.peptides)
             auc = sklearn.metrics.roc_auc_score(true_label, -pred_ic50)
+            tau = scipy.stats.kendalltau(true_ic50, pred_ic50).correlation
+
             f1 = sklearn.metrics.f1_score(true_label, pred_ic50 <= 500)
-            print("%s (impute=%s) n=%d, AUC=%0.4f, F1=%0.4f" % (
-                allele, imputer, n_train, auc, f1))
+            print("%s (impute=%s) n=%d, AUC=%0.4f, F1=%0.4f, tau=%0.4f" % (
+                allele, imputer, n_train, auc, f1, tau))
             results["num_samples"].append(n_train)
             results["idx"].append(i)
             results["auc"].append(auc)
             results["f1"].append(f1)
+            results["tau"].append(tau)
             results["impute"].append(True)
 
     return pd.DataFrame(results)
@@ -202,41 +225,116 @@ def subsample_performance(
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    dataset = Dataset.from_csv(args.training_csv)
-    imputer = imputer_from_args(args)
+    base_filename = \
+        "%s-vs-nsamples-hidden-%s-activation-%s-impute-%s-epochs-%d-embedding-%d" % (
+            args.allele,
+            args.hidden_layer_size,
+            args.activation,
+            args.imputation_method,
+            args.training_epochs,
+            args.embedding_size)
+    csv_filename = base_filename + ".csv"
 
-    def make_model():
-        return predictor_from_args(allele_name=args.allele, args=args)
+    if args.load_existing_data:
+        results_df = pd.read_csv(csv_filename)
+    else:
+        dataset = Dataset.from_csv(args.training_csv)
+        imputer = imputer_from_args(args)
 
-    results_df = subsample_performance(
-        dataset=dataset,
-        allele=args.allele,
-        imputer=imputer,
-        model_fn=make_model,
-        n_repeats_per_size=args.repeat,
-        n_training_epochs=args.training_epochs,
-        batch_size=args.batch_size,
-        min_training_samples=args.min_training_samples,
-        max_training_samples=args.max_training_samples,
-        n_subsample_sizes=args.number_dataset_sizes,
-        n_random_negative_samples=args.random_negative_samples,
-        sample_censored_affinities=args.sample_censored_affinities)
+        def make_model():
+            return predictor_from_args(allele_name=args.allele, args=args)
+
+        results_df = subsample_performance(
+            dataset=dataset,
+            allele=args.allele,
+            imputer=imputer,
+            model_fn=make_model,
+            n_repeats_per_size=args.repeat,
+            n_training_epochs=args.training_epochs,
+            batch_size=args.batch_size,
+            min_training_samples=args.min_training_samples,
+            max_training_samples=args.max_training_samples,
+            n_subsample_sizes=args.number_dataset_sizes,
+            n_random_negative_samples=args.random_negative_samples,
+            sample_censored_affinities=args.sample_censored_affinities)
+        print("Writing CSV to %s" % csv_filename)
+        results_df.to_csv(csv_filename)
 
     print(results_df)
 
-    for name in ["auc", "f1"]:
-        seaborn.violinplot(
-            data=results_df,
-            x="num_samples",
-            y=name,
-            hue="impute")
-        seaborn.plt.xlabel("# samples (subset of %s)" % args.allele)
-        seaborn.plt.ylabel(name)
+    metrics = ["auc", "f1", "tau"]
 
-        filename = "%s-%s-vs-nsamples-hidden-%s-activation-%s-impute-%s.png" % (
-            args.allele,
-            name,
-            args.hidden_layer_size,
-            args.activation,
-            args.imputation_method)
-        seaborn.plt.savefig(filename)
+    if args.seaborn_lmplot:
+        for score_name in metrics:
+            seaborn.lmplot(
+                data=results_df,
+                x="num_samples",
+                y=score_name,
+                hue="impute",
+                legend=True,
+                fit_reg=True,
+                logx=True,
+                truncate=True,
+                x_jitter=0.5,
+                y_jitter=0.01)
+            seaborn.plt.xlim(
+                max(-1, results_df["num_samples"].min() - 2),
+                results_df["num_samples"].max() + 50,
+            )
+            seaborn.plt.ylim(0, 1)
+            seaborn.plt.xlabel("# samples (subset of %s)" % args.allele)
+            seaborn.plt.ylabel(score_name)
+            image_filename = "%s-%s.png" % (base_filename, score_name)
+            print("Writing image to %s" % image_filename)
+            seaborn.plt.savefig(image_filename)
+    else:
+        titles = {
+            "tau": "Kendall's $\\tau$",
+            "auc": "AUC",
+            "f1": "$F_1$ score"
+        }
+        pyplot.figure(figsize=(6, 4))
+        seaborn.set_style("whitegrid")
+
+        for (j, score_name) in enumerate(metrics):
+            ax = pyplot.subplot2grid((1, 3), (0, j))
+            groups = results_df.groupby(["num_samples", "impute"])
+            groups_score = groups[score_name].mean().to_frame().reset_index()
+            groups_score["std_error"] = \
+                groups[score_name].std().to_frame().reset_index()[score_name]
+
+            for impute in [True, False]:
+                sub = groups_score[groups_score.impute == impute]
+                color = seaborn.get_color_cycle()[0] if impute else seaborn.get_color_cycle()[1]
+                pyplot.errorbar(
+                    x=sub.num_samples.values,
+                    y=sub[score_name].values,
+                    yerr=sub.std_error.values,
+                    label=("with" if impute else "without") + " imputation",
+                    color=color)
+            pyplot.xlabel("Training set size")
+            pyplot.xscale("log")
+            pyplot.title(titles[score_name])
+
+            if score_name == "auc":
+                pyplot.ylim(ymin=0.5, ymax=1.0)
+            if score_name == "f1":
+                pyplot.ylim(ymin=0, ymax=1)
+            if score_name == "tau":
+                pyplot.ylim(ymin=0, ymax=0.6)
+                pyplot.yticks(np.arange(0, 0.61, 0.15))
+
+            if j == 0:
+                pyplot.legend(
+                    loc=(-0.1, 0.05),
+                    fancybox=True,
+                    frameon=True,
+                    fontsize="small")
+
+        pyplot.tight_layout()
+        # Put the legend out of the figure
+        # pyplot.legend(
+        #    bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., fancybox=True, frameon=True)
+        image_filename = base_filename + ".png"
+        print("Writing PNG to %s" % image_filename)
+        pyplot.savefig(image_filename)
