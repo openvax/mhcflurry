@@ -382,7 +382,8 @@ class Dataset(object):
         Get Dataset for a single allele
         """
         if allele_name not in self.unique_alleles():
-            raise KeyError("Allele '%s' not found" % (allele_name,))
+            raise KeyError("Allele '%s' not found, available alleles: %s" % (
+                allele_name, list(sorted(self.unique_alleles()))))
         df = self.to_dataframe()
         df_allele = df[df.allele == allele_name]
         return self.__class__(df_allele)

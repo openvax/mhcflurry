@@ -25,6 +25,7 @@ from fancyimpute.iterative_svd import IterativeSVD
 from fancyimpute.simple_fill import SimpleFill
 from fancyimpute.soft_impute import SoftImpute
 from fancyimpute.mice import MICE
+from fancyimpute.biscaler import BiScaler
 
 
 def check_dense_pMHC_array(X, peptide_list, allele_list):
@@ -134,6 +135,8 @@ def imputer_from_name(imputation_method_name, **kwargs):
         kwargs["rank"] = kwargs.get("rank", 10)
         return IterativeSVD(**kwargs)
     elif imputation_method_name == "svt" or imputation_method_name == "softimpute":
+        kwargs["init_fill_method"] = kwargs.get("init_fill_method", "min")
+        kwargs["normalizer"] = kwargs.get("normalizer", BiScaler())
         return SoftImpute(**kwargs)
     elif imputation_method_name == "mean":
         return SimpleFill("mean", **kwargs)
