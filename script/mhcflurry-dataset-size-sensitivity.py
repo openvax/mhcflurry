@@ -94,8 +94,9 @@ parser.add_argument(
 parser.add_argument(
     "--pretraining-weight-decay",
     choices=("exponential", "quadratic", "linear"),
-    default="quadratic",
+    default="exponential",
     help="Rate at which weight of imputed samples decays")
+
 """
 parser.add_argument(
     "--remove-similar-peptides-from-test-data",
