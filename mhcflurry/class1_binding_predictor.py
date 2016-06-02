@@ -37,7 +37,15 @@ from .serialization_helpers import (
     save_keras_model_to_disk
 )
 from .peptide_encoding import check_valid_index_encoding_array
-from .feedforward_hyperparameters import LOSS, OPTIMIZER
+from .feedforward_hyperparameters import (
+    LOSS,
+    OPTIMIZER,
+    ACTIVATION,
+    BATCH_NORMALIZATION,
+    INITIALIZATION_METHOD,
+    DROPOUT_PROBABILITY,
+    HIDDEN_LAYER_SIZE
+)
 from .regression_target import MAX_IC50, ic50_to_regression_target
 from .training_helpers import (
     combine_training_arrays,
@@ -121,13 +129,14 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             n_amino_acids=20,
             allow_unknown_amino_acids=True,
             embedding_output_dim=20,
-            layer_sizes=[50],
-            activation="tanh",
-            init="lecun_uniform",
+            layer_sizes=[HIDDEN_LAYER_SIZE],
+            activation=ACTIVATION,
+            init=INITIALIZATION_METHOD,
             output_activation="sigmoid",
-            dropout_probability=0,
+            dropout_probability=DROPOUT_PROBABILITY,
             loss=LOSS,
             optimizer=OPTIMIZER,
+            batch_normalization=BATCH_NORMALIZATION,
             **kwargs):
         """
         Create untrained predictor with the given hyperparameters.

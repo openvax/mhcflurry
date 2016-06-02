@@ -14,7 +14,8 @@ def test_make_embedding_network_properties():
         n_amino_acids=3,
         layer_sizes=layer_sizes,
         loss=mse,
-        optimizer=RMSprop(lr=0.7, rho=0.9, epsilon=1e-6))
+        optimizer=RMSprop(lr=0.7, rho=0.9, epsilon=1e-6),
+        batch_normalization=False,)
     eq_(nn.layers[0].input_dim, 3)
     eq_(nn.loss, mse)
     assert np.allclose(nn.optimizer.lr.eval(), 0.7)
@@ -31,6 +32,7 @@ def test_make_hotshot_network_properties():
         init="lecun_uniform",
         loss=mse,
         layer_sizes=layer_sizes,
+        batch_normalization=False,
         optimizer=RMSprop(lr=0.7, rho=0.9, epsilon=1e-6))
     eq_(nn.layers[0].input_dim, 6)
     eq_(nn.loss, mse)

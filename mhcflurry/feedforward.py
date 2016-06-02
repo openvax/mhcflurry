@@ -21,6 +21,8 @@ from __future__ import (
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Flatten, Dropout
 from keras.layers.embeddings import Embedding
+from keras.layers.normalization import BatchNormalization
+
 import theano
 
 from .feedforward_hyperparameters import OPTIMIZER, LOSS, ACTIVATION
@@ -34,9 +36,12 @@ def make_network(
         embedding_output_dim=None,
         layer_sizes=[100],
         activation=ACTIVATION,
-        init="lecun_uniform",
+        init="glorot_uniform",
         output_activation="sigmoid",
         dropout_probability=0.0,
+        batch_normalization=True,
+        initial_embedding_weights=None,
+        embedding_init_method="glorot_uniform",
         model=None,
         optimizer=OPTIMIZER,
         loss=LOSS):
@@ -49,11 +54,24 @@ def make_network(
             raise ValueError(
                 "Both embedding_input_dim and embedding_output_dim must be set")
 
-        model.add(Embedding(
-            input_dim=embedding_input_dim,
-            output_dim=embedding_output_dim,
-            input_length=input_size,
-            init=init))
+        if initial_embedding_weights:
+            n_rows, n_cols = initial_embedding_weights.shape
+            if n_rows != embedding_input_dim or n_cols != embedding_output_dim:
+                raise ValueError(
+                    "Wrong shape for embedding: expected (%d, %d) but got (%d, %d)" % (
+                        embedding_input_dim, embedding_output_dim,
+                        n_rows, n_cols))
+            model.add(Embedding(
+                input_dim=embedding_input_dim,
+                output_dim=embedding_output_dim,
+                input_length=input_size,
+                weights=[initial_embedding_weights]))
+        else:
+            model.add(Embedding(
+                input_dim=embedding_input_dim,
+                output_dim=embedding_output_dim,
+                input_length=input_size,
+                init=embedding_init_method))
         model.add(Flatten())
 
         if dropout_probability > 0:
@@ -78,6 +96,10 @@ def make_network(
                 output_dim=dim,
                 init=init))
         model.add(Activation(activation))
+
+        if batch_normalization:
+            model.add(BatchNormalization())
+
         if dropout_probability > 0:
             model.add(Dropout(dropout_probability))
 

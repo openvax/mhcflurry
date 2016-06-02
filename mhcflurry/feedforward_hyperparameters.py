@@ -21,7 +21,7 @@ from .common import all_combinations
 # keeping these for compatibility with old code
 N_EPOCHS = 250
 ACTIVATION = "tanh"
-INITIALIZATION_METHOD = "lecun_uniform"
+INITIALIZATION_METHOD = "glorot_uniform"
 EMBEDDING_DIM = 32
 HIDDEN_LAYER_SIZE = 100
 DROPOUT_PROBABILITY = 0.1
@@ -29,6 +29,7 @@ LEARNING_RATE = 0.001
 OPTIMIZER = "rmsprop"
 LOSS = "mse"
 BATCH_SIZE = 32
+BATCH_NORMALIZATION = True
 
 Params = namedtuple("Params", [
     "activation",
@@ -41,6 +42,7 @@ Params = namedtuple("Params", [
     "optimizer",
     "n_training_epochs",
     "batch_size",
+    "batch_normalization",
 ])
 
 default_hyperparameters = Params(
@@ -53,7 +55,8 @@ default_hyperparameters = Params(
     loss=LOSS,
     optimizer=OPTIMIZER,
     n_training_epochs=N_EPOCHS,
-    batch_size=BATCH_SIZE)
+    batch_size=BATCH_SIZE,
+    batch_normalization=BATCH_NORMALIZATION)
 
 def all_combinations_of_hyperparameters(**kwargs):
     # enusre that all parameters are members of the Params object
