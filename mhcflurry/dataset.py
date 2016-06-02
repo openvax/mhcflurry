@@ -33,6 +33,7 @@ from .imputation_helpers import (
     check_dense_pMHC_array,
     prune_dense_matrix_and_labels,
     dense_pMHC_matrix_to_nested_dict,
+    imputer_from_name
 )
 
 
@@ -649,7 +650,8 @@ class Dataset(object):
             self,
             test_allele=None,
             n_folds=3,
-            shuffle=True):
+            shuffle=True,
+            stratify_fn=None):
         """
         Yields a sequence of training/test splits of this dataset.
 
@@ -657,6 +659,9 @@ class Dataset(object):
         only split the measurements of the specified allele (other alleles
         will then always be included in the training datasets).
         """
+        if stratify_fn is not None:
+            raise ValueError("StratifiedKFold not yet implemented!")
+
         if test_allele is None:
             candidate_test_indices = np.arange(len(self))
 
@@ -809,6 +814,9 @@ class Dataset(object):
         Returns Dataset with original pMHC affinities and additional
         synthetic samples.
         """
+        if isinstance(imputation_method, string_types):
+            imputation_method = imputer_from_name(imputation_method)
+
         X_incomplete, peptide_list, allele_list = self.to_dense_pMHC_affinity_matrix(
             min_observations_per_peptide=min_observations_per_peptide,
             min_observations_per_allele=min_observations_per_allele)

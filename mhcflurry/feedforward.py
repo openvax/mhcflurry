@@ -65,17 +65,16 @@ def make_network(
                 input_dim=embedding_input_dim,
                 output_dim=embedding_output_dim,
                 input_length=input_size,
-                weights=[initial_embedding_weights]))
+                weights=[initial_embedding_weights],
+                dropout=dropout_probability))
         else:
             model.add(Embedding(
                 input_dim=embedding_input_dim,
                 output_dim=embedding_output_dim,
                 input_length=input_size,
-                init=embedding_init_method))
+                init=embedding_init_method,
+                dropout=dropout_probability))
         model.add(Flatten())
-
-        if dropout_probability > 0:
-            model.add(Dropout(dropout_probability))
 
         input_size = input_size * embedding_output_dim
 
