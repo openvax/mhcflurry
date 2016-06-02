@@ -24,7 +24,7 @@ def test_A1_Titin_epitope():
     print(ic50s)
     assert len(ic50s) == 1
     ic50 = ic50s[0]
-    assert ic50 <= 500
+    assert ic50 <= 500, ic50
 
 def test_A1_MAGE_epitope():
     # Test the A1 MAGE epitope EVDPIGHLY from
@@ -36,7 +36,7 @@ def test_A1_MAGE_epitope():
     print(ic50s)
     assert len(ic50s) == 1
     ic50 = ic50s[0]
-    assert ic50 <= 500
+    assert ic50 <= 500, ic50
 
 def test_A2_HIV_epitope():
     # Test the A2 HIV epitope SLYNTVATL from
@@ -46,7 +46,7 @@ def test_A2_HIV_epitope():
     print(ic50s)
     assert len(ic50s) == 1
     ic50 = ic50s[0]
-    assert ic50 <= 500
+    assert ic50 <= 500, ic50
 
 
 if __name__ == "__main__":
