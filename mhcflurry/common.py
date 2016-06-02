@@ -95,8 +95,8 @@ def all_combinations(**dict_of_lists):
 
 def groupby_indices(iterable, key_fn=lambda x: x):
     """
-    Returns diçtionary mapping unique values to list of indices that had
-    those values.
+    Returns dictionary mapping unique values to list of indices that
+    had those values.
     """
     index_groups = defaultdict(list)
     for i, x in enumerate(key_fn(x) for x in iterable):
