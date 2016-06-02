@@ -55,6 +55,7 @@ script:
       --training-epochs 100
       --imputation-method mice
       --random-negative-samples 100
+      --dropout 0.1
   # run tests
   - nosetests test --with-coverage --cover-package=mhcflurry  && ./lint.sh
 after_success:
