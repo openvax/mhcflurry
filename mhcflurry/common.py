@@ -15,6 +15,9 @@
 from __future__ import print_function, division, absolute_import
 from math import exp, log
 import itertools
+from collections import defaultdict
+
+import numpy as np
 
 def parse_int_list(s):
     return [int(part.strip() for part in s.split(","))]
@@ -88,3 +91,32 @@ def all_combinations(**dict_of_lists):
     value_lists = dict_of_lists.values()
     for combination_of_values in itertools.product(*value_lists):
         yield dict(zip(arg_names, combination_of_values))
+
+
+def groupby_indices(iterable, key_fn=lambda x: x):
+    """
+    Returns diçtionary mapping unique values to list of indices that had
+    those values.
+    """
+    index_groups = defaultdict(list)
+    for i, x in enumerate(key_fn(x) for x in iterable):
+        index_groups[x].append(i)
+    return index_groups
+
+def shuffle_split_list(indices, fraction=0.5):
+    """
+    Split a list of indices into two sub-lists, with an optional parameter
+    controlling what fraction of the indices go to the left list.
+    """
+    indices = np.asarray(indices)
+    np.random.shuffle(indices)
+    n = len(indices)
+
+    left_count = int(np.ceil(fraction * n))
+
+    if n > 1 and left_count == 0:
+        left_count = 1
+    elif n > 1 and left_count == n:
+        left_count = n - 1
+
+    return indices[:left_count], indices[left_count:]

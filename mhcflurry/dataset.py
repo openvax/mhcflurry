@@ -21,9 +21,9 @@ from six import string_types
 import pandas as pd
 import numpy as np
 from typechecks import require_iterable_of
-from sklearn.cross_validation import KFold
+from sklearn.cross_validation import StratifiedKFold
 
-from .common import geometric_mean
+from .common import geometric_mean, groupby_indices, shuffle_split_list
 from .dataset_helpers import (
     prepare_pMHC_affinity_arrays,
     load_dataframe
@@ -607,21 +607,9 @@ class Dataset(object):
                     n_total - 1,
                     n))
 
-        stratify_values = []
-        all_indices = []
-        for i, (_, row) in enumerate(self.iterrows()):
-            if stratify_fn is None:
-                stratify_values.append(None)
-            else:
-                stratify_values.append(stratify_fn(row))
-            all_indices.append(i)
-        stratify_values = np.asarray(stratify_values)
-        all_indices = np.asarray(all_indices)
-
-        index_groups = defaultdict(list)
-
-        for stratify_value, index in zip(stratify_values, all_indices):
-            index_groups[stratify_value].append(index)
+        index_groups = groupby_indices(
+            iterable=(pair[1] for pair in self.iterrows()),
+            key_fn=stratify_fn if stratify_fn else lambda _: 0)
 
         fraction = float(n) / n_total
 
@@ -629,18 +617,9 @@ class Dataset(object):
         right_indices = []
 
         for _, group_indices in index_groups.items():
-            n_group = len(group_indices)
-            group_indices = np.asarray(group_indices)
-            np.random.shuffle(group_indices)
-
-            left_count = int(np.ceil(fraction * len(group_indices)))
-            if n_group > 1 and left_count == 0:
-                left_count = 1
-            elif n_group > 1 and left_count == n_group:
-                left_count = n_group - 1
-
-            left_indices.extend(group_indices[:left_count])
-            right_indices.extend(group_indices[left_count:])
+            left, right = shuffle_split_list(group_indices, fraction)
+            left_indices.extend(left)
+            right_indices.extend(right)
 
         left = self.slice(left_indices)
         right = self.slice(right_indices)
@@ -659,30 +638,40 @@ class Dataset(object):
         only split the measurements of the specified allele (other alleles
         will then always be included in the training datasets).
         """
-        if stratify_fn is not None:
-            raise ValueError("StratifiedKFold not yet implemented!")
 
+        n_total = len(self)
         if test_allele is None:
-            candidate_test_indices = np.arange(len(self))
-
+            test_samples = self
+            test_sample_indices = np.arange(n_total)
         elif test_allele not in self.unique_alleles():
             raise ValueError("Allele '%s' not in Dataset" % test_allele)
 
         else:
-            candidate_test_indices = np.where(self.alleles == test_allele)[0]
+            test_sample_indices = np.where(self.alleles == test_allele)[0]
+            test_samples = self.slice(test_sample_indices)
 
-        n_candidate_test_samples = len(candidate_test_indices)
-        n_total = len(self)
+        n_test_samples = len(test_sample_indices)
 
-        for _, subindices in KFold(
-                n=n_candidate_test_samples,
+        # for uniformity we're using StratifiedKFold even for regular CV
+        # but with a single label/category
+        if stratify_fn is None:
+            stratify_labels = [0] * n_test_samples
+        else:
+            stratify_labels = [
+                stratify_fn(row) for (_, row) in test_samples.iterrows()
+            ]
+
+        assert len(stratify_labels) == n_test_samples
+
+        for _, test_indices_in_single_allele in StratifiedKFold(
+                y=stratify_labels,
                 n_folds=n_folds,
                 shuffle=shuffle):
-            test_indices = candidate_test_indices[subindices]
+            test_data = test_samples.slice(test_indices_in_single_allele)
+            test_indices_across_alleles = test_sample_indices[test_indices_in_single_allele]
             train_mask = np.ones(n_total, dtype=bool)
-            train_mask[test_indices] = False
+            train_mask[test_indices_across_alleles] = False
             train_data = self.slice(train_mask)
-            test_data = self.slice(test_indices)
             yield train_data, test_data
 
     def split_allele_randomly_and_impute_training_set(
