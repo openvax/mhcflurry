@@ -51,7 +51,8 @@ def test_make_embedding_network_small_dataset():
         init="lecun_uniform",
         loss="mse",
         embedding_output_dim=20,
-        optimizer=RMSprop(lr=0.05, rho=0.9, epsilon=1e-6))
+        optimizer=RMSprop(lr=0.05, rho=0.9, epsilon=1e-6),
+        batch_normalization=False)
     X_negative = np.array([
         [0] * 3,
         [1] * 3,
@@ -87,7 +88,8 @@ def test_make_hotshot_network_small_dataset():
         init="lecun_uniform",
         loss="mse",
         layer_sizes=[4],
-        optimizer=RMSprop(lr=0.05, rho=0.9, epsilon=1e-6))
+        optimizer=RMSprop(lr=0.05, rho=0.9, epsilon=1e-6),
+        batch_normalization=False)
     X_binary = np.array([
         [True, False, True, False, True, False],
         [True, False, True, False, False, True],
