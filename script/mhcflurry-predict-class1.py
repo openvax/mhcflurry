@@ -28,6 +28,7 @@ from mhcflurry.common import (
     split_allele_names,
 )
 from mhcflurry.predict import predict
+from six import string_types
 
 parser = argparse.ArgumentParser()
 
@@ -55,5 +56,19 @@ parser.add_argument(
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    df = predict(alleles=args.mhc, peptides=args.sequence)
+    if len(args.peptide_lengths) == 0:
+        raise ValueError("Must specify at least one peptide length")
+
+    long_sequences = args.sequence
+    if isinstance(long_sequences, string_types):
+        long_sequences = [long_sequences]
+
+    peptides = []
+    for peptide_length in args.peptide_lengths:
+        for long_sequence in long_sequences:
+            total_length = len(long_sequence)
+            for i in range(total_length - peptide_length):
+                peptides.append(long_sequence[i:i + peptide_length])
+    print("Running predictor over %d sub-sequences" % len(peptides))
+    df = predict(alleles=args.mhc, peptides=peptides)
     print(df.to_csv(sep="\t", index=False), end="")
