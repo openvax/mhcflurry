@@ -810,20 +810,24 @@ class Dataset(object):
             min_observations_per_peptide=min_observations_per_peptide,
             min_observations_per_allele=min_observations_per_allele)
 
-        if log_transform:
-            X_incomplete = np.log(X_incomplete)
-
-        if np.isnan(X_incomplete).sum() == 0:
-            # if all entries in the matrix are already filled in then don't
-            # try using an imputation algorithm since it might raise an
-            # exception.
-            logging.warn("No missing values, using original data instead of imputation")
+        if imputation_method is None:
+            logging.warn("No imputation method given")
             X_complete = X_incomplete
         else:
-            X_complete = imputation_method.complete(X_incomplete)
+            if log_transform:
+                X_incomplete = np.log(X_incomplete)
 
-        if log_transform:
-            X_complete = np.exp(X_complete)
+            if np.isnan(X_incomplete).sum() == 0:
+                # if all entries in the matrix are already filled in then don't
+                # try using an imputation algorithm since it might raise an
+                # exception.
+                logging.warn("No missing values, using original data instead of imputation")
+                X_complete = X_incomplete
+            else:
+                X_complete = imputation_method.complete(X_incomplete)
+
+            if log_transform:
+                X_complete = np.exp(X_complete)
 
         allele_to_peptide_to_affinity_dict = dense_pMHC_matrix_to_nested_dict(
             X=X_complete,
