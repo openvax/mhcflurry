@@ -20,8 +20,7 @@ from collections import defaultdict
 import numpy as np
 
 def parse_int_list(s):
-    return [int(part.strip() for part in s.split(","))]
-
+    return [int(part.strip()) for part in s.split(",")]
 
 def split_uppercase_sequences(s):
     return [part.strip().upper() for part in s.split(",")]
