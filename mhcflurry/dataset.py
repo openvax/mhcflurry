@@ -812,7 +812,9 @@ class Dataset(object):
 
         if imputation_method is None:
             logging.warn("No imputation method given")
-            X_complete = X_incomplete
+            # without an imputation method we should leave all the values
+            # incomplete and return an empty dataset
+            X_complete = np.ones_like(X_incomplete) * np.nan
         else:
             if log_transform:
                 X_incomplete = np.log(X_incomplete)
