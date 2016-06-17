@@ -45,7 +45,11 @@ from mhcflurry.common import normalize_allele_name
 from mhcflurry.dataset import Dataset
 
 from mhcflurry.args import (
-    add_arguments_to_parser, predictor_from_args, imputer_from_args
+    add_hyperparameter_arguments_to_parser,
+    add_training_arguments_to_parser,
+    add_imputation_argument_to_parser,
+    predictor_from_args,
+    imputer_from_args
 )
 from mhcflurry.paths import (CLASS1_MODEL_DIRECTORY, CLASS1_DATA_DIRECTORY)
 
@@ -88,8 +92,10 @@ parser.add_argument(
     nargs="+",
     type=normalize_allele_name)
 
-# add options for neural network hyperparameters
-parser = add_arguments_to_parser(parser)
+
+add_hyperparameter_arguments_to_parser(parser)
+add_training_arguments_to_parser(parser)
+add_imputation_argument_to_parser(parser)
 
 if __name__ == "__main__":
     args = parser.parse_args()

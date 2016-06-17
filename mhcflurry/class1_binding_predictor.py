@@ -41,6 +41,7 @@ from .feedforward_hyperparameters import (
     LOSS,
     OPTIMIZER,
     ACTIVATION,
+    BATCH_SIZE,
     BATCH_NORMALIZATION,
     INITIALIZATION_METHOD,
     DROPOUT_PROBABILITY,
@@ -68,7 +69,38 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             max_ic50=MAX_IC50,
             allow_unknown_amino_acids=True,
             verbose=False,
-            kmer_size=9):
+            kmer_size=9,
+            batch_size=BATCH_SIZE,
+            n_random_negative_samples=0):
+        """
+        Parameters
+        ----------
+        model : object
+            Takes fixed length encoding of a peptide as an input,
+            predicts a single scalar float between 0 and 1.
+
+        name : str
+            Name of allele or other description of dataset.
+
+        max_ic50 : float
+            Largest IC50 value represented by a prediction of 0 from the model.
+
+        allow_unknown_amino_acids : bool
+            When lengthening e.g. 8mer peptides into 9mers should the extra
+            amino acids be marked explicitly as unknown with the character "X"
+            or should every possible amino acid be used at all positions.
+
+        verbose : bool
+            Print debugging messages.
+
+        kmer_size : int
+            Fixed-length encoding size for peptides
+
+        batch_size : int
+            Number of fixed-length peptide samples to use in each mini-batch.
+        n_random_negative_samples : int
+            Number of random samples to generate as negative examples.
+        """
         Class1AlleleSpecificKmerIC50PredictorBase.__init__(
             self,
             name=name,
@@ -78,6 +110,8 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             kmer_size=kmer_size)
         self.name = name
         self.model = model
+        self.batch_size = batch_size
+        self.n_random_negative_samples = n_random_negative_samples
 
     @classmethod
     def from_disk(
@@ -136,11 +170,16 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             dropout_probability=DROPOUT_PROBABILITY,
             loss=LOSS,
             optimizer=OPTIMIZER,
+            n_random_negative_samples=0,
+            batch_size=BATCH_SIZE,
             batch_normalization=BATCH_NORMALIZATION,
             **kwargs):
         """
         Create untrained predictor with the given hyperparameters.
         """
+        # allow layers to get omitted in configuration by specifying
+        # their size as 0
+        layer_sizes = [size for size in layer_sizes if size > 0]
         model = make_embedding_network(
             peptide_length=peptide_length,
             n_amino_acids=n_amino_acids + int(allow_unknown_amino_acids),
@@ -158,6 +197,8 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             model=model,
             allow_unknown_amino_acids=allow_unknown_amino_acids,
             kmer_size=peptide_length,
+            batch_size=batch_size,
+            n_random_negative_samples=n_random_negative_samples,
             **kwargs)
 
     def fit_kmer_encoded_arrays(
@@ -169,11 +210,9 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             X_pretrain=None,
             ic50_pretrain=None,
             sample_weights_pretrain=None,
-            n_random_negative_samples=0,
             pretrain_decay=lambda epoch: np.exp(-epoch),
             n_training_epochs=200,
-            verbose=False,
-            batch_size=128):
+            verbose=False):
         """
         Train predictive model from index encoding of fixed length k-mer
         peptides.
@@ -212,14 +251,10 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             Initial weights for the rows of X_pretrain. If not specified then
             initialized to ones.
 
-        n_random_negative_samples : int
-            Number of random samples to generate as negative examples.
 
         n_training_epochs : int
 
         verbose : bool
-
-        batch_size : int
         """
         X_combined, ic50_combined, combined_weights, n_pretrain = \
             combine_training_arrays(
@@ -282,13 +317,13 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
                 Y_curr_iter = Y_adjusted_for_censoring[n_pretrain:]
                 weights_curr_iter = combined_weights[n_pretrain:]
 
-            if n_random_negative_samples > 0:
+            if self.n_random_negative_samples > 0:
                 X_curr_iter, Y_curr_iter, weights_curr_iter = \
                     extend_with_negative_random_samples(
                         X_curr_iter,
                         Y_curr_iter,
                         weights_curr_iter,
-                        n_random_negative_samples,
+                        self.n_random_negative_samples,
                         max_amino_acid_encoding_value=self.max_amino_acid_encoding_value)
 
             self.model.fit(
@@ -297,7 +332,7 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
                 sample_weight=weights_curr_iter,
                 nb_epoch=1,
                 verbose=0,
-                batch_size=batch_size,
+                batch_size=self.batch_size,
                 shuffle=True)
 
     @classmethod

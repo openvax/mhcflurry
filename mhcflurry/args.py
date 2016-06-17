@@ -13,17 +13,16 @@
 # limitations under the License.
 
 from .regression_target import MAX_IC50
+
 from .feedforward_hyperparameters import (
-    HIDDEN_LAYER_SIZE,
-    EMBEDDING_DIM,
     N_EPOCHS,
     INITIALIZATION_METHOD,
     ACTIVATION,
-    DROPOUT_PROBABILITY,
     BATCH_SIZE
 )
 from .class1_binding_predictor import Class1BindingPredictor
 from .imputation_helpers import imputer_from_name
+from .feedforward_hyperparameters import all_combinations_of_hyperparameters
 
 from keras.optimizers import RMSprop
 
@@ -31,7 +30,8 @@ def add_imputation_argument_to_parser(parser, default="none"):
     """
     Extends an argument parser with --imputation-method
     """
-    parser.add_argument(
+    group = parser.add_argument_group("Imputation")
+    group.add_argument(
         "--imputation-method",
         default=default,
         choices=("mice", "knn", "softimpute", "svd", "mean", "none"),
@@ -51,50 +51,66 @@ def add_hyperparameter_arguments_to_parser(parser):
         --kmer-size
 
     """
-    parser.add_argument(
+    group = parser.add_argument_group("Neural Network Hyperparameters")
+    group.add_argument(
         "--initialization",
-        default=INITIALIZATION_METHOD,
+        default=[INITIALIZATION_METHOD],
+        nargs="+",
         help="Initialization for neural network weights Default: %(default)s")
 
-    parser.add_argument(
+    group.add_argument(
         "--activation",
-        default=ACTIVATION,
-        help="Activation function for neural network layers. "
+        default=[ACTIVATION],
+        choices=("tanh", "sigmoid", "relu", "linear", "softmax", "softplus"),
+        nargs="+",
+        help="Activation function for neural network layers."
         "Default: %(default)s")
 
-    parser.add_argument(
+    group.add_argument(
         "--embedding-size",
         type=int,
-        default=EMBEDDING_DIM,
+        default=[16, 32, 64],
         help="Size of vector representations for embedding amino acids. "
         "Default: %(default)s")
 
-    parser.add_argument(
+    group.add_argument(
         "--hidden-layer-size",
         type=int,
-        default=HIDDEN_LAYER_SIZE,
+        default=[4, 16, 64],
+        nargs="+",
         help="Size of hidden neural network layer. Default: %(default)s")
 
-    parser.add_argument(
+    group.add_argument(
         "--dropout",
         type=float,
-        default=DROPOUT_PROBABILITY,
+        default=[0, 0.5],
+        nargs="+",
         help="Dropout probability after neural network layers. "
         "Default: %(default)s")
 
-    parser.add_argument(
+    group.add_argument(
         "--kmer-size",
         type=int,
         default=9,
         help="Size of input vector for neural network")
 
-    parser.add_argument(
+    group.add_argument(
         "--max-ic50",
         type=float,
-        default=MAX_IC50,
-        help="Largest IC50 represented by neural network output. "
+        default=[MAX_IC50],
+        help="Largest IC50 represented by neural network output."
         "Default: %(default)s")
+
+    group.add_argument(
+        "--batch-normalization",
+        default=[False],
+        type=lambda s: bool(int(s)),
+        nargs="+",
+        help=(
+            "Use batch normalization on layer activations, "
+            "should be specified as integer values '0' or '1'."))
     return parser
+
 
 def add_training_arguments_to_parser(parser):
     """
@@ -104,25 +120,28 @@ def add_training_arguments_to_parser(parser):
         --learning-rate
         --batch-size
     """
-    parser.add_argument(
+    group = parser.add_argument_group("Training Parameters")
+    group.add_argument(
         "--random-negative-samples",
         type=int,
-        default=0,
+        nargs="+",
+        default=[0, 10, 100],
         help="Number of random negtive samples to generate each training epoch")
 
-    parser.add_argument(
+    group.add_argument(
         "--learning-rate",
         type=float,
-        default=0.001,
+        default=[0.001],
+        nargs="+",
         help="Learning rate for training neural network. Default: %(default)s")
 
-    parser.add_argument(
+    group.add_argument(
         "--training-epochs",
         type=int,
         default=N_EPOCHS,
         help="Number of training epochs. Default: %(default)s")
 
-    parser.add_argument(
+    group.add_argument(
         "--batch-size",
         type=int,
         default=BATCH_SIZE,
@@ -155,21 +174,47 @@ def add_arguments_to_parser(parser):
     return parser
 
 
-def predictor_from_args(args, allele_name):
-    """
-    Given parsed arguments returns a Class1BindingPredictor
-    """
-    layer_sizes = (args.hidden_layer_size,) if args.hidden_layer_size > 0 else ()
-    return Class1BindingPredictor.from_hyperparameters(
-        name=allele_name,
-        peptide_length=args.kmer_size,
-        max_ic50=args.max_ic50,
-        embedding_output_dim=args.embedding_size,
-        layer_sizes=layer_sizes,
+def feedforward_parameter_grid_from_args(args):
+    return all_combinations_of_hyperparameters(
         activation=args.activation,
-        init=args.initialization,
+        initialization_method=args.initialization,
+        embedding_dim=args.embedding_size,
         dropout_probability=args.dropout,
-        optimizer=RMSprop(lr=args.learning_rate))
+        hidden_layer_size=args.hidden_layer_size,
+        loss=["mse"],
+        learning_rate=args.learning_rate,
+        n_training_epochs=args.training_epochs,
+        batch_size=args.batch_size,
+        batch_normalization=args.batch_normalization)
+
+def predictors_from_args(args, allele_name):
+    """
+    Given parsed arguments generates a sequence of Class1BindingPredictor
+    objects
+    """
+    for params in feedforward_parameter_grid_from_args(args):
+        yield Class1BindingPredictor.from_hyperparameters(
+            name=allele_name,
+            peptide_length=args.kmer_size,
+            max_ic50=args.max_ic50,
+            embedding_output_dim=args.embedding_size,
+            layer_sizes=[params.hidden_layer_size],
+            activation=args.activation,
+            init=args.initialization,
+            dropout_probability=args.dropout,
+            optimizer=RMSprop(lr=args.learning_rate),
+            batch_size=args.batch_size,
+            batch_normalization=args.batch_normalization,
+            n_random_negative_samples=args.random_negative_samples)
+
+def predictor_from_args(args, allele_name):
+    one_or_more_predictors = list(predictors_from_args(args, allele_name))
+    if len(one_or_more_predictors) == 0:
+        raise ValueError("No predictors created from given arguments!")
+    if len(one_or_more_predictors) > 1:
+        raise ValueError("Expected only one predictor, got %d" % (
+            len(one_or_more_predictors)))
+    return one_or_more_predictors[0]
 
 def imputer_from_args(args):
     return imputer_from_name(args.imputation_method)

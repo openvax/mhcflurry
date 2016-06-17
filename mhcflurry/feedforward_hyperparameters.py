@@ -31,7 +31,7 @@ LOSS = "mse"
 BATCH_SIZE = 32
 BATCH_NORMALIZATION = True
 
-Params = namedtuple("Params", [
+FeedForwardParams = namedtuple("FeedForwardParams", [
     "activation",
     "initialization_method",
     "embedding_dim",
@@ -45,7 +45,7 @@ Params = namedtuple("Params", [
     "batch_normalization",
 ])
 
-default_hyperparameters = Params(
+default_hyperparameters = FeedForwardParams(
     activation=ACTIVATION,
     initialization_method=INITIALIZATION_METHOD,
     embedding_dim=EMBEDDING_DIM,
@@ -61,13 +61,18 @@ default_hyperparameters = Params(
 def all_combinations_of_hyperparameters(**kwargs):
     # enusre that all parameters are members of the Params object
     for arg_name in set(kwargs.keys()):
-        if arg_name not in Params._fields:
+        if arg_name not in FeedForwardParams._fields:
             raise ValueError("Invalid parameter '%s'" % arg_name)
     # if any values aren't specified then just fill them with a single
     # element list containing the default value
-    for arg_name in Params._fields:
+    for arg_name in FeedForwardParams._fields:
         if arg_name not in kwargs:
             default_value = getattr(default_hyperparameters, arg_name)
             kwargs[arg_name] = [default_value]
+        else:
+            # if value is a scalar then turn it into a single element list
+            v = kwargs[arg_name]
+            if not isinstance(v, (list, tuple)):
+                kwargs[arg_name] = [v]
     for d in all_combinations(**kwargs):
-        yield Params(**d)
+        yield FeedForwardParams(**d)
