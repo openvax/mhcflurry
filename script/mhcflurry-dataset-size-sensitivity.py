@@ -26,10 +26,9 @@ import pandas as pd
 import scipy
 import sklearn
 import sklearn.metrics
-import seaborn
-from matplotlib import pyplot
 
 
+from mhcflurry.plotting import plot_nsamples_vs_metrics_with_imputation
 from mhcflurry.dataset import Dataset
 from mhcflurry.args import (
     add_imputation_argument_to_parser,
@@ -97,15 +96,11 @@ parser.add_argument(
     default="exponential",
     help="Rate at which weight of imputed samples decays")
 
-"""
 parser.add_argument(
-    "--remove-similar-peptides-from-test-data",
-    action="store_true",
-    default=False,
-    help=(
-        "Use a 4 letter reduced amino acid alphabet to identify and "
-        "remove correlated peptides from the test data."))
-"""
+    "--dpi",
+    type=int,
+    default=None,
+    help="Dots per inch (DPI) for generated figures")
 
 add_imputation_argument_to_parser(parser, default="mice")
 add_hyperparameter_arguments_to_parser(parser)
@@ -113,7 +108,6 @@ add_training_arguments_to_parser(parser)
 
 def stratify_by_binder_label(row):
     return row["affinity"] <= 500
-
 
 def subsample_performance(
         dataset,
@@ -294,60 +288,7 @@ if __name__ == "__main__":
         results_df.to_csv(csv_filename)
 
     print(results_df)
-
-    metrics = ["auc", "f1", "tau"]
-
-    titles = {
-        "tau": "Kendall's $\\tau$",
-        "auc": "AUC",
-        "f1": "$F_1$ score"
-    }
-    pyplot.figure(figsize=(6.5, 3.5))
-    seaborn.set_style("whitegrid")
-
-    for (j, score_name) in enumerate(metrics):
-        ax = pyplot.subplot2grid((1, 4), (0, j))
-        groups = results_df.groupby(["num_samples", "impute"])
-        groups_score = groups[score_name].mean().to_frame().reset_index()
-        groups_score["std_error"] = \
-            groups[score_name].std().to_frame().reset_index()[score_name]
-
-        for impute in [True, False]:
-            sub = groups_score[groups_score.impute == impute]
-            color = seaborn.get_color_cycle()[0] if impute else seaborn.get_color_cycle()[1]
-            pyplot.errorbar(
-                x=sub.num_samples.values,
-                y=sub[score_name].values,
-                yerr=sub.std_error.values,
-                label=("with" if impute else "without") + " imputation",
-                color=color)
-        if j == 1:
-            pyplot.xlabel("Training set size")
-        pyplot.xscale("log")
-        pyplot.title(titles[score_name])
-
-        if score_name == "auc":
-            pyplot.ylim(ymin=0.5, ymax=1.0)
-        if score_name == "f1":
-            pyplot.ylim(ymin=0, ymax=1)
-        if score_name == "tau":
-            pyplot.ylim(ymin=0, ymax=0.6)
-            pyplot.yticks(np.arange(0, 0.61, 0.15))
-
-    pyplot.legend(
-        bbox_to_anchor=(1.1, 1),
-        loc=2,
-        borderaxespad=0.,
-        fancybox=True,
-        frameon=True,
-        fontsize="small")
-
-    pyplot.tight_layout()
-    # Put the legend out of the figure
-    image_filename = base_filename + ".png"
-    print("Writing PNG to %s" % image_filename)
-    pyplot.savefig(image_filename)
-
-    pdf_filename = base_filename + ".pdf"
-    print("Writing PDF to %s" % pdf_filename)
-    pyplot.savefig(pdf_filename)
+    plot_nsamples_vs_metrics_with_imputation(
+        results_df,
+        base_filename=base_filename,
+        dpi=args.dpi)
