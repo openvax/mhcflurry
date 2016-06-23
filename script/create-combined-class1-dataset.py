@@ -168,6 +168,15 @@ if __name__ == "__main__":
     combined_df = pd.DataFrame(
         combined_columns,
         columns=["species", "mhc", "peptide", "peptide_length", "meas"])
+
+    # filter out post-translation modifications and peptides with unknown
+    # residues
+    modified_peptide_mask = combined_df.peptide.str.contains("+")
+    n_modified = modified_peptide_mask.sum()
+    if n_modified > 0:
+        print("Dropping %d modified peptides" % n_modified)
+        combined_df = combined_df[~modified_peptide_mask]
+
     print("New entry allele distribution")
     for (allele, count) in new_allele_counts.most_common():
         print("%s: %d" % (allele, count))
