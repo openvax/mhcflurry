@@ -171,7 +171,7 @@ if __name__ == "__main__":
 
     # filter out post-translation modifications and peptides with unknown
     # residues
-    modified_peptide_mask = combined_df.peptide.str.contains("+")
+    modified_peptide_mask = combined_df.peptide.str.contains("\+")
     n_modified = modified_peptide_mask.sum()
     if n_modified > 0:
         print("Dropping %d modified peptides" % n_modified)

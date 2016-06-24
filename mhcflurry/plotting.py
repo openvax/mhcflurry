@@ -34,7 +34,7 @@ def plot_nsamples_vs_metrics_with_imputation(
     seaborn.set_style("whitegrid")
 
     for (j, score_name) in enumerate(metrics):
-        ax = pyplot.subplot2grid((1, 4), (0, j))
+        pyplot.subplot2grid((1, 4), (0, j))
         groups = results_df.groupby(groupby_columns)
         groups_score = groups[score_name].mean().to_frame().reset_index()
         groups_score["std_error"] = \
