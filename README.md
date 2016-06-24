@@ -20,7 +20,7 @@ Download, Normalize, and Combine Training Data:
 
 ```
 script/download-iedb.sh
-script/download-peters-2013-dataset.sh
+script/download-kim-2013-dataset.sh
 script/create-iedb-class1-dataset.py
 script/create-combined-class1-dataset.py
 ```
