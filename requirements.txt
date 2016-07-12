@@ -1,4 +1,4 @@
-numpy>= 1.7
+numpy>= 1.11
 pandas>=0.13.1
 appdirs
 theano>=0.8.2
