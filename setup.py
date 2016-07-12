@@ -61,7 +61,7 @@ if __name__ == '__main__':
             'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
         install_requires=[
-            'numpy>=1.7',
+            'numpy>=1.11',
             'pandas>=0.13.1',
             'appdirs',
             'theano>=0.8.2',
