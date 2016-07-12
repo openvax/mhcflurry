@@ -1,5 +1,7 @@
-FROM floydhub/dl-docker:cpu # TODO: seems like it updates; freeze a version of this
-MAINTAINER Maxim Zaslavsky <maxim@maximz.com>
+FROM floydhub/dl-docker:cpu
+# TODO: seems like it updates; freeze a version of this
+
+MAINTAINER Jeff Hammerbacher <jeff.hammerbacher@gmail.com>
 
 #RUN apt-get update
 #RUN apt-get -y upgrade
