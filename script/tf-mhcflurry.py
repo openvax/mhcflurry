@@ -13,4 +13,8 @@ training_hotshot = indices_to_hotshot_encoding(df_kmers[0])
 from keras.models import Sequential
 from keras.layers import Dense, Activation
 model = Sequential()
-model.add(Dense(input_dim=9*21, output_dim=1))
+model.add(Dense(input_dim=9*21, output_dim=1)) # TF backend segfaults here
+model.add(Activation("sigmoid"))
+model.compile(loss="mse", optimizer="rmsprop")
+
+model.fit(training_hotshot, df_kmers[1], nb_epoch=5, batch_size=1)
