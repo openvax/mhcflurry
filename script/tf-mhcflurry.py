@@ -1,11 +1,5 @@
-import numpy as np
-import pandas as pd
-import tensorflow as tf
-
 from mhcflurry.dataset import Dataset
 from mhcflurry.peptide_encoding import indices_to_hotshot_encoding
-
-allele_list=['HLA-A0201', 'HLA-A2301', 'HLA-A2402', 'HLA-A1101']
 
 file_to_explore="/root/.local/share/mhcflurry/2/class1_data/combined_human_class1_dataset.csv"
 dataset = Dataset.from_csv(
@@ -13,7 +7,6 @@ dataset = Dataset.from_csv(
         sep=",",
         peptide_column_name="peptide")
 df = dataset.to_dataframe()
-df_reduced = df[df.allele.isin(allele_list)][['allele','affinity']].reset_index(drop=True)
 df_kmers = dataset.kmer_index_encoding()
 training_hotshot = indices_to_hotshot_encoding(df_kmers[0])
 
@@ -21,8 +14,3 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation
 model = Sequential()
 model.add(Dense(input_dim=9*21, output_dim=1))
-model.add(Activation("sigmoid"))
-model.compile(loss="mse", optimizer="rmsprop")
-
-model.fit(training_hotshot, df_kmers[1], nb_epoch=5, batch_size=1)
-
