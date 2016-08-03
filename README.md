@@ -44,3 +44,7 @@ predict(alleles=['A0201'], peptides=['SIINFEKL'])
   Allele   Peptide  Prediction
 0  A0201  SIINFEKL  586.730529
 ```
+
+## Training Data for Class I Binding Prediction
+
+The core data used for training mhcflurry is the BD2013 dataset from [Dataset size and composition impact the reliability of performance benchmarks for peptide-MHC binding predictions](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241). This is augmented with more recent peptide-MHC binding affinities from [IEDB](http://www.iedb.org/). Since affinity is measured using a variety of assays, some of which are incompatible, the `create-combined-class1-dataset.py` script filters the available Class I binding assays in IEDB by only retaining those with high correlation to overlapping measurements in BD2013. 
