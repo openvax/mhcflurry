@@ -2,7 +2,7 @@ numpy>= 1.11
 pandas>=0.13.1
 appdirs
 theano>=0.8.2
-keras<1.0
+keras
 h5py
 cherrypy
 bottle
