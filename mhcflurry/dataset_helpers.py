@@ -29,6 +29,7 @@ from .peptide_encoding import (
     check_valid_index_encoding_array,
 )
 
+
 def check_pMHC_affinity_arrays(alleles, peptides, affinities, sample_weights):
     """
     Make sure that we have the same number of peptides, affinity values,
@@ -46,18 +47,24 @@ def check_pMHC_affinity_arrays(alleles, peptides, affinities, sample_weights):
         raise ValueError("Expected 1d array of peptides but got shape %s" % (
             peptides.shape,))
     if len(affinities.shape) != 1:
-        raise ValueError("Expected 1d array of affinity values but got shape %s" % (alleles.shape,))
+        raise ValueError(
+            "Expected 1d array of affinity values but got shape %s" % (
+                alleles.shape,))
     if len(sample_weights.shape) != 1:
-        raise ValueError("Expected 1d array of sample weights but got shape %s" % (
-            sample_weights.shape,))
+        raise ValueError(
+            "Expected 1d array of sample weights but got shape %s" % (
+                sample_weights.shape,))
 
     n = len(alleles)
     if len(peptides) != n:
-        raise ValueError("Expected %d peptides but got %d" % (n, len(peptides)))
+        raise ValueError(
+            "Expected %d peptides but got %d" % (n, len(peptides)))
     if len(affinities) != n:
-        raise ValueError("Expected %d affinity values but got %d" % (n, len(affinities)))
+        raise ValueError(
+            "Expected %d affinity values but got %d" % (n, len(affinities)))
     if len(sample_weights) != n:
-        raise ValueError("Expected %d sample weights but got %d" % (n, len(sample_weights)))
+        raise ValueError(
+            "Expected %d sample weights but got %d" % (n, len(sample_weights)))
 
 
 def prepare_pMHC_affinity_arrays(alleles, peptides, affinities, sample_weights=None):

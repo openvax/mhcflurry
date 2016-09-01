@@ -16,8 +16,9 @@ from collections import OrderedDict
 
 import pandas as pd
 
-from .class1_binding_predictor import Class1BindingPredictor
+from .class1_allele_specific import load
 from .common import normalize_allele_name
+
 
 def predict(alleles, peptides):
     """
@@ -38,7 +39,7 @@ def predict(alleles, peptides):
     ])
     for allele in alleles:
         allele = normalize_allele_name(allele)
-        model = Class1BindingPredictor.from_allele_name(allele)
+        model = load.from_allele_name(allele)
         for i, ic50 in enumerate(model.predict(peptides)):
             result_dict["Allele"].append(allele)
             result_dict["Peptide"].append(peptides[i])

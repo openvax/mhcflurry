@@ -12,7 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .class1_binding_predictor import Class1BindingPredictor
+from . import class1_allele_specific
+from .class1_allele_specific import Class1BindingPredictor
 from .predict import predict
-from .ensemble import Ensemble
 from .package_metadata import __version__
+from . import parallelism
+
+parallelism.configure_joblib()
+
+__all__ = [
+    "Class1BindingPredictor",
+    "class1_allele_specific",
+    "predict",
+    "parallelism",
+    "__version__",
+]

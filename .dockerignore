@@ -1,9 +1,8 @@
 .git
 .gitignore
 LICENSE
-*.txt
-*.csv
 *.zip
 *.swp
-!requirements.txt
 experiments
+mhc_ligand_full*
+training/class1_allele_specific/data/mhc_ligand_full.*

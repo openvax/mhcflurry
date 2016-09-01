@@ -43,6 +43,7 @@ def check_dense_pMHC_array(X, peptide_list, allele_list):
             "Expected dense array with shape %s to have %d columns" % (
                 X.shape, len(allele_list)))
 
+
 def prune_dense_matrix_and_labels(
         X,
         peptide_list,
@@ -101,6 +102,7 @@ def prune_dense_matrix_and_labels(
     check_dense_pMHC_array(X, peptide_list, allele_list)
     return X, peptide_list, allele_list
 
+
 def dense_pMHC_matrix_to_nested_dict(X, peptide_list, allele_list):
     """
     Converts a dense matrix of (n_peptides, n_alleles) floats to a nested
@@ -134,7 +136,7 @@ def imputer_from_name(imputation_method_name, **kwargs):
     elif imputation_method_name == "svd":
         kwargs["rank"] = kwargs.get("rank", 10)
         return IterativeSVD(**kwargs)
-    elif imputation_method_name == "svt" or imputation_method_name == "softimpute":
+    elif imputation_method_name in ("svt", "softimpute"):
         kwargs["init_fill_method"] = kwargs.get("init_fill_method", "min")
         kwargs["normalizer"] = kwargs.get("normalizer", BiScaler())
         return SoftImpute(**kwargs)
@@ -143,4 +145,5 @@ def imputer_from_name(imputation_method_name, **kwargs):
     elif imputation_method_name == "none":
         return None
     else:
-        raise ValueError("Invalid imputation method: %s" % imputation_method_name)
+        raise ValueError(
+            "Invalid imputation method: %s" % imputation_method_name)

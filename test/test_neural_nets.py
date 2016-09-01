@@ -1,11 +1,14 @@
+import numpy as np
+np.random.seed(0)
+
 from mhcflurry.feedforward import (
     make_embedding_network,
     make_hotshot_network,
 )
 from keras.optimizers import RMSprop
 from keras.objectives import mse
-import numpy as np
 from nose.tools import eq_
+
 
 def test_make_embedding_network_properties():
     layer_sizes = [3, 4]
@@ -99,7 +102,7 @@ def test_make_hotshot_network_small_dataset():
         [False, True, True, False, False, True],
     ], dtype=bool)
     Y = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0])
-    nn.fit(X_binary, Y, nb_epoch=20)
+    nn.fit(X_binary, Y, nb_epoch=200)
     Y_pred = nn.predict(X_binary)
     print(Y)
     print(Y_pred)

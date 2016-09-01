@@ -19,11 +19,14 @@ from collections import defaultdict
 
 import numpy as np
 
+
 def parse_int_list(s):
     return [int(part.strip()) for part in s.split(",")]
 
+
 def split_uppercase_sequences(s):
     return [part.strip().upper() for part in s.split(",")]
+
 
 MHC_PREFIXES = [
     "HLA",
@@ -101,6 +104,7 @@ def groupby_indices(iterable, key_fn=lambda x: x):
     for i, x in enumerate(key_fn(x) for x in iterable):
         index_groups[x].append(i)
     return index_groups
+
 
 def shuffle_split_list(indices, fraction=0.5):
     """

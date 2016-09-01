@@ -1,13 +1,11 @@
-from os.path import join, dirname, realpath
 from mhcflurry.dataset import Dataset
 from nose.tools import eq_
+from . import data_path
 
 
 def load_csv(filename):
-    base_dir = dirname(realpath(__file__))
-    data_dir = join(base_dir, "data")
-    full_path = join(data_dir, filename)
-    return Dataset.from_csv(full_path)
+    return Dataset.from_csv(data_path(filename))
+
 
 def test_load_allele_datasets_8mer():
     dataset = load_csv("data_8mer.csv")

@@ -22,13 +22,15 @@ from collections import defaultdict
 import numpy as np
 from six import string_types
 
-from .peptide_encoding import fixed_length_index_encoding
-from .amino_acid import (
+from ..peptide_encoding import fixed_length_index_encoding
+from ..amino_acid import (
     amino_acids_with_unknown,
     common_amino_acids
 )
-from .regression_target import regression_target_to_ic50, MAX_IC50
-from .ic50_predictor_base import IC50PredictorBase
+from ..regression_target import regression_target_to_ic50
+from ..ic50_predictor_base import IC50PredictorBase
+from ..hyperparameters import HyperparameterDefaults
+
 
 class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
     """
@@ -36,28 +38,36 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
     k-mer representation of peptides and don't require scanning over
     a longer sequence to find a binding core (like you might for Class II).
     """
+    hyperparameter_defaults = (HyperparameterDefaults(
+        kmer_size=9)
+        .extend(IC50PredictorBase.hyperparameter_defaults))
+
     def __init__(
             self,
             name,
             allow_unknown_amino_acids,
             verbose,
-            max_ic50=MAX_IC50,
-            kmer_size=9):
+            **hyperparameters):
+        effective_hyperparameters = (
+            self.hyperparameter_defaults.with_defaults(hyperparameters))
         IC50PredictorBase.__init__(
             self,
             name=name,
-            max_ic50=max_ic50,
-            verbose=verbose)
+            verbose=verbose,
+            **IC50PredictorBase.hyperparameter_defaults.subselect(
+                effective_hyperparameters))
         self.allow_unknown_amino_acids = allow_unknown_amino_acids
-        self.kmer_size = kmer_size
+        self.kmer_size = effective_hyperparameters["kmer_size"]
 
     def __repr__(self):
-        return "%s(name=%s, max_ic50=%f, allow_unknown_amino_acids=%s, kmer_size=%d)" % (
-            self.__class__.__name__,
-            self.name,
-            self.max_ic50,
-            self.allow_unknown_amino_acids,
-            self.kmer_size)
+        return (
+            "%s(name=%s, max_ic50=%f, allow_unknown_amino_acids=%s, "
+            "kmer_size=%d)" % (
+                self.__class__.__name__,
+                self.name,
+                self.max_ic50,
+                self.allow_unknown_amino_acids,
+                self.kmer_size))
 
     def __str__(self):
         return repr(self)
@@ -101,7 +111,8 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
         index_array = np.array(indices)
         expected_shape = (len(index_array), self.kmer_size)
         assert combined_matrix.shape == expected_shape, \
-            "Expected shape %s but got %s" % (expected_shape, combined_matrix.shape)
+            "Expected shape %s but got %s" % (
+                expected_shape, combined_matrix.shape)
         return combined_matrix, index_array
 
     def predict_scores_for_kmer_peptides(self, peptides):
@@ -131,8 +142,8 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
                 peptides, type(peptides)))
 
         input_matrix, original_peptide_indices = self.encode_peptides(peptides)
-        # peptides of lengths other than self.kmer_size get multiple predictions,
-        # which are then combined with the combine_fn argument
+        # peptides of lengths other than self.kmer_size get multiple
+        # predictions, which are then combined with the combine_fn argument
         multiple_predictions_dict = defaultdict(list)
         fixed_length_predictions = \
             self.predict_scores_for_kmer_encoded_array(input_matrix)
@@ -173,8 +184,8 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
         """
         if len(dataset.unique_alleles()) > 1:
             raise ValueError(
-                "Allele-specific predictor can't be trained on multi-allele data: %s" % (
-                    dataset,))
+                "Allele-specific predictor can't be trained on multi-allele "
+                "data: %s" % dataset)
 
         if pretraining_dataset and len(pretraining_dataset.unique_alleles()) > 1:
             raise ValueError(

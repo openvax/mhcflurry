@@ -51,6 +51,13 @@ if __name__ == '__main__':
         author_email="alex {dot} rubinsteyn {at} mssm {dot} edu",
         url="https://github.com/hammerlab/mhcflurry",
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
+        entry_points={
+            'console_scripts': [
+                'mhcflurry-downloads = mhcflurry.downloads_command:run',
+                'mhcflurry-class1-allele-specific-cv-and-train = '
+                    'mhcflurry.class1_allele_specific.cv_and_train_command:run'
+            ]
+        },
         classifiers=[
             'Development Status :: 3 - Alpha',
             'Environment :: Console',
@@ -60,6 +67,9 @@ if __name__ == '__main__':
             'Programming Language :: Python',
             'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
+        package_data={
+            'mhcflurry': ['downloads.yml'],
+        },
         install_requires=[
             'numpy>=1.11',
             'pandas>=0.13.1',
@@ -70,16 +80,16 @@ if __name__ == '__main__':
             'scikit-learn',
             'h5py',
             'typechecks',
-            # using for multi-threaded web server
-            'cherrypy',
+            'pepdata',
+            'joblib',
+            'cherrypy',  # for multi-threaded web server
             'bottle',
+            'six',
         ],
         long_description=readme,
-        packages=['mhcflurry'],
+        packages=['mhcflurry', 'mhcflurry.class1_allele_specific'],
         scripts=[
-            "script/mhcflurry-train-class1-allele-specific-models.py",
             "script/mhcflurry-predict-class1.py",
             "script/mhcflurry-class1-web-server.py",
-            "script/mhcflurry-dataset-size-sensitivity.py",
         ],
     )

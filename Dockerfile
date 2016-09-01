@@ -13,6 +13,8 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
         libhdf5-serial-dev \
         liblapack-dev \
         libpng12-dev \
+        libxml2-dev \
+        libxslt1-dev \
         libyaml-dev \
         libzmq3-dev \
         pkg-config \
@@ -40,11 +42,20 @@ WORKDIR /home/user
 # issue in python2, but installing it separately seems to work.
 # We also install bokeh so that dask distributed will have an admin web interface.
 RUN virtualenv venv-py3 --python=python3 && \
-    venv-py3/bin/pip install cherrypy bokeh distributed jupyter seaborn
+    venv-py3/bin/pip install \
+        numpy \
+        bokeh \
+        cherrypy \
+        distributed \
+        jupyter \
+        lxml \
+        scipy \
+        scikit-learn \
+        seaborn
 
-# Install mhcflurry.
+# Install mhcflurry and download data and models.
 COPY . ./mhcflurry
-RUN venv-py3/bin/pip install ./mhcflurry
+RUN venv-py3/bin/pip install ./mhcflurry && venv-py3/bin/mhcflurry-downloads fetch
  
 EXPOSE 8888
 CMD venv-py3/bin/jupyter notebook --no-browser

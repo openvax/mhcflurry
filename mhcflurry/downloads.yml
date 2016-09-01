@@ -1,0 +1,33 @@
+# This file describes collections of data and trained model weights that are
+# released with MHCflurry. We refer to these datasets as "downloads."
+#
+# Downloads are organized into "releases", which generally correspond with
+# MHCflurry releases of the same version.
+#
+# When users run "mhcflurry-downloads fetch" without specifying any downloads
+# by name, the downloads with "default=true" are downloaded.
+
+# This should usually be the latest release.
+current-release: 0.0.1
+
+# An integer indicating what models the current MHCflurry code base is compatible
+# with. Increment this integer when changes are made to MHCflurry that would break
+# the use of previously released models.
+current-compatibility-version: 1
+
+# Add new releases here as they are made.
+releases:
+    0.0.1:
+        compatibility-version: 1
+        downloads:
+            - name: models_class1_allele_specific_single
+              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.0/models_class1_allele_specific_single.tar.bz2
+              default: true
+
+            - name: data_kim2014
+              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.0/data_kim2014.tar.bz2
+              default: true
+
+            - name: data_combined_iedb_kim2014
+              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.0/data_combined_iedb_kim2014.tar.bz2
+              default: true
