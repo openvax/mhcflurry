@@ -37,16 +37,14 @@ WORKDIR /home/user
 
 # Setup virtual envs and install convenience packages.  Note: installing
 # cherrypy as part of the mhcflurry installation weirdly fails on a unicode
-# issue in python2, but installing it separately seems to work. We also install
-# bokeh so that dask distributed will have an admin web interface.
+# issue in python2, but installing it separately seems to work.
+# We also install bokeh so that dask distributed will have an admin web interface.
 RUN virtualenv venv-py3 --python=python3 && \
-    venv-py3/bin/pip install cherrypy bokeh distributed jupyter seaborn && \
-    virtualenv venv-py2 --python=python && \
-    venv-py2/bin/pip install cherrypy bokeh distributed jupyter seaborn
+    venv-py3/bin/pip install cherrypy bokeh distributed jupyter seaborn
 
 # Install mhcflurry.
 COPY . ./mhcflurry
-RUN venv-py3/bin/pip install ./mhcflurry && venv-py2/bin/pip install ./mhcflurry
+RUN venv-py3/bin/pip install ./mhcflurry
  
 EXPOSE 8888
 CMD venv-py3/bin/jupyter notebook --no-browser
