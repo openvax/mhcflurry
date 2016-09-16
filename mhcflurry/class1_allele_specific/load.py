@@ -113,7 +113,7 @@ class Class1AlleleSpecificPredictorLoader(object):
                     "No models for allele '%s'. Alleles with models: %s"
                     " in models file: %s" % (
                         allele_name,
-                        ' '.join(self.supported_alleles()),
+                        ' '.join(self.supported_alleles),
                         self.path_to_models_csv))
 
             model_path = join(self.path, "models", predictor_name + ".pickle")
