@@ -106,7 +106,7 @@ def test_performance_improves_for_A0205_with_pretraining():
         X_pretrain=X_index_imputed,
         ic50_pretrain=ic50_imputed,
         sample_weights_pretrain=sample_weights_imputed,
-        n_training_epochs=200)
+        n_training_epochs=10)
 
     ic50_pred_with_imputation = \
         predictor_with_imputation.predict_ic50_for_kmer_encoded_array(X_index)
