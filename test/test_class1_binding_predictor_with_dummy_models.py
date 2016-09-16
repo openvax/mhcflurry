@@ -15,7 +15,7 @@
 
 import numpy as np
 
-from dummy_models import always_zero_predictor_with_unknown_AAs
+from .dummy_models import always_zero_predictor_with_unknown_AAs
 
 
 def test_always_zero_9mer_inputs():

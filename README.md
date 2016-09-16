@@ -3,35 +3,33 @@
 # mhcflurry
 Peptide-MHC binding affinity prediction
 
-## Quickstart
+The presentation of protein fragments by MHC molecules is central to adaptive immunity. Machine learning models of the strength of the peptide/MHC interaction are routinely used in studies of infectious diseases, autoimmune diseases, vaccine development, and cancer immunotherapy. MHCflurry is an open source implementation of neural network models for this task.
 
-Set up the Python environment:
+MHCflurry currently supports peptide / MHC class I affinity prediction using one model per MHC allele. The predictors may be trained on data that has been augmented with data imputed based on other alleles (see [Rubinsteyn 2016](http://biorxiv.org/content/early/2016/06/07/054775)). We anticipate developing a number of additional models in the future, including pan-allele and class II predictors.
 
-```
-# (set up environment)
-pip install scipy Cython
-pip install h5py
-python setup.py develop
-```
+You can fit MHCflurry models to your own data or download trained models that we provide. Our models are trained on data from [IEDB](http://www.iedb.org/home_v3.php) and [Kim 2014](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241). See [here](downloads-generation/data_combined_iedb_kim2014) for details on the training data preparation. The steps we use to train predictors on this data, including hyperparameter selection using cross validation, are [here](downloads-generation/models_class1_allele_specific_single).
 
-Download, Normalize, and Combine Training Data:
+The MHCflurry predictors are implemented in Python using [keras](https://keras.io).
 
-(make sure you have `wget` available, e.g. `brew install wget` on Mac OS X)
+## Setup
+
+From a checkout run:
 
 ```
-script/download-iedb.sh
-script/download-kim-2013-dataset.sh
-script/create-iedb-class1-dataset.py
-script/create-combined-class1-dataset.py
+pip install .
 ```
 
-## Train Neural Network Models
+then download the trained models (as well as some datasets used in the unit tests):
 
 ```
-mhcflurry-train-class1-allele-specific-models.py
+mhcflurry-downloads fetch
 ```
 
-This will train separate models for each HLA type.
+You can now run the unit tests if you like:
+
+```
+nosetests .
+```
 
 ## Making predictions
 
@@ -45,6 +43,29 @@ predict(alleles=['A0201'], peptides=['SIINFEKL'])
 0  A0201  SIINFEKL  586.730529
 ```
 
-## Training Data for Class I Binding Prediction
+## Details on the downloaded class I allele-specific models
 
-The core data used for training mhcflurry is the BD2013 dataset from [Dataset size and composition impact the reliability of performance benchmarks for peptide-MHC binding predictions](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241). This is augmented with more recent peptide-MHC binding affinities from [IEDB](http://www.iedb.org/). Since affinity is measured using a variety of assays, some of which are incompatible, the `create-combined-class1-dataset.py` script filters the available Class I binding assays in IEDB by only retaining those with high correlation to overlapping measurements in BD2013. 
+Besides the actual model weights, the data downloaded with `mhcflurry-downloads fetch` also includes a CSV file giving the hyperparameters used for each predictor. Another CSV gives the cross validation results used to select these hyperparameters.
+
+To see the hyperparameters for the production models, run:
+
+```
+open "$(mhcflurry-downloads path models_class1_allele_specific_single)/production.csv"
+```
+
+To see the cross validation results:
+
+```
+open "$(mhcflurry-downloads path models_class1_allele_specific_single)/cv.csv"
+```
+
+## Environment variables
+
+The path where MHCflurry looks for model weights and data can be set with the `MHCFLURRY_DOWNLOADS_DIR` environment variable. This directory should contain subdirectories like "models_class1_allele_specific_single". Setting this variable overrides the other environment variables described below.
+
+If you only want to change the version of the released data used, you can set `MHCFLURRY_DOWNLOADS_CURRENT_RELEASE`. If you want to change the base directory used for all releases, set `MHCFLURRY_DATA_DIR`.
+
+By default,`MHCFLURRY_DOWNLOADS_DIR` is a platform specific application storage directory, `MHCFLURRY_DOWNLOADS_CURRENT_RELEASE` is the latest release, and `MHCFLURRY_DOWNLOADS_DIR` is set to `$MHCFLURRY_DATA_DIR/$MHCFLURRY_DOWNLOADS_CURRENT_RELEASE`.
+
+See [downloads.py](mhcflurry/downloads.py) for details.
+

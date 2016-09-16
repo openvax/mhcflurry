@@ -25,8 +25,6 @@ from keras.layers.normalization import BatchNormalization
 
 import theano
 
-from .feedforward_hyperparameters import OPTIMIZER, LOSS, ACTIVATION
-
 theano.config.exception_verbosity = 'high'
 
 
@@ -35,7 +33,7 @@ def make_network(
         embedding_input_dim=None,
         embedding_output_dim=None,
         layer_sizes=[100],
-        activation=ACTIVATION,
+        activation="tanh",
         init="glorot_uniform",
         output_activation="sigmoid",
         dropout_probability=0.0,
@@ -43,8 +41,8 @@ def make_network(
         initial_embedding_weights=None,
         embedding_init_method="glorot_uniform",
         model=None,
-        optimizer=OPTIMIZER,
-        loss=LOSS):
+        optimizer="rmsprop",
+        loss="mse"):
 
     if model is None:
         model = Sequential()
@@ -52,13 +50,15 @@ def make_network(
     if embedding_input_dim:
         if not embedding_output_dim:
             raise ValueError(
-                "Both embedding_input_dim and embedding_output_dim must be set")
+                "Both embedding_input_dim and embedding_output_dim must be "
+                "set")
 
         if initial_embedding_weights:
             n_rows, n_cols = initial_embedding_weights.shape
             if n_rows != embedding_input_dim or n_cols != embedding_output_dim:
                 raise ValueError(
-                    "Wrong shape for embedding: expected (%d, %d) but got (%d, %d)" % (
+                    "Wrong shape for embedding: expected (%d, %d) but got "
+                    "(%d, %d)" % (
                         embedding_input_dim, embedding_output_dim,
                         n_rows, n_cols))
             model.add(Embedding(
@@ -111,6 +111,7 @@ def make_network(
     model.compile(loss=loss, optimizer=optimizer)
     return model
 
+
 def make_hotshot_network(
         peptide_length=9,
         n_amino_acids=20,
@@ -121,6 +122,7 @@ def make_hotshot_network(
     acid sequence.
     """
     return make_network(input_size=peptide_length * n_amino_acids, **kwargs)
+
 
 def make_embedding_network(
         peptide_length=9,

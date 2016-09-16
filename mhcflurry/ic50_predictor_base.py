@@ -22,6 +22,7 @@ import numpy as np
 
 from .regression_target import regression_target_to_ic50, MAX_IC50
 from .dataset import Dataset
+from .hyperparameters import HyperparameterDefaults
 
 
 class IC50PredictorBase(object):
@@ -29,11 +30,13 @@ class IC50PredictorBase(object):
     Base class for all mhcflurry predictors which predict IC50 values
     (using any representation of peptides)
     """
+    hyperparameter_defaults = HyperparameterDefaults(max_ic50=MAX_IC50)
+
     def __init__(
             self,
             name,
             verbose=False,
-            max_ic50=MAX_IC50):
+            max_ic50=hyperparameter_defaults.defaults["max_ic50"]):
         self.name = name
         self.max_ic50 = max_ic50
         self.verbose = verbose

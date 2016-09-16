@@ -1,3 +1,6 @@
+# Swap files
+*.swp
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -58,3 +61,12 @@ target/
 
 # Data files
 *.zip
+
+# Dask distributed clutter
+.dask-web-ui.json
+
+# ipython checkpoints
+.ipynb_checkpoints
+
+# OS X extra files
+.DS_Store

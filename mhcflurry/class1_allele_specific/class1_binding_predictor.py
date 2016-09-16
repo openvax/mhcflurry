@@ -21,39 +21,26 @@ from __future__ import (
     absolute_import,
 )
 
-from os import listdir
-from os.path import exists, join
+import tempfile
+import os
 
 import numpy as np
 
-from .common import normalize_allele_name
-from .paths import CLASS1_MODEL_DIRECTORY
-from .feedforward import make_embedding_network
+import keras.models
+
+from ..feedforward import make_embedding_network
 from .class1_allele_specific_kmer_ic50_predictor_base import (
     Class1AlleleSpecificKmerIC50PredictorBase,
 )
-from .serialization_helpers import (
-    load_keras_model_from_disk,
-    save_keras_model_to_disk
-)
-from .peptide_encoding import check_valid_index_encoding_array
-from .feedforward_hyperparameters import (
-    LOSS,
-    OPTIMIZER,
-    ACTIVATION,
-    BATCH_NORMALIZATION,
-    INITIALIZATION_METHOD,
-    DROPOUT_PROBABILITY,
-    HIDDEN_LAYER_SIZE
-)
-from .regression_target import MAX_IC50, ic50_to_regression_target
-from .training_helpers import (
+from ..peptide_encoding import check_valid_index_encoding_array
+from ..regression_target import MAX_IC50, ic50_to_regression_target
+from ..training_helpers import (
     combine_training_arrays,
     extend_with_negative_random_samples,
 )
-from .regression_target import regression_target_to_ic50
+from ..regression_target import regression_target_to_ic50
+from ..hyperparameters import HyperparameterDefaults
 
-_allele_predictor_cache = {}
 
 class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
     """
@@ -61,14 +48,39 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
     fixed-length (k-mer) index encoding for inputs and outputs
     a value between 0 and 1 (where 1 is the strongest binder).
     """
+
+    network_hyperparameter_defaults = HyperparameterDefaults(
+        embedding_output_dim=32,
+        layer_sizes=[64],
+        init="glorot_uniform",
+        loss="mse",
+        optimizer="rmsprop",
+        output_activation="sigmoid",
+        activation="tanh",
+        dropout_probability=0.0)
+
+    fit_hyperparameter_defaults = HyperparameterDefaults(
+        n_training_epochs=250,
+        batch_size=128,
+        pretrain_decay="numpy.exp(-epoch)",
+        fraction_negative=0.0,
+        batch_normalization=True)
+
+    hyperparameter_defaults = (
+        Class1AlleleSpecificKmerIC50PredictorBase.hyperparameter_defaults
+        .extend(network_hyperparameter_defaults)
+        .extend(fit_hyperparameter_defaults))
+
     def __init__(
             self,
-            model,
+            model=None,
             name=None,
             max_ic50=MAX_IC50,
             allow_unknown_amino_acids=True,
+            kmer_size=9,
+            n_amino_acids=20,
             verbose=False,
-            kmer_size=9):
+            **hyperparameters):
         Class1AlleleSpecificKmerIC50PredictorBase.__init__(
             self,
             name=name,
@@ -76,37 +88,50 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             allow_unknown_amino_acids=allow_unknown_amino_acids,
             verbose=verbose,
             kmer_size=kmer_size)
+
+        specified_network_hyperparameters = (
+            self.network_hyperparameter_defaults.subselect(hyperparameters))
+
+        effective_hyperparameters = (
+            self.hyperparameter_defaults.with_defaults(hyperparameters))
+
+        if model is None:
+            model = make_embedding_network(
+                peptide_length=kmer_size,
+                n_amino_acids=n_amino_acids + int(allow_unknown_amino_acids),
+                **self.network_hyperparameter_defaults.subselect(
+                    effective_hyperparameters))
+        elif specified_network_hyperparameters:
+            raise ValueError(
+                "Do not specify network hyperparameters when passing a model. "
+                "Network hyperparameters specified: %s"
+                % " ".join(specified_network_hyperparameters))
+
+        self.hyperparameters = effective_hyperparameters
         self.name = name
         self.model = model
 
-    @classmethod
-    def from_disk(
-            cls,
-            model_json_path,
-            weights_hdf_path=None,
-            name=None,
-            optimizer=OPTIMIZER,
-            loss=LOSS,
-            **kwargs):
-        """
-        Load model from stored JSON representation of network and
-        (optionally) load weights from HDF5 file.
-        """
-        model = load_keras_model_from_disk(
-            model_json_path,
-            weights_hdf_path,
-            name=name)
-        # In some cases I haven't been able to use a model after loading it
-        # without compiling it first.
-        model.compile(optimizer=optimizer, loss=loss)
-        return cls(model=model, **kwargs)
+    def __getstate__(self):
+        result = dict(self.__dict__)
+        del result['model']
+        with tempfile.NamedTemporaryFile(suffix='.hdf5', delete=True) as fd:
+            keras.models.save_model(self.model, fd.name, overwrite=True)
+            result['model_bytes'] = fd.read()
+        return result
 
-    def to_disk(self, model_json_path, weights_hdf_path, overwrite=False):
-        save_keras_model_to_disk(
-            self.model,
-            model_json_path,
-            weights_hdf_path,
-            overwrite=overwrite)
+    def __setstate__(self, state):
+        model_bytes = state.pop('model_bytes')
+        self.__dict__.update(state)
+        fd = tempfile.NamedTemporaryFile(suffix='.hdf5', delete=False)
+        try:
+            fd.write(model_bytes)
+
+            # HDF5 has issues when the file is open multiple times, so we close
+            # it here before loading it into keras.
+            fd.close()
+            self.model = keras.models.load_model(fd.name)
+        finally:
+            os.unlink(fd.name)
 
     def get_weights(self):
         """
@@ -120,46 +145,6 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
         """
         self.model.set_weights(weights)
 
-    @classmethod
-    def from_hyperparameters(
-            cls,
-            name=None,
-            max_ic50=MAX_IC50,
-            peptide_length=9,
-            n_amino_acids=20,
-            allow_unknown_amino_acids=True,
-            embedding_output_dim=20,
-            layer_sizes=[HIDDEN_LAYER_SIZE],
-            activation=ACTIVATION,
-            init=INITIALIZATION_METHOD,
-            output_activation="sigmoid",
-            dropout_probability=DROPOUT_PROBABILITY,
-            loss=LOSS,
-            optimizer=OPTIMIZER,
-            batch_normalization=BATCH_NORMALIZATION,
-            **kwargs):
-        """
-        Create untrained predictor with the given hyperparameters.
-        """
-        model = make_embedding_network(
-            peptide_length=peptide_length,
-            n_amino_acids=n_amino_acids + int(allow_unknown_amino_acids),
-            embedding_output_dim=embedding_output_dim,
-            layer_sizes=layer_sizes,
-            activation=activation,
-            init=init,
-            loss=loss,
-            optimizer=optimizer,
-            output_activation=output_activation,
-            dropout_probability=dropout_probability)
-        return cls(
-            name=name,
-            max_ic50=max_ic50,
-            model=model,
-            allow_unknown_amino_acids=allow_unknown_amino_acids,
-            kmer_size=peptide_length,
-            **kwargs)
-
     def fit_kmer_encoded_arrays(
             self,
             X,
@@ -169,11 +154,11 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
             X_pretrain=None,
             ic50_pretrain=None,
             sample_weights_pretrain=None,
-            n_random_negative_samples=0,
-            pretrain_decay=lambda epoch: np.exp(-epoch),
-            n_training_epochs=200,
-            verbose=False,
-            batch_size=128):
+            n_random_negative_samples=None,
+            pretrain_decay=None,
+            n_training_epochs=None,
+            batch_size=None,
+            verbose=False):
         """
         Train predictive model from index encoding of fixed length k-mer
         peptides.
@@ -221,6 +206,25 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
 
         batch_size : int
         """
+
+        # Apply defaults from hyperparameters
+        if n_random_negative_samples is None:
+            n_random_negative_samples = (
+                int(self.hyperparameters["fraction_negative"] * len(ic50)))
+
+        if pretrain_decay is None:
+            pretrain_decay = (
+                lambda epoch:
+                eval(
+                    self.hyperparameters["pretrain_decay"],
+                    {'epoch': epoch, 'numpy': np}))
+
+        if n_training_epochs is None:
+            n_training_epochs = self.hyperparameters["n_training_epochs"]
+
+        if batch_size is None:
+            batch_size = self.hyperparameters["batch_size"]
+
         X_combined, ic50_combined, combined_weights, n_pretrain = \
             combine_training_arrays(
                 X, ic50, sample_weights,
@@ -239,7 +243,7 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
                     right_censoring_mask.shape,))
             if len(right_censoring_mask) != len(ic50):
                 raise ValueError(
-                    "Wrong length for censoring mask, expected %d but got %d" % (
+                    "Wrong length for censoring mask, expected %d not %d" % (
                         len(ic50),
                         len(right_censoring_mask)))
             right_censoring_mask_combined[n_pretrain:] = right_censoring_mask
@@ -289,7 +293,8 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
                         Y_curr_iter,
                         weights_curr_iter,
                         n_random_negative_samples,
-                        max_amino_acid_encoding_value=self.max_amino_acid_encoding_value)
+                        max_amino_acid_encoding_value=(
+                            self.max_amino_acid_encoding_value))
 
             self.model.fit(
                 X_curr_iter,
@@ -299,52 +304,6 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
                 verbose=0,
                 batch_size=batch_size,
                 shuffle=True)
-
-    @classmethod
-    def from_allele_name(
-            cls,
-            allele_name,
-            model_directory=CLASS1_MODEL_DIRECTORY,
-            max_ic50=MAX_IC50):
-        if not exists(model_directory) or len(listdir(model_directory)) == 0:
-            raise ValueError(
-                "No MHC prediction models found in %s" % (model_directory,))
-
-        allele_name = normalize_allele_name(allele_name)
-        key = (allele_name, model_directory, max_ic50)
-        if key in _allele_predictor_cache:
-            return _allele_predictor_cache[key]
-
-        if not exists(model_directory) or len(listdir(model_directory)) == 0:
-            raise ValueError(
-                "No MHC prediction models found in %s" % (model_directory,))
-
-        model_json_filename = allele_name + ".json"
-        model_json_path = join(model_directory, model_json_filename)
-
-        weights_hdf_filename = allele_name + ".hdf"
-        weights_hdf_path = join(model_directory, weights_hdf_filename)
-
-        predictor = cls.from_disk(
-            model_json_path=model_json_path,
-            weights_hdf_path=weights_hdf_path,
-            name=allele_name,
-            max_ic50=max_ic50)
-
-        _allele_predictor_cache[key] = predictor
-        return predictor
-
-    @classmethod
-    def supported_alleles(cls, model_directory=CLASS1_MODEL_DIRECTORY):
-        alleles_with_weights = set([])
-        alleles_with_models = set([])
-        for filename in listdir(model_directory):
-            if filename.endswith(".hdf"):
-                alleles_with_weights.add(filename.replace(".hdf", ""))
-            elif filename.endswith(".json"):
-                alleles_with_models.add(filename.replace(".json", ""))
-        alleles = alleles_with_models.intersection(alleles_with_weights)
-        return list(sorted(alleles))
 
     def predict_scores_for_kmer_encoded_array(self, X):
         """

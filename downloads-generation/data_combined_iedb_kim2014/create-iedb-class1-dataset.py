@@ -19,37 +19,23 @@ Turn a raw CSV snapshot of the IEDB contents into a usable
 class I binding prediction dataset by grouping all unique pMHCs
 """
 from collections import defaultdict
-from os import makedirs
-from os.path import join, exists
 import pickle
 import argparse
 
 import numpy as np
 import pandas as pd
 
-from mhcflurry.paths import CLASS1_DATA_DIRECTORY
-
-
-IEDB_SOURCE_FILENAME = "mhc_ligand_full.csv"
-PICKLE_OUTPUT_FILENAME = "iedb_human_class1_assay_datasets.pickle"
-
 parser = argparse.ArgumentParser(usage=__doc__)
 
 parser.add_argument(
     "--input-csv",
-    default=IEDB_SOURCE_FILENAME,
-    help="CSV file with IEDB's MHC binding data. Default: %(default)s")
-
-parser.add_argument(
-    "--output-dir",
-    default=CLASS1_DATA_DIRECTORY,
-    help="Directory to write output pickle file. Default: %(default)s")
+    required=True,
+    help="CSV file with IEDB's MHC binding data.")
 
 parser.add_argument(
     "--output-pickle-filename",
-    default=PICKLE_OUTPUT_FILENAME,
-    help="Path to .pickle file containing dictionary of IEDB assay datasets. "
-    "Default: %(default)s")
+    required=True,
+    help="Path to .pickle file containing dictionary of IEDB assay datasets.")
 
 parser.add_argument(
     "--alleles",
@@ -58,20 +44,23 @@ parser.add_argument(
     default=[],
     help="Restrict dataset to specified alleles")
 
+
 def filter_class1_alleles(df):
     mhc_class = df["MHC"]["MHC allele class"]
     print("MHC class counts: \n%s" % (mhc_class.value_counts(),))
     class1_mask = mhc_class == "I"
     return df[class1_mask]
 
+
 def filter_allele_names(df):
     alleles = df["MHC"]["Allele Name"]
     invalid_allele_mask = alleles.str.contains(" ") | alleles.str.contains("/")
     invalid_alleles = alleles[invalid_allele_mask]
     print("-- Invalid allele names: %s" % (list(sorted(set(invalid_alleles)))))
-    print("Dropping %d with complex alleles (e.g. descriptions of mutations)" % (
-        len(invalid_alleles),))
+    print("Dropping %d with complex alleles (e.g. descriptions of mutations)" %
+          len(invalid_alleles))
     return df[~invalid_allele_mask]
+
 
 def filter_affinity_values(df):
     affinities = df["Assay"]["Quantitative measurement"]
@@ -81,6 +70,7 @@ def filter_affinity_values(df):
     print("Dropping %d rows without finite affinity measurements" % (
         invalid_affinity_mask.sum(),))
     return df[finite_affinity_mask]
+
 
 def filter_mhc_dataframe(df):
     filter_functions = [
@@ -177,10 +167,5 @@ if __name__ == "__main__":
 
     assay_dataframes = groupby_assay(df)
 
-    if not exists(args.output_dir):
-        makedirs(args.output_dir)
-
-    output_path = join(args.output_dir, args.output_pickle_filename)
-
-    with open(output_path, "wb") as f:
+    with open(args.output_pickle_filename, "wb") as f:
         pickle.dump(assay_dataframes, f, pickle.HIGHEST_PROTOCOL)

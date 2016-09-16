@@ -19,27 +19,18 @@ Combine 2013 Kim/Peters NetMHCpan dataset[*] with more recent IEDB entries
 
 * = "Dataset size and composition impact the reliability..."
 """
-
+ 
 from __future__ import (
     print_function,
     division,
     absolute_import,
     unicode_literals
 )
-from os import makedirs
-from os.path import join, exists
 import pickle
 from collections import Counter
 import argparse
 
 import pandas as pd
-
-from mhcflurry.paths import CLASS1_DATA_DIRECTORY, CLASS1_DATA_CSV_FILENAME
-
-IEDB_PICKLE_FILENAME = "iedb_human_class1_assay_datasets.pickle"
-IEDB_PICKLE_PATH = join(CLASS1_DATA_DIRECTORY, IEDB_PICKLE_FILENAME)
-
-KIM_2013_CSV_FILENAME = "bdata.20130222.mhci.public.1.txt"
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -69,26 +60,18 @@ parser.add_argument(
 
 parser.add_argument(
     "--iedb-pickle-path",
-    default=IEDB_PICKLE_PATH,
-    help="Path to .pickle file containing dictionary of IEDB assay datasets. "
-    "Default: %(default)s")
+    required=True,
+    help="Path to .pickle file containing dictionary of IEDB assay datasets.")
 
 parser.add_argument(
     "--netmhcpan-csv-path",
-    default=KIM_2013_CSV_FILENAME,
-    help="Path to CSV with NetMHCpan dataset from 2013 Peters paper. "
-    "Default: %(default)s")
-
-parser.add_argument(
-    "--output-dir",
-    default=CLASS1_DATA_DIRECTORY,
-    help="Path to directory where output CSV should be written. "
-    "Default: %(default)s")
+    required=True,
+    help="Path to CSV with NetMHCpan dataset from 2013 Peters paper.")
 
 parser.add_argument(
     "--output-csv-filename",
-    default=CLASS1_DATA_CSV_FILENAME,
-    help="Name of combined CSV file. Default: %(default)s")
+    required=True,
+    help="Name of combined CSV file.")
 
 parser.add_argument(
     "--extra-dataset-csv-path",
@@ -98,9 +81,6 @@ parser.add_argument(
 
 if __name__ == "__main__":
     args = parser.parse_args()
-
-    if not exists(args.output_dir):
-        makedirs(args.output_dir)
 
     print("Reading %s..." % args.iedb_pickle_path)
     with open(args.iedb_pickle_path, "rb") as f:
@@ -183,8 +163,5 @@ if __name__ == "__main__":
     print("Combined DataFrame size: %d (+%d)" % (
         len(combined_df),
         len(combined_df) - len(nielsen_data)))
-    if not exists(args.output_dir):
-        makedirs(args.output_dir)
-    output_csv_path = join(args.output_dir, args.output_csv_filename)
-    print("Writing %s..." % output_csv_path)
-    combined_df.to_csv(output_csv_path, index=False)
+    print("Writing %s..." % args.output_csv_filename)
+    combined_df.to_csv(args.output_csv_filename, index=False)
