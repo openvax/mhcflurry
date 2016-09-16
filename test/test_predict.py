@@ -6,4 +6,4 @@ def test_predict_A1_Titin_epitope():
     assert len(result_df) == 1
     row = result_df.ix[0]
     ic50 = row["Prediction"]
-    assert ic50 <= 700
+    assert ic50 <= 500
