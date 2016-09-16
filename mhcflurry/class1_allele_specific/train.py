@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-
+from __future__ import (
+    print_function,
+    division,
+    absolute_import,
+)
 import collections
 import logging
 import time
@@ -277,7 +280,7 @@ def train_across_models_and_folds(
     pandas.DataFrame
     '''
     if cartesian_product_of_folds_and_models:
-        tasks_per_model = int(math.ceil(len(folds) / folds_per_task))
+        tasks_per_model = int(math.ceil(float(len(folds)) / folds_per_task))
         fold_index_groups = [[] for _ in range(tasks_per_model)]
         index_group = 0
         for index in range(len(folds)):

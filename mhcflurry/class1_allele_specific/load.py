@@ -14,7 +14,11 @@
 '''
 Load predictors
 '''
-
+from __future__ import (
+    print_function,
+    division,
+    absolute_import,
+)
 import pickle
 from os.path import join
 

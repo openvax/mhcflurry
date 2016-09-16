@@ -22,6 +22,7 @@ from __future__ import (
 )
 
 import tempfile
+import os
 
 import numpy as np
 
@@ -121,9 +122,16 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
     def __setstate__(self, state):
         model_bytes = state.pop('model_bytes')
         self.__dict__.update(state)
-        with tempfile.NamedTemporaryFile(suffix='.hdf5', delete=True) as fd:
+        fd = tempfile.NamedTemporaryFile(suffix='.hdf5', delete=False)
+        try:
             fd.write(model_bytes)
+
+            # HDF5 has issues when the file is open multiple times, so we close
+            # it here before loading it into keras.
+            fd.close()
             self.model = keras.models.load_model(fd.name)
+        finally:
+            os.unlink(fd.name)
 
     def get_weights(self):
         """
