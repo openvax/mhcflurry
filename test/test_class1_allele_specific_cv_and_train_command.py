@@ -114,6 +114,7 @@ def verify_trained_models(base_temp_dir):
         environ["MHCFLURRY_DOWNLOADS_DIR"] = old_dir
         downloads.configure()
 
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         # Make it possible to continue from a previous run since this test

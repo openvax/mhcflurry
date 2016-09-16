@@ -23,6 +23,9 @@ import pandas
 from ..downloads import get_path
 from ..common import normalize_allele_name
 
+_ALLELE_PREDICTOR_CACHE = {}
+_PRODUCTION_MODELS_DATAFRAME = None
+
 
 def from_allele_name(allele_name):
     """
@@ -42,7 +45,12 @@ def from_allele_name(allele_name):
         return _ALLELE_PREDICTOR_CACHE[allele_name]
 
     models_df = production_models_dataframe()
-    predictor_name = models_df.ix[allele_name].predictor_name
+    try:
+        predictor_name = models_df.ix[allele_name].predictor_name
+    except KeyError:
+        raise ValueError(
+            "No models for allele '%s'. Alleles with models: %s"
+            % (allele_name, ' '.join(supported_alleles())))
     model_path = get_path(
         "models_class1_allele_specific_single",
         "models/%s.pickle" % predictor_name)
@@ -52,7 +60,6 @@ def from_allele_name(allele_name):
 
     _ALLELE_PREDICTOR_CACHE[allele_name] = predictor
     return predictor
-_ALLELE_PREDICTOR_CACHE = {}
 
 
 def supported_alleles():
@@ -75,4 +82,3 @@ def production_models_dataframe():
         _PRODUCTION_MODELS_DATAFRAME.index = (
             _PRODUCTION_MODELS_DATAFRAME.allele)
     return _PRODUCTION_MODELS_DATAFRAME
-_PRODUCTION_MODELS_DATAFRAME = None
