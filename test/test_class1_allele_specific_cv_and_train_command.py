@@ -38,7 +38,7 @@ def test_small_run():
         "n_burn_in": 2,
         "n_imputations": 10,
         "n_nearest_columns": 10,
-        "min_observations_per_peptide": 20,
+        "min_observations_per_peptide": 5,
         "min_observations_per_allele": 1000,  # limit the number of alleles
     }
 

@@ -21,7 +21,8 @@ releases:
         compatibility-version: 1
         downloads:
             - name: models_class1_allele_specific_single
-              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.0/models_class1_allele_specific_single.tar.bz2
+              #url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.0/models_class1_allele_specific_single.tar.bz2
+              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.0/models_class1_allele_specific_single.no_impute.tar.bz2
               default: true
 
             - name: data_kim2014
