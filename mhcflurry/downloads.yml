@@ -8,7 +8,7 @@
 # by name, the downloads with "default=true" are downloaded.
 
 # This should usually be the latest release.
-current-release: 0.0.1
+current-release: 0.0.8
 
 # An integer indicating what models the current MHCflurry code base is compatible
 # with. Increment this integer when changes are made to MHCflurry that would break
@@ -17,18 +17,17 @@ current-compatibility-version: 1
 
 # Add new releases here as they are made.
 releases:
-    0.0.1:
+    0.0.8:
         compatibility-version: 1
         downloads:
             - name: models_class1_allele_specific_single
-              #url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.0/models_class1_allele_specific_single.tar.bz2
-              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.0/models_class1_allele_specific_single.no_impute.tar.bz2
+              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.8/models_class1_allele_specific_single.no_impute.tar.bz2
               default: true
 
             - name: data_kim2014
-              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.0/data_kim2014.tar.bz2
+              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.8/data_kim2014.tar.bz2
               default: true
 
             - name: data_combined_iedb_kim2014
-              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.0/data_combined_iedb_kim2014.tar.bz2
+              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.8/data_combined_iedb_kim2014.tar.bz2
               default: true

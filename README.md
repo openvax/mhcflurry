@@ -1,11 +1,11 @@
 [![Build Status](https://travis-ci.org/hammerlab/mhcflurry.svg?branch=master)](https://travis-ci.org/hammerlab/mhcflurry) [![Coverage Status](https://coveralls.io/repos/github/hammerlab/mhcflurry/badge.svg?branch=master)](https://coveralls.io/github/hammerlab/mhcflurry?branch=master)
 
 # mhcflurry
-Peptide-MHC binding affinity prediction
+Open source neural network models for peptide-MHC binding affinity prediction
 
-The presentation of protein fragments by MHC molecules is central to adaptive immunity. Machine learning models of the strength of the peptide/MHC interaction are routinely used in studies of infectious diseases, autoimmune diseases, vaccine development, and cancer immunotherapy. MHCflurry is an open source implementation of neural network models for this task.
+The [adaptive immune system](https://en.wikipedia.org/wiki/Adaptive_immune_system) depends on the presentation of protein fragments by [MHC](https://en.wikipedia.org/wiki/Major_histocompatibility_complex) molecules. Machine learning models of this interaction are routinely used in studies of infectious diseases, autoimmune diseases, vaccine development, and cancer immunotherapy.
 
-MHCflurry currently supports peptide / MHC class I affinity prediction using one model per MHC allele. The predictors may be trained on data that has been augmented with data imputed based on other alleles (see [Rubinsteyn 2016](http://biorxiv.org/content/early/2016/06/07/054775)). We anticipate developing a number of additional models in the future, including pan-allele and class II predictors.
+MHCflurry currently supports peptide / [MHC class I](https://en.wikipedia.org/wiki/MHC_class_I) affinity prediction using one model per MHC allele. The predictors may be trained on data that has been augmented with data imputed based on other alleles (see [Rubinsteyn 2016](http://biorxiv.org/content/early/2016/06/07/054775)). We anticipate adding additional models, including pan-allele and class II predictors.
 
 You can fit MHCflurry models to your own data or download trained models that we provide. Our models are trained on data from [IEDB](http://www.iedb.org/home_v3.php) and [Kim 2014](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241). See [here](downloads-generation/data_combined_iedb_kim2014) for details on the training data preparation. The steps we use to train predictors on this data, including hyperparameter selection using cross validation, are [here](downloads-generation/models_class1_allele_specific_single).
 
@@ -40,7 +40,7 @@ predict(alleles=['A0201'], peptides=['SIINFEKL'])
 
 ```
   Allele   Peptide  Prediction
-0  A0201  SIINFEKL  586.730529
+0  A0201  SIINFEKL  10672.347656
 ```
 
 ## Details on the downloaded class I allele-specific models

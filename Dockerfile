@@ -3,9 +3,11 @@ FROM nvidia/cuda:cudnn-runtime
 MAINTAINER Tim O'Donnell <timodonnell@gmail.com>
 
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
+    apt-get clean && \
     apt-get update && \
     apt-get install --yes \
         gfortran \
+        git \
         libatlas-base-dev \
         libatlas3gf-base \
         libblas-dev \
@@ -42,11 +44,12 @@ WORKDIR /home/user
 # issue in python2, but installing it separately seems to work.
 # We also install bokeh so that dask distributed will have an admin web interface.
 RUN virtualenv venv-py3 --python=python3 && \
-    venv-py3/bin/pip install \
+    venv-py3/bin/pip install --upgrade pip && \
+    venv-py3/bin/pip install --upgrade \
         numpy \
         bokeh \
         cherrypy \
-        distributed \
+        git+https://github.com/dask/distributed.git \
         jupyter \
         lxml \
         scipy \
