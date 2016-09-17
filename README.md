@@ -13,19 +13,19 @@ The MHCflurry predictors are implemented in Python using [keras](https://keras.i
 
 ## Setup
 
-From a checkout run:
+Install the package:
 
 ```
-pip install .
+pip install mhcflurry
 ```
 
-then download the trained models (as well as some datasets used in the unit tests):
+Then download our datasets and trained models:
 
 ```
 mhcflurry-downloads fetch
 ```
 
-You can now run the unit tests if you like:
+From a checkout you can run the unit tests with:
 
 ```
 nosetests .
@@ -66,6 +66,3 @@ The path where MHCflurry looks for model weights and data can be set with the `M
 If you only want to change the version of the released data used, you can set `MHCFLURRY_DOWNLOADS_CURRENT_RELEASE`. If you want to change the base directory used for all releases, set `MHCFLURRY_DATA_DIR`.
 
 By default,`MHCFLURRY_DOWNLOADS_DIR` is a platform specific application storage directory, `MHCFLURRY_DOWNLOADS_CURRENT_RELEASE` is the latest release, and `MHCFLURRY_DOWNLOADS_DIR` is set to `$MHCFLURRY_DATA_DIR/$MHCFLURRY_DOWNLOADS_CURRENT_RELEASE`.
-
-See [downloads.py](mhcflurry/downloads.py) for details.
-
