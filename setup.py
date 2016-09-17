@@ -88,8 +88,4 @@ if __name__ == '__main__':
         ],
         long_description=readme,
         packages=['mhcflurry', 'mhcflurry.class1_allele_specific'],
-        scripts=[
-            "script/mhcflurry-predict-class1.py",
-            "script/mhcflurry-class1-web-server.py",
-        ],
     )
