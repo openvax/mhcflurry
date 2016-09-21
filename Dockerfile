@@ -56,6 +56,9 @@ RUN virtualenv venv-py3 --python=python3 && \
         scikit-learn \
         seaborn
 
+ENV KERAS_BACKEND theano
+# RUN venv-py3/bin/pip install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.10.0-cp35-cp35m-linux_x86_64.whl
+
 # Install mhcflurry and download data and models.
 COPY . ./mhcflurry
 RUN venv-py3/bin/pip install ./mhcflurry && venv-py3/bin/mhcflurry-downloads fetch
