@@ -25,7 +25,7 @@ from os.path import join
 import pandas
 
 from ..downloads import get_path
-from ..common import normalize_allele_name
+from ..common import normalize_allele_name, UnsupportedAllele
 
 CACHED_LOADER = None
 
@@ -113,7 +113,7 @@ class Class1AlleleSpecificPredictorLoader(object):
             try:
                 predictor_name = self.df.ix[allele_name].predictor_name
             except KeyError:
-                raise ValueError(
+                raise UnsupportedAllele(
                     "No models for allele '%s'. Alleles with models: %s"
                     " in models file: %s" % (
                         allele_name,

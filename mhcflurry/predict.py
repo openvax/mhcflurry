@@ -17,10 +17,10 @@ from collections import OrderedDict
 import pandas as pd
 
 from .class1_allele_specific import load
-from .common import normalize_allele_name
+from .common import normalize_allele_name, UnsupportedAllele
 
 
-def predict(alleles, peptides):
+def predict(alleles, peptides, loaders=None):
     """
     Parameters
     ----------
@@ -32,6 +32,10 @@ def predict(alleles, peptides):
 
     Returns DataFrame with columns "Allele", "Peptide", and "Prediction"
     """
+    if loaders is None:
+        loaders = [
+            load.get_loader_for_downloaded_models(),
+        ]
     result_dict = OrderedDict([
         ("Allele", []),
         ("Peptide", []),
@@ -39,7 +43,22 @@ def predict(alleles, peptides):
     ])
     for allele in alleles:
         allele = normalize_allele_name(allele)
-        model = load.from_allele_name(allele)
+        exceptions = {}  # loader -> UnsupportedAllele exception
+        model = None
+        for loader in loaders:
+            try:
+                model = loader.from_allele_name(allele)
+                break
+            except UnsupportedAllele as e:
+                exceptions[loader] = e
+        if model is None:
+            raise UnsupportedAllele(
+                "No loaders support allele '%s'. Errors were:\n%s" % (
+                    allele,
+                    "\n".join(
+                        ("\t%-20s : %s" % (k, v))
+                        for (k, v) in exceptions.items())))
+
         for i, ic50 in enumerate(model.predict(peptides)):
             result_dict["Allele"].append(allele)
             result_dict["Peptide"].append(peptides[i])
