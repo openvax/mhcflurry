@@ -40,7 +40,7 @@ time mhcflurry-class1-allele-specific-cv-and-train \
     --imputer-description imputer.json \
     --train-data "$(mhcflurry-downloads path data_kim2014)/bdata.2009.mhci.public.1.txt" \
     --test-data "$(mhcflurry-downloads path data_kim2014)/bdata.2013.mhci.public.blind.1.txt" \
-    --min-samples-per-allele 70 \
+    --min-samples-per-allele 50 \
     --out-cv-results cv.csv \
     --out-production-results production.csv \
     --out-models models \
