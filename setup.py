@@ -81,8 +81,7 @@ if __name__ == '__main__':
             'h5py',
             'typechecks',
             'pepdata',
-            'joblib',
-            'cherrypy',  # for multi-threaded web server
+            'futures',
             'bottle',
             'six',
         ],

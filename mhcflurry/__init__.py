@@ -18,8 +18,6 @@ from .predict import predict
 from .package_metadata import __version__
 from . import parallelism
 
-parallelism.configure_joblib()
-
 __all__ = [
     "Class1BindingPredictor",
     "predict",

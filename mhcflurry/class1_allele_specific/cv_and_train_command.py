@@ -22,19 +22,14 @@ What it does:
 
 Features:
  * Supports imputation as a hyperparameter that can be searched over
- * Parallelized with joblib
+ * Parallelized with concurrent.futures
 
 Note:
 
-The joblib-based parallelization is primary intended to be used with an
-alternative joblib backend such as dask-distributed that supports
+The parallelization is primary intended to be used with an
+alternative concurrent.futures Executor such as dask-distributed that supports
 multi-node parallelization. Theano in particular seems to have deadlocks
 when running with single-node parallelization.
-
-Also, when using the multiprocessing backend for joblib (the default),
-the 'fork' mode causes a library we use to hang. We have to instead use
-the 'spawn' or 'forkserver' modes. See:
-https://pythonhosted.org/joblib/parallel.html#bad-interaction-of-multiprocessing-and-third-party-libraries
 '''
 from __future__ import (
     print_function,
@@ -52,8 +47,10 @@ import hashlib
 import pickle
 
 import numpy
-import joblib
 
+from dask import distributed
+
+from ..parallelism import set_default_executor, get_default_executor
 from ..dataset import Dataset
 from ..imputation_helpers import imputer_from_name
 from .cross_validation import cross_validation_folds
@@ -142,20 +139,6 @@ parser.add_argument(
     help="Host and port of dask distributed scheduler")
 
 parser.add_argument(
-    "--joblib-num-jobs",
-    type=int,
-    default=1,
-    metavar="N",
-    help="Number of joblib workers. Set to -1 to use as many jobs as cores. "
-    "Default: %(default)s")
-
-parser.add_argument(
-    "--joblib-pre-dispatch",
-    metavar="STRING",
-    default='2*n_jobs',
-    help="Tasks to initially dispatch to joblib. Default: %(default)s")
-
-parser.add_argument(
     "--min-samples-per-allele",
     default=100,
     metavar="N",
@@ -183,23 +166,18 @@ def run(argv=sys.argv[1:]):
     if args.verbose:
         logging.basicConfig(level="DEBUG")
     if args.dask_scheduler:
-        import distributed.joblib  # for side effects
-        backend = joblib.parallel_backend(
-            'distributed',
-            scheduler_host=args.dask_scheduler)
-        with backend:
-            active_backend = joblib.parallel.get_active_backend()[0]
-            logging.info(
-                "Running with dask scheduler: %s [%d cores]" % (
-                    args.dask_scheduler,
-                    active_backend.effective_n_jobs()))
-
-            go(args)
-    else:
-        go(args)
+        executor = distributed.Executor(args.dask_scheduler)
+        set_default_executor(executor)
+        logging.info(
+            "Running with dask scheduler: %s [%s cores]" % (
+                args.dask_scheduler,
+                sum(executor.ncores().values())))
+    go(args)
 
 
 def go(args):
+    executor = get_default_executor()
+
     model_architectures = json.loads(args.model_architectures.read())
     logging.info("Read %d model architectures" % len(model_architectures))
     if args.max_models:
@@ -251,10 +229,7 @@ def go(args):
         imputer=imputer,
         impute_kwargs=impute_kwargs,
         drop_similar_peptides=True,
-        alleles=args.alleles,
-        n_jobs=args.joblib_num_jobs,
-        pre_dispatch=args.joblib_pre_dispatch,
-        verbose=1 if not args.quiet else 0)
+        alleles=args.alleles)
 
     logging.info(
         "Training %d model architectures across %d folds = %d models"
@@ -266,10 +241,7 @@ def go(args):
     cv_results = train_across_models_and_folds(
         cv_folds,
         model_architectures,
-        folds_per_task=args.cv_folds_per_task,
-        n_jobs=args.joblib_num_jobs,
-        verbose=1 if not args.quiet else 0,
-        pre_dispatch=args.joblib_pre_dispatch)
+        folds_per_task=args.cv_folds_per_task)
     logging.info(
         "Completed cross validation in %0.2f seconds" % (time.time() - start))
 
@@ -311,7 +283,6 @@ def go(args):
     logging.info("")
     train_folds = []
     train_models = []
-    imputation_tasks = []
     for (allele_num, allele) in enumerate(cv_results.allele.unique()):
         best_index = best_architectures_by_allele[allele]
         architecture = model_architectures[best_index]
@@ -321,14 +292,14 @@ def go(args):
             (allele, best_index, architecture))
 
         if architecture['impute']:
-            imputation_task = joblib.delayed(impute_and_select_allele)(
+            imputation_future = executor.submit(
+                impute_and_select_allele,
                 train_data,
                 imputer=imputer,
                 allele=allele,
                 **impute_kwargs)
-            imputation_tasks.append(imputation_task)
         else:
-            imputation_task = None
+            imputation_future = None
 
         test_data_this_allele = None
         if test_data is not None:
@@ -344,29 +315,17 @@ def go(args):
             # the imputations so we have to queue up the tasks first.
             # If we are not doing imputation then the imputation_task
             # is None.
-            imputed_train=imputation_task,
+            imputed_train=imputation_future,
             test=test_data_this_allele)
         train_folds.append(fold)
 
-    if imputation_tasks:
-        logging.info(
-            "Waiting for %d full-data imputation tasks to complete"
-            % len(imputation_tasks))
-        imputation_results = joblib.Parallel(
-            n_jobs=args.joblib_num_jobs,
-            verbose=1 if not args.quiet else 0,
-            pre_dispatch=args.joblib_pre_dispatch)(imputation_tasks)
-
-        train_folds = [
-            train_fold._replace(
-                # Now we replace imputed_train with the actual imputed
-                # dataset.
-                imputed_train=imputation_results.pop(0)
-                if (train_fold.imputed_train is not None) else None)
-            for train_fold in train_folds
-        ]
-        assert not imputation_results
-        del imputation_tasks
+    train_folds = [
+        result_fold._replace(imputed_train=(
+            result_fold.imputed_train.result()
+            if result_fold.imputed_train is not None
+            else None))
+        for result_fold in train_folds
+    ]
 
     logging.info("Training %d production models" % len(train_folds))
     start = time.time()
@@ -374,10 +333,7 @@ def go(args):
         train_folds,
         train_models,
         cartesian_product_of_folds_and_models=False,
-        return_predictors=args.out_models_dir is not None,
-        n_jobs=args.joblib_num_jobs,
-        verbose=1 if not args.quiet else 0,
-        pre_dispatch=args.joblib_pre_dispatch)
+        return_predictors=args.out_models_dir is not None)
     logging.info(
         "Completed production training in %0.2f seconds"
         % (time.time() - start))

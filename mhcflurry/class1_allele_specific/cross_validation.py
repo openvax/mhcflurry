@@ -20,11 +20,11 @@ from __future__ import (
 import collections
 import logging
 
-from joblib import Parallel, delayed
 
 import pepdata
 
 from .train import impute_and_select_allele, AlleleSpecificTrainTestFold
+from ..parallelism import get_default_executor
 
 gbmr4_transformer = pepdata.reduced_alphabet.make_alphabet_transformer("gbmr4")
 
@@ -100,9 +100,7 @@ def cross_validation_folds(
             'min_observations_per_peptide': 2,
             'min_observations_per_allele': 2,
         },
-        n_jobs=1,
-        verbose=0,
-        pre_dispatch='2*n_jobs'):
+        executor=None):
     '''
     Split a Dataset into n_folds cross validation folds for each allele,
     optionally performing imputation.
@@ -133,26 +131,18 @@ def cross_validation_folds(
         The number of jobs to run in parallel. If -1, then the number of jobs
         is set to the number of cores.
 
-    verbose : integer, optional
-        The joblib verbosity. If non zero, progress messages are printed. Above
-        50, the output is sent to stdout. The frequency of the messages
-        increases with the verbosity level. If it more than 10, all iterations
-        are reported.
-
-    pre_dispatch : {"all", integer, or expression, as in "3*n_jobs"}
-        The number of joblib batches (of tasks) to be pre-dispatched. Default
-        is "2*n_jobs".
-
     Returns
     -----------
     list of AlleleSpecificTrainTestFold of length num alleles * n_folds
 
     '''
+    if executor is None:
+        executor = get_default_executor()
+
     if alleles is None:
         alleles = train_data.unique_alleles()
 
-    result = []
-    imputation_tasks = []
+    result_folds = []
     for allele in alleles:
         logging.info("Allele: %s" % allele)
         cv_iter = train_data.cross_validation_iterator(
@@ -176,31 +166,27 @@ def cross_validation_folds(
                 test_split = full_test_split
 
             if imputer is not None:
-                imputation_tasks.append(delayed(impute_and_select_allele)(
+                imputation_future = executor.submit(
+                    impute_and_select_allele,
                     all_allele_train_split,
                     imputer=imputer,
                     allele=allele,
-                    **impute_kwargs))
+                    **impute_kwargs)
+            else:
+                imputation_future = None
 
             train_split = all_allele_train_split.get_allele(allele)
             fold = AlleleSpecificTrainTestFold(
                 allele=allele,
                 train=train_split,
-                imputed_train=None,
+                imputed_train=imputation_future,
                 test=test_split)
-            result.append(fold)
+            result_folds.append(fold)
 
-    if imputer is not None:
-        imputation_results = Parallel(
-            n_jobs=n_jobs,
-            verbose=verbose,
-            pre_dispatch=pre_dispatch)(imputation_tasks)
-
-        result = [
-            result_fold._replace(
-                imputed_train=imputation_result)
-            for (imputation_result, result_fold)
-            in zip(imputation_results, result)
-            if imputation_result is not None
-        ]
-    return result
+    return [
+        result_fold._replace(imputed_train=(
+            result_fold.imputed_train.result()
+            if result_fold.imputed_train is not None
+            else None))
+        for result_fold in result_folds
+    ]

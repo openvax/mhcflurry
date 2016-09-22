@@ -1,30 +1,34 @@
-import multiprocessing
+from concurrent import futures
 import logging
 
-import joblib.parallel
+DEFAULT_EXECUTOR = None
 
 
-def configure_joblib(multiprocessing_mode="spawn"):
-    """
-    Set joblib's default multiprocessing mode.
+def set_default_executor(executor):
+    global DEFAULT_EXECUTOR
+    DEFAULT_EXECUTOR = executor
 
-    The default used in joblib is "fork" which causes a library we use to
-    deadlock. This function defaults to setting the multiprocessing mode
-    to "spawn", which does not deadlock. On Python 3.4, you can also try
-    the "forkserver" mode which does not deadlock and has better
-    performance.
 
-    See: https://pythonhosted.org/joblib/parallel.html#bad-interaction-of-multiprocessing-and-third-party-libraries
+def get_default_executor():
+    global DEFAULT_EXECUTOR
+    if DEFAULT_EXECUTOR is None:
+        DEFAULT_EXECUTOR = futures.ThreadPoolExecutor(max_workers=1)
+    return DEFAULT_EXECUTOR
 
-    Parameters
-    -------------
-    multiprocessing_mode : string, one of "spawn", "fork", or "forkserver"
 
-    """
-    if hasattr(multiprocessing, "get_context"):
-        joblib.parallel.DEFAULT_MP_CONTEXT = multiprocessing.get_context(
-            multiprocessing_mode)
-    else:
-        logging.warn(
-            "You will probably get deadlocks on Python earlier than 3.4 "
-            "if you set n_jobs to anything other than 1.")
+def map_throw_fast(executor, func, iterable):
+    futures = [
+        executor.submit(func, arg) for arg in iterable
+    ]
+    return wait_all_throw_fast(futures)
+
+
+def wait_all_throw_fast(fs):
+    result_dict = {}
+    for finished_future in futures.as_completed(fs):
+        result = finished_future.result()
+        logging.info("%3d / %3d tasks completed" % (
+            len(result_dict), len(fs)))
+        result_dict[finished_future] = result
+
+    return [result_dict[future] for future in fs]
