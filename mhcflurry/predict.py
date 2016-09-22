@@ -64,3 +64,4 @@ def predict(alleles, peptides, loaders=None):
             result_dict["Peptide"].append(peptides[i])
             result_dict["Prediction"].append(ic50)
     return pd.DataFrame(result_dict)
+ 
