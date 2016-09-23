@@ -60,6 +60,7 @@ def test_small_run():
         "--cv-num-folds", "2",
         "--alleles", "HLA-A0201", "HLA-A0301",
         "--verbose",
+        "--num-local-threads", "2",
     ]
     print("Running cv_and_train_command with args: %s " % str(args))
 

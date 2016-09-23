@@ -31,7 +31,7 @@ import mhcflurry
 from .scoring import make_scores
 from .class1_binding_predictor import Class1BindingPredictor
 from ..hyperparameters import HyperparameterDefaults
-from ..parallelism import get_default_executor, map_throw_fast
+from ..parallelism import get_default_backend
 
 
 TRAIN_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(impute=False)
@@ -239,7 +239,7 @@ def train_across_models_and_folds(
         cartesian_product_of_folds_and_models=True,
         return_predictors=False,
         folds_per_task=1,
-        executor=None):
+        parallel_backend=None):
     '''
     Train and optionally test any number of models across any number of folds.
 
@@ -259,14 +259,14 @@ def train_across_models_and_folds(
     return_predictors : boolean, optional
         Include the trained predictors in the result.
 
-    executor : 
+    parallel_backend : parallel backend, optional
 
     Returns
     -----------
     pandas.DataFrame
     '''
-    if executor is None:
-        executor = get_default_executor()
+    if parallel_backend is None:
+        parallel_backend = get_default_backend()
 
     if cartesian_product_of_folds_and_models:
         tasks_per_model = int(math.ceil(float(len(folds)) / folds_per_task))
@@ -303,8 +303,7 @@ def train_across_models_and_folds(
             [folds[i] for i in fold_nums],
             return_predictor=return_predictors)
 
-    task_results = map_throw_fast(
-        executor,
+    task_results = parallel_backend.map(
         train_and_test_one_model_task,
         task_model_and_fold_indices)
 

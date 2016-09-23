@@ -20,11 +20,10 @@ from __future__ import (
 import collections
 import logging
 
-
 import pepdata
 
 from .train import impute_and_select_allele, AlleleSpecificTrainTestFold
-from ..parallelism import get_default_executor
+from ..parallelism import get_default_backend
 
 gbmr4_transformer = pepdata.reduced_alphabet.make_alphabet_transformer("gbmr4")
 
@@ -100,7 +99,7 @@ def cross_validation_folds(
             'min_observations_per_peptide': 2,
             'min_observations_per_allele': 2,
         },
-        executor=None):
+        parallel_backend=None):
     '''
     Split a Dataset into n_folds cross validation folds for each allele,
     optionally performing imputation.
@@ -136,8 +135,8 @@ def cross_validation_folds(
     list of AlleleSpecificTrainTestFold of length num alleles * n_folds
 
     '''
-    if executor is None:
-        executor = get_default_executor()
+    if parallel_backend is None:
+        parallel_backend = get_default_backend()
 
     if alleles is None:
         alleles = train_data.unique_alleles()
@@ -166,7 +165,7 @@ def cross_validation_folds(
                 test_split = full_test_split
 
             if imputer is not None:
-                imputation_future = executor.submit(
+                imputation_future = parallel_backend.submit(
                     impute_and_select_allele,
                     all_allele_train_split,
                     imputer=imputer,

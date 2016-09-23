@@ -48,9 +48,7 @@ import pickle
 
 import numpy
 
-from dask import distributed
-
-from ..parallelism import set_default_executor, get_default_executor
+from .. import parallelism
 from ..dataset import Dataset
 from ..imputation_helpers import imputer_from_name
 from .cross_validation import cross_validation_folds
@@ -139,6 +137,19 @@ parser.add_argument(
     help="Host and port of dask distributed scheduler")
 
 parser.add_argument(
+    "--num-local-processes",
+    metavar="N",
+    type=int,
+    help="Processes (exclusive with --dask-scheduler and --num-local-threads)")
+
+parser.add_argument(
+    "--num-local-threads",
+    metavar="N",
+    type=int,
+    default=1,
+    help="Threads (exclusive with --dask-scheduler and --num-local-processes)")
+
+parser.add_argument(
     "--min-samples-per-allele",
     default=100,
     metavar="N",
@@ -161,22 +172,36 @@ parser.add_argument(
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
-    if not args.quiet:
-        logging.basicConfig(level="INFO")
     if args.verbose:
-        logging.basicConfig(level="DEBUG")
+        logging.root.setLevel(level="DEBUG")
+    elif not args.quiet:
+        logging.root.setLevel(level="INFO")
+
+    logging.info("Running with arguments: %s" % args)
+    print("Past logging")
+
+
+    # Set parallel backend
     if args.dask_scheduler:
-        executor = distributed.Executor(args.dask_scheduler)
-        set_default_executor(executor)
-        logging.info(
-            "Running with dask scheduler: %s [%s cores]" % (
-                args.dask_scheduler,
-                sum(executor.ncores().values())))
+        backend = parallelism.DaskDistributedParallelBackend(
+            args.dask_scheduler)
+    else:
+        if args.num_local_processes:
+            backend = parallelism.ConcurrentFuturesParallelBackend(
+                args.num_local_processes,
+                processes=True)
+        else:
+            backend = parallelism.ConcurrentFuturesParallelBackend(
+                args.num_local_threads,
+                processes=False)
+
+    parallelism.set_default_backend(backend)
+    logging.info("Using parallel backend: %s" % backend)
     go(args)
 
 
 def go(args):
-    executor = get_default_executor()
+    backend = parallelism.get_default_backend()
 
     model_architectures = json.loads(args.model_architectures.read())
     logging.info("Read %d model architectures" % len(model_architectures))
@@ -292,7 +317,7 @@ def go(args):
             (allele, best_index, architecture))
 
         if architecture['impute']:
-            imputation_future = executor.submit(
+            imputation_future = backend.submit(
                 impute_and_select_allele,
                 train_data,
                 imputer=imputer,
