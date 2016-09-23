@@ -34,7 +34,7 @@ class ParallelBackend(object):
 
 class DaskDistributedParallelBackend(ParallelBackend):
     def __init__(self, scheduler_ip_and_port, verbose=1):
-        from dask import distributed
+        from dask import distributed  # pylint: disable=import-error
         executor = distributed.Executor(scheduler_ip_and_port)
         ParallelBackend.__init__(self, executor, distributed, verbose=verbose)
         self.scheduler_ip_and_port = scheduler_ip_and_port
