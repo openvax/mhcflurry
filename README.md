@@ -31,7 +31,24 @@ From a checkout you can run the unit tests with:
 nosetests .
 ```
 
-## Making predictions
+## Making predictions from the command-line
+
+```shell
+$ mhcflurry-predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ
+Predicting for 2 alleles and 3 peptides = 6 predictions
+allele,peptide,mhcflurry_prediction
+HLA-A0201,SIINFEKL,10672.34765625
+HLA-A0201,SIINFEKD,26042.716796875
+HLA-A0201,SIINFEKQ,26375.794921875
+HLA-A0301,SIINFEKL,25532.703125
+HLA-A0301,SIINFEKD,24997.876953125
+HLA-A0301,SIINFEKQ,28262.828125
+```
+
+You can also specify the input and output as CSV files. Run `mhcflurry-predict -h` for details.
+
+
+## Making predictions from Python
 
 ```python
 from mhcflurry import predict

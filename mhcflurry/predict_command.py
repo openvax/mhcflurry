@@ -137,7 +137,6 @@ def run(argv=sys.argv[1:]):
 
     predictions = {}  # allele -> peptide -> value
     for (allele, sub_df) in df.groupby(args.allele_column):
-        print(sub_df)
         logging.info("Running %d predictions for allele %s" % (
             len(sub_df), allele))
         model = class1_allele_specific_loader.from_allele_name(allele)
