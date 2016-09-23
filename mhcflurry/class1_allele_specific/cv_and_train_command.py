@@ -178,8 +178,6 @@ def run(argv=sys.argv[1:]):
         logging.root.setLevel(level="INFO")
 
     logging.info("Running with arguments: %s" % args)
-    print("Past logging")
-
 
     # Set parallel backend
     if args.dask_scheduler:
