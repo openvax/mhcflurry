@@ -64,7 +64,9 @@ The predictions returned by `predict` are affinities (KD) in nM.
 
 ## Training your own models
 
-This [unit test](https://github.com/hammerlab/mhcflurry/blob/master/test/test_class1_binding_predictor_A0205.py) gives a simple example of how to train a predictor in Python. There is also a script called `mhcflurry-class1-allele-specific-cv-and-train` that will perform cross validation and model selection given a CSV file of training data. Try `mhcflurry-class1-allele-specific-cv-and-train --help` for details.
+See the [class1_allele_specific_models.ipynb](https://github.com/hammerlab/mhcflurry/blob/master/examples/class1_allele_specific_models.ipynb) notebook for an overview of the Python API, including predicting, fitting, and scoring models.
+
+There is also a script called `mhcflurry-class1-allele-specific-cv-and-train` that will perform cross validation and model selection given a CSV file of training data. Try `mhcflurry-class1-allele-specific-cv-and-train --help` for details.
 
 ## Details on the downloaded class I allele-specific models
 
