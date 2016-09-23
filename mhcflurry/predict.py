@@ -22,6 +22,9 @@ from .common import normalize_allele_name, UnsupportedAllele
 
 def predict(alleles, peptides, loaders=None):
     """
+    Make predictions across all combinations of the specified alleles and
+    peptides.
+
     Parameters
     ----------
     alleles : list of str
@@ -29,6 +32,9 @@ def predict(alleles, peptides, loaders=None):
 
     peptides : list of str
         Peptide amino acid sequences.
+
+    loaders : list of Class1AlleleSpecificPredictorLoader, optional
+        Loaders to try. Will be tried in the order given.
 
     Returns DataFrame with columns "Allele", "Peptide", and "Prediction"
     """
@@ -64,4 +70,3 @@ def predict(alleles, peptides, loaders=None):
             result_dict["Peptide"].append(peptides[i])
             result_dict["Prediction"].append(ic50)
     return pd.DataFrame(result_dict)
- 

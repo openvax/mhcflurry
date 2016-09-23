@@ -5,6 +5,10 @@ DEFAULT_BACKEND = None
 
 
 class ParallelBackend(object):
+    """
+    Thin wrapper of futures implementations. Designed to support
+    concurrent.futures as well as dask.distributed's workalike implementation.
+    """
     def __init__(self, executor, module, verbose=1):
         self.executor = executor
         self.module = module
@@ -33,6 +37,9 @@ class ParallelBackend(object):
 
 
 class DaskDistributedParallelBackend(ParallelBackend):
+    """
+    ParallelBackend that uses dask.distributed
+    """
     def __init__(self, scheduler_ip_and_port, verbose=1):
         from dask import distributed  # pylint: disable=import-error
         executor = distributed.Executor(scheduler_ip_and_port)
@@ -46,6 +53,10 @@ class DaskDistributedParallelBackend(ParallelBackend):
 
 
 class ConcurrentFuturesParallelBackend(ParallelBackend):
+    """
+    ParallelBackend that uses Python's concurrent.futures module.
+    Can use either threads or processes.
+    """
     def __init__(self, num_workers=1, processes=False, verbose=1):
         if processes:
             executor = futures.ProcessPoolExecutor(num_workers)

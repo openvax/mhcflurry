@@ -126,9 +126,9 @@ def cross_validation_folds(
     impute_kwargs : dict, optional
         Additional kwargs to pass to mhcflurry.Dataset.impute_missing_values.
 
-    n_jobs : integer, optional
-        The number of jobs to run in parallel. If -1, then the number of jobs
-        is set to the number of cores.
+    parallel_backend : mhcflurry.parallelism.ParallelBackend, optional
+        Futures implementation to use for running on multiple threads,
+        processes, or nodes
 
     Returns
     -----------

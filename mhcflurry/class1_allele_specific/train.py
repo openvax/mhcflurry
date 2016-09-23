@@ -259,7 +259,9 @@ def train_across_models_and_folds(
     return_predictors : boolean, optional
         Include the trained predictors in the result.
 
-    parallel_backend : parallel backend, optional
+    parallel_backend : mhcflurry.parallelism.ParallelBackend, optional
+        Futures implementation to use for running on multiple threads,
+        processes, or nodes
 
     Returns
     -----------
