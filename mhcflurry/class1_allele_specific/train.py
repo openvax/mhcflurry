@@ -28,11 +28,11 @@ import pandas
 
 import mhcflurry
 
-from joblib import Parallel, delayed
-
 from .scoring import make_scores
 from .class1_binding_predictor import Class1BindingPredictor
 from ..hyperparameters import HyperparameterDefaults
+from ..parallelism import get_default_backend
+
 
 TRAIN_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(impute=False)
 HYPERPARAMETER_DEFAULTS = (
@@ -239,9 +239,7 @@ def train_across_models_and_folds(
         cartesian_product_of_folds_and_models=True,
         return_predictors=False,
         folds_per_task=1,
-        n_jobs=1,
-        verbose=0,
-        pre_dispatch='2*n_jobs'):
+        parallel_backend=None):
     '''
     Train and optionally test any number of models across any number of folds.
 
@@ -261,24 +259,17 @@ def train_across_models_and_folds(
     return_predictors : boolean, optional
         Include the trained predictors in the result.
 
-    n_jobs : integer, optional
-        The number of jobs to run in parallel. If -1, then the number of jobs
-        is set to the number of cores.
-
-    verbose : integer, optional
-        The joblib verbosity. If non zero, progress messages are printed. Above
-        50, the output is sent to stdout. The frequency of the messages
-        increases with the verbosity level. If it more than 10, all iterations
-        are reported.
-
-    pre_dispatch : {"all", integer, or expression, as in "3*n_jobs"}
-        The number of joblib batches (of tasks) to be pre-dispatched. Default
-        is "2*n_jobs".
+    parallel_backend : mhcflurry.parallelism.ParallelBackend, optional
+        Futures implementation to use for running on multiple threads,
+        processes, or nodes
 
     Returns
     -----------
     pandas.DataFrame
     '''
+    if parallel_backend is None:
+        parallel_backend = get_default_backend()
+
     if cartesian_product_of_folds_and_models:
         tasks_per_model = int(math.ceil(float(len(folds)) / folds_per_task))
         fold_index_groups = [[] for _ in range(tasks_per_model)]
@@ -307,15 +298,16 @@ def train_across_models_and_folds(
     logging.info("Training %d architectures on %d folds = %d tasks." % (
         len(model_descriptions), len(folds), len(task_model_and_fold_indices)))
 
-    task_results = Parallel(
-        n_jobs=n_jobs,
-        verbose=verbose,
-        pre_dispatch=pre_dispatch)(
-        delayed(train_and_test_one_model)(
+    def train_and_test_one_model_task(model_and_fold_nums_pair):
+        (model_num, fold_nums) = model_and_fold_nums_pair
+        return train_and_test_one_model(
             model_descriptions[model_num],
             [folds[i] for i in fold_nums],
             return_predictor=return_predictors)
-        for (model_num, fold_nums) in task_model_and_fold_indices)
+
+    task_results = parallel_backend.map(
+        train_and_test_one_model_task,
+        task_model_and_fold_indices)
 
     logging.info("Done.")
 

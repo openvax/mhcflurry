@@ -31,7 +31,24 @@ From a checkout you can run the unit tests with:
 nosetests .
 ```
 
-## Making predictions
+## Making predictions from the command-line
+
+```shell
+$ mhcflurry-predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ
+Predicting for 2 alleles and 3 peptides = 6 predictions
+allele,peptide,mhcflurry_prediction
+HLA-A0201,SIINFEKL,10672.34765625
+HLA-A0201,SIINFEKD,26042.716796875
+HLA-A0201,SIINFEKQ,26375.794921875
+HLA-A0301,SIINFEKL,25532.703125
+HLA-A0301,SIINFEKD,24997.876953125
+HLA-A0301,SIINFEKQ,28262.828125
+```
+
+You can also specify the input and output as CSV files. Run `mhcflurry-predict -h` for details.
+
+
+## Making predictions from Python
 
 ```python
 from mhcflurry import predict
@@ -47,7 +64,9 @@ The predictions returned by `predict` are affinities (KD) in nM.
 
 ## Training your own models
 
-This [unit test](https://github.com/hammerlab/mhcflurry/blob/master/test/test_class1_binding_predictor_A0205.py) gives a simple example of how to train a predictor in Python. There is also a script called `mhcflurry-class1-allele-specific-cv-and-train` that will perform cross validation and model selection given a CSV file of training data. Try `mhcflurry-class1-allele-specific-cv-and-train --help` for details.
+See the [class1_allele_specific_models.ipynb](https://github.com/hammerlab/mhcflurry/blob/master/examples/class1_allele_specific_models.ipynb) notebook for an overview of the Python API, including predicting, fitting, and scoring models.
+
+There is also a script called `mhcflurry-class1-allele-specific-cv-and-train` that will perform cross validation and model selection given a CSV file of training data. Try `mhcflurry-class1-allele-specific-cv-and-train --help` for details.
 
 ## Details on the downloaded class I allele-specific models
 

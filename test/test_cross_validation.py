@@ -28,10 +28,7 @@ def test_imputation():
         n_folds=3,
         imputer=imputer,
         drop_similar_peptides=True,
-        alleles=["HLA-A0201", "HLA-A0202"],
-        n_jobs=2,
-        verbose=5,
-    )
+        alleles=["HLA-A0201", "HLA-A0202"])
 
     eq_(set(x.allele for x in folds), {"HLA-A0201", "HLA-A0202"})
     eq_(len(folds), 6)
@@ -70,11 +67,7 @@ def test_cross_validation_no_imputation():
         n_training_epochs=[3])
     print(models)
 
-    df = train_across_models_and_folds(
-        folds,
-        models,
-        n_jobs=2,
-        verbose=50)
+    df = train_across_models_and_folds(folds, models)
     print(df)
     assert df.test_auc.mean() > 0.6
 
@@ -92,10 +85,7 @@ def test_cross_validation_with_imputation():
         n_folds=3,
         imputer=imputer,
         drop_similar_peptides=True,
-        alleles=["HLA-A0201", "HLA-A0202"],
-        n_jobs=3,
-        verbose=5,
-    )
+        alleles=["HLA-A0201", "HLA-A0202"])
 
     eq_(set(x.allele for x in folds), {"HLA-A0201", "HLA-A0202"})
     eq_(len(folds), 6)
@@ -112,10 +102,6 @@ def test_cross_validation_with_imputation():
         n_training_epochs=[3])
     print(models)
 
-    df = train_across_models_and_folds(
-        folds,
-        models,
-        n_jobs=3,
-        verbose=5)
+    df = train_across_models_and_folds(folds, models)
     print(df)
     assert df.test_auc.mean() > 0.6

@@ -20,6 +20,10 @@ from collections import defaultdict
 import numpy as np
 
 
+class UnsupportedAllele(Exception):
+    pass
+
+
 def parse_int_list(s):
     return [int(part.strip()) for part in s.split(",")]
 

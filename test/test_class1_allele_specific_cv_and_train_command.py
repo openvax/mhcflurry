@@ -58,9 +58,9 @@ def test_small_run():
         "--out-production-results", join(temp_dir, "production.csv"),
         "--out-models", join(temp_dir, "models"),
         "--cv-num-folds", "2",
-        "--joblib-num-jobs", "1",
         "--alleles", "HLA-A0201", "HLA-A0301",
         "--verbose",
+        "--num-local-threads", "1",
     ]
     print("Running cv_and_train_command with args: %s " % str(args))
 

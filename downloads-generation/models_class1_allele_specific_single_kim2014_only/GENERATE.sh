@@ -9,7 +9,7 @@ fi
 set -e
 set -x
 
-DOWNLOAD_NAME=models_class1_allele_specific_single
+DOWNLOAD_NAME=models_class1_allele_specific_single_kim2014_only
 SCRATCH_DIR=/tmp/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
@@ -39,8 +39,9 @@ python models.py > models.json
 time mhcflurry-class1-allele-specific-cv-and-train \
     --model-architectures models.json \
     --imputer-description imputer.json \
-    --train-data "$(mhcflurry-downloads path data_combined_iedb_kim2014)/combined_human_class1_dataset.csv" \
-    --min-samples-per-allele 200 \
+    --train-data "$(mhcflurry-downloads path data_kim2014)/bdata.2009.mhci.public.1.txt" \
+    --test-data "$(mhcflurry-downloads path data_kim2014)/bdata.2013.mhci.public.blind.1.txt" \
+    --min-samples-per-allele 50 \
     --out-cv-results cv.csv \
     --out-production-results production.csv \
     --out-models models \

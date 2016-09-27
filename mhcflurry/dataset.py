@@ -70,7 +70,9 @@ class Dataset(object):
 
         for expected_column_name in {"allele", "peptide", "affinity"}:
             if expected_column_name not in columns:
-                raise ValueError("Missing column '%s' from DataFrame")
+                raise ValueError(
+                    "Missing column '%s' from DataFrame" %
+                    expected_column_name)
         # make allele and peptide columns the index, and copy it
         # so we can add a column without any observable side-effect in
         # the calling code
