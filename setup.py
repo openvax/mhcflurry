@@ -76,7 +76,7 @@ if __name__ == '__main__':
             'pandas>=0.13.1',
             'appdirs',
             'theano>=0.8.2',
-            'keras',
+            'keras==1.1.0',
             'fancyimpute>=0.0.12',
             'scikit-learn',
             'h5py',
