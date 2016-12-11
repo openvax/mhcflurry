@@ -13,7 +13,16 @@ The MHCflurry predictors are implemented in Python using [keras](https://keras.i
 
 ## Setup
 
-Install the package:
+To configure keras, the neural network library used by MHCflurry, you'll need to set an environment variable in your shell:
+
+```
+export KERAS_BACKEND=theano
+```
+
+If you're familiar with keras, you may also try using the tensorflow backend. MHCflurry is currently tested using theano, however.
+ 
+
+Now install the package:
 
 ```
 pip install mhcflurry
