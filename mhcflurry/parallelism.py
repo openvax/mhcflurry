@@ -36,6 +36,21 @@ class ParallelBackend(object):
         return [result_dict[future] for future in fs]
 
 
+class KubefaceParallelBackend(ParallelBackend):
+    """
+    ParallelBackend that uses kubeface
+    """
+    def __init__(self, args):
+        from kubeface import Client  # pylint: disable=import-error
+        self.client = Client.from_args(args)
+
+    def map(self, func, iterable):
+        return self.client.map(func, iterable)
+
+    def __str__(self):
+        return "<Kubeface backend, client=%s>" % self.client
+
+
 class DaskDistributedParallelBackend(ParallelBackend):
     """
     ParallelBackend that uses dask.distributed

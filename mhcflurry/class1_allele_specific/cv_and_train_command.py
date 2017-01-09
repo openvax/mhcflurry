@@ -169,6 +169,12 @@ parser.add_argument(
     default=False,
     help="Output more info")
 
+try:
+    import kubeface
+    kubeface.Client.add_args(parser)
+except ImportError:
+    logging.error("Kubeface support disabled, not installed.")
+
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
@@ -183,6 +189,8 @@ def run(argv=sys.argv[1:]):
     if args.dask_scheduler:
         backend = parallelism.DaskDistributedParallelBackend(
             args.dask_scheduler)
+    elif hasattr(args, 'storage_prefix') and args.storage_prefix:
+        backend = parallelism.KubefaceParallelBackend(args)
     else:
         if args.num_local_processes:
             backend = parallelism.ConcurrentFuturesParallelBackend(
