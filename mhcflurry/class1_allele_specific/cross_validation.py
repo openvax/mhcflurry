@@ -142,6 +142,7 @@ def cross_validation_folds(
         alleles = train_data.unique_alleles()
 
     result_folds = []
+    imputation_args = []
     for allele in alleles:
         logging.info("Allele: %s" % allele)
         cv_iter = train_data.cross_validation_iterator(
@@ -165,27 +166,30 @@ def cross_validation_folds(
                 test_split = full_test_split
 
             if imputer is not None:
-                imputation_future = parallel_backend.submit(
-                    impute_and_select_allele,
-                    all_allele_train_split,
+                base_args = dict(impute_kwargs)
+                base_args.update(dict(
+                    dataset=all_allele_train_split,
                     imputer=imputer,
-                    allele=allele,
-                    **impute_kwargs)
-            else:
-                imputation_future = None
+                    allele=allele))
+                imputation_args.append(base_args)
 
             train_split = all_allele_train_split.get_allele(allele)
             fold = AlleleSpecificTrainTestFold(
+                imputed_train=None,  # updated later
                 allele=allele,
                 train=train_split,
-                imputed_train=imputation_future,
                 test=test_split)
             result_folds.append(fold)
 
-    return [
-        result_fold._replace(imputed_train=(
-            result_fold.imputed_train.result()
-            if result_fold.imputed_train is not None
-            else None))
-        for result_fold in result_folds
-    ]
+    if imputation_args:
+        assert len(imputation_args) == len(result_folds)
+        imputation_results = parallel_backend.map(
+            lambda kwargs: impute_and_select_allele(**kwargs),
+            imputation_args)
+
+        return [
+            result_fold._replace(imputed_train=imputation_result)
+            for (result_fold, imputation_result) in zip(
+                result_folds, imputation_results)
+        ]
+    return result_fold
