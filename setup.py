@@ -21,7 +21,7 @@ from setuptools import setup
 
 # normally we would import six.PY2 but can't yet assume that six
 # is installed here
-PY2 = sys.version_info < (3, 0)
+PY2 = (sys.version_info.major == 2)
 
 readme_dir = os.path.dirname(__file__)
 readme_filename = os.path.join(readme_dir, 'README.md')
