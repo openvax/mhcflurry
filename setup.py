@@ -15,8 +15,13 @@
 import os
 import logging
 import re
+import sys
 
 from setuptools import setup
+
+# normally we would import six.PY2 but can't yet assume that six
+# is installed here
+PY2 = sys.version_info < (3, 0)
 
 readme_dir = os.path.dirname(__file__)
 readme_filename = os.path.join(readme_dir, 'README.md')
@@ -43,6 +48,25 @@ with open('mhcflurry/package_metadata.py', 'r') as f:
         re.MULTILINE).group(1)
 
 if __name__ == '__main__':
+    required_packages = [
+        'numpy>=1.11',
+        'pandas>=0.13.1',
+        'appdirs',
+        'theano>=0.8.2',
+        'keras==1.1.0',
+        'fancyimpute>=0.0.12',
+        'scikit-learn',
+        'h5py',
+        'typechecks',
+        'pepdata',
+        'bottle',
+        'six',
+    ]
+    if PY2:
+        # concurrent.futures is a standard library in Py3 but Py2
+        # requires this backport
+        required_packages.append('futures')
+
     setup(
         name='mhcflurry',
         version=version,
@@ -71,21 +95,7 @@ if __name__ == '__main__':
         package_data={
             'mhcflurry': ['downloads.yml'],
         },
-        install_requires=[
-            'numpy>=1.11',
-            'pandas>=0.13.1',
-            'appdirs',
-            'theano>=0.8.2',
-            'keras==1.1.0',
-            'fancyimpute>=0.0.12',
-            'scikit-learn',
-            'h5py',
-            'typechecks',
-            'pepdata',
-            'futures',
-            'bottle',
-            'six',
-        ],
+        install_requires=required_packages,
         long_description=readme,
         packages=['mhcflurry', 'mhcflurry.class1_allele_specific'],
     )
