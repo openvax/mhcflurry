@@ -122,8 +122,19 @@ def run(argv=sys.argv[1:]):
             parser.error(
                 "Specify either an input CSV file or both the "
                 "--alleles and --peptides arguments")
-
-        pairs = list(itertools.product(args.alleles, args.peptides))
+        # split user specified allele and peptide strings in case they
+        # contain multiple entries separated by commas
+        alleles = []
+        for allele_string in args.alleles:
+            alleles.extend([s.strip() for s in allele_string.split(",")])
+        peptides = []
+        for peptide in args.peptides:
+            peptides.extend(peptide.strip() for p in peptide.split(","))
+        for peptide in peptides:
+            if not peptide.isalpha():
+                raise ValueError(
+                    "Unexpected character(s) in peptide '%s'" % peptide)
+        pairs = list(itertools.product(alleles, peptides))
         df = pandas.DataFrame({
             "allele": [p[0] for p in pairs],
             "peptide": [p[1] for p in pairs],
