@@ -11,10 +11,13 @@ To generate this download we run:
 ```
 # If you are running dask distributed using our kubernetes config, you can use the DASK_IP one liner below.
 # Otherwise, just set it to the IP of the dask scheduler.
-DASK_IP=$(kubectl get service | grep daskd-scheduler | tr -s ' ' | cut -d ' ' -f 3)
 ./GENERATE.sh \
-    --joblib-num-jobs 100 \
-    --joblib-pre-dispatch all \
     --cv-folds-per-task 10 \
-    --dask-scheduler $DASK_IP:8786
+    --backend kubernetes \
+    --storage-prefix gs://kubeface \
+    --worker-image hammerlab/mhcflurry:latest \
+    --kubernetes-task-resources-memory-mb 10000 \
+    --worker-path-prefix venv-py3/bin \
+    --max-simultaneous-tasks 200 \
+
 ```
