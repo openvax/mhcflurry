@@ -92,6 +92,17 @@ To see the cross validation results:
 ```
 open "$(mhcflurry-downloads path models_class1_allele_specific_single)/cv.csv"
 ```
+## Problems and Solutions
+
+###  undefined symbol
+If you get an error like:
+
+```
+ImportError: _CVXcanon.cpython-35m-x86_64-linux-gnu.so: undefined symbol: _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEED1Ev
+```
+
+Try installing cvxpy using conda instead of pip.
+
 
 ## Environment variables
 
