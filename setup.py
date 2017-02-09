@@ -41,7 +41,7 @@ except:
     pass
 
 
-with open('mhcflurry/package_metadata.py', 'r') as f:
+with open('mhcflurry/__init__.py', 'r') as f:
     version = re.search(
         r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
         f.read(),
