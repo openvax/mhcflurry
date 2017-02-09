@@ -15,8 +15,9 @@
 from .class1_allele_specific.class1_binding_predictor import (
     Class1BindingPredictor)
 from .predict import predict
-from .package_metadata import __version__
 from . import parallelism
+
+__version__ = "0.2.0"
 
 __all__ = [
     "Class1BindingPredictor",
