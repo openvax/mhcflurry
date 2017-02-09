@@ -14,6 +14,7 @@ class ParallelBackend(object):
         self.module = module
         self.verbose = verbose
 
+
 class KubefaceParallelBackend(ParallelBackend):
     """
     ParallelBackend that uses kubeface

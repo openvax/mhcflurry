@@ -192,4 +192,4 @@ def cross_validation_folds(
             for (result_fold, imputation_result) in zip(
                 result_folds, imputation_results)
         ]
-    return result_fold
+    return result_folds
