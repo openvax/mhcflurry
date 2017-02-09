@@ -1,5 +1,6 @@
-from concurrent import futures
 import logging
+from six import PY2
+from concurrent import futures
 
 DEFAULT_BACKEND = None
 

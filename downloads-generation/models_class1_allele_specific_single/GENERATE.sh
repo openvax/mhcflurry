@@ -25,9 +25,9 @@ exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 
 # Log some environment info
 date
-pip freeze
-git rev-parse HEAD
-git status
+# pip freeze
+# git rev-parse HEAD
+# git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
