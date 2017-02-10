@@ -187,6 +187,9 @@ def cross_validation_folds(
             lambda kwargs: impute_and_select_allele(**kwargs),
             imputation_args)
 
+        # Here _replace is a method on named tuples that returns a new named
+        # tuple with the specified key set to the given value and all other key/
+        # values the same as the original.
         return [
             result_fold._replace(imputed_train=imputation_result)
             for (result_fold, imputation_result) in zip(
