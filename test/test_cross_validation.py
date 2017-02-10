@@ -77,7 +77,7 @@ def test_cross_validation_with_imputation():
         n_imputations=2, n_burn_in=1, n_nearest_columns=25)
     train_data = (
         mhcflurry.dataset.Dataset.from_csv(
-            get_path("data_kim2014" , "bdata.2009.mhci.public.1.txt"))
+            get_path("data_kim2014", "bdata.2009.mhci.public.1.txt"))
         .get_alleles(["HLA-A0201", "HLA-A0202", "HLA-A0301"]))
 
     folds = cross_validation_folds(

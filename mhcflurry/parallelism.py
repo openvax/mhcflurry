@@ -14,10 +14,31 @@ class ParallelBackend(object):
         self.module = module
         self.verbose = verbose
 
-    def submit(self, func, *args, **kwargs):
-        if self.verbose > 0:
-            logging.debug("Submitting: %s %s %s" % (func, args, kwargs))
-        return self.executor.submit(func, *args, **kwargs)
+
+class KubefaceParallelBackend(ParallelBackend):
+    """
+    ParallelBackend that uses kubeface
+    """
+    def __init__(self, args):
+        from kubeface import Client  # pylint: disable=import-error
+        self.client = Client.from_args(args)
+
+    def map(self, func, iterable):
+        return self.client.map(func, iterable)
+
+    def __str__(self):
+        return "<Kubeface backend, client=%s>" % self.client
+
+
+class DaskDistributedParallelBackend(ParallelBackend):
+    """
+    ParallelBackend that uses dask.distributed
+    """
+    def __init__(self, scheduler_ip_and_port, verbose=1):
+        from dask import distributed  # pylint: disable=import-error
+        executor = distributed.Executor(scheduler_ip_and_port)
+        ParallelBackend.__init__(self, executor, distributed, verbose=verbose)
+        self.scheduler_ip_and_port = scheduler_ip_and_port
 
     def map(self, func, iterable):
         fs = [
@@ -34,17 +55,6 @@ class ParallelBackend(object):
             result_dict[finished_future] = result
 
         return [result_dict[future] for future in fs]
-
-
-class DaskDistributedParallelBackend(ParallelBackend):
-    """
-    ParallelBackend that uses dask.distributed
-    """
-    def __init__(self, scheduler_ip_and_port, verbose=1):
-        from dask import distributed  # pylint: disable=import-error
-        executor = distributed.Executor(scheduler_ip_and_port)
-        ParallelBackend.__init__(self, executor, distributed, verbose=verbose)
-        self.scheduler_ip_and_port = scheduler_ip_and_port
 
     def __str__(self):
         return "<Dask distributed backend, scheduler=%s, total_cores=%d>" % (
@@ -69,6 +79,22 @@ class ConcurrentFuturesParallelBackend(ParallelBackend):
     def __str__(self):
         return "<Concurrent futures %s parallel backend, num workers = %d>" % (
             ("processes" if self.processes else "threads"), self.num_workers)
+
+    def map(self, func, iterable):
+        fs = [
+            self.executor.submit(func, arg) for arg in iterable
+        ]
+        return self.wait(fs)
+
+    def wait(self, fs):
+        result_dict = {}
+        for finished_future in self.module.as_completed(fs):
+            result = finished_future.result()
+            logging.info("%3d / %3d tasks completed" % (
+                len(result_dict), len(fs)))
+            result_dict[finished_future] = result
+
+        return [result_dict[future] for future in fs]
 
 
 def set_default_backend(backend):

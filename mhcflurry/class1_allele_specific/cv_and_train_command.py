@@ -169,6 +169,12 @@ parser.add_argument(
     default=False,
     help="Output more info")
 
+try:
+    import kubeface
+    kubeface.Client.add_args(parser)
+except ImportError:
+    logging.error("Kubeface support disabled, not installed.")
+
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
@@ -183,6 +189,8 @@ def run(argv=sys.argv[1:]):
     if args.dask_scheduler:
         backend = parallelism.DaskDistributedParallelBackend(
             args.dask_scheduler)
+    elif hasattr(args, 'storage_prefix') and args.storage_prefix:
+        backend = parallelism.KubefaceParallelBackend(args)
     else:
         if args.num_local_processes:
             backend = parallelism.ConcurrentFuturesParallelBackend(
@@ -306,23 +314,24 @@ def go(args):
     logging.info("")
     train_folds = []
     train_models = []
+    imputation_args_list = []
+    best_architectures = []
     for (allele_num, allele) in enumerate(cv_results.allele.unique()):
         best_index = best_architectures_by_allele[allele]
         architecture = model_architectures[best_index]
+        best_architectures.append(architecture)
         train_models.append(architecture)
         logging.info(
             "Allele: %s best architecture is index %d: %s" %
             (allele, best_index, architecture))
 
         if architecture['impute']:
-            imputation_future = backend.submit(
-                impute_and_select_allele,
-                train_data,
+            imputation_args = dict(impute_kwargs)
+            imputation_args.update(dict(
+                dataset=train_data,
                 imputer=imputer,
-                allele=allele,
-                **impute_kwargs)
-        else:
-            imputation_future = None
+                allele=allele))
+            imputation_args_list.append(imputation_args)
 
         test_data_this_allele = None
         if test_data is not None:
@@ -330,25 +339,26 @@ def go(args):
         fold = AlleleSpecificTrainTestFold(
             allele=allele,
             train=train_data.get_allele(allele),
-
-            # Here we set imputed_train to the imputation *task* if
-            # imputation was used on this fold. We set this to the actual
-            # imputed training dataset a few lines farther down. This
-            # complexity is because we want to be able to parallelize
-            # the imputations so we have to queue up the tasks first.
-            # If we are not doing imputation then the imputation_task
-            # is None.
-            imputed_train=imputation_future,
+            imputed_train=None,
             test=test_data_this_allele)
         train_folds.append(fold)
 
-    train_folds = [
-        result_fold._replace(imputed_train=(
-            result_fold.imputed_train.result()
-            if result_fold.imputed_train is not None
-            else None))
-        for result_fold in train_folds
-    ]
+    if imputation_args_list:
+        imputation_results = list(backend.map(
+            lambda kwargs: impute_and_select_allele(**kwargs),
+            imputation_args_list))
+
+        new_train_folds = []
+        for (best_architecture, train_fold) in zip(
+                best_architectures, train_folds):
+            imputed_train = None
+            if best_architecture['impute']:
+                imputed_train = imputation_results.pop(0)
+            new_train_folds.append(
+                train_fold._replace(imputed_train=imputed_train))
+        assert not imputation_results
+
+        train_folds = new_train_folds
 
     logging.info("Training %d production models" % len(train_folds))
     start = time.time()
