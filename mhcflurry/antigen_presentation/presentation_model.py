@@ -12,13 +12,8 @@ from sklearn.linear_model import LogisticRegression
 
 from ..common import assert_no_null, drop_nulls_and_warn
 
-EVAL_CONTEXT = {
-    'log': numpy.log,
-    'exp': numpy.exp,
-}
 
-
-def build_presentation_models_from_formulas(term_dict, formulas, **kwargs):
+def build_presentation_models(term_dict, formulas, **kwargs):
     """
     Convenience function for creating multiple final models based on
     shared terms.
@@ -164,14 +159,16 @@ class PresentationModel(object):
         self.fit_experiments = set(hits_df.experiment_name.unique())
 
         if self.component_models_require_fitting and not self.ensemble_size:
-            print("Using 2-fold fit.")
             # Use two fold CV to train model inputs then final models.
             cv = StratifiedKFold(
                 n_splits=2, shuffle=True, random_state=self.random_state)
 
             self.trained_component_models = []
             self.presentation_models_predictors = []
+            fold_num = 1
             for (fold1, fold2) in cv.split(hits_df, hits_df.experiment_name):
+                print("Two fold fit: fitting fold %d" % fold_num)
+                fold_num += 1
                 assert len(fold1) > 0
                 assert len(fold2) > 0
                 model_input_training_hits_df = hits_df.iloc[fold1]
@@ -282,7 +279,9 @@ class PresentationModel(object):
     def evaluate_expressions(self, input_df):
         result = pandas.DataFrame()
         for expression in self.feature_expressions:
-            values = eval(expression, EVAL_CONTEXT, input_df)
+            # We use numpy module as globals here so math functions
+            # like log, log1p, exp, are in scope.
+            values = eval(expression, numpy.__dict__, input_df)
             assert len(values) == len(input_df), expression
             if hasattr(values, 'values'):
                 values = values.values

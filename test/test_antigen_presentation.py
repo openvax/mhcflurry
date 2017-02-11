@@ -1,11 +1,16 @@
 from nose.tools import eq_, assert_less
 
 import numpy
-from numpy import testing
 import pandas
 from mhcflurry import amino_acid
-from mhcflurry.antigen_presentation import presentation_component_models
+from mhcflurry.antigen_presentation import (
+    decoy_strategies,
+    presentation_component_models,
+    presentation_model)
 
+
+######################
+# Helper functions
 
 def make_random_peptides(num, length=9):
     return [
@@ -15,6 +20,14 @@ def make_random_peptides(num, length=9):
             amino_acid.common_amino_acid_letters, size=(num, length))
     ]
 
+
+def hit_criterion(experiment_name, peptide):
+    # Peptides with 'A' are always hits. Easy for model to learn.
+    return 'A' in peptide
+
+
+######################
+# Small test dataset
 
 PEPTIDES = make_random_peptides(100, 9)
 
@@ -42,11 +55,6 @@ PEPTIDES_AND_TRANSCRIPTS_DF = TRANSCIPTS_DF.stack().to_frame().reset_index()
 PEPTIDES_AND_TRANSCRIPTS_DF.columns = ["peptide", "group", "transcript"]
 del PEPTIDES_AND_TRANSCRIPTS_DF["group"]
 
-
-def hit_criterion(experiment_name, peptide):
-    return 'A' in peptide
-
-
 PEPTIDES_DF = pandas.DataFrame({"peptide": PEPTIDES})
 PEPTIDES_DF["experiment_name"] = "exp1"
 PEPTIDES_DF["hit"] = [
@@ -58,9 +66,12 @@ PEPTIDES_DF["hit"] = [
 HITS_DF = PEPTIDES_DF.ix[PEPTIDES_DF.hit].reset_index().copy()
 del HITS_DF["hit"]
 
+######################
+# Tests
+
 
 def test_mhcflurry_trained_on_hits():
-    model = presentation_component_models.MHCflurryTrainedOnHits(
+    mhcflurry_model = presentation_component_models.MHCflurryTrainedOnHits(
         "basic",
         experiment_to_alleles=EXPERIMENT_TO_ALLELES,
         experiment_to_expression_group=EXPERIMENT_TO_EXPRESSION_GROUP,
@@ -68,10 +79,10 @@ def test_mhcflurry_trained_on_hits():
         peptides_and_transcripts=PEPTIDES_AND_TRANSCRIPTS_DF,
         random_peptides_for_percent_rank=make_random_peptides(10000, 9),
     )
-    model.fit(HITS_DF)
+    mhcflurry_model.fit(HITS_DF)
 
     peptides = PEPTIDES_DF.copy()
-    predictions = model.predict(peptides)
+    predictions = mhcflurry_model.predict(peptides)
     peptides["affinity"] = predictions["mhcflurry_basic_affinity"]
     peptides["percent_rank"] = predictions["mhcflurry_basic_percentile_rank"]
     assert_less(
@@ -80,3 +91,39 @@ def test_mhcflurry_trained_on_hits():
     assert_less(
         peptides.percent_rank[peptides.hit].mean(),
         peptides.percent_rank[~peptides.hit].mean())
+
+
+def test_presentation_model():
+    mhcflurry_model = presentation_component_models.MHCflurryTrainedOnHits(
+        "basic",
+        experiment_to_alleles=EXPERIMENT_TO_ALLELES,
+        experiment_to_expression_group=EXPERIMENT_TO_EXPRESSION_GROUP,
+        transcripts=TRANSCIPTS_DF,
+        peptides_and_transcripts=PEPTIDES_AND_TRANSCRIPTS_DF,
+        random_peptides_for_percent_rank=make_random_peptides(10000, 9),
+    )
+
+    decoys = decoy_strategies.UniformRandom(
+        make_random_peptides(10000, 9),
+        decoys_per_hit=50)
+
+    terms = {
+        'A_ms': (
+            [mhcflurry_model],
+            ["log1p(mhcflurry_basic_affinity)"]),
+    }
+
+    models = presentation_model.build_presentation_models(
+        terms,
+        ["A_ms"],
+        decoy_strategy=decoys)
+    eq_(len(models), 1)
+
+    model = models["A_ms"]
+    model.fit(HITS_DF.ix[HITS_DF.experiment_name == "exp1"])
+
+    peptides = PEPTIDES_DF.copy()
+    peptides["prediction"] = model.predict(peptides)
+    assert_less(
+        peptides.prediction[~peptides.hit].mean(),
+        peptides.prediction[peptides.hit].mean())

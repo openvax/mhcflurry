@@ -165,7 +165,8 @@ class MHCflurryTrainedOnHits(PresentationComponentModel):
         (allele,) = alleles
         mhcflurry_allele = normalize_allele_name(allele)
         assert allele not in self.allele_to_model, \
-            "TODO: Support training on >1 experiments with same allele"
+            "TODO: Support training on >1 experiments with same allele " \
+            + str(self.allele_to_model)
 
         extra_hits = hit_list = set(hit_list)
 
@@ -237,18 +238,22 @@ class MHCflurryTrainedOnHits(PresentationComponentModel):
     def predict_for_experiment(self, experiment_name, peptides):
         assert self.allele_to_model is not None, "Must fit first"
 
+        peptides_deduped = pandas.unique(peptides)
+        print(len(peptides_deduped))
+
         alleles = self.experiment_to_alleles[experiment_name]
-        predictions = pandas.DataFrame(index=peptides)
+        predictions = pandas.DataFrame(index=peptides_deduped)
         for allele in alleles:
             predictions[allele] = self.predict_affinity_for_allele(
-                allele, peptides)
+                allele, peptides_deduped)
 
         result = {
-            self.column_name_affinity(): predictions.min(axis=1).values
+            self.column_name_affinity(): (
+                predictions.min(axis=1).ix[peptides].values)
         }
         if self.percent_rank_transforms is not None:
             self.fit_percentile_rank_if_needed(alleles)
-            percentile_ranks = pandas.DataFrame(index=peptides)
+            percentile_ranks = pandas.DataFrame(index=peptides_deduped)
             for allele in alleles:
                 percentile_ranks[allele] = (
                     self.percent_rank_transforms[allele]
@@ -256,10 +261,13 @@ class MHCflurryTrainedOnHits(PresentationComponentModel):
             result[self.column_name_percentile_rank()] = (
                 percentile_ranks.min(axis=1).ix[peptides].values)
         assert all(len(x) == len(peptides) for x in result.values()), (
-            "Result lengths don't match peptide lengths. %s:\n%s" % (
+            "Result lengths don't match peptide lengths. peptides=%d, "
+            "peptides_deduped=%d, %s" % (
+                len(peptides),
+                len(peptides_deduped),
                 ", ".join(
-                    "%s=%d" % (key, value) for (key, value) in result.items()),
-                result))
+                    "%s=%d" % (key, len(value))
+                    for (key, value) in result.items())))
         return result
 
     def get_fit(self):
