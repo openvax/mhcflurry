@@ -24,7 +24,7 @@ class PercentRankTransform(object):
         self.cdf[0] = 0.0
         self.cdf[1] = 0.0
         self.cdf[-1] = 100.0
-        numpy.cumsum(hist / numpy.sum(hist) * 100.0, out=self.cdf[2:-1])
+        numpy.cumsum(hist * 100.0 / numpy.sum(hist), out=self.cdf[2:-1])
         assert not numpy.isnan(self.cdf).any()
 
     def transform(self, values):

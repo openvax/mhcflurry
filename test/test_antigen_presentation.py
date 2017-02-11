@@ -1,7 +1,7 @@
 from nose.tools import eq_, assert_less
 
 import numpy
-from numpy.testing import assert_almost_equal
+from numpy.testing import assert_allclose
 import pandas
 from mhcflurry import amino_acid
 from mhcflurry.antigen_presentation import (
@@ -76,9 +76,10 @@ del HITS_DF["hit"]
 def test_percent_rank_transform():
     model = percent_rank_transform.PercentRankTransform()
     model.fit(numpy.arange(1000))
-    assert_almost_equal(
+    assert_allclose(
         model.transform([-2, 0, 50, 100, 2000]),
-        [0.0, 0.0, 5.0, 10.0, 100.0])
+        [0.0, 0.0, 5.0, 10.0, 100.0],
+        err_msg=str(model.__dict__))
 
 
 def test_mhcflurry_trained_on_hits():
