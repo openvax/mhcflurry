@@ -1,10 +1,12 @@
 from nose.tools import eq_, assert_less
 
 import numpy
+from numpy.testing import assert_almost_equal
 import pandas
 from mhcflurry import amino_acid
 from mhcflurry.antigen_presentation import (
     decoy_strategies,
+    percent_rank_transform,
     presentation_component_models,
     presentation_model)
 
@@ -62,12 +64,21 @@ PEPTIDES_DF["hit"] = [
     for _, row in
     PEPTIDES_DF.iterrows()
 ]
+print("Hit rate: %0.3f" % PEPTIDES_DF.hit.mean())
 
 HITS_DF = PEPTIDES_DF.ix[PEPTIDES_DF.hit].reset_index().copy()
 del HITS_DF["hit"]
 
 ######################
 # Tests
+
+
+def test_percent_rank_transform():
+    model = percent_rank_transform.PercentRankTransform()
+    model.fit(numpy.arange(1000))
+    assert_almost_equal(
+        model.transform([-2, 0, 50, 100, 2000]),
+        [0.0, 0.0, 5.0, 10.0, 100.0])
 
 
 def test_mhcflurry_trained_on_hits():
@@ -100,11 +111,11 @@ def test_presentation_model():
         experiment_to_expression_group=EXPERIMENT_TO_EXPRESSION_GROUP,
         transcripts=TRANSCIPTS_DF,
         peptides_and_transcripts=PEPTIDES_AND_TRANSCRIPTS_DF,
-        random_peptides_for_percent_rank=make_random_peptides(10000, 9),
+        random_peptides_for_percent_rank=make_random_peptides(1000, 9),
     )
 
     decoys = decoy_strategies.UniformRandom(
-        make_random_peptides(10000, 9),
+        make_random_peptides(1000, 9),
         decoys_per_hit=50)
 
     terms = {

@@ -53,7 +53,7 @@ class PresentationComponentModel(object):
         """
         raise NotImplementedError(str(self))
 
-    def clone_and_fit(self, peptides_df):
+    def clone_and_fit(self, hits_df):
         """
         Clone the object and fit to given dataset with a weakref cache.
         """
@@ -65,12 +65,12 @@ class PresentationComponentModel(object):
             result = None
         else:
             key = dataframe_cryptographic_hash(
-                peptides_df[["experiment_name", "peptide"]])
+                hits_df[["experiment_name", "peptide"]])
             result = self.cached_fits.get(key)
         if result is None:
             print("Cache miss in clone_and_fit: %s" % str(self))
             result = self.clone()
-            result.fit(peptides_df)
+            result.fit(hits_df)
             if self.cached_fits is not None:
                 self.cached_fits[key] = result
         else:
@@ -228,6 +228,9 @@ class PresentationComponentModel(object):
         if self.cached_predictions is not None:
             self.cached_predictions[cache_key] = return_value
         return return_value
+
+    def fit_ensemble_and_predict(peptides_df):
+        raise NotImplementedError
 
     def reset_cache(self):
         for key in PresentationComponentModel.cache_fields:

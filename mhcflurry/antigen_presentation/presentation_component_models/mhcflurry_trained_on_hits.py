@@ -144,6 +144,8 @@ class MHCflurryTrainedOnHits(PresentationComponentModel):
     def fit(self, hits_df):
         assert 'experiment_name' in hits_df.columns
         assert 'peptide' in hits_df.columns
+        if 'hit' in hits_df.columns:
+            assert (hits_df.hit == 1).all()
 
         grouped = hits_df.groupby("experiment_name")
         for (experiment_name, sub_df) in grouped:

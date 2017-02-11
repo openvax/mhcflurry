@@ -321,7 +321,6 @@ class PresentationModel(object):
         assert len(self.presentation_models_predictors) == \
             len(self.trained_component_models)
 
-        # peptides_df = peptides_df.reset_index(drop=True)
         prediction_cols = []
         presentation_model_predictions = {}
         zipped = enumerate(
@@ -343,20 +342,6 @@ class PresentationModel(object):
             x_df = self.evaluate_expressions(df)
             assert_no_null(x_df)
 
-            """
-            with pandas.option_context('mode.use_inf_as_null', True):
-                null_x = x_df.ix[x_df.isnull().sum(axis=1) > 0]
-                if len(null_x) > 0:
-                    null_x = null_x.copy()
-                    null_x["peptide"] = peptides_df.ix[null_x.index, "peptide"]
-                    null_x["experiment_name"] = peptides_df.ix[
-                        null_x.index, "experiment_name"
-                    ]
-                    raise ValueError(
-                        "Null values in features:\n%s\ninputs:\n%s" % (
-                            str(null_x), str(df.iloc[null_x.index])))
-            """
-
             prediction_col = "Prediction (Model %d)" % (i + 1)
             assert prediction_col not in presentation_model_predictions
             presentation_model_predictions[prediction_col] = (
@@ -370,7 +355,10 @@ class PresentationModel(object):
             del presentation_model_predictions[prediction_cols[0]]
         else:
             presentation_model_predictions["Prediction"] = numpy.mean(
-                [presentation_model_predictions[col] for col in prediction_cols],
+                [
+                    presentation_model_predictions[col]
+                    for col in prediction_cols
+                ],
                 axis=0)
 
         return pandas.DataFrame(presentation_model_predictions)
