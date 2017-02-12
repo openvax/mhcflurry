@@ -265,7 +265,7 @@ class PresentationModel(object):
 
         for sub_model in component_models:
             predictions = sub_model.predict(hits_and_decoys_df)
-            for (col, values) in predictions.items():
+            for (col, values) in predictions.iteritems():
                 hits_and_decoys_df[col] = values
 
         (x, y) = self.make_features_and_target(hits_and_decoys_df)
