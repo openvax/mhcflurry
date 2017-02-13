@@ -334,7 +334,7 @@ class PresentationModel(object):
                 predictions = sub_model.predict(peptides_df)
                 print("Input '%s' generated %d predictions in %0.2f sec." % (
                     sub_model, len(peptides_df), (time.time() - start_t)))
-                for (col, values) in predictions.items():
+                for (col, values) in predictions.iteritems():
                     values = pandas.Series(values)
                     assert_no_null(values)
                     df[col] = values
