@@ -2,7 +2,7 @@ import logging
 from copy import copy
 
 import pandas
-import numpy
+from numpy import log, exp, nanmean, array
 
 from ...dataset import Dataset
 from ...class1_allele_specific import Class1BindingPredictor
@@ -113,8 +113,18 @@ class MHCflurryTrainedOnHits(PresentationComponentModel):
             self.random_peptides_for_percent_rank = None
         else:
             self.percent_rank_transforms = {}
-            self.random_peptides_for_percent_rank = numpy.array(
+            self.random_peptides_for_percent_rank = array(
                 random_peptides_for_percent_rank)
+
+    def combine_ensemble_predictions(self, column_name, values):
+        # Geometric mean
+        return exp(nanmean(log(values), axis=1))
+
+    def stratification_groups(self, hits_df):
+        return [
+            self.experiment_to_alleles[e][0]
+            for e in hits_df.experiment_name
+        ]
 
     def column_name_affinity(self):
         return "mhcflurry_%s_affinity" % self.predictor_name

@@ -48,6 +48,12 @@ class PresentationComponentModel(object):
         self.__dict__.update(state)
         self.reset_cache()
 
+    def combine_ensemble_predictions(self, column_name, values):
+        return numpy.nanmean(values, axis=1)
+
+    def stratification_groups(self, hits_df):
+        return hits_df.experiment_name
+
     def column_names(self):
         """
         Names for the values this final model input emits.
@@ -113,7 +119,7 @@ class PresentationComponentModel(object):
 
     def fit(self, hits_df):
         """
-        Train the final model input.
+        Train the model.
 
         Parameters
         -----------
@@ -228,9 +234,6 @@ class PresentationComponentModel(object):
         if self.cached_predictions is not None:
             self.cached_predictions[cache_key] = return_value
         return return_value
-
-    def fit_ensemble_and_predict(self, peptides_df):
-        raise NotImplementedError
 
     def clone(self):
         """

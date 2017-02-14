@@ -125,17 +125,19 @@ def test_presentation_model():
             ["log1p(mhcflurry_basic_affinity)"]),
     }
 
-    models = presentation_model.build_presentation_models(
-        terms,
-        ["A_ms"],
-        decoy_strategy=decoys)
-    eq_(len(models), 1)
+    for kwargs in [{}, {'ensemble_size': 6}]:
+        models = presentation_model.build_presentation_models(
+            terms,
+            ["A_ms"],
+            decoy_strategy=decoys,
+            **kwargs)
+        eq_(len(models), 1)
 
-    model = models["A_ms"]
-    model.fit(HITS_DF.ix[HITS_DF.experiment_name == "exp1"])
+        model = models["A_ms"]
+        model.fit(HITS_DF.ix[HITS_DF.experiment_name == "exp1"])
 
-    peptides = PEPTIDES_DF.copy()
-    peptides["prediction"] = model.predict(peptides)
-    assert_less(
-        peptides.prediction[~peptides.hit].mean(),
-        peptides.prediction[peptides.hit].mean())
+        peptides = PEPTIDES_DF.copy()
+        peptides["prediction"] = model.predict(peptides)
+        assert_less(
+            peptides.prediction[~peptides.hit].mean(),
+            peptides.prediction[peptides.hit].mean())

@@ -212,15 +212,17 @@ def raise_or_debug(exception):
 
 def assert_no_null(df, message=''):
     """
-    Raise an assertino error if the given DataFrame has any nan or inf values.
+    Raise an assertion error if the given DataFrame has any nan or inf values.
     """
-    # start = time.time()
-    with pandas.option_context('mode.use_inf_as_null', True):
-        if df.count().sum() != df.size:
-            raise_or_debug(
-                AssertionError(
-                    "%s %s" % (message, describe_nulls(df))))
-    # print("Null check completed in %0.2f sec" % (time.time() - start))
+    if hasattr(df, 'count'):
+        with pandas.option_context('mode.use_inf_as_null', True):
+            failed = df.count().sum() != df.size
+    else:
+        failed = np.isnan(df).sum() > 0
+    if failed:
+        raise_or_debug(
+            AssertionError(
+                "%s %s" % (message, describe_nulls(df))))
 
 
 def drop_nulls_and_warn(df, related_df_with_same_index_to_describe=None):
