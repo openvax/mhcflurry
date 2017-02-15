@@ -22,10 +22,11 @@ def cache_dict_for_policy(policy):
 
 class PresentationComponentModel(object):
     '''
-    Base class for inputs to a "final model". By "final model" we mean
-    something like a logistic regression model that takes as input expression,
-    mhc binding affinity, cleavage, etc. By "final model input" we mean
-    the predictors for expression, mhc binding affinity, etc.
+    Base class for component models to a presentation model.
+
+    The component models are things like mhc binding affinity and cleavage,
+    and the presentation model is typically a logistic regression model
+    over these.
     '''
     def __init__(
             self, fit_cache_policy="weak", predictions_cache_policy="weak"):

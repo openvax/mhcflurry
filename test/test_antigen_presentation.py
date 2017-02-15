@@ -1,7 +1,9 @@
+import pickle
+
 from nose.tools import eq_, assert_less
 
 import numpy
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 import pandas
 from mhcflurry import amino_acid
 from mhcflurry.antigen_presentation import (
@@ -9,6 +11,8 @@ from mhcflurry.antigen_presentation import (
     percent_rank_transform,
     presentation_component_models,
     presentation_model)
+
+from mhcflurry.amino_acid import common_amino_acid_letters
 
 
 ######################
@@ -31,7 +35,8 @@ def hit_criterion(experiment_name, peptide):
 ######################
 # Small test dataset
 
-PEPTIDES = make_random_peptides(100, 9)
+PEPTIDES = make_random_peptides(1000, 9)
+OTHER_PEPTIDES = make_random_peptides(1000, 9)
 
 TRANSCRIPTS = [
     "transcript-%d" % i
@@ -66,6 +71,15 @@ PEPTIDES_DF["hit"] = [
 ]
 print("Hit rate: %0.3f" % PEPTIDES_DF.hit.mean())
 
+AA_COMPOSITION_DF = pandas.DataFrame({
+    'peptide': sorted(set(PEPTIDES).union(set(OTHER_PEPTIDES))),
+})
+for aa in sorted(common_amino_acid_letters):
+    AA_COMPOSITION_DF[aa] = AA_COMPOSITION_DF.peptide.str.count(aa)
+
+AA_COMPOSITION_DF.index = AA_COMPOSITION_DF.peptide
+del AA_COMPOSITION_DF['peptide']
+
 HITS_DF = PEPTIDES_DF.ix[PEPTIDES_DF.hit].reset_index().copy()
 del HITS_DF["hit"]
 
@@ -89,7 +103,7 @@ def test_mhcflurry_trained_on_hits():
         experiment_to_expression_group=EXPERIMENT_TO_EXPRESSION_GROUP,
         transcripts=TRANSCIPTS_DF,
         peptides_and_transcripts=PEPTIDES_AND_TRANSCRIPTS_DF,
-        random_peptides_for_percent_rank=make_random_peptides(10000, 9),
+        random_peptides_for_percent_rank=OTHER_PEPTIDES,
     )
     mhcflurry_model.fit(HITS_DF)
 
@@ -112,32 +126,67 @@ def test_presentation_model():
         experiment_to_expression_group=EXPERIMENT_TO_EXPRESSION_GROUP,
         transcripts=TRANSCIPTS_DF,
         peptides_and_transcripts=PEPTIDES_AND_TRANSCRIPTS_DF,
-        random_peptides_for_percent_rank=make_random_peptides(1000, 9),
+        random_peptides_for_percent_rank=OTHER_PEPTIDES,
     )
 
+    aa_content_model = (
+        presentation_component_models.FixedPerPeptideQuantity(
+            "aa composition",
+            numpy.log1p(AA_COMPOSITION_DF)))
+
     decoys = decoy_strategies.UniformRandom(
-        make_random_peptides(1000, 9),
+        OTHER_PEPTIDES,
         decoys_per_hit=50)
 
     terms = {
         'A_ms': (
             [mhcflurry_model],
             ["log1p(mhcflurry_basic_affinity)"]),
+        'P': (
+            [aa_content_model],
+            list(AA_COMPOSITION_DF.columns)),
     }
 
-    for kwargs in [{}, {'ensemble_size': 6}]:
+    for kwargs in [{}, {'ensemble_size': 3}]:
         models = presentation_model.build_presentation_models(
             terms,
-            ["A_ms"],
+            ["A_ms", "A_ms + P"],
             decoy_strategy=decoys,
             **kwargs)
-        eq_(len(models), 1)
+        eq_(len(models), 2)
 
-        model = models["A_ms"]
+        unfit_model = models["A_ms"]
+        model = unfit_model.clone()
         model.fit(HITS_DF.ix[HITS_DF.experiment_name == "exp1"])
 
         peptides = PEPTIDES_DF.copy()
         peptides["prediction"] = model.predict(peptides)
+        print(peptides)
+        print("Hit mean", peptides.prediction[peptides.hit].mean())
+        print("Decoy mean", peptides.prediction[~peptides.hit].mean())
+
         assert_less(
             peptides.prediction[~peptides.hit].mean(),
             peptides.prediction[peptides.hit].mean())
+
+        model2 = pickle.loads(pickle.dumps(model))
+        assert_array_equal(
+            model.predict(peptides), model2.predict(peptides))
+
+        model3 = unfit_model.clone()
+        assert not model3.has_been_fit
+        model3.restore_fit(model2.get_fit())
+        assert_array_equal(
+            model.predict(peptides), model3.predict(peptides))
+
+        better_unfit_model = models["A_ms + P"]
+        model = better_unfit_model.clone()
+        model.fit(HITS_DF.ix[HITS_DF.experiment_name == "exp1"])
+        peptides["prediction_better"] = model.predict(peptides)
+
+        assert_less(
+            peptides.prediction_better[~peptides.hit].mean(),
+            peptides.prediction[~peptides.hit].mean())
+        assert_less(
+            peptides.prediction[peptides.hit].mean(),
+            peptides.prediction_better[peptides.hit].mean())

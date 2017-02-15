@@ -52,7 +52,7 @@ def build_presentation_models(term_dict, formulas, **kwargs):
             (term_inputs, term_expressions) = term_dict[name]
             inputs.extend(term_inputs)
             expressions.extend(term_expressions)
-        assert len(set(expressions)) == len(expressions)
+        assert len(set(expressions)) == len(expressions), expressions
         presentation_model = PresentationModel(
             inputs,
             expressions,
@@ -301,7 +301,11 @@ class PresentationModel(object):
         for expression in self.feature_expressions:
             # We use numpy module as globals here so math functions
             # like log, log1p, exp, are in scope.
-            values = eval(expression, numpy.__dict__, input_df)
+            try:
+                values = eval(expression, numpy.__dict__, input_df)
+            except SyntaxError:
+                logging.error("Syntax error in expression: %s" % expression)
+                raise
             assert len(values) == len(input_df), expression
             if hasattr(values, 'values'):
                 values = values.values
@@ -419,7 +423,6 @@ class PresentationModel(object):
         assert 'hit' in peptides_df.columns
 
         peptides_df["prediction"] = self.predict(peptides_df)
-        # print(sorted(peptides_df.prediction[peptides_df.hit].values))
         top_n = float(peptides_df.hit.sum())
 
         if not include_hit_indices:
@@ -503,9 +506,8 @@ class PresentationModel(object):
                 "those of this PresentationModel: '%s'" % (
                     feature_expressions, self.feature_expressions))
         assert not fit, "Unhandled data in fit: %s" % fit
-        assert len(model_input_fits) == (
-            2 if self.component_models_require_fitting else 1), (
-            "Wrong length: %s" % model_input_fits)
+        assert (
+            len(model_input_fits) == len(self.presentation_models_predictors))
 
         self.trained_component_models = []
         for model_input_fits_for_fold in model_input_fits:

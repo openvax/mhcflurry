@@ -201,10 +201,10 @@ def describe_nulls(df, related_df_with_same_index_to_describe=None):
 
 def raise_or_debug(exception):
     """
-    Raise the exception unless the NEON_DEBUG environment variable is set,
+    Raise the exception unless the MHCFLURRY_DEBUG environment variable is set,
     in which case drop into ipython debugger (ipdb).
     """
-    if environ.get("NEON_DEBUG"):
+    if environ.get("MHCFLURRY_DEBUG"):
         import ipdb
         ipdb.set_trace()
     raise exception
