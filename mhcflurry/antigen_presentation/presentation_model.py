@@ -188,7 +188,7 @@ class PresentationModel(object):
                         model_input_training_hits_df)
                     self.trained_component_models[-1].append((sub_model,))
                     predictions = sub_model.predict(hits_and_decoys_df)
-                    for (col, values) in predictions.iteritems():
+                    for (col, values) in predictions.items():
                         hits_and_decoys_df[col] = values
                 final_predictor = self.fit_final_predictor(hits_and_decoys_df)
                 self.presentation_models_predictors.append(final_predictor)

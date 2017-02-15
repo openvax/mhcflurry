@@ -233,7 +233,8 @@ class PresentationComponentModel(object):
             return_value = result_df[columns]
         if self.cached_predictions is not None:
             self.cached_predictions[cache_key] = return_value
-        return return_value
+        return dict(
+            (col, return_value[col].values) for col in self.column_names())
 
     def clone(self):
         """
