@@ -130,7 +130,7 @@ def compare_predictions(peptides_df, model1, model2):
     predictions2 = model2.predict(peptides_df)
     failed = False
     for i in range(len(peptides_df)):
-        if predictions1[i] != predictions2[i]:
+        if abs(predictions1[i] - predictions2[i]) > .0001:
             failed = True
             print(
                 "Compare predictions: mismatch at index %d: "
