@@ -96,21 +96,27 @@ def test_percent_rank_transform():
         err_msg=str(model.__dict__))
 
 
-def test_mhcflurry_trained_on_hits():
-    mhcflurry_model = presentation_component_models.MHCflurryTrainedOnHits(
-        "basic",
+def mhcflurry_basic_model():
+    return presentation_component_models.MHCflurryTrainedOnHits(
+        predictor_name="mhcflurry_affinity",
         experiment_to_alleles=EXPERIMENT_TO_ALLELES,
         experiment_to_expression_group=EXPERIMENT_TO_EXPRESSION_GROUP,
         transcripts=TRANSCIPTS_DF,
         peptides_and_transcripts=PEPTIDES_AND_TRANSCRIPTS_DF,
         random_peptides_for_percent_rank=OTHER_PEPTIDES,
     )
+
+
+def test_mhcflurry_trained_on_hits():
+    mhcflurry_model = mhcflurry_basic_model()
     mhcflurry_model.fit(HITS_DF)
 
     peptides = PEPTIDES_DF.copy()
     predictions = mhcflurry_model.predict(peptides)
-    peptides["affinity"] = predictions["mhcflurry_basic_affinity"]
-    peptides["percent_rank"] = predictions["mhcflurry_basic_percentile_rank"]
+    peptides["affinity"] = predictions["mhcflurry_affinity_value"]
+    peptides["percent_rank"] = predictions[
+        "mhcflurry_affinity_percentile_rank"
+    ]
     assert_less(
         peptides.affinity[peptides.hit].mean(),
         peptides.affinity[~peptides.hit].mean())
@@ -119,15 +125,25 @@ def test_mhcflurry_trained_on_hits():
         peptides.percent_rank[~peptides.hit].mean())
 
 
+def compare_predictions(peptides_df, model1, model2):
+    predictions1 = model1.predict(peptides_df)
+    predictions2 = model2.predict(peptides_df)
+    failed = False
+    for i in range(len(peptides_df)):
+        if predictions1[i] != predictions2[i]:
+            failed = True
+            print(
+                "Compare predictions: mismatch at index %d: "
+                "%f != %f, row: %s" % (
+                    i,
+                    predictions1[i],
+                    predictions2[i],
+                    str(peptides_df.iloc[i])))
+    assert not failed
+
+
 def test_presentation_model():
-    mhcflurry_model = presentation_component_models.MHCflurryTrainedOnHits(
-        "basic",
-        experiment_to_alleles=EXPERIMENT_TO_ALLELES,
-        experiment_to_expression_group=EXPERIMENT_TO_EXPRESSION_GROUP,
-        transcripts=TRANSCIPTS_DF,
-        peptides_and_transcripts=PEPTIDES_AND_TRANSCRIPTS_DF,
-        random_peptides_for_percent_rank=OTHER_PEPTIDES,
-    )
+    mhcflurry_model = mhcflurry_basic_model()
 
     aa_content_model = (
         presentation_component_models.FixedPerPeptideQuantity(
@@ -141,7 +157,7 @@ def test_presentation_model():
     terms = {
         'A_ms': (
             [mhcflurry_model],
-            ["log1p(mhcflurry_basic_affinity)"]),
+            ["log1p(mhcflurry_affinity_value)"]),
         'P': (
             [aa_content_model],
             list(AA_COMPOSITION_DF.columns)),
@@ -170,14 +186,12 @@ def test_presentation_model():
             peptides.prediction[peptides.hit].mean())
 
         model2 = pickle.loads(pickle.dumps(model))
-        assert_allclose(
-            model.predict(peptides), model2.predict(peptides))
+        compare_predictions(peptides, model, model2)
 
         model3 = unfit_model.clone()
         assert not model3.has_been_fit
         model3.restore_fit(model2.get_fit())
-        assert_allclose(
-            model.predict(peptides), model3.predict(peptides))
+        compare_predictions(peptides, model, model3)
 
         better_unfit_model = models["A_ms + P"]
         model = better_unfit_model.clone()
