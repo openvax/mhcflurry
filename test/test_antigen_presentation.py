@@ -3,7 +3,7 @@ import pickle
 from nose.tools import eq_, assert_less
 
 import numpy
-from numpy.testing import assert_allclose, assert_array_equal
+from numpy.testing import assert_allclose
 import pandas
 from mhcflurry import amino_acid
 from mhcflurry.antigen_presentation import (
@@ -170,13 +170,13 @@ def test_presentation_model():
             peptides.prediction[peptides.hit].mean())
 
         model2 = pickle.loads(pickle.dumps(model))
-        assert_array_equal(
+        assert_allclose(
             model.predict(peptides), model2.predict(peptides))
 
         model3 = unfit_model.clone()
         assert not model3.has_been_fit
         model3.restore_fit(model2.get_fit())
-        assert_array_equal(
+        assert_allclose(
             model.predict(peptides), model3.predict(peptides))
 
         better_unfit_model = models["A_ms + P"]
