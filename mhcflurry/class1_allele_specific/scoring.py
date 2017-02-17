@@ -7,7 +7,7 @@ import sklearn
 import numpy
 import scipy
 
-import mhcflurry
+from ..regression_target import ic50_to_regression_target
 
 
 def make_scores(
@@ -38,8 +38,7 @@ def make_scores(
     dict with entries "auc", "f1", "tau"
     """
 
-    y_pred = mhcflurry.regression_target.ic50_to_regression_target(
-        ic50_y_pred, max_ic50)
+    y_pred = ic50_to_regression_target(ic50_y_pred, max_ic50)
     try:
         auc = sklearn.metrics.roc_auc_score(
             ic50_y <= threshold_nm,

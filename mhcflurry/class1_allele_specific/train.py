@@ -26,8 +26,6 @@ import math
 import numpy
 import pandas
 
-import mhcflurry
-
 from .scoring import make_scores
 from .class1_binding_predictor import Class1BindingPredictor
 from ..hyperparameters import HyperparameterDefaults
@@ -186,7 +184,7 @@ def train_and_test_one_model_one_fold(
             impute,
             model_description))
 
-    predictor = mhcflurry.Class1BindingPredictor(
+    predictor = Class1BindingPredictor(
         max_ic50=max_ic50,
         **model_params)
 
