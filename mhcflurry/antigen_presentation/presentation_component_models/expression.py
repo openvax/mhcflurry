@@ -25,7 +25,7 @@ class Expression(PresentationComponentModel):
             group in expression_values.columns
             for group in experiment_to_expression_group.values())
 
-        assert_no_null(experiment_to_expression_group)
+        assert_no_null(expression_values)
 
         self.experiment_to_expression_group = experiment_to_expression_group
         self.expression_values = expression_values

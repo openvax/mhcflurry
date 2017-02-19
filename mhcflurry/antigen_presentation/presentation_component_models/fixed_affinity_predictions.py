@@ -16,6 +16,9 @@ class FixedAffinityPredictions(PresentationComponentModel):
             - "value", "percentile_rank" (IC50 and percent rank)
             - peptide (string)
             - allele (string)
+
+    name : string
+        Used to name output columns and in debug messages
     """
 
     def __init__(
