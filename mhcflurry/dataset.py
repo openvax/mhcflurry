@@ -792,7 +792,7 @@ class Dataset(object):
             of floats and replaces some or all NaN values with synthetic
             affinities.
 
-        log_transform : function
+        log_transform : bool
             Transform affinities with to log10 values before imputation
             (and then transform back afterward).
 
