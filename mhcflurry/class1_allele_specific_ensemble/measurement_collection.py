@@ -37,6 +37,16 @@ class MeasurementCollection(object):
                 assert measurement_type in MEASUREMENT_TYPES, measurement_type
         self.df = df[COLUMNS]
 
+    @staticmethod
+    def from_dataset(dataset):
+        dataset_df = dataset.to_dataframe()
+        df = dataset_df.reset_index(drop=True)[["allele", "peptide"]].copy()
+        df["measurement_type"] = "affinity"
+        df["measurement_source"] = "in_vitro_affinity_assay"
+        df["measurement_value"] = dataset_df.affinity.values
+        df["weight"] = dataset_df.sample_weight.values
+        return MeasurementCollection(df)
+
     def select_allele(self, allele):
         return MeasurementCollection(
             self.df.ix[self.df.allele == allele],
@@ -89,7 +99,7 @@ class MeasurementCollection(object):
                     else (
                         ms_hit_affinity if row.value > 0
                         else ms_decoy_affinity)
-                    for (_, row) in self.df
+                    for (_, row) in self.df.iterrows()
                 ],
                 "sample_weight": self.df.weight,
             }))
@@ -106,9 +116,20 @@ class MeasurementCollection(object):
             }))
         return dataset
 
-    def impute(self, **kwargs):
-        dataset = self.to_datset(include_ms=False)
-        result_df = dataset.impute_missing_values(**kwargs).to_dataframe()
+    def impute(
+            self,
+            impute_method="mice",
+            impute_log_transform=True,
+            impute_min_observations_per_peptide=1,
+            impute_min_observations_per_allele=1):
+
+        dataset = self.to_dataset(include_ms=False)
+        result_df = dataset.impute_missing_values(
+            imputation_method=impute_method,
+            log_transform=impute_log_transform,
+            min_observations_per_peptide=impute_min_observations_per_peptide,
+            min_observations_per_allele=impute_min_observations_per_allele,
+        ).to_dataframe()
         result_df["measurement_type"] = "affinity"
         result_df["measurement_source"] = "imputed"
         result_df["measurement_value"] = result_df.affinity

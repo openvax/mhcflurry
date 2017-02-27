@@ -35,21 +35,22 @@ from ..hyperparameters import HyperparameterDefaults
 from ..class1_allele_specific import Class1BindingPredictor, scoring
 from .. import parallelism
 
-measurement_collection_hyperparameter_defaults = HyperparameterDefaults(
+MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     include_ms=True,
     ms_hit_affinity=1.0,
     ms_decoy_affinity=20000.0)
 
-impute_hyperparameter_defaults = HyperparameterDefaults(
-    impute=True,
+IMPUTE_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     impute_method='mice',
     impute_min_observations_per_peptide=1,
     impute_min_observations_per_allele=1)
 
-model_hyperparameter_defaults = (
-    measurement_collection_hyperparameter_defaults.extend(
-        impute_hyperparameter_defaults.extend(
-            Class1BindingPredictor.hyperparameter_defaults)))
+HYPERPARAMETER_DEFAULTS = (
+    HyperparameterDefaults(
+        impute=True)
+    .extend(MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS)
+    .extend(IMPUTE_HYPERPARAMETER_DEFAULTS)
+    .extend(Class1BindingPredictor.hyperparameter_defaults))
 
 
 def call_fit_and_test(args):
@@ -63,9 +64,10 @@ def fit_and_test(
         alleles,
         model_hyperparameters_list):
 
+    results = []
     for hyperparameters in model_hyperparameters_list:
         measurement_collection_hyperparameters = (
-            measurement_collection_hyperparameter_defaults.subselect(
+            MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS.subselect(
                 hyperparameters))
         model_hyperparameters = (
             Class1BindingPredictor.hyperparameter_defaults.subselect(
@@ -86,16 +88,17 @@ def fit_and_test(
             model = Class1BindingPredictor(**model_hyperparameters)
 
             model.fit_dataset(train_dataset)
-            predictions = model.predict(test_dataset.peptides())
+            predictions = model.predict(test_dataset.peptides)
             scores = scoring.make_scores(
-                test_dataset.affinities(), predictions)
-            yield {
+                test_dataset.affinities, predictions)
+            results.append({
                 'fold_num': fold_num,
                 'allele': allele,
                 'hyperparameters': hyperparameters,
                 'model': model,
                 'scores': scores
-            }
+            })
+    return results
 
 
 def impute(hyperparameters, measurement_collection):
@@ -130,12 +133,13 @@ class Class1EnsembleMultiAllelePredictor(object):
         self.imputation_hyperparameters = None  # None indicates no imputation
         self.model_hyperparameters_to_search = []
         for (num, params) in enumerate(model_hyperparameters_to_search):
-            params = model_hyperparameter_defaults.with_defaults(params)
+            params = HYPERPARAMETER_DEFAULTS.with_defaults(params)
             params["architecture_num"] = num
             self.model_hyperparameters_to_search.append(params)
 
-            imputation_args = impute_hyperparameter_defaults.subselect(params)
-            if imputation_args['impute']:
+            if params['impute']:
+                imputation_args = IMPUTE_HYPERPARAMETER_DEFAULTS.subselect(
+                    params)
                 if self.imputation_hyperparameters is None:
                     self.imputation_hyperparameters = imputation_args
                 if self.imputation_hyperparameters != imputation_args:
@@ -207,7 +211,7 @@ class Class1EnsembleMultiAllelePredictor(object):
             logging.info("Imputing: %d tasks, imputation args: %s" % (
                 len(splits), str(self.imputation_hyperparameters)))
             imputed_trains = parallel_backend.map(
-                partial(impute, self.model_hyperparameters_to_search),
+                partial(impute, self.imputation_hyperparameters),
                 [train for (train, test) in splits])
             splits = [
                 (imputed_train, test)
@@ -218,7 +222,7 @@ class Class1EnsembleMultiAllelePredictor(object):
         else:
             logging.info("No imputation required.")
 
-        alleles = measurement_collection.df.alleles.unique()
+        alleles = measurement_collection.df.allele.unique()
 
         total_work = (
             len(alleles) *
@@ -261,7 +265,8 @@ class Class1EnsembleMultiAllelePredictor(object):
                 target_tasks,
                 len(alleles),
                 self.ensemble_size,
-                len(self.model_hyperparameters_to_search)))
+                len(self.model_hyperparameters_to_search),
+                total_work))
 
         results = parallel_backend.map(call_fit_and_test, tasks)
 
