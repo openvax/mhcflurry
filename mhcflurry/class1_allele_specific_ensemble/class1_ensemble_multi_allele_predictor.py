@@ -27,12 +27,14 @@ import math
 import logging
 import collections
 import time
+import numpy
 from functools import partial
 
 import pandas
 
 from ..hyperparameters import HyperparameterDefaults
 from ..class1_allele_specific import Class1BindingPredictor, scoring
+from ..common import geometric_mean
 from .. import parallelism
 
 MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
@@ -47,7 +49,8 @@ IMPUTE_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
 
 HYPERPARAMETER_DEFAULTS = (
     HyperparameterDefaults(
-        impute=True)
+        impute=True,
+        architecture_num=None)
     .extend(MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS)
     .extend(IMPUTE_HYPERPARAMETER_DEFAULTS)
     .extend(Class1BindingPredictor.hyperparameter_defaults))
@@ -62,16 +65,16 @@ def fit_and_test(
         train_measurement_collection_broadcast,
         test_measurement_collection_broadcast,
         alleles,
-        model_hyperparameters_list):
+        hyperparameters_list):
 
     results = []
-    for hyperparameters in model_hyperparameters_list:
+    for all_hyperparameters in hyperparameters_list:
         measurement_collection_hyperparameters = (
             MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS.subselect(
-                hyperparameters))
+                all_hyperparameters))
         model_hyperparameters = (
             Class1BindingPredictor.hyperparameter_defaults.subselect(
-                hyperparameters))
+                all_hyperparameters))
 
         for allele in alleles:
             train_dataset = (
@@ -94,7 +97,7 @@ def fit_and_test(
             results.append({
                 'fold_num': fold_num,
                 'allele': allele,
-                'hyperparameters': hyperparameters,
+                'hyperparameters': all_hyperparameters,
                 'model': model,
                 'scores': scores
             })
@@ -113,8 +116,8 @@ class Class1EnsembleMultiAllelePredictor(object):
         manifest_df["hyperparameters"] = [
             eval(s) for s in manifest_df.hyperparameters
         ]
-        model_hyperparameters_to_search = list(dict(
-            (row.architecture_num, row.hyperparameters)
+        hyperparameters_to_search = list(dict(
+            (row.hyperparameters_architecture_num, row.hyperparameters)
             for (_, row) in manifest_df.iterrows()
         ).values())
         (ensemble_size,) = list(manifest_df.ensemble_size.unique())
@@ -125,17 +128,20 @@ class Class1EnsembleMultiAllelePredictor(object):
             .count() == ensemble_size).all()
         result = Class1EnsembleMultiAllelePredictor(
             ensemble_size=ensemble_size,
-            model_hyperparameters_to_search=model_hyperparameters_to_search)
+            hyperparameters_to_search=hyperparameters_to_search)
         result.manifest_df = manifest_df
-        result.model
+        result.allele_to_models = {}
+        result.models_dir = os.path.abspath(path_to_models_dir)
+        return result
 
-    def __init__(self, ensemble_size, model_hyperparameters_to_search):
+    def __init__(self, ensemble_size, hyperparameters_to_search):
         self.imputation_hyperparameters = None  # None indicates no imputation
-        self.model_hyperparameters_to_search = []
-        for (num, params) in enumerate(model_hyperparameters_to_search):
-            params = HYPERPARAMETER_DEFAULTS.with_defaults(params)
+        self.hyperparameters_to_search = []
+        for (num, params) in enumerate(hyperparameters_to_search):
+            params = dict(params)
             params["architecture_num"] = num
-            self.model_hyperparameters_to_search.append(params)
+            params = HYPERPARAMETER_DEFAULTS.with_defaults(params)
+            self.hyperparameters_to_search.append(params)
 
             if params['impute']:
                 imputation_args = IMPUTE_HYPERPARAMETER_DEFAULTS.subselect(
@@ -150,7 +156,6 @@ class Class1EnsembleMultiAllelePredictor(object):
                             str(imputation_args)))
 
         self.ensemble_size = ensemble_size
-        self.model_hyperparameters_to_search = model_hyperparameters_to_search
         self.manifest_df = None
         self.allele_to_models = None
         self.models_dir = None
@@ -158,6 +163,51 @@ class Class1EnsembleMultiAllelePredictor(object):
     def supported_alleles(self):
         return list(
             self.manifest_df.ix[self.manifest_df.weight > 0].allele.unique())
+
+    def description(self):
+        lines = []
+        kvs = []
+
+        def kv(key, value):
+            kvs.append((key, value))
+
+        kv("ensemble size", self.ensemble_size)
+        kv("num architectures considered",
+            len(self.hyperparameters_to_search))
+        if self.allele_to_models is not None:
+            kv("supported alleles", " ".join(self.supported_alleles()))
+        kv("models dir", self.models_dir)
+
+        lines.append("%s Ensemble: %s" % (
+            "Untrained" if self.allele_to_models is None else "Trained",
+            self))
+        for (key, value) in kvs:
+            lines.append("* %s: %s" % (key, value))
+
+        if self.manifest_df is not None:
+            models_used = self.manifest_df.ix[self.manifest_df.weight > 0]
+
+            ignored_properties = set(['hyperparameters', 'scores'])
+            lines.append("* Attributes common to all models:")
+            unique = None
+            for col in models_used.columns:
+                unique = models_used[col].map(str).unique()
+                if len(unique) == 1:
+                    lines.append("\t%s: %s" % (col, unique[0]))
+                    ignored_properties.add(col)
+            if unique is None:
+                lines.append("\t(none)")
+
+            for (allele, manifest_rows) in models_used.groupby("allele"):
+                lines.append("***")
+                for (i, (name, row)) in enumerate(manifest_rows.iterrows()):
+                    lines.append("* %s model %d: %s" % (
+                        allele, i + 1, name))
+                    for (k, v) in row.iteritems():
+                        if k not in ignored_properties:
+                            lines.append("\t%s: %s" % (k, v))
+                    lines.append("")
+        return "\n".join(lines)
 
     def models_for_allele(self, allele):
         if allele not in self.allele_to_models:
@@ -188,7 +238,7 @@ class Class1EnsembleMultiAllelePredictor(object):
         self.manifest_df.to_csv(path_to_manifest_csv)
         logging.debug("Wrote: %s" % path_to_manifest_csv)
         models_written = []
-        for (allele, models) in self.allele_to_models:
+        for (allele, models) in self.allele_to_models.items():
             for model in models:
                 filename = os.path.join(
                     path_to_models_dir, "%s.pickle" % model.name)
@@ -198,6 +248,26 @@ class Class1EnsembleMultiAllelePredictor(object):
                 models_written.append(model.name)
         assert set(models_written) == set(
             self.manifest_df.ix[self.manifest_df.weight > 0].index)
+
+    def predict(self, measurement_collection):
+        result = pandas.Series(
+            index=measurement_collection.df.index)
+        for (allele, sub_df) in measurement_collection.df.groupby("allele"):
+            result.loc[sub_df.index] = self.predict_for_allele(
+                allele, sub_df.peptide.values)
+        assert not result.isnull().any()
+        return result
+
+    def predict_for_allele(self, allele, peptides):
+        values = [
+            model.predict(peptides)
+            for model in self.allele_to_models[allele]
+        ]
+
+        # Geometric mean
+        result = numpy.exp(numpy.nanmean(numpy.log(values), axis=0))
+        assert len(result) == len(peptides)
+        return result
 
     def fit(
             self,
@@ -227,7 +297,7 @@ class Class1EnsembleMultiAllelePredictor(object):
         total_work = (
             len(alleles) *
             self.ensemble_size *
-            len(self.model_hyperparameters_to_search))
+            len(self.hyperparameters_to_search))
         work_per_task = int(math.ceil(total_work / target_tasks))
         tasks = []
         for (fold_num, (train_split, test_split)) in enumerate(splits):
@@ -250,7 +320,7 @@ class Class1EnsembleMultiAllelePredictor(object):
 
             for allele in alleles:
                 task_alleles.append(allele)
-                for model in self.model_hyperparameters_to_search:
+                for model in self.hyperparameters_to_search:
                     task_models.append(model)
                     if len(task_alleles) * len(task_models) > work_per_task:
                         make_task()
@@ -265,7 +335,7 @@ class Class1EnsembleMultiAllelePredictor(object):
                 target_tasks,
                 len(alleles),
                 self.ensemble_size,
-                len(self.model_hyperparameters_to_search),
+                len(self.hyperparameters_to_search),
                 total_work))
 
         results = parallel_backend.map(call_fit_and_test, tasks)
@@ -292,9 +362,9 @@ class Class1EnsembleMultiAllelePredictor(object):
                 if allele in fold_results:
                     current_best = fold_results[allele]['summary_score']
 
-                logging.debug("Work item: %s, current best score: %f" % (
-                    str(item),
-                    current_best))
+                # logging.debug("Work item: %s, current best score: %f" % (
+                #    str(item),
+                #    current_best))
 
                 if item['summary_score'] > current_best:
                     logging.info("Updating current best: %s" % str(item))
@@ -304,13 +374,14 @@ class Class1EnsembleMultiAllelePredictor(object):
                 del manifest_entry['model']
                 for key in ['hyperparameters', 'scores']:
                     for (sub_key, value) in item[key].items():
-                        manifest_entry[sub_key] = value
+                        manifest_entry["%s_%s" % (key, sub_key)] = value
                 manifest_rows.append(manifest_entry)
 
         manifest_df = pandas.DataFrame(manifest_rows)
         manifest_df.index = manifest_df.model_name
         del manifest_df["model_name"]
         manifest_df["weight"] = 0.0
+        manifest_df["ensemble_size"] = self.ensemble_size
 
         logging.info("Done collecting results.")
 
