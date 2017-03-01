@@ -208,11 +208,11 @@ def go(args):
             "Filtered training dataset by allele to: %s" % train_dataset)
 
     if args.min_samples_per_allele:
-        train_data = train_dataset.filter_alleles_by_count(
+        train_dataset = train_dataset.filter_alleles_by_count(
             args.min_samples_per_allele)
         logging.info(
             "Filtered training dataset to alleles with >= %d observations: %s"
-            % (args.min_samples_per_allele, train_data))
+            % (args.min_samples_per_allele, train_dataset))
 
     train_mc = MeasurementCollection.from_dataset(train_dataset)
     model = Class1EnsembleMultiAllelePredictor(

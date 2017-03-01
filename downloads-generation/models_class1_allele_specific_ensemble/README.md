@@ -18,5 +18,16 @@ To generate this download we run:
     --kubernetes-task-resources-memory-mb 10000 \
     --worker-path-prefix venv-py3/bin \
     --max-simultaneous-tasks 200 \
+```
 
+To debug locally:
+./GENERATE.sh \
+    --parallel-backend local-threads \
+    --target-tasks 1 \
+    --backend kubernetes \
+    --storage-prefix gs://kubeface-tim \
+    --worker-image hammerlab/mhcflurry-misc:latest \
+    --kubernetes-task-resources-memory-mb 10000 \
+    --worker-path-prefix venv-py3/bin \
+    --max-simultaneous-tasks 200 \
 ```
