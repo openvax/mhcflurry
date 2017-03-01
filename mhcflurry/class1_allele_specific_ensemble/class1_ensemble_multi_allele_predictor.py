@@ -34,7 +34,6 @@ import pandas
 
 from ..hyperparameters import HyperparameterDefaults
 from ..class1_allele_specific import Class1BindingPredictor, scoring
-from ..common import geometric_mean
 from .. import parallelism
 
 MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
@@ -45,7 +44,8 @@ MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
 IMPUTE_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     impute_method='mice',
     impute_min_observations_per_peptide=1,
-    impute_min_observations_per_allele=1)
+    impute_min_observations_per_allele=1,
+    imputer_args=[{"n_burn_in": 5, "n_imputations": 25}])
 
 HYPERPARAMETER_DEFAULTS = (
     HyperparameterDefaults(
@@ -67,6 +67,9 @@ def fit_and_test(
         alleles,
         hyperparameters_list):
 
+    assert len(train_measurement_collection_broadcast.value.df) > 0
+    assert len(test_measurement_collection_broadcast.value.df) > 0
+
     results = []
     for all_hyperparameters in hyperparameters_list:
         measurement_collection_hyperparameters = (
@@ -87,6 +90,9 @@ def fit_and_test(
                 .value
                 .select_allele(allele)
                 .to_dataset(**measurement_collection_hyperparameters))
+
+            assert len(train_dataset) > 0
+            assert len(test_dataset) > 0
 
             model = Class1BindingPredictor(**model_hyperparameters)
 
@@ -275,22 +281,28 @@ class Class1EnsembleMultiAllelePredictor(object):
             parallel_backend=parallelism.ConcurrentFuturesParallelBackend(),
             target_tasks=1):
         fit_name = time.asctime().replace(" ", "_")
+        assert len(measurement_collection.df) > 0
 
         splits = measurement_collection.half_splits(self.ensemble_size)
+
         if self.imputation_hyperparameters is not None:
             logging.info("Imputing: %d tasks, imputation args: %s" % (
                 len(splits), str(self.imputation_hyperparameters)))
             imputed_trains = parallel_backend.map(
                 partial(impute, self.imputation_hyperparameters),
                 [train for (train, test) in splits])
-            splits = [
-                (imputed_train, test)
-                for (imputed_train, (train, test))
-                in zip(imputed_trains, splits)
-            ]
+            imputed_splits = []
+            for (imputed_train, (train, test)) in zip(imputed_trains, splits):
+                assert len(imputed_train.df) > 0
+                assert len(train.df) > 0
+                assert len(test.df) > 0
+                imputed_splits.append((imputed_train, test))
+            splits = imputed_splits
             logging.info("Imputation completed.")
         else:
             logging.info("No imputation required.")
+
+        assert len(splits) == self.ensemble_size, len(splits)
 
         alleles = measurement_collection.df.allele.unique()
 
@@ -301,6 +313,8 @@ class Class1EnsembleMultiAllelePredictor(object):
         work_per_task = int(math.ceil(total_work / target_tasks))
         tasks = []
         for (fold_num, (train_split, test_split)) in enumerate(splits):
+            assert len(train_split.df) > 0
+            assert len(test_split.df) > 0
             train_broadcast = parallel_backend.broadcast(train_split)
             test_broadcast = parallel_backend.broadcast(test_split)
 
