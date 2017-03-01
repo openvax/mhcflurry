@@ -179,6 +179,7 @@ class MeasurementCollection(object):
         assert len(self.df) > 0
 
         dataset = self.to_dataset(include_ms=False)
+        assert len(dataset) > 0
         imputer = imputer_from_name(impute_method, **imputer_args)
         result_df = dataset.impute_missing_values(
             imputation_method=imputer,

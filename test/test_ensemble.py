@@ -99,8 +99,8 @@ def test_train_command():
         dropout_probability=[.25],
         n_training_epochs=[10],
         imputer_args=[{"n_burn_in": 2, "n_imputations": 10}],
-        impute_min_observations_per_peptide=[5],
-        impute_min_observations_per_allele=[2000],  # limit num alleles
+        impute_min_observations_per_peptide=[1],
+        impute_min_observations_per_allele=[1],
     )
     print("Model selection will be over %d models" % len(models))
 
