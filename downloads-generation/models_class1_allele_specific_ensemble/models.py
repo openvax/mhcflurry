@@ -1,5 +1,5 @@
 import sys
-from mhcflurry.class1_allele_specific.train import HYPERPARAMETER_DEFAULTS
+from mhcflurry.class1_allele_specific_ensemble import HYPERPARAMETER_DEFAULTS
 import json
 
 models = HYPERPARAMETER_DEFAULTS.models_grid(

@@ -42,14 +42,12 @@ WORKDIR /home/user
 # Setup virtual envs and install convenience packages.  Note: installing
 # cherrypy as part of the mhcflurry installation weirdly fails on a unicode
 # issue in python2, but installing it separately seems to work.
-# We also install bokeh so that dask distributed will have an admin web interface.
 RUN virtualenv venv-py3 --python=python3 && \
     venv-py3/bin/pip install --upgrade pip && \
     venv-py3/bin/pip install --upgrade \
         numpy \
-        bokeh \
         cherrypy \
-        git+https://github.com/dask/distributed.git \
+        git+https://github.com/hammerlab/kubeface.git \
         jupyter \
         lxml \
         scipy \

@@ -11,9 +11,10 @@ To generate this download we run:
 ```
 ./GENERATE.sh \
     --parallel-backend kubeface \
+    --target-tasks 200 \
     --backend kubernetes \
-    --storage-prefix gs://kubeface \
-    --worker-image hammerlab/mhcflurry:latest \
+    --storage-prefix gs://kubeface-tim \
+    --worker-image hammerlab/mhcflurry-misc:latest \
     --kubernetes-task-resources-memory-mb 10000 \
     --worker-path-prefix venv-py3/bin \
     --max-simultaneous-tasks 200 \

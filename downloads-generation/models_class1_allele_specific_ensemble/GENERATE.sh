@@ -39,7 +39,7 @@ time mhcflurry-class1-allele-specific-ensemble-train \
     --ensemble-size 8 \
     --model-architectures models.json \
     --train-data "$(mhcflurry-downloads path data_combined_iedb_kim2014)/combined_human_class1_dataset.csv" \
-    --min-samples-per-allele 100 \
+    --min-samples-per-allele 200 \
     --out-manifest models.csv \
     --out-models models \
     --verbose \

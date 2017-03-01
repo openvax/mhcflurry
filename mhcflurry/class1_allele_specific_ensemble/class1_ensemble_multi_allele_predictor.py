@@ -278,8 +278,11 @@ class Class1EnsembleMultiAllelePredictor(object):
     def fit(
             self,
             measurement_collection,
-            parallel_backend=parallelism.ConcurrentFuturesParallelBackend(),
+            parallel_backend=None,
             target_tasks=1):
+        if parallel_backend is None:
+            parallel_backend = parallelism.get_default_backend()
+
         fit_name = time.asctime().replace(" ", "_")
         assert len(measurement_collection.df) > 0
 

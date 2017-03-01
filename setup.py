@@ -99,5 +99,9 @@ if __name__ == '__main__':
         },
         install_requires=required_packages,
         long_description=readme,
-        packages=['mhcflurry', 'mhcflurry.class1_allele_specific'],
+        packages=[
+            'mhcflurry',
+            'mhcflurry.class1_allele_specific',
+            'mhcflurry.class1_allele_specific_ensemble',
+        ],
     )
