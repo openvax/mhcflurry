@@ -68,7 +68,8 @@ class MeasurementCollection(object):
         """
         assert isinstance(allele, str), type(allele)
         assert len(self.df) > 0
-        assert allele in self.df.allele.unique()
+        alleles = set(self.df.allele.unique())
+        assert allele in alleles, "%s not in %s" % (allele, alleles)
         return MeasurementCollection(
             self.df.ix[self.df.allele == allele],
             check=False)
@@ -100,6 +101,8 @@ class MeasurementCollection(object):
                     None if random_state is None
                     else random_state + len(results)))
             stratification_groups = self.df.allele + self.df.measurement_type
+            assert len(stratification_groups.unique()) > 1, (
+                stratification_groups.unique())
             (indices1, indices2) = next(
                 cv.split(self.df.values, stratification_groups))
             assert len(indices1) > 0

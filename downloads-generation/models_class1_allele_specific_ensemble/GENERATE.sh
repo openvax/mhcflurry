@@ -36,7 +36,7 @@ cp $SCRIPT_DIR/models.py .
 python models.py > models.json
 
 time mhcflurry-class1-allele-specific-ensemble-train \
-    --ensemble-size 8 \
+    --ensemble-size 16 \
     --model-architectures models.json \
     --train-data "$(mhcflurry-downloads path data_combined_iedb_kim2014)/combined_human_class1_dataset.csv" \
     --min-samples-per-allele 200 \

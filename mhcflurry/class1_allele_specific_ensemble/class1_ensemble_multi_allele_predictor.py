@@ -307,7 +307,7 @@ class Class1EnsembleMultiAllelePredictor(object):
 
         assert len(splits) == self.ensemble_size, len(splits)
 
-        alleles = measurement_collection.df.allele.unique()
+        alleles = set(measurement_collection.df.allele.unique())
 
         total_work = (
             len(alleles) *
@@ -335,8 +335,18 @@ class Class1EnsembleMultiAllelePredictor(object):
                 task_alleles.clear()
                 task_models.clear()
 
+            assert all(
+                allele in set(train_split.df.allele.unique())
+                for allele in alleles), (
+                "%s not in %s" % (
+                    alleles, set(train_split.df.allele.unique())))
+            assert all(
+                allele in set(test_split.df.allele.unique())
+                for allele in alleles), (
+                "%s not in %s" % (
+                    alleles, set(test_split.df.allele.unique())))
+
             for allele in alleles:
-                task_alleles.append(allele)
                 for model in self.hyperparameters_to_search:
                     task_models.append(model)
                     if len(task_alleles) * len(task_models) > work_per_task:
