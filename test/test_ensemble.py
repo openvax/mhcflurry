@@ -21,12 +21,6 @@ from mhcflurry \
         Class1EnsembleMultiAllelePredictor,
         HYPERPARAMETER_DEFAULTS)
 
-try:
-    import kubeface
-    KUBEFACE_INSTALLED = True
-except ImportError:
-    KUBEFACE_INSTALLED = False
-
 
 def test_basic():
     model_hyperparameters = HYPERPARAMETER_DEFAULTS.models_grid(
