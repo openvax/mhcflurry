@@ -66,11 +66,30 @@ def fit_and_test(
         test_measurement_collection_broadcast,
         allele_and_hyperparameter_pairs):
 
+    logging.info(
+        "Fit and test: fold_num=%d train=%s test=%s alleles/models [%d]=%s" % (
+            fold_num,
+            train_measurement_collection_broadcast.value,
+            test_measurement_collection_broadcast.value,
+            len(allele_and_hyperparameter_pairs),
+            "\n".join("Allele: %s, hyperparameters: %s" % (
+                allele, hyperparameters)
+                for (allele, hyperparameters)
+                in allele_and_hyperparameter_pairs)))
+
     assert len(train_measurement_collection_broadcast.value.df) > 0
     assert len(test_measurement_collection_broadcast.value.df) > 0
 
     results = []
-    for (allele, all_hyperparameters) in allele_and_hyperparameter_pairs:
+    for (i, (allele, all_hyperparameters)) in enumerate(
+            allele_and_hyperparameter_pairs):
+        logging.info("Model %d / %d: allele=%s hyperparameters=%s" % (
+            i + 1,
+            len(allele_and_hyperparameter_pairs),
+            allele,
+            str(all_hyperparameters)))
+
+        start = time.time()
         measurement_collection_hyperparameters = (
             MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS.subselect(
                 all_hyperparameters))
@@ -105,6 +124,8 @@ def fit_and_test(
             'model': model,
             'scores': scores
         })
+        logging.info("Done training model in %0.2f sec" % (
+            time.time() - start))
     return results
 
 
@@ -349,14 +370,21 @@ class Class1EnsembleMultiAllelePredictor(object):
                 make_task()
             assert not task_allele_model_pairs
 
+        allele_models_per_task = numpy.array([
+            len(task[-1]) for task in tasks
+        ])
         logging.info(
             "Training and scoring models: %d tasks (target was %d), "
-            "total work: %d alleles * %d ensemble size * %d models = %d" % (
+            "total work: %d alleles * %d ensemble size * %d models = %d"
+            "allele/models per task: (min=%d mean=%f max=%d)" % (
                 len(tasks),
                 target_tasks,
                 len(alleles),
                 self.ensemble_size,
                 len(self.hyperparameters_to_search),
+                allele_models_per_task.min(),
+                allele_models_per_task.max(),
+                allele_models_per_task.mean(),
                 total_work))
 
         assert len(tasks) > 0
