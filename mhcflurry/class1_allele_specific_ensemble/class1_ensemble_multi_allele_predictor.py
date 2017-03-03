@@ -360,7 +360,7 @@ class Class1EnsembleMultiAllelePredictor(object):
                         imputed_train_broadcast,
                         test_broadcast,
                         list(task_allele_model_pairs)))
-                    task_allele_model_pairs.clear()
+                    task_allele_model_pairs[:] = []
 
             assert all(
                 allele in set(train_split.df.allele.unique())
