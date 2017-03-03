@@ -63,13 +63,15 @@ def call_fit_and_test(args):
 def fit_and_test(
         fold_num,
         train_measurement_collection_broadcast,
+        imputed_train_measurement_collection_broadcast,
         test_measurement_collection_broadcast,
         allele_and_hyperparameter_pairs):
 
     logging.info(
-        "Fit and test: fold_num=%d train=%s test=%s alleles/models [%d]=%s" % (
+        "Fit and test: fold=%d train=%s,%s test=%s alleles/models [%d]=%s" % (
             fold_num,
             train_measurement_collection_broadcast.value,
+            imputed_train_measurement_collection_broadcast,
             test_measurement_collection_broadcast.value,
             len(allele_and_hyperparameter_pairs),
             "\n".join("Allele: %s, hyperparameters: %s" % (
@@ -102,6 +104,14 @@ def fit_and_test(
             .value
             .select_allele(allele)
             .to_dataset(**measurement_collection_hyperparameters))
+        if all_hyperparameters['impute']:
+            imputed_train_dataset = (
+                train_measurement_collection_broadcast
+                .value
+                .select_allele(allele)
+                .to_dataset(**measurement_collection_hyperparameters))
+        else:
+            imputed_train_dataset = None
         test_dataset = (
             test_measurement_collection_broadcast
             .value
@@ -113,7 +123,9 @@ def fit_and_test(
 
         model = Class1BindingPredictor(**model_hyperparameters)
 
-        model.fit_dataset(train_dataset)
+        model.fit_dataset(
+            train_dataset,
+            pretraining_dataset=imputed_train_dataset)
         predictions = model.predict(test_dataset.peptides)
         scores = scoring.make_scores(
             test_dataset.affinities, predictions)
@@ -310,19 +322,13 @@ class Class1EnsembleMultiAllelePredictor(object):
         if self.imputation_hyperparameters is not None:
             logging.info("Imputing: %d tasks, imputation args: %s" % (
                 len(splits), str(self.imputation_hyperparameters)))
-            imputed_trains = parallel_backend.map(
+            imputed_trains = list(parallel_backend.map(
                 partial(impute, self.imputation_hyperparameters),
-                [train for (train, test) in splits])
-            imputed_splits = []
-            for (imputed_train, (train, test)) in zip(imputed_trains, splits):
-                assert len(imputed_train.df) > 0
-                assert len(train.df) > 0
-                assert len(test.df) > 0
-                imputed_splits.append((imputed_train, test))
-            splits = imputed_splits
+                [train for (train, test) in splits]))
             logging.info("Imputation completed.")
         else:
             logging.info("No imputation required.")
+            imputed_trains = None
 
         assert len(splits) == self.ensemble_size, len(splits)
 
@@ -339,6 +345,10 @@ class Class1EnsembleMultiAllelePredictor(object):
             assert len(test_split.df) > 0
             train_broadcast = parallel_backend.broadcast(train_split)
             test_broadcast = parallel_backend.broadcast(test_split)
+            imputed_train_broadcast = None
+            if imputed_trains is not None:
+                imputed_train_broadcast = parallel_backend.broadcast(
+                    imputed_trains[fold_num])
 
             task_allele_model_pairs = []
 
@@ -347,6 +357,7 @@ class Class1EnsembleMultiAllelePredictor(object):
                     tasks.append((
                         fold_num,
                         train_broadcast,
+                        imputed_train_broadcast,
                         test_broadcast,
                         list(task_allele_model_pairs)))
                     task_allele_model_pairs.clear()
@@ -362,8 +373,8 @@ class Class1EnsembleMultiAllelePredictor(object):
                 "%s not in %s" % (
                     alleles, set(test_split.df.allele.unique())))
 
-            for allele in alleles:
-                for model in self.hyperparameters_to_search:
+            for model in self.hyperparameters_to_search:
+                for allele in alleles:
                     task_allele_model_pairs.append((allele, model))
                     if len(task_allele_model_pairs) > work_per_task:
                         make_task()
