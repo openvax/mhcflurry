@@ -12,12 +12,12 @@ To generate this download we run:
 ./GENERATE.sh \
     --parallel-backend kubeface \
     --target-tasks 200 \
-    --backend kubernetes \
-    --storage-prefix gs://kubeface-tim \
-    --worker-image hammerlab/mhcflurry-misc:latest \
-    --kubernetes-task-resources-memory-mb 10000 \
-    --worker-path-prefix venv-py3/bin \
-    --max-simultaneous-tasks 200 \
+    --kubeface-backend kubernetes \
+    --kubeface-storage gs://kubeface-tim \
+    --kubeface-worker-image hammerlab/mhcflurry-misc:latest \
+    --kubeface-kubernetes-task-resources-memory-mb 10000 \
+    --kubeface-worker-path-prefix venv-py3/bin \
+    --kubeface-max-simultaneous-tasks 200 \
 ```
 
 To debug locally:
