@@ -18,6 +18,7 @@ To generate this download we run:
     --kubeface-kubernetes-task-resources-memory-mb 10000 \
     --kubeface-worker-path-prefix venv-py3/bin \
     --kubeface-max-simultaneous-tasks 200 \
+    --kubeface-speculation-max-reruns 3 \
 ```
 
 To debug locally:

@@ -61,26 +61,27 @@ def call_fit_and_test(args):
 
 
 def fit_and_test(
+        parallel_backend,
         fold_num,
-        train_measurement_collection_broadcast,
-        imputed_train_measurement_collection_broadcast,
-        test_measurement_collection_broadcast,
+        train_measurement_collection_remote_object,
+        imputed_train_measurement_collection_remote_object,
+        test_measurement_collection_remote_object,
         allele_and_hyperparameter_pairs):
 
     logging.info(
         "Fit and test: fold=%d train=%s,%s test=%s alleles/models [%d]=%s" % (
             fold_num,
-            train_measurement_collection_broadcast.value,
-            imputed_train_measurement_collection_broadcast,
-            test_measurement_collection_broadcast.value,
+            train_measurement_collection_remote_object.value,
+            imputed_train_measurement_collection_remote_object,
+            test_measurement_collection_remote_object.value,
             len(allele_and_hyperparameter_pairs),
             "\n".join("Allele: %s, hyperparameters: %s" % (
                 allele, hyperparameters)
                 for (allele, hyperparameters)
                 in allele_and_hyperparameter_pairs)))
 
-    assert len(train_measurement_collection_broadcast.value.df) > 0
-    assert len(test_measurement_collection_broadcast.value.df) > 0
+    assert len(train_measurement_collection_remote_object.value.df) > 0
+    assert len(test_measurement_collection_remote_object.value.df) > 0
 
     results = []
     for (i, (allele, all_hyperparameters)) in enumerate(
@@ -100,20 +101,20 @@ def fit_and_test(
                 all_hyperparameters))
 
         train_dataset = (
-            train_measurement_collection_broadcast
+            train_measurement_collection_remote_object
             .value
             .select_allele(allele)
             .to_dataset(**measurement_collection_hyperparameters))
         if all_hyperparameters['impute']:
             imputed_train_dataset = (
-                train_measurement_collection_broadcast
+                train_measurement_collection_remote_object
                 .value
                 .select_allele(allele)
                 .to_dataset(**measurement_collection_hyperparameters))
         else:
             imputed_train_dataset = None
         test_dataset = (
-            test_measurement_collection_broadcast
+            test_measurement_collection_remote_object
             .value
             .select_allele(allele)
             .to_dataset(**measurement_collection_hyperparameters))
@@ -133,8 +134,8 @@ def fit_and_test(
             'fold_num': fold_num,
             'allele': allele,
             'hyperparameters': all_hyperparameters,
-            'model': model,
-            'scores': scores
+            'model': parallel_backend.remote_object(model),
+            'scores': scores,
         })
         logging.info("Done training model in %0.2f sec" % (
             time.time() - start))
@@ -317,7 +318,8 @@ class Class1EnsembleMultiAllelePredictor(object):
         fit_name = time.asctime().replace(" ", "_")
         assert len(measurement_collection.df) > 0
 
-        splits = measurement_collection.half_splits(self.ensemble_size)
+        splits = measurement_collection.half_splits(
+            self.ensemble_size, random_state=0)
 
         if self.imputation_hyperparameters is not None:
             logging.info("Imputing: %d tasks, imputation args: %s" % (
@@ -343,11 +345,11 @@ class Class1EnsembleMultiAllelePredictor(object):
         for (fold_num, (train_split, test_split)) in enumerate(splits):
             assert len(train_split.df) > 0
             assert len(test_split.df) > 0
-            train_broadcast = parallel_backend.broadcast(train_split)
-            test_broadcast = parallel_backend.broadcast(test_split)
-            imputed_train_broadcast = None
+            train_remote_object = parallel_backend.remote_object(train_split)
+            test_remote_object = parallel_backend.remote_object(test_split)
+            imputed_train_remote_object = None
             if imputed_trains is not None:
-                imputed_train_broadcast = parallel_backend.broadcast(
+                imputed_train_remote_object = parallel_backend.remote_object(
                     imputed_trains[fold_num])
 
             task_allele_model_pairs = []
@@ -355,10 +357,11 @@ class Class1EnsembleMultiAllelePredictor(object):
             def make_task():
                 if task_allele_model_pairs:
                     tasks.append((
+                        parallel_backend,
                         fold_num,
-                        train_broadcast,
-                        imputed_train_broadcast,
-                        test_broadcast,
+                        train_remote_object,
+                        imputed_train_remote_object,
+                        test_remote_object,
                         list(task_allele_model_pairs)))
                     task_allele_model_pairs[:] = []
 
@@ -378,7 +381,7 @@ class Class1EnsembleMultiAllelePredictor(object):
                     task_allele_model_pairs.append((allele, model))
                     if len(task_allele_model_pairs) > work_per_task:
                         make_task()
-                make_task()
+            make_task()
             assert not task_allele_model_pairs
 
         allele_models_per_task = numpy.array([
@@ -386,17 +389,17 @@ class Class1EnsembleMultiAllelePredictor(object):
         ])
         logging.info(
             "Training and scoring models: %d tasks (target was %d), "
-            "total work: %d alleles * %d ensemble size * %d models = %d"
+            "total work: %d alleles * %d ensemble size * %d models = %d, "
             "allele/models per task: (min=%d mean=%f max=%d)" % (
                 len(tasks),
                 target_tasks,
                 len(alleles),
                 self.ensemble_size,
                 len(self.hyperparameters_to_search),
+                total_work,
                 allele_models_per_task.min(),
                 allele_models_per_task.max(),
-                allele_models_per_task.mean(),
-                total_work))
+                allele_models_per_task.mean()))
 
         assert len(tasks) > 0
         results = parallel_backend.map(call_fit_and_test, tasks)
@@ -423,10 +426,6 @@ class Class1EnsembleMultiAllelePredictor(object):
                 if allele in fold_results:
                     current_best = fold_results[allele]['summary_score']
 
-                # logging.debug("Work item: %s, current best score: %f" % (
-                #    str(item),
-                #    current_best))
-
                 if item['summary_score'] > current_best:
                     logging.info("Updating current best: %s" % str(item))
                     fold_results[allele] = item
@@ -452,8 +451,9 @@ class Class1EnsembleMultiAllelePredictor(object):
             assert set(fold_results) == set(alleles), (
                 "%s != %s" % (set(fold_results), set(alleles)))
             for (allele, item) in fold_results.items():
-                item['model'].name = item['model_name']
-                self.allele_to_models[allele].append(item['model'])
-                manifest_df.loc[item['model_name'], "weight"] = 1.0
+                model = item['model'].value
+                model.name = item['model_name']
+                self.allele_to_models[allele].append(model)
+                manifest_df.loc[model.name, "weight"] = 1.0
 
         self.manifest_df = manifest_df

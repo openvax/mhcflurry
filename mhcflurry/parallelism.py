@@ -4,7 +4,7 @@ import logging
 DEFAULT_BACKEND = None
 
 
-class BroadcastStub(object):
+class RemoteObjectStub(object):
     def __init__(self, value):
         self.value = value
 
@@ -19,8 +19,8 @@ class ParallelBackend(object):
         self.module = module
         self.verbose = verbose
 
-    def broadcast(self, value):
-        return BroadcastStub(value)
+    def remote_object(self, value):
+        return RemoteObjectStub(value)
 
 
 class KubefaceParallelBackend(ParallelBackend):
@@ -34,8 +34,8 @@ class KubefaceParallelBackend(ParallelBackend):
     def map(self, func, iterable):
         return self.client.map(func, iterable)
 
-    def broadcast(self, value):
-        return self.client.broadcast(value)
+    def remote_object(self, value):
+        return self.client.remote_object(value)
 
     def __str__(self):
         return "<Kubeface backend, client=%s>" % self.client
