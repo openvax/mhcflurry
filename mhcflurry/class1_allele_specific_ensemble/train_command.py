@@ -39,13 +39,9 @@ import sys
 import argparse
 import json
 import logging
-import time
 import os
-import socket
-import hashlib
-import pickle
-
-import numpy
+import traceback
+import signal
 
 from .. import parallelism
 from ..dataset import Dataset
@@ -161,6 +157,10 @@ except ImportError:
 
 
 def run(argv=sys.argv[1:]):
+    # On sigusr1 print stack trace
+    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
+    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+
     args = parser.parse_args(argv)
     if args.verbose:
         logging.root.setLevel(level="DEBUG")
