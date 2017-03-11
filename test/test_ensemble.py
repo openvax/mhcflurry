@@ -59,11 +59,11 @@ def test_basic():
     try:
         tmpdir = tempfile.mkdtemp(prefix="mhcflurry-test")
         model.write_fit(
-            os.path.join(tmpdir, "models.csv"),
-            tmpdir)
+            tmpdir,
+            all_models_csv=os.path.join(tmpdir, "models.csv"))
         model2 = Class1EnsembleMultiAllelePredictor.load_fit(
-            os.path.join(tmpdir, "models.csv"),
-            tmpdir)
+            tmpdir,
+            os.path.join(tmpdir, "models.csv"))
     finally:
         shutil.rmtree(tmpdir)
 
@@ -71,7 +71,7 @@ def test_basic():
     eq_(model.supported_alleles(), model2.supported_alleles())
     eq_(model.hyperparameters_to_search, model2.hyperparameters_to_search)
     ic50_pred2 = model.predict(mc)
-    assert_allclose(ic50_pred, ic50_pred2)
+    assert_allclose(ic50_pred, ic50_pred2, rtol=1e-06)
 
 
 def test_train_command():

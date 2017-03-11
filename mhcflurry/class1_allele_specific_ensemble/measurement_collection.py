@@ -47,6 +47,7 @@ class MeasurementCollection(object):
             for measurement_type in df.measurement_type.unique():
                 assert measurement_type in MEASUREMENT_TYPES, measurement_type
         self.df = df[COLUMNS]
+        self.alleles = set(df.allele)
 
     @staticmethod
     def from_dataset(dataset):
@@ -190,7 +191,6 @@ class MeasurementCollection(object):
             min_observations_per_peptide=impute_min_observations_per_peptide,
             min_observations_per_allele=impute_min_observations_per_allele
         ).to_dataframe()
-        assert len(result_df) > 0
         result_df["measurement_type"] = "affinity"
         result_df["measurement_source"] = "imputed"
         result_df["measurement_value"] = result_df.affinity
