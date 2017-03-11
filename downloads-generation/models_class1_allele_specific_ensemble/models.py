@@ -17,8 +17,8 @@ models = HYPERPARAMETER_DEFAULTS.models_grid(
         # Arguments specific to imputation method (mice)
         {"n_burn_in": 5, "n_imputations": 50, "n_nearest_columns": 25}
     ],
-    impute_min_observations_per_peptide=[1],
-    impute_min_observations_per_allele=[1])
+    impute_min_observations_per_peptide=[3],
+    impute_min_observations_per_allele=[3])
 
 sys.stderr.write("Models: %d\n" % len(models))
 print(json.dumps(models, indent=4))

@@ -43,8 +43,8 @@ MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
 
 IMPUTE_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     impute_method='mice',
-    impute_min_observations_per_peptide=1,
-    impute_min_observations_per_allele=1,
+    impute_min_observations_per_peptide=5,
+    impute_min_observations_per_allele=5,
     imputer_args={"n_burn_in": 5, "n_imputations": 25})
 
 HYPERPARAMETER_DEFAULTS = (
@@ -63,25 +63,25 @@ def call_fit_and_test(args):
 def fit_and_test(
         parallel_backend,
         fold_num,
-        train_measurement_collection_remote_object,
-        imputed_train_measurement_collection_remote_object,
-        test_measurement_collection_remote_object,
+        train_mc_remote_object,
+        imputed_mc_remote_object,
+        test_mc_remote_object,
         allele_and_hyperparameter_pairs):
 
     logging.info(
         "Fit and test: fold=%d train=%s,%s test=%s alleles/models [%d]=%s" % (
             fold_num,
-            train_measurement_collection_remote_object.value,
-            imputed_train_measurement_collection_remote_object,
-            test_measurement_collection_remote_object.value,
+            train_mc_remote_object.value,
+            imputed_mc_remote_object,
+            test_mc_remote_object.value,
             len(allele_and_hyperparameter_pairs),
             "\n".join("Allele: %s, hyperparameters: %s" % (
                 allele, hyperparameters)
                 for (allele, hyperparameters)
                 in allele_and_hyperparameter_pairs)))
 
-    assert len(train_measurement_collection_remote_object.value.df) > 0
-    assert len(test_measurement_collection_remote_object.value.df) > 0
+    assert len(train_mc_remote_object.value.df) > 0
+    assert len(test_mc_remote_object.value.df) > 0
 
     results = []
     for (i, (allele, all_hyperparameters)) in enumerate(
@@ -101,20 +101,22 @@ def fit_and_test(
                 all_hyperparameters))
 
         train_dataset = (
-            train_measurement_collection_remote_object
+            train_mc_remote_object
             .value
             .select_allele(allele)
             .to_dataset(**measurement_collection_hyperparameters))
-        if all_hyperparameters['impute']:
+        if all_hyperparameters['impute'] and (
+                allele in
+                imputed_mc_remote_object.value.alleles):
             imputed_train_dataset = (
-                train_measurement_collection_remote_object
+                imputed_mc_remote_object
                 .value
                 .select_allele(allele)
                 .to_dataset(**measurement_collection_hyperparameters))
         else:
             imputed_train_dataset = None
         test_dataset = (
-            test_measurement_collection_remote_object
+            test_mc_remote_object
             .value
             .select_allele(allele)
             .to_dataset(**measurement_collection_hyperparameters))
@@ -136,19 +138,25 @@ def fit_and_test(
             'hyperparameters': all_hyperparameters,
             'model': parallel_backend.remote_object(model),
             'scores': scores,
+            'train_size': len(train_dataset),
+            'test_size': len(test_dataset),
+            'pretrain_size': (
+                0 if imputed_train_dataset is None
+                else len(imputed_train_dataset)),
         })
         logging.info("Done training model in %0.2f sec" % (
             time.time() - start))
     return results
 
 
-def impute(hyperparameters, measurement_collection):
-    return measurement_collection.impute(**hyperparameters)
+def impute(parallel_backend, hyperparameters, measurement_collection):
+    return parallel_backend.remote_object(
+        measurement_collection.impute(**hyperparameters))
 
 
 class Class1EnsembleMultiAllelePredictor(object):
     @staticmethod
-    def load_fit(path_to_manifest, path_to_models_dir):
+    def load_fit(path_to_models_dir, path_to_manifest):
         manifest_df = pandas.read_csv(path_to_manifest, index_col="model_name")
         # Convert string-serialized dicts into Python objects.
         manifest_df["hyperparameters"] = [
@@ -272,20 +280,32 @@ class Class1EnsembleMultiAllelePredictor(object):
         assert len(result) == self.ensemble_size
         return result
 
-    def write_fit(self, path_to_manifest_csv, path_to_models_dir):
-        self.manifest_df.to_csv(path_to_manifest_csv)
-        logging.debug("Wrote: %s" % path_to_manifest_csv)
-        models_written = []
-        for (allele, models) in self.allele_to_models.items():
-            for model in models:
-                filename = os.path.join(
-                    path_to_models_dir, "%s.pickle" % model.name)
-                with open(filename, 'wb') as fd:
-                    pickle.dump(model, fd)
-                logging.debug("Wrote: %s" % filename)
-                models_written.append(model.name)
-        assert set(models_written) == set(
-            self.manifest_df.ix[self.manifest_df.weight > 0].index)
+    def write_fit(
+            self,
+            models_dir=None,
+            selected_models_csv=None,
+            all_models_csv=None):
+        if all_models_csv:
+            self.manifest_df.to_csv(all_models_csv)
+            logging.debug("Wrote: %s" % all_models_csv)
+        if selected_models_csv:
+            self.manifest_df.ix[
+                self.manifest_df.weight > 0
+            ].to_csv(selected_models_csv)
+            logging.debug("Wrote: %s" % selected_models_csv)
+
+        if models_dir:
+            models_written = []
+            for (allele, models) in self.allele_to_models.items():
+                for model in models:
+                    filename = os.path.join(
+                        models_dir, "%s.pickle" % model.name)
+                    with open(filename, 'wb') as fd:
+                        pickle.dump(model, fd)
+                    logging.debug("Wrote: %s" % filename)
+                    models_written.append(model.name)
+            assert set(models_written) == set(
+                self.manifest_df.ix[self.manifest_df.weight > 0].index)
 
     def predict(self, measurement_collection):
         result = pandas.Series(
@@ -325,7 +345,8 @@ class Class1EnsembleMultiAllelePredictor(object):
             logging.info("Imputing: %d tasks, imputation args: %s" % (
                 len(splits), str(self.imputation_hyperparameters)))
             imputed_trains = list(parallel_backend.map(
-                partial(impute, self.imputation_hyperparameters),
+                partial(
+                    impute, parallel_backend, self.imputation_hyperparameters),
                 [train for (train, test) in splits]))
             logging.info("Imputation completed.")
         else:
@@ -349,8 +370,7 @@ class Class1EnsembleMultiAllelePredictor(object):
             test_remote_object = parallel_backend.remote_object(test_split)
             imputed_train_remote_object = None
             if imputed_trains is not None:
-                imputed_train_remote_object = parallel_backend.remote_object(
-                    imputed_trains[fold_num])
+                imputed_train_remote_object = imputed_trains[fold_num]
 
             task_allele_model_pairs = []
 

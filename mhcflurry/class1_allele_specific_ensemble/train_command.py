@@ -78,7 +78,12 @@ parser.add_argument(
 parser.add_argument(
     "--out-manifest",
     metavar="X.csv",
-    help="Write results to the given file")
+    help="Write descriptions of selected models to given file")
+
+parser.add_argument(
+    "--out-model-selection-manifest",
+    metavar="X.csv",
+    help="Write complete results of all models to the given file")
 
 parser.add_argument(
     "--out-models-dir",
@@ -221,4 +226,7 @@ def go(args):
     model.fit(train_mc, target_tasks=args.target_tasks)
     logging.info("Done fitting.")
 
-    model.write_fit(args.out_manifest, args.out_models_dir)
+    model.write_fit(
+        selected_models_csv=args.out_manifest,
+        all_models_csv=args.out_model_selection_manifest,
+        models_dir=args.out_models_dir)
