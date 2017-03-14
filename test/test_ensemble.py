@@ -6,7 +6,7 @@ import json
 from os.path import join
 from os import mkdir
 
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_equal
 from nose.tools import eq_
 
 from mhcflurry.class1_allele_specific import scoring
@@ -47,6 +47,22 @@ def test_basic():
     print(model.description())
     print("Now fitting.")
     model.fit(mc)
+
+    model2 = Class1EnsembleMultiAllelePredictor(
+        ensemble_size=3,
+        hyperparameters_to_search=model_hyperparameters)
+    model2.fit(mc)
+    print(set(model.manifest_df.all_alleles_train_data_hash))
+    assert_equal(
+        set(model.manifest_df.all_alleles_train_data_hash),
+        set(model2.manifest_df.all_alleles_train_data_hash))
+    assert_equal(
+        set(model.manifest_df.all_alleles_test_data_hash),
+        set(model2.manifest_df.all_alleles_test_data_hash))
+    assert_equal(
+        set(model.manifest_df.all_alleles_imputed_data_hash),
+        set(model2.manifest_df.all_alleles_imputed_data_hash))
+
     print(model.description())
     ic50_pred = model.predict(mc)
     ic50_true = mc.df.measurement_value
