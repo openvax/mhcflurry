@@ -34,7 +34,7 @@ import pandas
 
 from ..hyperparameters import HyperparameterDefaults
 from ..class1_allele_specific import Class1BindingPredictor, scoring
-from .. import parallelism
+from .. import parallelism, common
 
 MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     include_ms=True,
@@ -82,6 +82,23 @@ def fit_and_test(
 
     assert len(train_mc_remote_object.value.df) > 0
     assert len(test_mc_remote_object.value.df) > 0
+
+    train_mc_hash = common.dataframe_cryptographic_hash(
+        train_mc_remote_object.value.df)
+
+    imputed_mc_hash = None
+    if imputed_mc_remote_object is not None:
+        imputed_mc_hash = common.dataframe_cryptographic_hash(
+            imputed_mc_remote_object.value.df)
+    test_mc_hash = common.dataframe_cryptographic_hash(
+        test_mc_remote_object.value.df)
+
+    common_result_entries = {
+        'fold_num': fold_num,
+        'all_alleles_train_data_hash': train_mc_hash,
+        'all_alleles_imputed_data_hash': imputed_mc_hash,
+        'all_alleles_test_data_hash': test_mc_hash,
+    }
 
     results = []
     for (i, (allele, all_hyperparameters)) in enumerate(
@@ -132,8 +149,9 @@ def fit_and_test(
         predictions = model.predict(test_dataset.peptides)
         scores = scoring.make_scores(
             test_dataset.affinities, predictions)
-        results.append({
-            'fold_num': fold_num,
+
+        result = dict(common_result_entries)
+        result.update({
             'allele': allele,
             'hyperparameters': all_hyperparameters,
             'model': parallel_backend.remote_object(model),
@@ -144,6 +162,7 @@ def fit_and_test(
                 0 if imputed_train_dataset is None
                 else len(imputed_train_dataset)),
         })
+        results.append(result)
         logging.info("Done training model in %0.2f sec" % (
             time.time() - start))
     return results
