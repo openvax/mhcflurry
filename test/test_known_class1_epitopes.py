@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mhcflurry.class1_allele_specific import load
+from mhcflurry.class1_allele_specific import class1_single_model_multi_allele_predictor
 
 
 def test_A1_Titin_epitope():
@@ -20,7 +20,7 @@ def test_A1_Titin_epitope():
     #   Identification of a Titin-Derived HLA-A1-Presented Peptide
     #   as a Cross-Reactive Target for Engineered MAGE A3-Directed
     #   T Cells
-    model = load.from_allele_name("HLA-A*01:01")
+    model = class1_single_model_multi_allele_predictor.from_allele_name("HLA-A*01:01")
     ic50s = model.predict(["ESDPIVAQY"])
     print(ic50s)
     assert len(ic50s) == 1
@@ -33,7 +33,7 @@ def test_A1_MAGE_epitope():
     #   Identification of a Titin-Derived HLA-A1-Presented Peptide
     #   as a Cross-Reactive Target for Engineered MAGE A3-Directed
     #   T Cells
-    model = load.from_allele_name("HLA-A*01:01")
+    model = class1_single_model_multi_allele_predictor.from_allele_name("HLA-A*01:01")
     ic50s = model.predict(["EVDPIGHLY"])
     print(ic50s)
     assert len(ic50s) == 1
@@ -44,7 +44,7 @@ def test_A1_MAGE_epitope():
 def test_A2_HIV_epitope():
     # Test the A2 HIV epitope SLYNTVATL from
     #    The HIV-1 HLA-A2-SLYNTVATL Is a Help-Independent CTL Epitope
-    model = load.from_allele_name("HLA-A*02:01")
+    model = class1_single_model_multi_allele_predictor.from_allele_name("HLA-A*02:01")
     ic50s = model.predict(["SLYNTVATL"])
     print(ic50s)
     assert len(ic50s) == 1

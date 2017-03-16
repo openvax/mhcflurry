@@ -180,6 +180,13 @@ def impute(parallel_backend, hyperparameters, measurement_collection):
 
 class Class1EnsembleMultiAllelePredictor(object):
     @staticmethod
+    def load_from_download_directory(directory):
+        return Class1EnsembleMultiAllelePredictor.load_fit(
+            os.path.join(directory, "models"),
+            os.path.join(directory, "selected_models.csv"),
+        )
+
+    @staticmethod
     def load_fit(path_to_models_dir, path_to_manifest):
         manifest_df = pandas.read_csv(path_to_manifest, index_col="model_name")
         # Convert string-serialized dicts into Python objects.
@@ -344,7 +351,7 @@ class Class1EnsembleMultiAllelePredictor(object):
     def predict_for_allele(self, allele, peptides):
         values = [
             model.predict(peptides)
-            for model in self.allele_to_models[allele]
+            for model in self.models_for_allele(allele)
         ]
 
         # Geometric mean
