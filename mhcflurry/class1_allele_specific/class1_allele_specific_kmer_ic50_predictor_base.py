@@ -168,12 +168,12 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
 
         Parameters
         ----------
-        dataset : Dataset
+        dataset : AffinityMeasurementDataset
 
-        pretraining_dataset : Dataset
+        pretraining_dataset : AffinityMeasurementDataset
 
         sample_censored_affinities : bool
-            If a column named 'inequality' is in the Dataset then every
+            If a column named 'inequality' is in the AffinityMeasurementDataset then every
             peptide with a value of '>' on each training epoch, gets a
             randomly sampled IC50 between its observed value and the
             max_ic50 of the predictor. Default is False.

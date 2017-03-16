@@ -1,10 +1,10 @@
-from mhcflurry.dataset import Dataset
+from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset
 from nose.tools import eq_
 from . import data_path
 
 
 def load_csv(filename):
-    return Dataset.from_csv(data_path(filename))
+    return AffinityMeasurementDataset.from_csv(data_path(filename))
 
 
 def test_load_allele_datasets_8mer():

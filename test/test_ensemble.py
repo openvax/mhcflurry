@@ -12,7 +12,7 @@ from nose.tools import eq_
 from mhcflurry.class1_allele_specific import scoring
 from mhcflurry.measurement_collection import MeasurementCollection
 from mhcflurry.class1_allele_specific_ensemble import train_command
-from mhcflurry.dataset import Dataset
+from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset
 from mhcflurry.downloads import get_path
 from mhcflurry \
     .class1_allele_specific_ensemble \
@@ -34,9 +34,9 @@ def test_basic():
         hyperparameters_to_search=model_hyperparameters)
     print(model)
 
-    dataset = Dataset.from_csv(get_path(
+    dataset = AffinityMeasurementDataset.from_csv(get_path(
         "data_combined_iedb_kim2014", "combined_human_class1_dataset.csv"))
-    sub_dataset = Dataset(
+    sub_dataset = AffinityMeasurementDataset(
         dataset._df.ix[
             (dataset._df.allele.isin(["HLA-A0101", "HLA-A0205"])) &
             (dataset._df.peptide.str.len() == 9)
@@ -83,7 +83,7 @@ def test_basic():
         shutil.rmtree(tmpdir)
 
     eq_(model.ensemble_size, model2.ensemble_size)
-    eq_(model.supported_alleles(), model2.supported_alleles())
+    eq_(model.supported_alleles, model2.supported_alleles)
     eq_(model.hyperparameters_to_search, model2.hyperparameters_to_search)
     ic50_pred2 = model.predict(mc)
     assert_allclose(ic50_pred, ic50_pred2, rtol=1e-06)
