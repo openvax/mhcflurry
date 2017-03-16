@@ -1,15 +1,15 @@
 from nose.tools import eq_
-from mhcflurry.dataset import Dataset
+from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset
 
 def test_create_allele_data_from_single_allele_dict():
     peptide_to_ic50_dict = {
         ("A" * 10): 1.2,
         ("C" * 9): 1000,
     }
-    dataset = Dataset.from_single_allele_dictionary(
+    dataset = AffinityMeasurementDataset.from_single_allele_dictionary(
         allele_name="A0201",
         peptide_to_affinity_dict=peptide_to_ic50_dict)
-    assert isinstance(dataset, Dataset)
+    assert isinstance(dataset, AffinityMeasurementDataset)
 
     eq_(len(peptide_to_ic50_dict), len(dataset))
     expected_peptides = set([
@@ -22,7 +22,7 @@ def test_create_allele_data_from_single_allele_dict():
         eq_(pi, pj)
 
 def test_dataset_random_split():
-    dataset = Dataset.from_nested_dictionary({
+    dataset = AffinityMeasurementDataset.from_nested_dictionary({
         "H-2-Kb": {
             "SIINFEKL": 10.0,
             "FEKLSIIN": 20000.0,
@@ -33,15 +33,15 @@ def test_dataset_random_split():
     assert len(right) == 1
 
 def test_dataset_difference():
-    dataset1 = Dataset.from_nested_dictionary({
+    dataset1 = AffinityMeasurementDataset.from_nested_dictionary({
         "H-2-Kb": {
             "SIINFEKL": 10.0,
             "FEKLSIIN": 20000.0,
             "SIFEKLIN": 50000.0,
         }})
-    dataset2 = Dataset.from_nested_dictionary({"H-2-Kb": {"SIINFEKL": 10.0}})
+    dataset2 = AffinityMeasurementDataset.from_nested_dictionary({"H-2-Kb": {"SIINFEKL": 10.0}})
     dataset_diff = dataset1.difference(dataset2)
-    expected_result = Dataset.from_nested_dictionary({
+    expected_result = AffinityMeasurementDataset.from_nested_dictionary({
         "H-2-Kb": {
             "FEKLSIIN": 20000.0,
             "SIFEKLIN": 50000.0,
@@ -50,20 +50,20 @@ def test_dataset_difference():
 
 
 def test_dataset_intersection():
-    dataset1 = Dataset.from_nested_dictionary({
+    dataset1 = AffinityMeasurementDataset.from_nested_dictionary({
         "H-2-Kb": {
             "SIINFEKL": 10.0,
             "FEKLSIIN": 20000.0,
             "SIFEKLIN": 50000.0,
         }})
-    dataset2 = Dataset.from_nested_dictionary({"H-2-Kb": {"SIINFEKL": 30.0}})
+    dataset2 = AffinityMeasurementDataset.from_nested_dictionary({"H-2-Kb": {"SIINFEKL": 30.0}})
     dataset_intersection = dataset1.intersection(dataset2)
-    expected_result = Dataset.from_nested_dictionary({
+    expected_result = AffinityMeasurementDataset.from_nested_dictionary({
         "H-2-Kb": {"SIINFEKL": 10.0}})
     eq_(dataset_intersection, expected_result)
 
 def test_dataset_cross_validation():
-    dataset = Dataset.from_nested_dictionary({
+    dataset = AffinityMeasurementDataset.from_nested_dictionary({
         "H-2-Kb": {
             "SIINFEKL": 10.0,
             "FEKLSIIN": 20000.0,

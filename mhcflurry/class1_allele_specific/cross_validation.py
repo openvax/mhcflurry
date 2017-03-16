@@ -102,12 +102,12 @@ def cross_validation_folds(
         },
         parallel_backend=None):
     '''
-    Split a Dataset into n_folds cross validation folds for each allele,
+    Split a AffinityMeasurementDataset into n_folds cross validation folds for each allele,
     optionally performing imputation.
 
     Parameters
     -----------
-    train_data : mhcflurry.Dataset
+    train_data : mhcflurry.AffinityMeasurementDataset
 
     alleles : string list, optional
         Alleles to run cross validation on. Default: all alleles in
@@ -125,7 +125,7 @@ def cross_validation_folds(
         Imputer to use. If not specified, no imputation is done.
 
     impute_kwargs : dict, optional
-        Additional kwargs to pass to mhcflurry.Dataset.impute_missing_values.
+        Additional kwargs to pass to mhcflurry.AffinityMeasurementDataset.impute_missing_values.
 
     parallel_backend : mhcflurry.parallelism.ParallelBackend, optional
         Futures implementation to use for running on multiple threads,

@@ -44,7 +44,7 @@ import traceback
 import signal
 
 from .. import parallelism
-from ..dataset import Dataset
+from ..affinity_measurement_dataset import AffinityMeasurementDataset
 
 from .class1_ensemble_multi_allele_predictor import (
     Class1EnsembleMultiAllelePredictor)
@@ -204,7 +204,7 @@ def go(args):
         logging.info(
             "Subselected to %d model architectures" % len(model_architectures))
 
-    train_dataset = Dataset.from_csv(args.train_data)
+    train_dataset = AffinityMeasurementDataset.from_csv(args.train_data)
     logging.info("Loaded training data: %s" % train_dataset)
 
     if args.alleles:

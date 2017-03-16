@@ -21,7 +21,7 @@ from __future__ import (
 import numpy as np
 
 from .regression_target import regression_target_to_ic50, MAX_IC50
-from .dataset import Dataset
+from .affinity_measurement_dataset import AffinityMeasurementDataset
 from .hyperparameters import HyperparameterDefaults
 
 
@@ -71,7 +71,7 @@ class IC50PredictorBase(object):
         peptide_to_ic50_dict : dict
             Dictionary that maps peptides to IC50 values.
         """
-        dataset = Dataset.from_peptide_to_affinity_dictionary(
+        dataset = AffinityMeasurementDataset.from_peptide_to_affinity_dictionary(
             allele_name=self.name,
             peptide_to_affinity_dict=peptide_to_ic50_dict)
         return self.fit_dataset(dataset, **kwargs)
@@ -84,7 +84,7 @@ class IC50PredictorBase(object):
             alleles=None, **kwargs):
         if alleles is None:
             alleles = [self.name] * len(peptides)
-        dataset = Dataset.from_sequences(
+        dataset = AffinityMeasurementDataset.from_sequences(
             alleles=alleles,
             peptides=peptides,
             affinities=affinities,

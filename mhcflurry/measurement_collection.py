@@ -1,7 +1,7 @@
 from sklearn.model_selection import StratifiedKFold
 import pandas
 
-from .dataset import Dataset
+from .affinity_measurement_dataset import AffinityMeasurementDataset
 from .imputation_helpers import imputer_from_name
 
 COLUMNS = [
@@ -32,9 +32,9 @@ class MeasurementCollection(object):
     A single measurement collection may have both MS hits and affinity
     measurements.
 
-    This is more general than a Dataset since it supports MS hits. It is also
+    This is more general than a AffinityMeasurementDataset since it supports MS hits. It is also
     simpler, as the user is expected to manipulate the underlying dataframe.
-    Later we may want to retire Dataset or combine it with this class.
+    Later we may want to retire AffinityMeasurementDataset or combine it with this class.
     """
 
     def __init__(self, df, check=True):
@@ -50,7 +50,7 @@ class MeasurementCollection(object):
     @staticmethod
     def from_dataset(dataset):
         """
-        Given a Dataset, return a MeasurementCollection
+        Given a AffinityMeasurementDataset, return a MeasurementCollection
         """
         dataset_df = dataset.to_dataframe()
         df = dataset_df.reset_index(drop=True)[["allele", "peptide"]].copy()
@@ -141,7 +141,7 @@ class MeasurementCollection(object):
             ms_hit_affinity=1.0,
             ms_decoy_affinity=20000):
         """
-        Return a Dataset containing the observations in the collection.
+        Return a AffinityMeasurementDataset containing the observations in the collection.
         Mass-spec data are converted to affinities according to
         ms_hit_affinity and ms_decoy_affinity.
 
@@ -160,10 +160,10 @@ class MeasurementCollection(object):
 
         Returns
         -------------
-        Dataset instance
+        AffinityMeasurementDataset instance
         """
         if include_ms:
-            dataset = Dataset(pandas.DataFrame({
+            dataset = AffinityMeasurementDataset(pandas.DataFrame({
                 "allele": self.df.allele,
                 "peptide": self.df.peptide,
                 "affinity": [
@@ -180,7 +180,7 @@ class MeasurementCollection(object):
                 (self.df.measurement_type == "affinity") &
                 (self.df.measurement_source == "in_vitro_affinity_assay")
             ]
-            dataset = Dataset(pandas.DataFrame({
+            dataset = AffinityMeasurementDataset(pandas.DataFrame({
                 "allele": df.allele,
                 "peptide": df.peptide,
                 "affinity": df.measurement_value,
