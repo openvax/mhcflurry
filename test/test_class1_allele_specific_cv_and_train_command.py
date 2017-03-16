@@ -72,7 +72,7 @@ def test_small_run():
         # If kubeface is installed, then this command will by default use it.
         # In that case, we want to have the kubeface storage written to a
         # local file and not assume the existence of a google storage bucket.
-        args.extend(["--storage-prefix", "/tmp/"])
+        args.extend(["--kubeface-storage", "/tmp/"])
     print("Running cv_and_train_command with args: %s " % str(args))
 
     cv_and_train_command.run(args)

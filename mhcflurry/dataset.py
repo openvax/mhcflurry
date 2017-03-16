@@ -38,10 +38,13 @@ from .imputation_helpers import (
 
 
 class Dataset(object):
-
     """
     Peptide-MHC binding dataset with helper methods for constructing
     different representations (arrays, DataFrames, dictionaries, &c).
+
+    This class is specific for affinity measurements (IC50s), whereas the
+    MeasurementCollection class supports both affinitites and other
+    measurement types like mass spec hits.
 
     Design considerations:
         - want to allow multiple measurements for each pMHC pair (which can
@@ -50,7 +53,7 @@ class Dataset(object):
     """
     def __init__(self, df):
         """
-        Constructs a DataSet from a pandas DataFrame with the following
+        Constructs a Dataset from a pandas DataFrame with the following
         columns:
             - allele
             - peptide

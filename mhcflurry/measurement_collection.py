@@ -1,10 +1,8 @@
-from ..dataset import Dataset
-
 from sklearn.model_selection import StratifiedKFold
-
 import pandas
 
-from ..imputation_helpers import imputer_from_name
+from .dataset import Dataset
+from .imputation_helpers import imputer_from_name
 
 COLUMNS = [
     "allele",
@@ -61,6 +59,28 @@ class MeasurementCollection(object):
         df["measurement_value"] = dataset_df.affinity.values
         df["weight"] = dataset_df.sample_weight.values
         return MeasurementCollection(df)
+
+    def select_measurement_type(self, kind):
+        """
+        Return a new MeasurementCollection containing only measurements of the
+        given type.
+
+        Parameters
+        -----------
+        kind : string
+            "affinity" or "ms_hit"
+
+        Returns
+        -----------
+        MeasurementCollection instance
+        """
+        if kind not in MEASUREMENT_TYPES:
+            raise ValueError(
+                "Unknown measurement type: %s. Supported types: %s" % (
+                    kind, ", ".join(MEASUREMENT_TYPES)))
+        return MeasurementCollection(
+            self.df.ix[self.df.measurement_type == kind],
+            check=False)
 
     def select_allele(self, allele):
         """

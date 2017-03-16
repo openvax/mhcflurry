@@ -69,6 +69,60 @@ def get_loader_for_downloaded_models():
     return CACHED_LOADER
 
 
+'''
+class Class1SingleModelMultiAllelePredictor(object):
+    """
+    Factory for Class1BindingPredictor instances that are stored on disk
+    using this directory structure:
+
+        production.csv - Manifest file giving information on all models
+
+        models/ - directory of models with names given in the manifest file
+            MODEL-BAR.pickle
+            MODEL-FOO.pickle
+            ...
+    """
+
+    def __init__(self, path):
+        """
+        Parameters
+        ----------
+        path : string
+            Path to directory containing manifest and models
+        """
+        self.path = path
+        self.path_to_models_csv = join(path, "production.csv")
+        self.df = pandas.read_csv(self.path_to_models_csv)
+        self.df.index = self.df["allele"]
+        self.supported_alleles = list(sorted(self.df.allele))
+        self.predictors_cache = {}
+
+    def supported_alleles(self):
+        return list(
+            self.manifest_df.ix[self.manifest_df.weight > 0].allele.unique())
+
+    def predict(self, measurement_collection):
+        result = pandas.Series(
+            index=measurement_collection.df.index)
+        for (allele, sub_df) in measurement_collection.df.groupby("allele"):
+            result.loc[sub_df.index] = self.predict_for_allele(
+                allele, sub_df.peptide.values)
+        assert not result.isnull().any()
+        return result
+
+    def predict_for_allele(self, allele, peptides):
+        values = [
+            model.predict(peptides)
+            for model in self.allele_to_models[allele]
+        ]
+
+        # Geometric mean
+        result = numpy.exp(numpy.nanmean(numpy.log(values), axis=0))
+        assert len(result) == len(peptides)
+        return result
+'''
+
+
 class Class1AlleleSpecificPredictorLoader(object):
     """
     Factory for Class1BindingPredictor instances that are stored on disk

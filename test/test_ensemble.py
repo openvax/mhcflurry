@@ -10,8 +10,7 @@ from numpy.testing import assert_allclose, assert_equal
 from nose.tools import eq_
 
 from mhcflurry.class1_allele_specific import scoring
-from mhcflurry.class1_allele_specific_ensemble.measurement_collection import (
-    MeasurementCollection)
+from mhcflurry.measurement_collection import MeasurementCollection
 from mhcflurry.class1_allele_specific_ensemble import train_command
 from mhcflurry.dataset import Dataset
 from mhcflurry.downloads import get_path
