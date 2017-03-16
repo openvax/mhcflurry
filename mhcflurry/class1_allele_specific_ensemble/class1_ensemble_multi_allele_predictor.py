@@ -143,10 +143,13 @@ def fit_and_test(
 
         model = Class1BindingPredictor(**model_hyperparameters)
 
+        train_start = time.time()
         model.fit_dataset(
             train_dataset,
             pretraining_dataset=imputed_train_dataset)
+        train_end = time.time()
         predictions = model.predict(test_dataset.peptides)
+        test_end = time.time()
         scores = scoring.make_scores(
             test_dataset.affinities, predictions)
 
@@ -161,6 +164,8 @@ def fit_and_test(
             'pretrain_size': (
                 0 if imputed_train_dataset is None
                 else len(imputed_train_dataset)),
+            'train_time': train_end - train_start,
+            'predict_time': test_end - train_end,
         })
         results.append(result)
         logging.info("Done training model in %0.2f sec" % (
@@ -225,6 +230,7 @@ class Class1EnsembleMultiAllelePredictor(object):
         self.allele_to_models = None
         self.models_dir = None
 
+    @property
     def supported_alleles(self):
         return list(
             self.manifest_df.ix[self.manifest_df.weight > 0].allele.unique())
@@ -240,7 +246,7 @@ class Class1EnsembleMultiAllelePredictor(object):
         kv("num architectures considered",
             len(self.hyperparameters_to_search))
         if self.allele_to_models is not None:
-            kv("supported alleles", " ".join(self.supported_alleles()))
+            kv("supported alleles", " ".join(self.supported_alleles))
         kv("models dir", self.models_dir)
 
         lines.append("%s Ensemble: %s" % (
@@ -284,7 +290,7 @@ class Class1EnsembleMultiAllelePredictor(object):
                 raise ValueError(
                     "Unsupported allele: %s. Supported alleles: %s" % (
                         allele,
-                        ", ".join(self.supported_alleles())))
+                        ", ".join(self.supported_alleles)))
             assert len(model_names) == self.ensemble_size
             models = []
             for name in model_names:

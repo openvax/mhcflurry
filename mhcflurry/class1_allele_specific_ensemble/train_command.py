@@ -48,7 +48,7 @@ from ..dataset import Dataset
 
 from .class1_ensemble_multi_allele_predictor import (
     Class1EnsembleMultiAllelePredictor)
-from .measurement_collection import MeasurementCollection
+from ..measurement_collection import MeasurementCollection
 
 parser = argparse.ArgumentParser(
     description=__doc__,
