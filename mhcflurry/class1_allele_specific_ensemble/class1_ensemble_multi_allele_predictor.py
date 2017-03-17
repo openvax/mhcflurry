@@ -58,6 +58,7 @@ HYPERPARAMETER_DEFAULTS = (
 
 
 CACHED_PREDICTOR = None
+CACHED_PREDICTOR_PATH = None
 
 
 def supported_alleles():
@@ -72,14 +73,15 @@ def get_downloaded_predictor():
     """
     Return a Class1AlleleSpecificPredictorLoader that uses downloaded models.
     """
-    global CACHED_PREDICTOR
+    global CACHED_PREDICTOR, CACHED_PREDICTOR_PATH
 
     # Some of the unit tests manipulate the downloads directory configuration
     # so get_path here may return different results in the same Python process.
     # For this reason we check the path and invalidate the loader if it's
     # different.
     path = get_path("models_class1_allele_specific_ensemble")
-    if CACHED_PREDICTOR is None or path != CACHED_PREDICTOR.path:
+    if CACHED_PREDICTOR_PATH != path:
+        CACHED_PREDICTOR_PATH = path
         CACHED_PREDICTOR = (
             Class1EnsembleMultiAllelePredictor
                 .load_from_download_directory(path))
