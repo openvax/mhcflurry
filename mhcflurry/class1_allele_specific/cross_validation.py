@@ -20,12 +20,12 @@ from __future__ import (
 import collections
 import logging
 
-import pepdata
+from pepdata.reduced_alphabet import make_alphabet_transformer, gbmr4
 
 from .train import impute_and_select_allele, AlleleSpecificTrainTestFold
 from ..parallelism import get_default_backend
 
-gbmr4_transformer = pepdata.reduced_alphabet.make_alphabet_transformer("gbmr4")
+gbmr4_transformer = make_alphabet_transformer(gbmr4)
 
 
 def default_projector(peptide):
@@ -70,7 +70,8 @@ def similar_peptides(set1, set2, projector=default_projector):
 
     Returns
     ----------
-    string list
+    string list of peptides which approximately overlap between the two input
+    sets.
     """
     result = collections.defaultdict(lambda: ([], []))
     for (index, peptides) in enumerate([set1, set2]):
@@ -156,6 +157,10 @@ def cross_validation_folds(
                 )
 
             if peptides_to_remove:
+                # TODO: instead of dropping peptides, downweight the
+                # peptides which get grouped together
+                # For example, we could replace this code with
+                #   test_peptides, test_peptide_weights = ....
                 test_split = full_test_split.drop_allele_peptide_lists(
                     [allele] * len(peptides_to_remove),
                     peptides_to_remove)

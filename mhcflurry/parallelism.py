@@ -1,5 +1,5 @@
-from concurrent import futures
 import logging
+from concurrent import futures
 
 DEFAULT_BACKEND = None
 
