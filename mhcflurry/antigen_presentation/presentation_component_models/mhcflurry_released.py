@@ -21,15 +21,22 @@ class MHCflurryReleased(PresentationComponentModel):
     random_peptides_for_percent_rank : list of string
         If specified, then percentile rank will be calibrated and emitted
         using the given peptides.
+
+    predictor : Class1EnsembleMultiAllelePredictor-like object
+        Predictor to use.
     """
 
     def __init__(
             self,
             experiment_to_alleles,
             random_peptides_for_percent_rank=None,
+            predictor=None,
+            predictor_name="mhcflurry_released",
             **kwargs):
         PresentationComponentModel.__init__(self, **kwargs)
         self.experiment_to_alleles = experiment_to_alleles
+        self.predictor = predictor
+        self.predictor_name = predictor_name
         if random_peptides_for_percent_rank is None:
             self.percent_rank_transforms = None
             self.random_peptides_for_percent_rank = None
@@ -39,9 +46,9 @@ class MHCflurryReleased(PresentationComponentModel):
                 random_peptides_for_percent_rank)
 
     def column_names(self):
-        columns = ['mhcflurry_released_affinity']
+        columns = [self.predictor_name + '_affinity']
         if self.percent_rank_transforms is not None:
-            columns.append('mhcflurry_released_percentile_rank')
+            columns.append(self.predictor_name + '_percentile_rank')
         return columns
 
     def requires_fitting(self):
@@ -63,11 +70,14 @@ class MHCflurryReleased(PresentationComponentModel):
             normalize_allele_name(allele)
             for allele in alleles
         ]
-        df = predict(alleles, numpy.unique(numpy.array(peptides)))
+        df = predict(
+            alleles,
+            numpy.unique(numpy.array(peptides)),
+            predictor=self.predictor)
         pivoted = df.pivot(index='Peptide', columns='Allele')
         pivoted.columns = pivoted.columns.droplevel()
         result = {
-            'mhcflurry_released_affinity': (
+            self.predictor_name + '_affinity': (
                 pivoted.min(axis=1).ix[peptides].values)
         }
         if self.percent_rank_transforms is not None:
@@ -77,7 +87,7 @@ class MHCflurryReleased(PresentationComponentModel):
                 percentile_ranks[allele] = (
                     self.percent_rank_transforms[allele]
                     .transform(pivoted[allele].values))
-            result['mhcflurry_released_percentile_rank'] = (
+            result[self.predictor_name + '_percentile_rank'] = (
                 percentile_ranks.min(axis=1).ix[peptides].values)
         return result
 

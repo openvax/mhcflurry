@@ -8,7 +8,7 @@
 # by name, the downloads with "default=true" are downloaded.
 
 # This should usually be the latest release.
-current-release: 0.0.8
+current-release: 0.1.0
 
 # An integer indicating what models the current MHCflurry code base is compatible
 # with. Increment this integer when changes are made to MHCflurry that would break
