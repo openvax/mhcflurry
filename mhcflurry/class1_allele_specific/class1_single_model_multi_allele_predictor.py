@@ -32,7 +32,7 @@ CACHED_PREDICTOR = None
 
 def from_allele_name(allele_name):
     """
-    Load a predictor for an allele using the default loader.
+    Load a single-allele predictor.
 
     Parameters
     ----------
@@ -42,7 +42,7 @@ def from_allele_name(allele_name):
     ----------
     Class1BindingPredictor
     """
-    return get_downloaded_predictor().from_allele_name(allele_name)
+    return get_downloaded_predictor().predictor_for_allele(allele_name)
 
 
 def supported_alleles():
@@ -65,7 +65,9 @@ def get_downloaded_predictor():
     # different.
     path = get_path("models_class1_allele_specific_single")
     if CACHED_PREDICTOR is None or path != CACHED_PREDICTOR.path:
-        CACHED_PREDICTOR = Class1SingleModelMultiAllelePredictor(path)
+        CACHED_PREDICTOR = (
+            Class1SingleModelMultiAllelePredictor
+                .load_from_download_directory(path))
     return CACHED_PREDICTOR
 
 

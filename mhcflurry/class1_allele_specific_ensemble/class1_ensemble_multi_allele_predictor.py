@@ -34,6 +34,7 @@ import pandas
 
 from ..hyperparameters import HyperparameterDefaults
 from ..class1_allele_specific import Class1BindingPredictor, scoring
+from ..downloads import get_path
 from .. import parallelism, common
 
 MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
@@ -54,6 +55,35 @@ HYPERPARAMETER_DEFAULTS = (
     .extend(MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS)
     .extend(IMPUTE_HYPERPARAMETER_DEFAULTS)
     .extend(Class1BindingPredictor.hyperparameter_defaults))
+
+
+CACHED_PREDICTOR = None
+
+
+def supported_alleles():
+    """
+    Return a list of the names of the alleles for which there are trained
+    predictors in the default laoder.
+    """
+    return get_downloaded_predictor().supported_alleles
+
+
+def get_downloaded_predictor():
+    """
+    Return a Class1AlleleSpecificPredictorLoader that uses downloaded models.
+    """
+    global CACHED_PREDICTOR
+
+    # Some of the unit tests manipulate the downloads directory configuration
+    # so get_path here may return different results in the same Python process.
+    # For this reason we check the path and invalidate the loader if it's
+    # different.
+    path = get_path("models_class1_allele_specific_ensemble")
+    if CACHED_PREDICTOR is None or path != CACHED_PREDICTOR.path:
+        CACHED_PREDICTOR = (
+            Class1EnsembleMultiAllelePredictor
+                .load_from_download_directory(path))
+    return CACHED_PREDICTOR
 
 
 def call_fit_and_test(args):
