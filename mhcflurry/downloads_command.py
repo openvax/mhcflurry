@@ -13,18 +13,13 @@
 # limitations under the License.
 '''
 Download MHCflurry released datasets and trained models.
-
 Examples
-
 Fetch the default downloads:
     $ mhcflurry-downloads fetch
-
 Fetch a specific download:
     $ mhcflurry-downloads fetch data_kim2014
-
 Get the path to a download:
     $ mhcflurry-downloads path data_kim2014
-
 Summarize available and fetched downloads:
     $ mhcflurry-downloads info
 '''
@@ -40,7 +35,7 @@ import os
 from pipes import quote
 import errno
 import tarfile
-from tempfile import NamedTemporaryFile
+from tempfile import mkstemp
 try:
     from urllib.request import urlretrieve
 except ImportError:
@@ -116,7 +111,6 @@ def run(argv=sys.argv[1:]):
 def mkdir_p(path):
     """
     Make directories as needed, similar to mkdir -p in a shell.
-
     From:
     http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python
     """
@@ -185,29 +179,30 @@ def fetch_subcommand(args):
     # Also may want to extract into somewhere temporary and then rename to
     # making an incomplete extract if the process is killed.
     for item in items_to_fetch:
-        metadata = downloads[item]['metadata']
-        with NamedTemporaryFile(delete=not args.keep) as temp_fd:
-            target_path = temp_fd.name
-            qprint("Downloading: %s" % metadata['url'])
-            urlretrieve(metadata['url'], target_path)
-            qprint("Downloaded to: %s" % quote(target_path))
+	metadata = downloads[item]['metadata']
+	handle, target_path = mkstemp()
+	qprint("Downloading: %s" % metadata['url'])
+	urlretrieve(metadata['url'], target_path)
+	qprint("Downloaded to: %s" % quote(target_path))
 
-            tar = tarfile.open(target_path, 'r:bz2')
-            names = tar.getnames()
-            logging.debug("Extracting: %s" % names)
-            bad_names = [
-                n for n in names
-                if n.strip().startswith("/") or n.strip().startswith(".")
-            ]
-            if bad_names:
-                raise RuntimeError(
-                    "Archive has suspicious names: %s" % bad_names)
-            result_dir = get_path(item, test_exists=False)
-            os.mkdir(result_dir)
-            tar.extractall(path=result_dir)
-            tar.close()
-            qprint("Extracted %d files to: %s" % (
-                len(names), quote(result_dir)))
+	tar = tarfile.open(target_path, 'r:bz2')
+	names = tar.getnames()
+	logging.debug("Extracting: %s" % names)
+	bad_names = [
+		n for n in names
+		if n.strip().startswith("/") or n.strip().startswith(".")
+	]
+	if bad_names:
+		raise RuntimeError(
+			"Archive has suspicious names: %s" % bad_names)
+	result_dir = get_path(item, test_exists=False)
+	os.mkdir(result_dir)
+	tar.extractall(path=result_dir)
+	tar.close()
+	qprint("Extracted %d files to: %s" % (
+		len(names), quote(result_dir)))
+	os.close(handle)
+	os.remove(target_path)
 
 
 def info_subcommand(args):
