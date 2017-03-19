@@ -72,7 +72,7 @@ class MHCflurryReleased(PresentationComponentModel):
         ]))
         df = predict(
             alleles,
-            numpy.array(set(peptides)),
+            list(set(peptides)),
             predictor=self.predictor)
         pivoted = df.pivot(index='Peptide', columns='Allele')
         pivoted.columns = pivoted.columns.droplevel()

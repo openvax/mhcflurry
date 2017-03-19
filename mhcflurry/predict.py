@@ -44,10 +44,11 @@ def predict(alleles, peptides, predictor=None):
         ("Peptide", []),
         ("Prediction", []),
     ])
-    for allele in alleles:
-        allele = normalize_allele_name(allele)
-        for i, ic50 in enumerate(predictor.predict_for_allele(allele, peptides)):
-            result_dict["Allele"].append(allele)
-            result_dict["Peptide"].append(peptides[i])
-            result_dict["Prediction"].append(ic50)
+    if len(peptides) > 0:
+        for allele in alleles:
+            allele = normalize_allele_name(allele)
+            for i, ic50 in enumerate(predictor.predict_for_allele(allele, peptides)):
+                result_dict["Allele"].append(allele)
+                result_dict["Peptide"].append(peptides[i])
+                result_dict["Prediction"].append(ic50)
     return pandas.DataFrame(result_dict)
