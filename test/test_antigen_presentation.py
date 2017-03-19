@@ -13,19 +13,11 @@ from mhcflurry.antigen_presentation import (
     presentation_model)
 
 from mhcflurry.amino_acid import common_amino_acid_letters
+from . import make_random_peptides
 
 
 ######################
 # Helper functions
-
-def make_random_peptides(num, length=9):
-    return [
-        ''.join(peptide_sequence)
-        for peptide_sequence in
-        numpy.random.choice(
-            amino_acid.common_amino_acid_letters, size=(num, length))
-    ]
-
 
 def hit_criterion(experiment_name, peptide):
     # Peptides with 'A' are always hits. Easy for model to learn.
