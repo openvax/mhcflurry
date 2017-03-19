@@ -35,7 +35,9 @@ import pandas
 from ..hyperparameters import HyperparameterDefaults
 from ..class1_allele_specific import Class1BindingPredictor, scoring
 from ..downloads import get_path
+from ..common import normalize_allele_name, UnsupportedAllele
 from .. import parallelism, common
+
 
 MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     include_ms=True,
@@ -320,13 +322,14 @@ class Class1EnsembleMultiAllelePredictor(object):
         return "\n".join(lines)
 
     def models_for_allele(self, allele):
+        allele = normalize_allele_name(allele)
         if allele not in self.allele_to_models:
             model_names = self.manifest_df.ix[
                 (self.manifest_df.weight > 0) &
                 (self.manifest_df.allele == allele)
             ].index
             if len(model_names) == 0:
-                raise ValueError(
+                raise UnsupportedAllele(
                     "Unsupported allele: %s. Supported alleles: %s" % (
                         allele,
                         ", ".join(self.supported_alleles)))

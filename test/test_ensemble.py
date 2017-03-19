@@ -1,6 +1,8 @@
 import tempfile
 import shutil
 import os
+import time
+import cProfile
 
 import json
 from os.path import join
@@ -9,15 +11,19 @@ from os import mkdir
 from numpy.testing import assert_allclose, assert_equal
 from nose.tools import eq_
 
+from . import make_random_peptides
+
 from mhcflurry.class1_allele_specific import scoring
 from mhcflurry.measurement_collection import MeasurementCollection
 from mhcflurry.class1_allele_specific_ensemble import train_command
 from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset
 from mhcflurry.downloads import get_path
+from mhcflurry.amino_acid import common_amino_acid_letters
 from mhcflurry \
     .class1_allele_specific_ensemble \
     .class1_ensemble_multi_allele_predictor import (
         Class1EnsembleMultiAllelePredictor,
+        get_downloaded_predictor,
         HYPERPARAMETER_DEFAULTS)
 
 
@@ -87,6 +93,35 @@ def test_basic():
     eq_(model.hyperparameters_to_search, model2.hyperparameters_to_search)
     ic50_pred2 = model.predict(mc)
     assert_allclose(ic50_pred, ic50_pred2, rtol=1e-06)
+
+def test_prediction_performance():
+    use_profiling = True
+
+    def evaluate(context, s):
+        if use_profiling:
+            return cProfile.runctx(s, globals(), context, sort="cumtime")
+        else:
+            return eval(s, globals(), context)
+
+    start = time.time()
+    predictor = get_downloaded_predictor()
+    print("\nInstantiated ensemble predictor in %0.2f sec" % (time.time() - start))
+
+    start = time.time()
+    evaluate({'predictor': predictor}, 'predictor.models_for_allele(("HLA-A*01:01"))')
+    print("Loaded ensemble for allele in %0.2f sec" % (time.time() - start))
+
+    start = time.time()
+    evaluate({'predictor': predictor}, 'predictor.predict_for_allele("HLA-A*01:01", ["ESDPIVAQY"])')
+    print("Generated 1 prediction in %0.2f sec" % (time.time() - start))
+
+    start = time.time()
+    peptides = make_random_peptides(10000)
+    evaluate(
+        {'predictor': predictor, 'peptides': peptides},
+        'predictor.predict_for_allele("HLA-A*01:01", peptides)')
+    print("Generated %d predictions in %0.2f sec" % (
+        len(peptides), time.time() - start))
 
 
 def test_train_command():

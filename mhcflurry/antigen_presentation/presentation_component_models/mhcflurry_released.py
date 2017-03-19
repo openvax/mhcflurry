@@ -66,13 +66,13 @@ class MHCflurryReleased(PresentationComponentModel):
                     .Prediction.values)
 
     def predict_min_across_alleles(self, alleles, peptides):
-        alleles = [
+        alleles = list(set([
             normalize_allele_name(allele)
             for allele in alleles
-        ]
+        ]))
         df = predict(
             alleles,
-            numpy.unique(numpy.array(peptides)),
+            numpy.array(set(peptides)),
             predictor=self.predictor)
         pivoted = df.pivot(index='Peptide', columns='Allele')
         pivoted.columns = pivoted.columns.droplevel()
