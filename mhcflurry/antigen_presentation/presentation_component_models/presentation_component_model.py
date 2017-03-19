@@ -202,7 +202,9 @@ class PresentationComponentModel(object):
                     result_df.loc[sub_df.index, "experiment_name"] ==
                     experiment_name).all()
 
-                unique_peptides = numpy.unique(sub_df.peptide.values)
+                unique_peptides = list(set(sub_df.peptide))
+                if len(unique_peptides) == 0:
+                    continue
 
                 result_dict = self.predict_for_experiment(
                     experiment_name, unique_peptides)
