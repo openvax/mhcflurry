@@ -94,8 +94,9 @@ def test_basic():
     ic50_pred2 = model.predict(mc)
     assert_allclose(ic50_pred, ic50_pred2, rtol=1e-06)
 
+
 def test_prediction_performance():
-    use_profiling = True
+    use_profiling = False
 
     def evaluate(context, s):
         if use_profiling:

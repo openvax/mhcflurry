@@ -17,17 +17,14 @@ from __future__ import (
     division,
     absolute_import,
 )
-from collections import defaultdict
 
-import numpy as np
 from six import string_types
 
-from ..peptide_encoding import fixed_length_index_encoding
+from ..peptide_encoding import encode_peptides
 from ..amino_acid import (
     amino_acids_with_unknown,
     common_amino_acids
 )
-from ..regression_target import regression_target_to_ic50
 from ..ic50_predictor_base import IC50PredictorBase
 from ..hyperparameters import HyperparameterDefaults
 
@@ -87,75 +84,23 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
     def max_amino_acid_encoding_value(self):
         return len(self.amino_acids)
 
-    def encode_peptides(self, peptides):
-        """
-        Parameters
-        ----------
-        peptides : str list
-            Peptide strings of any length
-
-        Encode peptides of any length into fixed length vectors.
-        Returns 2d array of encoded peptides and 1d array indicating the
-        original peptide index for each row.
-        """
-        indices = []
-        encoded_matrices = []
-        for i, peptide in enumerate(peptides):
-            matrix, _, _, _ = fixed_length_index_encoding(
-                peptides=[peptide],
-                desired_length=self.kmer_size,
-                allow_unknown_amino_acids=self.allow_unknown_amino_acids)
-            encoded_matrices.append(matrix)
-            indices.extend([i] * len(matrix))
-        combined_matrix = np.concatenate(encoded_matrices)
-        index_array = np.array(indices)
-        expected_shape = (len(index_array), self.kmer_size)
-        assert combined_matrix.shape == expected_shape, \
-            "Expected shape %s but got %s" % (
-                expected_shape, combined_matrix.shape)
-        return combined_matrix, index_array
-
-    def predict_scores_for_kmer_peptides(self, peptides):
-        """
-        Predict binding affinity for 9mer peptides
-        """
-        if any(len(peptide) != self.kmer_size for peptide in peptides):
-            raise ValueError("Can only predict 9mer peptides")
-        X, _ = self.encode_peptides(peptides)
-        return self.predict_scores_for_kmer_encoded_array(X)
-
-    def predict_ic50_for_kmer_peptides(self, peptides):
-        scores = self.predict_scores_for_kmer_peptides(peptides)
-        return regression_target_to_ic50(scores, max_ic50=self.max_ic50)
-
-    def predict_scores(self, peptides, combine_fn=np.mean):
+    def predict_scores(self, peptides):
         """
         Given a list of peptides of any length, returns an array of predicted
         normalized affinity values. Unlike IC50, a higher value here
         means a stronger affinity. Peptides of lengths other than 9 are
         transformed into a set of k-mers either by deleting or inserting
-        amino acid characters. The prediction for a single peptide will be
+        amino acid characters. The prediction for a single peptides will be
         the average of expanded k-mers.
         """
         if isinstance(peptides, string_types):
             raise TypeError("Input must be a list of peptides, not %s : %s" % (
                 peptides, type(peptides)))
 
-        input_matrix, original_peptide_indices = self.encode_peptides(peptides)
-        # peptides of lengths other than self.kmer_size get multiple
-        # predictions, which are then combined with the combine_fn argument
-        multiple_predictions_dict = defaultdict(list)
-        fixed_length_predictions = \
-            self.predict_scores_for_kmer_encoded_array(input_matrix)
-        for i, yi in enumerate(fixed_length_predictions):
-            original_peptide_index = original_peptide_indices[i]
-            original_peptide = peptides[original_peptide_index]
-            multiple_predictions_dict[original_peptide].append(yi)
-        combined_predictions_dict = {
-            p: combine_fn(ys) if len(ys) > 1 else ys[0]
-            for (p, ys) in multiple_predictions_dict.items()
-        }
-        return np.array([combined_predictions_dict[p] for p in peptides])
+        encoded_peptides = encode_peptides(
+            peptides, kmer_size=self.kmer_size, allow_unknown_amino_acids=self.allow_unknown_amino_acids)
+        return encoded_peptides.combine_predictions(
+            self.predict_scores_for_kmer_encoded_array(encoded_peptides.encoded_matrix))
 
     def fit_dataset(
             self,

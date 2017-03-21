@@ -114,24 +114,34 @@ class Class1BindingPredictor(Class1AlleleSpecificKmerIC50PredictorBase):
     def __getstate__(self):
         result = dict(self.__dict__)
         del result['model']
-        with tempfile.NamedTemporaryFile(suffix='.hdf5', delete=True) as fd:
-            keras.models.save_model(self.model, fd.name, overwrite=True)
-            result['model_bytes'] = fd.read()
+        result['model_json'] = self.model.to_json()
+        result['model_weights'] = self.get_weights()
         return result
 
     def __setstate__(self, state):
-        model_bytes = state.pop('model_bytes')
-        self.__dict__.update(state)
-        fd = tempfile.NamedTemporaryFile(suffix='.hdf5', delete=False)
+        model_bytes = model_json = model_weights = None
         try:
-            fd.write(model_bytes)
+            model_bytes = state.pop('model_bytes')
+        except KeyError:
+            model_json = state.pop('model_json')
+            model_weights = state.pop('model_weights')
+        self.__dict__.update(state)
 
-            # HDF5 has issues when the file is open multiple times, so we close
-            # it here before loading it into keras.
-            fd.close()
-            self.model = keras.models.load_model(fd.name)
-        finally:
-            os.unlink(fd.name)
+        if model_bytes is not None:
+            # Old format
+            fd = tempfile.NamedTemporaryFile(suffix='.hdf5', delete=False)
+            try:
+                fd.write(model_bytes)
+
+                # HDF5 has issues when the file is open multiple times, so we close
+                # it here before loading it into keras.
+                fd.close()
+                self.model = keras.models.load_model(fd.name)
+            finally:
+                os.unlink(fd.name)
+        else:
+            self.model = keras.models.model_from_json(model_json)
+            self.set_weights(model_weights)
 
     def get_weights(self):
         """

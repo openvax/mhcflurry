@@ -37,6 +37,8 @@ from ..class1_allele_specific import Class1BindingPredictor, scoring
 from ..downloads import get_path
 from ..common import normalize_allele_name, UnsupportedAllele
 from .. import parallelism, common
+from ..peptide_encoding import encode_peptides
+
 
 
 MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
@@ -384,8 +386,9 @@ class Class1EnsembleMultiAllelePredictor(object):
         return result
 
     def predict_for_allele(self, allele, peptides):
+        encoded = encode_peptides(peptides)
         values = [
-            model.predict(peptides)
+            model.predict(encoded)
             for model in self.models_for_allele(allele)
         ]
 
