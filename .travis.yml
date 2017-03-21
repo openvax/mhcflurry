@@ -45,7 +45,7 @@ env:
 script:
   # download data and models, then run tests
   - mhcflurry-downloads fetch
-  - mhcflurry-downloads fetch models_class1_allele_specific_ensemble
+  - mhcflurry-downloads fetch models_class1_allele_specific_single
   - mhcflurry-downloads info  # just to test this command works
   - nosetests test --with-coverage --cover-package=mhcflurry  && ./lint.sh
 after_success:

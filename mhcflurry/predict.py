@@ -16,9 +16,10 @@ from collections import OrderedDict
 
 import pandas as pandas
 
-from .class1_allele_specific import class1_single_model_multi_allele_predictor
+from .class1_allele_specific_ensemble import class1_ensemble_multi_allele_predictor
 from .common import normalize_allele_name, UnsupportedAllele
 from .peptide_encoding import encode_peptides
+
 
 def predict(alleles, peptides, predictor=None):
     """
@@ -40,7 +41,7 @@ def predict(alleles, peptides, predictor=None):
     encoded_peptides = encode_peptides(peptides)
 
     if predictor is None:
-        predictor = class1_single_model_multi_allele_predictor.get_downloaded_predictor()
+        predictor = class1_ensemble_multi_allele_predictor.get_downloaded_predictor()
     result_dict = OrderedDict([
         ("Allele", []),
         ("Peptide", []),

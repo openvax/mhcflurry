@@ -22,11 +22,11 @@ releases:
         downloads:
             - name: models_class1_allele_specific_ensemble
               url: http://github.com/hammerlab/mhcflurry/releases/download/0.1.0-alpha1/models_class1_allele_specific_ensemble.tar.bz2
-              default: false
+              default: true
 
             - name: models_class1_allele_specific_single
               url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.8/models_class1_allele_specific_single.no_impute.tar.bz2
-              default: true
+              default: false
 
             - name: data_kim2014
               url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.8/data_kim2014.tar.bz2
