@@ -52,10 +52,10 @@ def impute_and_select_allele(dataset, imputer, allele=None, **kwargs):
 
     Parameters
     -----------
-    dataset : mhcflurry.Dataset
+    dataset : mhcflurry.AffinityMeasurementDataset
 
     imputer : object or string
-        See Dataset.impute_missing_values
+        See AffinityMeasurementDataset.impute_missing_values
 
     allele : string [optional]
         Allele name to subselect to after imputation
@@ -121,14 +121,14 @@ def train_and_test_one_model_one_fold(
     -----------
     model_description : dict of model parameters
 
-    train_dataset : mhcflurry.Dataset
-        Dataset to train on. Must include only one allele.
+    train_dataset : mhcflurry.AffinityMeasurementDataset
+        AffinityMeasurementDataset to train on. Must include only one allele.
 
-    test_dataset : mhcflurry.Dataset, optional
-        Dataset to test on. Must include only one allele. If not specified
+    test_dataset : mhcflurry.AffinityMeasurementDataset, optional
+        AffinityMeasurementDataset to test on. Must include only one allele. If not specified
         no testing is performed.
 
-    imputed_train_dataset : mhcflurry.Dataset, optional
+    imputed_train_dataset : mhcflurry.AffinityMeasurementDataset, optional
         Required only if model_description["impute"] == True
 
     return_train_scores : boolean

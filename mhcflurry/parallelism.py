@@ -4,6 +4,11 @@ from concurrent import futures
 DEFAULT_BACKEND = None
 
 
+class RemoteObjectStub(object):
+    def __init__(self, value):
+        self.value = value
+
+
 class ParallelBackend(object):
     """
     Thin wrapper of futures implementations. Designed to support
@@ -13,6 +18,9 @@ class ParallelBackend(object):
         self.executor = executor
         self.module = module
         self.verbose = verbose
+
+    def remote_object(self, value):
+        return RemoteObjectStub(value)
 
 
 class KubefaceParallelBackend(ParallelBackend):
@@ -25,6 +33,9 @@ class KubefaceParallelBackend(ParallelBackend):
 
     def map(self, func, iterable):
         return self.client.map(func, iterable)
+
+    def remote_object(self, value):
+        return self.client.remote_object(value)
 
     def __str__(self):
         return "<Kubeface backend, client=%s>" % self.client

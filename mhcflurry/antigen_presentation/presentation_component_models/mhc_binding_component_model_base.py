@@ -47,7 +47,7 @@ class MHCBindingComponentModelBase(PresentationComponentModel):
     fallback_predictor : function: (allele, peptides) -> predictions
         Used when missing an allele.
 
-    iedb_dataset : mhcflurry.Dataset
+    iedb_dataset : mhcflurry.AffinityMeasurementDataset
         IEDB data for this allele. If not specified no iedb data is used.
 
     decoys_per_hit : int

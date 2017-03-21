@@ -14,13 +14,13 @@
 
 from collections import OrderedDict
 
-import pandas as pd
+import pandas as pandas
 
-from .class1_allele_specific import load
+from .class1_allele_specific import class1_single_model_multi_allele_predictor
 from .common import normalize_allele_name, UnsupportedAllele
+from .peptide_encoding import encode_peptides
 
-
-def predict(alleles, peptides, loaders=None):
+def predict(alleles, peptides, predictor=None):
     """
     Make predictions across all combinations of the specified alleles and
     peptides.
@@ -33,40 +33,24 @@ def predict(alleles, peptides, loaders=None):
     peptides : list of str
         Peptide amino acid sequences.
 
-    loaders : list of Class1AlleleSpecificPredictorLoader, optional
-        Loaders to try. Will be tried in the order given.
+    predictor : Predictor to use. Defaults to downloaded Class1SingleModelMultiAllelePredictor.
 
     Returns DataFrame with columns "Allele", "Peptide", and "Prediction"
     """
-    if loaders is None:
-        loaders = [
-            load.get_loader_for_downloaded_models(),
-        ]
+    encoded_peptides = encode_peptides(peptides)
+
+    if predictor is None:
+        predictor = class1_single_model_multi_allele_predictor.get_downloaded_predictor()
     result_dict = OrderedDict([
         ("Allele", []),
         ("Peptide", []),
         ("Prediction", []),
     ])
-    for allele in alleles:
-        allele = normalize_allele_name(allele)
-        exceptions = {}  # loader -> UnsupportedAllele exception
-        model = None
-        for loader in loaders:
-            try:
-                model = loader.from_allele_name(allele)
-                break
-            except UnsupportedAllele as e:
-                exceptions[loader] = e
-        if model is None:
-            raise UnsupportedAllele(
-                "No loaders support allele '%s'. Errors were:\n%s" % (
-                    allele,
-                    "\n".join(
-                        ("\t%-20s : %s" % (k, v))
-                        for (k, v) in exceptions.items())))
-
-        for i, ic50 in enumerate(model.predict(peptides)):
-            result_dict["Allele"].append(allele)
-            result_dict["Peptide"].append(peptides[i])
-            result_dict["Prediction"].append(ic50)
-    return pd.DataFrame(result_dict)
+    if len(peptides) > 0:
+        for allele in alleles:
+            allele = normalize_allele_name(allele)
+            for i, ic50 in enumerate(predictor.predict_for_allele(allele, encoded_peptides)):
+                result_dict["Allele"].append(allele)
+                result_dict["Peptide"].append(peptides[i])
+                result_dict["Prediction"].append(ic50)
+    return pandas.DataFrame(result_dict)

@@ -2,7 +2,7 @@ import numpy as np
 np.random.seed(0)
 
 from mhcflurry.imputation_helpers import imputer_from_name
-from mhcflurry.dataset import Dataset
+from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset
 from mhcflurry import Class1BindingPredictor
 
 from fancyimpute import MICE, KNN, SoftImpute, IterativeSVD
@@ -12,13 +12,13 @@ from mhcflurry.downloads import get_path
 
 
 def test_create_imputed_datasets_empty():
-    empty_dataset = Dataset.create_empty()
+    empty_dataset = AffinityMeasurementDataset.create_empty()
     result = empty_dataset.impute_missing_values(MICE(n_imputations=25))
     eq_(result, empty_dataset)
 
 
 def test_create_imputed_datasets_two_alleles():
-    dataset = Dataset.from_nested_dictionary({
+    dataset = AffinityMeasurementDataset.from_nested_dictionary({
         "HLA-A*02:01": {
             "A" * 9: 20.0,
             "C" * 9: 40000.0,
@@ -38,7 +38,7 @@ def test_create_imputed_datasets_two_alleles():
 def test_performance_improves_for_A0205_with_pretraining():
     # test to make sure that imputation improves predictive accuracy after a
     # small number of training iterations (5 epochs)
-    dataset = Dataset.from_csv(
+    dataset = AffinityMeasurementDataset.from_csv(
         get_path("data_combined_iedb_kim2014", "combined_human_class1_dataset.csv"))
     print("Full dataset: %d pMHC entries" % len(dataset))
 
@@ -51,7 +51,7 @@ def test_performance_improves_for_A0205_with_pretraining():
 
     a0205_data_without_imputation = dataset.get_allele("HLA-A0205")
 
-    print("Dataset with only A0205, # entries: %d" % (
+    print("AffinityMeasurementDataset with only A0205, # entries: %d" % (
         len(a0205_data_without_imputation)))
 
     predictor_without_imputation = Class1BindingPredictor(

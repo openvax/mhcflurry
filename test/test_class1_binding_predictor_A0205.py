@@ -1,7 +1,7 @@
 import numpy as np
 np.random.seed(0)
 
-from mhcflurry.dataset import Dataset
+from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset
 from mhcflurry import Class1BindingPredictor
 
 from nose.tools import eq_
@@ -11,10 +11,10 @@ from mhcflurry.downloads import get_path
 
 
 def test_class1_binding_predictor_A0205_training_accuracy():
-    dataset = Dataset.from_csv(get_path(
+    dataset = AffinityMeasurementDataset.from_csv(get_path(
         "data_combined_iedb_kim2014", "combined_human_class1_dataset.csv"))
     dataset_a0205_all_lengths = dataset.get_allele("HLA-A0205")
-    dataset_a0205 = Dataset(
+    dataset_a0205 = AffinityMeasurementDataset(
         dataset_a0205_all_lengths._df.ix[
             dataset_a0205_all_lengths._df.peptide.str.len() == 9])
 

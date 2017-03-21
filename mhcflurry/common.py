@@ -150,7 +150,8 @@ def dataframe_cryptographic_hash(df):
     """
     start = time.time()
     result = hashlib.sha1(df.to_msgpack()).hexdigest()
-    print("Generated dataframe hash in %0.2f sec" % (time.time() - start))
+    logging.info(
+        "Generated dataframe hash in %0.2f sec" % (time.time() - start))
     return result
 
 

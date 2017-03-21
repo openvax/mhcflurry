@@ -17,7 +17,7 @@
 """
 Combine 2013 Kim/Peters NetMHCpan dataset[*] with more recent IEDB entries
 
-* = "Dataset size and composition impact the reliability..."
+* = "AffinityMeasurementDataset size and composition impact the reliability..."
 """
  
 from __future__ import (
