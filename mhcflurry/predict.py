@@ -18,7 +18,7 @@ import pandas as pandas
 
 from .class1_allele_specific import class1_single_model_multi_allele_predictor
 from .common import normalize_allele_name, UnsupportedAllele
-
+from .peptide_encoding import encode_peptides
 
 def predict(alleles, peptides, predictor=None):
     """
@@ -37,6 +37,8 @@ def predict(alleles, peptides, predictor=None):
 
     Returns DataFrame with columns "Allele", "Peptide", and "Prediction"
     """
+    encoded_peptides = encode_peptides(peptides)
+
     if predictor is None:
         predictor = class1_single_model_multi_allele_predictor.get_downloaded_predictor()
     result_dict = OrderedDict([
@@ -47,7 +49,7 @@ def predict(alleles, peptides, predictor=None):
     if len(peptides) > 0:
         for allele in alleles:
             allele = normalize_allele_name(allele)
-            for i, ic50 in enumerate(predictor.predict_for_allele(allele, peptides)):
+            for i, ic50 in enumerate(predictor.predict_for_allele(allele, encoded_peptides)):
                 result_dict["Allele"].append(allele)
                 result_dict["Peptide"].append(peptides[i])
                 result_dict["Prediction"].append(ic50)

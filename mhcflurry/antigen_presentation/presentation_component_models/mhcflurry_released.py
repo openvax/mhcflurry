@@ -6,6 +6,7 @@ import pandas
 from ...common import normalize_allele_name
 from ...predict import predict
 from ..percent_rank_transform import PercentRankTransform
+from ...peptide_encoding import encode_peptides
 from .presentation_component_model import PresentationComponentModel
 
 
@@ -66,13 +67,16 @@ class MHCflurryReleased(PresentationComponentModel):
                     .Prediction.values)
 
     def predict_min_across_alleles(self, alleles, peptides):
+        peptides = list(set(peptides))
+        encoded_peptides = encode_peptides(peptides)
+
         alleles = list(set([
             normalize_allele_name(allele)
             for allele in alleles
         ]))
         df = predict(
             alleles,
-            list(set(peptides)),
+            encoded_peptides,
             predictor=self.predictor)
         pivoted = df.pivot(index='Peptide', columns='Allele')
         pivoted.columns = pivoted.columns.droplevel()
