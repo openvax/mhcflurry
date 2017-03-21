@@ -84,6 +84,10 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
     def max_amino_acid_encoding_value(self):
         return len(self.amino_acids)
 
+    def encode_peptides(self, peptides):
+        return encode_peptides(
+            peptides, kmer_size=self.kmer_size, allow_unknown_amino_acids=self.allow_unknown_amino_acids)
+
     def predict_scores(self, peptides):
         """
         Given a list of peptides of any length, returns an array of predicted
@@ -97,8 +101,7 @@ class Class1AlleleSpecificKmerIC50PredictorBase(IC50PredictorBase):
             raise TypeError("Input must be a list of peptides, not %s : %s" % (
                 peptides, type(peptides)))
 
-        encoded_peptides = encode_peptides(
-            peptides, kmer_size=self.kmer_size, allow_unknown_amino_acids=self.allow_unknown_amino_acids)
+        encoded_peptides = self.encode_peptides(peptides)
         return encoded_peptides.combine_predictions(
             self.predict_scores_for_kmer_encoded_array(encoded_peptides.encoded_matrix))
 
