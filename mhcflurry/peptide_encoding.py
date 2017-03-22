@@ -51,21 +51,21 @@ class KmerEncodedPeptides(object):
         self.encoded_matrix = encoded_matrix
         self.kmer_size = kmer_size
         self.allow_unknown_amino_acids = allow_unknown_amino_acids
-        self._peptides = peptides
-        self._indices = indices
+        self.peptides = peptides
+        self.indices = indices
 
     def __len__(self):
-        return len(self._peptides)
+        return len(self.peptides)
 
     def combine_predictions(self, predictions):
         assert len(predictions) == len(self.encoded_matrix)
-        assert len(predictions) == len(self._indices)
+        assert len(predictions) == len(self.indices)
         df = pandas.DataFrame({
-            'original_peptide_index': self._indices,
+            'original_peptide_index': self.indices,
             'prediction': predictions,
         })
         predictions_by_index = df.groupby("original_peptide_index").prediction.mean()
-        return predictions_by_index[np.arange(0, max(self._indices) + 1)].values
+        return predictions_by_index[np.arange(0, max(self.indices) + 1)].values
 
 
 def encode_peptides(peptides, kmer_size=9, allow_unknown_amino_acids=True):
