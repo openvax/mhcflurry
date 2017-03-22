@@ -52,7 +52,7 @@ if __name__ == '__main__':
         'numpy>=1.11',
         'pandas>=0.13.1',
         'appdirs',
-        'theano>=0.8.2',
+        'theano==0.8.2',
         'keras==1.2.0',
         'fancyimpute>=0.0.12',
         'scikit-learn',
