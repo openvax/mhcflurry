@@ -71,8 +71,8 @@ def test_encode_peptides_9mer():
     encoded = always_zero_predictor_with_unknown_AAs.encode_peptides(["AAASSSYYY"])
     assert len(encoded.indices) == 1
     assert encoded.indices[0] == 0
-    assert encoded.encoded_matrix.shape[0] == 1, X.shape
-    assert encoded.encoded_matrix.shape[1] == 9, X.shape
+    assert encoded.encoded_matrix.shape[0] == 1, encoded.encoded_matrix.shape
+    assert encoded.encoded_matrix.shape[1] == 9, encoded.encoded_matrix.shape
 
 
 def test_encode_peptides_8mer():
