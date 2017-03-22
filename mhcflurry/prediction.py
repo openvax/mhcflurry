@@ -14,7 +14,8 @@
 
 from collections import OrderedDict
 
-import pandas as pandas
+import pandas
+import numpy
 
 from .class1_allele_specific_ensemble import class1_ensemble_multi_allele_predictor
 from .common import normalize_allele_name, UnsupportedAllele
@@ -38,20 +39,22 @@ def predict(alleles, peptides, predictor=None):
 
     Returns DataFrame with columns "Allele", "Peptide", and "Prediction"
     """
-    encoded_peptides = encode_peptides(peptides)
-
     if predictor is None:
         predictor = class1_ensemble_multi_allele_predictor.get_downloaded_predictor()
-    result_dict = OrderedDict([
-        ("Allele", []),
-        ("Peptide", []),
-        ("Prediction", []),
-    ])
-    if len(peptides) > 0:
-        for allele in alleles:
-            allele = normalize_allele_name(allele)
-            for i, ic50 in enumerate(predictor.predict_for_allele(allele, encoded_peptides)):
-                result_dict["Allele"].append(allele)
-                result_dict["Peptide"].append(peptides[i])
-                result_dict["Prediction"].append(ic50)
-    return pandas.DataFrame(result_dict)
+
+    if len(peptides) == 0 or len(alleles) == 0:
+        return pandas.DataFrame(columns=["Peptide", "Allele", "Prediction"])
+
+    peptides = numpy.unique(peptides)
+    encoded_peptides = encode_peptides(peptides)
+    result_dfs = []
+    result_df = pandas.DataFrame()
+    result_df["Peptide"] = peptides
+    for allele in alleles:
+        allele = normalize_allele_name(allele)
+        predictions = predictor.predict_for_allele(allele, encoded_peptides)
+        result_df = result_df.copy()
+        result_df["Allele"] = allele
+        result_df["Prediction"] = predictions
+        result_dfs.append(result_df)
+    return pandas.concat(result_dfs, ignore_index=True)

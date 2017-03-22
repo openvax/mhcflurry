@@ -73,6 +73,9 @@ AA_COMPOSITION_DF.index = AA_COMPOSITION_DF.peptide
 del AA_COMPOSITION_DF['peptide']
 
 HITS_DF = PEPTIDES_DF.ix[PEPTIDES_DF.hit].reset_index().copy()
+
+# Add some duplicates:
+HITS_DF = pandas.concat([HITS_DF, HITS_DF.iloc[:10]], ignore_index=True)
 del HITS_DF["hit"]
 
 ######################
@@ -97,6 +100,15 @@ def mhcflurry_basic_model():
         peptides_and_transcripts=PEPTIDES_AND_TRANSCRIPTS_DF,
         random_peptides_for_percent_rank=OTHER_PEPTIDES,
     )
+
+
+def mhcflurry_released_model():
+    return presentation_component_models.MHCflurryReleased(
+        predictor_name="mhcflurry_ensemble",
+        experiment_to_alleles=EXPERIMENT_TO_ALLELES,
+        random_peptides_for_percent_rank=OTHER_PEPTIDES,
+        fit_cache_policy="strong",
+        predictions_cache_policy="strong")
 
 
 def test_mhcflurry_trained_on_hits():
@@ -136,6 +148,7 @@ def compare_predictions(peptides_df, model1, model2):
 
 def test_presentation_model():
     mhcflurry_model = mhcflurry_basic_model()
+    mhcflurry_ie_model = mhcflurry_released_model()
 
     aa_content_model = (
         presentation_component_models.FixedPerPeptideQuantity(
@@ -147,6 +160,9 @@ def test_presentation_model():
         decoys_per_hit=50)
 
     terms = {
+        'A_ie': (
+            [mhcflurry_ie_model],
+            ["log1p(mhcflurry_ensemble_affinity)"]),
         'A_ms': (
             [mhcflurry_model],
             ["log1p(mhcflurry_affinity_value)"]),
@@ -158,10 +174,10 @@ def test_presentation_model():
     for kwargs in [{}, {'ensemble_size': 3}]:
         models = presentation_model.build_presentation_models(
             terms,
-            ["A_ms", "A_ms + P"],
+            ["A_ms", "A_ms + P", "A_ie + P"],
             decoy_strategy=decoys,
             **kwargs)
-        eq_(len(models), 2)
+        eq_(len(models), 3)
 
         unfit_model = models["A_ms"]
         model = unfit_model.clone()
@@ -189,10 +205,14 @@ def test_presentation_model():
         model = better_unfit_model.clone()
         model.fit(HITS_DF.ix[HITS_DF.experiment_name == "exp1"])
         peptides["prediction_better"] = model.predict(peptides)
-
         assert_less(
             peptides.prediction_better[~peptides.hit].mean(),
             peptides.prediction[~peptides.hit].mean())
         assert_less(
             peptides.prediction[peptides.hit].mean(),
             peptides.prediction_better[peptides.hit].mean())
+
+        another_unfit_model = models["A_ie + P"]
+        model = another_unfit_model.clone()
+        model.fit(HITS_DF.ix[HITS_DF.experiment_name == "exp1"])
+        model.predict(peptides)

@@ -40,7 +40,6 @@ from .. import parallelism, common
 from ..peptide_encoding import encode_peptides
 
 
-
 MEASUREMENT_COLLECTION_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     include_ms=True,
     ms_hit_affinity=1.0,
@@ -93,6 +92,9 @@ def get_downloaded_predictor():
 
 
 def call_fit_and_test(args):
+    """
+    This top-level function exists for
+    """
     return fit_and_test(*args)
 
 

@@ -24,6 +24,97 @@ from .amino_acid import common_amino_acids, amino_acids_with_unknown
 common_amino_acid_letters = common_amino_acids.letters()
 
 
+class KmerEncodedPeptides(object):
+    """
+    Variable-length peptides encoded into a fixed length matrix using netmhc-style reduction to kmers (usually 9mers).
+
+    Parameters
+    ----------
+    peptides : str list
+        Peptide strings of any length
+
+    encoded_matrix : int array of shape (R, k)
+        The encoded peptides. R >= len(peptides) is the number of kmers needed to represent the peptides.
+        If all peptides are length k then R == len(peptides).
+
+    indices : int array of length R
+        peptides[indices[i]] gives the peptide that gave rise to row encoded_matrix[i] for all 0 < i < R.
+
+    kmer_size : int
+        k (usually 9)
+
+    allow_unknown_amino_acids : bool
+    """
+    def __init__(self, peptides, encoded_matrix, indices, kmer_size, allow_unknown_amino_acids):
+        assert len(indices) == len(encoded_matrix)
+        assert len(peptides) == 0 or len(peptides) == max(indices) + 1
+        self.encoded_matrix = encoded_matrix
+        self.kmer_size = kmer_size
+        self.allow_unknown_amino_acids = allow_unknown_amino_acids
+        self._peptides = peptides
+        self._indices = indices
+
+    def __len__(self):
+        return len(self._peptides)
+
+    def combine_predictions(self, predictions):
+        assert len(predictions) == len(self.encoded_matrix)
+        assert len(predictions) == len(self._indices)
+        df = pandas.DataFrame({
+            'original_peptide_index': self._indices,
+            'prediction': predictions,
+        })
+        predictions_by_index = df.groupby("original_peptide_index").prediction.mean()
+        return predictions_by_index[np.arange(0, max(self._indices) + 1)].values
+
+
+def encode_peptides(peptides, kmer_size=9, allow_unknown_amino_acids=True):
+    """
+    Encode peptides of any length into KmerEncodedPeptides instance
+
+    Parameters
+    ----------
+    peptides : str list or KmerEncodedPeptides
+        Peptide strings of any length. For convenience, if a KmerEncodedPeptides instance is passed then it is returned.
+
+    """
+    if isinstance(peptides, KmerEncodedPeptides):
+        assert peptides.kmer_size == kmer_size
+        assert peptides.allow_unknown_amino_acids == allow_unknown_amino_acids
+        return peptides
+
+    if pandas.Series(peptides).nunique() != len(peptides):
+        raise ValueError("Duplicate peptides not supported")
+
+    if len(peptides) == 0:
+        combined_matrix = np.zeros((0, kmer_size))
+        indices = []
+    else:
+        indices = []
+        encoded_matrices = []
+        for i, peptide in enumerate(peptides):
+            matrix, _, _, _ = fixed_length_index_encoding(
+                peptides=[peptide],
+                desired_length=kmer_size,
+                allow_unknown_amino_acids=allow_unknown_amino_acids)
+            encoded_matrices.append(matrix)
+            indices.extend([i] * len(matrix))
+        combined_matrix = np.concatenate(encoded_matrices)
+    index_array = np.array(indices)
+    expected_shape = (len(index_array), kmer_size)
+    assert combined_matrix.shape == expected_shape, \
+        "Expected shape %s but got %s" % (
+            expected_shape, combined_matrix.shape)
+
+    return KmerEncodedPeptides(
+        peptides,
+        combined_matrix,
+        index_array,
+        kmer_size=kmer_size,
+        allow_unknown_amino_acids=allow_unknown_amino_acids)
+
+
+
 def all_kmers(k, alphabet=common_amino_acid_letters):
     """
     Generates all k-mer peptide sequences
@@ -316,67 +407,3 @@ def check_valid_index_encoding_array(X, allow_unknown_amino_acids=True):
         return X
 
 
-class KmerEncodedPeptides(object):
-    def __init__(self, peptides, encoded_matrix, indices, kmer_size, allow_unknown_amino_acids):
-        assert len(indices) == len(encoded_matrix)
-        assert len(peptides) == 0 or len(peptides) == max(indices) + 1
-        self.peptides = peptides
-        self.encoded_matrix = encoded_matrix
-        self.indices = indices
-        self.kmer_size = kmer_size
-        self.allow_unknown_amino_acids = allow_unknown_amino_acids
-
-    def __len__(self):
-        return len(self.peptides)
-
-    def combine_predictions(self, predictions):
-        assert len(predictions) == len(self.encoded_matrix)
-        assert len(predictions) == len(self.indices)
-        df = pandas.DataFrame({
-            'original_peptide_index': self.indices,
-            'prediction': predictions,
-        })
-        predictions_by_index = df.groupby("original_peptide_index").prediction.mean()
-        return predictions_by_index[np.arange(0, max(self.indices) + 1)].values
-
-
-def encode_peptides(peptides, kmer_size=9, allow_unknown_amino_acids=True):
-    """
-    Parameters
-    ----------
-    peptides : str list
-        Peptide strings of any length
-
-    Encode peptides of any length into KmerEncodedPeptides instance
-    """
-    if isinstance(peptides, KmerEncodedPeptides):
-        assert peptides.kmer_size == kmer_size
-        assert peptides.allow_unknown_amino_acids == allow_unknown_amino_acids
-        return peptides
-
-    if len(peptides) == 0:
-        combined_matrix = np.zeros((0, kmer_size))
-        indices = []
-    else:
-        indices = []
-        encoded_matrices = []
-        for i, peptide in enumerate(peptides):
-            matrix, _, _, _ = fixed_length_index_encoding(
-                peptides=[peptide],
-                desired_length=kmer_size,
-                allow_unknown_amino_acids=allow_unknown_amino_acids)
-            encoded_matrices.append(matrix)
-            indices.extend([i] * len(matrix))
-        combined_matrix = np.concatenate(encoded_matrices)
-    index_array = np.array(indices)
-    expected_shape = (len(index_array), kmer_size)
-    assert combined_matrix.shape == expected_shape, \
-        "Expected shape %s but got %s" % (
-            expected_shape, combined_matrix.shape)
-
-    return KmerEncodedPeptides(
-        peptides,
-        combined_matrix,
-        index_array,
-        kmer_size=kmer_size,
-        allow_unknown_amino_acids=allow_unknown_amino_acids)
