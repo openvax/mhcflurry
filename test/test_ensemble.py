@@ -9,6 +9,7 @@ from os.path import join
 from os import mkdir
 
 from numpy.testing import assert_allclose, assert_equal
+import numpy
 from nose.tools import eq_
 
 from . import make_random_peptides
@@ -25,6 +26,38 @@ from mhcflurry \
         Class1EnsembleMultiAllelePredictor,
         get_downloaded_predictor,
         HYPERPARAMETER_DEFAULTS)
+
+
+def test_single_allele():
+    model_hyperparameters = HYPERPARAMETER_DEFAULTS.models_grid(
+        impute=[False],
+        activation=["tanh"],
+        layer_sizes=[[4], [16]],
+        embedding_output_dim=[16],
+        dropout_probability=[.25],
+        n_training_epochs=[20])
+    model = Class1EnsembleMultiAllelePredictor(
+        ensemble_size=3,
+        hyperparameters_to_search=model_hyperparameters)
+    print(model)
+
+    dataset = AffinityMeasurementDataset.from_csv(get_path(
+        "data_combined_iedb_kim2014", "combined_human_class1_dataset.csv"))
+    sub_dataset = AffinityMeasurementDataset(
+        dataset._df.ix[
+            (dataset._df.allele.isin(["HLA-A0205"])) &
+            (dataset._df.peptide.str.len() == 9)
+            ])
+    mc = MeasurementCollection.from_dataset(sub_dataset)
+    model.fit(mc)
+    results = mc.df.copy()
+    results["prediction"] = model.predict(mc)
+    score = results[["measurement_value", "prediction"]].corr('kendall').ix["measurement_value", "prediction"]
+    assert score > 0.3, score
+
+    repeated = model.predict_for_allele("HLA-A0205", ["AAAAAAAA","AAAAAAAA", "AAAAAAAA"])
+    assert len(repeated) == 3, repeated
+    assert numpy.std(repeated) < 1e-4, (repeated, numpy.std(repeated))
 
 
 def test_basic():

@@ -29,8 +29,7 @@ MEASUREMENT_SOURCES = [
 class MeasurementCollection(object):
     """
     A measurement collection is a set of observations for allele/peptide pairs.
-    A single measurement collection may have both MS hits and affinity
-    measurements.
+    A single measurement collection may have both MS hits and affinity measurements.
 
     This is more general than a AffinityMeasurementDataset since it supports MS hits. It is also
     simpler, as the user is expected to manipulate the underlying dataframe.
@@ -122,8 +121,8 @@ class MeasurementCollection(object):
                     None if random_state is None
                     else random_state + len(results)))
             stratification_groups = self.df.allele + self.df.measurement_type
-            assert len(stratification_groups.unique()) > 1, (
-                stratification_groups.unique())
+            #assert len(stratification_groups.unique()) > 1, (
+            #    stratification_groups.unique())
             (indices1, indices2) = next(
                 cv.split(self.df.values, stratification_groups))
             assert len(indices1) > 0

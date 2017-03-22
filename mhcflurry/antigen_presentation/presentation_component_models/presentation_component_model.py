@@ -187,7 +187,12 @@ class PresentationComponentModel(object):
                 self.predict_for_experiment(
                     str(peptides_df.iloc[0].experiment_name),
                     peptides_df.peptide.values))
-            assert len(return_value) == len(peptides_df), str(self)
+            assert len(return_value) == len(peptides_df), (
+                "%d != %d" % (len(return_value), len(peptides_df)),
+                str(self),
+                peptides_df.peptide.nunique(),
+                return_value,
+                peptides_df)
             assert_no_null(return_value, str(self))
         else:
             peptides_df = (

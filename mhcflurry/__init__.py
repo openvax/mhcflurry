@@ -14,11 +14,12 @@
 
 from .class1_allele_specific.class1_binding_predictor import (
     Class1BindingPredictor)
-from .predict import predict
+from .prediction import predict
 from .package_metadata import __version__
 from .affinity_measurement_dataset import AffinityMeasurementDataset
 from .class1_allele_specific_ensemble import Class1EnsembleMultiAllelePredictor
 from .class1_allele_specific import Class1SingleModelMultiAllelePredictor
+from .measurement_collection import MeasurementCollection
 from . import parallelism
 
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     "AffinityMeasurementDataset",
     "Class1EnsembleMultiAllelePredictor",
     "Class1SingleModelMultiAllelePredictor",
+    "MeasurementCollection",
     "__version__",
 ]
