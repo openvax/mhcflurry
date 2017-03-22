@@ -93,7 +93,9 @@ def get_downloaded_predictor():
 
 def call_fit_and_test(args):
     """
-    This top-level function exists for
+    Call fit_and_test with the given arguments and return the result.
+
+    This top-level function exists as a convenience for parallel execution of fit_and_test using a parallel map.
     """
     return fit_and_test(*args)
 
@@ -105,6 +107,17 @@ def fit_and_test(
         imputed_mc_remote_object,
         test_mc_remote_object,
         allele_and_hyperparameter_pairs):
+    """
+    Fit and test one or more models on one or more alleles.
+
+    :param parallel_backend:
+    :param fold_num:
+    :param train_mc_remote_object:
+    :param imputed_mc_remote_object:
+    :param test_mc_remote_object:
+    :param allele_and_hyperparameter_pairs:
+    :return:
+    """
 
     logging.info(
         "Fit and test: fold=%d train=%s,%s test=%s alleles/models [%d]=%s" % (
@@ -388,16 +401,18 @@ class Class1EnsembleMultiAllelePredictor(object):
         return result
 
     def predict_for_allele(self, allele, peptides):
-        encoded = encode_peptides(peptides)
+        unique_peptides = numpy.unique(peptides)
+        encoded = encode_peptides(unique_peptides)
         values = [
             model.predict(encoded)
             for model in self.models_for_allele(allele)
         ]
 
         # Geometric mean
-        result = numpy.exp(numpy.nanmean(numpy.log(values), axis=0))
-        assert len(result) == len(peptides)
-        return result
+        result = pandas.Series(numpy.exp(numpy.nanmean(numpy.log(values), axis=0)), index=unique_peptides)
+        result_by_peptide = result.ix[peptides].values
+        assert len(result_by_peptide) == len(peptides)
+        return result_by_peptide
 
     def fit(
             self,
