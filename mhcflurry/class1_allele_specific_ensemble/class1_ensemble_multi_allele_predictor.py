@@ -201,6 +201,7 @@ def fit_and_test(
         train_end = time.time()
         predictions = model.predict(test_dataset.peptides)
         test_end = time.time()
+        assert len(test_dataset.affinities) == len(predictions)
         scores = scoring.make_scores(
             test_dataset.affinities, predictions)
 
