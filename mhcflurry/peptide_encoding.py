@@ -53,6 +53,7 @@ class KmerEncodedPeptides(object):
         self.allow_unknown_amino_acids = allow_unknown_amino_acids
         self.peptides = peptides
         self.indices = indices
+        self.unique_peptides = np.unique(peptides)
 
     def __len__(self):
         return len(self.peptides)
@@ -82,9 +83,6 @@ def encode_peptides(peptides, kmer_size=9, allow_unknown_amino_acids=True):
         assert peptides.kmer_size == kmer_size
         assert peptides.allow_unknown_amino_acids == allow_unknown_amino_acids
         return peptides
-
-    if pandas.Series(peptides).nunique() != len(peptides):
-        raise ValueError("Duplicate peptides not supported")
 
     if len(peptides) == 0:
         combined_matrix = np.zeros((0, kmer_size))
