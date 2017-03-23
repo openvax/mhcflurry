@@ -402,18 +402,16 @@ class Class1EnsembleMultiAllelePredictor(object):
         return result
 
     def predict_for_allele(self, allele, peptides):
-        unique_peptides = numpy.unique(peptides)
-        encoded = encode_peptides(unique_peptides)
+        encoded = encode_peptides(peptides)
         values = [
             model.predict(encoded)
             for model in self.models_for_allele(allele)
         ]
 
         # Geometric mean
-        result = pandas.Series(numpy.exp(numpy.nanmean(numpy.log(values), axis=0)), index=unique_peptides)
-        result_by_peptide = result.ix[peptides].values
-        assert len(result_by_peptide) == len(peptides)
-        return result_by_peptide
+        result = numpy.exp(numpy.nanmean(numpy.log(values), axis=0))
+        assert len(result) == len(peptides)
+        return result
 
     def fit(
             self,
