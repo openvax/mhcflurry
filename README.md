@@ -8,16 +8,15 @@ The [adaptive immune system](https://en.wikipedia.org/wiki/Adaptive_immune_syste
 MHCflurry currently supports allele-specific peptide / [MHC class I](https://en.wikipedia.org/wiki/MHC_class_I) affinity prediction using two approaches:
 
  * Ensembles of predictors trained on random halves of the training data (the default)
- * Single-model predictors for each allele trained on all the training data
+ * Single-model predictors for each allele trained on all data
 
 For both kinds of predictors, you can fit models to your own data or download
 trained models that we provide.
 
 The downloadable models were trained on data from
-[IEDB](http://www.iedb.org/home_v3.php) and [Kim 2014]
-(http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241).
+[IEDB](http://www.iedb.org/home_v3.php) and [Kim 2014](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241).
 The ensemble predictors include models trained on data that has been
-augmented with data imputed based on other alleles (see
+augmented with values imputed from other alleles (see
 [Rubinsteyn 2016](http://biorxiv.org/content/early/2016/06/07/054775)).
 
 In validation experiments using presented peptides identified by mass-spec,
@@ -27,11 +26,11 @@ available soon.
 
 We anticipate adding additional models, including pan-allele and class II predictors.
 
-The MHCflurry predictors are implemented in Python using [keras](https://keras.io).
 
 ## Setup
 
-To configure keras, the neural network library used by MHCflurry, you'll need to set an environment variable in your shell:
+The MHCflurry predictors are implemented in Python using [keras](https://keras.io).
+To configure keras you'll need to set an environment variable in your shell:
 
 ```
 export KERAS_BACKEND=theano
@@ -91,28 +90,27 @@ The predictions returned by `predict` are affinities (KD) in nM.
 
 ## Training your own models
 
-See the [class1_allele_specific_models.ipynb](https://github.com/hammerlab/mhcflurry/blob/master/examples/class1_allele_specific_models.ipynb) notebook for an overview of the Python API, including predicting, fitting, and scoring models.
+See the [class1_allele_specific_models.ipynb](https://github.com/hammerlab/mhcflurry/blob/master/examples/class1_allele_specific_models.ipynb) notebook for an overview of the Python API, including predicting, fitting, and scoring single-model predictors. There is also a script called `mhcflurry-class1-allele-specific-cv-and-train` that will perform cross validation and model selection given a CSV file of training data. Try `mhcflurry-class1-allele-specific-cv-and-train --help` for details.
 
-There is also a script called `mhcflurry-class1-allele-specific-cv-and-train` that will perform cross validation and model selection given a CSV file of training data. Try `mhcflurry-class1-allele-specific-cv-and-train --help` for details.
+The ensemble predictors are trained similarly using the `mhcflurry-class1-allele-specific-ensemble-train` command.
 
 ## Details on the downloadable models
 
 The scripts we use to train predictors, including hyperparameter selection
 using cross validation, are
-[here](https://github.com/hammerlab/mhcflurry/tree/master/downloads-generation/models_class1_allele_specific_ensemble)
-for the ensemble predictors and [here](https://github.com/hammerlab/mhcflurry/tree/master/downloads-generation/models_class1_allele_specific_single)
+[here](downloads-generation/models_class1_allele_specific_ensemble)
+for the ensemble predictors and [here](downloads-generation/models_class1_allele_specific_single)
 for the single-model predictors.
 
 For the ensemble predictors, we also generate a [report](http://htmlpreview.github.io/?https://github.com/hammerlab/mhcflurry/blob/master/downloads-generation/models_class1_allele_specific_ensemble/models-summary/report.html)
-that describes the hyperparamters selected and the test performance of each
+that describes the hyperparameters selected and the test performance of each
 model.
 
 Besides the model weights, the data downloaded when you run
 `mhcflurry-downloads  fetch` also includes a CSV file giving the
 hyperparameters used for each predictor. Run `mhcflurry-downloads path
 models_class1_allele_specific_ensemble` or `mhcflurry-downloads path
-models_class1_allele_specific_single` to get the directory to look in for these
-files.
+models_class1_allele_specific_single` to get the directory where these files are stored.
 
 ## Problems and Solutions
 
