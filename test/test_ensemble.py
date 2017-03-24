@@ -51,7 +51,7 @@ def test_single_allele():
     mc = MeasurementCollection.from_dataset(sub_dataset)
     model.fit(mc)
     results = mc.df.copy()
-    results["prediction"] = model.predict(mc)
+    results["prediction"] = model.predict_measurement_collection(mc)
     score = results[["measurement_value", "prediction"]].corr('kendall').ix["measurement_value", "prediction"]
     assert score > 0.3, score
 
@@ -102,7 +102,7 @@ def test_basic():
         set(model2.manifest_df.all_alleles_imputed_data_hash))
 
     print(model.description())
-    ic50_pred = model.predict(mc)
+    ic50_pred = model.predict_measurement_collection(mc)
     ic50_true = mc.df.measurement_value
 
     scores = scoring.make_scores(ic50_true, ic50_pred)
@@ -124,7 +124,7 @@ def test_basic():
     eq_(model.ensemble_size, model2.ensemble_size)
     eq_(model.supported_alleles, model2.supported_alleles)
     eq_(model.hyperparameters_to_search, model2.hyperparameters_to_search)
-    ic50_pred2 = model.predict(mc)
+    ic50_pred2 = model.predict_measurement_collection(mc)
     assert_allclose(ic50_pred, ic50_pred2, rtol=1e-04)
 
 
