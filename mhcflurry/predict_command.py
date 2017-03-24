@@ -96,7 +96,7 @@ parser.add_argument(
 parser.add_argument(
     "--predictor",
     choices=("class1-allele-specific-single", "class1-allele-specific-ensemble"),
-    default="class1-allele-specific-single",
+    default="class1-allele-specific-ensemble",
     help="Predictor to use. Default: %(default)s.")
 
 parser.add_argument(
