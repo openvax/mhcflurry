@@ -3,7 +3,11 @@ from __future__ import absolute_import
 from .class1_binding_predictor import Class1BindingPredictor
 from .train import train_across_models_and_folds, AlleleSpecificTrainTestFold
 from .cross_validation import cross_validation_folds
-from .load import from_allele_name, supported_alleles
+from .class1_single_model_multi_allele_predictor import (
+    from_allele_name,
+    supported_alleles,
+    get_downloaded_predictor,
+    Class1SingleModelMultiAllelePredictor)
 
 __all__ = [
     'Class1BindingPredictor',
@@ -12,4 +16,6 @@ __all__ = [
     'train_across_models_and_folds',
     'from_allele_name',
     'supported_alleles',
+    'get_downloaded_predictor',
+    'Class1SingleModelMultiAllelePredictor',
 ]

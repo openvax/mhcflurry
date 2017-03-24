@@ -52,7 +52,7 @@ if __name__ == '__main__':
         'numpy>=1.11',
         'pandas>=0.13.1',
         'appdirs',
-        'theano>=0.8.2',
+        'theano==0.8.2',
         'keras==1.2.0',
         'fancyimpute>=0.0.12',
         'scikit-learn',
@@ -79,8 +79,10 @@ if __name__ == '__main__':
             'console_scripts': [
                 'mhcflurry-downloads = mhcflurry.downloads_command:run',
                 'mhcflurry-predict = mhcflurry.predict_command:run',
+                'mhcflurry-class1-allele-specific-ensemble-train = '
+                    'mhcflurry.class1_allele_specific_ensemble.train_command:run',
                 'mhcflurry-class1-allele-specific-cv-and-train = '
-                    'mhcflurry.class1_allele_specific.cv_and_train_command:run'
+                    'mhcflurry.class1_allele_specific.cv_and_train_command:run',
             ]
         },
         classifiers=[
@@ -97,5 +99,9 @@ if __name__ == '__main__':
         },
         install_requires=required_packages,
         long_description=readme,
-        packages=['mhcflurry', 'mhcflurry.class1_allele_specific'],
+        packages=[
+            'mhcflurry',
+            'mhcflurry.class1_allele_specific',
+            'mhcflurry.class1_allele_specific_ensemble',
+        ],
     )

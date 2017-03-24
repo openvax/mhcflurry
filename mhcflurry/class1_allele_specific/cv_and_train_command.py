@@ -49,7 +49,7 @@ import pickle
 import numpy
 
 from .. import parallelism
-from ..dataset import Dataset
+from ..affinity_measurement_dataset import AffinityMeasurementDataset
 from ..imputation_helpers import imputer_from_name
 from .cross_validation import cross_validation_folds
 from .train import (
@@ -216,12 +216,12 @@ def go(args):
         logging.info(
             "Subselected to %d model architectures" % len(model_architectures))
 
-    train_data = Dataset.from_csv(args.train_data)
+    train_data = AffinityMeasurementDataset.from_csv(args.train_data)
     logging.info("Loaded training dataset: %s" % train_data)
 
     test_data = None
     if args.test_data:
-        test_data = Dataset.from_csv(args.test_data)
+        test_data = AffinityMeasurementDataset.from_csv(args.test_data)
         logging.info("Loaded testing dataset: %s" % test_data)
 
     if args.min_samples_per_allele:

@@ -197,7 +197,7 @@ def fetch_subcommand(args):
             logging.debug("Extracting: %s" % names)
             bad_names = [
                 n for n in names
-                if n.strip().startswith("/") or n.strip().startswith(".")
+                if n.strip().startswith("/") or n.strip().startswith("..")
             ]
             if bad_names:
                 raise RuntimeError(

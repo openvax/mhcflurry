@@ -10,7 +10,7 @@ from os import mkdir, environ
 import pandas
 
 from mhcflurry.class1_allele_specific import cv_and_train_command
-from mhcflurry import downloads, predict
+from mhcflurry import downloads, predict, class1_allele_specific
 from mhcflurry.class1_allele_specific.train import HYPERPARAMETER_DEFAULTS
 
 try:
@@ -72,7 +72,7 @@ def test_small_run():
         # If kubeface is installed, then this command will by default use it.
         # In that case, we want to have the kubeface storage written to a
         # local file and not assume the existence of a google storage bucket.
-        args.extend(["--storage-prefix", "/tmp/"])
+        args.extend(["--kubeface-storage", "/tmp/"])
     print("Running cv_and_train_command with args: %s " % str(args))
 
     cv_and_train_command.run(args)
@@ -113,7 +113,11 @@ def verify_trained_models(base_temp_dir):
             ("HLA-A0201", "LLGLPAAEY", False),
         ], columns=("allele", "peptide", "binder"))
 
-        data["prediction"] = predict(data.allele, data.peptide).Prediction
+        data["prediction"] = predict(
+            data.allele,
+            data.peptide,
+            predictor=class1_allele_specific.get_downloaded_predictor()
+        ).Prediction
         print(data)
         mean_binder = data.ix[data.binder].prediction.mean()
         mean_nonbinder = data.ix[~data.binder].prediction.mean()

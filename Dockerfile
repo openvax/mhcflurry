@@ -42,14 +42,11 @@ WORKDIR /home/user
 # Setup virtual envs and install convenience packages.  Note: installing
 # cherrypy as part of the mhcflurry installation weirdly fails on a unicode
 # issue in python2, but installing it separately seems to work.
-# We also install bokeh so that dask distributed will have an admin web interface.
 RUN virtualenv venv-py3 --python=python3 && \
     venv-py3/bin/pip install --upgrade pip && \
     venv-py3/bin/pip install --upgrade \
         numpy \
-        bokeh \
         cherrypy \
-        git+https://github.com/dask/distributed.git \
         jupyter \
         lxml \
         scipy \
@@ -59,9 +56,10 @@ RUN virtualenv venv-py3 --python=python3 && \
 ENV KERAS_BACKEND theano
 # RUN venv-py3/bin/pip install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.10.0-cp35-cp35m-linux_x86_64.whl
 
-# Install mhcflurry and download data and models.
+# Install mhcflurry and latest kubeface and download data and models.
 COPY . ./mhcflurry
-RUN venv-py3/bin/pip install ./mhcflurry && venv-py3/bin/mhcflurry-downloads fetch
+RUN venv-py3/bin/pip install --upgrade ./mhcflurry git+https://github.com/hammerlab/kubeface.git \
+    && venv-py3/bin/mhcflurry-downloads fetch
  
 EXPOSE 8888
 CMD venv-py3/bin/jupyter notebook --no-browser

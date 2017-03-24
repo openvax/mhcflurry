@@ -37,11 +37,14 @@ from .imputation_helpers import (
 )
 
 
-class Dataset(object):
-
+class AffinityMeasurementDataset(object):
     """
     Peptide-MHC binding dataset with helper methods for constructing
     different representations (arrays, DataFrames, dictionaries, &c).
+
+    This class is specific for affinity measurements (IC50s), whereas the
+    MeasurementCollection class supports both affinitites and other
+    measurement types like mass spec hits.
 
     Design considerations:
         - want to allow multiple measurements for each pMHC pair (which can
@@ -50,7 +53,7 @@ class Dataset(object):
     """
     def __init__(self, df):
         """
-        Constructs a DataSet from a pandas DataFrame with the following
+        Constructs a AffinityMeasurementDataset from a pandas DataFrame with the following
         columns:
             - allele
             - peptide
@@ -89,7 +92,7 @@ class Dataset(object):
 
     def to_dataframe(self):
         """
-        Returns DataFrame representation of data contained in Dataset
+        Returns DataFrame representation of data contained in AffinityMeasurementDataset
         """
         return self._df
 
@@ -125,7 +128,7 @@ class Dataset(object):
         return len(self.to_dataframe())
 
     def __str__(self):
-        return "Dataset(n=%d, alleles=%s)" % (
+        return "AffinityMeasurementDataset(n=%d, alleles=%s)" % (
             len(self), list(sorted(self.unique_alleles())))
 
     def __repr__(self):
@@ -136,7 +139,7 @@ class Dataset(object):
         Two datasets are equal if they contain the same number of samples
         with the same properties and values.
         """
-        if type(other) is not Dataset:
+        if type(other) is not AffinityMeasurementDataset:
             return False
         elif len(self) != len(other):
             return False
@@ -180,13 +183,13 @@ class Dataset(object):
 
     def unique_alleles(self):
         """
-        Returns the set of allele names contained in this Dataset.
+        Returns the set of allele names contained in this AffinityMeasurementDataset.
         """
         return set(self.alleles)
 
     def unique_peptides(self):
         """
-        Returns the set of peptide sequences contained in this Dataset.
+        Returns the set of peptide sequences contained in this AffinityMeasurementDataset.
         """
         return set(self.peptides)
 
@@ -202,11 +205,11 @@ class Dataset(object):
         entries just for that allele.
         """
         for (allele_name, group_df) in self.to_dataframe().groupby("allele"):
-            yield (allele_name, Dataset(group_df))
+            yield (allele_name, AffinityMeasurementDataset(group_df))
 
     def groupby_allele_dictionary(self):
         """
-        Returns dictionary mapping each allele name to a Dataset containing
+        Returns dictionary mapping each allele name to a AffinityMeasurementDataset containing
         only entries from that allele.
         """
         return dict(self.groupby_allele())
@@ -314,7 +317,7 @@ class Dataset(object):
     @classmethod
     def from_single_allele_dataframe(cls, allele_name, single_allele_df):
         """
-        Construct a Dataset from a single MHC allele's DataFrame
+        Construct a AffinityMeasurementDataset from a single MHC allele's DataFrame
         """
         df = single_allele_df.copy()
         df["allele"] = allele_name
@@ -326,7 +329,7 @@ class Dataset(object):
             allele_to_peptide_to_affinity_dict):
         """
         Given nested dictionaries mapping allele -> peptide -> affinity,
-        construct a Dataset with uniform sample weights.
+        construct a AffinityMeasurementDataset with uniform sample weights.
         """
         alleles = []
         peptides = []
@@ -344,7 +347,7 @@ class Dataset(object):
     @classmethod
     def create_empty(cls):
         """
-        Returns an empty Dataset containing no pMHC entries.
+        Returns an empty AffinityMeasurementDataset containing no pMHC entries.
         """
         return cls.from_nested_dictionary({})
 
@@ -355,7 +358,7 @@ class Dataset(object):
             peptide_to_affinity_dict):
         """
         Given a peptide->affinity dictionary for a single allele,
-        create a Dataset.
+        create a AffinityMeasurementDataset.
         """
         return cls.from_nested_dictionary({allele_name: peptide_to_affinity_dict})
 
@@ -382,7 +385,7 @@ class Dataset(object):
 
     def get_allele(self, allele_name):
         """
-        Get Dataset for a single allele
+        Get AffinityMeasurementDataset for a single allele
         """
         if allele_name not in self.unique_alleles():
             raise KeyError("Allele '%s' not found, available alleles: %s" % (
@@ -393,7 +396,7 @@ class Dataset(object):
 
     def get_alleles(self, allele_names):
         """
-        Restrict Dataset to several allele names.
+        Restrict AffinityMeasurementDataset to several allele names.
         """
         datasets = []
         for allele_name in allele_names:
@@ -446,7 +449,7 @@ class Dataset(object):
             weight = row["sample_weight"]
             # we're either going to create a fresh original peptide column
             # or extend the existing original peptide tuple that tracks
-            # the provenance of entries in the new Dataset
+            # the provenance of entries in the new AffinityMeasurementDataset
             original_peptide = row.get("original_peptide")
             if original_peptide is None:
                 original_peptide = ()
@@ -569,14 +572,14 @@ class Dataset(object):
 
     def slice(self, indices):
         """
-        Create a new Dataset by slicing through all columns of this dataset
+        Create a new AffinityMeasurementDataset by slicing through all columns of this dataset
         with the given indices.
         """
         indices = np.asarray(indices)
         max_index = indices.max()
         n_total = len(self)
         if max_index >= len(self):
-            raise ValueError("Invalid index %d for Dataset of size %d" % (
+            raise ValueError("Invalid index %d for AffinityMeasurementDataset of size %d" % (
                 max_index, n_total))
 
         df = self.to_dataframe()
@@ -587,7 +590,7 @@ class Dataset(object):
 
     def random_split(self, n=None, stratify_fn=None):
         """
-        Randomly split the Dataset into smaller Dataset objects.
+        Randomly split the AffinityMeasurementDataset into smaller AffinityMeasurementDataset objects.
 
         Parameters
         ----------
@@ -598,7 +601,7 @@ class Dataset(object):
             Function that takes a row and returns bool, stratifying sampling
             into two groups.
 
-        Returns a pair of Dataset objects.
+        Returns a pair of AffinityMeasurementDataset objects.
         """
         n_total = len(self)
         if n is None:
@@ -646,7 +649,7 @@ class Dataset(object):
             test_samples = self
             test_sample_indices = np.arange(n_total)
         elif test_allele not in self.unique_alleles():
-            raise ValueError("Allele '%s' not in Dataset" % test_allele)
+            raise ValueError("Allele '%s' not in AffinityMeasurementDataset" % test_allele)
 
         else:
             test_sample_indices = np.where(self.alleles == test_allele)[0]
@@ -685,7 +688,7 @@ class Dataset(object):
         """
         Split an allele into training and test sets, and then impute values
         for peptides missing from the training set using data from other alleles
-        in this Dataset.
+        in this AffinityMeasurementDataset.
 
         (apologies for the wordy name, this turns out to be a common operation)
 
@@ -698,13 +701,13 @@ class Dataset(object):
             Size of the training set to return for this allele.
 
         stratify_fn : function
-            Function mapping from rows of the Dataset to booleans for stratifying
+            Function mapping from rows of the AffinityMeasurementDataset to booleans for stratifying
             by two groups.
 
         **kwargs : dict
-            Extra keyword arguments passed to Dataset.impute_missing_values
+            Extra keyword arguments passed to AffinityMeasurementDataset.impute_missing_values
 
-        Returns three Dataset objects:
+        Returns three AffinityMeasurementDataset objects:
             - training set with original pMHC affinities for given allele
             - larger imputed training set for given allele
             - test set
@@ -729,7 +732,7 @@ class Dataset(object):
 
         The two arguments are assumed to be the same length.
 
-        Returns Dataset of equal or smaller size.
+        Returns AffinityMeasurementDataset of equal or smaller size.
         """
         if len(alleles) != len(peptides):
             raise ValueError(
@@ -746,7 +749,7 @@ class Dataset(object):
         allele_peptide_pairs : list of (str, str) tuples
         The two arguments are assumed to be the same length.
 
-        Returns Dataset of equal or smaller size.
+        Returns AffinityMeasurementDataset of equal or smaller size.
         """
         require_iterable_of(allele_peptide_pairs, tuple)
         keys_to_remove_set = set(allele_peptide_pairs)
@@ -763,7 +766,7 @@ class Dataset(object):
 
         Parameters
         ----------
-        other_dataset : Dataset
+        other_dataset : AffinityMeasurementDataset
 
         Returns a new Dataset object of equal or lesser size.
         """
@@ -792,7 +795,7 @@ class Dataset(object):
             of floats and replaces some or all NaN values with synthetic
             affinities.
 
-        log_transform : function
+        log_transform : bool
             Transform affinities with to log10 values before imputation
             (and then transform back afterward).
 
@@ -802,7 +805,7 @@ class Dataset(object):
         min_observations_per_allele : int
             Drop allele columns with fewer than this number of observed values.
 
-        Returns Dataset with original pMHC affinities and additional
+        Returns AffinityMeasurementDataset with original pMHC affinities and additional
         synthetic samples.
         """
         if isinstance(imputation_method, string_types):

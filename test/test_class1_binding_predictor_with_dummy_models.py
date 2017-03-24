@@ -68,24 +68,28 @@ def test_always_zero_10mer_inputs():
 
 
 def test_encode_peptides_9mer():
-    X, indices = always_zero_predictor_with_unknown_AAs.encode_peptides(["AAASSSYYY"])
-    assert len(indices) == 1
-    assert indices[0] == 0
-    assert X.shape[0] == 1, X.shape
-    assert X.shape[1] == 9, X.shape
+    encoded = always_zero_predictor_with_unknown_AAs.encode_peptides(["AAASSSYYY"])
+    assert len(encoded.indices) == 1
+    assert encoded.indices[0] == 0
+    assert encoded.encoded_matrix.shape[0] == 1, encoded.encoded_matrix.shape
+    assert encoded.encoded_matrix.shape[1] == 9, encoded.encoded_matrix.shape
 
 
 def test_encode_peptides_8mer():
-    X, indices = always_zero_predictor_with_unknown_AAs.encode_peptides(["AAASSSYY"])
-    assert len(indices) == 9
-    assert (indices == 0).all()
+    encoded = always_zero_predictor_with_unknown_AAs.encode_peptides(["AAASSSYY"])
+    assert len(encoded.indices) == 9
+    assert (encoded.indices == 0).all()
+
+    X = encoded.encoded_matrix
     assert X.shape[0] == 9, (X.shape, X)
     assert X.shape[1] == 9, (X.shape, X)
 
 
 def test_encode_peptides_10mer():
-    X, indices = always_zero_predictor_with_unknown_AAs.encode_peptides(["AAASSSYYFF"])
-    assert len(indices) == 10
-    assert (indices == 0).all()
+    encoded = always_zero_predictor_with_unknown_AAs.encode_peptides(["AAASSSYYFF"])
+    assert len(encoded.indices) == 10
+    assert (encoded.indices == 0).all()
+
+    X = encoded.encoded_matrix
     assert X.shape[0] == 10, (X.shape, X)
     assert X.shape[1] == 9, (X.shape, X)

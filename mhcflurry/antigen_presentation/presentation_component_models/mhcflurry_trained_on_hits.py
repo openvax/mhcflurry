@@ -3,7 +3,7 @@ from copy import copy
 import pandas
 from numpy import log, exp, nanmean
 
-from ...dataset import Dataset
+from ...affinity_measurement_dataset import AffinityMeasurementDataset
 from ...class1_allele_specific import Class1BindingPredictor
 from ...common import normalize_allele_name
 
@@ -22,7 +22,7 @@ class MHCflurryTrainedOnHits(MHCBindingComponentModelBase):
 
     Parameters
     ------------
-    iedb_dataset : mhcflurry.Dataset
+    iedb_dataset : mhcflurry.AffinityMeasurementDataset
         IEDB data for this allele. If not specified no iedb data is used.
 
     mhcflurry_hyperparameters : dict
@@ -96,7 +96,7 @@ class MHCflurryTrainedOnHits(MHCBindingComponentModelBase):
         if self.iedb_dataset is not None:
             df = df.append(iedb_dataset_df, ignore_index=True)
 
-        dataset = Dataset(
+        dataset = AffinityMeasurementDataset(
             df.sample(frac=1))  # shuffle dataframe
         print("Train data: ", dataset)
         model = Class1BindingPredictor(

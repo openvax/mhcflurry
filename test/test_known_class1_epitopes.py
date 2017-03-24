@@ -12,7 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mhcflurry.class1_allele_specific import load
+import cProfile
+
+import mhcflurry
+import mhcflurry.class1_allele_specific
+import mhcflurry.class1_allele_specific_ensemble
+
+
+predictors = [
+    mhcflurry.class1_allele_specific.get_downloaded_predictor(),
+    mhcflurry.class1_allele_specific_ensemble.get_downloaded_predictor(),
+]
+
+
+def predict_and_check(allele, peptide, expected_range=(0, 500)):
+    for predictor in predictors:
+        (prediction,) = predictor.predict_for_allele(allele, [peptide])
+        assert prediction >= expected_range[0], (predictor, prediction)
+        assert prediction <= expected_range[1], (predictor, prediction)
 
 
 def test_A1_Titin_epitope():
@@ -20,12 +37,7 @@ def test_A1_Titin_epitope():
     #   Identification of a Titin-Derived HLA-A1-Presented Peptide
     #   as a Cross-Reactive Target for Engineered MAGE A3-Directed
     #   T Cells
-    model = load.from_allele_name("HLA-A*01:01")
-    ic50s = model.predict(["ESDPIVAQY"])
-    print(ic50s)
-    assert len(ic50s) == 1
-    ic50 = ic50s[0]
-    assert ic50 <= 500, ic50
+    predict_and_check("HLA-A*01:01", "ESDPIVAQY")
 
 
 def test_A1_MAGE_epitope():
@@ -33,23 +45,13 @@ def test_A1_MAGE_epitope():
     #   Identification of a Titin-Derived HLA-A1-Presented Peptide
     #   as a Cross-Reactive Target for Engineered MAGE A3-Directed
     #   T Cells
-    model = load.from_allele_name("HLA-A*01:01")
-    ic50s = model.predict(["EVDPIGHLY"])
-    print(ic50s)
-    assert len(ic50s) == 1
-    ic50 = ic50s[0]
-    assert ic50 <= 500, ic50
+    predict_and_check("HLA-A*01:01", "EVDPIGHLY")
 
 
 def test_A2_HIV_epitope():
     # Test the A2 HIV epitope SLYNTVATL from
     #    The HIV-1 HLA-A2-SLYNTVATL Is a Help-Independent CTL Epitope
-    model = load.from_allele_name("HLA-A*02:01")
-    ic50s = model.predict(["SLYNTVATL"])
-    print(ic50s)
-    assert len(ic50s) == 1
-    ic50 = ic50s[0]
-    assert ic50 <= 500, ic50
+    predict_and_check("HLA-A*02:01", "SLYNTVATL")
 
 
 if __name__ == "__main__":

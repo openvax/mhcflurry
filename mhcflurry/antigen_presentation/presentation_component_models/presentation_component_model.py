@@ -187,7 +187,12 @@ class PresentationComponentModel(object):
                 self.predict_for_experiment(
                     str(peptides_df.iloc[0].experiment_name),
                     peptides_df.peptide.values))
-            assert len(return_value) == len(peptides_df), str(self)
+            assert len(return_value) == len(peptides_df), (
+                "%d != %d" % (len(return_value), len(peptides_df)),
+                str(self),
+                peptides_df.peptide.nunique(),
+                return_value,
+                peptides_df)
             assert_no_null(return_value, str(self))
         else:
             peptides_df = (
@@ -202,7 +207,9 @@ class PresentationComponentModel(object):
                     result_df.loc[sub_df.index, "experiment_name"] ==
                     experiment_name).all()
 
-                unique_peptides = numpy.unique(sub_df.peptide.values)
+                unique_peptides = list(set(sub_df.peptide))
+                if len(unique_peptides) == 0:
+                    continue
 
                 result_dict = self.predict_for_experiment(
                     experiment_name, unique_peptides)

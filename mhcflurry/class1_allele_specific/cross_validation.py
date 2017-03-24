@@ -102,12 +102,12 @@ def cross_validation_folds(
         },
         parallel_backend=None):
     '''
-    Split a Dataset into n_folds cross validation folds for each allele,
+    Split a AffinityMeasurementDataset into n_folds cross validation folds for each allele,
     optionally performing imputation.
 
     Parameters
     -----------
-    train_data : mhcflurry.Dataset
+    train_data : mhcflurry.AffinityMeasurementDataset
 
     alleles : string list, optional
         Alleles to run cross validation on. Default: all alleles in
@@ -125,7 +125,7 @@ def cross_validation_folds(
         Imputer to use. If not specified, no imputation is done.
 
     impute_kwargs : dict, optional
-        Additional kwargs to pass to mhcflurry.Dataset.impute_missing_values.
+        Additional kwargs to pass to mhcflurry.AffinityMeasurementDataset.impute_missing_values.
 
     parallel_backend : mhcflurry.parallelism.ParallelBackend, optional
         Futures implementation to use for running on multiple threads,
@@ -193,8 +193,8 @@ def cross_validation_folds(
             imputation_args)
 
         # Here _replace is a method on named tuples that returns a new named
-        # tuple with the specified key set to the given value and all other key/
-        # values the same as the original.
+        # tuple with the specified key set to the given value and all other
+        # key/values the same as the original.
         return [
             result_fold._replace(imputed_train=imputation_result)
             for (result_fold, imputation_result) in zip(
