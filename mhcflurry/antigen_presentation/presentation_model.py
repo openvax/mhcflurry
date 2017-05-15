@@ -422,6 +422,8 @@ class PresentationModel(object):
         assert 'experiment_name' in peptides_df.columns
         assert 'hit' in peptides_df.columns
 
+        peptides_df = peptides_df.copy()
+
         peptides_df["prediction"] = self.predict(peptides_df)
         top_n = float(peptides_df.hit.sum())
 
@@ -432,8 +434,13 @@ class PresentationModel(object):
             }
         else:
             ranks = peptides_df.prediction.rank(ascending=False)
+            hit_indices = ranks[peptides_df.hit > 0].values
+            hit_lengths = peptides_df.peptide[
+                peptides_df.hit > 0
+            ].str.len().values
             result = {
-                'hit_indices': numpy.sort(ranks[peptides_df.hit > 0].values),
+                'hit_indices': hit_indices,
+                'hit_lengths': hit_lengths,
                 'total_peptides': len(peptides_df),
             }
             result['score'] = (
@@ -572,5 +579,5 @@ def ensemble_predictions(models, peptides_df, mask_indices_list=None):
         values = panel.ix[:, :, col]
         assert values.shape == (len(peptides_df), len(models))
         result[col] = model.combine_ensemble_predictions(col, values.values)
-        assert_no_null(result[col])
+        assert_no_null(pandas.Series(result[col]))
     return result

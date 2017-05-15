@@ -757,7 +757,7 @@ class AffinityMeasurementDataset(object):
             (k in keys_to_remove_set)
             for k in zip(self.alleles, self.peptides)
         ])
-        keep_mask = ~remove_mask
+        keep_mask = remove_mask == False
         return self.slice(keep_mask)
 
     def difference(self, other_dataset):
