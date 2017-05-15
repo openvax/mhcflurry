@@ -188,8 +188,8 @@ def describe_nulls(df, related_df_with_same_index_to_describe=None):
     if isinstance(df, pandas.Series):
         df = df.to_frame()
     with pandas.option_context('mode.use_inf_as_null', True):
-        null_counts_by_col = df.isnull().sum(axis=0)
-        null_rows = df.isnull().sum(axis=1) > 0
+        null_counts_by_col = pandas.isnull(df).sum(axis=0)
+        null_rows = pandas.isnull(df).sum(axis=1) > 0
         return (
             "Columns with nulls:\n%s, related rows with nulls:\n%s, "
             "full df:\n%s" % (

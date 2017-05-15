@@ -579,5 +579,5 @@ def ensemble_predictions(models, peptides_df, mask_indices_list=None):
         values = panel.ix[:, :, col]
         assert values.shape == (len(peptides_df), len(models))
         result[col] = model.combine_ensemble_predictions(col, values.values)
-        assert_no_null(result[col])
+        assert_no_null(pandas.Series(result[col]))
     return result
