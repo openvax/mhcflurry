@@ -93,13 +93,14 @@ class EncodableSequences(object):
         self.sequences = sequences
         self.encoding_cache = {}
         self.fixed_sequence_length = None
-        if sequences and all(len(s) == len(sequences[0]) for s in sequences):
+        if len(sequences) > 0 and all(
+                len(s) == len(sequences[0]) for s in sequences):
             self.fixed_sequence_length = len(sequences[0])
 
     def __len__(self):
         return len(self.sequences)
 
-    def fixed_length_to_categorical(self):
+    def fixed_length_categorical(self):
         """
         Returns a categorical encoding (i.e. integers 0 <= x < 21) of the
         sequences, which must already be all the same length.
@@ -199,7 +200,7 @@ class EncodableSequences(object):
             max_length)
 
         if cache_key not in self.encoding_cache:
-            encoded = self.fixed_length_categorical_encoding(
+            encoded = self.variable_length_to_fixed_length_categorical(
                 left_edge=left_edge,
                 right_edge=right_edge,
                 max_length=max_length)
