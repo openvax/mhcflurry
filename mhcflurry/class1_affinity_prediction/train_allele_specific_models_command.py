@@ -14,7 +14,7 @@ import mhcnames
 
 
 from .class1_binding_predictor import Class1BindingPredictor
-
+from ..common import configure_logging
 
 def normalize_allele_name(s):
     try:
@@ -64,6 +64,8 @@ parser.add_argument(
 
 def run():
     args = parser.parse_args(sys.argv[1:])
+
+    configure_logging(verbose=args.verbosity > 1)
 
     hyperparameters_lst = json.load(open(args.hyperparameters))
     assert isinstance(hyperparameters_lst, list)
