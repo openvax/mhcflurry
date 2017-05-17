@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 
-from mhcflurry.class1_allele_specific import Class1BindingPredictor
+from mhcflurry.class1_affinity_prediction import Class1BindingPredictor
 
 
 def test_predict_after_saving_model_to_disk():

@@ -15,12 +15,12 @@
 import cProfile
 
 import mhcflurry
-import mhcflurry.class1_allele_specific
+import mhcflurry.class1_affinity_prediction
 import mhcflurry.class1_allele_specific_ensemble
 
 
 predictors = [
-    mhcflurry.class1_allele_specific.get_downloaded_predictor(),
+    mhcflurry.class1_affinity_prediction.get_downloaded_predictor(),
     mhcflurry.class1_allele_specific_ensemble.get_downloaded_predictor(),
 ]
 

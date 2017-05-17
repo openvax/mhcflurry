@@ -1,6 +1,6 @@
 from numpy.testing import assert_equal
 
-from mhcflurry.class1_allele_specific import Class1BindingPredictor
+from mhcflurry.class1_affinity_prediction import Class1BindingPredictor
 
 
 def test_all_combinations_of_hyperparameters():

@@ -12,24 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .class1_allele_specific.class1_binding_predictor import (
+from .class1_affinity_prediction.class1_binding_predictor import (
     Class1BindingPredictor)
-from .prediction import predict
-from .affinity_measurement_dataset import AffinityMeasurementDataset
-from .class1_allele_specific_ensemble import Class1EnsembleMultiAllelePredictor
-from .class1_allele_specific import Class1SingleModelMultiAllelePredictor
-from .measurement_collection import MeasurementCollection
-from . import parallelism
+from .class1_affinity_prediction.multi_allele_predictor_ensemble import (
+    MultiAllelePredictorEnsemble)
 
 __version__ = "0.2.0"
 
 __all__ = [
     "Class1BindingPredictor",
-    "predict",
-    "parallelism",
-    "AffinityMeasurementDataset",
-    "Class1EnsembleMultiAllelePredictor",
-    "Class1SingleModelMultiAllelePredictor",
-    "MeasurementCollection",
+    "MultiAllelePredictorEnsemble",
     "__version__",
 ]

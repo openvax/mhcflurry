@@ -15,15 +15,17 @@
 from __future__ import print_function, division, absolute_import
 from math import exp, log
 import itertools
-from collections import defaultdict
+import collections
 import logging
 import hashlib
 import time
 import sys
 from os import environ
 
-import numpy as np
+import numpy
 import pandas
+
+from . import amino_acid
 
 
 class UnsupportedAllele(Exception):
@@ -110,7 +112,7 @@ def groupby_indices(iterable, key_fn=lambda x: x):
     Returns dictionary mapping unique values to list of indices that
     had those values.
     """
-    index_groups = defaultdict(list)
+    index_groups = collections.defaultdict(list)
     for i, x in enumerate(key_fn(x) for x in iterable):
         index_groups[x].append(i)
     return index_groups
@@ -240,3 +242,63 @@ def drop_nulls_and_warn(df, related_df_with_same_index_to_describe=None):
                 new_df.shape,
                 describe_nulls(df, related_df_with_same_index_to_describe)))
     return new_df
+
+
+def from_ic50(ic50):
+    x = 1.0 - (numpy.log(ic50) / numpy.log(50000))
+    return numpy.minimum(
+        1.0,
+        numpy.maximum(0.0, x))
+
+
+def to_ic50(x):
+    return 50000.0 ** (1.0 - x)
+
+
+def amino_acid_distribution(peptides, smoothing=0.0):
+    peptides = pandas.Series(peptides)
+    aa_counts = pandas.Series(peptides.map(collections.Counter).sum())
+    normalized = aa_counts / aa_counts.sum()
+    if smoothing:
+        normalized += smoothing
+        normalized /= normalized.sum()
+    return normalized
+
+
+def random_peptides(num, length=9, distribution=None):
+    """
+    Generate random peptides (kmers).
+
+    Parameters
+    ----------
+    num : int
+        Number of peptides to return
+
+    length : int
+        Length of each peptide
+
+    distribution : pandas.Series
+        Maps 1-letter amino acid abbreviations to
+        probabilities. If not specified a uniform
+        distribution is used.
+
+    Returns
+    ----------
+    list of string
+
+    """
+    if num == 0:
+        return []
+    if distribution is None:
+        distribution = pandas.Series(
+            1, index=amino_acid.common_amino_acid_letters)
+        distribution /= distribution.sum()
+
+    return [
+        ''.join(peptide_sequence)
+        for peptide_sequence in
+        numpy.random.choice(
+            distribution.index,
+            p=distribution.values,
+            size=(int(num), int(length)))
+    ]

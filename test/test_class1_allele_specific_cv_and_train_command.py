@@ -9,9 +9,9 @@ from os import mkdir, environ
 
 import pandas
 
-from mhcflurry.class1_allele_specific import cv_and_train_command
-from mhcflurry import downloads, predict, class1_allele_specific
-from mhcflurry.class1_allele_specific.train import HYPERPARAMETER_DEFAULTS
+from mhcflurry.class1_affinity_prediction import cv_and_train_command
+from mhcflurry import downloads, predict, class1_affinity_prediction
+from mhcflurry.class1_affinity_prediction.train import HYPERPARAMETER_DEFAULTS
 
 try:
     import kubeface
@@ -116,7 +116,7 @@ def verify_trained_models(base_temp_dir):
         data["prediction"] = predict(
             data.allele,
             data.peptide,
-            predictor=class1_allele_specific.get_downloaded_predictor()
+            predictor=class1_affinity_prediction.get_downloaded_predictor()
         ).Prediction
         print(data)
         mean_binder = data.ix[data.binder].prediction.mean()

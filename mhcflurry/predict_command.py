@@ -46,7 +46,7 @@ import pandas
 import itertools
 
 from .downloads import get_path
-from . import class1_allele_specific, class1_allele_specific_ensemble
+from . import class1_affinity_prediction, class1_allele_specific_ensemble
 
 parser = argparse.ArgumentParser(
     description=__doc__,
@@ -163,7 +163,7 @@ def run(argv=sys.argv[1:]):
             # them to download the models if needed.
             models_dir = get_path("models_class1_allele_specific_single")
         predictor = (
-            class1_allele_specific
+            class1_affinity_prediction
                 .class1_single_model_multi_allele_predictor
                 .Class1SingleModelMultiAllelePredictor
         ).load_from_download_directory(models_dir)

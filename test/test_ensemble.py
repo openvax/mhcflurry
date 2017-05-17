@@ -14,7 +14,7 @@ from nose.tools import eq_
 
 from . import make_random_peptides
 
-from mhcflurry.class1_allele_specific import scoring
+from mhcflurry.class1_affinity_prediction import scoring
 from mhcflurry.measurement_collection import MeasurementCollection
 from mhcflurry.class1_allele_specific_ensemble import train_command
 from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset

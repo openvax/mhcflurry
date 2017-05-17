@@ -7,11 +7,11 @@ import fancyimpute
 
 from mhcflurry.downloads import get_path
 
-from mhcflurry.class1_allele_specific import (
+from mhcflurry.class1_affinity_prediction import (
     cross_validation_folds,
     train_across_models_and_folds)
 
-from mhcflurry.class1_allele_specific.train import (
+from mhcflurry.class1_affinity_prediction.train import (
     HYPERPARAMETER_DEFAULTS)
 
 from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset

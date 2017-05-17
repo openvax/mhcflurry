@@ -12,40 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
+import numpy
 
-MAX_IC50 = 50000.0
 
-def ic50_to_regression_target(ic50, max_ic50=MAX_IC50):
+def from_ic50(ic50):
     """
-    Transform IC50 inhibitory binding concentrations to affinity values between
-    [0,1] where 0 means a value greater or equal to max_ic50 and 1 means very
-    strong binder.
-
+    Convert ic50s to regression targets in the range [0.0, 1.0].
+    
     Parameters
     ----------
-    ic50 : numpy.ndarray
+    ic50 : numpy.array of float
 
-    max_ic50 : float
+    Returns
+    -------
+    numpy.array of float
+
     """
-    log_ic50 = np.log(ic50) / np.log(max_ic50)
-    regression_target = 1.0 - log_ic50
-    # clamp to values between 0, 1
-    regression_target = np.maximum(regression_target, 0.0)
-    regression_target = np.minimum(regression_target, 1.0)
-    return regression_target
+    x = 1.0 - (numpy.log(ic50) / numpy.log(50000))
+    return numpy.minimum(
+        1.0,
+        numpy.maximum(0.0, x))
 
-def regression_target_to_ic50(y, max_ic50=MAX_IC50):
+
+def to_ic50(x):
     """
-    Transform values between [0,1] to IC50 inhibitory binding concentrations
-    between [1.0, infinity]
-
+    Convert regression targets in the range [0.0, 1.0] to ic50s in the range
+    [0, 50000.0].
+    
     Parameters
     ----------
-    y : numpy.ndarray of float
+    x : numpy.array of float
 
-    max_ic50 : float
-
-    Returns numpy.ndarray
+    Returns
+    -------
+    numpy.array of float
     """
-    return max_ic50 ** (1.0 - y)
+    return 50000.0 ** (1.0 - x)

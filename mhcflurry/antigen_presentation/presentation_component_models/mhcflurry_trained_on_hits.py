@@ -4,7 +4,7 @@ import pandas
 from numpy import log, exp, nanmean
 
 from ...affinity_measurement_dataset import AffinityMeasurementDataset
-from ...class1_allele_specific import Class1BindingPredictor
+from ...class1_affinity_prediction import Class1BindingPredictor
 from ...common import normalize_allele_name
 
 from .mhc_binding_component_model_base import MHCBindingComponentModelBase
