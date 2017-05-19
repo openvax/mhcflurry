@@ -75,6 +75,12 @@ def load_data_iedb(iedb_csv, include_qualitative=True):
     iedb_df = pandas.read_csv(iedb_csv, skiprows=1, low_memory=False)
     print("Loaded iedb data: %s" % str(iedb_df.shape))
 
+    print("Selecting only class I")
+    iedb_df = iedb_df.ix[
+        iedb_df["MHC allele class"].str.strip().str.upper() == "I"
+    ]
+    print("New shape: %s" % str(iedb_df.shape))
+
     print("Dropping known unusuable alleles")
     iedb_df = iedb_df.ix[
         ~iedb_df["Allele Name"].isin(EXCLUDE_IEDB_ALLELES)
