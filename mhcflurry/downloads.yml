@@ -20,6 +20,14 @@ releases:
     1.0.0:
         compatibility-version: 2
         downloads:
+            - name: models_class1
+              url: http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/models_class1.tar.bz2
+              default: true
+
+            - name: data_curated
+              url: https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/data_curated.tar.bz2
+              default: true
+
             - name: data_kim2014
               url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.8/data_kim2014.tar.bz2
               default: false
@@ -27,10 +35,6 @@ releases:
             - name: data_iedb
               url: https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/data_iedb.tar.bz2
               default: false
-
-            - name: data_curated
-              url: https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/data_curated.tar.bz2
-              default: true
 
     0.2.0:
         compatibility-version: 1

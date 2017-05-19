@@ -150,7 +150,7 @@ class Class1BindingPredictor(object):
                 self.hyperparameters['random_negative_rate'] +
                 self.hyperparameters['random_negative_constant'])
         num_random_negative = pandas.Series(num_random_negative)
-        logging.info("Random negative counts per length: %s" % (
+        logging.info("Random negative counts per length:\n%s" % (
             str(num_random_negative)))
 
         aa_distribution = None
@@ -160,7 +160,7 @@ class Class1BindingPredictor(object):
                 smoothing=self.hyperparameters[
                     'random_negative_distribution_smoothing'])
             logging.info(
-                "Using amino acid distribution for random negative: %s" % (
+                "Using amino acid distribution for random negative:\n%s" % (
                 str(aa_distribution)))
 
         y_values = from_ic50(affinities)
@@ -224,17 +224,14 @@ class Class1BindingPredictor(object):
                 "peptide": numpy.concatenate([
                     random_negative_peptides_encoding,
                     peptide_encoding,
-                ])
+                ]) if len(random_negative_peptides_encoding) > 0
+                else peptide_encoding
             }
             if pseudosequence_length:
                 # TODO: add random pseudosequences for random negative peptides
                 raise NotImplemented(
                     "Allele pseudosequences unsupported with random negatives")
 
-            logging.info("Epoch %3d / %3d. Min val loss at epoch %s" % (
-                i,
-                self.hyperparameters['max_epochs'],
-                min_val_loss_iteration))
             fit_history = self.network.fit(
                 x_dict_with_random_negatives,
                 y_dict_with_random_negatives,
@@ -247,6 +244,13 @@ class Class1BindingPredictor(object):
 
             for (key, value) in fit_history.history.items():
                 self.fit_history[key].extend(value)
+
+            logging.info(
+                "Epoch %3d / %3d: loss=%g. Min val loss at epoch %s" % (
+                    i,
+                    self.hyperparameters['max_epochs'],
+                    self.fit_history['loss'][-1],
+                    min_val_loss_iteration))
 
             if self.hyperparameters['validation_split']:
                 val_loss = fit_history.history['val_loss'][-1]
@@ -273,7 +277,8 @@ class Class1BindingPredictor(object):
             pseudosequences_input = self.pseudosequence_to_network_input(
                 allele_pseudosequences)
             x_dict['pseudosequence'] = pseudosequences_input
-        return numpy.array(self.network.predict(x_dict))
+        (predictions,) = numpy.array(self.network.predict(x_dict)).T
+        return to_ic50(predictions)
 
     @staticmethod
     def make_network(

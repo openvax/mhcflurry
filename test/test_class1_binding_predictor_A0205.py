@@ -1,7 +1,7 @@
-import numpy as np
-np.random.seed(0)
+import numpy
+import pandas
+numpy.random.seed(0)
 
-from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset
 from mhcflurry import Class1BindingPredictor
 
 from nose.tools import eq_
@@ -11,27 +11,32 @@ from mhcflurry.downloads import get_path
 
 
 def test_class1_binding_predictor_A0205_training_accuracy():
-    dataset = AffinityMeasurementDataset.from_csv(get_path(
-        "data_combined_iedb_kim2014", "combined_human_class1_dataset.csv"))
-    dataset_a0205_all_lengths = dataset.get_allele("HLA-A0205")
-    dataset_a0205 = AffinityMeasurementDataset(
-        dataset_a0205_all_lengths._df.ix[
-            dataset_a0205_all_lengths._df.peptide.str.len() == 9])
+    df = pandas.read_csv(
+        get_path(
+            "data_curated", "curated_training_data.csv.bz2"))
+    df = df.ix[df.allele == "HLA-A*02:05"]
+    df = df.ix[
+        df.peptide.str.len() == 9
+    ]
+    df = df.ix[
+        df.measurement_type == "quantitative"
+    ]
+    df = df.ix[
+        df.measurement_source == "kim2014"
+    ]
 
     predictor = Class1BindingPredictor(
-        name="A0205",
-        embedding_output_dim=32,
         activation="tanh",
         layer_sizes=[64],
-        optimizer="adam",
+        max_epochs=1000,  # Memorize the dataset.
+        early_stopping=False,
         dropout_probability=0.0)
-    predictor.fit_dataset(dataset_a0205, n_training_epochs=1000)
-    peptides = dataset_a0205.peptides
-    ic50_pred = predictor.predict(peptides)
-    ic50_true = dataset_a0205.affinities
+    predictor.fit(df.peptide.values, df.measurement_value.values)
+    ic50_pred = predictor.predict(df.peptide.values)
+    ic50_true = df.measurement_value.values
     eq_(len(ic50_pred), len(ic50_true))
     testing.assert_allclose(
-        np.log(ic50_pred),
-        np.log(ic50_true),
+        numpy.log(ic50_pred),
+        numpy.log(ic50_true),
         rtol=0.2,
         atol=0.2)
