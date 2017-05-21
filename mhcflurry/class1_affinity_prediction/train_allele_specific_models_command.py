@@ -16,6 +16,7 @@ import mhcnames
 from .class1_neural_network import Class1NeuralNetwork
 from ..common import configure_logging
 
+
 def normalize_allele_name(s):
     try:
         return mhcnames.normalize_allele_name(s)
