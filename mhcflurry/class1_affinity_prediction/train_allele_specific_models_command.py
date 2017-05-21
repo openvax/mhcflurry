@@ -5,23 +5,12 @@ Train single allele models
 import sys
 import argparse
 import json
-import os
-import pickle
 
 import pandas
 
-import mhcnames
 
-
-from .class1_neural_network import Class1NeuralNetwork
+from .class1_affinity_predictor import Class1AffinityPredictor
 from ..common import configure_logging
-
-
-def normalize_allele_name(s):
-    try:
-        return mhcnames.normalize_allele_name(s)
-    except Exception:
-        return "UNKNOWN"
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -62,9 +51,8 @@ parser.add_argument(
     default=1)
 
 
-
-def run():
-    args = parser.parse_args(sys.argv[1:])
+def run(argv=sys.argv[1:]):
+    args = parser.parse_args(argv)
 
     configure_logging(verbose=args.verbosity > 1)
 
@@ -93,20 +81,11 @@ def run():
     print("Selected %d alleles: %s" % (len(alleles), ' '.join(alleles)))
     print("Training data: %s" % (str(df.shape)))
 
-    manifest = pandas.DataFrame()
-    manifest["name"] = []
-    manifest["hyperparameters_index"] = []
-    manifest["model_group"] = []
-    manifest["allele"] = []
-    manifest["hyperparameters"] = []
-    manifest["history"] = []
-    manifest["num_measurements"] = []
-    manifest["fit_seconds"] = []
-
-    manifest_path = os.path.join(args.out_models_dir, "manifest.csv")
+    predictor = Class1AffinityPredictor()
 
     for (h, hyperparameters) in enumerate(hyperparameters_lst):
         n_models = hyperparameters.pop("n_models")
+
         for model_group in range(n_models):
             for (i, allele) in enumerate(alleles):
                 print(
@@ -123,41 +102,13 @@ def run():
                 train_data = df.ix[df.allele == allele].dropna().sample(
                     frac=1.0)
 
-                model = Class1NeuralNetwork(
-                    verbose=args.verbosity,
-                    **hyperparameters)
-
-                model.fit(
-                    train_data.peptide.values,
-                    train_data.measurement_value.values)
-                print("Fit in %0.2f sec" % model.fit_seconds)
-
-                name = "%s-%d-%d" % (
-                    allele.replace("*", "_"),
-                    h,
-                    model_group)
-
-                row = pandas.Series({
-                    "hyperparameters_index": h,
-                    "model_group": model_group,
-                    "allele": allele,
-                    "hyperparameters": hyperparameters,
-                    "history": model.fit_history,
-                    "name": name,
-                    "num_measurements": len(train_data),
-                    "fit_seconds": model.fit_seconds,
-                }).to_frame().T
-                manifest = pandas.concat([manifest, row], ignore_index=True)
-                print(manifest)
-
-                manifest.to_csv(manifest_path, index=False)
-                print("Wrote: %s" % manifest_path)
-
-                model_path = os.path.join(
-                    args.out_models_dir, "%s.pickle" % name)
-                with open(model_path, 'wb') as fd:
-                    pickle.dump(model, fd, protocol=2)
-                print("Wrote: %s" % model_path)
+                predictor.fit_allele_specific_predictors(
+                    n_models=1,
+                    architecture_hyperparameters=hyperparameters,
+                    allele=allele,
+                    peptides=train_data.peptide.values,
+                    affinities=train_data.measurement_value.values,
+                    models_dir_for_save=args.out_models_dir)
 
 
 if __name__ == '__main__':

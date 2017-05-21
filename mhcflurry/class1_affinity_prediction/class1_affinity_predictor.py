@@ -1,7 +1,7 @@
 import collections
-import pickle
 import time
 import hashlib
+import json
 from os.path import join, exists
 
 import numpy
@@ -17,10 +17,15 @@ from .class1_neural_network import Class1NeuralNetwork
 class Class1AffinityPredictor(object):
     def __init__(
             self,
-            allele_to_allele_specific_models={},
-            class1_pan_allele_models=[],
+            allele_to_allele_specific_models=None,
+            class1_pan_allele_models=None,
             allele_to_pseudosequence=None,
             manifest_df=None):
+
+        if allele_to_allele_specific_models is None:
+            allele_to_allele_specific_models = {}
+        if class1_pan_allele_models is None:
+            class1_pan_allele_models = []
 
         if class1_pan_allele_models:
             assert allele_to_pseudosequence, "Pseudosequences required"
@@ -32,14 +37,9 @@ class Class1AffinityPredictor(object):
 
         if manifest_df is None:
             manifest_df = pandas.DataFrame()
-            manifest_df["name"] = []
+            manifest_df["model_name"] = []
             manifest_df["allele"] = []
-            manifest_df["hyperparameters"] = []
-            manifest_df["history"] = []
-            manifest_df["num_measurements"] = []
-            manifest_df["random_negative_rate"] = []
-            manifest_df["sources"] = []
-            manifest_df["fit_seconds"] = []
+            manifest_df["config_json"] = []
             manifest_df["model"] = []
         self.manifest_df = manifest_df
 
@@ -52,17 +52,16 @@ class Class1AffinityPredictor(object):
 
         if model_names_to_write is None:
             # Write all models
-            models_names_to_write = self.manifest_df.model_name.values
+            model_names_to_write = self.manifest_df.model_name.values
 
         sub_manifest_df = self.manifest_df.ix[
-            self.manifest_df.model_name.isin(models_names_to_write)
+            self.manifest_df.model_name.isin(model_names_to_write)
         ]
 
         for (_, row) in sub_manifest_df.iterrows():
-            model_path = join(models_dir, "%s.pickle" % row.name)
-            with open(join(model_path), 'wb') as fd:
-                pickle.dump(row.model, fd, protocol=2)
-            print("Wrote: %s" % model_path)
+            weights_path = self.weights_path(models_dir, row.model_name)
+            row.model.save_weights(weights_path)
+            print("Wrote: %s" % weights_path)
 
         write_manifest_df = self.manifest_df[[
             c for c in self.manifest_df.columns if c != "model"
@@ -78,20 +77,29 @@ class Class1AffinityPredictor(object):
         return "%s-%d-%s" % (allele, num, random_string)
 
     @staticmethod
+    def weights_path(models_dir, model_name):
+        return join(
+            models_dir,
+            "%s.%s" % (
+                model_name, Class1NeuralNetwork.weights_filename_extension))
+
+
+    @staticmethod
     def load(models_dir, max_models=None):
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
-        manifest_df["hyperparameters"] = manifest_df.hyperparameters.map(eval)
-        manifest_df["history"] = manifest_df.history.map(eval)
 
         allele_to_allele_specific_models = collections.defaultdict(list)
         class1_pan_allele_models = []
         all_models = []
         for (_, row) in manifest_df.iterrows():
-            model_path = join(models_dir, "%s.pickle" % row["name"])
-            print("Loading model: %s" % model_path)
-            with open(model_path, 'rb') as fd:
-                model = pickle.load(fd)
+            model = Class1NeuralNetwork.from_config(
+                json.loads(row.config_json))
+            weights_path = Class1AffinityPredictor.weights_path(
+                models_dir, row.model_name)
+            print("Loading model weights: %s" % weights_path)
+            model.restore_weights(weights_path)
+
             if row.allele == "pan-class1":
                 class1_pan_allele_models.append(model)
             else:
@@ -131,7 +139,6 @@ class Class1AffinityPredictor(object):
             allele,
             peptides,
             affinities,
-            output_assignments=None,
             models_dir_for_save=None,
             verbose=1):
 
@@ -139,33 +146,30 @@ class Class1AffinityPredictor(object):
         models = self._fit_predictors(
             n_models=n_models,
             architecture_hyperparameters=architecture_hyperparameters,
-            peptide=peptides,
+            peptides=peptides,
             affinities=affinities,
-            output_assignments=output_assignments,
             allele_pseudosequences=None,
             verbose=verbose)
 
-        models_list = []
-        for (i, model) in enumerate(models):
-            name = self.model_name(allele, i)
-            models_list.append(model)  # models is a generator
-            row = pandas.Series({
-                "allele": allele,
-                "hyperparameters": architecture_hyperparameters,
-                "history": model.fit_history.history,
-                "name": name,
-                "num_measurements": len(peptides),
-                "fit_seconds": model.fit_seconds,
-                "model": model,
-            }).to_frame().T
-            self.manifest_df = pandas.concat(
-                [self.manifest_df, row], ignore_index=True)
-            if models_dir_for_save:
-                self.save(models_dir_for_save, model_names_to_write=[name])
-
         if allele not in self.allele_to_allele_specific_models:
             self.allele_to_allele_specific_models[allele] = []
-        self.allele_to_allele_specific_models[allele].extend(models_list)
+
+        models_list = []
+        for (i, model) in enumerate(models):
+            model_name = self.model_name(allele, i)
+            models_list.append(model)  # models is a generator
+            row = pandas.Series(collections.OrderedDict([
+                ("model_name", model_name),
+                ("allele", allele),
+                ("config_json", json.dumps(model.get_config())),
+                ("model", model),
+            ])).to_frame().T
+            self.manifest_df = pandas.concat(
+                [self.manifest_df, row], ignore_index=True)
+            self.allele_to_allele_specific_models[allele].append(model)
+            if models_dir_for_save:
+                self.save(
+                    models_dir_for_save, model_names_to_write=[model_name])
         return models
 
     def fit_class1_pan_allele_models(
@@ -175,7 +179,6 @@ class Class1AffinityPredictor(object):
             alleles,
             peptides,
             affinities,
-            output_assignments=None,
             models_dir_for_save=None,
             verbose=1):
 
@@ -187,28 +190,22 @@ class Class1AffinityPredictor(object):
             architecture_hyperparameters=architecture_hyperparameters,
             peptides=peptides,
             affinities=affinities,
-            output_assignments=output_assignments,
             allele_pseudosequences=allele_pseudosequences)
 
-        models_list = []
         for (i, model) in enumerate(models):
-            name = self.model_name("pan-class1", i)
-            models_list.append(model)  # models is a generator
-            row = pandas.Series({
-                "allele": "pan-class1",
-                "hyperparameters": architecture_hyperparameters,
-                "history": model.fit_history.history,
-                "name": name,
-                "num_measurements": len(peptides),
-                "fit_seconds": model.fit_seconds,
-                "model": model,
-            }).to_frame().T
+            model_name = self.model_name("pan-class1", i)
+            self.class1_pan_allele_models.append(model)
+            row = pandas.Series(collections.OrderedDict([
+                ("model_name", model_name),
+                ("allele", "pan-class1"),
+                ("config_json", json.dumps(model.get_config())),
+                ("model", model),
+            ])).to_frame().T
             self.manifest_df = pandas.concat(
                 [self.manifest_df, row], ignore_index=True)
             if models_dir_for_save:
-                self.save(models_dir_for_save, model_names_to_write=[name])
-
-        self.class1_pan_allele_models.extend(models_list)
+                self.save(
+                    models_dir_for_save, model_names_to_write=[model_name])
         return models
 
     def _fit_predictors(
@@ -217,20 +214,16 @@ class Class1AffinityPredictor(object):
             architecture_hyperparameters,
             peptides,
             affinities,
-            output_assignments,
             allele_pseudosequences,
             verbose=1):
 
         encodable_peptides = EncodableSequences.create(peptides)
-        if output_assignments is None:
-            output_assignments = ["output"] * len(encodable_peptides.sequences)
         for i in range(n_models):
             print("Training model %d / %d" % (i + 1, n_models))
             model = Class1NeuralNetwork(**architecture_hyperparameters)
             model.fit(
                 encodable_peptides,
                 affinities,
-                output_assignments=output_assignments,
                 allele_pseudosequences=allele_pseudosequences,
                 verbose=verbose)
             yield model

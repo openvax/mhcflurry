@@ -22,6 +22,8 @@ from ..common import random_peptides, amino_acid_distribution
 
 
 class Class1NeuralNetwork(object):
+    weights_filename_extension = "npz"
+
     network_hyperparameter_defaults = HyperparameterDefaults(
         kmer_size=15,
         use_embedding=True,
@@ -38,6 +40,10 @@ class Class1NeuralNetwork(object):
         batch_normalization=True,
         embedding_init_method="glorot_uniform",
         locally_connected_layers=[],
+    )
+
+    compile_hyperparameter_defaults = HyperparameterDefaults(
+        loss="mse",
         optimizer="rmsprop",
     )
 
@@ -65,6 +71,7 @@ class Class1NeuralNetwork(object):
         mode='auto')
 
     hyperparameter_defaults = network_hyperparameter_defaults.extend(
+        compile_hyperparameter_defaults).extend(
         input_encoding_hyperparameter_defaults).extend(
         fit_hyperparameter_defaults).extend(
         early_stopping_hyperparameter_defaults)
@@ -75,11 +82,25 @@ class Class1NeuralNetwork(object):
         self.network = None
         self.loss_history = None
         self.fit_seconds = None
+        self.fit_num_points = None
 
-    def __getstate__(self):
+    def get_config(self):
         result = dict(self.__dict__)
         del result['network']
         result['network_json'] = self.network.to_json()
+        return result
+
+    @classmethod
+    def from_config(cls, config):
+        config = dict(config)
+        instance = cls(**config.pop('hyperparameters'))
+        instance.network = keras.models.model_from_json(
+            config.pop('network_json'))
+        instance.__dict__.update(config)
+        return instance
+
+    def __getstate__(self):
+        result = self.get_config()
         result['network_weights'] = self.get_weights()
         return result
 
@@ -90,16 +111,19 @@ class Class1NeuralNetwork(object):
         self.network = keras.models.model_from_json(network_json)
         self.set_weights(network_weights)
 
-    def get_weights(self):
-        """
-        Returns weights, which can be passed to set_weights later.
-        """
-        return [x.copy() for x in self.network.get_weights()]
+    def save_weights(self, filename):
+        weights_list = self.network.get_weights()
+        numpy.savez(
+            filename,
+            **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list)))
 
-    def set_weights(self, weights):
-        """
-        Reset the model weights.
-        """
+    def restore_weights(self, filename):
+        loaded = numpy.load(filename)
+        weights = [
+            loaded["array_%d" % i]
+            for i in range(len(loaded.keys()))
+        ]
+        loaded.close()
         self.network.set_weights(weights)
 
     def peptides_to_network_input(self, peptides):
@@ -133,10 +157,11 @@ class Class1NeuralNetwork(object):
             allele_pseudosequences=None,
             sample_weights=None,
             verbose=1):
+
+        self.fit_num_points = len(peptides)
+
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
-        peptide_to_encoding = dict(
-            zip(encodable_peptides.sequences, peptide_encoding))
 
         length_counts = (
             pandas.Series(encodable_peptides.sequences)
@@ -181,6 +206,7 @@ class Class1NeuralNetwork(object):
                 pseudosequence_length=pseudosequence_length,
                 **self.network_hyperparameter_defaults.subselect(
                     self.hyperparameters))
+            self.compile()
 
         y_dict_with_random_negatives = {
             "output": numpy.concatenate([
@@ -279,6 +305,11 @@ class Class1NeuralNetwork(object):
         (predictions,) = numpy.array(self.network.predict(x_dict)).T
         return to_ic50(predictions)
 
+    def compile(self):
+        self.network.compile(
+            **self.compile_hyperparameter_defaults.subselect(
+                self.hyperparameters))
+
     @staticmethod
     def make_network(
             pseudosequence_length,
@@ -296,8 +327,7 @@ class Class1NeuralNetwork(object):
             dropout_probability,
             batch_normalization,
             embedding_init_method,
-            locally_connected_layers,
-            optimizer):
+            locally_connected_layers):
 
         if use_embedding:
             peptide_input = Input(
@@ -374,7 +404,4 @@ class Class1NeuralNetwork(object):
             activation=output_activation,
             name="output")(current_layer)
         model = keras.models.Model(inputs=inputs, outputs=[output])
-        model.compile(
-            loss="mse",
-            optimizer=optimizer)
         return model
