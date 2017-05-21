@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .class1_affinity_prediction.class1_binding_predictor import (
-    Class1BindingPredictor)
-from .class1_affinity_prediction.multi_allele_predictor_ensemble import (
-    MultiAllelePredictorEnsemble)
+from .class1_affinity_prediction.class1_neural_network import (
+    Class1NeuralNetwork)
+from .class1_affinity_prediction.class1_affinity_predictor import (
+    Class1AffinityPredictor)
 
 __version__ = "0.2.0"
 
 __all__ = [
-    "Class1BindingPredictor",
-    "MultiAllelePredictorEnsemble",
+    "Class1NeuralNetwork",
+    "Class1AffinityPredictor",
     "__version__",
 ]

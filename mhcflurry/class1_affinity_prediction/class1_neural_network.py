@@ -21,7 +21,7 @@ from ..regression_target import to_ic50, from_ic50
 from ..common import random_peptides, amino_acid_distribution
 
 
-class Class1BindingPredictor(object):
+class Class1NeuralNetwork(object):
     network_hyperparameter_defaults = HyperparameterDefaults(
         kmer_size=15,
         use_embedding=True,

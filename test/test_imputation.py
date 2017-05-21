@@ -3,7 +3,7 @@ np.random.seed(0)
 
 from mhcflurry.imputation_helpers import imputer_from_name
 from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset
-from mhcflurry import Class1BindingPredictor
+from mhcflurry import Class1NeuralNetwork
 
 from fancyimpute import MICE, KNN, SoftImpute, IterativeSVD
 from nose.tools import eq_
@@ -54,7 +54,7 @@ def test_performance_improves_for_A0205_with_pretraining():
     print("AffinityMeasurementDataset with only A0205, # entries: %d" % (
         len(a0205_data_without_imputation)))
 
-    predictor_without_imputation = Class1BindingPredictor(
+    predictor_without_imputation = Class1NeuralNetwork(
         name="A0205-no-impute")
 
     X_index, ic50_true, sample_weights, _ = (
@@ -97,7 +97,7 @@ def test_performance_improves_for_A0205_with_pretraining():
     assert sample_weights_imputed.max() <= 1, sample_weights_imputed.max()
     assert ic50_imputed.min() >= 0, ic50_imputed.min()
 
-    predictor_with_imputation = Class1BindingPredictor(name="A0205-impute")
+    predictor_with_imputation = Class1NeuralNetwork(name="A0205-impute")
 
     predictor_with_imputation.fit_kmer_encoded_arrays(
         X=X_index,

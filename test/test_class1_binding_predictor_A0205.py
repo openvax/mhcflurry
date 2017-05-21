@@ -2,7 +2,7 @@ import numpy
 import pandas
 numpy.random.seed(0)
 
-from mhcflurry import Class1BindingPredictor
+from mhcflurry import Class1NeuralNetwork
 
 from nose.tools import eq_
 from numpy import testing
@@ -25,7 +25,7 @@ def test_class1_binding_predictor_A0205_training_accuracy():
         df.measurement_source == "kim2014"
     ]
 
-    predictor = Class1BindingPredictor(
+    predictor = Class1NeuralNetwork(
         activation="tanh",
         layer_sizes=[64],
         max_epochs=1000,  # Memorize the dataset.

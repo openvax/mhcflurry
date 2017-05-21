@@ -11,10 +11,10 @@ import mhcnames
 
 from ..encodable_sequences import EncodableSequences
 
-from .class1_binding_predictor import Class1BindingPredictor
+from .class1_neural_network import Class1NeuralNetwork
 
 
-class MultiAllelePredictorEnsemble(object):
+class Class1AffinityPredictor(object):
     def __init__(
             self,
             allele_to_allele_specific_models={},
@@ -117,7 +117,7 @@ class MultiAllelePredictorEnsemble(object):
                     for (allele, v)
                     in sorted(allele_to_allele_specific_models.items()))))
 
-        result = MultiAllelePredictorEnsemble(
+        result = Class1AffinityPredictor(
             allele_to_allele_specific_models=allele_to_allele_specific_models,
             class1_pan_allele_models=class1_pan_allele_models,
             allele_to_pseudosequence=pseudosequences,
@@ -226,7 +226,7 @@ class MultiAllelePredictorEnsemble(object):
             output_assignments = ["output"] * len(encodable_peptides.sequences)
         for i in range(n_models):
             print("Training model %d / %d" % (i + 1, n_models))
-            model = Class1BindingPredictor(**architecture_hyperparameters)
+            model = Class1NeuralNetwork(**architecture_hyperparameters)
             model.fit(
                 encodable_peptides,
                 affinities,

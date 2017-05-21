@@ -46,7 +46,8 @@ import pandas
 import itertools
 
 from .downloads import get_path
-from . import class1_affinity_prediction, class1_allele_specific_ensemble
+from .class1_affinity_prediction import Class1AffinityPredictor
+
 
 parser = argparse.ArgumentParser(
     description=__doc__,
@@ -94,24 +95,11 @@ parser.add_argument(
     help="Output column name for predictions. Default: '%(default)s'")
 
 parser.add_argument(
-    "--predictor",
-    choices=("class1-allele-specific-single", "class1-allele-specific-ensemble"),
-    default="class1-allele-specific-ensemble",
-    help="Predictor to use. Default: %(default)s.")
-
-parser.add_argument(
-    "--models-class1-allele-specific-ensemble",
+    "--models",
     metavar="DIR",
     default=None,
-    help="Directory containing class1 allele specific ensemble models. "
-    "Default: %s" % get_path("models_class1_allele_specific_ensemble", test_exists=False))
-
-parser.add_argument(
-    "--models-class1-allele-specific-single",
-    metavar="DIR",
-    default=None,
-    help="Directory containing class1 allele specific single models. "
-    "Default: %s" % get_path("models_class1_allele_specific_single", test_exists=False))
+    help="Directory containing models. "
+    "Default: %s" % get_path("models_class1", test_exists=False))
 
 
 def run(argv=sys.argv[1:]):
@@ -155,29 +143,13 @@ def run(argv=sys.argv[1:]):
         print("Predicting for %d alleles and %d peptides = %d predictions" % (
             len(args.alleles), len(args.peptides), len(df)))
 
-    if args.predictor == "class1-allele-specific-single":
-        models_dir = args.models_class1_allele_specific_single
-        if models_dir is None:
-            # The reason we set the default here instead of in the argument parser is that
-            # we want to test_exists at this point, so the user gets a message instructing
-            # them to download the models if needed.
-            models_dir = get_path("models_class1_allele_specific_single")
-        predictor = (
-            class1_affinity_prediction
-                .class1_single_model_multi_allele_predictor
-                .Class1SingleModelMultiAllelePredictor
-        ).load_from_download_directory(models_dir)
-    elif args.predictor == "class1-allele-specific-ensemble":
-        models_dir = args.models_class1_allele_specific_ensemble
-        if models_dir is None:
-            models_dir = get_path("models_class1_allele_specific_ensemble")
-        predictor = (
-            class1_allele_specific_ensemble
-                .class1_ensemble_multi_allele_predictor
-                .Class1EnsembleMultiAllelePredictor
-        ).load_from_download_directory(models_dir)
-    else:
-        assert False
+    models_dir = args.models
+    if models_dir is None:
+        # The reason we set the default here instead of in the argument parser is that
+        # we want to test_exists at this point, so the user gets a message instructing
+        # them to download the models if needed.
+        models_dir = get_path("models_class1")
+    predictor = Class1AffinityPredictor.load(models_dir)
 
     predictions = {}  # allele -> peptide -> value
     for (allele, sub_df) in df.groupby(args.allele_column):

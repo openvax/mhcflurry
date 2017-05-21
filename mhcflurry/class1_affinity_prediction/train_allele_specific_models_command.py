@@ -13,7 +13,7 @@ import pandas
 import mhcnames
 
 
-from .class1_binding_predictor import Class1BindingPredictor
+from .class1_neural_network import Class1NeuralNetwork
 from ..common import configure_logging
 
 def normalize_allele_name(s):
@@ -122,7 +122,7 @@ def run():
                 train_data = df.ix[df.allele == allele].dropna().sample(
                     frac=1.0)
 
-                model = Class1BindingPredictor(
+                model = Class1NeuralNetwork(
                     verbose=args.verbosity,
                     **hyperparameters)
 

@@ -1,6 +1,6 @@
 from numpy.testing import assert_equal
 
-from mhcflurry.class1_affinity_prediction import Class1BindingPredictor
+from mhcflurry.class1_affinity_prediction import Class1NeuralNetwork
 
 
 def test_all_combinations_of_hyperparameters():
@@ -8,7 +8,7 @@ def test_all_combinations_of_hyperparameters():
         activation=["tanh", "sigmoid"],
         fraction_negative=[0, 0.2])
     results = (
-        Class1BindingPredictor
+        Class1NeuralNetwork
         .hyperparameter_defaults
         .models_grid(**combinations_dict))
     assert_equal(len(results), 4)

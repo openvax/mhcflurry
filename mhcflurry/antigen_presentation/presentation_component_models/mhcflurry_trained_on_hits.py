@@ -4,7 +4,7 @@ import pandas
 from numpy import log, exp, nanmean
 
 from ...affinity_measurement_dataset import AffinityMeasurementDataset
-from ...class1_affinity_prediction import Class1BindingPredictor
+from ...class1_affinity_prediction import Class1NeuralNetwork
 from ...common import normalize_allele_name
 
 from .mhc_binding_component_model_base import MHCBindingComponentModelBase
@@ -99,7 +99,7 @@ class MHCflurryTrainedOnHits(MHCBindingComponentModelBase):
         dataset = AffinityMeasurementDataset(
             df.sample(frac=1))  # shuffle dataframe
         print("Train data: ", dataset)
-        model = Class1BindingPredictor(
+        model = Class1NeuralNetwork(
             **self.mhcflurry_hyperparameters)
         model.fit_dataset(dataset, verbose=True)
         self.allele_to_model[allele] = model

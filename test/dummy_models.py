@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import numpy as np
-from mhcflurry import Class1BindingPredictor
+from mhcflurry import Class1NeuralNetwork
 
 class Dummy9merIndexEncodingModel(object):
     """
@@ -30,19 +30,19 @@ class Dummy9merIndexEncodingModel(object):
             n_cols,)
         return np.ones(n_rows, dtype=float) * self.constant_output_value
 
-always_zero_predictor_with_unknown_AAs = Class1BindingPredictor(
+always_zero_predictor_with_unknown_AAs = Class1NeuralNetwork(
     model=Dummy9merIndexEncodingModel(0),
     allow_unknown_amino_acids=True)
 
-always_zero_predictor_without_unknown_AAs = Class1BindingPredictor(
+always_zero_predictor_without_unknown_AAs = Class1NeuralNetwork(
     model=Dummy9merIndexEncodingModel(0),
     allow_unknown_amino_acids=False)
 
 
-always_one_predictor_with_unknown_AAs = Class1BindingPredictor(
+always_one_predictor_with_unknown_AAs = Class1NeuralNetwork(
     model=Dummy9merIndexEncodingModel(1),
     allow_unknown_amino_acids=True)
 
-always_one_predictor_without_unknown_AAs = Class1BindingPredictor(
+always_one_predictor_without_unknown_AAs = Class1NeuralNetwork(
     model=Dummy9merIndexEncodingModel(1),
     allow_unknown_amino_acids=False)
