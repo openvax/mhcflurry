@@ -34,6 +34,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --min-measurements-per-allele 100
 
 cp $SCRIPT_ABSOLUTE_PATH .
+bzip2 LOG.txt
 tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
 
 echo "Created archive: $SCRATCH_DIR/$DOWNLOAD_NAME.tar.bz2"

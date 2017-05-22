@@ -175,7 +175,7 @@ class Class1NeuralNetwork(object):
                 self.hyperparameters['random_negative_constant'])
         num_random_negative = pandas.Series(num_random_negative)
         logging.info("Random negative counts per length:\n%s" % (
-            str(num_random_negative)))
+            str(num_random_negative.to_dict())))
 
         aa_distribution = None
         if self.hyperparameters['random_negative_match_distribution']:
@@ -185,7 +185,7 @@ class Class1NeuralNetwork(object):
                     'random_negative_distribution_smoothing'])
             logging.info(
                 "Using amino acid distribution for random negative:\n%s" % (
-                str(aa_distribution)))
+                str(aa_distribution.to_dict())))
 
         y_values = from_ic50(affinities)
         assert numpy.isnan(y_values).sum() == 0, numpy.isnan(y_values).sum()
@@ -224,6 +224,8 @@ class Class1NeuralNetwork(object):
             sample_weights_with_random_negatives = numpy.concatenate([
                 numpy.ones(int(num_random_negative.sum())),
                 sample_weights])
+        else:
+            sample_weights_with_random_negatives = None
 
         val_losses = []
         min_val_loss_iteration = None
@@ -239,12 +241,10 @@ class Class1NeuralNetwork(object):
                         count,
                         length=length,
                         distribution=aa_distribution))
-            random_negative_peptides_encodable = (
-                EncodableSequences.create(
-                    random_negative_peptides_list))
             random_negative_peptides_encoding = (
                 self.peptides_to_network_input(
-                    random_negative_peptides_encodable))
+                    random_negative_peptides_list))
+
             x_dict_with_random_negatives = {
                 "peptide": numpy.concatenate([
                     random_negative_peptides_encoding,
@@ -263,9 +263,8 @@ class Class1NeuralNetwork(object):
                 shuffle=True,
                 verbose=verbose,
                 epochs=1,
-                validation_split=self.hyperparameters[
-                    'validation_split'],
-                sample_weight=sample_weights)
+                validation_split=self.hyperparameters['validation_split'],
+                sample_weight=sample_weights_with_random_negatives)
 
             for (key, value) in fit_history.history.items():
                 self.loss_history[key].extend(value)

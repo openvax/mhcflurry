@@ -65,8 +65,17 @@ def one_hot_encoding(index_encoded, alphabet_size):
     result = numpy.zeros(
         (num_sequences, sequence_length, alphabet_size),
         dtype='int32')
-    for position in range(sequence_length):
-        result[:, position, index_encoded[:, position]] = 1
+
+    # Transform the index encoded array into an array of indices into the
+    # flattened result, which we will set to 1.
+    flattened_indices = (
+        index_encoded +
+        (
+            sequence_length * alphabet_size * numpy.arange(num_sequences)
+        ).reshape((-1, 1)) +
+        numpy.tile(numpy.arange(sequence_length),
+                   (num_sequences, 1)) * alphabet_size)
+    result.put(flattened_indices, 1)
     return result
 
 

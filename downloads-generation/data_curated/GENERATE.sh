@@ -35,6 +35,7 @@ time python curate.py \
 
 bzip2 curated_training_data.csv
 cp $SCRIPT_ABSOLUTE_PATH .
+bzip2 LOG.txt
 tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
 
 echo "Created archive: $SCRATCH_DIR/$DOWNLOAD_NAME.tar.bz2"

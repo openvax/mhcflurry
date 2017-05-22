@@ -11,8 +11,45 @@ import pandas
 import mhcnames
 
 from ..encodable_sequences import EncodableSequences
+from ..downloads import get_path
 
 from .class1_neural_network import Class1NeuralNetwork
+
+
+class LazyLoadingClass1NeuralNetwork(object):
+    @classmethod
+    def wrap(cls, instance):
+        if isinstance(instance, cls):
+            return instance
+        elif isinstance(instance, Class1NeuralNetwork):
+            return cls(model=instance)
+        raise TypeError("Unsupported type: %s" % instance)
+
+    @classmethod
+    def wrap_list(cls, lst):
+        return [
+            cls.wrap(instance)
+            for instance in lst
+        ]
+
+    def __init__(self, model=None, config=None, weights_filename=None):
+        if model is None:
+            assert config is not None
+            assert weights_filename is not None
+        else:
+            assert config is None
+            assert weights_filename is None
+
+        self.model = model
+        self.config = config
+        self.weights_filename = weights_filename
+
+    @property
+    def instance(self):
+        if self.model is None:
+            self.model = Class1NeuralNetwork.from_config(self.config)
+            self.model.restore_weights(self.weights_filename)
+        return self.model
 
 
 class Class1AffinityPredictor(object):
@@ -31,9 +68,11 @@ class Class1AffinityPredictor(object):
         if class1_pan_allele_models:
             assert allele_to_pseudosequence, "Pseudosequences required"
 
-        self.allele_to_allele_specific_models = (
-            allele_to_allele_specific_models)
-        self.class1_pan_allele_models = class1_pan_allele_models
+        self.allele_to_allele_specific_models = dict(
+            (k, LazyLoadingClass1NeuralNetwork.wrap_list(v))
+            for (k, v) in allele_to_allele_specific_models.items())
+        self.class1_pan_allele_models = (
+            LazyLoadingClass1NeuralNetwork.wrap_list(class1_pan_allele_models))
         self.allele_to_pseudosequence = allele_to_pseudosequence
 
         if manifest_df is None:
@@ -61,7 +100,7 @@ class Class1AffinityPredictor(object):
 
         for (_, row) in sub_manifest_df.iterrows():
             weights_path = self.weights_path(models_dir, row.model_name)
-            row.model.save_weights(weights_path)
+            row.model.instance.save_weights(weights_path)
             print("Wrote: %s" % weights_path)
 
         write_manifest_df = self.manifest_df[[
@@ -75,7 +114,7 @@ class Class1AffinityPredictor(object):
     def model_name(allele, num):
         random_string = hashlib.sha1(
             str(time.time()).encode()).hexdigest()[:16]
-        return "%s-%d-%s" % (allele, num, random_string)
+        return "%s-%d-%s" % (allele.upper(), num, random_string)
 
     @staticmethod
     def weights_path(models_dir, model_name):
@@ -84,9 +123,11 @@ class Class1AffinityPredictor(object):
             "weights_%s.%s" % (
                 model_name, Class1NeuralNetwork.weights_filename_extension))
 
-
     @staticmethod
-    def load(models_dir, max_models=None):
+    def load(models_dir=None, max_models=None):
+        if models_dir is None:
+            models_dir = get_path("models_class1", "models")
+
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
 
@@ -94,13 +135,11 @@ class Class1AffinityPredictor(object):
         class1_pan_allele_models = []
         all_models = []
         for (_, row) in manifest_df.iterrows():
-            model = Class1NeuralNetwork.from_config(
-                json.loads(row.config_json))
-            weights_path = Class1AffinityPredictor.weights_path(
-                models_dir, row.model_name)
-            print("Loading model weights: %s" % weights_path)
-            model.restore_weights(weights_path)
-
+            model = LazyLoadingClass1NeuralNetwork(
+                config=json.loads(row.config_json),
+                weights_filename=Class1AffinityPredictor.weights_path(
+                    models_dir, row.model_name)
+            )
             if row.allele == "pan-class1":
                 class1_pan_allele_models.append(model)
             else:
@@ -157,17 +196,18 @@ class Class1AffinityPredictor(object):
 
         models_list = []
         for (i, model) in enumerate(models):
+            lazy_model = LazyLoadingClass1NeuralNetwork.wrap(model)
             model_name = self.model_name(allele, i)
             models_list.append(model)  # models is a generator
             row = pandas.Series(collections.OrderedDict([
                 ("model_name", model_name),
                 ("allele", allele),
                 ("config_json", json.dumps(model.get_config())),
-                ("model", model),
+                ("model", lazy_model),
             ])).to_frame().T
             self.manifest_df = pandas.concat(
                 [self.manifest_df, row], ignore_index=True)
-            self.allele_to_allele_specific_models[allele].append(model)
+            self.allele_to_allele_specific_models[allele].append(lazy_model)
             if models_dir_for_save:
                 self.save(
                     models_dir_for_save, model_names_to_write=[model_name])
@@ -191,16 +231,18 @@ class Class1AffinityPredictor(object):
             architecture_hyperparameters=architecture_hyperparameters,
             peptides=peptides,
             affinities=affinities,
-            allele_pseudosequences=allele_pseudosequences)
+            allele_pseudosequences=allele_pseudosequences,
+            verbose=verbose)
 
         for (i, model) in enumerate(models):
+            lazy_model = LazyLoadingClass1NeuralNetwork.wrap(model)
             model_name = self.model_name("pan-class1", i)
-            self.class1_pan_allele_models.append(model)
+            self.class1_pan_allele_models.append(lazy_model)
             row = pandas.Series(collections.OrderedDict([
                 ("model_name", model_name),
                 ("allele", "pan-class1"),
                 ("config_json", json.dumps(model.get_config())),
-                ("model", model),
+                ("model", lazy_model),
             ])).to_frame().T
             self.manifest_df = pandas.concat(
                 [self.manifest_df, row], ignore_index=True)
@@ -265,7 +307,7 @@ class Class1AffinityPredictor(object):
             encodable_peptides = EncodableSequences.create(
                 df.peptide.values)
             for (i, model) in enumerate(self.class1_pan_allele_models):
-                df["model_pan_%d" % i] = model.predict(
+                df["model_pan_%d" % i] = model.instance.predict(
                     encodable_peptides,
                     allele_pseudosequences=allele_pseudosequences)
 
@@ -276,8 +318,9 @@ class Class1AffinityPredictor(object):
                     df.ix[mask].peptide.values)
                 models = self.allele_to_allele_specific_models.get(allele, [])
                 for (i, model) in enumerate(models):
-                    df.loc[mask, "model_single_%d" % i] = model.predict(
-                        allele_peptides)
+                    df.loc[
+                        mask, "model_single_%d" % i
+                    ] = model.instance.predict(allele_peptides)
 
         # Geometric mean
         df_predictions = df[

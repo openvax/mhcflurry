@@ -28,6 +28,7 @@ wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.20130222.mhci.pub
 wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.2013.mhci.public.blind.1.txt
 
 cp $SCRIPT_ABSOLUTE_PATH .
+bzip2 LOG.txt
 tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
 
 echo "Created archive: $SCRATCH_DIR/$DOWNLOAD_NAME.tar.bz2"
