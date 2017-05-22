@@ -49,7 +49,7 @@ def test_class1_neural_network_A0205_training_accuracy():
 def test_class1_neural_network_A0205_training_accuracy():
     predictor = Class1AffinityPredictor()
     predictor.fit_allele_specific_predictors(
-        n_models=1,
+        n_models=2,
         architecture_hyperparameters=hyperparameters,
         allele=allele,
         peptides=df.peptide.values,
@@ -63,4 +63,14 @@ def test_class1_neural_network_A0205_training_accuracy():
         numpy.log(ic50_true),
         rtol=0.2,
         atol=0.2)
+
+    ic50_pred_df = predictor.predict_to_dataframe(
+        df.peptide.values, allele=allele)
+    print(ic50_pred_df)
+
+    ic50_pred_df2 = predictor.predict_to_dataframe(
+        df.peptide.values,
+        allele=allele,
+        include_individual_model_predictions=True)
+    print(ic50_pred_df2)
 

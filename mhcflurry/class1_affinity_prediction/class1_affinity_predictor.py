@@ -256,7 +256,7 @@ class Class1AffinityPredictor(object):
             'peptide': peptides,
             'allele': alleles,
         })
-        df["normalized_allele"] = input_df.allele.map(
+        df["normalized_allele"] = df.allele.map(
             mhcnames.normalize_allele_name)
 
         if self.class1_pan_allele_models:
@@ -283,13 +283,17 @@ class Class1AffinityPredictor(object):
         df_predictions = df[
             [c for c in df.columns if c.startswith("model_")]
         ]
-        log_means = numpy.log(df_predictions).mean(1)
+        logs = numpy.log(df_predictions)
+        log_means = logs.mean(1)
         df["prediction"] = numpy.exp(log_means)
-        df["prediction_low"] = numpy.exp(log_means.quantile(q=.05, axis=1))
-        df["prediction_high"] = numpy.exp(log_means.quantile(q=.05, axis=1))
+        df["prediction_low"] = numpy.exp(logs.quantile(0.05, axis=1))
+        df["prediction_high"] = numpy.exp(logs.quantile(0.95, axis=1))
 
+        del df["normalized_allele"]
         if include_individual_model_predictions:
-            return df
-        return df[
-            [c for c in df.columns if c not in df_predictions.columns]
-        ]
+            columns = sorted(df.columns, key=lambda c: c.startswith('model_'))
+        else:
+            columns = [
+                c for c in df.columns if c not in df_predictions.columns
+            ]
+        return df[columns]
