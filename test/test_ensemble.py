@@ -1,31 +1,28 @@
-import tempfile
-import shutil
-import os
-import time
 import cProfile
-
 import json
-from os.path import join
+import os
+import shutil
+import tempfile
+import time
 from os import mkdir
+from os.path import join
 
-from numpy.testing import assert_allclose, assert_equal
 import numpy
-from nose.tools import eq_
-
-from . import make_random_peptides
-
-from mhcflurry.class1_affinity_prediction import scoring
-from mhcflurry.measurement_collection import MeasurementCollection
-from mhcflurry.class1_allele_specific_ensemble import train_command
+from mhcflurry import scoring
 from mhcflurry.affinity_measurement_dataset import AffinityMeasurementDataset
-from mhcflurry.downloads import get_path
-from mhcflurry.amino_acid import common_amino_acid_letters
+from mhcflurry.class1_allele_specific_ensemble import train_command
 from mhcflurry \
     .class1_allele_specific_ensemble \
     .class1_ensemble_multi_allele_predictor import (
-        Class1EnsembleMultiAllelePredictor,
-        get_downloaded_predictor,
-        HYPERPARAMETER_DEFAULTS)
+    Class1EnsembleMultiAllelePredictor,
+    get_downloaded_predictor,
+    HYPERPARAMETER_DEFAULTS)
+from mhcflurry.downloads import get_path
+from mhcflurry.measurement_collection import MeasurementCollection
+from nose.tools import eq_
+from numpy.testing import assert_allclose, assert_equal
+
+from . import make_random_peptides
 
 
 def test_single_allele():

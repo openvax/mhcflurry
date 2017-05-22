@@ -3,6 +3,7 @@ import time
 import hashlib
 import json
 from os.path import join, exists
+from six import string_types
 
 import numpy
 import pandas
@@ -80,7 +81,7 @@ class Class1AffinityPredictor(object):
     def weights_path(models_dir, model_name):
         return join(
             models_dir,
-            "%s.%s" % (
+            "weights_%s.%s" % (
                 model_name, Class1NeuralNetwork.weights_filename_extension))
 
 
@@ -228,66 +229,67 @@ class Class1AffinityPredictor(object):
                 verbose=verbose)
             yield model
 
-    def predict(
+    def predict(self, peptides, alleles=None, allele=None):
+        df = self.predict_to_dataframe(
+            peptides=peptides,
+            alleles=alleles,
+            allele=allele
+        )
+        return df.prediction.values
+
+    def predict_to_dataframe(
             self,
             peptides,
-            alleles,
-            include_mean=True,
-            include_peptides_and_alleles=True):
-        input_df = pandas.DataFrame({
+            alleles=None,
+            allele=None,
+            include_individual_model_predictions=False):
+        if isinstance(peptides, string_types):
+            raise TypeError("peptides must be a list or array, not a string")
+        if isinstance(alleles, string_types):
+            raise TypeError("alleles must be a list or array, not a string")
+        if allele is not None:
+            if alleles is not None:
+                raise ValueError("Specify exactly one of allele or alleles")
+            alleles = [allele] * len(peptides)
+
+        df = pandas.DataFrame({
             'peptide': peptides,
             'allele': alleles,
         })
-        input_df["allele"] = input_df.allele.map(
+        df["normalized_allele"] = input_df.allele.map(
             mhcnames.normalize_allele_name)
 
-        result_dataframes = []
-
         if self.class1_pan_allele_models:
-            allele_pseudosequences = input_df.allele.map(
+            allele_pseudosequences = df.normalized_allele.map(
                 self.allele_to_pseudosequence)
             encodable_peptides = EncodableSequences.create(
-                input_df.peptide.values)
-            for model in self.class1_pan_allele_models:
-                result_df = pandas.DataFrame(
-                    model.predict(
-                        encodable_peptides,
-                        allele_pseudosequences=allele_pseudosequences))
-                result_dataframes.append(result_df)
+                df.peptide.values)
+            for (i, model) in enumerate(self.class1_pan_allele_models):
+                df["model_pan_%d" % i] = model.predict(
+                    encodable_peptides,
+                    allele_pseudosequences=allele_pseudosequences)
 
         if self.allele_to_allele_specific_models:
-            for allele in input_df.allele.unique():
-                mask = (input_df.allele == allele).values
+            for allele in df.normalized_allele.unique():
+                mask = (df.normalized_allele == allele).values
                 allele_peptides = EncodableSequences.create(
-                    input_df.ix[mask].peptide.values)
+                    df.ix[mask].peptide.values)
                 models = self.allele_to_allele_specific_models.get(allele, [])
-                for model in models:
-                    result_df = pandas.DataFrame(
-                        model.predict(allele_peptides),
-                        index=input_df.index[mask].values)
-                    result_dataframes.append(result_df)
-
-        model_predictions = pandas.Panel(
-            dict(enumerate(result_dataframes)),
-            major_axis=input_df.index)
+                for (i, model) in enumerate(models):
+                    df.loc[mask, "model_single_%d" % i] = model.predict(
+                        allele_peptides)
 
         # Geometric mean
-        log_means = numpy.log(model_predictions).mean(0)
-        first_columns = []
-        if include_mean:
-            log_means["mean"] = log_means.mean(1)
-            first_columns.append("mean")
+        df_predictions = df[
+            [c for c in df.columns if c.startswith("model_")]
+        ]
+        log_means = numpy.log(df_predictions).mean(1)
+        df["prediction"] = numpy.exp(log_means)
+        df["prediction_low"] = numpy.exp(log_means.quantile(q=.05, axis=1))
+        df["prediction_high"] = numpy.exp(log_means.quantile(q=.05, axis=1))
 
-        result = numpy.exp(log_means)
-
-        if include_peptides_and_alleles:
-            result["peptide"] = input_df.peptide.values
-            result["allele"] = input_df.allele.values
-            first_columns.append("allele")
-            first_columns.append("peptide")
-
-        assert len(result) == len(peptides), result.shape
-        return result[
-            list(reversed(first_columns)) +
-            [c for c in result.columns if c not in first_columns]
+        if include_individual_model_predictions:
+            return df
+        return df[
+            [c for c in df.columns if c not in df_predictions.columns]
         ]

@@ -8,7 +8,7 @@ import sklearn
 import numpy
 import scipy
 
-from ..regression_target import ic50_to_regression_target
+from mhcflurry.regression_target import ic50_to_regression_target
 
 
 def make_scores(
