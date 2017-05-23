@@ -16,42 +16,6 @@ from ..downloads import get_path
 from .class1_neural_network import Class1NeuralNetwork
 
 
-class LazyLoadingClass1NeuralNetwork(object):
-    @classmethod
-    def wrap(cls, instance):
-        if isinstance(instance, cls):
-            return instance
-        elif isinstance(instance, Class1NeuralNetwork):
-            return cls(model=instance)
-        raise TypeError("Unsupported type: %s" % instance)
-
-    @classmethod
-    def wrap_list(cls, lst):
-        return [
-            cls.wrap(instance)
-            for instance in lst
-        ]
-
-    def __init__(self, model=None, config=None, weights_filename=None):
-        if model is None:
-            assert config is not None
-            assert weights_filename is not None
-        else:
-            assert config is None
-            assert weights_filename is None
-
-        self.model = model
-        self.config = config
-        self.weights_filename = weights_filename
-
-    @property
-    def instance(self):
-        if self.model is None:
-            self.model = Class1NeuralNetwork.from_config(self.config)
-            self.model.restore_weights(self.weights_filename)
-        return self.model
-
-
 class Class1AffinityPredictor(object):
     def __init__(
             self,
@@ -340,3 +304,39 @@ class Class1AffinityPredictor(object):
                 c for c in df.columns if c not in df_predictions.columns
             ]
         return df[columns]
+
+
+class LazyLoadingClass1NeuralNetwork(object):
+    @classmethod
+    def wrap(cls, instance):
+        if isinstance(instance, cls):
+            return instance
+        elif isinstance(instance, Class1NeuralNetwork):
+            return cls(model=instance)
+        raise TypeError("Unsupported type: %s" % instance)
+
+    @classmethod
+    def wrap_list(cls, lst):
+        return [
+            cls.wrap(instance)
+            for instance in lst
+        ]
+
+    def __init__(self, model=None, config=None, weights_filename=None):
+        if model is None:
+            assert config is not None
+            assert weights_filename is not None
+        else:
+            assert config is None
+            assert weights_filename is None
+
+        self.model = model
+        self.config = config
+        self.weights_filename = weights_filename
+
+    @property
+    def instance(self):
+        if self.model is None:
+            self.model = Class1NeuralNetwork.from_config(self.config)
+            self.model.restore_weights(self.weights_filename)
+        return self.model

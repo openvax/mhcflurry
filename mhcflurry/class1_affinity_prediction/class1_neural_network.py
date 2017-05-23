@@ -257,6 +257,7 @@ class Class1NeuralNetwork(object):
         peptides : EncodableSequences or list of string
         
         affinities : list of float
+            nM affinities. Must be same length of as peptides.
         
         allele_pseudosequences : EncodableSequences or list of string, optional
             If not specified, the model will be a single-allele predictor.
@@ -407,15 +408,18 @@ class Class1NeuralNetwork(object):
 
     def predict(self, peptides, allele_pseudosequences=None):
         """
+        Predict affinities
         
         Parameters
         ----------
-        peptides
-        allele_pseudosequences
+        peptides : EncodableSequences or list of string
+        
+        allele_pseudosequences : EncodableSequences or list of string, optional
+            Only required when this model is a pan-allele model
 
         Returns
         -------
-
+        numpy.array of nM affinity predictions 
         """
         x_dict = {
             'peptide': self.peptides_to_network_input(peptides)
@@ -428,6 +432,9 @@ class Class1NeuralNetwork(object):
         return to_ic50(predictions)
 
     def compile(self):
+        """
+        Compile the keras model. Used internally.
+        """
         self.network.compile(
             **self.compile_hyperparameter_defaults.subselect(
                 self.hyperparameters))
@@ -450,7 +457,9 @@ class Class1NeuralNetwork(object):
             batch_normalization,
             embedding_init_method,
             locally_connected_layers):
-
+        """
+        Helper function to make a keras network for class1 affinity prediction.
+        """
         if use_embedding:
             peptide_input = Input(
                 shape=(kmer_size,), dtype='int32', name='peptide')

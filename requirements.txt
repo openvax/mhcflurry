@@ -6,8 +6,8 @@ keras
 scikit-learn
 h5py
 typechecks
-pepdata
 joblib
 cherrypy
 bottle
 six
+mhcnames
