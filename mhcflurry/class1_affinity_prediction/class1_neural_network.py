@@ -22,6 +22,15 @@ from ..common import random_peptides, amino_acid_distribution
 
 
 class Class1NeuralNetwork(object):
+    """
+    Low level class I predictor consisting of a single neural network.
+    
+    Both single allele and pan-allele prediction are supported, but pan-allele
+    is in development and not yet well performing.
+    
+    Users will generally use Class1AffinityPredictor, which gives a higher-level
+    interface and supports ensembles.
+    """
     weights_filename_extension = "npz"
 
     network_hyperparameter_defaults = HyperparameterDefaults(
@@ -85,6 +94,13 @@ class Class1NeuralNetwork(object):
         self.fit_num_points = None
 
     def get_config(self):
+        """
+        serialize to a dict all attributes except model weights
+        
+        Returns
+        -------
+        dict
+        """
         result = dict(self.__dict__)
         del result['network']
         result['network_json'] = self.network.to_json()
@@ -92,6 +108,21 @@ class Class1NeuralNetwork(object):
 
     @classmethod
     def from_config(cls, config):
+        """
+        deserialize from a dict returned by get_config().
+        
+        The weights of the neural network are not restored by this function.
+        You must call `restore_weights` separately.
+        
+        Parameters
+        ----------
+        config : dict
+
+        Returns
+        -------
+        Class1NeuralNetwork
+
+        """
         config = dict(config)
         instance = cls(**config.pop('hyperparameters'))
         instance.network = keras.models.model_from_json(
@@ -100,11 +131,28 @@ class Class1NeuralNetwork(object):
         return instance
 
     def __getstate__(self):
+        """
+        serialize to a dict. Model weights are included. For pickle support.
+        
+        Returns
+        -------
+        dict
+
+        """
         result = self.get_config()
         result['network_weights'] = self.get_weights()
         return result
 
     def __setstate__(self, state):
+        """
+        deserialize from a dict. Model weights are included. For pickle support.
+        
+        Parameters
+        ----------
+        state : dict
+
+
+        """
         network_json = state.pop('network_json')
         network_weights = state.pop('network_weights')
         self.__dict__.update(state)
@@ -112,12 +160,32 @@ class Class1NeuralNetwork(object):
         self.set_weights(network_weights)
 
     def save_weights(self, filename):
+        """
+        Save the model weights to the given filename using numpy's ".npz"
+        format.
+        
+        Parameters
+        ----------
+        filename : string
+            Should end in ".npz".
+
+        """
         weights_list = self.network.get_weights()
         numpy.savez(
             filename,
             **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list)))
 
     def restore_weights(self, filename):
+        """
+        Restore model weights from the given filename, which should have been
+        created with `save_weights`.
+        
+        Parameters
+        ----------
+        filename : string
+            Should end in ".npz".
+
+        """
         loaded = numpy.load(filename)
         weights = [
             loaded["array_%d" % i]
@@ -127,6 +195,18 @@ class Class1NeuralNetwork(object):
         self.network.set_weights(weights)
 
     def peptides_to_network_input(self, peptides):
+        """
+        Encode peptides to the fixed-length encoding expected by the neural
+        network (which depends on the architecture).
+        
+        Parameters
+        ----------
+        peptides : EncodableSequences or list of string
+
+        Returns
+        -------
+        numpy.array
+        """
         encoder = EncodableSequences.create(peptides)
         if self.hyperparameters['use_embedding']:
             encoded = encoder.variable_length_to_fixed_length_categorical(
@@ -142,6 +222,18 @@ class Class1NeuralNetwork(object):
         return encoded
 
     def pseudosequence_to_network_input(self, pseudosequences):
+        """
+        Encode pseudosequences to the fixed-length encoding expected by the neural
+        network (which depends on the architecture).
+
+        Parameters
+        ----------
+        pseudosequences : EncodableSequences or list of string
+
+        Returns
+        -------
+        numpy.array
+        """
         encoder = EncodableSequences.create(pseudosequences)
         if self.hyperparameters['pseudosequence_use_embedding']:
             encoded = encoder.fixed_length_categorical()
@@ -157,6 +249,26 @@ class Class1NeuralNetwork(object):
             allele_pseudosequences=None,
             sample_weights=None,
             verbose=1):
+        """
+        Fit the neural network.
+        
+        Parameters
+        ----------
+        peptides : EncodableSequences or list of string
+        
+        affinities : list of float
+        
+        allele_pseudosequences : EncodableSequences or list of string, optional
+            If not specified, the model will be a single-allele predictor.
+            
+        sample_weights : list of float, optional
+            If not specified, all samples (including random negatives added
+            during training) will have equal weight. If specified, the random
+            negatives will be assigned weight=1.0.
+        
+        verbose : int
+            Keras verbosity level
+        """
 
         self.fit_num_points = len(peptides)
 
@@ -294,6 +406,17 @@ class Class1NeuralNetwork(object):
         self.fit_seconds = time.time() - start
 
     def predict(self, peptides, allele_pseudosequences=None):
+        """
+        
+        Parameters
+        ----------
+        peptides
+        allele_pseudosequences
+
+        Returns
+        -------
+
+        """
         x_dict = {
             'peptide': self.peptides_to_network_input(peptides)
         }
