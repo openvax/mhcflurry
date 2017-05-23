@@ -47,7 +47,8 @@ class Class1AffinityPredictor(object):
         manifest_df : pandas.DataFrame, optional
             Must have columns: model_name, allele, config_json, model.
             Only required if you want to update an existing serialization of a
-            Class1AffinityPredictor.
+            Class1AffinityPredictor. Otherwise this dataframe will be generated
+            automatically based on the supplied models.
         """
 
         if allele_to_allele_specific_models is None:
@@ -90,6 +91,12 @@ class Class1AffinityPredictor(object):
     def save(self, models_dir, model_names_to_write=None):
         """
         Serialize the predictor to a directory on disk.
+        
+        The serialization format consists of a file called "manifest.csv" with
+        the configurations of each Class1NeuralNetwork, along with per-network
+        files giving the model weights. If there are pan-allele predictors in
+        the ensemble, the allele pseudosequences are also stored in the
+        directory.
         
         Parameters
         ----------

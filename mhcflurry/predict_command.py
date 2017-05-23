@@ -41,9 +41,9 @@ from __future__ import (
 )
 import sys
 import argparse
-import logging
-import pandas
 import itertools
+
+import pandas
 
 from .downloads import get_path
 from .class1_affinity_prediction import Class1AffinityPredictor
@@ -99,7 +99,7 @@ parser.add_argument(
     metavar="DIR",
     default=None,
     help="Directory containing models. "
-    "Default: %s" % get_path("models_class1", test_exists=False))
+    "Default: %s" % get_path("models_class1", "models", test_exists=False))
 
 
 def run(argv=sys.argv[1:]):
@@ -148,24 +148,11 @@ def run(argv=sys.argv[1:]):
         # The reason we set the default here instead of in the argument parser is that
         # we want to test_exists at this point, so the user gets a message instructing
         # them to download the models if needed.
-        models_dir = get_path("models_class1")
+        models_dir = get_path("models_class1", "models")
     predictor = Class1AffinityPredictor.load(models_dir)
-
-    predictions = {}  # allele -> peptide -> value
-    for (allele, sub_df) in df.groupby(args.allele_column):
-        logging.info("Running %d predictions for allele %s" % (
-            len(sub_df), allele))
-        peptides = sub_df[args.peptide_column].values
-        predictions[allele] = dict(
-            (peptide, prediction)
-            for (peptide, prediction)
-            in zip(peptides, predictor.predict_for_allele(allele, peptides)))
-
-    logging.info("Collecting result")
-    df[args.prediction_column] = [
-        predictions[row[args.allele_column]][row[args.peptide_column]]
-        for (_, row) in df.iterrows()
-    ]
+    df[args.prediction_column] = predictor.predict(
+        peptides=df[args.peptide_column].values,
+        alleles=df[args.allele_column].values)
 
     if args.out:
         df.to_csv(args.out, index=False)

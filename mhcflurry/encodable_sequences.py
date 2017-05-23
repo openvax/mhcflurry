@@ -252,9 +252,14 @@ class EncodableSequences(object):
         string of length max_length
 
         """
-        assert len(klass.unknown_character) == 1
-        assert len(sequence) >= left_edge + right_edge, sequence
-        assert len(sequence) <= max_length, sequence
+        if len(sequence) < left_edge + right_edge:
+            raise ValueError(
+                "Sequence '%s' (length %d) unsupported: length must be at "
+                "least %d" % (sequence, len(sequence), left_edge + right_edge))
+        if len(sequence) > max_length:
+            raise ValueError(
+                "Sequence '%s' (length %d) unsupported: length must be at "
+                "most %d" % (sequence, len(sequence), max_length))
 
         middle_length = max_length - left_edge - right_edge
 

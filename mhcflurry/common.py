@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from __future__ import print_function, division, absolute_import
-from math import exp, log
 import itertools
 import collections
 import logging
@@ -28,73 +27,6 @@ import pandas
 from . import amino_acid
 
 
-class UnsupportedAllele(Exception):
-    pass
-
-
-def parse_int_list(s):
-    return [int(part.strip()) for part in s.split(",")]
-
-
-def split_uppercase_sequences(s):
-    return [part.strip().upper() for part in s.split(",")]
-
-
-MHC_PREFIXES = [
-    "HLA",
-    "H-2",
-    "Mamu",
-    "Patr",
-    "Gogo",
-    "ELA",
-]
-
-
-def normalize_allele_name(allele_name, default_prefix="HLA"):
-    """
-    Only works for a small number of species.
-
-    TODO: use the same logic as mhctools for MHC name parsing.
-    Possibly even worth its own small repo called something like "mhcnames"
-    """
-    allele_name = allele_name.upper()
-    # old school HLA-C serotypes look like "Cw"
-    allele_name = allele_name.replace("CW", "C")
-
-    prefix = default_prefix
-    for candidate in MHC_PREFIXES:
-        if (allele_name.startswith(candidate.upper()) or
-                allele_name.startswith(candidate.replace("-", "").upper())):
-            prefix = candidate
-            allele_name = allele_name[len(prefix):]
-            break
-    for pattern in MHC_PREFIXES + ["-", "*", ":"]:
-        allele_name = allele_name.replace(pattern, "")
-    return "%s%s" % (prefix + "-" if prefix else "", allele_name)
-
-
-def split_allele_names(s):
-    return [
-        normalize_allele_name(part.strip())
-        for part
-        in s.split(",")
-    ]
-
-
-def geometric_mean(xs, weights=None):
-    """
-    Geometric mean of a collection of affinity measurements, with optional
-    sample weights.
-    """
-    if len(xs) == 1:
-        return xs[0]
-    elif weights is None:
-        return exp(sum(log(xi) for xi in xs) / len(xs))
-    sum_weighted_log = sum(log(xi) * wi for (xi, wi) in zip(xs, weights))
-    denom = sum(weights)
-    return exp(sum_weighted_log / denom)
-
-
 def all_combinations(**dict_of_lists):
     """
     Iterator that generates all combinations of parameters given in the
@@ -105,36 +37,6 @@ def all_combinations(**dict_of_lists):
     value_lists = dict_of_lists.values()
     for combination_of_values in itertools.product(*value_lists):
         yield dict(zip(arg_names, combination_of_values))
-
-
-def groupby_indices(iterable, key_fn=lambda x: x):
-    """
-    Returns dictionary mapping unique values to list of indices that
-    had those values.
-    """
-    index_groups = collections.defaultdict(list)
-    for i, x in enumerate(key_fn(x) for x in iterable):
-        index_groups[x].append(i)
-    return index_groups
-
-
-def shuffle_split_list(indices, fraction=0.5):
-    """
-    Split a list of indices into two sub-lists, with an optional parameter
-    controlling what fraction of the indices go to the left list.
-    """
-    indices = np.asarray(indices)
-    np.random.shuffle(indices)
-    n = len(indices)
-
-    left_count = int(np.ceil(fraction * n))
-
-    if n > 1 and left_count == 0:
-        left_count = 1
-    elif n > 1 and left_count == n:
-        left_count = n - 1
-
-    return indices[:left_count], indices[left_count:]
 
 
 def dataframe_cryptographic_hash(df):
@@ -244,18 +146,21 @@ def drop_nulls_and_warn(df, related_df_with_same_index_to_describe=None):
     return new_df
 
 
-def from_ic50(ic50):
-    x = 1.0 - (numpy.log(ic50) / numpy.log(50000))
-    return numpy.minimum(
-        1.0,
-        numpy.maximum(0.0, x))
-
-
-def to_ic50(x):
-    return 50000.0 ** (1.0 - x)
-
-
 def amino_acid_distribution(peptides, smoothing=0.0):
+    """
+    Compute the fraction of each amino acid across a collection of peptides.
+    
+    Parameters
+    ----------
+    peptides : list of string
+    smoothing : float, optional
+        Small number (e.g. 0.01) to add to all amino acid fractions. The higher
+        the number the more uniform the distribution.
+
+    Returns
+    -------
+    pandas.Series indexed by amino acids
+    """
     peptides = pandas.Series(peptides)
     aa_counts = pandas.Series(peptides.map(collections.Counter).sum())
     normalized = aa_counts / aa_counts.sum()

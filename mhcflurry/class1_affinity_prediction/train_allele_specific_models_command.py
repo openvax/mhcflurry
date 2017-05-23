@@ -1,5 +1,5 @@
 """
-Train single allele models
+Train Class1 single allele models.
 
 """
 import sys
@@ -7,7 +7,6 @@ import argparse
 import json
 
 import pandas
-
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from ..common import configure_logging
@@ -17,14 +16,19 @@ parser = argparse.ArgumentParser(usage=__doc__)
 
 parser.add_argument(
     "--data",
+    metavar="FILE.csv",
     required=True,
-    help="Training data")
+    help=(
+        "Training data CSV. Expected columns: "
+        "allele, peptide, measurement_value"))
 parser.add_argument(
     "--out-models-dir",
+    metavar="DIR",
     required=True,
     help="Directory to write models and manifest")
 parser.add_argument(
     "--hyperparameters",
+    metavar="FILE.json",
     required=True,
     help="JSON of hyperparameters")
 parser.add_argument(
@@ -40,14 +44,9 @@ parser.add_argument(
     default=50,
     help="Train models for alleles with >=N measurements.")
 parser.add_argument(
-    "--only-quantitative",
-    action="store_true",
-    help="Exclude qualitative measurements",
-    default=False)
-parser.add_argument(
     "--verbosity",
     type=int,
-    help="Default: %(default)s",
+    help="Keras verbosity. Default: %(default)s",
     default=1)
 
 

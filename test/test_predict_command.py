@@ -37,8 +37,8 @@ def test_csv():
 
 def test_no_csv():
     args = [
-        "--alleles", "HLA-A0201", "H-2Kb",
-        "--peptides", "SIINFEKL", "DENDREKLLL", "PICKLE",
+        "--alleles", "HLA-A0201", "H-2-Kb",
+        "--peptides", "SIINFEKL", "DENDREKLLL", "PICKLEEE",
         "--prediction-column", "prediction",
     ]
 
@@ -58,5 +58,5 @@ def test_no_csv():
     assert_equal(result.shape, (6, 3))
     sub_result1 = result.ix[result.peptide == "SIINFEKL"].set_index("allele")
     assert (
-        sub_result1.ix["H-2Kb"].prediction <
+        sub_result1.ix["H-2-Kb"].prediction <
         sub_result1.ix["HLA-A0201"].prediction)
