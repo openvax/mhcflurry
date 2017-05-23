@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import tempfile
+import shutil
+
 import pandas
 import mhcflurry.class1_affinity_prediction
 from mhcflurry.downloads import get_path
@@ -54,6 +57,12 @@ def test_A1_MAGE_epitope_downloaded_models():
     #   as a Cross-Reactive Target for Engineered MAGE A3-Directed
     #   T Cells
     predict_and_check("HLA-A*01:01", "EVDPIGHLY")
+
+
+def test_A2_HIV_epitope_downloaded_models():
+    # Test the A2 HIV epitope SLYNTVATL from
+    #    The HIV-1 HLA-A2-SLYNTVATL Is a Help-Independent CTL Epitope
+    predict_and_check("HLA-A*02:01", "SLYNTVATL")
 
 
 def test_A1_trained_models():
@@ -113,9 +122,22 @@ def test_A1_trained_models():
 
     predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictors=[predictor])
 
+    models_dir = tempfile.mkdtemp("_models")
+    print(models_dir)
+    predictor.save(models_dir)
+    predictor2 = Class1AffinityPredictor.load(models_dir)
+    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictors=[predictor2])
+    shutil.rmtree(models_dir)
 
-def test_A2_HIV_epitope_downloaded_models():
-    # Test the A2 HIV epitope SLYNTVATL from
-    #    The HIV-1 HLA-A2-SLYNTVATL Is a Help-Independent CTL Epitope
-    predict_and_check("HLA-A*02:01", "SLYNTVATL")
+    predictor3 = Class1AffinityPredictor(
+        allele_to_allele_specific_models={
+            allele: [predictor.allele_to_allele_specific_models[allele][0]]
+        })
+    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictors=[predictor3])
+    models_dir = tempfile.mkdtemp("_models")
+    print(models_dir)
+    predictor3.save(models_dir)
+    predictor4 = Class1AffinityPredictor.load(models_dir)
+    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictors=[predictor4])
+    shutil.rmtree(models_dir)
 

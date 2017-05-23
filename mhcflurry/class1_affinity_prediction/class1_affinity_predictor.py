@@ -17,12 +17,38 @@ from .class1_neural_network import Class1NeuralNetwork
 
 
 class Class1AffinityPredictor(object):
+    """
+    High-level interface for peptide/MHC I binding affinity prediction.
+    
+    This is the class most users will want to use.
+    
+    This class delegates to one or more `Class1NeuralNetwork` instances.
+    It supports prediction across multiple alleles using ensembles of single-
+    or pan-allele predictors.
+    """
     def __init__(
             self,
             allele_to_allele_specific_models=None,
             class1_pan_allele_models=None,
             allele_to_pseudosequence=None,
             manifest_df=None):
+        """
+        Parameters
+        ----------
+        allele_to_allele_specific_models : dict of string -> list of Class1NeuralNetwork
+            Ensemble of single-allele models to use for each allele. 
+        
+        class1_pan_allele_models : list of Class1NeuralNetwork
+            Ensemble of pan-allele models.
+        
+        allele_to_pseudosequence : dict of string -> string
+            Required only if class1_pan_allele_models is specified.
+        
+        manifest_df : pandas.DataFrame, optional
+            Must have columns: model_name, allele, config_json, model.
+            Only required if you want to update an existing serialization of a
+            Class1AffinityPredictor.
+        """
 
         if allele_to_allele_specific_models is None:
             allele_to_allele_specific_models = {}
@@ -40,14 +66,40 @@ class Class1AffinityPredictor(object):
         self.allele_to_pseudosequence = allele_to_pseudosequence
 
         if manifest_df is None:
-            manifest_df = pandas.DataFrame()
-            manifest_df["model_name"] = []
-            manifest_df["allele"] = []
-            manifest_df["config_json"] = []
-            manifest_df["model"] = []
+            rows = []
+            for (i, model) in enumerate(self.class1_pan_allele_models):
+                rows.append((
+                    self.model_name("pan-class1", i),
+                    "pan-class1",
+                    json.dumps(model.instance.get_config()),
+                    model
+                ))
+            for (allele, models) in self.allele_to_allele_specific_models.items():
+                for (i, model) in enumerate(models):
+                    rows.append((
+                        self.model_name(allele, i),
+                        allele,
+                        json.dumps(model.instance.get_config()),
+                        model
+                    ))
+            manifest_df = pandas.DataFrame(
+                rows,
+                columns=["model_name", "allele", "config_json", "model"])
         self.manifest_df = manifest_df
 
     def save(self, models_dir, model_names_to_write=None):
+        """
+        Serialize the predictor to a directory on disk.
+        
+        Parameters
+        ----------
+        models_dir : string
+            Path to directory
+            
+        model_names_to_write : list of string, optional
+            Only write the weights for the specified models. Useful for
+            incremental updates during training.
+        """
         num_models = len(self.class1_pan_allele_models) + sum(
             len(v) for v in self.allele_to_allele_specific_models.values())
         assert len(self.manifest_df) == num_models, (
@@ -75,20 +127,22 @@ class Class1AffinityPredictor(object):
         print("Wrote: %s" % manifest_path)
 
     @staticmethod
-    def model_name(allele, num):
-        random_string = hashlib.sha1(
-            str(time.time()).encode()).hexdigest()[:16]
-        return "%s-%d-%s" % (allele.upper(), num, random_string)
-
-    @staticmethod
-    def weights_path(models_dir, model_name):
-        return join(
-            models_dir,
-            "weights_%s.%s" % (
-                model_name, Class1NeuralNetwork.weights_filename_extension))
-
-    @staticmethod
     def load(models_dir=None, max_models=None):
+        """
+        Deserialize a predictor from a directory on disk.
+        
+        Parameters
+        ----------
+        models_dir : string
+            Path to directory
+            
+        max_models : int, optional
+            Maximum number of Class1NeuralNetwork instances to load
+
+        Returns
+        -------
+        Class1AffinityPredictor
+        """
         if models_dir is None:
             models_dir = get_path("models_class1", "models")
 
@@ -136,6 +190,44 @@ class Class1AffinityPredictor(object):
             manifest_df=manifest_df)
         return result
 
+    @staticmethod
+    def model_name(allele, num):
+        """
+        Generate a model name
+        
+        Parameters
+        ----------
+        allele : string
+        num : int
+
+        Returns
+        -------
+        string
+
+        """
+        random_string = hashlib.sha1(
+            str(time.time()).encode()).hexdigest()[:16]
+        return "%s-%d-%s" % (allele.upper(), num, random_string)
+
+    @staticmethod
+    def weights_path(models_dir, model_name):
+        """
+        Generate the path to the weights file for a model
+        
+        Parameters
+        ----------
+        models_dir : string
+        model_name : string
+
+        Returns
+        -------
+        string
+        """
+        return join(
+            models_dir,
+            "weights_%s.%s" % (
+                model_name, Class1NeuralNetwork.weights_filename_extension))
+
     def fit_allele_specific_predictors(
             self,
             n_models,
@@ -145,6 +237,38 @@ class Class1AffinityPredictor(object):
             affinities,
             models_dir_for_save=None,
             verbose=1):
+        """
+        Fit one or more allele specific predictors for a single allele using a
+        single neural network architecture.
+        
+        The new predictors are saved in the Class1AffinityPredictor instance
+        and will be used on subsequent calls to `predict`.
+        
+        Parameters
+        ----------
+        n_models : int
+            Number of neural networks to fit
+        
+        architecture_hyperparameters : dict 
+               
+        allele : string
+        
+        peptides : EncodableSequences or list of string
+        
+        affinities : list of float
+            nM affinities
+        
+        models_dir_for_save : string, optional
+            If specified, the Class1AffinityPredictor is (incrementally) written
+            to the given models dir after each neural network is fit.
+        
+        verbose : int
+            Keras verbosity
+
+        Returns
+        -------
+        list of Class1NeuralNetwork
+        """
 
         allele = mhcnames.normalize_allele_name(allele)
         models = self._fit_predictors(
@@ -186,6 +310,39 @@ class Class1AffinityPredictor(object):
             affinities,
             models_dir_for_save=None,
             verbose=1):
+        """
+        Fit one or more pan-allele predictors using a single neural network
+        architecture.
+        
+        The new predictors are saved in the Class1AffinityPredictor instance
+        and will be used on subsequent calls to `predict`.
+        
+        Parameters
+        ----------
+        n_models : int
+            Number of neural networks to fit
+            
+        architecture_hyperparameters : dict
+        
+        alleles : list of string
+            Allele names (not pseudosequences) corresponding to each peptide 
+        
+        peptides : EncodableSequences or list of string
+        
+        affinities : list of float
+            nM affinities
+        
+        models_dir_for_save : string, optional
+            If specified, the Class1AffinityPredictor is (incrementally) written
+            to the given models dir after each neural network is fit.
+        
+        verbose : int
+            Keras verbosity
+
+        Returns
+        -------
+        list of Class1NeuralNetwork
+        """
 
         alleles = pandas.Series(alleles).map(mhcnames.normalize_allele_name)
         allele_pseudosequences = alleles.map(self.allele_to_pseudosequence)
@@ -223,7 +380,22 @@ class Class1AffinityPredictor(object):
             affinities,
             allele_pseudosequences,
             verbose=1):
+        """
+        Private helper method
+        
+        Parameters
+        ----------
+        n_models : int
+        architecture_hyperparameters : dict
+        peptides : EncodableSequences or list of string
+        affinities : list of float
+        allele_pseudosequences : EncodableSequences or list of string
+        verbose : int
 
+        Returns
+        -------
+        generator of Class1NeuralNetwork
+        """
         encodable_peptides = EncodableSequences.create(peptides)
         for i in range(n_models):
             print("Training model %d / %d" % (i + 1, n_models))
@@ -236,6 +408,27 @@ class Class1AffinityPredictor(object):
             yield model
 
     def predict(self, peptides, alleles=None, allele=None):
+        """
+        Predict nM binding affinities.
+        
+        If multiple predictors are available for an allele, the predictions are
+        the geometric means of the individual model predictions.
+        
+        One of 'allele' or 'alleles' must be specified. If 'allele' is specified
+        all predictions will be for the given allele. If 'alleles' is specified
+        it must be the same length as 'peptides' and give the allele
+        corresponding to each peptide.
+        
+        Parameters
+        ----------
+        peptides : EncodableSequences or list of string
+        alleles : list of string
+        allele : string
+
+        Returns
+        -------
+        numpy.array of predictions
+        """
         df = self.predict_to_dataframe(
             peptides=peptides,
             alleles=alleles,
@@ -249,6 +442,31 @@ class Class1AffinityPredictor(object):
             alleles=None,
             allele=None,
             include_individual_model_predictions=False):
+        """
+        Predict nM binding affinities. Gives more detailed output than `predict`
+        method, including 5-95% prediction intervals.
+        
+        If multiple predictors are available for an allele, the predictions are
+        the geometric means of the individual model predictions.
+        
+        One of 'allele' or 'alleles' must be specified. If 'allele' is specified
+        all predictions will be for the given allele. If 'alleles' is specified
+        it must be the same length as 'peptides' and give the allele
+        corresponding to each peptide. 
+        
+        Parameters
+        ----------
+        peptides : EncodableSequences or list of string
+        alleles : list of string
+        allele : string
+        include_individual_model_predictions : boolean
+            If True, the predictions of each individual model are incldued as
+            columns in the result dataframe.
+
+        Returns
+        -------
+        pandas.DataFrame of predictions
+        """
         if isinstance(peptides, string_types):
             raise TypeError("peptides must be a list or array, not a string")
         if isinstance(alleles, string_types):
@@ -307,8 +525,26 @@ class Class1AffinityPredictor(object):
 
 
 class LazyLoadingClass1NeuralNetwork(object):
+    """
+    Thing wrapper over a Class1NeuralNetwork that supports deserializing it
+    lazily as needed.
+    """
     @classmethod
     def wrap(cls, instance):
+        """
+        Return a LazyLoadingClass1NeuralNetwork given a Class1NeuralNetwork.
+        If the given instance is a LazyLoadingClass1NeuralNetwork it is
+        returned unchanged.
+        
+        Parameters
+        ----------
+        instance : Class1NeuralNetwork or LazyLoadingClass1NeuralNetwork
+
+        Returns
+        -------
+        LazyLoadingClass1NeuralNetwork
+
+        """
         if isinstance(instance, cls):
             return instance
         elif isinstance(instance, Class1NeuralNetwork):
@@ -317,12 +553,40 @@ class LazyLoadingClass1NeuralNetwork(object):
 
     @classmethod
     def wrap_list(cls, lst):
+        """
+        Wrap each element of a list of Class1NeuralNetwork instances
+        
+        Parameters
+        ----------
+        lst : list of (Class1NeuralNetwork or LazyLoadingClass1NeuralNetwork)
+
+        Returns
+        -------
+        list of LazyLoadingClass1NeuralNetwork
+
+        """
         return [
             cls.wrap(instance)
             for instance in lst
         ]
 
     def __init__(self, model=None, config=None, weights_filename=None):
+        """
+        Specify either 'model' (to wrap an already loaded instance) or both
+        of "config" and "weights_filename" (to wrap a not yet loaded instance).
+        
+        Parameters
+        ----------
+        model : Class1NeuralNetwork, optional
+            If not specified you must specify both 'config' and
+            'weights_filename'
+               
+        config : dict, optional
+            As returned by `Class1NeuralNetwork.get_config`
+        
+        weights_filename : string, optional
+            Path to weights
+        """
         if model is None:
             assert config is not None
             assert weights_filename is not None
@@ -336,6 +600,14 @@ class LazyLoadingClass1NeuralNetwork(object):
 
     @property
     def instance(self):
+        """
+        Return the wrapped Class1NeuralNetwork instance, which will be loaded
+        the first time it is accessed and cached thereafter.
+        
+        Returns
+        -------
+        Class1NeuralNetwork
+        """
         if self.model is None:
             self.model = Class1NeuralNetwork.from_config(self.config)
             self.model.restore_weights(self.weights_filename)
