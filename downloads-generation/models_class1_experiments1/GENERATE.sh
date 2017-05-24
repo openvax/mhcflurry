@@ -23,15 +23,16 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-mkdir models
-
-cp $SCRIPT_DIR/hyperparameters.json .
-
-time mhcflurry-class1-train-allele-specific-models \
-    --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
-    --hyperparameters hyperparameters.json \
-    --out-models-dir models \
-    --min-measurements-per-allele 100
+for mod in 0local 1local dense16 dense64 noL1
+do
+    cp $SCRIPT_DIR/hyperparameters-${mod}.json .
+    mkdir models-${mod}
+    time mhcflurry-class1-train-allele-specific-models \
+        --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+        --hyperparameters hyperparameters-${mod}.json \
+        --out-models-dir models-${mod} \
+        --min-measurements-per-allele 100
+done
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt

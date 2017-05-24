@@ -4,7 +4,7 @@ set -e
 set -x
 
 DOWNLOAD_NAME=data_iedb
-SCRATCH_DIR=/tmp/mhcflurry-downloads-generation
+SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
 mkdir -p "$SCRATCH_DIR"
