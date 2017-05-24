@@ -6,7 +6,7 @@ from mhcflurry.class1_affinity_prediction import Class1NeuralNetwork
 def test_all_combinations_of_hyperparameters():
     combinations_dict = dict(
         activation=["tanh", "sigmoid"],
-        fraction_negative=[0, 0.2])
+        random_negative_constant=[0, 20])
     results = (
         Class1NeuralNetwork
         .hyperparameter_defaults
