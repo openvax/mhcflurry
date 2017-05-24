@@ -4,7 +4,7 @@ numpy.random.seed(0)
 
 from mhcflurry import Class1NeuralNetwork, Class1AffinityPredictor
 
-from nose.tools import eq_
+from nose.tools import eq_, assert_raises
 from numpy import testing
 
 from mhcflurry.downloads import get_path
@@ -28,12 +28,12 @@ df = df.ix[
 hyperparameters = dict(
     activation="tanh",
     layer_sizes=[64],
-    max_epochs=1000,  # Memorize the dataset.
+    max_epochs=500,  # Memorize the dataset.
     early_stopping=False,
     dropout_probability=0.0)
 
 
-def test_class1_neural_network_A0205_training_accuracy():
+def test_class1_neural_network_a0205_training_accuracy():
     predictor = Class1NeuralNetwork(**hyperparameters)
     predictor.fit(df.peptide.values, df.measurement_value.values)
     ic50_pred = predictor.predict(df.peptide.values)
@@ -46,7 +46,7 @@ def test_class1_neural_network_A0205_training_accuracy():
         atol=0.2)
 
 
-def test_class1_neural_network_A0205_training_accuracy():
+def test_class1_affinity_predictor_a0205_training_accuracy():
     predictor = Class1AffinityPredictor()
     predictor.fit_allele_specific_predictors(
         n_models=2,
@@ -73,4 +73,18 @@ def test_class1_neural_network_A0205_training_accuracy():
         allele=allele,
         include_individual_model_predictions=True)
     print(ic50_pred_df2)
+
+    # Test an unknown allele
+    ic50_pred = predictor.predict(
+        df.peptide.values,
+        allele="HLA-A*02:01",
+        throw=False)
+    assert numpy.isnan(ic50_pred).all()
+
+    assert_raises(
+        ValueError,
+        predictor.predict,
+        df.peptide.values,
+        allele="HLA-A*02:01")
+
 

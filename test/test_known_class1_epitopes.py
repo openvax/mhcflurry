@@ -16,27 +16,24 @@ import tempfile
 import shutil
 
 import pandas
-import mhcflurry.class1_affinity_prediction
 from mhcflurry.downloads import get_path
 from mhcflurry import Class1AffinityPredictor
 
-predictors = [
-    mhcflurry.class1_affinity_prediction.Class1AffinityPredictor.load(),
-]
+DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
 
 
 def predict_and_check(
         allele,
         peptide,
-        predictors=predictors,
+        predictor=DOWNLOADED_PREDICTOR,
         expected_range=(0, 500)):
-    for predictor in predictors:
-        def debug():
-            print("\n%s" % (
-                predictor.predict_to_dataframe(
-                    peptides=[peptide],
-                    allele=allele,
-                    include_individual_model_predictions=True)))
+
+    def debug():
+        print("\n%s" % (
+            predictor.predict_to_dataframe(
+                peptides=[peptide],
+                allele=allele,
+                include_individual_model_predictions=True)))
 
         (prediction,) = predictor.predict(allele=allele, peptides=[peptide])
         assert prediction >= expected_range[0], (predictor, prediction, debug())

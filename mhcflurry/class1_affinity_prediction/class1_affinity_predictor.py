@@ -4,6 +4,7 @@ import hashlib
 import json
 from os.path import join, exists
 from six import string_types
+import logging
 
 import numpy
 import pandas
@@ -59,11 +60,8 @@ class Class1AffinityPredictor(object):
         if class1_pan_allele_models:
             assert allele_to_pseudosequence, "Pseudosequences required"
 
-        self.allele_to_allele_specific_models = dict(
-            (k, LazyLoadingClass1NeuralNetwork.wrap_list(v))
-            for (k, v) in allele_to_allele_specific_models.items())
-        self.class1_pan_allele_models = (
-            LazyLoadingClass1NeuralNetwork.wrap_list(class1_pan_allele_models))
+        self.allele_to_allele_specific_models = allele_to_allele_specific_models
+        self.class1_pan_allele_models = class1_pan_allele_models
         self.allele_to_pseudosequence = allele_to_pseudosequence
 
         if manifest_df is None:
@@ -72,7 +70,7 @@ class Class1AffinityPredictor(object):
                 rows.append((
                     self.model_name("pan-class1", i),
                     "pan-class1",
-                    json.dumps(model.instance.get_config()),
+                    json.dumps(model.get_config()),
                     model
                 ))
             for (allele, models) in self.allele_to_allele_specific_models.items():
@@ -80,7 +78,7 @@ class Class1AffinityPredictor(object):
                     rows.append((
                         self.model_name(allele, i),
                         allele,
-                        json.dumps(model.instance.get_config()),
+                        json.dumps(model.get_config()),
                         model
                     ))
             manifest_df = pandas.DataFrame(
@@ -123,7 +121,8 @@ class Class1AffinityPredictor(object):
 
         for (_, row) in sub_manifest_df.iterrows():
             weights_path = self.weights_path(models_dir, row.model_name)
-            row.model.instance.save_weights(weights_path)
+            Class1AffinityPredictor.save_weights(
+                row.model.get_weights(), weights_path)
             print("Wrote: %s" % weights_path)
 
         write_manifest_df = self.manifest_df[[
@@ -160,11 +159,11 @@ class Class1AffinityPredictor(object):
         class1_pan_allele_models = []
         all_models = []
         for (_, row) in manifest_df.iterrows():
-            model = LazyLoadingClass1NeuralNetwork(
-                config=json.loads(row.config_json),
-                weights_filename=Class1AffinityPredictor.weights_path(
-                    models_dir, row.model_name)
-            )
+            weights_filename = Class1AffinityPredictor.weights_path(
+                models_dir, row.model_name)
+            weights = Class1AffinityPredictor.load_weights(weights_filename)
+            config = json.loads(row.config_json)
+            model = Class1NeuralNetwork.from_config(config, weights=weights)
             if row.allele == "pan-class1":
                 class1_pan_allele_models.append(model)
             else:
@@ -230,10 +229,7 @@ class Class1AffinityPredictor(object):
         -------
         string
         """
-        return join(
-            models_dir,
-            "weights_%s.%s" % (
-                model_name, Class1NeuralNetwork.weights_filename_extension))
+        return join(models_dir, "weights_%s.npz" % model_name)
 
     def fit_allele_specific_predictors(
             self,
@@ -291,18 +287,17 @@ class Class1AffinityPredictor(object):
 
         models_list = []
         for (i, model) in enumerate(models):
-            lazy_model = LazyLoadingClass1NeuralNetwork.wrap(model)
             model_name = self.model_name(allele, i)
             models_list.append(model)  # models is a generator
             row = pandas.Series(collections.OrderedDict([
                 ("model_name", model_name),
                 ("allele", allele),
                 ("config_json", json.dumps(model.get_config())),
-                ("model", lazy_model),
+                ("model", model),
             ])).to_frame().T
             self.manifest_df = pandas.concat(
                 [self.manifest_df, row], ignore_index=True)
-            self.allele_to_allele_specific_models[allele].append(lazy_model)
+            self.allele_to_allele_specific_models[allele].append(model)
             if models_dir_for_save:
                 self.save(
                     models_dir_for_save, model_names_to_write=[model_name])
@@ -363,14 +358,13 @@ class Class1AffinityPredictor(object):
             verbose=verbose)
 
         for (i, model) in enumerate(models):
-            lazy_model = LazyLoadingClass1NeuralNetwork.wrap(model)
             model_name = self.model_name("pan-class1", i)
-            self.class1_pan_allele_models.append(lazy_model)
+            self.class1_pan_allele_models.append(model)
             row = pandas.Series(collections.OrderedDict([
                 ("model_name", model_name),
                 ("allele", "pan-class1"),
                 ("config_json", json.dumps(model.get_config())),
-                ("model", lazy_model),
+                ("model", model),
             ])).to_frame().T
             self.manifest_df = pandas.concat(
                 [self.manifest_df, row], ignore_index=True)
@@ -414,7 +408,7 @@ class Class1AffinityPredictor(object):
                 verbose=verbose)
             yield model
 
-    def predict(self, peptides, alleles=None, allele=None):
+    def predict(self, peptides, alleles=None, allele=None, throw=True):
         """
         Predict nM binding affinities.
         
@@ -431,6 +425,10 @@ class Class1AffinityPredictor(object):
         peptides : EncodableSequences or list of string
         alleles : list of string
         allele : string
+        throw : boolean
+            If True, a ValueError will be raised in the case of unsupported
+            alleles or peptide lengths. If False, a warning will be logged and
+            the predictions for the unsupported alleles or peptides will be NaN.
 
         Returns
         -------
@@ -439,7 +437,8 @@ class Class1AffinityPredictor(object):
         df = self.predict_to_dataframe(
             peptides=peptides,
             alleles=alleles,
-            allele=allele
+            allele=allele,
+            throw=throw,
         )
         return df.prediction.values
 
@@ -448,6 +447,7 @@ class Class1AffinityPredictor(object):
             peptides,
             alleles=None,
             allele=None,
+            throw=True,
             include_individual_model_predictions=False):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
@@ -469,6 +469,10 @@ class Class1AffinityPredictor(object):
         include_individual_model_predictions : boolean
             If True, the predictions of each individual model are incldued as
             columns in the result dataframe.
+        throw : boolean
+            If True, a ValueError will be raised in the case of unsupported
+            alleles or peptide lengths. If False, a warning will be logged and
+            the predictions for the unsupported alleles or peptides will be NaN.
 
         Returns
         -------
@@ -491,25 +495,53 @@ class Class1AffinityPredictor(object):
             mhcnames.normalize_allele_name)
 
         if self.class1_pan_allele_models:
+            unsupported_alleles = [
+                allele for allele in
+                df.normalized_allele.unique()
+                if allele not in self.allele_to_pseudosequence
+            ]
+            if unsupported_alleles:
+                msg = (
+                    "No pseudosequences for allele(s): %s. "
+                    "Supported alleles: %s" % (
+                        " ".join(unsupported_alleles),
+                        " ".join(self.allele_to_pseudosequence)))
+                logging.warning(msg)
+                if throw:
+                    raise ValueError(msg)
             allele_pseudosequences = df.normalized_allele.map(
                 self.allele_to_pseudosequence)
             encodable_peptides = EncodableSequences.create(
                 df.peptide.values)
             for (i, model) in enumerate(self.class1_pan_allele_models):
-                df["model_pan_%d" % i] = model.instance.predict(
+                df["model_pan_%d" % i] = model.predict(
                     encodable_peptides,
                     allele_pseudosequences=allele_pseudosequences)
 
         if self.allele_to_allele_specific_models:
-            for allele in df.normalized_allele.unique():
+            query_alleles = df.normalized_allele.unique()
+            unsupported_alleles = [
+                allele for allele in query_alleles
+                if not self.allele_to_allele_specific_models.get(allele)
+            ]
+            if unsupported_alleles:
+                msg = (
+                    "No single-allele models for allele(s): %s. "
+                    "Supported alleles: %s" % (
+                        " ".join(unsupported_alleles),
+                        " ".join(self.allele_to_allele_specific_models)))
+                logging.warning(msg)
+                if throw:
+                    raise ValueError(msg)
+            for allele in query_alleles:
+                models = self.allele_to_allele_specific_models.get(allele, [])
                 mask = (df.normalized_allele == allele).values
                 allele_peptides = EncodableSequences.create(
                     df.ix[mask].peptide.values)
-                models = self.allele_to_allele_specific_models.get(allele, [])
                 for (i, model) in enumerate(models):
                     df.loc[
                         mask, "model_single_%d" % i
-                    ] = model.instance.predict(allele_peptides)
+                    ] = model.predict(allele_peptides)
 
         # Geometric mean
         df_predictions = df[
@@ -531,91 +563,45 @@ class Class1AffinityPredictor(object):
         return df[columns]
 
 
-class LazyLoadingClass1NeuralNetwork(object):
-    """
-    Thing wrapper over a Class1NeuralNetwork that supports deserializing it
-    lazily as needed.
-    """
-    @classmethod
-    def wrap(cls, instance):
+    @staticmethod
+    def save_weights(weights_list, filename):
         """
-        Return a LazyLoadingClass1NeuralNetwork given a Class1NeuralNetwork.
-        If the given instance is a LazyLoadingClass1NeuralNetwork it is
-        returned unchanged.
-        
+        Save the model weights to the given filename using numpy's ".npz"
+        format.
+    
         Parameters
         ----------
-        instance : Class1NeuralNetwork or LazyLoadingClass1NeuralNetwork
-
-        Returns
-        -------
-        LazyLoadingClass1NeuralNetwork
-
-        """
-        if isinstance(instance, cls):
-            return instance
-        elif isinstance(instance, Class1NeuralNetwork):
-            return cls(model=instance)
-        raise TypeError("Unsupported type: %s" % instance)
-
-    @classmethod
-    def wrap_list(cls, lst):
-        """
-        Wrap each element of a list of Class1NeuralNetwork instances
+        weights_list : list of array
         
+        filename : string
+            Should end in ".npz".
+    
+        """
+        numpy.savez(
+            filename,
+            **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list)))
+
+    @staticmethod
+    def load_weights(filename):
+        """
+        Restore model weights from the given filename, which should have been
+        created with `save_weights`.
+    
         Parameters
         ----------
-        lst : list of (Class1NeuralNetwork or LazyLoadingClass1NeuralNetwork)
-
+        filename : string
+            Should end in ".npz".
+            
+            
         Returns
-        -------
-        list of LazyLoadingClass1NeuralNetwork
-
+        ----------
+        
+        list of array
         """
-        return [
-            cls.wrap(instance)
-            for instance in lst
+        loaded = numpy.load(filename)
+        weights = [
+            loaded["array_%d" % i]
+            for i in range(len(loaded.keys()))
         ]
-
-    def __init__(self, model=None, config=None, weights_filename=None):
-        """
-        Specify either 'model' (to wrap an already loaded instance) or both
-        of "config" and "weights_filename" (to wrap a not yet loaded instance).
-        
-        Parameters
-        ----------
-        model : Class1NeuralNetwork, optional
-            If not specified you must specify both 'config' and
-            'weights_filename'
-               
-        config : dict, optional
-            As returned by `Class1NeuralNetwork.get_config`
-        
-        weights_filename : string, optional
-            Path to weights
-        """
-        if model is None:
-            assert config is not None
-            assert weights_filename is not None
-        else:
-            assert config is None
-            assert weights_filename is None
-
-        self.model = model
-        self.config = config
-        self.weights_filename = weights_filename
-
-    @property
-    def instance(self):
-        """
-        Return the wrapped Class1NeuralNetwork instance, which will be loaded
-        the first time it is accessed and cached thereafter.
-        
-        Returns
-        -------
-        Class1NeuralNetwork
-        """
-        if self.model is None:
-            self.model = Class1NeuralNetwork.from_config(self.config)
-            self.model.restore_weights(self.weights_filename)
-        return self.model
+        loaded.close()
+        return weights

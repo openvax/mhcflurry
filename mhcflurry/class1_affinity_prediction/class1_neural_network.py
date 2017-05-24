@@ -31,7 +31,6 @@ class Class1NeuralNetwork(object):
     Users will generally use Class1AffinityPredictor, which gives a higher-level
     interface and supports ensembles.
     """
-    weights_filename_extension = "npz"
 
     network_hyperparameter_defaults = HyperparameterDefaults(
         kmer_size=15,
@@ -88,10 +87,29 @@ class Class1NeuralNetwork(object):
     def __init__(self, **hyperparameters):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
             hyperparameters)
-        self.network = None
+
+        self._network = None
+        self.network_json = None
+        self.network_weights = None
+
         self.loss_history = None
         self.fit_seconds = None
         self.fit_num_points = None
+
+    @property
+    def network(self):
+        if self._network is None and self.network_json is not None:
+            self._network = keras.models.model_from_json(self.network_json)
+            if self.network_weights is not None:
+                self.network.set_weights(self.network_weights)
+            self.network_json = None
+            self.network_weights = None
+        return self._network
+
+    def update_network_description(self):
+        if self._network is not None:
+            self.network_json = self.network.to_json()
+            self.network_weights = self._network.get_weights()
 
     def get_config(self):
         """
@@ -101,22 +119,22 @@ class Class1NeuralNetwork(object):
         -------
         dict
         """
+        self.update_network_description()
         result = dict(self.__dict__)
-        del result['network']
-        result['network_json'] = self.network.to_json()
+        result['_network'] = None
+        result['network_weights'] = None
         return result
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config, weights=None):
         """
         deserialize from a dict returned by get_config().
-        
-        The weights of the neural network are not restored by this function.
-        You must call `restore_weights` separately.
         
         Parameters
         ----------
         config : dict
+        weights : list of array, optional
+            Network weights to restore
 
         Returns
         -------
@@ -125,10 +143,22 @@ class Class1NeuralNetwork(object):
         """
         config = dict(config)
         instance = cls(**config.pop('hyperparameters'))
-        instance.network = keras.models.model_from_json(
-            config.pop('network_json'))
+        assert all(hasattr(instance, key) for key in config), config.keys()
         instance.__dict__.update(config)
+        instance.network_weights = weights
         return instance
+
+    def get_weights(self):
+        """
+        Get the network weights
+        
+        Returns
+        -------
+        list of numpy.array giving weights for each layer
+        or None if there is no network
+        """
+        self.update_network_description()
+        return self.network_weights
 
     def __getstate__(self):
         """
@@ -139,60 +169,11 @@ class Class1NeuralNetwork(object):
         dict
 
         """
-        result = self.get_config()
-        result['network_weights'] = self.get_weights()
+        self.update_network_description()
+        self.update_network_description()
+        result = dict(self.__dict__)
+        result['_network'] = None
         return result
-
-    def __setstate__(self, state):
-        """
-        deserialize from a dict. Model weights are included. For pickle support.
-        
-        Parameters
-        ----------
-        state : dict
-
-
-        """
-        network_json = state.pop('network_json')
-        network_weights = state.pop('network_weights')
-        self.__dict__.update(state)
-        self.network = keras.models.model_from_json(network_json)
-        self.set_weights(network_weights)
-
-    def save_weights(self, filename):
-        """
-        Save the model weights to the given filename using numpy's ".npz"
-        format.
-        
-        Parameters
-        ----------
-        filename : string
-            Should end in ".npz".
-
-        """
-        weights_list = self.network.get_weights()
-        numpy.savez(
-            filename,
-            **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list)))
-
-    def restore_weights(self, filename):
-        """
-        Restore model weights from the given filename, which should have been
-        created with `save_weights`.
-        
-        Parameters
-        ----------
-        filename : string
-            Should end in ".npz".
-
-        """
-        loaded = numpy.load(filename)
-        weights = [
-            loaded["array_%d" % i]
-            for i in range(len(loaded.keys()))
-        ]
-        loaded.close()
-        self.network.set_weights(weights)
 
     def peptides_to_network_input(self, peptides):
         """
@@ -220,6 +201,22 @@ class Class1NeuralNetwork(object):
                     self.hyperparameters))
         assert len(encoded) == len(peptides)
         return encoded
+
+
+    @property
+    def supported_peptide_length_range_inclusive(self):
+        """
+        (minimum, maximum) lengths of peptides supported.
+        
+        Returns
+        -------
+        (int, int) tuple
+
+        """
+        return (
+            self.hyperparameters['left_edge'] +
+            self.hyperparameters['right_edge'],
+        self.hyperparameters['kmer_size'])
 
     def pseudosequence_to_network_input(self, pseudosequences):
         """
@@ -315,7 +312,7 @@ class Class1NeuralNetwork(object):
                 pseudosequences_input)
 
         if self.network is None:
-            self.network = self.make_network(
+            self._network = self.make_network(
                 pseudosequence_length=pseudosequence_length,
                 **self.network_hyperparameter_defaults.subselect(
                     self.hyperparameters))
