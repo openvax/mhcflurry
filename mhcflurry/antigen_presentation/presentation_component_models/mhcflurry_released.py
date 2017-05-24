@@ -81,8 +81,7 @@ class MHCflurryReleased(PresentationComponentModel):
             df[allele] = self.predictor.predict(peptides, allele=allele)
         result = {
             self.predictor_name + '_affinity': (
-                df[list(df.columns)[1:]].min(axis=1).ix[
-                    peptides.sequences].values)
+                df[list(df.columns)[1:]].min(axis=1))
         }
         if self.percent_rank_transforms is not None:
             self.fit_percentile_rank_if_needed(alleles)
@@ -92,7 +91,7 @@ class MHCflurryReleased(PresentationComponentModel):
                     self.percent_rank_transforms[allele]
                     .transform(df[allele].values))
             result[self.predictor_name + '_percentile_rank'] = (
-                percentile_ranks.min(axis=1).ix[peptides.sequences].values)
+                percentile_ranks.min(axis=1).values)
 
         for (key, value) in result.items():
             assert len(value) == len(peptides), (len(peptides), result)
