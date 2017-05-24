@@ -99,5 +99,8 @@ if __name__ == '__main__':
         packages=[
             'mhcflurry',
             'mhcflurry.class1_affinity_prediction',
+            'mhcflurry.antigen_presentation',
+            'mhcflurry.antigen_presentation.decoy_strategies',
+            'mhcflurry.antigen_presentation.presentation_component_models',
         ],
     )

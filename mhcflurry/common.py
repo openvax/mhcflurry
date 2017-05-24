@@ -123,7 +123,7 @@ def assert_no_null(df, message=''):
         with pandas.option_context('mode.use_inf_as_null', True):
             failed = df.count().sum() != df.size
     else:
-        failed = np.isnan(df).sum() > 0
+        failed = numpy.isnan(df).sum() > 0
     if failed:
         raise_or_debug(
             AssertionError(
@@ -196,7 +196,7 @@ def random_peptides(num, length=9, distribution=None):
         return []
     if distribution is None:
         distribution = pandas.Series(
-            1, index=amino_acid.common_amino_acid_letters)
+            1, index=sorted(amino_acid.COMMON_AMINO_ACIDS))
         distribution /= distribution.sum()
 
     return [

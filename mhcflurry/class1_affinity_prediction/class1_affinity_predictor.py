@@ -86,6 +86,20 @@ class Class1AffinityPredictor(object):
                 columns=["model_name", "allele", "config_json", "model"])
         self.manifest_df = manifest_df
 
+    @property
+    def supported_alleles(self):
+        """
+        Alleles for which predictions can be made.
+        
+        Returns
+        -------
+        list of string
+        """
+        result = set(self.allele_to_allele_specific_models)
+        if self.allele_to_pseudosequence:
+            result = result.union(self.allele_to_pseudosequence)
+        return sorted(result)
+
     def save(self, models_dir, model_names_to_write=None):
         """
         Serialize the predictor to a directory on disk.
@@ -487,8 +501,10 @@ class Class1AffinityPredictor(object):
                 raise ValueError("Specify exactly one of allele or alleles")
             alleles = [allele] * len(peptides)
 
+        peptides = EncodableSequences.create(peptides)
+
         df = pandas.DataFrame({
-            'peptide': peptides,
+            'peptide': peptides.sequences,
             'allele': alleles,
         })
         df["normalized_allele"] = df.allele.map(
@@ -511,11 +527,9 @@ class Class1AffinityPredictor(object):
                     raise ValueError(msg)
             allele_pseudosequences = df.normalized_allele.map(
                 self.allele_to_pseudosequence)
-            encodable_peptides = EncodableSequences.create(
-                df.peptide.values)
             for (i, model) in enumerate(self.class1_pan_allele_models):
                 df["model_pan_%d" % i] = model.predict(
-                    encodable_peptides,
+                    peptides,
                     allele_pseudosequences=allele_pseudosequences)
 
         if self.allele_to_allele_specific_models:

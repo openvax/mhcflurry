@@ -364,7 +364,7 @@ class Class1NeuralNetwork(object):
             }
             if pseudosequence_length:
                 # TODO: add random pseudosequences for random negative peptides
-                raise NotImplemented(
+                raise NotImplementedError(
                     "Allele pseudosequences unsupported with random negatives")
 
             fit_history = self.network.fit(

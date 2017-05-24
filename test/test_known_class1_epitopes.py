@@ -117,24 +117,24 @@ def test_A1_trained_models():
         affinities=df.measurement_value.values,
     )
 
-    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictors=[predictor])
+    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictor=predictor)
 
     models_dir = tempfile.mkdtemp("_models")
     print(models_dir)
     predictor.save(models_dir)
     predictor2 = Class1AffinityPredictor.load(models_dir)
-    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictors=[predictor2])
+    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictor=predictor2)
     shutil.rmtree(models_dir)
 
     predictor3 = Class1AffinityPredictor(
         allele_to_allele_specific_models={
             allele: [predictor.allele_to_allele_specific_models[allele][0]]
         })
-    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictors=[predictor3])
+    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictor=predictor3)
     models_dir = tempfile.mkdtemp("_models")
     print(models_dir)
     predictor3.save(models_dir)
     predictor4 = Class1AffinityPredictor.load(models_dir)
-    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictors=[predictor4])
+    predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictor=predictor4)
     shutil.rmtree(models_dir)
 
