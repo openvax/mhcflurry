@@ -1,6 +1,9 @@
 import tempfile
 import shutil
 import logging
+import warnings
+import traceback
+import sys
 
 import numpy
 import pandas
@@ -16,6 +19,14 @@ from mhcflurry.downloads import get_path
 DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
 
 logging.basicConfig(level=logging.DEBUG)
+
+
+# To hunt down a weird warning we were seeing in pandas.
+def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
+    log = file if hasattr(file,'write') else sys.stderr
+    traceback.print_stack(file=log)
+    log.write(warnings.formatwarning(message, category, filename, lineno, line))
+warnings.showwarning = warn_with_traceback
 
 
 def predict_and_check(
@@ -132,7 +143,7 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
         get_path(
             "data_curated", "curated_training_data.csv.bz2"))
     df = df.ix[
-        df.allele == df
+        df.allele == allele
     ]
     df = df.ix[
         df.peptide.str.len() == 9
