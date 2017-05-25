@@ -42,6 +42,7 @@ from __future__ import (
 import sys
 import argparse
 import itertools
+import logging
 
 import pandas
 
@@ -89,10 +90,10 @@ parser.add_argument(
     help="Input column name for peptides. Default: '%(default)s'")
 
 parser.add_argument(
-    "--prediction-column",
+    "--prediction-column-prefix",
     metavar="NAME",
-    default="mhcflurry_prediction",
-    help="Output column name for predictions. Default: '%(default)s'")
+    default="mhcflurry_",
+    help="Prefix for output column names. Default: '%(default)s'")
 
 parser.add_argument(
     "--models",
@@ -100,6 +101,13 @@ parser.add_argument(
     default=None,
     help="Directory containing models. "
     "Default: %s" % get_path("models_class1", "models", test_exists=False))
+
+parser.add_argument(
+    "--include-individual-model-predictions",
+    action="store_true",
+    default=False,
+    help="Include predictions from each model in the ensemble"
+)
 
 
 def run(argv=sys.argv[1:]):
@@ -140,7 +148,8 @@ def run(argv=sys.argv[1:]):
             "allele": [p[0] for p in pairs],
             "peptide": [p[1] for p in pairs],
         })
-        print("Predicting for %d alleles and %d peptides = %d predictions" % (
+        logging.info(
+            "Predicting for %d alleles and %d peptides = %d predictions" % (
             len(args.alleles), len(args.peptides), len(df)))
 
     models_dir = args.models
@@ -150,9 +159,15 @@ def run(argv=sys.argv[1:]):
         # them to download the models if needed.
         models_dir = get_path("models_class1", "models")
     predictor = Class1AffinityPredictor.load(models_dir)
-    df[args.prediction_column] = predictor.predict(
+
+    predictions = predictor.predict_to_dataframe(
         peptides=df[args.peptide_column].values,
-        alleles=df[args.allele_column].values)
+        alleles=df[args.allele_column].values,
+        include_individual_model_predictions=args.include_individual_model_predictions)
+
+    for col in predictions.columns:
+        if col not in ("allele", "peptide"):
+            df[args.prediction_column_prefix + col] = predictions[col]
 
     if args.out:
         df.to_csv(args.out, index=False)

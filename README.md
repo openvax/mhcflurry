@@ -31,7 +31,8 @@ To configure keras you'll need to set an environment variable in your shell:
 export KERAS_BACKEND=theano
 ```
 
-If you're familiar with keras, you may also try using the tensorflow backend. MHCflurry is currently tested using theano, however.
+If you're familiar with keras, you may also try using the tensorflow backend.
+MHCflurry is most tested with theano but should also work with tensorflow.
  
 
 Now install the package:
@@ -56,17 +57,21 @@ nosetests .
 
 ```shell
 $ mhcflurry-predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ
-Predicting for 2 alleles and 3 peptides = 6 predictions
-allele,peptide,mhcflurry_prediction
-HLA-A0201,SIINFEKL,10672.34765625
-HLA-A0201,SIINFEKD,26042.716796875
-HLA-A0201,SIINFEKQ,26375.794921875
-HLA-A0301,SIINFEKL,25532.703125
-HLA-A0301,SIINFEKD,24997.876953125
-HLA-A0301,SIINFEKQ,28262.828125
+allele,peptide,mhcflurry_prediction,mhcflurry_prediction_low,mhcflurry_prediction_high
+HLA-A0201,SIINFEKL,6029.079749556217,4474.10333152741,7771.2922076773575
+HLA-A0201,SIINFEKD,18950.310303704624,15317.127851792027,22490.05728778504
+HLA-A0201,SIINFEKQ,18776.978315260818,14899.359763218705,22314.737180384865
+HLA-A0301,SIINFEKL,25589.66470369661,22962.4956808368,29395.86949262485
+HLA-A0301,SIINFEKD,25753.619337400796,22851.89399578629,29347.659901990868
+HLA-A0301,SIINFEKQ,26870.51318688641,24198.39885651102,30364.15208364084
 ```
 
-You can also specify the input and output as CSV files. Run `mhcflurry-predict -h` for details.
+The predictions returned are affinities (KD) in nM. The `prediction_low` and
+`prediction_high` fields give the 5-95 percentile predictions across the models 
+in the ensemble.
+
+You can also specify the input and output as CSV files.
+Run `mhcflurry-predict -h` for details.
 
 
 ## Making predictions from Python
@@ -81,14 +86,8 @@ You can also specify the input and output as CSV files. Run `mhcflurry-predict -
   A0201  SIINFEKL  6029.084473     4474.103253      7771.297702
 ```
 
-The predictions returned are affinities (KD) in nM. The `prediction_low` and
-`prediction_high` fields give the 5-95 percentile predictions across the models 
-in the ensemble.
-
-## Training your own models
-
 See the [class1_allele_specific_models.ipynb](https://github.com/hammerlab/mhcflurry/blob/master/examples/class1_allele_specific_models.ipynb)
-notebook for an overview of the Python API.
+notebook for an overview of the Python API, including fitting your own predictors.
 
 
 ## Details on the downloadable models
