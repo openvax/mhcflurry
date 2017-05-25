@@ -1,25 +1,21 @@
-# Copyright (c) 2016. Mount Sinai School of Medicine
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import tempfile
 import shutil
+import logging
 
+import numpy
 import pandas
-from mhcflurry.downloads import get_path
+numpy.random.seed(0)
+
 from mhcflurry import Class1AffinityPredictor
 
+from nose.tools import eq_, assert_raises
+from numpy import testing
+
+from mhcflurry.downloads import get_path
+
 DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 def predict_and_check(
@@ -40,29 +36,7 @@ def predict_and_check(
         assert prediction <= expected_range[1], (predictor, prediction, debug())
 
 
-def test_A1_Titin_epitope_downloaded_models():
-    # Test the A1 Titin epitope ESDPIVAQY from
-    #   Identification of a Titin-Derived HLA-A1-Presented Peptide
-    #   as a Cross-Reactive Target for Engineered MAGE A3-Directed
-    #   T Cells
-    predict_and_check("HLA-A*01:01", "ESDPIVAQY")
-
-
-def test_A1_MAGE_epitope_downloaded_models():
-    # Test the A1 MAGE epitope EVDPIGHLY from
-    #   Identification of a Titin-Derived HLA-A1-Presented Peptide
-    #   as a Cross-Reactive Target for Engineered MAGE A3-Directed
-    #   T Cells
-    predict_and_check("HLA-A*01:01", "EVDPIGHLY")
-
-
-def test_A2_HIV_epitope_downloaded_models():
-    # Test the A2 HIV epitope SLYNTVATL from
-    #    The HIV-1 HLA-A2-SLYNTVATL Is a Help-Independent CTL Epitope
-    predict_and_check("HLA-A*02:01", "SLYNTVATL")
-
-
-def test_A1_trained_models():
+def test_a1_known_epitopes_in_newly_trained_model():
     allele = "HLA-A*01:01"
     df = pandas.read_csv(
         get_path(
@@ -137,4 +111,98 @@ def test_A1_trained_models():
     predictor4 = Class1AffinityPredictor.load(models_dir)
     predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictor=predictor4)
     shutil.rmtree(models_dir)
+
+
+def test_class1_affinity_predictor_a0205_memorize_training_data():
+    # Memorize the dataset.
+    hyperparameters = dict(
+        activation="tanh",
+        layer_sizes=[64],
+        max_epochs=500,
+        early_stopping=False,
+        validation_split=0.0,
+        locally_connected_layers=[],
+        dense_layer_l1_regularization=0.0,
+        dropout_probability=0.0)
+
+    # First test a Class1NeuralNetwork, then a Class1AffinityPredictor.
+    allele = "HLA-A*02:05"
+
+    df = pandas.read_csv(
+        get_path(
+            "data_curated", "curated_training_data.csv.bz2"))
+    df = df.ix[
+        df.allele == df
+    ]
+    df = df.ix[
+        df.peptide.str.len() == 9
+    ]
+    df = df.ix[
+        df.measurement_type == "quantitative"
+    ]
+    df = df.ix[
+        df.measurement_source == "kim2014"
+    ]
+
+    predictor = Class1AffinityPredictor()
+    predictor.fit_allele_specific_predictors(
+        n_models=2,
+        architecture_hyperparameters=hyperparameters,
+        allele=allele,
+        peptides=df.peptide.values,
+        affinities=df.measurement_value.values,
+    )
+    ic50_pred = predictor.predict(df.peptide.values, allele=allele)
+    ic50_true = df.measurement_value.values
+    eq_(len(ic50_pred), len(ic50_true))
+    testing.assert_allclose(
+        numpy.log(ic50_pred),
+        numpy.log(ic50_true),
+        rtol=0.2,
+        atol=0.2)
+
+    ic50_pred_df = predictor.predict_to_dataframe(
+        df.peptide.values, allele=allele)
+    print(ic50_pred_df)
+
+    ic50_pred_df2 = predictor.predict_to_dataframe(
+        df.peptide.values,
+        allele=allele,
+        include_individual_model_predictions=True)
+    print(ic50_pred_df2)
+
+    # Test an unknown allele
+    print("Starting unknown allele check")
+    eq_(predictor.supported_alleles, [allele])
+    ic50_pred = predictor.predict(
+        df.peptide.values,
+        allele="HLA-A*02:01",
+        throw=False)
+    assert numpy.isnan(ic50_pred).all()
+
+    assert_raises(
+        ValueError,
+        predictor.predict,
+        df.peptide.values,
+        allele="HLA-A*02:01")
+
+
+    eq_(predictor.supported_alleles, [allele])
+    assert_raises(
+        ValueError,
+        predictor.predict,
+        ["AAAAA"],  # too short
+        allele=allele)
+    assert_raises(
+        ValueError,
+        predictor.predict,
+        ["AAAAAAAAAAAAAAAAAAAA"],  # too long
+        allele=allele)
+    ic50_pred = predictor.predict(
+        ["AAAAA", "AAAAAAAAA", "AAAAAAAAAAAAAAAAAAAA"],
+        allele=allele,
+        throw=False)
+    assert numpy.isnan(ic50_pred[0])
+    assert not numpy.isnan(ic50_pred[1])
+    assert numpy.isnan(ic50_pred[2])
 
