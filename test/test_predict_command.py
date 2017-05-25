@@ -32,14 +32,14 @@ def test_csv():
         for delete in deletes:
             os.unlink(delete)
 
-    assert_equal(result.shape, (3, 4))
+    assert_equal(result.shape, (3, 6))
 
 
 def test_no_csv():
     args = [
         "--alleles", "HLA-A0201", "H-2-Kb",
         "--peptides", "SIINFEKL", "DENDREKLLL", "PICKLEEE",
-        "--prediction-column", "prediction",
+        "--prediction-column-prefix", "mhcflurry1_",
     ]
 
     deletes = []
@@ -55,8 +55,8 @@ def test_no_csv():
         for delete in deletes:
             os.unlink(delete)
 
-    assert_equal(result.shape, (6, 3))
+    assert_equal(result.shape, (6, 5))
     sub_result1 = result.ix[result.peptide == "SIINFEKL"].set_index("allele")
     assert (
-        sub_result1.ix["H-2-Kb"].prediction <
-        sub_result1.ix["HLA-A0201"].prediction)
+        sub_result1.ix["H-2-Kb"].mhcflurry1_prediction <
+        sub_result1.ix["HLA-A0201"].mhcflurry1_prediction)

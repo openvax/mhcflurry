@@ -29,7 +29,7 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib mkl-service
+      numpy scipy nose pandas matplotlib mkl-service tensorflow
   - source activate test-environment
   - pip install pypandoc pylint
   - pip install -r requirements.txt
@@ -40,8 +40,7 @@ env:
     - PYTHONHASHSEED=0 
   matrix:
     # Enable this eventually after getting tensorflow to build on travis:
-    # - KERAS_BACKEND=theano KERAS_BACKEND=tensorflow
-    - KERAS_BACKEND=theano
+    - KERAS_BACKEND=theano KERAS_BACKEND=tensorflow
 script:
   # download data and models, then run tests
   - mhcflurry-downloads fetch
