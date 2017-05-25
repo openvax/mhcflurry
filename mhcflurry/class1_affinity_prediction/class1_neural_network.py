@@ -357,7 +357,7 @@ class Class1NeuralNetwork(object):
         start = time.time()
         for i in range(self.hyperparameters['max_epochs']):
             random_negative_peptides_list = []
-            for (length, count) in num_random_negative.items():
+            for (length, count) in num_random_negative.iteritems():
                 random_negative_peptides_list.extend(
                     random_peptides(
                         count,

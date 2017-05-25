@@ -36,6 +36,10 @@ releases:
               url: https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/data_iedb.tar.bz2
               default: false
 
+            - name: models_class1_experiments1
+              url: http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/models_class1_experiments1.tar.bz2
+              default: false
+
     0.2.0:
         compatibility-version: 1
         downloads:
