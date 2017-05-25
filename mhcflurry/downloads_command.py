@@ -40,7 +40,7 @@ import os
 from pipes import quote
 import errno
 import tarfile
-from tempfile import NamedTemporaryFile
+from tempfile import mkstemp
 try:
     from urllib.request import urlretrieve
 except ImportError:
@@ -186,8 +186,8 @@ def fetch_subcommand(args):
     # making an incomplete extract if the process is killed.
     for item in items_to_fetch:
         metadata = downloads[item]['metadata']
-        with NamedTemporaryFile(delete=not args.keep) as temp_fd:
-            target_path = temp_fd.name
+        (temp_fd, target_path) = mkstemp()
+        try:
             qprint("Downloading: %s" % metadata['url'])
             urlretrieve(metadata['url'], target_path)
             qprint("Downloaded to: %s" % quote(target_path))
@@ -208,6 +208,9 @@ def fetch_subcommand(args):
             tar.close()
             qprint("Extracted %d files to: %s" % (
                 len(names), quote(result_dir)))
+        finally:
+            if not args.keep:
+                os.remove(target_path)
 
 
 def info_subcommand(args):
