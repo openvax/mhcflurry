@@ -54,7 +54,7 @@ if __name__ == '__main__':
         'pandas>=0.13.1',
         'Keras==2.0.4',
         'appdirs',
-        'theano',
+        'tensorflow',
         'scikit-learn',
         'typechecks',
         'mhcnames',

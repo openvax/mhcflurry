@@ -24,18 +24,7 @@ processing is also implemented but experimental.
 
 ## Setup
 
-The MHCflurry predictors are implemented in Python using [keras](https://keras.io).
-To configure keras you'll need to set an environment variable in your shell:
-
-```
-export KERAS_BACKEND=theano
-```
-
-If you're familiar with keras, you may also try using the tensorflow backend.
-MHCflurry is most tested with theano but should also work with tensorflow.
- 
-
-Now install the package:
+Install the package:
 
 ```
 pip install mhcflurry
@@ -52,6 +41,21 @@ From a checkout you can run the unit tests with:
 ```
 nosetests .
 ```
+
+The MHCflurry predictors are implemented in Python using [keras](https://keras.io).
+
+MHCflurry works with both the tensorflow and theano keras backends. The
+tensorflow backend gives faster model-loading time but is undergoing more
+rapid development and sometimes hits issues. If you encounter tensorflow errors
+running MHCflurry, try setting this environment variable to switch to the theano
+backend:
+
+```
+export KERAS_BACKEND=theano
+```
+
+You may also needs to `pip install theano`.
+
 
 ## Making predictions from the command-line
 
