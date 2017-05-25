@@ -29,7 +29,7 @@ def test_class1_affinity_predictor_a0205_training_accuracy():
         get_path(
             "data_curated", "curated_training_data.csv.bz2"))
     df = df.ix[
-        df.allele == df
+        df.allele == allele
     ]
     df = df.ix[
         df.peptide.str.len() == 9
