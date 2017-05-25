@@ -558,7 +558,7 @@ class Class1AffinityPredictor(object):
                     "No pseudosequences for allele(s): %s.\n"
                     "Supported alleles: %s" % (
                         " ".join(unsupported_alleles),
-                        " ".join(self.allele_to_pseudosequence)))
+                        " ".join(sorted(self.allele_to_pseudosequence))))
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
@@ -584,7 +584,7 @@ class Class1AffinityPredictor(object):
                     "No single-allele models for allele(s): %s.\n"
                     "Supported alleles are: %s" % (
                         " ".join(unsupported_alleles),
-                        " ".join(self.allele_to_allele_specific_models)))
+                        " ".join(sorted(self.allele_to_allele_specific_models))))
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)

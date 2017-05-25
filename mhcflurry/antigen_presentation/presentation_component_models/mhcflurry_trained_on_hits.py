@@ -9,11 +9,6 @@ from mhcnames import normalize_allele_name
 from .mhc_binding_component_model_base import MHCBindingComponentModelBase
 
 
-MHCFLURRY_DEFAULT_HYPERPARAMETERS = dict(
-    embedding_output_dim=8,
-    dropout_probability=0.25)
-
-
 class MHCflurryTrainedOnHits(MHCBindingComponentModelBase):
     """
     Final model input that is a mhcflurry predictor trained on mass-spec
@@ -35,7 +30,7 @@ class MHCflurryTrainedOnHits(MHCBindingComponentModelBase):
 
     def __init__(
             self,
-            mhcflurry_hyperparameters=MHCFLURRY_DEFAULT_HYPERPARAMETERS,
+            mhcflurry_hyperparameters={},
             hit_affinity=100,
             decoy_affinity=20000,
             ensemble_size=1,
