@@ -63,6 +63,7 @@ def one_hot_encoding(index_encoded, alphabet_size):
     numpy.array of integers of shape (n, k, alphabet_size)
 
     """
+    alphabet_size = int(alphabet_size)
     (num_sequences, sequence_length) = index_encoded.shape
     result = numpy.zeros(
         (num_sequences, sequence_length, alphabet_size),
@@ -103,12 +104,12 @@ class EncodableSequences(object):
     def __init__(self, sequences):
         typechecks.require_iterable_of(
             sequences, typechecks.string_types, "sequences")
-        self.sequences = sequences
+        self.sequences = numpy.array(sequences)
         self.encoding_cache = {}
         self.fixed_sequence_length = None
-        if len(sequences) > 0 and all(
-                len(s) == len(sequences[0]) for s in sequences):
-            self.fixed_sequence_length = len(sequences[0])
+        if len(self.sequences) > 0 and all(
+                len(s) == len(self.sequences[0]) for s in self.sequences):
+            self.fixed_sequence_length = len(self.sequences[0])
 
     def __len__(self):
         return len(self.sequences)

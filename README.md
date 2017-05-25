@@ -3,9 +3,19 @@
 # mhcflurry
 Open source neural network models for peptide-MHC binding affinity prediction
 
-The [adaptive immune system](https://en.wikipedia.org/wiki/Adaptive_immune_system) depends on the presentation of protein fragments by [MHC](https://en.wikipedia.org/wiki/Major_histocompatibility_complex) molecules. Machine learning models of this interaction are used in studies of infectious diseases, autoimmune diseases, vaccine development, and cancer immunotherapy.
+The [adaptive immune system](https://en.wikipedia.org/wiki/Adaptive_immune_system)
+depends on the presentation of protein fragments by [MHC](https://en.wikipedia.org/wiki/Major_histocompatibility_complex)
+molecules. Machine learning models of this interaction are used in studies of
+infectious diseases, autoimmune diseases, vaccine development, and cancer
+immunotherapy.
 
-MHCflurry currently supports allele-specific peptide / [MHC class I](https://en.wikipedia.org/wiki/MHC_class_I) affinity prediction using two approaches:
+MHCflurry supports Class I peptide/MHC binding affinity prediction using
+ensembles of allele-specific models. Pan-allelic prediction is supported in the
+software but is not yet performing accurately and should not be use. Other 
+
+MHCflurry ships with an  allele-specific (i.e. one model per allele)
+
+MHCflurry supports allele-specific peptide / [MHC class I](https://en.wikipedia.org/wiki/MHC_class_I) affinity prediction using two approaches:
 
  * Ensembles of predictors trained on random halves of the training data (the default)
  * Single-model predictors for each allele trained on all data
@@ -15,9 +25,7 @@ trained models that we provide.
 
 The downloadable models were trained on data from
 [IEDB](http://www.iedb.org/home_v3.php) and [Kim 2014](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241).
-The ensemble predictors include models trained on data that has been
-augmented with values imputed from other alleles (see
-[Rubinsteyn 2016](http://biorxiv.org/content/early/2016/06/07/054775)).
+The training dataset is available [here]()
 
 In validation experiments using presented peptides identified by mass-spec,
 the ensemble models perform best. We are working on a performance comparison of

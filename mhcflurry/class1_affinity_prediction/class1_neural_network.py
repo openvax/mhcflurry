@@ -34,20 +34,31 @@ class Class1NeuralNetwork(object):
 
     network_hyperparameter_defaults = HyperparameterDefaults(
         kmer_size=15,
-        use_embedding=True,
+        use_embedding=False,
         embedding_input_dim=21,
         embedding_output_dim=8,
-        pseudosequence_use_embedding=True,
+        pseudosequence_use_embedding=False,
         layer_sizes=[32],
-        dense_layer_l1_regularization=0.0,
+        dense_layer_l1_regularization=0.001,
         dense_layer_l2_regularization=0.0,
-        activation="tanh",
+        activation="relu",
         init="glorot_uniform",
         output_activation="sigmoid",
         dropout_probability=0.0,
-        batch_normalization=True,
+        batch_normalization=False,
         embedding_init_method="glorot_uniform",
-        locally_connected_layers=[],
+        locally_connected_layers=[
+            {
+                "filters": 8,
+                "activation": "tanh",
+                "kernel_size": 3
+            },
+            {
+                "filters": 8,
+                "activation": "tanh",
+                "kernel_size": 3
+            }
+        ],
     )
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
@@ -60,23 +71,24 @@ class Class1NeuralNetwork(object):
         right_edge=4)
 
     fit_hyperparameter_defaults = HyperparameterDefaults(
-        max_epochs=250,
-        validation_split=None,
-        early_stopping=False,
-        take_best_epoch=False,
+        max_epochs=500,
+        take_best_epoch=False,  # currently unused
+        validation_split=0.2,
+        early_stopping=True,
         random_negative_rate=0.0,
-        random_negative_constant=0,
-        random_negative_affinity_min=50000.0,
+        random_negative_constant=25,
+        random_negative_affinity_min=20000.0,
         random_negative_affinity_max=50000.0,
         random_negative_match_distribution=True,
         random_negative_distribution_smoothing=0.0)
 
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
-        monitor='val_loss',
-        min_delta=0,
-        patience=0,
-        verbose=1,
-        mode='auto')
+        patience=10,
+        monitor='val_loss',  # currently unused
+        min_delta=0,  # currently unused
+        verbose=1,  # currently unused
+        mode='auto'  # currently unused
+    )
 
     hyperparameter_defaults = network_hyperparameter_defaults.extend(
         compile_hyperparameter_defaults).extend(
@@ -204,9 +216,9 @@ class Class1NeuralNetwork(object):
 
 
     @property
-    def supported_peptide_length_range_inclusive(self):
+    def supported_peptide_lengths(self):
         """
-        (minimum, maximum) lengths of peptides supported.
+        (minimum, maximum) lengths of peptides supported, inclusive.
         
         Returns
         -------

@@ -25,11 +25,15 @@ df = df.ix[
     df.measurement_source == "kim2014"
 ]
 
+# Memorize the dataset.
 hyperparameters = dict(
     activation="tanh",
     layer_sizes=[64],
-    max_epochs=500,  # Memorize the dataset.
+    max_epochs=500,
     early_stopping=False,
+    validation_split=0.0,
+    locally_connected_layers=[],
+    dense_layer_l1_regularization=0.0,
     dropout_probability=0.0)
 
 
@@ -75,6 +79,7 @@ def test_class1_affinity_predictor_a0205_training_accuracy():
     print(ic50_pred_df2)
 
     # Test an unknown allele
+    eq_(predictor.supported_alleles, [allele])
     ic50_pred = predictor.predict(
         df.peptide.values,
         allele="HLA-A*02:01",
@@ -87,4 +92,23 @@ def test_class1_affinity_predictor_a0205_training_accuracy():
         df.peptide.values,
         allele="HLA-A*02:01")
 
+
+    eq_(predictor.supported_alleles, [allele])
+    assert_raises(
+        ValueError,
+        predictor.predict,
+        ["AAAAA"],  # too short
+        allele=allele)
+    assert_raises(
+        ValueError,
+        predictor.predict,
+        ["AAAAAAAAAAAAAAAAAAAA"],  # too long
+        allele=allele)
+    ic50_pred = predictor.predict(
+        ["AAAAA", "AAAAAAAAA", "AAAAAAAAAAAAAAAAAAAA"],
+        allele=allele,
+        throw=False)
+    assert numpy.isnan(ic50_pred[0])
+    assert not numpy.isnan(ic50_pred[1])
+    assert numpy.isnan(ic50_pred[2])
 

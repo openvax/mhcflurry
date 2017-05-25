@@ -100,6 +100,25 @@ class Class1AffinityPredictor(object):
             result = result.union(self.allele_to_pseudosequence)
         return sorted(result)
 
+    @property
+    def supported_peptide_lengths(self):
+        """
+        (minimum, maximum) lengths of peptides supported by *all models*,
+        inclusive.
+
+        Returns
+        -------
+        (int, int) tuple
+
+        """
+        models = list(self.class1_pan_allele_models)
+        for allele_models in self.allele_to_allele_specific_models.values():
+            models.extend(allele_models)
+        length_ranges = [model.supported_peptide_lengths for model in models]
+        return (
+            max(lower for (lower, upper) in length_ranges),
+            min(upper for (lower, upper) in length_ranges))
+
     def save(self, models_dir, model_names_to_write=None):
         """
         Serialize the predictor to a directory on disk.
@@ -137,14 +156,14 @@ class Class1AffinityPredictor(object):
             weights_path = self.weights_path(models_dir, row.model_name)
             Class1AffinityPredictor.save_weights(
                 row.model.get_weights(), weights_path)
-            print("Wrote: %s" % weights_path)
+            logging.info("Wrote: %s" % weights_path)
 
         write_manifest_df = self.manifest_df[[
             c for c in self.manifest_df.columns if c != "model"
         ]]
         manifest_path = join(models_dir, "manifest.csv")
         write_manifest_df.to_csv(manifest_path, index=False)
-        print("Wrote: %s" % manifest_path)
+        logging.info("Wrote: %s" % manifest_path)
 
     @staticmethod
     def load(models_dir=None, max_models=None):
@@ -192,7 +211,7 @@ class Class1AffinityPredictor(object):
                 join(models_dir, "pseudosequences.csv"),
                 index_col="allele").to_dict()
 
-        print(
+        logging.info(
             "Loaded %d class1 pan allele predictors, %d pseudosequences, and "
             "%d allele specific models: %s" % (
                 len(class1_pan_allele_models),
@@ -413,7 +432,7 @@ class Class1AffinityPredictor(object):
         """
         encodable_peptides = EncodableSequences.create(peptides)
         for i in range(n_models):
-            print("Training model %d / %d" % (i + 1, n_models))
+            logging.info("Training model %d / %d" % (i + 1, n_models))
             model = Class1NeuralNetwork(**architecture_hyperparameters)
             model.fit(
                 encodable_peptides,
@@ -501,6 +520,7 @@ class Class1AffinityPredictor(object):
                 raise ValueError("Specify exactly one of allele or alleles")
             alleles = [allele] * len(peptides)
 
+        alleles = numpy.array(alleles)
         peptides = EncodableSequences.create(peptides)
 
         df = pandas.DataFrame({
@@ -510,6 +530,23 @@ class Class1AffinityPredictor(object):
         df["normalized_allele"] = df.allele.map(
             mhcnames.normalize_allele_name)
 
+        (min_peptide_length, max_peptide_length) = (
+            self.supported_peptide_lengths)
+        df["supported_peptide_length"] = (
+            (df.peptide.str.len() >= min_peptide_length) &
+            (df.peptide.str.len() <= max_peptide_length))
+        if (~df.supported_peptide_length).any():
+            msg = (
+                "%d peptides have lengths outside of supported range [%d, %d]: "
+                "%s" % (
+                    (~df.supported_peptide_length).sum(),
+                    min_peptide_length,
+                    max_peptide_length,
+                    str(df.ix[~df.supported_peptide_length].peptide.unique())))
+            logging.warning(msg)
+            if throw:
+                raise ValueError(msg)
+
         if self.class1_pan_allele_models:
             unsupported_alleles = [
                 allele for allele in
@@ -518,19 +555,23 @@ class Class1AffinityPredictor(object):
             ]
             if unsupported_alleles:
                 msg = (
-                    "No pseudosequences for allele(s): %s. "
+                    "No pseudosequences for allele(s): %s.\n"
                     "Supported alleles: %s" % (
                         " ".join(unsupported_alleles),
                         " ".join(self.allele_to_pseudosequence)))
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
-            allele_pseudosequences = df.normalized_allele.map(
-                self.allele_to_pseudosequence)
-            for (i, model) in enumerate(self.class1_pan_allele_models):
-                df["model_pan_%d" % i] = model.predict(
-                    peptides,
-                    allele_pseudosequences=allele_pseudosequences)
+            mask = df.supported_peptide_length
+            if mask.sum() > 0:
+                masked_allele_pseudosequences = (
+                    df.ix[mask].normalized_allele.map(
+                        self.allele_to_pseudosequence))
+                masked_peptides = peptides.sequences[mask]
+                for (i, model) in enumerate(self.class1_pan_allele_models):
+                    df.loc[mask, "model_pan_%d" % i] = model.predict(
+                        masked_peptides,
+                        allele_pseudosequences=masked_allele_pseudosequences)
 
         if self.allele_to_allele_specific_models:
             query_alleles = df.normalized_allele.unique()
@@ -540,8 +581,8 @@ class Class1AffinityPredictor(object):
             ]
             if unsupported_alleles:
                 msg = (
-                    "No single-allele models for allele(s): %s. "
-                    "Supported alleles: %s" % (
+                    "No single-allele models for allele(s): %s.\n"
+                    "Supported alleles are: %s" % (
                         " ".join(unsupported_alleles),
                         " ".join(self.allele_to_allele_specific_models)))
                 logging.warning(msg)
@@ -549,13 +590,16 @@ class Class1AffinityPredictor(object):
                     raise ValueError(msg)
             for allele in query_alleles:
                 models = self.allele_to_allele_specific_models.get(allele, [])
-                mask = (df.normalized_allele == allele).values
-                allele_peptides = EncodableSequences.create(
-                    df.ix[mask].peptide.values)
-                for (i, model) in enumerate(models):
-                    df.loc[
-                        mask, "model_single_%d" % i
-                    ] = model.predict(allele_peptides)
+                mask = (
+                    (df.normalized_allele == allele) &
+                    df.supported_peptide_length).values
+                if mask.sum() > 0:
+                    allele_peptides = EncodableSequences.create(
+                        df.ix[mask].peptide.values)
+                    for (i, model) in enumerate(models):
+                        df.loc[
+                            mask, "model_single_%d" % i
+                        ] = model.predict(allele_peptides)
 
         # Geometric mean
         df_predictions = df[
@@ -568,6 +612,7 @@ class Class1AffinityPredictor(object):
         df["prediction_high"] = numpy.exp(logs.quantile(0.95, axis=1))
 
         del df["normalized_allele"]
+        del df["supported_peptide_length"]
         if include_individual_model_predictions:
             columns = sorted(df.columns, key=lambda c: c.startswith('model_'))
         else:
