@@ -29,7 +29,7 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib h5py cvxopt
+      numpy scipy nose pandas matplotlib h5py
   - source activate test-environment
   - pip install pypandoc pylint
   - pip install -r requirements.txt
@@ -45,8 +45,6 @@ env:
 script:
   # download data and models, then run tests
   - mhcflurry-downloads fetch
-  - mhcflurry-downloads fetch models_class1_allele_specific_ensemble
-  - mhcflurry-downloads fetch models_class1_allele_specific_single
   - mhcflurry-downloads info  # just to test this command works
   - nosetests test --with-coverage --cover-package=mhcflurry  && ./lint.sh
 after_success:

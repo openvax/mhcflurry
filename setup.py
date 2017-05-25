@@ -49,15 +49,14 @@ with open('mhcflurry/__init__.py', 'r') as f:
 
 if __name__ == '__main__':
     required_packages = [
+        'six',
         'numpy>=1.11',
         'pandas>=0.13.1',
+        'Keras==2.0.4',
         'appdirs',
         'theano',
-        'keras',
         'scikit-learn',
-        'h5py',
         'typechecks',
-        'six',
         'mhcnames',
     ]
     if PY2:
