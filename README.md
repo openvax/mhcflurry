@@ -10,29 +10,16 @@ infectious diseases, autoimmune diseases, vaccine development, and cancer
 immunotherapy.
 
 MHCflurry supports Class I peptide/MHC binding affinity prediction using
-ensembles of allele-specific models. Pan-allelic prediction is supported in the
-software but is not yet performing accurately and should not be use. Other 
-
-MHCflurry ships with an  allele-specific (i.e. one model per allele)
-
-MHCflurry supports allele-specific peptide / [MHC class I](https://en.wikipedia.org/wiki/MHC_class_I) affinity prediction using two approaches:
-
- * Ensembles of predictors trained on random halves of the training data (the default)
- * Single-model predictors for each allele trained on all data
-
-For both kinds of predictors, you can fit models to your own data or download
-trained models that we provide.
-
-The downloadable models were trained on data from
+ensembles of allele-specific models. You can fit MHCflurry models to your own data or download models that we fit to data from
 [IEDB](http://www.iedb.org/home_v3.php) and [Kim 2014](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241).
-The training dataset is available [here]()
+Our combined dataset is available for download [here](https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/data_curated.tar.bz2).
 
-In validation experiments using presented peptides identified by mass-spec,
-the ensemble models perform best. We are working on a performance comparison of
-these models with other predictors such as netMHCpan, which we hope to make
-available soon.
+We are working on a performance comparison of these models with other predictors
+such as netMHCpan, which we plan to make available soon.
 
-We anticipate adding additional models, including pan-allele and class II predictors.
+Pan-allelic prediction is supported in principle but is not yet performing
+accurately. Infrastructure for modeling other aspects of antigen
+processing is also implemented but experimental.
 
 
 ## Setup
@@ -85,40 +72,34 @@ You can also specify the input and output as CSV files. Run `mhcflurry-predict -
 ## Making predictions from Python
 
 ```python
-from mhcflurry import predict
-predict(alleles=['A0201'], peptides=['SIINFEKL'])
+>>> from mhcflurry import Class1AffinityPredictor
+>>> predictor = Class1AffinityPredictor.load()
+>>> predictor.predict_to_dataframe(peptides=['SIINFEKL'], allele='A0201')
+
+
+  allele   peptide   prediction  prediction_low  prediction_high
+  A0201  SIINFEKL  6029.084473     4474.103253      7771.297702
 ```
 
-```
-  Allele   Peptide  Prediction
-0  A0201  SIINFEKL  10672.347656
-```
-
-The predictions returned by `predict` are affinities (KD) in nM.
+The predictions returned are affinities (KD) in nM. The `prediction_low` and
+`prediction_high` fields give the 5-95 percentile predictions across the models 
+in the ensemble.
 
 ## Training your own models
 
-See the [class1_allele_specific_models.ipynb](https://github.com/hammerlab/mhcflurry/blob/master/examples/class1_allele_specific_models.ipynb) notebook for an overview of the Python API, including predicting, fitting, and scoring single-model predictors. There is also a script called `mhcflurry-class1-allele-specific-cv-and-train` that will perform cross validation and model selection given a CSV file of training data. Try `mhcflurry-class1-allele-specific-cv-and-train --help` for details.
+See the [class1_allele_specific_models.ipynb](https://github.com/hammerlab/mhcflurry/blob/master/examples/class1_allele_specific_models.ipynb)
+notebook for an overview of the Python API.
 
-The ensemble predictors are trained similarly using the `mhcflurry-class1-allele-specific-ensemble-train` command.
 
 ## Details on the downloadable models
 
-The scripts we use to train predictors, including hyperparameter selection
-using cross validation, are
-[here](downloads-generation/models_class1_allele_specific_ensemble)
-for the ensemble predictors and [here](downloads-generation/models_class1_allele_specific_single)
-for the single-model predictors.
+An ensemble of eight single-allele models was trained for each allele with at least
+100 measurements in the training set (118 alleles). The models were trained on a
+random 80% sample of the data for the allele and the remaining 20% was used for
+early stopping. All models use the same [architecture](downloads-generation/models_class1/hyperparameters.json). The
+predictions are taken to be the geometric mean of the nM binding affinity
+predictions of the individual models. The training script is [here](downloads-generation/models_class1/GENERATE.sh).
 
-For the ensemble predictors, we also generate a [report](http://htmlpreview.github.io/?https://github.com/hammerlab/mhcflurry/blob/master/downloads-generation/models_class1_allele_specific_ensemble/models-summary/report.html)
-that describes the hyperparameters selected and the test performance of each
-model.
-
-Besides the model weights, the data downloaded when you run
-`mhcflurry-downloads  fetch` also includes a CSV file giving the
-hyperparameters used for each predictor. Run `mhcflurry-downloads path
-models_class1_allele_specific_ensemble` or `mhcflurry-downloads path
-models_class1_allele_specific_single` to get the directory where these files are stored.
 
 ## Problems and Solutions
 
@@ -134,8 +115,4 @@ Try installing cvxpy using conda instead of pip.
 
 ## Environment variables
 
-The path where MHCflurry looks for model weights and data can be set with the `MHCFLURRY_DOWNLOADS_DIR` environment variable. This directory should contain subdirectories like "models_class1_allele_specific_single". Setting this variable overrides the other environment variables described below.
-
-If you only want to change the version of the released data used, you can set `MHCFLURRY_DOWNLOADS_CURRENT_RELEASE`. If you want to change the base directory used for all releases, set `MHCFLURRY_DATA_DIR`.
-
-By default, `MHCFLURRY_DOWNLOADS_DIR` is a platform specific application storage directory, `MHCFLURRY_DOWNLOADS_CURRENT_RELEASE` is the latest release, and `MHCFLURRY_DOWNLOADS_DIR` is set to `$MHCFLURRY_DATA_DIR/$MHCFLURRY_DOWNLOADS_CURRENT_RELEASE`.
+The path where MHCflurry looks for model weights and data can be set with the `MHCFLURRY_DOWNLOADS_DIR` environment variable. This directory should contain subdirectories like "models_class1".
