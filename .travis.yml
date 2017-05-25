@@ -39,8 +39,8 @@ env:
   global:
     - PYTHONHASHSEED=0 
   matrix:
-    # Enable this eventually after getting tensorflow to build on travis:
-    - KERAS_BACKEND=theano KERAS_BACKEND=tensorflow
+    - KERAS_BACKEND=theano
+    - KERAS_BACKEND=tensorflow
 script:
   # download data and models, then run tests
   - mhcflurry-downloads fetch
