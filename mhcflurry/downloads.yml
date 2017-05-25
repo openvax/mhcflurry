@@ -8,15 +8,38 @@
 # by name, the downloads with "default=true" are downloaded.
 
 # This should usually be the latest release.
-current-release: 0.2.0
+current-release: 1.0.0
 
 # An integer indicating what models the current MHCflurry code base is compatible
 # with. Increment this integer when changes are made to MHCflurry that would break
 # the use of previously released models.
-current-compatibility-version: 1
+current-compatibility-version: 2
 
 # Add new releases here as they are made.
 releases:
+    1.0.0:
+        compatibility-version: 2
+        downloads:
+            - name: models_class1
+              url: http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/models_class1.tar.bz2
+              default: true
+
+            - name: data_curated
+              url: https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/data_curated.tar.bz2
+              default: true
+
+            - name: data_kim2014
+              url: http://github.com/hammerlab/mhcflurry/releases/download/0.0.8/data_kim2014.tar.bz2
+              default: false
+
+            - name: data_iedb
+              url: https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/data_iedb.tar.bz2
+              default: false
+
+            - name: models_class1_experiments1
+              url: http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/models_class1_experiments1.tar.bz2
+              default: false
+
     0.2.0:
         compatibility-version: 1
         downloads:

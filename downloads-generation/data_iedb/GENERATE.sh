@@ -3,7 +3,7 @@
 set -e
 set -x
 
-DOWNLOAD_NAME=data_kim2014
+DOWNLOAD_NAME=data_iedb
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
@@ -17,15 +17,13 @@ exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 
 # Log some environment info
 date
-pip freeze
-# git rev-parse HEAD
-git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.2009.mhci.public.1.txt
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.20130222.mhci.public.1.txt
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.2013.mhci.public.blind.1.txt
+wget --quiet http://www.iedb.org/doc/mhc_ligand_full.zip
+unzip mhc_ligand_full.zip
+rm mhc_ligand_full.zip
+bzip2 mhc_ligand_full.csv
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt

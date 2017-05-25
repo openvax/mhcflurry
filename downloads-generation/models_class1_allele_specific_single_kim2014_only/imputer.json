@@ -1,8 +1,0 @@
-{
-    "imputation_method_name": "mice",
-    "n_burn_in": 5,
-    "n_imputations": 50,
-    "n_nearest_columns": 25,
-    "min_observations_per_peptide": 2,
-    "min_observations_per_allele": 2 
-}

@@ -1,14 +1,9 @@
+six
 numpy>= 1.11
 pandas>=0.13.1
+Keras==2.0.4
 appdirs
-theano==0.8.2
-keras==1.2.0
-fancyimpute>=0.0.12
+tensorflow
 scikit-learn
-h5py
 typechecks
-pepdata
-joblib
-cherrypy
-bottle
-six
+mhcnames

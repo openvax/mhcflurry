@@ -10,11 +10,6 @@ from ..decoy_strategies import SameTranscriptsAsHits
 from ..percent_rank_transform import PercentRankTransform
 
 
-MHCFLURRY_DEFAULT_HYPERPARAMETERS = dict(
-    embedding_output_dim=8,
-    dropout_probability=0.25)
-
-
 class MHCBindingComponentModelBase(PresentationComponentModel):
     """
     Base class for single-allele MHC binding predictors.

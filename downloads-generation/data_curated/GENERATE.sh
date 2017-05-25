@@ -3,9 +3,11 @@
 set -e
 set -x
 
-DOWNLOAD_NAME=data_kim2014
+DOWNLOAD_NAME=data_curated
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
+export PYTHONUNBUFFERED=1
 
 mkdir -p "$SCRATCH_DIR"
 rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
@@ -18,15 +20,20 @@ exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 # Log some environment info
 date
 pip freeze
-# git rev-parse HEAD
 git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.2009.mhci.public.1.txt
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.20130222.mhci.public.1.txt
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.2013.mhci.public.blind.1.txt
+cp $SCRIPT_DIR/curate.py .
 
+time python curate.py \
+    --data-iedb \
+        "$(mhcflurry-downloads path data_iedb)/mhc_ligand_full.csv.bz2" \
+    --data-kim2014 \
+        "$(mhcflurry-downloads path data_kim2014)/bdata.20130222.mhci.public.1.txt" \
+    --out-csv curated_training_data.csv
+
+bzip2 curated_training_data.csv
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
 tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *

@@ -3,9 +3,10 @@
 set -e
 set -x
 
-DOWNLOAD_NAME=data_kim2014
+DOWNLOAD_NAME=models_class1
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 
 mkdir -p "$SCRATCH_DIR"
 rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
@@ -18,14 +19,19 @@ exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 # Log some environment info
 date
 pip freeze
-# git rev-parse HEAD
 git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.2009.mhci.public.1.txt
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.20130222.mhci.public.1.txt
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.2013.mhci.public.blind.1.txt
+mkdir models
+
+cp $SCRIPT_DIR/hyperparameters.json .
+
+time mhcflurry-class1-train-allele-specific-models \
+    --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+    --hyperparameters hyperparameters.json \
+    --out-models-dir models \
+    --min-measurements-per-allele 100
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt

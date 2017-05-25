@@ -3,11 +3,13 @@ import logging
 import numpy
 import pandas
 
-from ...common import normalize_allele_name
-from ...prediction import predict
+from mhcnames import normalize_allele_name
+
 from ..percent_rank_transform import PercentRankTransform
-from ...peptide_encoding import encode_peptides
+from ...encodable_sequences import EncodableSequences
 from .presentation_component_model import PresentationComponentModel
+from ...class1_affinity_prediction.class1_affinity_predictor import (
+    Class1AffinityPredictor)
 
 
 class MHCflurryReleased(PresentationComponentModel):
@@ -36,6 +38,8 @@ class MHCflurryReleased(PresentationComponentModel):
             **kwargs):
         PresentationComponentModel.__init__(self, **kwargs)
         self.experiment_to_alleles = experiment_to_alleles
+        if predictor is None:
+            predictor = Class1AffinityPredictor.load()
         self.predictor = predictor
         self.predictor_name = predictor_name
         if random_peptides_for_percent_rank is None:
@@ -61,35 +65,33 @@ class MHCflurryReleased(PresentationComponentModel):
                 logging.info('fitting percent rank for allele: %s' % allele)
                 self.percent_rank_transforms[allele] = PercentRankTransform()
                 self.percent_rank_transforms[allele].fit(
-                    predict(
-                        [allele],
-                        self.random_peptides_for_percent_rank)
-                    .Prediction.values)
+                    self.predictor.predict(
+                        allele=allele,
+                        peptides=self.random_peptides_for_percent_rank))
 
     def predict_min_across_alleles(self, alleles, peptides):
         alleles = list(set([
             normalize_allele_name(allele)
             for allele in alleles
         ]))
-        df = predict(
-            alleles,
-            peptides,
-            predictor=self.predictor)
-        pivoted = df.pivot(index='Peptide', columns='Allele')
-        pivoted.columns = pivoted.columns.droplevel()
+        peptides = EncodableSequences.create(peptides)
+        df = pandas.DataFrame()
+        df["peptide"] = peptides.sequences
+        for allele in alleles:
+            df[allele] = self.predictor.predict(peptides, allele=allele)
         result = {
             self.predictor_name + '_affinity': (
-                pivoted.min(axis=1).ix[peptides].values)
+                df[list(df.columns)[1:]].min(axis=1))
         }
         if self.percent_rank_transforms is not None:
             self.fit_percentile_rank_if_needed(alleles)
-            percentile_ranks = pandas.DataFrame(index=pivoted.index)
+            percentile_ranks = pandas.DataFrame(index=df.index)
             for allele in alleles:
                 percentile_ranks[allele] = (
                     self.percent_rank_transforms[allele]
-                    .transform(pivoted[allele].values))
+                    .transform(df[allele].values))
             result[self.predictor_name + '_percentile_rank'] = (
-                percentile_ranks.min(axis=1).ix[peptides].values)
+                percentile_ranks.min(axis=1).values)
 
         for (key, value) in result.items():
             assert len(value) == len(peptides), (len(peptides), result)

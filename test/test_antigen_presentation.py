@@ -5,15 +5,14 @@ from nose.tools import eq_, assert_less
 import numpy
 from numpy.testing import assert_allclose
 import pandas
-from mhcflurry import amino_acid
 from mhcflurry.antigen_presentation import (
     decoy_strategies,
     percent_rank_transform,
     presentation_component_models,
     presentation_model)
 
-from mhcflurry.amino_acid import common_amino_acid_letters
-from . import make_random_peptides
+from mhcflurry.amino_acid import COMMON_AMINO_ACIDS
+from mhcflurry.common import random_peptides
 
 
 ######################
@@ -27,8 +26,8 @@ def hit_criterion(experiment_name, peptide):
 ######################
 # Small test dataset
 
-PEPTIDES = make_random_peptides(1000, 9)
-OTHER_PEPTIDES = make_random_peptides(1000, 9)
+PEPTIDES = random_peptides(1000, 9)
+OTHER_PEPTIDES = random_peptides(1000, 9)
 
 TRANSCRIPTS = [
     "transcript-%d" % i
@@ -66,7 +65,7 @@ print("Hit rate: %0.3f" % PEPTIDES_DF.hit.mean())
 AA_COMPOSITION_DF = pandas.DataFrame({
     'peptide': sorted(set(PEPTIDES).union(set(OTHER_PEPTIDES))),
 })
-for aa in sorted(common_amino_acid_letters):
+for aa in sorted(COMMON_AMINO_ACIDS):
     AA_COMPOSITION_DF[aa] = AA_COMPOSITION_DF.peptide.str.count(aa)
 
 AA_COMPOSITION_DF.index = AA_COMPOSITION_DF.peptide

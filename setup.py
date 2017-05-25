@@ -49,18 +49,15 @@ with open('mhcflurry/__init__.py', 'r') as f:
 
 if __name__ == '__main__':
     required_packages = [
+        'six',
         'numpy>=1.11',
         'pandas>=0.13.1',
+        'Keras==2.0.4',
         'appdirs',
-        'theano==0.8.2',
-        'keras==1.2.0',
-        'fancyimpute>=0.0.12',
+        'tensorflow',
         'scikit-learn',
-        'h5py',
         'typechecks',
-        'pepdata',
-        'bottle',
-        'six',
+        'mhcnames',
     ]
     if PY2:
         # concurrent.futures is a standard library in Py3 but Py2
@@ -79,10 +76,9 @@ if __name__ == '__main__':
             'console_scripts': [
                 'mhcflurry-downloads = mhcflurry.downloads_command:run',
                 'mhcflurry-predict = mhcflurry.predict_command:run',
-                'mhcflurry-class1-allele-specific-ensemble-train = '
-                    'mhcflurry.class1_allele_specific_ensemble.train_command:run',
-                'mhcflurry-class1-allele-specific-cv-and-train = '
-                    'mhcflurry.class1_allele_specific.cv_and_train_command:run',
+                'mhcflurry-class1-train-allele-specific-models = '
+                    'mhcflurry.class1_affinity_prediction.'
+                    'train_allele_specific_models_command:run',
             ]
         },
         classifiers=[
@@ -101,7 +97,9 @@ if __name__ == '__main__':
         long_description=readme,
         packages=[
             'mhcflurry',
-            'mhcflurry.class1_allele_specific',
-            'mhcflurry.class1_allele_specific_ensemble',
+            'mhcflurry.class1_affinity_prediction',
+            'mhcflurry.antigen_presentation',
+            'mhcflurry.antigen_presentation.decoy_strategies',
+            'mhcflurry.antigen_presentation.presentation_component_models',
         ],
     )
