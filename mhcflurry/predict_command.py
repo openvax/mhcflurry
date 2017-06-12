@@ -52,76 +52,87 @@ from .class1_affinity_prediction import Class1AffinityPredictor
 
 parser = argparse.ArgumentParser(
     description=__doc__,
-    formatter_class=argparse.RawDescriptionHelpFormatter)
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    add_help=False)
 
-parser.add_argument(
+
+helper_args = parser.add_argument_group(title="Help")
+helper_args.add_argument(
+    "-h", "--help",
+    action="help",
+    help="Show this help message and exit"
+)
+helper_args.add_argument(
+    "--list-supported-alleles",
+    action="store_true",
+    default=False,
+    help="Prints the list of supported alleles and exits"
+)
+helper_args.add_argument(
+    "--list-supported-peptide-lengths",
+    action="store_true",
+    default=False,
+    help="Prints the list of supported peptide lengths and exits"
+)
+
+
+input_args = parser.add_argument_group(title="Required input arguments")
+input_args.add_argument(
     "input",
-    metavar="FILE.csv",
+    metavar="INPUT.csv",
     nargs="?",
     help="Input CSV")
-
-parser.add_argument(
-    "--out",
-    metavar="FILE.csv",
-    help="Output CSV")
-
-parser.add_argument(
+input_args.add_argument(
     "--alleles",
     metavar="ALLELE",
     nargs="+",
     help="Alleles to predict (exclusive with --input)")
-
-parser.add_argument(
+input_args.add_argument(
     "--peptides",
     metavar="PEPTIDE",
     nargs="+",
     help="Peptides to predict (exclusive with --input)")
 
-parser.add_argument(
+
+input_mod_args = parser.add_argument_group(title="Optional input modifiers")
+input_mod_args.add_argument(
     "--allele-column",
     metavar="NAME",
     default="allele",
     help="Input column name for alleles. Default: '%(default)s'")
-
-parser.add_argument(
+input_mod_args.add_argument(
     "--peptide-column",
     metavar="NAME",
     default="peptide",
     help="Input column name for peptides. Default: '%(default)s'")
 
-parser.add_argument(
+
+output_args = parser.add_argument_group(title="Optional output modifiers")
+output_args.add_argument(
+    "--out",
+    metavar="OUTPUT.csv",
+    help="Output CSV")
+output_args.add_argument(
     "--prediction-column-prefix",
     metavar="NAME",
     default="mhcflurry_",
     help="Prefix for output column names. Default: '%(default)s'")
 
-parser.add_argument(
+
+model_args = parser.add_argument_group(title="Optional model settings")
+model_args.add_argument(
     "--models",
     metavar="DIR",
     default=None,
     help="Directory containing models. "
     "Default: %s" % get_path("models_class1", "models", test_exists=False))
-
-parser.add_argument(
+model_args.add_argument(
     "--include-individual-model-predictions",
     action="store_true",
     default=False,
     help="Include predictions from each model in the ensemble"
 )
 
-parser.add_argument(
-    "--list-supported-alleles",
-    action="store_true",
-    default=False,
-    help="List supported alleles and exit"
-)
-
-parser.add_argument(
-    "--list-supported-peptide-lengths",
-    action="store_true",
-    default=False,
-    help="List supported peptide lengths and exit"
-)
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
