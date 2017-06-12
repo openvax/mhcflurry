@@ -109,9 +109,43 @@ parser.add_argument(
     help="Include predictions from each model in the ensemble"
 )
 
+parser.add_argument(
+    "--list-supported-alleles",
+    action="store_true",
+    default=False,
+    help="List supported alleles and exit"
+)
+
+parser.add_argument(
+    "--list-supported-peptide-lengths",
+    action="store_true",
+    default=False,
+    help="List supported peptide lengths and exit"
+)
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
+
+    models_dir = args.models
+    if models_dir is None:
+        # The reason we set the default here instead of in the argument parser is that
+        # we want to test_exists at this point, so the user gets a message instructing
+        # them to download the models if needed.
+        models_dir = get_path("models_class1", "models")
+    predictor = Class1AffinityPredictor.load(models_dir)
+
+    # The following two are informative commands that can come 
+    # if a wrapper would like to incorporate input validation 
+    # to not delibaretly make mhcflurry fail
+    if args.list_supported_alleles:
+        print("\n".join(predictor.supported_alleles))
+        return
+
+    if args.list_supported_peptide_lengths:
+        min_len, max_len = predictor.supported_peptide_lengths
+        print("\n".join([str(l) for l in range(min_len, max_len+1)]))
+        return
+    # End of early terminating routines
 
     if args.input:
         if args.alleles or args.peptides:
@@ -151,14 +185,6 @@ def run(argv=sys.argv[1:]):
         logging.info(
             "Predicting for %d alleles and %d peptides = %d predictions" % (
             len(args.alleles), len(args.peptides), len(df)))
-
-    models_dir = args.models
-    if models_dir is None:
-        # The reason we set the default here instead of in the argument parser is that
-        # we want to test_exists at this point, so the user gets a message instructing
-        # them to download the models if needed.
-        models_dir = get_path("models_class1", "models")
-    predictor = Class1AffinityPredictor.load(models_dir)
 
     predictions = predictor.predict_to_dataframe(
         peptides=df[args.peptide_column].values,
