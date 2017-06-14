@@ -52,57 +52,81 @@ from .class1_affinity_prediction import Class1AffinityPredictor
 
 parser = argparse.ArgumentParser(
     description=__doc__,
-    formatter_class=argparse.RawDescriptionHelpFormatter)
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    add_help=False)
 
-parser.add_argument(
+
+helper_args = parser.add_argument_group(title="Help")
+helper_args.add_argument(
+    "-h", "--help",
+    action="help",
+    help="Show this help message and exit"
+)
+helper_args.add_argument(
+    "--list-supported-alleles",
+    action="store_true",
+    default=False,
+    help="Prints the list of supported alleles and exits"
+)
+helper_args.add_argument(
+    "--list-supported-peptide-lengths",
+    action="store_true",
+    default=False,
+    help="Prints the list of supported peptide lengths and exits"
+)
+
+
+input_args = parser.add_argument_group(title="Required input arguments")
+input_args.add_argument(
     "input",
-    metavar="FILE.csv",
+    metavar="INPUT.csv",
     nargs="?",
     help="Input CSV")
-
-parser.add_argument(
-    "--out",
-    metavar="FILE.csv",
-    help="Output CSV")
-
-parser.add_argument(
+input_args.add_argument(
     "--alleles",
     metavar="ALLELE",
     nargs="+",
     help="Alleles to predict (exclusive with --input)")
-
-parser.add_argument(
+input_args.add_argument(
     "--peptides",
     metavar="PEPTIDE",
     nargs="+",
     help="Peptides to predict (exclusive with --input)")
 
-parser.add_argument(
+
+input_mod_args = parser.add_argument_group(title="Optional input modifiers")
+input_mod_args.add_argument(
     "--allele-column",
     metavar="NAME",
     default="allele",
     help="Input column name for alleles. Default: '%(default)s'")
-
-parser.add_argument(
+input_mod_args.add_argument(
     "--peptide-column",
     metavar="NAME",
     default="peptide",
     help="Input column name for peptides. Default: '%(default)s'")
 
-parser.add_argument(
+
+output_args = parser.add_argument_group(title="Optional output modifiers")
+output_args.add_argument(
+    "--out",
+    metavar="OUTPUT.csv",
+    help="Output CSV")
+output_args.add_argument(
     "--prediction-column-prefix",
     metavar="NAME",
     default="mhcflurry_",
     help="Prefix for output column names. Default: '%(default)s'")
 
-parser.add_argument(
+
+model_args = parser.add_argument_group(title="Optional model settings")
+model_args.add_argument(
     "--models",
     metavar="DIR",
     default=None,
     help="Directory containing models. "
     "Default: %s" % get_path("models_class1", "models", test_exists=False))
-
-parser.add_argument(
+model_args.add_argument(
     "--include-individual-model-predictions",
     action="store_true",
     default=False,
@@ -112,6 +136,27 @@ parser.add_argument(
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
+
+    models_dir = args.models
+    if models_dir is None:
+        # The reason we set the default here instead of in the argument parser is that
+        # we want to test_exists at this point, so the user gets a message instructing
+        # them to download the models if needed.
+        models_dir = get_path("models_class1", "models")
+    predictor = Class1AffinityPredictor.load(models_dir)
+
+    # The following two are informative commands that can come 
+    # if a wrapper would like to incorporate input validation 
+    # to not delibaretly make mhcflurry fail
+    if args.list_supported_alleles:
+        print("\n".join(predictor.supported_alleles))
+        return
+
+    if args.list_supported_peptide_lengths:
+        min_len, max_len = predictor.supported_peptide_lengths
+        print("\n".join([str(l) for l in range(min_len, max_len+1)]))
+        return
+    # End of early terminating routines
 
     if args.input:
         if args.alleles or args.peptides:
@@ -151,14 +196,6 @@ def run(argv=sys.argv[1:]):
         logging.info(
             "Predicting for %d alleles and %d peptides = %d predictions" % (
             len(args.alleles), len(args.peptides), len(df)))
-
-    models_dir = args.models
-    if models_dir is None:
-        # The reason we set the default here instead of in the argument parser is that
-        # we want to test_exists at this point, so the user gets a message instructing
-        # them to download the models if needed.
-        models_dir = get_path("models_class1", "models")
-    predictor = Class1AffinityPredictor.load(models_dir)
 
     predictions = predictor.predict_to_dataframe(
         peptides=df[args.peptide_column].values,
