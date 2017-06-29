@@ -8,8 +8,8 @@ import json
 
 import pandas
 
-from .class1_affinity_predictor import Class1AffinityPredictor
-from ..common import configure_logging
+from mhcflurry import Class1AffinityPredictor, downloads
+from mhcflurry.common import configure_logging
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -48,7 +48,18 @@ parser.add_argument(
     type=int,
     help="Keras verbosity. Default: %(default)s",
     default=1)
+parser.add_argument(
+    "--use-kubeface",
+    type=bool,
+    help="Use Kubeface: %(default)s",
+    default=False)
 
+try:
+    import kubeface
+    kubeface.Client.add_args(parser)
+except Exception as e:
+    pass
+    
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
@@ -59,7 +70,10 @@ def run(argv=sys.argv[1:]):
     assert isinstance(hyperparameters_lst, list)
     print("Loaded hyperparameters list: %s" % str(hyperparameters_lst))
 
-    df = pandas.read_csv(args.data)
+
+    data_path = downloads.get_path("data_curated", args.data)
+    df = pandas.read_csv(data_path)
+    
     print("Loaded training data: %s" % (str(df.shape)))
 
     df = df.ix[
@@ -82,32 +96,60 @@ def run(argv=sys.argv[1:]):
 
     predictor = Class1AffinityPredictor()
 
+    def train_fn(arguments):
+        n_models, hyperparameters, allele, peptides, affinities, Class1AffinityPredictor = arguments
+        predictor = Class1AffinityPredictor()
+        for model_group in range(n_models):
+            print(
+                "[%2d / %2d hyperparameters] "
+                "[%2d / %2d replicates] "
+                "[%4d / %4d alleles]: %s" % (
+                    h + 1,
+                    len(hyperparameters_lst),
+                    model_group + 1,
+                    n_models,
+                    i + 1,
+                    len(alleles), allele))
+
+            train_data = df.ix[df.allele == allele].dropna().sample(
+                frac=1.0)
+
+            model = predictor.fit_allele_specific_predictors(
+                n_models=n_models,
+                architecture_hyperparameters=hyperparameters,
+                allele=allele,
+                peptides=train_data.peptide.values,
+                affinities=train_data.measurement_value.values)
+            
+            return predictor 
+
+
     for (h, hyperparameters) in enumerate(hyperparameters_lst):
         n_models = hyperparameters.pop("n_models")
 
-        for model_group in range(n_models):
-            for (i, allele) in enumerate(alleles):
-                print(
-                    "[%2d / %2d hyperparameters] "
-                    "[%2d / %2d replicates] "
-                    "[%4d / %4d alleles]: %s" % (
-                        h + 1,
-                        len(hyperparameters_lst),
-                        model_group + 1,
-                        n_models,
-                        i + 1,
-                        len(alleles), allele))
+        inputs = []
+        for (i, allele) in enumerate(alleles):
+            train_data = df.ix[df.allele == allele].dropna().sample(
+                frac=1.0)
+            inputs.append((n_models, hyperparameters, 
+                            allele,
+                            train_data.peptide.values,
+                            train_data.measurement_value.values,
+                            Class1AffinityPredictor))
+        
+        map_fn = map
+        
+        if args.use_kubeface:
+            client = kubeface.Client.from_args(args)            
+            map_fn = client.map
 
-                train_data = df.ix[df.allele == allele].dropna().sample(
-                    frac=1.0)
+        inputs = inputs[:3]
+        results = map_fn(train_fn, inputs)
 
-                predictor.fit_allele_specific_predictors(
-                    n_models=1,
-                    architecture_hyperparameters=hyperparameters,
-                    allele=allele,
-                    peptides=train_data.peptide.values,
-                    affinities=train_data.measurement_value.values,
-                    models_dir_for_save=args.out_models_dir)
+        final_predictor = Class1AffinityPredictor()
+        final_predictor.merge(results)
+        final_predictor.save(args.out_models_dir)
+
 
 
 if __name__ == '__main__':
