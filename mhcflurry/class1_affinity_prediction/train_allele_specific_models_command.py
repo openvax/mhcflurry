@@ -143,7 +143,7 @@ def run(argv=sys.argv[1:]):
             client = kubeface.Client.from_args(args)            
             map_fn = client.map
 
-        inputs = inputs[:3]
+        inputs = inputs
         results = map_fn(train_fn, inputs)
 
         final_predictor = Class1AffinityPredictor()
