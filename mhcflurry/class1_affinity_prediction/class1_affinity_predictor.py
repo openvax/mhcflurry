@@ -130,15 +130,17 @@ class Class1AffinityPredictor(object):
         affinity_predictors : list 
             Affinity predictors that want to merge
         """
+        manifests = [self.manifest_df]
         for affinity_predictor in affinity_predictors:
-            for allele in affinity_predictor.allele_to_allele_specific_models.keys():
-                if allele in self.allele_to_allele_specific_models:
-                    self.allele_to_allele_specific_models[allele] += affinity_predictor.allele_to_allele_specific_models[allele]
-                else:
+            for (allele, models) in affinity_predictor.allele_to_allele_specific_models.items():
+                if allele not in self.allele_to_allele_specific_models:
                     self.allele_to_allele_specific_models[allele] = []
-                    self.allele_to_allele_specific_models[allele] += affinity_predictor.allele_to_allele_specific_models[allele]
-            self.manifest_df = pandas.merge(self.manifest_df, affinity_predictor.manifest_df, on=['model_name', 'allele', 'config_json', 'model'], how='outer')
-
+                self.allele_to_allele_specific_models[allele].extend(
+                        affinity_predictor.allele_to_allele_specific_models[allele]ls)
+            manifests.append(affinity_predictor.manifest_df)
+        self.manifest_df = pandas.concat(manifests, ignore_index=True)
+        assert (self.manifest_df.model_name.value_counts() == 1).all()
+        
     def save(self, models_dir, model_names_to_write=None):
         """
         Serialize the predictor to a directory on disk.

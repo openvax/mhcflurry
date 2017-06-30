@@ -50,9 +50,9 @@ parser.add_argument(
     default=1)
 parser.add_argument(
     "--use-kubeface",
-    type=bool,
-    help="Use Kubeface: %(default)s",
-    default=False)
+    default=False,
+    action="store_true",
+    help="Use Kubeface: %(default)s")
 
 try:
     import kubeface
@@ -96,7 +96,7 @@ def run(argv=sys.argv[1:]):
 
     predictor = Class1AffinityPredictor()
 
-    def train_fn(arguments):
+    def train(arguments):
         n_models, hyperparameters, allele, peptides, affinities, Class1AffinityPredictor = arguments
         predictor = Class1AffinityPredictor()
         for model_group in range(n_models):
@@ -128,10 +128,11 @@ def run(argv=sys.argv[1:]):
         n_models = hyperparameters.pop("n_models")
 
         inputs = []
-        for (i, allele) in enumerate(alleles):
+        for (i, allele) in enumerate(alleles[:3]):
             train_data = df.ix[df.allele == allele].dropna().sample(
                 frac=1.0)
-            inputs.append((n_models, hyperparameters, 
+            inputs.append((n_models,
+                            hyperparameters, 
                             allele,
                             train_data.peptide.values,
                             train_data.measurement_value.values,
@@ -144,7 +145,7 @@ def run(argv=sys.argv[1:]):
             map_fn = client.map
 
         inputs = inputs
-        results = map_fn(train_fn, inputs)
+        results = map_fn(train, inputs)
 
         final_predictor = Class1AffinityPredictor()
         final_predictor.merge(results)
