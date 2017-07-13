@@ -1,65 +1,44 @@
-FROM nvidia/cuda:cudnn-runtime
+FROM debian:8.5
 
-MAINTAINER Tim O'Donnell <timodonnell@gmail.com>
+MAINTAINER Rohan Pai <rohanpai@hammerlab.org>
 
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
-    apt-get clean && \
-    apt-get update && \
-    apt-get install --yes \
-        gfortran \
-        git \
-        libatlas-base-dev \
-        libatlas3gf-base \
-        libblas-dev \
-        libfreetype6-dev \
-        libhdf5-serial-dev \
-        liblapack-dev \
-        libpng12-dev \
-        libxml2-dev \
-        libxslt1-dev \
-        libyaml-dev \
-        libzmq3-dev \
-        pkg-config \
-        python-virtualenv \
-        python3-dev \
-        python-dev && \
-    apt-get clean && \
-    useradd --create-home --home-dir /home/user --shell /bin/bash -G sudo user && \
-    echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-        
-# Set the locale (otherwise dask-distributed complains).
-RUN locale-gen en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US:en
-ENV LC_ALL en_US.UTF-8
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
-USER user
-ENV HOME=/home/user
-ENV SHELL=/bin/bash
-ENV USER=user
-WORKDIR /home/user
+RUN apt-get update --fix-missing && apt-get install -y wget bzip2 ca-certificates \
+    libglib2.0-0 libxext6 libsm6 libxrender1 \
+    git mercurial subversion
 
-# Setup virtual envs and install convenience packages.  Note: installing
-# cherrypy as part of the mhcflurry installation weirdly fails on a unicode
-# issue in python2, but installing it separately seems to work.
-RUN virtualenv venv-py3 --python=python3 && \
-    venv-py3/bin/pip install --upgrade pip && \
-    venv-py3/bin/pip install --upgrade \
-        numpy \
-        cherrypy \
-        jupyter \
-        lxml \
-        scipy \
-        scikit-learn \
-        seaborn
+RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
+    wget --quiet https://repo.continuum.io/archive/Anaconda3-4.4.0-Linux-x86_64.sh -O ~/anaconda.sh && \
+    /bin/bash ~/anaconda.sh -b -p /opt/conda && \
+    rm ~/anaconda.sh
 
-ENV KERAS_BACKEND theano
-# RUN venv-py3/bin/pip install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.10.0-cp35-cp35m-linux_x86_64.whl
+RUN apt-get install -y curl grep sed dpkg && \
+    TINI_VERSION=`curl https://github.com/krallin/tini/releases/latest | grep -o "/v.*\"" | sed 's:^..\(.*\).$:\1:'` && \
+    curl -L "https://github.com/krallin/tini/releases/download/v${TINI_VERSION}/tini_${TINI_VERSION}.deb" > tini.deb && \
+    dpkg -i tini.deb && \
+    rm tini.deb && \
+    apt-get clean
 
-# Install mhcflurry and latest kubeface and download data and models.
-COPY . ./mhcflurry
-RUN venv-py3/bin/pip install --upgrade ./mhcflurry git+https://github.com/hammerlab/kubeface.git \
-    && venv-py3/bin/mhcflurry-downloads fetch
- 
-EXPOSE 8888
-CMD venv-py3/bin/jupyter notebook --no-browser
+
+RUN /opt/conda/bin/pip install --upgrade pip
+RUN /opt/conda/bin/pip install mhcflurry
+RUN /opt/conda/bin/pip install pandas==0.19.2
+RUN /opt/conda/bin/pip install numpy>=1.11
+RUN /opt/conda/bin/pip install Keras==2.0.4
+RUN /opt/conda/bin/pip install appdirs
+RUN /opt/conda/bin/pip install tensorflow
+RUN /opt/conda/bin/pip install scikit-learn
+RUN /opt/conda/bin/pip install typechecks
+RUN /opt/conda/bin/pip install dill>=0.2.5
+RUN /opt/conda/bin/pip install parse
+RUN /opt/conda/bin/pip install oauth2client==4.0.0
+RUN /opt/conda/bin/pip install google-api-python-client==1.5.5
+RUN /opt/conda/bin/pip install mock
+RUN /opt/conda/bin/pip install nose>=1.3.1
+
+ENV PATH /opt/conda/bin:$PATH
+
+ENTRYPOINT [ "/usr/bin/tini", "--" ]
+CMD [ "/bin/bash" ]
+

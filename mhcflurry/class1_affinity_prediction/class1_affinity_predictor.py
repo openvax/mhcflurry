@@ -136,7 +136,7 @@ class Class1AffinityPredictor(object):
                 if allele not in self.allele_to_allele_specific_models:
                     self.allele_to_allele_specific_models[allele] = []
                 self.allele_to_allele_specific_models[allele].extend(
-                        affinity_predictor.allele_to_allele_specific_models[allele]ls)
+                        affinity_predictor.allele_to_allele_specific_models[allele])
             manifests.append(affinity_predictor.manifest_df)
         self.manifest_df = pandas.concat(manifests, ignore_index=True)
         assert (self.manifest_df.model_name.value_counts() == 1).all()
