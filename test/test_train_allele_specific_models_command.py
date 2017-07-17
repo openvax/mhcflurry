@@ -49,6 +49,49 @@ HYPERPARAMETERS = [
 ]
 
 
+def test_merge():
+    '''
+    What does this test need to do?
+    This test needs to create a mhcflurry predictor
+    needs to train a different mhcflurry predictor
+    then the test needs to merge them and make sure that the resulting mhcflurry predictor 
+    contains elements from both of them
+
+
+    how do I run the tests?
+
+    '''
+
+    try:
+        models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
+        hyperparameters_filename = os.path.join(
+            models_dir, "hyperparameters.json")
+        with open(hyperparameters_filename, "w") as fd:
+            json.dump(HYPERPARAMETERS, fd)
+
+        args = [
+            "--data", get_path("data_curated", "curated_training_data.csv.bz2"),
+            "--hyperparameters", hyperparameters_filename,
+            "--min-measurements-per-allele", "9000",
+            "--out-models-dir", models_dir,
+        ]
+        print("Running with args: %s" % args)
+        train_allele_specific_models_command.run(args)
+
+        empty_model = Class1AffinityPredictor()
+        result = Class1AffinityPredictor.load(models_dir)
+        predictions = result.predict(
+            peptides=["SLYNTVATL"],
+            alleles=["HLA-A*02:01"])
+        empty_model.merge([result])
+        assert(empty_model.allele_to_allele_specific_models.keys() == 
+                result.allele_to_allele_specific_models.keys())
+       
+
+    finally:
+        print("Deleting: %s" % models_dir)
+        shutil.rmtree(models_dir)
+
 def test_run():
     try:
         models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
@@ -76,3 +119,4 @@ def test_run():
     finally:
         print("Deleting: %s" % models_dir)
         shutil.rmtree(models_dir)
+

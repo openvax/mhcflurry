@@ -1,6 +1,6 @@
 six
 numpy>= 1.11
-pandas>=0.13.1
+pandas==0.19.2
 Keras==2.0.4
 appdirs
 tensorflow

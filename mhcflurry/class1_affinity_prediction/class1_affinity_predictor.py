@@ -119,6 +119,28 @@ class Class1AffinityPredictor(object):
             max(lower for (lower, upper) in length_ranges),
             min(upper for (lower, upper) in length_ranges))
 
+    def merge(self, affinity_predictors):
+        """ 
+        Merge multiple affinity predictors into current predictor.  
+        When training MHCFlurry in parallel, the user might be left with
+        multiple affinity predictors, merge can take in multiple affinity predictors
+        and the result will be a single ensemble.
+        Parameters
+        ----------
+        affinity_predictors : list 
+            Affinity predictors that want to merge
+        """
+        manifests = [self.manifest_df]
+        for affinity_predictor in affinity_predictors:
+            for (allele, models) in affinity_predictor.allele_to_allele_specific_models.items():
+                if allele not in self.allele_to_allele_specific_models:
+                    self.allele_to_allele_specific_models[allele] = []
+                self.allele_to_allele_specific_models[allele].extend(
+                        affinity_predictor.allele_to_allele_specific_models[allele])
+            manifests.append(affinity_predictor.manifest_df)
+        self.manifest_df = pandas.concat(manifests, ignore_index=True)
+        assert (self.manifest_df.model_name.value_counts() == 1).all()
+        
     def save(self, models_dir, model_names_to_write=None):
         """
         Serialize the predictor to a directory on disk.
