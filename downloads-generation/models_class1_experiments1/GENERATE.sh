@@ -23,7 +23,7 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-for mod in 0local 1local dense16 dense64 noL1
+for mod in base
 do
     cp $SCRIPT_DIR/hyperparameters-${mod}.json .
     mkdir models-${mod}
