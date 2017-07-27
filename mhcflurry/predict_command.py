@@ -105,6 +105,11 @@ input_mod_args.add_argument(
     metavar="NAME",
     default="peptide",
     help="Input column name for peptides. Default: '%(default)s'")
+input_mod_args.add_argument(
+    "--no-throw",
+    action="store_true",
+    default=False,
+    help="Return NaNs for unsupported alleles or peptides instead of raising")
 
 
 output_args = parser.add_argument_group(title="Optional output modifiers")
@@ -200,7 +205,8 @@ def run(argv=sys.argv[1:]):
     predictions = predictor.predict_to_dataframe(
         peptides=df[args.peptide_column].values,
         alleles=df[args.allele_column].values,
-        include_individual_model_predictions=args.include_individual_model_predictions)
+        include_individual_model_predictions=args.include_individual_model_predictions,
+        throw=not args.no_throw)
 
     for col in predictions.columns:
         if col not in ("allele", "peptide"):
