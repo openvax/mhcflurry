@@ -44,6 +44,11 @@ parser.add_argument(
     default=50,
     help="Train models for alleles with >=N measurements.")
 parser.add_argument(
+    "--only-quantitative",
+    action="store_true",
+    default=False,
+    help="Use only quantitative training data")
+parser.add_argument(
     "--verbosity",
     type=int,
     help="Keras verbosity. Default: %(default)s",
@@ -66,6 +71,12 @@ def run(argv=sys.argv[1:]):
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
+
+    if args.only_quantitative:
+        df = df.loc[
+            df.measurement_type == "quantitative"
+        ]
+        print("Subselected to quantitative: %s" % (str(df.shape)))
 
     allele_counts = df.allele.value_counts()
 
