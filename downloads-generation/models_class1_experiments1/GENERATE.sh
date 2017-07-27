@@ -23,7 +23,18 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-for mod in base
+# Standard architecture on quantitative only
+cp $SCRIPT_DIR/hyperparameters-standard.json .
+mkdir models-standard-quantitative
+time mhcflurry-class1-train-allele-specific-models \
+    --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+    --only-quantitative \
+    --hyperparameters hyperparameters-standard.json \
+    --out-models-dir models-standard-quantitative \
+    --min-measurements-per-allele 100
+
+# Model variations on qualitative + quantitative
+for mod in 0local_noL1 0local 1local dense16 dense64 noL1 
 do
     cp $SCRIPT_DIR/hyperparameters-${mod}.json .
     mkdir models-${mod}
