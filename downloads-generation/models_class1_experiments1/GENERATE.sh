@@ -31,7 +31,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --only-quantitative \
     --hyperparameters hyperparameters-standard.json \
     --out-models-dir models-standard-quantitative \
-    --min-measurements-per-allele 100
+    --min-measurements-per-allele 100 &
 
 # Model variations on qualitative + quantitative
 for mod in 0local_noL1 0local 1local dense16 dense64 noL1 
@@ -42,8 +42,9 @@ do
         --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
         --hyperparameters hyperparameters-${mod}.json \
         --out-models-dir models-${mod} \
-        --min-measurements-per-allele 100
+        --min-measurements-per-allele 100 &
 done
+wait
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
