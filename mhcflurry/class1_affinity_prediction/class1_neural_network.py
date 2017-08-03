@@ -108,19 +108,75 @@ class Class1NeuralNetwork(object):
         self.fit_seconds = None
         self.fit_num_points = None
 
-    @property
-    def network(self):
+    # Process-wide keras model cache.
+    # architecture JSON string -> (Keras model, existing network weights)
+    KERAS_MODELS_CACHE = {}
+
+    @classmethod
+    def borrow_cached_network(klass, network_json, network_weights):
+        """
+        Return a keras Model with the specified architecture and weights.
+        As an optimization, when possible this will reuse architectures from a
+        process-wide cache.
+
+        The returned object is "borrowed" in the sense that its weights can
+        change later after subsequent calls to this method from other objects.
+
+        If you're using this from a parallel implementation you'll need to
+        hold a lock while using the returned object.
+
+        Parameters
+        ----------
+        network_json : string of JSON
+        network_weights : list of numpy.array
+
+        Returns
+        -------
+        keras.models.Model
+        """
+        assert network_weights is not None
+        if network_json not in klass.KERAS_MODELS_CACHE:
+            # Cache miss.
+            network = keras.models.model_from_json(network_json)
+            existing_weights = None
+        else:
+            # Cache hit.
+            (network, existing_weights) = klass.KERAS_MODELS_CACHE[network_json]
+        if existing_weights is not network_weights:
+            network.set_weights(network_weights)
+            klass.KERAS_MODELS_CACHE[network_json] = (network, network_weights)
+        return network
+
+    def network(self, borrow=False):
+        """
+        Return the keras model associated with this predictor.
+
+        Parameters
+        ----------
+        borrow : bool
+            Whether to return a cached model if possible. See
+            borrow_cached_network for details
+
+        Returns
+        -------
+        keras.models.Model
+        """
         if self._network is None and self.network_json is not None:
-            self._network = keras.models.model_from_json(self.network_json)
-            if self.network_weights is not None:
-                self.network.set_weights(self.network_weights)
-            self.network_json = None
-            self.network_weights = None
+            if borrow:
+                return self.borrow_cached_network(
+                    self.network_json,
+                    self.network_weights)
+            else:
+                self._network = keras.models.model_from_json(self.network_json)
+                if self.network_weights is not None:
+                    self._network.set_weights(self.network_weights)
+                self.network_json = None
+                self.network_weights = None
         return self._network
 
     def update_network_description(self):
         if self._network is not None:
-            self.network_json = self.network.to_json()
+            self.network_json = self._network.to_json()
             self.network_weights = self._network.get_weights()
 
     def get_config(self):
@@ -151,7 +207,6 @@ class Class1NeuralNetwork(object):
         Returns
         -------
         Class1NeuralNetwork
-
         """
         config = dict(config)
         instance = cls(**config.pop('hyperparameters'))
@@ -323,7 +378,7 @@ class Class1NeuralNetwork(object):
             x_dict_without_random_negatives['pseudosequence'] = (
                 pseudosequences_input)
 
-        if self.network is None:
+        if self.network() is None:
             self._network = self.make_network(
                 pseudosequence_length=pseudosequence_length,
                 **self.network_hyperparameter_defaults.subselect(
@@ -379,7 +434,7 @@ class Class1NeuralNetwork(object):
                 raise NotImplementedError(
                     "Allele pseudosequences unsupported with random negatives")
 
-            fit_history = self.network.fit(
+            fit_history = self.network().fit(
                 x_dict_with_random_negatives,
                 y_dict_with_random_negatives,
                 shuffle=True,
@@ -437,14 +492,14 @@ class Class1NeuralNetwork(object):
             pseudosequences_input = self.pseudosequence_to_network_input(
                 allele_pseudosequences)
             x_dict['pseudosequence'] = pseudosequences_input
-        (predictions,) = numpy.array(self.network.predict(x_dict)).T
+        (predictions,) = numpy.array(self.network(borrow=True).predict(x_dict)).T
         return to_ic50(predictions)
 
     def compile(self):
         """
         Compile the keras model. Used internally.
         """
-        self.network.compile(
+        self.network().compile(
             **self.compile_hyperparameter_defaults.subselect(
                 self.hyperparameters))
 
@@ -476,7 +531,8 @@ class Class1NeuralNetwork(object):
                 input_dim=embedding_input_dim,
                 output_dim=embedding_output_dim,
                 input_length=kmer_size,
-                embeddings_initializer=embedding_init_method)(peptide_input)
+                embeddings_initializer=embedding_init_method,
+                name="peptide_embedding")(peptide_input)
         else:
             peptide_input = Input(
                 shape=(kmer_size, 21), dtype='float32', name='peptide')
@@ -484,17 +540,20 @@ class Class1NeuralNetwork(object):
 
         inputs = [peptide_input]
 
-        for locally_connected_params in locally_connected_layers:
+        for (i, locally_connected_params) in enumerate(locally_connected_layers):
             current_layer = keras.layers.LocallyConnected1D(
+                name="lc_%d" % i,
                 **locally_connected_params)(current_layer)
 
-        current_layer = Flatten()(current_layer)
+        current_layer = Flatten(name="flattened_0")(current_layer)
 
         if batch_normalization:
-            current_layer = BatchNormalization()(current_layer)
+            current_layer = BatchNormalization(name="batch_norm_early")(
+                current_layer)
 
         if dropout_probability:
-            current_layer = Dropout(dropout_probability)(current_layer)
+            current_layer = Dropout(dropout_probability, name="dropout_early")(
+                current_layer)
 
         if pseudosequence_length:
             if pseudosequence_use_embedding:
@@ -514,13 +573,13 @@ class Class1NeuralNetwork(object):
                     dtype='float32', name='peptide')
                 pseudo_embedding_layer = pseudosequence_input
             inputs.append(pseudosequence_input)
-            pseudo_embedding_layer = Flatten()(pseudo_embedding_layer)
+            pseudo_embedding_layer = Flatten(name="flattened_1")(
+                pseudo_embedding_layer)
 
             current_layer = keras.layers.concatenate([
-                current_layer, pseudo_embedding_layer
-            ])
+                current_layer, pseudo_embedding_layer], name="concatenated_0")
             
-        for layer_size in layer_sizes:
+        for (i, layer_size) in enumerate(layer_sizes):
             kernel_regularizer = None
             l1 = dense_layer_l1_regularization
             l2 = dense_layer_l2_regularization
@@ -530,18 +589,24 @@ class Class1NeuralNetwork(object):
             current_layer = Dense(
                 layer_size,
                 activation=activation,
-                kernel_regularizer=kernel_regularizer)(current_layer)
+                kernel_regularizer=kernel_regularizer,
+                name="dense_%d" % i)(current_layer)
 
             if batch_normalization:
-                current_layer = BatchNormalization()(current_layer)
+                current_layer = BatchNormalization(name="batch_norm_%d" % i)\
+                    (current_layer)
 
             if dropout_probability > 0:
-                current_layer = Dropout(dropout_probability)(current_layer)
+                current_layer = Dropout(
+                    dropout_probability, name="dropout_%d" % i)(current_layer)
 
         output = Dense(
             1,
             kernel_initializer=init,
             activation=output_activation,
             name="output")(current_layer)
-        model = keras.models.Model(inputs=inputs, outputs=[output])
+        model = keras.models.Model(
+            inputs=inputs,
+            outputs=[output],
+            name="predictor")
         return model
