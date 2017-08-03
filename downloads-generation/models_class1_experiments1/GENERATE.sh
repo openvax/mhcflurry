@@ -25,12 +25,12 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 # Standard architecture on quantitative only
 cp $SCRIPT_DIR/hyperparameters-standard.json .
-mkdir models-standard-quantitative
+mkdir models-quantitative
 time mhcflurry-class1-train-allele-specific-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
     --only-quantitative \
     --hyperparameters hyperparameters-standard.json \
-    --out-models-dir models-standard-quantitative \
+    --out-models-dir models-quantitative \
     --min-measurements-per-allele 100 &
 
 # Model variations on qualitative + quantitative
