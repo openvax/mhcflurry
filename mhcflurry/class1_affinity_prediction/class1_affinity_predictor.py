@@ -589,7 +589,6 @@ class Class1AffinityPredictor(object):
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
-
             for allele in query_alleles:
                 models = self.allele_to_allele_specific_models.get(allele, [])
                 mask = (
