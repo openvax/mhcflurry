@@ -1,6 +1,6 @@
 [
     {
-        "n_models": 8,
+        "n_models": 12,
         "max_epochs": 500,
         "patience": 10,
         "early_stopping": true,
