@@ -9,7 +9,7 @@ import pandas
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.common import random_peptides
 
-NUM = 100000
+NUM = 10000
 
 DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
 
