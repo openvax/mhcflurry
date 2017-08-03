@@ -45,6 +45,6 @@ script:
   # download data and models, then run tests
   - mhcflurry-downloads fetch
   - mhcflurry-downloads info  # just to test this command works
-  - nosetests test --with-coverage --cover-package=mhcflurry  && ./lint.sh
+  - nosetests test -sv --with-coverage --cover-package=mhcflurry  && ./lint.sh
 after_success:
   coveralls
