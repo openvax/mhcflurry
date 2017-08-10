@@ -85,6 +85,7 @@ class Class1AffinityPredictor(object):
                 rows,
                 columns=["model_name", "allele", "config_json", "model"])
         self.manifest_df = manifest_df
+        self.neural_network_cache = {}
 
     @property
     def supported_alleles(self):
@@ -597,9 +598,18 @@ class Class1AffinityPredictor(object):
                     allele_peptides = EncodableSequences.create(
                         df.ix[mask].peptide.values)
                     for (i, model) in enumerate(models):
+                        _model = None
+                        hashed_model = str(model.hyperparameters)
+                        if hashed_model in self.neural_network_cache:
+                            _model = self.neural_network_cache[hashed_model]
+                            _model._network.set_weights(model.get_weights())
+                        else:
+                            self.neural_network_cache[hashed_model] = model
+                            _model = model
+
                         df.loc[
                             mask, "model_single_%d" % i
-                        ] = model.predict(allele_peptides)
+                        ] = _model.predict(allele_peptides)
 
         # Geometric mean
         df_predictions = df[
