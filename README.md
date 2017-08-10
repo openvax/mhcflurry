@@ -14,13 +14,13 @@ ensembles of allele-specific models. You can fit MHCflurry models to your own da
 [IEDB](http://www.iedb.org/home_v3.php) and [Kim 2014](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241).
 Our combined dataset is available for download [here](https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0.0-alpha/data_curated.tar.bz2).
 
-We are working on a performance comparison of these models with other predictors
-such as netMHCpan, which we plan to make available soon.
-
 Pan-allelic prediction is supported in principle but is not yet performing
 accurately. Infrastructure for modeling other aspects of antigen
 processing is also implemented but experimental.
 
+If you find MHCflurry useful in your research please cite:
+
+> O'Donnell, T. et al., 2017. MHCflurry: open-source class I MHC binding affinity prediction. bioRxiv. Available at: http://www.biorxiv.org/content/early/2017/08/09/174243.
 
 ## Setup
 
