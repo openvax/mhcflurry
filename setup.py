@@ -18,6 +18,7 @@ import re
 import sys
 
 from setuptools import setup
+import versioneer
 
 # normally we would import six.PY2 but can't yet assume that six
 # is installed here
@@ -40,13 +41,6 @@ except:
     logging.warn("Conversion of long_description from MD to RST failed")
     pass
 
-
-with open('mhcflurry/__init__.py', 'r') as f:
-    version = re.search(
-        r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
-        f.read(),
-        re.MULTILINE).group(1)
-
 if __name__ == '__main__':
     required_packages = [
         'six',
@@ -66,7 +60,8 @@ if __name__ == '__main__':
 
     setup(
         name='mhcflurry',
-        version=version,
+        version=versioneer.get_version(),
+        cmdclass=versioneer.get_cmdclass(),
         description="MHC Binding Predictor",
         author="Alex Rubinsteyn <alex@hammerlab.org>, Tim O'Donnell <tim@hammerlab.org>",
         author_email="tim@hammerlab.org",
