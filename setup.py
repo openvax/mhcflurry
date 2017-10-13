@@ -67,8 +67,8 @@ if __name__ == '__main__':
         name='mhcflurry',
         version=version,
         description="MHC Binding Predictor",
-        author="Alex Rubinsteyn <alex@hammerlab.org>, Tim O'Donnell <tim@hammerlab.org>",
-        author_email="tim@hammerlab.org",
+        author="Tim O'Donnell and Alex Rubinsteyn",
+        author_email="timodonnell@gmail.com",
         url="https://github.com/hammerlab/mhcflurry",
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         entry_points={
@@ -81,7 +81,7 @@ if __name__ == '__main__':
             ]
         },
         classifiers=[
-            'Development Status :: 3 - Alpha',
+            'Development Status :: 4 - Beta',
             'Environment :: Console',
             'Operating System :: OS Independent',
             'Intended Audience :: Science/Research',
