@@ -74,9 +74,9 @@ The predictions returned are affinities (KD) in nM. The `prediction_low` and
 `prediction_high` fields give the 5-95 percentile predictions across the models
 in the ensemble. The predictions above were generated with MHCflurry 0.9.2.
 Your exact predictions may vary slightly from these (up to about 1 nM)
-depending on the Keras backend in use and other numerical details even if you
-match the MHCflurry version, whereas different versions of MHCflurry give
-results that are considerably different from these.
+depending on the Keras backend in use and other numerical details.
+Different versions of MHCflurry can of course give results considerably
+different from these.
 
 You can also specify the input and output as CSV files.
 Run `mhcflurry-predict -h` for details.
