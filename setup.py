@@ -51,7 +51,7 @@ if __name__ == '__main__':
         'six',
         'numpy>=1.11',
         'pandas>=0.13.1',
-        'Keras==2.0.6',
+        'Keras==2.0.8',
         'appdirs',
         'tensorflow',
         'scikit-learn',
@@ -67,8 +67,8 @@ if __name__ == '__main__':
         name='mhcflurry',
         version=version,
         description="MHC Binding Predictor",
-        author="Alex Rubinsteyn <alex@hammerlab.org>, Tim O'Donnell <tim@hammerlab.org>",
-        author_email="tim@hammerlab.org",
+        author="Tim O'Donnell and Alex Rubinsteyn",
+        author_email="timodonnell@gmail.com",
         url="https://github.com/hammerlab/mhcflurry",
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         entry_points={
@@ -81,7 +81,7 @@ if __name__ == '__main__':
             ]
         },
         classifiers=[
-            'Development Status :: 3 - Alpha',
+            'Development Status :: 4 - Beta',
             'Environment :: Console',
             'Operating System :: OS Independent',
             'Intended Audience :: Science/Research',
@@ -97,8 +97,5 @@ if __name__ == '__main__':
         packages=[
             'mhcflurry',
             'mhcflurry.class1_affinity_prediction',
-            'mhcflurry.antigen_presentation',
-            'mhcflurry.antigen_presentation.decoy_strategies',
-            'mhcflurry.antigen_presentation.presentation_component_models',
         ],
     )
