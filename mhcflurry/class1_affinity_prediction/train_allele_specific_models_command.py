@@ -81,7 +81,7 @@ def run(argv=sys.argv[1:]):
     allele_counts = df.allele.value_counts()
 
     if args.allele:
-        alleles = args.allelle
+        alleles = args.allele
         df = df.ix[df.allele.isin(alleles)]
     else:
         alleles = list(allele_counts.ix[
