@@ -2,6 +2,7 @@
 Train Class1 single allele models.
 
 """
+import os
 import sys
 import argparse
 import json
@@ -92,6 +93,11 @@ def run(argv=sys.argv[1:]):
     print("Training data: %s" % (str(df.shape)))
 
     predictor = Class1AffinityPredictor()
+
+    if args.out_models_dir and not os.path.exists(args.out_models_dir):
+        print("Attempting to create directory: %s" % args.out_models_dir)
+        os.mkdir(args.out_models_dir)
+        print("Done.")
 
     for (h, hyperparameters) in enumerate(hyperparameters_lst):
         n_models = hyperparameters.pop("n_models")
