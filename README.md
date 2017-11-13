@@ -22,7 +22,7 @@ If you find MHCflurry useful in your research please cite:
 
 > O'Donnell, T. et al., 2017. MHCflurry: open-source class I MHC binding affinity prediction. bioRxiv. Available at: http://www.biorxiv.org/content/early/2017/08/09/174243.
 
-## Setup
+## Setup (pip)
 
 Install the package:
 
@@ -55,6 +55,32 @@ export KERAS_BACKEND=theano
 ```
 
 You may also needs to `pip install theano`.
+
+## Setup (conda)
+
+You can alternatively get up and running with a [conda](https://conda.io/docs/)
+environment as follows:
+
+```
+conda create -q -n mhcflurry-env python=3.6 'tensorflow>=1.1.0'
+source activate mhcflurry-env
+```
+
+Then continue as above:
+
+```
+pip install mhcflurry
+mhcflurry-downloads fetch
+```
+
+If you wish to test your installation, you can install `nose` and run the tests
+from a checkout:
+
+```
+pip install nose
+nosetests .
+```
+
 
 
 ## Making predictions from the command-line

@@ -9,7 +9,7 @@ import keras.models
 import keras.layers.pooling
 import keras.regularizers
 from keras.layers import Input
-import keras.layers.merge
+import keras.layers
 from keras.layers.core import Dense, Flatten, Dropout
 from keras.layers.embeddings import Embedding
 from keras.layers.normalization import BatchNormalization
