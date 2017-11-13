@@ -51,12 +51,13 @@ if __name__ == '__main__':
         'six',
         'numpy>=1.11',
         'pandas>=0.13.1',
-        'Keras==2.0.8',
+        'Keras==2.0.9',
         'appdirs',
-        'tensorflow',
+        'tensorflow>=1.4.0',
         'scikit-learn',
         'typechecks',
         'mhcnames',
+        'pyyaml',
     ]
     if PY2:
         # concurrent.futures is a standard library in Py3 but Py2
