@@ -16,7 +16,10 @@ from keras.layers.normalization import BatchNormalization
 
 from mhcflurry.hyperparameters import HyperparameterDefaults
 
-from ..encodable_sequences import EncodableSequences
+from ..encodable_sequences import (
+    EncodableSequences,
+    available_vector_encodings,
+    vector_encoding_length)
 from ..regression_target import to_ic50, from_ic50
 from ..common import random_peptides, amino_acid_distribution
 
@@ -35,6 +38,7 @@ class Class1NeuralNetwork(object):
     network_hyperparameter_defaults = HyperparameterDefaults(
         kmer_size=15,
         use_embedding=False,
+        peptide_amino_acid_encoding="one-hot",
         embedding_input_dim=21,
         embedding_output_dim=8,
         pseudosequence_use_embedding=False,
@@ -256,19 +260,25 @@ class Class1NeuralNetwork(object):
         numpy.array
         """
         encoder = EncodableSequences.create(peptides)
-        if self.hyperparameters['use_embedding']:
+        if (self.hyperparameters['use_embedding'] or
+                self.hyperparameters['peptide_amino_acid_encoding'] == "embedding"):
             encoded = encoder.variable_length_to_fixed_length_categorical(
                 max_length=self.hyperparameters['kmer_size'],
                 **self.input_encoding_hyperparameter_defaults.subselect(
                     self.hyperparameters))
-        else:
-            encoded = encoder.variable_length_to_fixed_length_one_hot(
+        elif (
+                self.hyperparameters['peptide_amino_acid_encoding'] in
+                    available_vector_encodings()):
+            encoded = encoder.variable_length_to_fixed_length_vector_encoding(
+                self.hyperparameters['peptide_amino_acid_encoding'],
                 max_length=self.hyperparameters['kmer_size'],
                 **self.input_encoding_hyperparameter_defaults.subselect(
                     self.hyperparameters))
+        else:
+            raise ValueError("Unsupported peptide_amino_acid_encoding: %s" %
+                             self.hyperparameters['peptide_amino_acid_encoding'])
         assert len(encoded) == len(peptides)
         return encoded
-
 
     @property
     def supported_peptide_lengths(self):
@@ -492,7 +502,8 @@ class Class1NeuralNetwork(object):
             pseudosequences_input = self.pseudosequence_to_network_input(
                 allele_pseudosequences)
             x_dict['pseudosequence'] = pseudosequences_input
-        (predictions,) = numpy.array(self.network(borrow=True).predict(x_dict)).T
+        (predictions,) = numpy.array(
+            self.network(borrow=True).predict(x_dict), dtype="float64").T
         return to_ic50(predictions)
 
     def compile(self):
@@ -507,6 +518,7 @@ class Class1NeuralNetwork(object):
     def make_network(
             pseudosequence_length,
             kmer_size,
+            peptide_amino_acid_encoding,
             use_embedding,
             embedding_input_dim,
             embedding_output_dim,
@@ -524,7 +536,7 @@ class Class1NeuralNetwork(object):
         """
         Helper function to make a keras network for class1 affinity prediction.
         """
-        if use_embedding:
+        if use_embedding or peptide_amino_acid_encoding == "embedding":
             peptide_input = Input(
                 shape=(kmer_size,), dtype='int32', name='peptide')
             current_layer = Embedding(
@@ -535,7 +547,11 @@ class Class1NeuralNetwork(object):
                 name="peptide_embedding")(peptide_input)
         else:
             peptide_input = Input(
-                shape=(kmer_size, 21), dtype='float32', name='peptide')
+                shape=(
+                    kmer_size,
+                    vector_encoding_length(peptide_amino_acid_encoding)),
+                dtype='float32',
+                name='peptide')
             current_layer = peptide_input
 
         inputs = [peptide_input]
@@ -609,4 +625,7 @@ class Class1NeuralNetwork(object):
             inputs=inputs,
             outputs=[output],
             name="predictor")
+
+        print("*** ARCHITECTURE ***")
+        model.summary()
         return model
