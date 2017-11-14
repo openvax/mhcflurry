@@ -312,7 +312,8 @@ class Class1NeuralNetwork(object):
         if self.hyperparameters['pseudosequence_use_embedding']:
             encoded = encoder.fixed_length_categorical()
         else:
-            encoded = encoder.fixed_length_one_hot()
+            raise NotImplementedError
+            # encoded = encoder.fixed_length_one_hot()
         assert len(encoded) == len(pseudosequences)
         return encoded
 

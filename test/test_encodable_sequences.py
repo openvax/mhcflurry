@@ -1,6 +1,7 @@
 from mhcflurry import encodable_sequences
 from nose.tools import eq_
 from numpy.testing import assert_equal
+import numpy
 
 letter_to_index_dict = {
     'A': 0,
@@ -18,7 +19,13 @@ def test_index_and_one_hot_encoding():
             [0, 0, 0, 0],
             [0, 1, 2, 0],
         ])
-    one_hot = encodable_sequences.one_hot_encoding(index_encoding, 3)
+    one_hot = encodable_sequences.fixed_vectors_encoding(
+        index_encoding,
+        {
+            0: numpy.array([1, 0, 0]),
+            1: numpy.array([0, 1, 0]),
+            2: numpy.array([0, 0, 1]),
+        }.get)
     eq_(one_hot.shape, (2, 4, 3))
     assert_equal(
         one_hot[0],
