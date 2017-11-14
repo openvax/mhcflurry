@@ -129,7 +129,7 @@ notebook for an overview of the Python API, including fitting your own predictor
 An ensemble of eight single-allele models was trained for each allele with at least
 100 measurements in the training set (118 alleles). The models were trained on a
 random 80% sample of the data for the allele and the remaining 20% was used for
-early stopping. All models use the same [architecture](downloads-generation/models_class1/hyperparameters.json). The
+early stopping. All models use the same [architecture](downloads-generation/models_class1/hyperparameters.yaml). The
 predictions are taken to be the geometric mean of the nM binding affinity
 predictions of the individual models. The training script is [here](downloads-generation/models_class1/GENERATE.sh).
 
