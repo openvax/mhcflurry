@@ -53,7 +53,7 @@ def test_run():
     try:
         models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
         hyperparameters_filename = os.path.join(
-            models_dir, "hyperparameters.json")
+            models_dir, "hyperparameters.yaml")
         with open(hyperparameters_filename, "w") as fd:
             json.dump(HYPERPARAMETERS, fd)
 
