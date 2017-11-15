@@ -12,8 +12,14 @@ class PercentRankTransform(object):
 
     def fit(self, values, bins):
         """
-        Fit the transform using the given values, which are used to
-        establish percentiles.
+        Fit the transform using the given values (in our case ic50s).
+
+        Parameters
+        ----------
+        values : ic50 values
+        bins : bins for the cumulative distribution function
+            Anything that can be passed to numpy.histogram's "bins" argument
+            can be used here.
         """
         assert self.cdf is None
         assert self.bin_edges is None
