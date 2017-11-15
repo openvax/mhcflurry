@@ -558,8 +558,8 @@ class Class1AffinityPredictor(object):
         df["allele"] = alleles
         df["result"] = numpy.nan
         for (allele, sub_df) in df.groupby("allele"):
-            df.loc[sub_df.index, "result"] = self.percentile_ranks\
-                (sub_df.affinity, allele=allele)
+            df.loc[sub_df.index, "result"] = self.percentile_ranks(
+                sub_df.affinity, allele=allele)
         assert not df.result.isnull().any()
         return df.result.values
 
