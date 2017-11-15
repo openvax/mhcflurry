@@ -30,14 +30,14 @@ try:
     with open(readme_filename, 'r') as f:
         readme = f.read()
 except:
-    logging.warn("Failed to load %s" % readme_filename)
+    logging.warning("Failed to load %s" % readme_filename)
     readme = ""
 
 try:
     import pypandoc
     readme = pypandoc.convert(readme, to='rst', format='md')
 except:
-    logging.warn("Conversion of long_description from MD to RST failed")
+    logging.warning("Conversion of long_description from MD to RST failed")
     pass
 
 with open('mhcflurry/__init__.py', 'r') as f:
@@ -51,12 +51,13 @@ if __name__ == '__main__':
         'six',
         'numpy>=1.11',
         'pandas>=0.13.1',
-        'Keras==2.0.8',
+        'Keras==2.0.9',
         'appdirs',
-        'tensorflow',
+        'tensorflow>=1.1.0',
         'scikit-learn',
         'typechecks',
         'mhcnames',
+        'pyyaml',
     ]
     if PY2:
         # concurrent.futures is a standard library in Py3 but Py2

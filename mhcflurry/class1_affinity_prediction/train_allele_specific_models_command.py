@@ -5,7 +5,7 @@ Train Class1 single allele models.
 import os
 import sys
 import argparse
-import json
+import yaml
 
 import pandas
 
@@ -31,7 +31,7 @@ parser.add_argument(
     "--hyperparameters",
     metavar="FILE.json",
     required=True,
-    help="JSON of hyperparameters")
+    help="JSON or YAML of hyperparameters")
 parser.add_argument(
     "--allele",
     default=None,
@@ -61,7 +61,7 @@ def run(argv=sys.argv[1:]):
 
     configure_logging(verbose=args.verbosity > 1)
 
-    hyperparameters_lst = json.load(open(args.hyperparameters))
+    hyperparameters_lst = yaml.load(open(args.hyperparameters))
     assert isinstance(hyperparameters_lst, list)
     print("Loaded hyperparameters list: %s" % str(hyperparameters_lst))
 

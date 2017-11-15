@@ -25,11 +25,11 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 mkdir models
 
-cp $SCRIPT_DIR/hyperparameters.json .
+cp $SCRIPT_DIR/hyperparameters.yaml .
 
 time mhcflurry-class1-train-allele-specific-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
-    --hyperparameters hyperparameters.json \
+    --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
     --min-measurements-per-allele 200
 
