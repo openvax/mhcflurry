@@ -6,6 +6,7 @@ import os
 import sys
 import argparse
 import yaml
+import time
 
 import pandas
 
@@ -49,6 +50,13 @@ parser.add_argument(
     action="store_true",
     default=False,
     help="Use only quantitative training data")
+parser.add_argument(
+    "--percent-rank-calibration-num-peptides-per-length",
+    type=int,
+    default=int(1e5),
+    help="Number of peptides per length to use to calibrate percent ranks. "
+    "Set to 0 to disable percent rank calibration. The resulting models will "
+    "not support percent ranks")
 parser.add_argument(
     "--verbosity",
     type=int,
@@ -125,6 +133,15 @@ def run(argv=sys.argv[1:]):
                     peptides=train_data.peptide.values,
                     affinities=train_data.measurement_value.values,
                     models_dir_for_save=args.out_models_dir)
+
+    if args.percent_rank_calibration_num_peptides_per_length > 0:
+        start = time.time()
+        print("Performing percent rank calibration.")
+        predictor.calibrate_percentile_ranks(
+            num_peptides_per_length=args.percent_rank_calibration_num_peptides_per_length)
+        print("Finished calibrating percent ranks in %0.2f sec." % (
+            time.time() - start))
+        predictor.save(args.out_models_dir, model_names_to_write=[])
 
 
 if __name__ == '__main__':

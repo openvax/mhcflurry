@@ -21,6 +21,7 @@ HYPERPARAMETERS = [
         "random_negative_rate": 0.0,
         "random_negative_constant": 25,
 
+        "peptide_amino_acid_encoding": "BLOSUM62",
         "use_embedding": False,
         "kmer_size": 15,
         "batch_normalization": False,
@@ -50,29 +51,33 @@ HYPERPARAMETERS = [
 
 
 def test_run():
-    try:
-        models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
-        hyperparameters_filename = os.path.join(
-            models_dir, "hyperparameters.yaml")
-        with open(hyperparameters_filename, "w") as fd:
-            json.dump(HYPERPARAMETERS, fd)
+    models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
+    hyperparameters_filename = os.path.join(
+        models_dir, "hyperparameters.yaml")
+    with open(hyperparameters_filename, "w") as fd:
+        json.dump(HYPERPARAMETERS, fd)
 
-        args = [
-            "--data", get_path("data_curated", "curated_training_data.csv.bz2"),
-            "--hyperparameters", hyperparameters_filename,
-            "--min-measurements-per-allele", "9000",
-            "--out-models-dir", models_dir,
-        ]
-        print("Running with args: %s" % args)
-        train_allele_specific_models_command.run(args)
+    args = [
+        "--data", get_path("data_curated", "curated_training_data.csv.bz2"),
+        "--hyperparameters", hyperparameters_filename,
+        "--min-measurements-per-allele", "9000",
+        "--out-models-dir", models_dir,
+        "--percent-rank-calibration-num-peptides-per-length", "1000",
+    ]
+    print("Running with args: %s" % args)
+    train_allele_specific_models_command.run(args)
 
-        result = Class1AffinityPredictor.load(models_dir)
-        predictions = result.predict(
+    result = Class1AffinityPredictor.load(models_dir)
+    predictions = result.predict(
+        peptides=["SLYNTVATL"],
+        alleles=["HLA-A*02:01"])
+    assert_equal(predictions.shape, (1,))
+    assert_array_less(predictions, 500)
+    df = result.predict_to_dataframe(
             peptides=["SLYNTVATL"],
             alleles=["HLA-A*02:01"])
-        assert_equal(predictions.shape, (1,))
-        assert_array_less(predictions, 500)
+    print(df)
+    assert "prediction_percentile" in df.columns
 
-    finally:
-        print("Deleting: %s" % models_dir)
-        shutil.rmtree(models_dir)
+    print("Deleting: %s" % models_dir)
+    shutil.rmtree(models_dir)

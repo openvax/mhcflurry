@@ -16,10 +16,8 @@ from keras.layers.normalization import BatchNormalization
 
 from mhcflurry.hyperparameters import HyperparameterDefaults
 
-from ..encodable_sequences import (
-    EncodableSequences,
-    available_vector_encodings,
-    vector_encoding_length)
+from ..encodable_sequences import EncodableSequences
+from ..amino_acid import available_vector_encodings, vector_encoding_length
 from ..regression_target import to_ic50, from_ic50
 from ..common import random_peptides, amino_acid_distribution
 
