@@ -525,7 +525,7 @@ class Class1AffinityPredictor(object):
             transform.fit(predictions, bins=bins)
             self.allele_to_percent_rank_transform[allele] = transform
 
-    def percentile_ranks(self, affinities, allele=None, alleles=None):
+    def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
         """
         Return percentile ranks for the given ic50 affinities and alleles.
 
@@ -538,6 +538,10 @@ class Class1AffinityPredictor(object):
             nM affinities
         allele : string
         alleles : sequence of string
+        throw : boolean
+            If True, a ValueError will be raised in the case of unsupported
+            alleles. If False, a warning will be logged and NaN will be returned
+            for those percentile ranks.
 
         Returns
         -------
@@ -548,8 +552,13 @@ class Class1AffinityPredictor(object):
                 transform = self.allele_to_percent_rank_transform[allele]
                 return transform.transform(affinities)
             except KeyError:
-                raise ValueError(
-                    "Allele %s has no percentile rank information" % allele)
+                msg = "Allele %s has no percentile rank information" % allele
+                if throw:
+                    raise ValueError(msg)
+                else:
+                    warnings.warn(msg)
+                    # Return NaNs
+                    return numpy.ones(len(affinities)) * numpy.nan
 
         if alleles is None:
             raise ValueError("Specify allele or alleles")
@@ -559,7 +568,7 @@ class Class1AffinityPredictor(object):
         df["result"] = numpy.nan
         for (allele, sub_df) in df.groupby("allele"):
             df.loc[sub_df.index, "result"] = self.percentile_ranks(
-                sub_df.affinity, allele=allele)
+                sub_df.affinity, allele=allele, throw=throw)
         assert not df.result.isnull().any()
         return df.result.values
 
@@ -752,7 +761,7 @@ class Class1AffinityPredictor(object):
         if include_percentile_ranks:
             if self.allele_to_percent_rank_transform:
                 result["prediction_percentile"] = self.percentile_ranks(
-                    df.prediction, alleles=df.allele.values)
+                    df.prediction, alleles=df.allele.values, throw=throw)
             else:
                 warnings.warn("No percentile rank information available.")
         return result
