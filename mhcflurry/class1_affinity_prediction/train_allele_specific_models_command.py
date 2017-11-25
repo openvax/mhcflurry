@@ -60,6 +60,19 @@ parser.add_argument(
     "Set to 0 to disable percent rank calibration. The resulting models will "
     "not support percent ranks")
 parser.add_argument(
+    "--n-models",
+    type=int,
+    metavar="N",
+    help="Ensemble size, i.e. how many models to train for each architecture. "
+    "If specified here it overrides any 'n_models' specified in the "
+    "hyperparameters.")
+parser.add_argument(
+    "--max-epochs",
+    type=int,
+    metavar="N",
+    help="Max training epochs. If specified here it overrides any 'max_epochs' "
+    "specified in the hyperparameters.")
+parser.add_argument(
     "--verbosity",
     type=int,
     help="Keras verbosity. Default: %(default)s",
@@ -114,7 +127,16 @@ def run(argv=sys.argv[1:]):
         print("Done.")
 
     for (h, hyperparameters) in enumerate(hyperparameters_lst):
-        n_models = hyperparameters.pop("n_models")
+        n_models = None
+        if 'n_models' in hyperparameters:
+            n_models = hyperparameters.pop("n_models")
+        if args.n_models:
+            n_models = args.n_models
+        if not n_models:
+            raise ValueError("Specify --ensemble-size or n_models hyperparameter")
+
+        if args.max_epochs:
+            hyperparameters['max_epochs'] = args.max_epochs
 
         for model_group in range(n_models):
             for (i, allele) in enumerate(alleles):
