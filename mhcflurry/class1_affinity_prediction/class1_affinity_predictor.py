@@ -569,7 +569,6 @@ class Class1AffinityPredictor(object):
         for (allele, sub_df) in df.groupby("allele"):
             df.loc[sub_df.index, "result"] = self.percentile_ranks(
                 sub_df.affinity, allele=allele, throw=throw)
-        assert not df.result.isnull().any()
         return df.result.values
 
     def predict(self, peptides, alleles=None, allele=None, throw=True):
