@@ -37,9 +37,9 @@ time mhcflurry-class1-train-allele-specific-models \
     --alleles $ALLELES &
 
 # Model variations on qualitative + quantitative
-for mod in 0local_noL1 0local 1local dense16 dense64 noL1 
+for mod in 0local_noL1 0local 2local dense16 dense64 noL1 onehot embedding
 do
-    cp $SCRIPT_DIR/hyperparameters-${mod}.json .
+    cp $SCRIPT_DIR/hyperparameters-${mod}.yaml .
     mkdir models-${mod}
     time mhcflurry-class1-train-allele-specific-models \
         --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \

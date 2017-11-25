@@ -24,9 +24,8 @@
 # PEPTIDE REPRESENTATION
 ##########################################
 # One of "one-hot", "embedding", or "BLOSUM62".
-"peptide_amino_acid_encoding": "BLOSUM62",
+"peptide_amino_acid_encoding": "one-hot",
 "use_embedding": false,  # maintained for backward compatability
-"embedding_output_dim": 8,  # only used if using embedding
 "kmer_size": 15,
 
 ##########################################
