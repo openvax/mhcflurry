@@ -23,6 +23,8 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
+ALLELES="HLA-A*01:01 HLA-A*02:01 HLA-A*02:03 HLA-A*02:07 HLA-A*03:01 HLA-A*11:01 HLA-A*24:02 HLA-A*29:02 HLA-A*31:01 HLA-A*68:02 HLA-B*07:02 HLA-B*15:01 HLA-B*35:01 HLA-B*44:02 HLA-B*44:03 HLA-B*51:01 HLA-B*54:01 HLA-B*57:01"
+
 # Standard architecture on quantitative only
 cp $SCRIPT_DIR/hyperparameters-standard.json .
 mkdir models-standard-quantitative
@@ -31,7 +33,8 @@ time mhcflurry-class1-train-allele-specific-models \
     --only-quantitative \
     --hyperparameters hyperparameters-standard.json \
     --out-models-dir models-standard-quantitative \
-    --min-measurements-per-allele 100 &
+    --percent-rank-calibration-num-peptides-per-length 0 \
+    --alleles $ALLELES &
 
 # Model variations on qualitative + quantitative
 for mod in 0local_noL1 0local 1local dense16 dense64 noL1 
@@ -42,7 +45,8 @@ do
         --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
         --hyperparameters hyperparameters-${mod}.json \
         --out-models-dir models-${mod} \
-        --min-measurements-per-allele 100 &
+        --percent-rank-calibration-num-peptides-per-length 0 \
+        --alleles $ALLELES &
 done
 wait
 
