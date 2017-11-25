@@ -747,23 +747,25 @@ class Class1AffinityPredictor(object):
         df["prediction_low"] = numpy.exp(logs.quantile(0.05, axis=1))
         df["prediction_high"] = numpy.exp(logs.quantile(0.95, axis=1))
 
-        del df["normalized_allele"]
-        del df["supported_peptide_length"]
         if include_individual_model_predictions:
             columns = sorted(df.columns, key=lambda c: c.startswith('model_'))
         else:
             columns = [
                 c for c in df.columns if c not in df_predictions.columns
             ]
+        columns.remove("normalized_allele")
+        columns.remove("supported_peptide_length")
 
-        result = df[columns].copy()
         if include_percentile_ranks:
             if self.allele_to_percent_rank_transform:
-                result["prediction_percentile"] = self.percentile_ranks(
-                    df.prediction, alleles=df.allele.values, throw=throw)
+                df["prediction_percentile"] = self.percentile_ranks(
+                    df.prediction,
+                    alleles=df.normalized_allele.values,
+                    throw=throw)
+                columns.append("prediction_percentile")
             else:
                 warnings.warn("No percentile rank information available.")
-        return result
+        return df[columns].copy()
 
     @staticmethod
     def save_weights(weights_list, filename):

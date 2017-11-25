@@ -123,6 +123,24 @@ Run `mhcflurry-predict -h` for details.
 See the [class1_allele_specific_models.ipynb](https://github.com/hammerlab/mhcflurry/blob/master/examples/class1_allele_specific_models.ipynb)
 notebook for an overview of the Python API, including fitting your own predictors.
 
+## Scanning protein sequences for predicted epitopes
+
+The [mhctools](https://github.com/hammerlab/mhctools) package provides support
+for scanning protein sequences to find predicted epitopes. It supports MHCflurry
+as well as other binding predictors. Here is an example:
+
+```
+# First install mhctools if needed:
+pip install mhctools
+
+# Now generate predictions for protein sequences in FASTA format:
+mhctools \
+    --mhc-predictor mhcflurry \
+    --input-fasta-file INPUT.fasta \
+    --mhc-alleles A02:01,A03:01 \
+    --extract-subsequences \
+    --out RESULT.csv
+```
 
 ## Details on the downloadable models
 

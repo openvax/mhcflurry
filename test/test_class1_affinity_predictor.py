@@ -163,6 +163,7 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
         peptides=df.peptide.values,
         affinities=df.measurement_value.values,
     )
+    predictor.calibrate_percentile_ranks()
     ic50_pred = predictor.predict(df.peptide.values, allele=allele)
     ic50_true = df.measurement_value.values
     eq_(len(ic50_pred), len(ic50_true))
@@ -175,6 +176,8 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
     ic50_pred_df = predictor.predict_to_dataframe(
         df.peptide.values, allele=allele)
     print(ic50_pred_df)
+    assert 'prediction_percentile' in ic50_pred_df.columns
+    assert ic50_pred_df.prediction_percentile.isnull().sum() == 0
 
     ic50_pred_df2 = predictor.predict_to_dataframe(
         df.peptide.values,
