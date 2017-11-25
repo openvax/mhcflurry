@@ -2,7 +2,7 @@
 ##########################################
 # ENSEMBLE SIZE
 ##########################################
-"n_models": 12,
+"n_models": 8,
 
 ##########################################
 # OPTIMIZATION
@@ -32,11 +32,6 @@
 # NEURAL NETWORK ARCHITECTURE
 ##########################################
 "locally_connected_layers": [
-    {
-        "filters": 8,
-        "activation": "tanh",
-        "kernel_size": 3
-    },
     {
         "filters": 8,
         "activation": "tanh",

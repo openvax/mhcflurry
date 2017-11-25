@@ -31,7 +31,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
-    --min-measurements-per-allele 200
+    --min-measurements-per-allele 100
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
