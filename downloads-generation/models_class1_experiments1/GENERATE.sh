@@ -26,12 +26,12 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 ALLELES="HLA-A*01:01 HLA-A*02:01 HLA-A*02:03 HLA-A*02:07 HLA-A*03:01 HLA-A*11:01 HLA-A*24:02 HLA-A*29:02 HLA-A*31:01 HLA-A*68:02 HLA-B*07:02 HLA-B*15:01 HLA-B*35:01 HLA-B*44:02 HLA-B*44:03 HLA-B*51:01 HLA-B*54:01 HLA-B*57:01"
 
 # Standard architecture on quantitative only
-cp $SCRIPT_DIR/hyperparameters-standard.json .
+cp $SCRIPT_DIR/hyperparameters-standard.yaml .
 mkdir models-standard-quantitative
 time mhcflurry-class1-train-allele-specific-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
     --only-quantitative \
-    --hyperparameters hyperparameters-standard.json \
+    --hyperparameters hyperparameters-standard.yaml \
     --out-models-dir models-standard-quantitative \
     --percent-rank-calibration-num-peptides-per-length 0 \
     --alleles $ALLELES &
@@ -43,7 +43,7 @@ do
     mkdir models-${mod}
     time mhcflurry-class1-train-allele-specific-models \
         --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
-        --hyperparameters hyperparameters-${mod}.json \
+        --hyperparameters hyperparameters-${mod}.yaml \
         --out-models-dir models-${mod} \
         --percent-rank-calibration-num-peptides-per-length 0 \
         --alleles $ALLELES &
