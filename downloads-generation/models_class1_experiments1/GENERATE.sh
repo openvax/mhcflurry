@@ -34,10 +34,10 @@ time mhcflurry-class1-train-allele-specific-models \
     --hyperparameters hyperparameters-standard.yaml \
     --out-models-dir models-standard-quantitative \
     --percent-rank-calibration-num-peptides-per-length 0 \
-    --alleles $ALLELES &
+    --allele $ALLELES 2>&1 | tee -a LOG.standard.txt &
 
 # Model variations on qualitative + quantitative
-for mod in 0local_noL1 0local 2local dense16 dense64 noL1 onehot embedding
+for mod in 0local_noL1 0local 2local widelocal dense16 dense64 noL1 onehot embedding
 do
     cp $SCRIPT_DIR/hyperparameters-${mod}.yaml .
     mkdir models-${mod}
@@ -46,12 +46,15 @@ do
         --hyperparameters hyperparameters-${mod}.yaml \
         --out-models-dir models-${mod} \
         --percent-rank-calibration-num-peptides-per-length 0 \
-        --alleles $ALLELES &
+        --allele $ALLELES 2>&1 | tee -a LOG.${mod}.txt &
 done
 wait
 
 cp $SCRIPT_ABSOLUTE_PATH .
-bzip2 LOG.txt
+for i in $(ls *.txt)
+do
+    bzip2 $i
+done
 tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
 
 echo "Created archive: $SCRATCH_DIR/$DOWNLOAD_NAME.tar.bz2"
