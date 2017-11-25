@@ -455,7 +455,7 @@ class Class1NeuralNetwork(object):
             for (key, value) in fit_history.history.items():
                 self.loss_history[key].extend(value)
 
-            logging.info(
+            print(
                 "Epoch %3d / %3d: loss=%g. Min val loss at epoch %s" % (
                     i,
                     self.hyperparameters['max_epochs'],

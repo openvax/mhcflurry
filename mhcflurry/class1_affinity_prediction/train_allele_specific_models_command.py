@@ -7,6 +7,8 @@ import sys
 import argparse
 import yaml
 import time
+import signal
+import traceback
 
 import pandas
 
@@ -65,6 +67,10 @@ parser.add_argument(
 
 
 def run(argv=sys.argv[1:]):
+    # On sigusr1 print stack trace
+    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
+    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+
     args = parser.parse_args(argv)
 
     configure_logging(verbose=args.verbosity > 1)

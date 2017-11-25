@@ -59,7 +59,7 @@ def test_a1_known_epitopes_in_newly_trained_model():
     ]
 
     hyperparameters = {
-        "max_epochs": 500,
+        "max_epochs": 100,
         "patience": 10,
         "early_stopping": True,
         "validation_split": 0.2,
@@ -67,15 +67,11 @@ def test_a1_known_epitopes_in_newly_trained_model():
         "random_negative_rate": 0.0,
         "random_negative_constant": 25,
 
+        "peptide_amino_acid_encoding": "BLOSUM62",
         "use_embedding": False,
         "kmer_size": 15,
         "batch_normalization": False,
         "locally_connected_layers": [
-            {
-                "filters": 8,
-                "activation": "tanh",
-                "kernel_size": 3
-            },
             {
                 "filters": 8,
                 "activation": "tanh",
@@ -129,7 +125,7 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
     hyperparameters = dict(
         activation="tanh",
         layer_sizes=[64],
-        max_epochs=500,
+        max_epochs=100,
         early_stopping=False,
         validation_split=0.0,
         locally_connected_layers=[],
@@ -163,7 +159,7 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
         peptides=df.peptide.values,
         affinities=df.measurement_value.values,
     )
-    predictor.calibrate_percentile_ranks()
+    predictor.calibrate_percentile_ranks(num_peptides_per_length=1000)
     ic50_pred = predictor.predict(df.peptide.values, allele=allele)
     ic50_true = df.measurement_value.values
     eq_(len(ic50_pred), len(ic50_true))

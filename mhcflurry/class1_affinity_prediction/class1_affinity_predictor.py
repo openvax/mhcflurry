@@ -484,9 +484,10 @@ class Class1AffinityPredictor(object):
     def calibrate_percentile_ranks(
             self,
             peptides=None,
-            num_peptides_per_length=int(1e6),
+            num_peptides_per_length=int(1e5),
             alleles=None,
-            bins=None):
+            bins=None,
+            quiet=False):
         """
         Compute the cumulative distribution of ic50 values for a set of alleles
         over a large universe of random peptides, to enable computing quantiles in
@@ -503,6 +504,12 @@ class Class1AffinityPredictor(object):
         alleles : sequence of string, optional
             Alleles to perform calibration for. If not specified all supported
             alleles will be calibrated.
+        bins : object
+            Anything that can be passed to numpy.histogram's "bins" argument
+            can be used here, i.e. either an integer or a sequence giving bin
+            edges. This is in ic50 space.
+        quiet : boolean
+            If False (default), status updates will be printed to stdout.
         """
         if bins is None:
             bins = to_ic50(numpy.linspace(1, 0, 1000))
@@ -519,11 +526,25 @@ class Class1AffinityPredictor(object):
                 peptides.extend(
                     random_peptides(num_peptides_per_length, length))
 
-        for allele in alleles:
+        if quiet:
+            def msg(s):
+                pass
+        else:
+            def msg(s):
+                print(s)
+
+        for (i, allele) in enumerate(alleles):
+            msg("Calibrating percentile ranks for allele %03d/%03d: %s" % (
+                i + 1, len(alleles), allele))
+            start = time.time()
             predictions = self.predict(peptides, allele=allele)
+            msg("Generated %d predictions in %0.2f sec." % (
+                len(predictions), time.time() - start))
             transform = PercentRankTransform()
             transform.fit(predictions, bins=bins)
             self.allele_to_percent_rank_transform[allele] = transform
+            msg("Done calibrating allele %s in %0.2f sec." % (
+                allele, time.time() - start))
 
     def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
         """
