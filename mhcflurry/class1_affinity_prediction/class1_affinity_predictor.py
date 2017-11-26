@@ -6,6 +6,7 @@ from os.path import join, exists
 from six import string_types
 import logging
 import warnings
+import sys
 
 import numpy
 import pandas
@@ -532,12 +533,14 @@ class Class1AffinityPredictor(object):
         else:
             def msg(s):
                 print(s)
+                sys.stdout.flush()
 
+        encoded_peptides = EncodableSequences.create(peptides)
         for (i, allele) in enumerate(alleles):
             msg("Calibrating percentile ranks for allele %03d/%03d: %s" % (
                 i + 1, len(alleles), allele))
             start = time.time()
-            predictions = self.predict(peptides, allele=allele)
+            predictions = self.predict(encoded_peptides, allele=allele)
             msg("Generated %d predictions in %0.2f sec." % (
                 len(predictions), time.time() - start))
             transform = PercentRankTransform()
