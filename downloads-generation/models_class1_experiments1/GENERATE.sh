@@ -8,6 +8,9 @@ SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 
+# Terminate children on exit
+trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
+
 mkdir -p "$SCRATCH_DIR"
 rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
 mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
@@ -37,7 +40,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --allele $ALLELES 2>&1 | tee -a LOG.standard.txt &
 
 # Model variations on qualitative + quantitative
-for mod in 0local_noL1 0local 2local widelocal dense8 dense16 dense64 noL1 onehot embedding
+for mod in 0local_noL1 0local 2local widelocal dense8 dense32 dense64 noL1 onehot embedding
 do
     cp $SCRIPT_DIR/hyperparameters-${mod}.yaml .
     mkdir models-${mod}
