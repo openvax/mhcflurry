@@ -21,7 +21,6 @@ import collections
 from copy import copy
 
 import pandas
-import numpy
 from six import StringIO
 
 
@@ -136,21 +135,27 @@ def index_encoding(sequences, letter_to_index_dict):
     return result.values
 
 
-def fixed_vectors_encoding(sequences, letter_to_vector_function):
+def fixed_vectors_encoding(sequences, letter_to_vector_df):
     """
-    Given a sequence of n strings all of length k, return a n * k * m array where
-    the (i, j)th element is letter_to_vector_function(sequence[i][j]).
+    Given a sequence of n strings all of length k, and a dataframe mapping each
+    character to an arbitrary vector, return a n * k * m array where
+    the (i, j)th element is letter_to_vector_df.loc[sequence[i][j]].
 
     Parameters
     ----------
     sequences : list of length n of strings of length k
-    letter_to_vector_function : function : string -> vector of length m
+    letter_to_vector_df : pandas.DataFrame of shape (alphabet size, m)
+        The index of the dataframe should be amino acid characters.
 
     Returns
     -------
     numpy.array of integers with shape (n, k, m)
     """
-    arr = numpy.array([list(s) for s in sequences])
-    result = numpy.vectorize(
-        letter_to_vector_function, signature='()->(n)')(arr)
+    target_shape = (
+        len(sequences),
+        len(sequences[0]),
+        letter_to_vector_df.shape[0])
+    result = letter_to_vector_df.loc[
+            (letter for seq in sequences for letter in seq)
+    ].values.reshape(target_shape)
     return result
