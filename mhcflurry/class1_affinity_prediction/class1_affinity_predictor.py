@@ -753,7 +753,11 @@ class Class1AffinityPredictor(object):
                 mask = (
                     (df.normalized_allele == allele) &
                     df.supported_peptide_length).values
-                if mask.sum() > 0:
+                if mask.all():
+                    # Common case optimization
+                    for (i, model) in enumerate(models):
+                        df["model_single_%d" % i] = model.predict(peptides)
+                elif mask.sum() > 0:
                     allele_peptides = EncodableSequences.create(
                         df.ix[mask].peptide.values)
                     for (i, model) in enumerate(models):
