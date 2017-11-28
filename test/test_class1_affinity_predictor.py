@@ -132,7 +132,6 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
         dense_layer_l1_regularization=0.0,
         dropout_probability=0.0)
 
-    # First test a Class1NeuralNetwork, then a Class1AffinityPredictor.
     allele = "HLA-A*02:05"
 
     df = pandas.read_csv(

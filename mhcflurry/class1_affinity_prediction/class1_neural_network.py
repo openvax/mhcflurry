@@ -479,7 +479,7 @@ class Class1NeuralNetwork(object):
                         break
         self.fit_seconds = time.time() - start
 
-    def predict(self, peptides, allele_pseudosequences=None):
+    def predict(self, peptides, allele_pseudosequences=None, batch_size=4096):
         """
         Predict affinities
         
@@ -489,6 +489,9 @@ class Class1NeuralNetwork(object):
         
         allele_pseudosequences : EncodableSequences or list of string, optional
             Only required when this model is a pan-allele model
+
+        batch_size : int
+            batch_size passed to Keras
 
         Returns
         -------
@@ -501,8 +504,10 @@ class Class1NeuralNetwork(object):
             pseudosequences_input = self.pseudosequence_to_network_input(
                 allele_pseudosequences)
             x_dict['pseudosequence'] = pseudosequences_input
-        (predictions,) = numpy.array(
-            self.network(borrow=True).predict(x_dict), dtype="float64").T
+
+        network = self.network(borrow=True)
+        raw_predictions = network.predict(x_dict, batch_size=batch_size)
+        predictions = numpy.array(raw_predictions, dtype = "float64")[:,0]
         return to_ic50(predictions)
 
     def compile(self):

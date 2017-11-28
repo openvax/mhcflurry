@@ -60,9 +60,9 @@ def test_run():
     args = [
         "--data", get_path("data_curated", "curated_training_data.csv.bz2"),
         "--hyperparameters", hyperparameters_filename,
-        "--min-measurements-per-allele", "9000",
+        "--allele", "HLA-A*02:01", "HLA-A*01:01", "HLA-A*03:01",
         "--out-models-dir", models_dir,
-        "--percent-rank-calibration-num-peptides-per-length", "1000",
+        "--percent-rank-calibration-num-peptides-per-length", "10000",
     ]
     print("Running with args: %s" % args)
     train_allele_specific_models_command.run(args)
