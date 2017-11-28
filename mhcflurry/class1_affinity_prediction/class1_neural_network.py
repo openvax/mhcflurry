@@ -54,11 +54,6 @@ class Class1NeuralNetwork(object):
                 "filters": 8,
                 "activation": "tanh",
                 "kernel_size": 3
-            },
-            {
-                "filters": 8,
-                "activation": "tanh",
-                "kernel_size": 3
             }
         ],
     )
@@ -77,6 +72,7 @@ class Class1NeuralNetwork(object):
         take_best_epoch=False,  # currently unused
         validation_split=0.2,
         early_stopping=True,
+        minibatch_size=128,
         random_negative_rate=0.0,
         random_negative_constant=25,
         random_negative_affinity_min=20000.0,
@@ -447,6 +443,7 @@ class Class1NeuralNetwork(object):
                 x_dict_with_random_negatives,
                 y_dict_with_random_negatives,
                 shuffle=True,
+                batch_size=self.hyperparameters['minibatch_size'],
                 verbose=verbose,
                 epochs=1,
                 validation_split=self.hyperparameters['validation_split'],

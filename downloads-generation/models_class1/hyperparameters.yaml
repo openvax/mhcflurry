@@ -8,9 +8,10 @@
 # OPTIMIZATION
 ##########################################
 "max_epochs": 500,
-"patience": 10,
+"patience": 20,
 "early_stopping": true,
 "validation_split": 0.2,
+"minibatch_size": 128,
 
 ##########################################
 # RANDOM NEGATIVE PEPTIDES
