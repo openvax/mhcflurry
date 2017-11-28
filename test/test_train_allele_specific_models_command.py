@@ -50,7 +50,7 @@ HYPERPARAMETERS = [
 ]
 
 
-def test_run():
+def run_and_check(n_jobs=0):
     models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
     hyperparameters_filename = os.path.join(
         models_dir, "hyperparameters.yaml")
@@ -63,6 +63,7 @@ def test_run():
         "--allele", "HLA-A*02:01", "HLA-A*01:01", "HLA-A*03:01",
         "--out-models-dir", models_dir,
         "--percent-rank-calibration-num-peptides-per-length", "10000",
+        "--parallelization-num-jobs", str(n_jobs),
     ]
     print("Running with args: %s" % args)
     train_allele_specific_models_command.run(args)
@@ -81,3 +82,10 @@ def test_run():
 
     print("Deleting: %s" % models_dir)
     shutil.rmtree(models_dir)
+
+def Xtest_run_parallel():
+    run_and_check(n_jobs=3)
+
+
+def test_run_serial():
+    run_and_check(n_jobs=1)
