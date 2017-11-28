@@ -200,7 +200,7 @@ def run(argv=sys.argv[1:]):
 
                 # When running in serial we try to estimate time remaining.
                 data_trained_on += len(item['data'])
-                progress = data_trained_on / total_data_to_train_on
+                progress = float(data_trained_on) / total_data_to_train_on
                 time_elapsed = time.time() - start
                 total_time = time_elapsed / progress
                 print(
