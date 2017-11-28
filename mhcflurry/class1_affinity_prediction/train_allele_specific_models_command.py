@@ -55,10 +55,11 @@ parser.add_argument(
 parser.add_argument(
     "--percent-rank-calibration-num-peptides-per-length",
     type=int,
+    metavar="N",
     default=int(1e5),
     help="Number of peptides per length to use to calibrate percent ranks. "
     "Set to 0 to disable percent rank calibration. The resulting models will "
-    "not support percent ranks")
+    "not support percent ranks. Default: %(default)s.")
 parser.add_argument(
     "--n-models",
     type=int,
