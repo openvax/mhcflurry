@@ -317,7 +317,8 @@ class Class1NeuralNetwork(object):
             affinities,
             allele_pseudosequences=None,
             sample_weights=None,
-            verbose=1):
+            verbose=1,
+            progress_preamble=""):
         """
         Fit the neural network.
         
@@ -338,6 +339,9 @@ class Class1NeuralNetwork(object):
         
         verbose : int
             Keras verbosity level
+
+        progress_preamble : string
+            Optional string of information to include in each progress update
         """
 
         self.fit_num_points = len(peptides)
@@ -453,11 +457,14 @@ class Class1NeuralNetwork(object):
                 self.loss_history[key].extend(value)
 
             print(
-                "Epoch %3d / %3d: loss=%g. Min val loss at epoch %s" % (
-                    i,
-                    self.hyperparameters['max_epochs'],
-                    self.loss_history['loss'][-1],
-                    min_val_loss_iteration))
+                (
+                    progress_preamble + " " +
+                    "Epoch %3d / %3d: loss=%g. Min val loss (%s) at epoch %s" % (
+                        i,
+                        self.hyperparameters['max_epochs'],
+                        self.loss_history['loss'][-1],
+                        str(min_val_loss),
+                        min_val_loss_iteration)).strip())
 
             if self.hyperparameters['validation_split']:
                 val_loss = self.loss_history['val_loss'][-1]

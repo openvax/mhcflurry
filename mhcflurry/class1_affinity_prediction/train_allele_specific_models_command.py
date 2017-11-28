@@ -79,7 +79,7 @@ parser.add_argument(
     "--verbosity",
     type=int,
     help="Keras verbosity. Default: %(default)s",
-    default=1)
+    default=0)
 parser.add_argument(
     "--parallelization-num-jobs",
     default=1,
@@ -172,6 +172,7 @@ def run(argv=sys.argv[1:]):
                     'allele': allele,
                     'sub_df': sub_df,
                     'hyperparameters': hyperparameters,
+                    'verbose': args.verbosity,
                     'predictor': predictor if not worker_pool else None,
                     'save_to': args.out_models_dir if not worker_pool else None,
                 }
@@ -220,22 +221,23 @@ def process_work(
         allele,
         sub_df,
         hyperparameters,
+        verbose,
         predictor,
         save_to):
 
     if predictor is None:
         predictor = Class1AffinityPredictor()
 
-    print(
+    progress_preamble = (
         "[%2d / %2d hyperparameters] "
-        "[%2d / %2d replicates] "
-        "[%4d / %4d alleles]: %s" % (
+        "[%4d / %4d alleles] "
+        "[%2d / %2d replicates]: %s " % (
             hyperparameter_set_num + 1,
             num_hyperparameter_sets,
-            model_group + 1,
-            n_models,
             allele_num + 1,
             n_alleles,
+            model_group + 1,
+            n_models,
             allele))
 
     train_data = sub_df.dropna().sample(frac=1.0)
@@ -245,7 +247,9 @@ def process_work(
         allele=allele,
         peptides=train_data.peptide.values,
         affinities=train_data.measurement_value.values,
-        models_dir_for_save=save_to)
+        models_dir_for_save=save_to,
+        progress_preamble=progress_preamble,
+        verbose=verbose)
 
     return predictor
 

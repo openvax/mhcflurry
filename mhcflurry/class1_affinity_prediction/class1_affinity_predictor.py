@@ -370,7 +370,8 @@ class Class1AffinityPredictor(object):
             peptides,
             affinities,
             models_dir_for_save=None,
-            verbose=1):
+            verbose=1,
+            progress_preamble=""):
         """
         Fit one or more allele specific predictors for a single allele using a
         single neural network architecture.
@@ -399,6 +400,9 @@ class Class1AffinityPredictor(object):
         verbose : int
             Keras verbosity
 
+        progress_preamble : string
+            Optional string of information to include in each progress update
+
         Returns
         -------
         list of Class1NeuralNetwork
@@ -411,7 +415,8 @@ class Class1AffinityPredictor(object):
             peptides=peptides,
             affinities=affinities,
             allele_pseudosequences=None,
-            verbose=verbose)
+            verbose=verbose,
+            progress_preamble=progress_preamble)
 
         if allele not in self.allele_to_allele_specific_models:
             self.allele_to_allele_specific_models[allele] = []
@@ -442,7 +447,8 @@ class Class1AffinityPredictor(object):
             peptides,
             affinities,
             models_dir_for_save=None,
-            verbose=1):
+            verbose=1,
+            progress_preamble=""):
         """
         Fit one or more pan-allele predictors using a single neural network
         architecture.
@@ -472,6 +478,9 @@ class Class1AffinityPredictor(object):
         verbose : int
             Keras verbosity
 
+        progress_preamble : string
+            Optional string of information to include in each progress update
+
         Returns
         -------
         list of Class1NeuralNetwork
@@ -486,7 +495,8 @@ class Class1AffinityPredictor(object):
             peptides=peptides,
             affinities=affinities,
             allele_pseudosequences=allele_pseudosequences,
-            verbose=verbose)
+            verbose=verbose,
+            progress_preamble=progress_preamble)
 
         for (i, model) in enumerate(models):
             model_name = self.model_name("pan-class1", i)
@@ -511,7 +521,8 @@ class Class1AffinityPredictor(object):
             peptides,
             affinities,
             allele_pseudosequences,
-            verbose=1):
+            verbose=1,
+            progress_preamble = ""):
         """
         Private helper method
         
@@ -523,6 +534,8 @@ class Class1AffinityPredictor(object):
         affinities : list of float
         allele_pseudosequences : EncodableSequences or list of string
         verbose : int
+        progress_preamble : string
+            Optional string of information to include in each progress update
 
         Returns
         -------
@@ -536,7 +549,8 @@ class Class1AffinityPredictor(object):
                 encodable_peptides,
                 affinities,
                 allele_pseudosequences=allele_pseudosequences,
-                verbose=verbose)
+                verbose=verbose,
+                progress_preamble=progress_preamble)
             yield model
 
     def calibrate_percentile_ranks(
