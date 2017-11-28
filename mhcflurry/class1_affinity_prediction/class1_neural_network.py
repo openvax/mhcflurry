@@ -419,6 +419,7 @@ class Class1NeuralNetwork(object):
 
         self.loss_history = collections.defaultdict(list)
         start = time.time()
+        last_progress_print = None
         for i in range(self.hyperparameters['max_epochs']):
             random_negative_peptides_list = []
             for (length, count) in num_random_negative.iteritems():
@@ -456,15 +457,17 @@ class Class1NeuralNetwork(object):
             for (key, value) in fit_history.history.items():
                 self.loss_history[key].extend(value)
 
-            print(
-                (
-                    progress_preamble + " " +
-                    "Epoch %3d / %3d: loss=%g. Min val loss (%s) at epoch %s" % (
-                        i,
-                        self.hyperparameters['max_epochs'],
-                        self.loss_history['loss'][-1],
-                        str(min_val_loss),
-                        min_val_loss_iteration)).strip())
+            # Print progress no more often than once every few seconds.
+            if not last_progress_print or time.time() - last_progress_print > 5:
+                print((progress_preamble + " " +
+                       "Epoch %3d / %3d: loss=%g. "
+                       "Min val loss (%s) at epoch %s" % (
+                           i,
+                           self.hyperparameters['max_epochs'],
+                           self.loss_history['loss'][-1],
+                           str(min_val_loss),
+                           min_val_loss_iteration)).strip())
+                last_progress_print = time.time()
 
             if self.hyperparameters['validation_split']:
                 val_loss = self.loss_history['val_loss'][-1]
@@ -479,7 +482,14 @@ class Class1NeuralNetwork(object):
                         min_val_loss_iteration +
                         self.hyperparameters['patience'])
                     if i > threshold:
-                        logging.info("Early stopping")
+                        print((progress_preamble + " " +
+                            "Early stopping at epoch %3d / %3d: loss=%g. "
+                            "Min val loss (%s) at epoch %s" % (
+                                i,
+                                self.hyperparameters['max_epochs'],
+                                self.loss_history['loss'][-1],
+                                str(min_val_loss),
+                                min_val_loss_iteration)).strip())
                         break
         self.fit_seconds = time.time() - start
 
