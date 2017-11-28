@@ -13,6 +13,7 @@ from mhcflurry.common import random_peptides
 
 DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
 
+NUM = 10000
 
 def test_speed(profile=False):
     starts = collections.OrderedDict()
@@ -30,7 +31,6 @@ def test_speed(profile=False):
         if profile:
             profilers[name].disable()
 
-    NUM = 10000
 
     start("first")
     DOWNLOADED_PREDICTOR.predict(["SIINFEKL"], allele="HLA-A*02:01")
