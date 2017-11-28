@@ -50,7 +50,7 @@ if __name__ == '__main__':
     required_packages = [
         'six',
         'numpy>=1.11',
-        'pandas>=0.13.1',
+        'pandas>=0.20.3',
         'Keras==2.0.9',
         'appdirs',
         'tensorflow>=1.1.0',
