@@ -643,7 +643,4 @@ class Class1NeuralNetwork(object):
             inputs=inputs,
             outputs=[output],
             name="predictor")
-
-        print("*** ARCHITECTURE ***")
-        model.summary()
         return model

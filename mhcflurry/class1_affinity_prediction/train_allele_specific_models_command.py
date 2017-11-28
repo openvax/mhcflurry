@@ -241,7 +241,7 @@ def process_work(
             allele))
 
     train_data = sub_df.dropna().sample(frac=1.0)
-    predictor.fit_allele_specific_predictors(
+    (model,) = predictor.fit_allele_specific_predictors(
         n_models=1,
         architecture_hyperparameters=hyperparameters,
         allele=allele,
@@ -250,6 +250,12 @@ def process_work(
         models_dir_for_save=save_to,
         progress_preamble=progress_preamble,
         verbose=verbose)
+
+    if allele_num == 0 and model_group == 0:
+        # For the first model for the first allele, print the architecture.
+        print("*** ARCHITECTURE FOR HYPERPARAMETER SET %d***" %
+              (hyperparameter_set_num + 1))
+        model.network(borrow=True).summary()
 
     return predictor
 

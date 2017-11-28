@@ -437,7 +437,7 @@ class Class1AffinityPredictor(object):
             if models_dir_for_save:
                 self.save(
                     models_dir_for_save, model_names_to_write=[model_name])
-        return models
+        return models_list
 
     def fit_class1_pan_allele_models(
             self,
@@ -498,8 +498,10 @@ class Class1AffinityPredictor(object):
             verbose=verbose,
             progress_preamble=progress_preamble)
 
+        models_list = []
         for (i, model) in enumerate(models):
             model_name = self.model_name("pan-class1", i)
+            models_list.append(model)  # models is a generator
             self.class1_pan_allele_models.append(model)
             row = pandas.Series(collections.OrderedDict([
                 ("model_name", model_name),
@@ -512,7 +514,7 @@ class Class1AffinityPredictor(object):
             if models_dir_for_save:
                 self.save(
                     models_dir_for_save, model_names_to_write=[model_name])
-        return models
+        return models_list
 
     def _fit_predictors(
             self,
