@@ -189,7 +189,8 @@ def run(argv=sys.argv[1:]):
             # Run in serial. In this case, every worker is passed the same predictor,
             # which it adds models to, so no merging is required. It also saves
             # as it goes so no saving is required at the end.
-            for item in work_items:
+            while work_items:
+                item = work_items.pop(0)
                 work_predictor = work_entrypoint(item)
                 assert work_predictor is predictor
 
