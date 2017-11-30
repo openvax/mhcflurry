@@ -86,16 +86,13 @@ class EncodableSequences(object):
             max_length)
 
         if cache_key not in self.encoding_cache:
-            fixed_length_sequences = [
-                self.sequence_to_fixed_length_string(
-                    sequence,
+            fixed_length_sequences = (
+                self.sequences_to_fixed_length_index_encoded_array(
+                    self.sequences,
                     left_edge=left_edge,
                     right_edge=right_edge,
-                    max_length=max_length)
-                for sequence in self.sequences
-            ]
-            self.encoding_cache[cache_key] = amino_acid.index_encoding(
-                fixed_length_sequences, amino_acid.AMINO_ACID_INDEX)
+                    max_length=max_length))
+            self.encoding_cache[cache_key] = fixed_length_sequences
         return self.encoding_cache[cache_key]
 
     def variable_length_to_fixed_length_vector_encoding(
@@ -130,14 +127,12 @@ class EncodableSequences(object):
             right_edge,
             max_length)
         if cache_key not in self.encoding_cache:
-            fixed_length_sequences = [
-                self.sequence_to_fixed_length_string(
-                    sequence,
+            fixed_length_sequences = (
+                self.sequences_to_fixed_length_index_encoded_array(
+                    self.sequences,
                     left_edge=left_edge,
                     right_edge=right_edge,
-                    max_length=max_length)
-                for sequence in self.sequences
-            ]
+                    max_length=max_length))
             result = amino_acid.fixed_vectors_encoding(
                 fixed_length_sequences,
                 amino_acid.ENCODING_DFS[vector_encoding_name])
@@ -145,25 +140,26 @@ class EncodableSequences(object):
             self.encoding_cache[cache_key] = result
         return self.encoding_cache[cache_key]
 
-
     @classmethod
-    def sequence_to_fixed_length_string(
-            klass, sequence, left_edge=4, right_edge=4, max_length=15):
+    def sequences_to_fixed_length_index_encoded_array(
+            klass, sequences, left_edge=4, right_edge=4, max_length=15):
         """
-        Transform a string of length at least left_edge + right_edge and at
-        most max_length into a string of length max_length using a scheme
-        designed to preserve the anchor positions of class I peptides.
-        
+        Transform a sequence of strings, where each string is of length at least
+        left_edge + right_edge and at most max_length into strings of length
+        max_length using a scheme designed to preserve the anchor positions of
+        class I peptides.
+
         The first left_edge characters in the input always map to the first
         left_edge characters in the output. Similarly for the last right_edge
         characters. The middle characters are filled in based on the length,
         with the X character filling in the blanks.
-        
+
         For example, using defaults:
-        
+
         AAAACDDDD -> AAAAXXXCXXXDDDD
-        
-        
+
+        The strings are also converted to int categorical amino acid indices.
+
         Parameters
         ----------
         sequence : string
@@ -173,30 +169,37 @@ class EncodableSequences(object):
 
         Returns
         -------
-        string of length max_length
-
+        numpy array of shape (len(sequences), max_length, 21) and dtype int
         """
-        if len(sequence) < left_edge + right_edge:
-            raise ValueError(
-                "Sequence '%s' (length %d) unsupported: length must be at "
-                "least %d" % (sequence, len(sequence), left_edge + right_edge))
-        if len(sequence) > max_length:
-            raise ValueError(
-                "Sequence '%s' (length %d) unsupported: length must be at "
-                "most %d" % (sequence, len(sequence), max_length))
+        result = numpy.ones(shape=(len(sequences), max_length), dtype=int) * -1
+        fill_value = amino_acid.AMINO_ACID_INDEX['X']
+        for (i, sequence) in enumerate(sequences):
+            sequence_indexes = [
+                amino_acid.AMINO_ACID_INDEX[char] for char in sequence
+            ]
 
-        middle_length = max_length - left_edge - right_edge
+            if len(sequence) < left_edge + right_edge:
+                raise ValueError(
+                    "Sequence '%s' (length %d) unsupported: length must be at "
+                    "least %d" % (
+                    sequence, len(sequence), left_edge + right_edge))
+            if len(sequence) > max_length:
+                raise ValueError(
+                    "Sequence '%s' (length %d) unsupported: length must be at "
+                    "most %d" % (sequence, len(sequence), max_length))
 
-        num_null = max_length - len(sequence)
-        num_null_left = int(math.ceil(num_null / 2))
-        num_null_right = int(math.floor(num_null / 2))
-        num_not_null_middle = middle_length - num_null
-        string_encoding = "".join([
-            sequence[:left_edge],
-            klass.unknown_character * num_null_left,
-            sequence[left_edge:left_edge + num_not_null_middle],
-            klass.unknown_character * num_null_right,
-            sequence[-right_edge:],
-        ])
-        assert len(string_encoding) == max_length
-        return string_encoding
+            middle_length = max_length - left_edge - right_edge
+            num_null = max_length - len(sequence)
+            num_null_left = int(math.ceil(num_null / 2))
+            num_null_right = int(math.floor(num_null / 2))
+            num_not_null_middle = middle_length - num_null
+
+            result[i] = numpy.concatenate([
+                sequence_indexes[:left_edge],
+                numpy.ones(num_null_left) * fill_value,
+                sequence_indexes[left_edge:left_edge + num_not_null_middle],
+                numpy.ones(num_null_right) * fill_value,
+                sequence_indexes[-right_edge:],
+            ])
+            assert len(result[i]) == max_length
+        return result

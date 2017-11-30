@@ -135,7 +135,7 @@ def index_encoding(sequences, letter_to_index_dict):
     return result.values
 
 
-def fixed_vectors_encoding(sequences, letter_to_vector_df):
+def fixed_vectors_encoding(index_encoded_sequences, letter_to_vector_df):
     """
     Given a sequence of n strings all of length k, and a dataframe mapping each
     character to an arbitrary vector, return a n * k * m array where
@@ -152,10 +152,10 @@ def fixed_vectors_encoding(sequences, letter_to_vector_df):
     numpy.array of integers with shape (n, k, m)
     """
     target_shape = (
-        len(sequences),
-        len(sequences[0]),
+        len(index_encoded_sequences),
+        len(index_encoded_sequences[0]),
         letter_to_vector_df.shape[0])
-    result = letter_to_vector_df.loc[
-            (letter for seq in sequences for letter in seq)
+    result = letter_to_vector_df.iloc[
+        index_encoded_sequences.flat
     ].values.reshape(target_shape)
     return result
