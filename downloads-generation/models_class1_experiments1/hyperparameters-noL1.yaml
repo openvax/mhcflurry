@@ -42,7 +42,7 @@
 "activation": "relu",
 "output_activation": "sigmoid",
 "layer_sizes": [
-   16 
+   32
 ],
 "dense_layer_l1_regularization": 0.0,
 "batch_normalization": false,
