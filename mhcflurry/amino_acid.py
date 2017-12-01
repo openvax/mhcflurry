@@ -151,11 +151,11 @@ def fixed_vectors_encoding(index_encoded_sequences, letter_to_vector_df):
     -------
     numpy.array of integers with shape (n, k, m)
     """
+    (num_sequences, sequence_length) = index_encoded_sequences.shape
     target_shape = (
-        len(index_encoded_sequences),
-        len(index_encoded_sequences[0]),
-        letter_to_vector_df.shape[0])
+        num_sequences, sequence_length, letter_to_vector_df.shape[0])
     result = letter_to_vector_df.iloc[
         index_encoded_sequences.flat
     ].values.reshape(target_shape)
     return result
+
