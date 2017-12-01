@@ -5,15 +5,6 @@ import logging
 import numpy
 import pandas
 
-import keras.models
-import keras.layers.pooling
-import keras.regularizers
-from keras.layers import Input
-import keras.layers
-from keras.layers.core import Dense, Flatten, Dropout
-from keras.layers.embeddings import Embedding
-from keras.layers.normalization import BatchNormalization
-
 from mhcflurry.hyperparameters import HyperparameterDefaults
 
 from ..encodable_sequences import EncodableSequences
@@ -135,6 +126,7 @@ class Class1NeuralNetwork(object):
         assert network_weights is not None
         if network_json not in klass.KERAS_MODELS_CACHE:
             # Cache miss.
+            import keras.models
             network = keras.models.model_from_json(network_json)
             existing_weights = None
         else:
@@ -165,6 +157,7 @@ class Class1NeuralNetwork(object):
                     self.network_json,
                     self.network_weights)
             else:
+                import keras.models
                 self._network = keras.models.model_from_json(self.network_json)
                 if self.network_weights is not None:
                     self._network.set_weights(self.network_weights)
@@ -554,6 +547,16 @@ class Class1NeuralNetwork(object):
         """
         Helper function to make a keras network for class1 affinity prediction.
         """
+
+        # We import keras here to avoid tensorflow debug output, etc. unless we
+        # are actually about to use Keras.
+
+        from keras.layers import Input
+        import keras.layers
+        from keras.layers.core import Dense, Flatten, Dropout
+        from keras.layers.embeddings import Embedding
+        from keras.layers.normalization import BatchNormalization
+
         if use_embedding or peptide_amino_acid_encoding == "embedding":
             peptide_input = Input(
                 shape=(kmer_size,), dtype='int32', name='peptide')
