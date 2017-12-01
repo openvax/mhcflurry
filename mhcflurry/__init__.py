@@ -17,7 +17,7 @@ from .class1_affinity_prediction.class1_neural_network import (
 from .class1_affinity_prediction.class1_affinity_predictor import (
     Class1AffinityPredictor)
 
-__version__ = "0.9.3"
+__version__ = "1.0.0"
 
 __all__ = [
     "Class1NeuralNetwork",
