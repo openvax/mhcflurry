@@ -40,7 +40,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --allele $ALLELES 2>&1 | tee -a LOG.standard.txt &
 
 # Model variations on qualitative + quantitative
-for mod in 0local_noL1 0local 2local widelocal dense16 dense64 noL1 onehot embedding
+for mod in 0local_noL1 0local 2local widelocal dense8 dense32 noL1 onehot embedding
 do
     cp $SCRIPT_DIR/hyperparameters-${mod}.yaml .
     mkdir models-${mod}
