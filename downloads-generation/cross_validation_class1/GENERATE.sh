@@ -31,7 +31,7 @@ cp $SCRIPT_DIR/score.py .
 
 time python split_folds.py \
     "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
-    --min-measurements-per-allele 100 \
+    --min-measurements-per-allele 75 \
     --folds $NFOLDS \
     --random-state 1 \
     --output-pattern-test "./test.fold_{}.csv" \

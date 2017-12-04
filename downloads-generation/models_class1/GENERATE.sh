@@ -32,7 +32,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
     --percent-rank-calibration-num-peptides-per-length 1000000 \
-    --min-measurements-per-allele 100
+    --min-measurements-per-allele 75
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
