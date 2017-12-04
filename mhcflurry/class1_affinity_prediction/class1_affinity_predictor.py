@@ -760,6 +760,19 @@ class Class1AffinityPredictor(object):
             'peptide': peptides.sequences,
             'allele': alleles,
         })
+        if len(df) == 0:
+            # No predictions.
+            logging.warning("Predicting for 0 peptides.")
+            empty_result = pandas.DataFrame(
+                columns=[
+                    'peptide',
+                    'allele',
+                    'prediction',
+                    'prediction_low',
+                    'prediction_high'
+                ])
+            return empty_result
+
         df["normalized_allele"] = df.allele.map(
             mhcnames.normalize_allele_name)
 

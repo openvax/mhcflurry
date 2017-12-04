@@ -135,7 +135,7 @@ class EncodableSequences(object):
                     max_length=max_length))
             result = amino_acid.fixed_vectors_encoding(
                 fixed_length_sequences,
-                amino_acid.ENCODING_DFS[vector_encoding_name])
+                amino_acid.ENCODING_DATA_FRAMES[vector_encoding_name])
             assert result.shape[0] == len(self.sequences)
             self.encoding_cache[cache_key] = result
         return self.encoding_cache[cache_key]

@@ -75,6 +75,8 @@ def run(argv):
             scores['kind'] = "single" if "single" in prediction_col else "ensemble"
             scores['train_size'] = allele_df[prediction_col].isnull().sum()
             scores['test_size'] = len(sub_df)
+
+            # make_scores returns a dict with entries "auc", "f1", "tau"
             scores.update(
                 make_scores(
                     sub_df.measurement_value, sub_df[prediction_col]))

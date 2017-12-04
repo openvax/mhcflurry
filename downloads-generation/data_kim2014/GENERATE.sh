@@ -1,5 +1,8 @@
 #!/bin/bash
-
+#
+# Download some published MHC I ligand data from a location on Dropbox.
+#
+#
 set -e
 set -x
 

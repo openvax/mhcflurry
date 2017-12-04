@@ -1,5 +1,9 @@
 #!/bin/bash
-
+#
+# Train "experimental" models using various hyperparameter combinations.
+# This trains models only for a small number of alleles for which we have good
+# mass-spec validation data.
+#
 set -e
 set -x
 

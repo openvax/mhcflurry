@@ -1,5 +1,10 @@
 #!/bin/bash
-
+#
+# Cross validation using the standard class I models.
+# Splits training data into 5 folds (stratifying on allele), trains and tests a
+# predictor on each (train, test) fold, and writes a summary CSV giving
+# performance for each allele on each fold.
+#
 set -e
 set -x
 

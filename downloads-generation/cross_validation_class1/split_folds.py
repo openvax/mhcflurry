@@ -6,6 +6,7 @@ import sys
 from os.path import abspath
 
 import pandas
+import numpy
 from sklearn.model_selection import StratifiedKFold
 
 parser = argparse.ArgumentParser(usage = __doc__)
@@ -68,17 +69,24 @@ def run(argv):
     else:
         alleles = list(
             allele_counts.ix[
-                           allele_counts > args.min_measurements_per_allele
+                allele_counts > args.min_measurements_per_allele
         ].index)
 
-    df = df.ix[df.allele.isin(alleles)]
+    df = df.loc[df.allele.isin(alleles)].copy()
     print("Potentially subselected by allele to: %s" % str(df.shape))
 
     print("Data has %d alleles: %s" % (
         df.allele.nunique(), " ".join(df.allele.unique())))
 
+    print(df.head())
+
+    # Take log before taking median (in case of even number of samples).
+    df["measurement_value"] = numpy.log1p(df.measurement_value)
     df = df.groupby(["allele", "peptide"]).measurement_value.median().reset_index()
+    df["measurement_value"] = numpy.expm1(df.measurement_value)
     print("Took median for each duplicate peptide/allele pair: %s" % str(df.shape))
+
+    print(df.head())
 
     if args.subsample:
         df = df.head(args.subsample)

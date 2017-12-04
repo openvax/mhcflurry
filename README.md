@@ -138,6 +138,7 @@ mhctools \
     --mhc-predictor mhcflurry \
     --input-fasta-file INPUT.fasta \
     --mhc-alleles A02:01,A03:01 \
+    --mhc-peptide-lengths 8,9,10,11 \
     --extract-subsequences \
     --out RESULT.csv
 ```

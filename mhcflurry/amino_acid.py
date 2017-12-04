@@ -80,7 +80,7 @@ X  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  1
 """), sep='\s+').loc[AMINO_ACIDS, AMINO_ACIDS]
 assert (BLOSUM62_MATRIX == BLOSUM62_MATRIX.T).all().all()
 
-ENCODING_DFS = {
+ENCODING_DATA_FRAMES = {
     "BLOSUM62": BLOSUM62_MATRIX,
     "one-hot": pandas.DataFrame([
         [1 if i == j else 0 for i in range(len(AMINO_ACIDS))]
@@ -98,7 +98,7 @@ def available_vector_encodings():
     list of string
 
     """
-    return list(ENCODING_DFS)
+    return list(ENCODING_DATA_FRAMES)
 
 
 def vector_encoding_length(name):
@@ -113,7 +113,7 @@ def vector_encoding_length(name):
     -------
     int
     """
-    return ENCODING_DFS[name].shape[1]
+    return ENCODING_DATA_FRAMES[name].shape[1]
 
 
 def index_encoding(sequences, letter_to_index_dict):

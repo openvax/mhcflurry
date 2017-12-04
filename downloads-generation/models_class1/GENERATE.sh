@@ -1,5 +1,9 @@
 #!/bin/bash
-
+#
+# Train standard MHCflurry Class I models.
+# Calls mhcflurry-class1-train-allele-specific-models on curated training data
+# using the hyperparameters in "hyperparameters.yaml".
+#
 set -e
 set -x
 
