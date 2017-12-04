@@ -20,6 +20,18 @@ releases:
     1.0.0:
         compatibility-version: 2
         downloads:
+            - name: models_class1
+              url: http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/models_class1.tar.bz2
+              default: true
+
+            - name: models_class1_experiments1
+              url: http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/models_class1_experiments1.tar.bz2
+              default: false
+
+            - name: cross_validation_class1
+              url: http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/cross_validation_class1.tar.bz2
+              default: false
+
             - name: data_iedb
               url: https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/data_iedb.tar.bz2
               default: false
