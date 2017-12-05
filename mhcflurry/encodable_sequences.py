@@ -21,6 +21,7 @@ from __future__ import (
 import math
 
 import numpy
+import pandas
 
 import typechecks
 
@@ -169,37 +170,62 @@ class EncodableSequences(object):
 
         Returns
         -------
-        numpy array of shape (len(sequences), max_length, 21) and dtype int
+        numpy array of shape (len(sequences), max_length) and dtype int
         """
-        result = numpy.ones(shape=(len(sequences), max_length), dtype=int) * -1
-        fill_value = amino_acid.AMINO_ACID_INDEX['X']
-        for (i, sequence) in enumerate(sequences):
-            sequence_indexes = [
-                amino_acid.AMINO_ACID_INDEX[char] for char in sequence
-            ]
 
-            if len(sequence) < left_edge + right_edge:
+        # Result array is int32, filled with X (null amino acid) value.
+        result = numpy.full(
+            fill_value=amino_acid.AMINO_ACID_INDEX['X'],
+            shape=(len(sequences), max_length),
+            dtype="int32")
+
+        df = pandas.DataFrame({"peptide": sequences})
+        df["length"] = df.peptide.str.len()
+
+        middle_length = max_length - left_edge - right_edge
+
+        # For efficiency we handle each supported peptide length using bulk
+        # array operations.
+        for (length, sub_df) in df.groupby("length"):
+            if length < left_edge + right_edge:
                 raise ValueError(
                     "Sequence '%s' (length %d) unsupported: length must be at "
-                    "least %d" % (
-                    sequence, len(sequence), left_edge + right_edge))
-            if len(sequence) > max_length:
+                    "least %d. There are %d total peptides with this length." % (
+                        sub_df.iloc[0].peptide, length, left_edge + right_edge,
+                        len(sub_df)))
+            if length > max_length:
                 raise ValueError(
                     "Sequence '%s' (length %d) unsupported: length must be at "
-                    "most %d" % (sequence, len(sequence), max_length))
+                    "most %d. There are %d total peptides with this length." % (
+                        sub_df.iloc[0].peptide, length, max_length,
+                        len(sub_df)))
 
-            middle_length = max_length - left_edge - right_edge
-            num_null = max_length - len(sequence)
+            # Array of shape (num peptides, length) giving fixed-length amino
+            # acid encoding each peptide of the current length.
+            fixed_length_indices = numpy.stack(
+                sub_df.peptide.map(
+                    lambda s: numpy.array(
+                        [amino_acid.AMINO_ACID_INDEX[char] for char in
+                         s])).values)
+
+            num_null = max_length - length
             num_null_left = int(math.ceil(num_null / 2))
-            num_null_right = int(math.floor(num_null / 2))
             num_not_null_middle = middle_length - num_null
 
-            result[i] = numpy.concatenate([
-                sequence_indexes[:left_edge],
-                numpy.ones(num_null_left) * fill_value,
-                sequence_indexes[left_edge:left_edge + num_not_null_middle],
-                numpy.ones(num_null_right) * fill_value,
-                sequence_indexes[-right_edge:],
-            ])
-            assert len(result[i]) == max_length
+            # Set left edge
+            result[sub_df.index, :left_edge] = fixed_length_indices[
+                :, :left_edge
+            ]
+
+            # Set middle.
+            result[
+                sub_df.index,
+                left_edge + num_null_left : left_edge + num_null_left + num_not_null_middle
+            ] = fixed_length_indices[:, left_edge:left_edge + num_not_null_middle]
+
+            # Set right edge.
+            result[
+                sub_df.index,
+                -right_edge:
+            ] = fixed_length_indices[:, -right_edge:]
         return result
