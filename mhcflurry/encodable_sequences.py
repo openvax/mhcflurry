@@ -202,30 +202,33 @@ class EncodableSequences(object):
 
             # Array of shape (num peptides, length) giving fixed-length amino
             # acid encoding each peptide of the current length.
-            fixed_length_indices = numpy.stack(
+            fixed_length_sequences = numpy.stack(
                 sub_df.peptide.map(
-                    lambda s: numpy.array(
-                        [amino_acid.AMINO_ACID_INDEX[char] for char in
-                         s])).values)
+                    lambda s: numpy.array([
+                        amino_acid.AMINO_ACID_INDEX[char] for char in s
+                    ])).values)
 
             num_null = max_length - length
             num_null_left = int(math.ceil(num_null / 2))
-            num_not_null_middle = middle_length - num_null
+            num_middle_filled = middle_length - num_null
+            middle_start = left_edge + num_null_left
 
             # Set left edge
-            result[sub_df.index, :left_edge] = fixed_length_indices[
+            result[sub_df.index, :left_edge] = fixed_length_sequences[
                 :, :left_edge
             ]
 
             # Set middle.
             result[
                 sub_df.index,
-                left_edge + num_null_left : left_edge + num_null_left + num_not_null_middle
-            ] = fixed_length_indices[:, left_edge:left_edge + num_not_null_middle]
+                middle_start : middle_start + num_middle_filled
+            ] = fixed_length_sequences[
+                :, left_edge : left_edge + num_middle_filled
+            ]
 
             # Set right edge.
             result[
                 sub_df.index,
                 -right_edge:
-            ] = fixed_length_indices[:, -right_edge:]
+            ] = fixed_length_sequences[:, -right_edge:]
         return result
