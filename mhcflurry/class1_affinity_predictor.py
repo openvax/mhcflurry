@@ -1,26 +1,24 @@
 import collections
-import time
 import hashlib
 import json
-from os.path import join, exists
-from six import string_types
 import logging
-import warnings
 import sys
+import time
+import warnings
+from os.path import join, exists
 
+import mhcnames
 import numpy
 import pandas
 from numpy.testing import assert_equal
+from six import string_types
 
-import mhcnames
-
-from ..encodable_sequences import EncodableSequences
-from ..downloads import get_path
-from ..common import random_peptides
-from ..percent_rank_transform import PercentRankTransform
-from ..regression_target import to_ic50
-
-from .class1_neural_network import Class1NeuralNetwork
+from mhcflurry.class1_neural_network import Class1NeuralNetwork
+from mhcflurry.common import random_peptides
+from mhcflurry.downloads import get_path
+from mhcflurry.encodable_sequences import EncodableSequences
+from mhcflurry.percent_rank_transform import PercentRankTransform
+from mhcflurry.regression_target import to_ic50
 
 
 class Class1AffinityPredictor(object):

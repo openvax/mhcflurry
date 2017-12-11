@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .class1_affinity_prediction.class1_neural_network import (
-    Class1NeuralNetwork)
-from .class1_affinity_prediction.class1_affinity_predictor import (
+from mhcflurry.class1_affinity_predictor import (
     Class1AffinityPredictor)
+from mhcflurry.class1_neural_network import (
+    Class1NeuralNetwork)
 
 __version__ = "1.0.0"
 

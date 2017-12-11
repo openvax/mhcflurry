@@ -1,14 +1,13 @@
-import tempfile
-import shutil
-import os
 import json
+import os
+import shutil
+import tempfile
 
 from numpy.testing import assert_array_less, assert_equal
 
-from mhcflurry.class1_affinity_prediction import (
-    train_allele_specific_models_command, Class1AffinityPredictor)
+from mhcflurry import train_allele_specific_models_command
+from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
-
 
 HYPERPARAMETERS = [
     {

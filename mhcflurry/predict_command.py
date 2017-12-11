@@ -47,7 +47,7 @@ import logging
 import pandas
 
 from .downloads import get_path
-from .class1_affinity_prediction import Class1AffinityPredictor
+from .class1_affinity_predictor import Class1AffinityPredictor
 
 
 parser = argparse.ArgumentParser(

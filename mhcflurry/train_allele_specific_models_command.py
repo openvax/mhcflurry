@@ -2,21 +2,20 @@
 Train Class1 single allele models.
 
 """
-import os
-import sys
 import argparse
-import yaml
-import time
+import os
 import signal
+import sys
+import time
 import traceback
 from multiprocessing import Pool
 
 import pandas
+import yaml
 from mhcnames import normalize_allele_name
 
-from .class1_affinity_predictor import Class1AffinityPredictor
-from ..common import configure_logging
-
+from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
+from mhcflurry.common import configure_logging
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -88,6 +87,7 @@ parser.add_argument(
     help="Parallelization jobs. Experimental. Does NOT work with tensorflow. "
     "Set to 1 for serial run. Set to 0 to use number of cores. "
     "Default: %(default)s.")
+
 
 def run(argv=sys.argv[1:]):
     # On sigusr1 print stack trace

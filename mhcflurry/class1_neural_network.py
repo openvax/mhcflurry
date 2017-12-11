@@ -7,10 +7,10 @@ import pandas
 
 from mhcflurry.hyperparameters import HyperparameterDefaults
 
-from ..encodable_sequences import EncodableSequences
-from ..amino_acid import available_vector_encodings, vector_encoding_length
-from ..regression_target import to_ic50, from_ic50
-from ..common import random_peptides, amino_acid_distribution
+from mhcflurry.encodable_sequences import EncodableSequences
+from mhcflurry.amino_acid import available_vector_encodings, vector_encoding_length
+from mhcflurry.regression_target import to_ic50, from_ic50
+from mhcflurry.common import random_peptides, amino_acid_distribution
 
 
 class Class1NeuralNetwork(object):
