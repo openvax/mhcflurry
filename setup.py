@@ -77,8 +77,7 @@ if __name__ == '__main__':
                 'mhcflurry-downloads = mhcflurry.downloads_command:run',
                 'mhcflurry-predict = mhcflurry.predict_command:run',
                 'mhcflurry-class1-train-allele-specific-models = '
-                    'mhcflurry.class1_affinity_prediction.'
-                    'train_allele_specific_models_command:run',
+                    'mhcflurry.train_allele_specific_models_command:run',
             ]
         },
         classifiers=[
@@ -97,6 +96,5 @@ if __name__ == '__main__':
         long_description=readme,
         packages=[
             'mhcflurry',
-            'mhcflurry.class1_affinity_prediction',
         ],
     )
