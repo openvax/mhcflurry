@@ -59,8 +59,9 @@ rst:
 	    --out-models-architecture-png _models_architecture.png \
 	    --out-models-info-rst _models_info.rst \
 	    --out-models-supported-alleles-rst _models_supported_alleles.rst
+	tail -n +2 intro.rst > intro.first_two_lines_removed.rst
 	pandoc -f rst -t markdown_github -B readme_header.md --base-header-level 2 \
-	    intro.rst \
+	    intro.first_two_lines_removed.rst \
 	    commandline_tutorial.rst \
 	    python_tutorial.rst \
 	    _models_supported_alleles.rst \

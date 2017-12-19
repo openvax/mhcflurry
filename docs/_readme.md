@@ -7,10 +7,9 @@ Open source peptide/MHC I binding affinity prediction
 <!-- DO NOT EDIT README.md, EDIT FILES in docs/ INSTEAD -->
 <!-- Then run "make rst" in the docs/ directory to regenerate -->
 
-Introduction and setup
-----------------------
+------------------------------------------------------------------------
 
-MHCflurry is a peptide/MHC I binding affinity prediction package written in Python. It aims to provide state of the art accuracy with a documented, fast, and open source implementation.
+MHCflurry is a Python package for peptide/MHC I binding affinity prediction. It provides competitive accuracy with a fast, documented, open source implementation.
 
 MHCflurry users may download trained predictors fit to affinity measurements deposited in IEDB. See the "downloads\_generation/models\_class1" directory in the repository for the workflow used to train these predictors. It is also easy for users with their own data to fit their own models.
 
@@ -22,7 +21,8 @@ If you find MHCflurry useful in your research please cite:
 
 > O'Donnell, T. et al., 2017. MHCflurry: open-source class I MHC binding affinity prediction. bioRxiv. Available at: <http://www.biorxiv.org/content/early/2017/08/09/174243>.
 
-### Installation (pip)
+Installation (pip)
+------------------
 
 Install the package:
 
@@ -37,7 +37,8 @@ From a checkout you can run the unit tests with:
     pip install nose
     nosetests .
 
-### Using conda
+Using conda
+-----------
 
 You can alternatively get up and running with a [conda](https://conda.io/docs/) environment as follows. Some users have reported that this can avoid problems installing tensorflow.
 
@@ -49,10 +50,10 @@ Then continue as above:
     pip install mhcflurry
     mhcflurry-downloads fetch
 
-Using MHCflurry from the command-line
--------------------------------------
+### Using MHCflurry from the command-line
 
-### mhcflurry-predict
+mhcflurry-predict
+-----------------
 
 The `mhcflurry-predict` command generates predictions from the command-line.
 
@@ -73,13 +74,11 @@ Your exact predictions may vary slightly from these (up to about 1 nM) depending
 
 You can also specify the input and output as CSV files. Run `mhcflurry-predict -h` for details.
 
-Using MHCflurry as a library
-----------------------------
+### Using MHCflurry as a library
 
 xxx
 
-Supported peptides and alleles
-------------------------------
+### Supported peptides and alleles
 
 Models released with the current version of MHCflurry (1.0.0) support peptides of length 8-15 and the following 124 alleles:
 
