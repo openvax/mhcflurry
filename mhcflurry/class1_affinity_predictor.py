@@ -153,6 +153,9 @@ class Class1AffinityPredictor(object):
 
     @property
     def num_networks(self):
+        """
+        Total number of neural networks (models)
+        """
         return self.manifest_df.shape[0]
 
 

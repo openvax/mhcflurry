@@ -71,6 +71,14 @@ def freeze_object(o):
 
 
 def configure_logging(verbose=False):
+    """
+    Configure logging module using defaults.
+
+    Parameters
+    ----------
+    verbose : boolean
+        If true, output will be at level DEBUG, otherwise, INFO.
+    """
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         format="%(asctime)s.%(msecs)d %(levelname)s %(module)s - %(funcName)s:"

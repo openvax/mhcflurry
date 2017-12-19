@@ -69,12 +69,13 @@ def get_current_release_downloads():
     Return a dict of all available downloads in the current release.
 
     The dict keys are the names of the downloads. The values are a dict
-    with entries:
-        downloaded : bool
-            Whether the download is currently available locally
+    with two entries:
 
-        metadata : dict
-            Info about the download from downloads.yml such as URL
+    downloaded : bool
+        Whether the download is currently available locally
+
+    metadata : dict
+        Info about the download from downloads.yml such as URL
     """
     downloads = (
         get_downloads_metadata()

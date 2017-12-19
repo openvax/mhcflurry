@@ -48,15 +48,27 @@ class Class1NeuralNetwork(object):
             }
         ],
     )
+    """
+    Hyperparameters (and their default values) that affect the neural network
+    architecture.
+    """
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
         loss="mse",
         optimizer="rmsprop",
     )
+    """
+    Loss and optimizer hyperparameters. Any values supported by keras may be
+    used.
+    """
 
     input_encoding_hyperparameter_defaults = HyperparameterDefaults(
         left_edge=4,
         right_edge=4)
+    """
+    Number of amino acid residues that are given fixed positions on the each
+    side in the variable length encoding.
+    """
 
     fit_hyperparameter_defaults = HyperparameterDefaults(
         max_epochs=500,
@@ -70,6 +82,9 @@ class Class1NeuralNetwork(object):
         random_negative_affinity_max=50000.0,
         random_negative_match_distribution=True,
         random_negative_distribution_smoothing=0.0)
+    """
+    Hyperparameters for neural network training.
+    """
 
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
         patience=10,
@@ -78,12 +93,18 @@ class Class1NeuralNetwork(object):
         verbose=1,  # currently unused
         mode='auto'  # currently unused
     )
+    """
+    Hyperparameters for early stopping.
+    """
 
     hyperparameter_defaults = network_hyperparameter_defaults.extend(
         compile_hyperparameter_defaults).extend(
         input_encoding_hyperparameter_defaults).extend(
         fit_hyperparameter_defaults).extend(
         early_stopping_hyperparameter_defaults)
+    """
+    Combined set of all supported hyperparameters and their default values.
+    """
 
     def __init__(self, **hyperparameters):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
@@ -97,9 +118,11 @@ class Class1NeuralNetwork(object):
         self.fit_seconds = None
         self.fit_num_points = None
 
-    # Process-wide keras model cache.
-    # architecture JSON string -> (Keras model, existing network weights)
     KERAS_MODELS_CACHE = {}
+    """
+    Process-wide keras model cache, a map from: architecture JSON string to
+    (Keras model, existing network weights)
+    """
 
     @classmethod
     def borrow_cached_network(klass, network_json, network_weights):
