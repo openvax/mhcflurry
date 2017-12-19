@@ -1,16 +1,7 @@
-# Copyright (c) 2016. Mount Sinai School of Medicine
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+"""
+Functions for encoding fixed length sequences of amino acids into various
+vector representations, such as one-hot and BLOSUM62.
+"""
 
 from __future__ import (
     print_function,
@@ -118,8 +109,12 @@ def vector_encoding_length(name):
 
 def index_encoding(sequences, letter_to_index_dict):
     """
-    Given a sequence of n strings all of length k, return a k * n array where
-    the (i, j)th element is letter_to_index_dict[sequence[i][j]].
+    Encode a sequence of same-length strings to a matrix of integers of the
+    same shape. The map from characters to integers is given by
+    `letter_to_index_dict`.
+
+    Given a sequence of `n` strings all of length `k`, return a `k * n` array where
+    the (`i`, `j`)th element is `letter_to_index_dict[sequence[i][j]]`.
 
     Parameters
     ----------
@@ -128,7 +123,7 @@ def index_encoding(sequences, letter_to_index_dict):
 
     Returns
     -------
-    numpy.array of integers with shape (k, n)
+    numpy.array of integers with shape (`k`, `n`)
     """
     df = pandas.DataFrame(iter(s) for s in sequences)
     result = df.replace(letter_to_index_dict)
@@ -137,19 +132,22 @@ def index_encoding(sequences, letter_to_index_dict):
 
 def fixed_vectors_encoding(index_encoded_sequences, letter_to_vector_df):
     """
-    Given a sequence of n strings all of length k, and a dataframe mapping each
-    character to an arbitrary vector, return a n * k * m array where
-    the (i, j)th element is letter_to_vector_df.loc[sequence[i][j]].
+    Given a `n` x `k` matrix of integers such as that returned by `index_encoding()` and
+    a dataframe mapping each index to an arbitrary vector, return a `n * k * m`
+    array where the (`i`, `j`)'th element is `letter_to_vector_df.iloc[sequence[i][j]]`.
+
+    The dataframe index and columns names are ignored here; the indexing is done
+    entirely by integer position in the dataframe.
 
     Parameters
     ----------
-    sequences : list of length n of strings of length k
-    letter_to_vector_df : pandas.DataFrame of shape (alphabet size, m)
-        The index of the dataframe should be amino acid characters.
+    index_encoded_sequences : `n` x `k` array of integers
+
+    letter_to_vector_df : pandas.DataFrame of shape (`alphabet size`, `m`)
 
     Returns
     -------
-    numpy.array of integers with shape (n, k, m)
+    numpy.array of integers with shape (`n`, `k`, `m`)
     """
     (num_sequences, sequence_length) = index_encoded_sequences.shape
     target_shape = (
