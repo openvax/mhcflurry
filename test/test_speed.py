@@ -67,4 +67,5 @@ if __name__ == '__main__':
 
     # Leave in ipython
     locals().update(result)
-    import ipdb ; ipdb.set_trace()
+    import ipdb  # pylint: disable=import-error
+    ipdb.set_trace()

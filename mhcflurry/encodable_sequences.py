@@ -23,8 +23,6 @@ import math
 import numpy
 import pandas
 
-import typechecks
-
 from . import amino_acid
 
 
@@ -48,8 +46,6 @@ class EncodableSequences(object):
         return klass(sequences)
 
     def __init__(self, sequences):
-        typechecks.require_iterable_of(
-            sequences, typechecks.string_types, "sequences")
         self.sequences = numpy.array(sequences)
         self.encoding_cache = {}
         self.fixed_sequence_length = None

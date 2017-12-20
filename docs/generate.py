@@ -9,8 +9,6 @@ from textwrap import wrap
 import pypandoc
 import pandas
 from keras.utils.vis_utils import plot_model
-import matplotlib
-import seaborn
 
 from mhcflurry import __version__
 from mhcflurry.downloads import get_path

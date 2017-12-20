@@ -59,7 +59,7 @@ rst:
 	    --out-models-info-rst _build/_models_info.rst \
 	    --out-models-supported-alleles-rst _build/_models_supported_alleles.rst
 	tail -n +2 intro.rst > _build/_intro.first_two_lines_removed.rst
-	pandoc -f rst -t markdown_github -B readme_header.md --base-header-level 2 \
+	pandoc -f rst -t gfm -B readme_header.md --base-header-level 2 \
 	    _build/_intro.first_two_lines_removed.rst \
 	    commandline_tutorial.rst \
 	    python_tutorial.rst \

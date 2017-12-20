@@ -1,12 +1,22 @@
 Library usage
 =============
 
+The MHCflurry Python API exposes additional options and features beyond what's
+supported in the commandline tools. This tutorial gives a basic overview
+of the most important functionality. See the API docs for further details.
+
+The :class:`mhcflurry.Class1AffinityPredictor` is the primary user-facing component of the
+MHCflurry API. It
+
 .. runblock:: pycon
 
-    >>> # Load downloaded predictor
     >>> import mhcflurry
+    >>> print("MHCflurry version: %s" % (mhcflurry.__version__))
+    >>>
+    >>> # Load downloaded predictor
     >>> predictor = mhcflurry.Class1AffinityPredictor.load()
     >>> print(predictor.supported_alleles)
+
 
 
 ::
@@ -24,7 +34,6 @@ Library usage
 
     import mhcflurry
 
-    print("MHCflurry version: %s" % (mhcflurry.__version__))
 
 
     # # Download data and models
