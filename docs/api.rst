@@ -1,0 +1,1 @@
+.. include:: _build/mhcflurry.rst

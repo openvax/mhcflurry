@@ -1,0 +1,3 @@
+sphinx-autorun
+sphinx
+numpydoc

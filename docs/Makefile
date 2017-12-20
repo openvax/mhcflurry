@@ -52,20 +52,19 @@ help:
 # Added by Tim:
 .PHONY: rst
 rst:
-	sphinx-apidoc -T -f -o . ../mhcflurry
-	mv mhcflurry.rst _api.rst
-	python generate_models_report.py \
-	    --out-models-cv-rst _models_cv.rst \
-	    --out-models-architecture-png _models_architecture.png \
-	    --out-models-info-rst _models_info.rst \
-	    --out-models-supported-alleles-rst _models_supported_alleles.rst
-	tail -n +2 intro.rst > intro.first_two_lines_removed.rst
+	sphinx-apidoc -T -f -o _build/ ../mhcflurry
+	python generate.py \
+	    --out-models-cv-rst _build/_models_cv.rst \
+	    --out-models-architecture-png _build/_models_architecture.png \
+	    --out-models-info-rst _build/_models_info.rst \
+	    --out-models-supported-alleles-rst _build/_models_supported_alleles.rst
+	tail -n +2 intro.rst > _build/_intro.first_two_lines_removed.rst
 	pandoc -f rst -t markdown_github -B readme_header.md --base-header-level 2 \
-	    intro.first_two_lines_removed.rst \
+	    _build/_intro.first_two_lines_removed.rst \
 	    commandline_tutorial.rst \
 	    python_tutorial.rst \
-	    _models_supported_alleles.rst \
-	    -o _readme.md
+	    _build/_models_supported_alleles.rst \
+	    -o readme.generated.md
 
 .PHONY: clean
 clean:

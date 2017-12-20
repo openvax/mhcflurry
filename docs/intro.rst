@@ -5,10 +5,10 @@ MHCflurry is a Python package for peptide/MHC I binding affinity prediction. It
 provides competitive accuracy with a fast, documented, open source
 implementation.
 
-We provide downloadable MHCflurry predictors fit to affinity measurements
+You can download pre-trained MHCflurry models fit to affinity measurements
 deposited in IEDB. See the "downloads_generation/models_class1" directory in the
-repository for the workflow used to train these predictors. It is also easy
-for users with their own data to fit their own models.
+repository for the workflow used to train these predictors. Users with their own
+data can also fit their own MHCflurry models.
 
 Currently only allele-specific prediction is implemented, in which separate models
 are trained for each allele. The released models therefore support a fixed set of common

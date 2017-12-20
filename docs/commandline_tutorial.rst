@@ -1,11 +1,30 @@
-Using MHCflurry from the command-line
-=====================================
+Command-line usage
+==================
+
+Downloading models
+------------------
+
+Most users will use pre-trained MHCflurry models that we release. These models
+are distributed separately from the source code and may be downloaded with the
+following command:
+
+.. code: shell
+    $ mhcflurry-downloads fetch models_class1
+
+We also release other "downloads," such as curated training data and some
+experimental models. To see what you have downloaded, run:
+
+.. code: shell
+    $ mhcflurry-downloads info
 
 
 mhcflurry-predict
 -----------------
 
 The ``mhcflurry-predict`` command generates predictions from the command-line.
+It defaults to using the pre-trained models you downloaded above but this can
+be customized with the ``--models`` argument. See ``mhcflurry-predict -h`` for
+details.
 
 .. code:: shell
 
@@ -29,3 +48,7 @@ MHCflurry can of course give results considerably different from these.
 
 You can also specify the input and output as CSV files. Run
 ``mhcflurry-predict -h`` for details.
+
+Fitting your own models
+-----------------------
+
