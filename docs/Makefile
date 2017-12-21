@@ -58,11 +58,16 @@ generate:
 	    --out-models-architecture-png _build/_models_architecture.png \
 	    --out-models-info-rst _build/_models_info.rst \
 	    --out-models-supported-alleles-rst _build/_models_supported_alleles.rst
+
+
+# Added by Tim:
+.PHONY: readme
+readme: text
 	pandoc -B package_readme/readme_header.md \
 	    -f rst \
 	    -t gfm \
 	    --base-header-level 2 \
-	    package_readme/readme.template.rst \
+	    _build/text/package_readme/readme.template.txt \
 	    -o package_readme/readme.generated.md
 
 .PHONY: clean

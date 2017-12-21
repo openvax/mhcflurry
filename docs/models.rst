@@ -15,11 +15,11 @@ Neural network architecture
 The neural network architecture is quite simple, consisting of a locally
 connected layer, a dense layer, and a sigmoid output.
 
-.. include:: _build/_models_info.rst
+.. include:: /_build/_models_info.rst
 
 Architecture diagram:
 
-.. image:: _build/_models_architecture.png
+.. image:: /_build/_models_architecture.png
 
 
 Cross validation performance
@@ -33,4 +33,4 @@ The AUC and F1 estimates use a 500 nM cutoff for distinguishing strong-binders
 from weak- or non-binders. The Kendall Tau score gives the rank correlation
 between the predicted and measured affinities; it uses no cutoff.
 
-.. include:: _build/_models_cv.rst
+.. include:: /_build/_models_cv.rst
