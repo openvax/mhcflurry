@@ -1,5 +1,5 @@
 """
-Generate models report.
+Generate certain RST files used in documentation.
 """
 
 import sys

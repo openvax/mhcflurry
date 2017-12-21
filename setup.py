@@ -24,7 +24,7 @@ from setuptools import setup
 PY2 = (sys.version_info.major == 2)
 
 readme_dir = os.path.dirname(__file__)
-readme_filename = os.path.join(readme_dir, 'README.md')
+readme_filename = os.path.join(readme_dir, 'README.rst')
 
 try:
     with open(readme_filename, 'r') as f:
@@ -32,13 +32,6 @@ try:
 except:
     logging.warning("Failed to load %s" % readme_filename)
     readme = ""
-
-try:
-    import pypandoc
-    readme = pypandoc.convert(readme, to='rst', format='md')
-except:
-    logging.warning("Conversion of long_description from MD to RST failed")
-    pass
 
 with open('mhcflurry/__init__.py', 'r') as f:
     version = re.search(

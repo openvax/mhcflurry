@@ -2,3 +2,5 @@ sphinx-autorun
 sphinxcontrib-programoutput
 sphinx
 numpydoc
+pypandoc
+mhctools

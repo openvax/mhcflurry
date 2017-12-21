@@ -1,3 +1,5 @@
+:orphan:
+
 .. image:: https://travis-ci.org/hammerlab/mhcflurry.svg?branch=master
     :target: https://travis-ci.org/hammerlab/mhcflurry
 
