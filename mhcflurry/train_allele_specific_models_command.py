@@ -1,6 +1,5 @@
 """
 Train Class1 single allele models.
-
 """
 import argparse
 import os

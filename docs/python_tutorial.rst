@@ -1,5 +1,5 @@
-Library usage
-=============
+Python library tutorial
+=======================
 
 The MHCflurry Python API exposes additional options and features beyond those
 supported by the commandline tools. This tutorial gives a basic overview

@@ -1,5 +1,6 @@
 sphinx-autorun
 sphinxcontrib-programoutput
+sphinxcontrib-autoprogram
 sphinx
 numpydoc
 pypandoc

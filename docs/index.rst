@@ -11,6 +11,7 @@ Contents:
    python_tutorial
    models_supported_alleles
    models
+   commandline_tools
    api
 
 

@@ -70,54 +70,132 @@ Then continue as above:
    mhcflurry-downloads fetch
 
 
-Command-line usage
-==================
+Command-line tutorial
+=====================
 
 
 Downloading models
 ******************
 
 Most users will use pre-trained MHCflurry models that we release.
-These models are distributed separately from the source code and may
-be downloaded with the following command:
+These models are distributed separately from the pip package and may
+be downloaded with the mhcflurry-downloads tool:
 
-We also release other “downloads,” such as curated training data and
-some experimental models. To see what you have downloaded, run:
+   $ mhcflurry-downloads fetch models_class1
+
+We also release a few other “downloads,” such as curated training data
+and some experimental models. To see what you have downloaded, run:
+
+   $ mhcflurry-downloads info
+   Environment variables
+     MHCFLURRY_DATA_DIR                  [unset or empty]
+     MHCFLURRY_DOWNLOADS_CURRENT_RELEASE [unset or empty]
+     MHCFLURRY_DOWNLOADS_DIR             [unset or empty]
+
+   Configuration
+     current release                     = 1.0.0                
+     downloads dir                       = '/Users/tim/Library/Application Support/mhcflurry/4/1.0.0' [exists]
+
+   DOWNLOAD NAME                             DOWNLOADED?    DEFAULT?      URL                  
+   models_class1                             YES            YES           http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/models_class1.tar.bz2 
+   models_class1_experiments1                NO             NO            http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/models_class1_experiments1.tar.bz2 
+   cross_validation_class1                   YES            NO            http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/cross_validation_class1.tar.bz2 
+   data_iedb                                 NO             NO            https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/data_iedb.tar.bz2 
+   data_kim2014                              NO             NO            http://github.com/hammerlab/mhcflurry/releases/download/0.9.1/data_kim2014.tar.bz2 
+   data_curated                              YES            YES           https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/data_curated.tar.bz2
+
+Files downloaded with mhcflurry-downloads are stored in a platform-
+specific directory. To get the path to downloaded data, you can use:
+
+   $ mhcflurry-downloads path models_class1
+   /Users/tim/Library/Application Support/mhcflurry/4/1.0.0/models_class1/
 
 
-mhcflurry-predict
-*****************
+Generating predictions
+**********************
 
-The "mhcflurry-predict" command generates predictions from the
-command-line. It defaults to using the pre-trained models you
-downloaded above but this can be customized with the "--models"
-argument. See "mhcflurry-predict -h" for details.
+The mhcflurry-predict command generates predictions from the command-
+line. By default it will use the pre-trained models you downloaded
+above but other models can be used by specifying the "--models"
+argument.
 
-   $ mhcflurry-predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ
+Running:
+
+   $ mhcflurry-predict
+       --alleles HLA-A0201 HLA-A0301
+       --peptides SIINFEKL SIINFEKD SIINFEKQ
+       --out /tmp/predictions.csv
+   Wrote: /tmp/predictions.csv
+
+results in a file like this:
+
+   $ head -n 3 /tmp/predictions.csv
    allele,peptide,mhcflurry_prediction,mhcflurry_prediction_low,mhcflurry_prediction_high,mhcflurry_prediction_percentile
    HLA-A0201,SIINFEKL,4899.047843425702,2767.7636539507857,7269.683642935029,6.509787499999997
    HLA-A0201,SIINFEKD,21050.420242970613,16834.65859138968,24129.046091695887,34.297175
-   HLA-A0201,SIINFEKQ,21048.47265780004,16736.561254929948,24111.013114442652,34.297175
-   HLA-A0301,SIINFEKL,28227.298909150148,24826.30790978725,32714.28597399942,33.95121249999998
-   HLA-A0301,SIINFEKD,30816.721218383507,27685.50847082019,36037.32590461623,41.22577499999998
-   HLA-A0301,SIINFEKQ,24183.021046496786,19346.154182011513,32263.71247531383,24.81096249999999
 
-The predictions returned are affinities (KD) in nM. The
-"prediction_low" and "prediction_high" fields give the 5-95 percentile
-predictions across the models in the ensemble. The predictions above
-were generated with MHCflurry 1.0.0.
+The predictions are given as affinities (KD) in nM in the
+"mhcflurry_prediction" column. The other fields give the 5-95
+percentile predictions across the models in the ensemble and the
+quantile of the affinity prediction among a large number of random
+peptides tested on that allele.
 
-Your exact predictions may vary slightly from these (up to about 1 nM)
-depending on the Keras backend in use and other numerical details.
-Different versions of MHCflurry can of course give results
-considerably different from these.
+The predictions shown above were generated with MHCflurry 1.0.0.
+Different versions of MHCflurry can give considerably different
+results. Even on the same version, your exact predictions may vary (up
+to about 1 nM) depending on the Keras backend and other details.
 
-You can also specify the input and output as CSV files. Run
-"mhcflurry-predict -h" for details.
+In most cases you’ll want to specify the input as a CSV file instead
+of passing peptides and alleles as commandline arguments. See
+mhcflurry-predict docs.
 
 
 Fitting your own models
 ***********************
+
+The mhcflurry-class1-train-allele-specific-models command is used to
+fit models to training data. The models we release with MHCflurry are
+trained with a command like:
+
+   $ mhcflurry-class1-train-allele-specific-models \
+       --data TRAINING_DATA.csv \
+       --hyperparameters hyperparameters.yaml \
+       --percent-rank-calibration-num-peptides-per-length 1000000 \
+       --min-measurements-per-allele 75 \
+       --out-models-dir models
+
+MHCflurry predictors are serialized to disk as many files in a
+directory. The command above will write the models to the output
+directory specified by the "--out-models-dir" argument. This directory
+has files like:
+
+   manifest.csv
+   percent_ranks.csv
+   weights_BOLA-6*13:01-0-1e6e7c0610ac68f8.npz
+   ...
+   weights_PATR-B*24:01-0-e12e0ee723833110.npz
+   weights_PATR-B*24:01-0-ec4a36529321d868.npz
+   weights_PATR-B*24:01-0-fd5a340098d3a9f4.npz
+
+The "manifest.csv" file gives metadata for all the models used in the
+predictor. There will be a "weights_..." file for each model giving
+its weights (the parameters for the neural network). The
+"percent_ranks.csv" stores a histogram of model predictions for each
+allele over a large number of random peptides. It is used for
+generating the percent ranks at prediction time.
+
+To call mhcflurry-class1-train-allele-specific-models you’ll need some
+training data. The data we use for our released predictors can be
+downloaded with mhcflurry-downloads:
+
+   $ mhcflurry-downloads fetch data_curated
+
+It looks like this:
+
+   $ bzcat "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" | head -n 3
+   allele,peptide,measurement_value,measurement_type,measurement_source,original_allele
+   BoLA-1*21:01,AENDTLVVSV,7817.0,quantitative,Barlow - purified MHC/competitive/fluorescence,BoLA-1*02101
+   BoLA-1*21:01,NQFNGGCLLV,1086.0,quantitative,Barlow - purified MHC/direct/fluorescence,BoLA-1*02101
 
 
 Scanning protein sequences for predicted epitopes
@@ -150,24 +228,24 @@ information.
        --mhc-alleles A02:01,A03:01
        --mhc-peptide-lengths 8,9,10,11
        --extract-subsequences
-       --output-csv /tmp/result.csv
-   2017-12-21 14:13:47,847 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles ['HLA-A*02:01', 'HLA-A*03:01'] and epitope lengths [8, 9, 10, 11]
-   2017-12-21 14:13:52,753 - mhctools.cli.script - INFO - 
+       --output-csv /tmp/subsequence_predictions.csv
+   2017-12-21 14:26:39,143 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles ['HLA-A*02:01', 'HLA-A*03:01'] and epitope lengths [8, 9, 10, 11]
+   2017-12-21 14:26:45,471 - mhctools.cli.script - INFO - 
    ...
    [1192 rows x 8 columns]
-   Wrote: /tmp/result.csv
+   Wrote: /tmp/subsequence_predictions.csv
 
 This will write a file giving predictions for all subsequences of the
 specified lengths:
 
-   $ head -n 3 /tmp/result.csv
+   $ head -n 3 /tmp/subsequence_predictions.csv
    source_sequence_name,offset,peptide,allele,affinity,percentile_rank,prediction_method_name,length
    protein2,42,AARYSAFY,HLA-A*02:01,33829.639361000336,73.7865875,mhcflurry,8
    protein2,42,AARYSAFYN,HLA-A*02:01,29747.41688667342,60.34871249999998,mhcflurry,9
 
 
-Library usage
-=============
+Python library tutorial
+=======================
 
 The MHCflurry Python API exposes additional options and features
 beyond those supported by the commandline tools. This tutorial gives a
@@ -178,14 +256,8 @@ The "Class1AffinityPredictor" class is the primary user-facing
 interface.
 
 
-   >>> import mhcflurry
-   >>> print("MHCflurry version: %s" % (mhcflurry.__version__))
-   MHCflurry version: 1.0.0
-   >>> 
-   >>> # Load downloaded predictor
-   >>> predictor = mhcflurry.Class1AffinityPredictor.load()
-   >>> print(predictor.supported_alleles)
-   ['BoLA-6*13:01', 'Eqca-1*01:01', 'H-2-Db', 'H-2-Dd', 'H-2-Kb', 'H-2-Kd', 'H-2-Kk', 'H-2-Ld', 'HLA-A*01:01', 'HLA-A*02:01', 'HLA-A*02:02', 'HLA-A*02:03', 'HLA-A*02:05', 'HLA-A*02:06', 'HLA-A*02:07', 'HLA-A*02:11', 'HLA-A*02:12', 'HLA-A*02:16', 'HLA-A*02:17', 'HLA-A*02:19', 'HLA-A*02:50', 'HLA-A*03:01', 'HLA-A*11:01', 'HLA-A*23:01', 'HLA-A*24:01', 'HLA-A*24:02', 'HLA-A*24:03', 'HLA-A*25:01', 'HLA-A*26:01', 'HLA-A*26:02', 'HLA-A*26:03', 'HLA-A*29:02', 'HLA-A*30:01', 'HLA-A*30:02', 'HLA-A*31:01', 'HLA-A*32:01', 'HLA-A*32:07', 'HLA-A*33:01', 'HLA-A*66:01', 'HLA-A*68:01', 'HLA-A*68:02', 'HLA-A*68:23', 'HLA-A*69:01', 'HLA-A*80:01', 'HLA-B*07:01', 'HLA-B*07:02', 'HLA-B*08:01', 'HLA-B*08:02', 'HLA-B*08:03', 'HLA-B*14:02', 'HLA-B*15:01', 'HLA-B*15:02', 'HLA-B*15:03', 'HLA-B*15:09', 'HLA-B*15:17', 'HLA-B*15:42', 'HLA-B*18:01', 'HLA-B*27:01', 'HLA-B*27:03', 'HLA-B*27:04', 'HLA-B*27:05', 'HLA-B*27:06', 'HLA-B*27:20', 'HLA-B*35:01', 'HLA-B*35:03', 'HLA-B*35:08', 'HLA-B*37:01', 'HLA-B*38:01', 'HLA-B*39:01', 'HLA-B*40:01', 'HLA-B*40:02', 'HLA-B*42:01', 'HLA-B*44:01', 'HLA-B*44:02', 'HLA-B*44:03', 'HLA-B*45:01', 'HLA-B*45:06', 'HLA-B*46:01', 'HLA-B*48:01', 'HLA-B*51:01', 'HLA-B*53:01', 'HLA-B*54:01', 'HLA-B*57:01', 'HLA-B*58:01', 'HLA-B*73:01', 'HLA-B*83:01', 'HLA-C*03:03', 'HLA-C*03:04', 'HLA-C*04:01', 'HLA-C*05:01', 'HLA-C*06:02', 'HLA-C*07:01', 'HLA-C*07:02', 'HLA-C*08:02', 'HLA-C*12:03', 'HLA-C*14:02', 'HLA-C*15:02', 'Mamu-A*01:01', 'Mamu-A*02:01', 'Mamu-A*02:0102', 'Mamu-A*07:01', 'Mamu-A*07:0103', 'Mamu-A*11:01', 'Mamu-A*22:01', 'Mamu-A*26:01', 'Mamu-B*01:01', 'Mamu-B*03:01', 'Mamu-B*08:01', 'Mamu-B*10:01', 'Mamu-B*17:01', 'Mamu-B*17:04', 'Mamu-B*39:01', 'Mamu-B*52:01', 'Mamu-B*66:01', 'Mamu-B*83:01', 'Mamu-B*87:01', 'Patr-A*01:01', 'Patr-A*03:01', 'Patr-A*04:01', 'Patr-A*07:01', 'Patr-A*09:01', 'Patr-B*01:01', 'Patr-B*13:01', 'Patr-B*24:01']
+   /Users/tim/miniconda3/envs/py3k/lib/python3.5/site-packages/matplotlib/__init__.py:913: UserWarning: axes.color_cycle is deprecated and replaced with axes.prop_cycle; please use the latter.
+     warnings.warn(self.msg_depr % (key, alt_key))
 
    # coding: utf-8
 
