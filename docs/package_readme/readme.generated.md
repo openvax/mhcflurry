@@ -73,6 +73,7 @@ command-line. It defaults to using the pre-trained models you downloaded
 above but this can be customized with the "--models" argument. See
 "mhcflurry-predict -h" for details.
 
+```
 > $ mhcflurry-predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL
 > SIINFEKD SIINFEKQ
 > allele,peptide,mhcflurry\_prediction,mhcflurry\_prediction\_low,mhcflurry\_prediction\_high
@@ -82,6 +83,7 @@ above but this can be customized with the "--models" argument. See
 > HLA-A0301,SIINFEKL,24481.726678691946,21035.52779725433,27245.371837497867
 > HLA-A0301,SIINFEKD,24687.529360239587,21582.590014592537,27749.39869616437
 > HLA-A0301,SIINFEKQ,25923.062203902562,23522.5793450799,28079.456657427705
+```
 
 The predictions returned are affinities (KD) in nM. The
 "prediction\_low" and "prediction\_high" fields give the 5-95 percentile
