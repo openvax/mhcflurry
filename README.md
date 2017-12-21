@@ -1,1 +1,1 @@
-docs/readme.generated.md
+docs/package_readme/readme.generated.md

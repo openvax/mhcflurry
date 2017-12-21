@@ -1,4 +1,7 @@
------
+[![Build Status](https://travis-ci.org/hammerlab/mhcflurry.svg?branch=master)](https://travis-ci.org/hammerlab/mhcflurry) [![Coverage Status](https://coveralls.io/repos/github/hammerlab/mhcflurry/badge.svg?branch=master)](https://coveralls.io/github/hammerlab/mhcflurry?branch=master)
+
+# mhcflurry
+Open source neural network models for peptide-MHC binding affinity prediction
 
 MHCflurry is a Python package for peptide/MHC I binding affinity
 prediction. It provides competitive accuracy with a fast, documented,
@@ -101,13 +104,13 @@ You can also specify the input and output as CSV files. Run
 
 ### Library usage
 
-The MHCflurry Python API can do everything the commandline tools can,
-but also exposes additional options and features. This tutorial gives a
-basic overview of the most important functionality. See the API docs for
-further details.
+The MHCflurry Python API exposes additional options and features beyond
+those supported by the commandline tools. This tutorial gives a basic
+overview of the most important functionality. See the
+<span data-role="ref">API-documentation</span> for further details.
 
-The <span data-role="class">Class1AffinityPredictor</span> is the
-primary user-facing component of the MHCflurry API. It
+The ~mhcflurry.Class1AffinityPredictor class is the primary user-facing
+interface.
 
 <div class="runblock">
 
@@ -275,7 +278,7 @@ print(predictor.supported\_alleles)
     affinity_predictor2 = mhcflurry.Class1AffinityPredictor.load("/tmp/saved-affinity-predictor")
     affinity_predictor2.predict(["SYNPEPII"], allele="HLA-B*57:01")
 
-### Supported peptides and alleles
+### Supported alleles and peptide lengths
 
 Models released with the current version of MHCflurry (1.0.0) support
 peptides of length 8-15 and the following 124 alleles:

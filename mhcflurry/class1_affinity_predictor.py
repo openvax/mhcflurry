@@ -41,23 +41,23 @@ class Class1AffinityPredictor(object):
         """
         Parameters
         ----------
-        allele_to_allele_specific_models : dict of string -> list of Class1NeuralNetwork
+        allele_to_allele_specific_models : dict of string -> list of `Class1NeuralNetwork`
             Ensemble of single-allele models to use for each allele. 
         
-        class1_pan_allele_models : list of Class1NeuralNetwork
+        class1_pan_allele_models : list of `Class1NeuralNetwork`
             Ensemble of pan-allele models.
         
         allele_to_pseudosequence : dict of string -> string
             Required only if class1_pan_allele_models is specified.
         
-        manifest_df : pandas.DataFrame, optional
+        manifest_df : `pandas.DataFrame`, optional
             Must have columns: model_name, allele, config_json, model.
             Only required if you want to update an existing serialization of a
             Class1AffinityPredictor. Otherwise this dataframe will be generated
             automatically based on the supplied models.
 
-        allele_to_percent_rank_transform : dict of string -> PercentRankTransform, optional
-            PercentRankTransform instances to use for each allele
+        allele_to_percent_rank_transform : dict of string -> `PercentRankTransform`, optional
+            `PercentRankTransform` instances to use for each allele
         """
 
         if allele_to_allele_specific_models is None:
@@ -105,7 +105,7 @@ class Class1AffinityPredictor(object):
 
         Returns
         -------
-        list of Class1NeuralNetwork
+        list of `Class1NeuralNetwork`
         """
         result = []
         for models in self.allele_to_allele_specific_models.values():
@@ -116,18 +116,18 @@ class Class1AffinityPredictor(object):
     @classmethod
     def merge(cls, predictors):
         """
-        Merge the ensembles of two or more Class1AffinityPredictor instances.
+        Merge the ensembles of two or more `Class1AffinityPredictor` instances.
 
         Note: the resulting merged predictor will NOT have calibrated percentile
-        ranks. Call calibrate_percentile_ranks() on it if these are needed.
+        ranks. Call `calibrate_percentile_ranks` on it if these are needed.
 
         Parameters
         ----------
-        predictors : sequence of Class1AffinityPredictor
+        predictors : sequence of `Class1AffinityPredictor`
 
         Returns
         -------
-        Class1AffinityPredictor
+        `Class1AffinityPredictor` instance
 
         """
         assert len(predictors) > 0
@@ -150,14 +150,6 @@ class Class1AffinityPredictor(object):
             class1_pan_allele_models=class1_pan_allele_models,
             allele_to_pseudosequence=allele_to_pseudosequence
         )
-
-    @property
-    def num_networks(self):
-        """
-        Total number of neural networks (models)
-        """
-        return self.manifest_df.shape[0]
-
 
     @property
     def supported_alleles(self):
@@ -264,11 +256,11 @@ class Class1AffinityPredictor(object):
             Path to directory
             
         max_models : int, optional
-            Maximum number of Class1NeuralNetwork instances to load
+            Maximum number of `Class1NeuralNetwork` instances to load
 
         Returns
         -------
-        Class1AffinityPredictor
+        `Class1AffinityPredictor` instance
         """
         if models_dir is None:
             models_dir = get_path("models_class1", "models")
@@ -389,7 +381,7 @@ class Class1AffinityPredictor(object):
                
         allele : string
         
-        peptides : EncodableSequences or list of string
+        peptides : `EncodableSequences` or list of string
         
         affinities : list of float
             nM affinities
@@ -406,7 +398,7 @@ class Class1AffinityPredictor(object):
 
         Returns
         -------
-        list of Class1NeuralNetwork
+        list of `Class1NeuralNetwork`
         """
 
         allele = mhcnames.normalize_allele_name(allele)
@@ -467,7 +459,7 @@ class Class1AffinityPredictor(object):
         alleles : list of string
             Allele names (not pseudosequences) corresponding to each peptide 
         
-        peptides : EncodableSequences or list of string
+        peptides : `EncodableSequences` or list of string
         
         affinities : list of float
             nM affinities
@@ -484,7 +476,7 @@ class Class1AffinityPredictor(object):
 
         Returns
         -------
-        list of Class1NeuralNetwork
+        list of `Class1NeuralNetwork`
         """
 
         alleles = pandas.Series(alleles).map(mhcnames.normalize_allele_name)
@@ -542,7 +534,7 @@ class Class1AffinityPredictor(object):
 
         Returns
         -------
-        generator of Class1NeuralNetwork
+        generator of `Class1NeuralNetwork`
         """
         encodable_peptides = EncodableSequences.create(peptides)
         for i in range(n_models):
@@ -627,7 +619,7 @@ class Class1AffinityPredictor(object):
         """
         Return percentile ranks for the given ic50 affinities and alleles.
 
-        The 'allele' and 'alleles' argument are as in the predict() method.
+        The 'allele' and 'alleles' argument are as in the `predict` method.
         Specify one of these.
 
         Parameters
@@ -683,7 +675,7 @@ class Class1AffinityPredictor(object):
         
         Parameters
         ----------
-        peptides : EncodableSequences or list of string
+        peptides : `EncodableSequences` or list of string
         alleles : list of string
         allele : string
         throw : boolean
@@ -726,7 +718,7 @@ class Class1AffinityPredictor(object):
         
         Parameters
         ----------
-        peptides : EncodableSequences or list of string
+        peptides : `EncodableSequences` or list of string
         alleles : list of string
         allele : string
         throw : boolean
@@ -743,7 +735,7 @@ class Class1AffinityPredictor(object):
 
         Returns
         -------
-        pandas.DataFrame of predictions
+        `pandas.DataFrame` of predictions
         """
         if isinstance(peptides, string_types):
             raise TypeError("peptides must be a list or array, not a string")
@@ -910,11 +902,9 @@ class Class1AffinityPredictor(object):
         ----------
         filename : string
             Should end in ".npz".
-            
-            
+
         Returns
         ----------
-        
         list of array
         """
         loaded = numpy.load(filename)

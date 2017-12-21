@@ -62,8 +62,6 @@ def go(argv):
             predictor = Class1AffinityPredictor.load(args.class1_models_dir)
         with open(args.out_models_supported_alleles_rst, "w") as fd:
             fd.write(
-                "Supported peptides and alleles\n" + "=" * 30 + "\n\n")
-            fd.write(
                 "Models released with the current version of MHCflurry (%s) "
                 "support peptides of "
                 "length %d-%d and the following %d alleles:\n\n::\n\n\t%s\n\n" % (

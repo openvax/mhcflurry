@@ -50,21 +50,20 @@ help:
 	@echo "  dummy      to check syntax errors of document sources"
 
 # Added by Tim:
-.PHONY: rst
-rst:
-	sphinx-apidoc -T -f -o _build/ ../mhcflurry
+.PHONY: generate
+generate:
+	sphinx-apidoc -f -o _build/ ../mhcflurry
 	python generate.py \
 	    --out-models-cv-rst _build/_models_cv.rst \
 	    --out-models-architecture-png _build/_models_architecture.png \
 	    --out-models-info-rst _build/_models_info.rst \
 	    --out-models-supported-alleles-rst _build/_models_supported_alleles.rst
-	tail -n +2 intro.rst > _build/_intro.first_two_lines_removed.rst
-	pandoc -f rst -t gfm -B readme_header.md --base-header-level 2 \
-	    _build/_intro.first_two_lines_removed.rst \
-	    commandline_tutorial.rst \
-	    python_tutorial.rst \
-	    _build/_models_supported_alleles.rst \
-	    -o readme.generated.md
+	pandoc -B package_readme/readme_header.md \
+	    -f rst \
+	    -t gfm \
+	    --base-header-level 2 \
+	    package_readme/readme.template.rst \
+	    -o package_readme/readme.generated.md
 
 .PHONY: clean
 clean:

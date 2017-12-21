@@ -1,12 +1,12 @@
 Library usage
 =============
 
-The MHCflurry Python API exposes additional options and features beyond what's
-supported in the commandline tools. This tutorial gives a basic overview
-of the most important functionality. See the API docs for further details.
+The MHCflurry Python API exposes additional options and features beyond those
+supported by the commandline tools. This tutorial gives a basic overview
+of the most important functionality. See the :ref:`API-documentation` for further details.
 
-The :class:`mhcflurry.Class1AffinityPredictor` is the primary user-facing component of the
-MHCflurry API. It
+The `~mhcflurry.Class1AffinityPredictor` class is the primary user-facing interface.
+
 
 .. runblock:: pycon
 
