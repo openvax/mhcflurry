@@ -63,13 +63,15 @@ generate:
 # Added by Tim:
 .PHONY: readme
 readme: text
-	#cp _build/text/package_readme/readme.template.txt package_readme/readme.generated.rst
-	pandoc -B package_readme/readme_header.rst \
-	    -f rst \
-	    -t rst \
-	    --base-header-level 2 \
+	cat package_readme/readme_header.rst \
 	    _build/text/package_readme/readme.template.txt \
-	    -o package_readme/readme.generated.rst
+	    > package_readme/readme.generated.rst
+	#pandoc -B package_readme/readme_header.rst \
+	#    -f rst \
+	#    -t rst \
+	#    --base-header-level 2 \
+	#    _build/text/package_readme/readme.template.txt \
+	#    -o package_readme/readme.generated.rst
 
 .PHONY: clean
 clean:
