@@ -1,4 +1,3 @@
-.. readme_header.md will be inserted first by pandoc
 
 .. include:: /intro.rst
     :start-line: 3
