@@ -5,9 +5,11 @@
     :target: https://coveralls.io/github/hammerlab/mhcflurry
 
 mhcflurry
-=========
+===================
 
-Open source neural network models for peptide-MHC binding affinity predictionMHCflurry is a Python package for peptide/MHC I binding affinity
+Open source neural network models for peptide-MHC binding affinity prediction
+
+MHCflurry is a Python package for peptide/MHC I binding affinity
 prediction. It provides competitive accuracy with a fast, documented,
 open source implementation.
 
@@ -90,18 +92,20 @@ downloaded above but this can be customized with the "--models"
 argument. See "mhcflurry-predict -h" for details.
 
    $ mhcflurry-predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ
-   allele,peptide,mhcflurry_prediction,mhcflurry_prediction_low,mhcflurry_prediction_high
-   HLA-A0201,SIINFEKL,5326.541919062165,3757.86675352994,7461.37693353508
-   HLA-A0201,SIINFEKD,18763.70298522213,13140.82000240037,23269.82139560844
-   HLA-A0201,SIINFEKQ,18620.10057358322,13096.425874678192,23223.148184869413
-   HLA-A0301,SIINFEKL,24481.726678691946,21035.52779725433,27245.371837497867
-   HLA-A0301,SIINFEKD,24687.529360239587,21582.590014592537,27749.39869616437
-   HLA-A0301,SIINFEKQ,25923.062203902562,23522.5793450799,28079.456657427705
+   2017-12-21 13:15:45.075649: I tensorflow/core/platform/cpu_feature_guard.cc:137] Your CPU supports instructions that this TensorFlow binary was not compiled to use: SSE4.1 SSE4.2 AVX AVX2 FMA
+   Using TensorFlow backend.
+   allele,peptide,mhcflurry_prediction,mhcflurry_prediction_low,mhcflurry_prediction_high,mhcflurry_prediction_percentile
+   HLA-A0201,SIINFEKL,4899.047843425702,2767.7636539507857,7269.683642935029,6.509787499999997
+   HLA-A0201,SIINFEKD,21050.420242970613,16834.65859138968,24129.046091695887,34.297175
+   HLA-A0201,SIINFEKQ,21048.47265780004,16736.561254929948,24111.013114442652,34.297175
+   HLA-A0301,SIINFEKL,28227.298909150148,24826.30790978725,32714.28597399942,33.95121249999998
+   HLA-A0301,SIINFEKD,30816.721218383507,27685.50847082019,36037.32590461623,41.22577499999998
+   HLA-A0301,SIINFEKQ,24183.021046496786,19346.154182011513,32263.71247531383,24.81096249999999
 
 The predictions returned are affinities (KD) in nM. The
 "prediction_low" and "prediction_high" fields give the 5-95 percentile
 predictions across the models in the ensemble. The predictions above
-were generated with MHCflurry 0.9.2.
+were generated with MHCflurry 1.0.0.
 
 Your exact predictions may vary slightly from these (up to about 1 nM)
 depending on the Keras backend in use and other numerical details.

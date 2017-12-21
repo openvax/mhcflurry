@@ -39,6 +39,7 @@ extensions = [
     'sphinx.ext.githubpages',
     'numpydoc',
     'sphinx_autorun',
+    'sphinxcontrib.programoutput',
 ]
 
 # Add any paths that contain templates here, relative to this directory.

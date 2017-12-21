@@ -1,3 +1,4 @@
 sphinx-autorun
+sphinxcontrib-programoutput
 sphinx
 numpydoc

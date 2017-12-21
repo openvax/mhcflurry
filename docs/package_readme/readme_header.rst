@@ -5,6 +5,7 @@
     :target: https://coveralls.io/github/hammerlab/mhcflurry
 
 mhcflurry
-=========
+===================
 
 Open source neural network models for peptide-MHC binding affinity prediction
+
