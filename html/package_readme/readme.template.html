@@ -391,6 +391,12 @@ models directory, then it will load that predictor instead.</p>
 </div>
 <p>With a predictor loaded we can now generate some binding predictions:</p>
 <div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-A0201&quot;</span><span class="p">,</span> <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SIINFEKL&quot;</span><span class="p">,</span> <span class="s2">&quot;SIINFEQL&quot;</span><span class="p">])</span>
+<span class="go">/Users/tim/miniconda3/envs/py2k/lib/python2.7/site-packages/h5py/__init__.py:34: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 80</span>
+<span class="go">  from ._conv import register_converters as _register_converters</span>
+<span class="go">/Users/tim/miniconda3/envs/py2k/lib/python2.7/site-packages/h5py/__init__.py:43: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 80</span>
+<span class="go">  from . import h5a, h5d, h5ds, h5f, h5fd, h5g, h5r, h5s, h5t, h5p, h5z</span>
+<span class="go">/Users/tim/miniconda3/envs/py2k/lib/python2.7/site-packages/h5py/_hl/group.py:21: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 80</span>
+<span class="go">  from .. import h5g, h5i, h5o, h5r, h5t, h5l, h5p</span>
 <span class="go">Using TensorFlow backend.</span>
 <span class="go">array([ 4899.04784343,  5685.25682682])</span>
 </pre></div>
@@ -476,25 +482,25 @@ some models.</p>
 <span class="go">Train on 112 samples, validate on 28 samples</span>
 <span class="go">Epoch 1/1</span>
 
-<span class="go">112/112 [==============================] - 0s 4ms/step - loss: 0.3621 - val_loss: 0.3198</span>
-<span class="go">Epoch   0 /   5: loss=0.362132. Min val loss (None) at epoch None</span>
+<span class="go">112/112 [==============================] - 0s 3ms/step - loss: 0.3770 - val_loss: 0.3144</span>
+<span class="go">Epoch   0 /   5: loss=0.376962. Min val loss (None) at epoch None</span>
 <span class="go">Train on 112 samples, validate on 28 samples</span>
 <span class="go">Epoch 1/1</span>
 
-<span class="go">112/112 [==============================] - 0s 37us/step - loss: 0.3378 - val_loss: 0.3073</span>
+<span class="go">112/112 [==============================] - 0s 43us/step - loss: 0.3547 - val_loss: 0.3043</span>
 <span class="go">Train on 112 samples, validate on 28 samples</span>
 <span class="go">Epoch 1/1</span>
 
-<span class="go">112/112 [==============================] - 0s 37us/step - loss: 0.3247 - val_loss: 0.2958</span>
+<span class="go">112/112 [==============================] - 0s 37us/step - loss: 0.3437 - val_loss: 0.2951</span>
 <span class="go">Train on 112 samples, validate on 28 samples</span>
 <span class="go">Epoch 1/1</span>
 
-<span class="go">112/112 [==============================] - 0s 36us/step - loss: 0.3078 - val_loss: 0.2857</span>
+<span class="go">112/112 [==============================] - 0s 39us/step - loss: 0.3317 - val_loss: 0.2865</span>
 <span class="go">Train on 112 samples, validate on 28 samples</span>
 <span class="go">Epoch 1/1</span>
 
-<span class="go">112/112 [==============================] - 0s 33us/step - loss: 0.2967 - val_loss: 0.2768</span>
-<span class="go">[&lt;mhcflurry.class1_neural_network.Class1NeuralNetwork object at 0x11afaff50&gt;]</span>
+<span class="go">112/112 [==============================] - 0s 38us/step - loss: 0.3218 - val_loss: 0.2788</span>
+<span class="go">[&lt;mhcflurry.class1_neural_network.Class1NeuralNetwork object at 0x11eb67850&gt;]</span>
 </pre></div>
 </div>
 <p>The <a class="reference internal" href="../api.html#mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors" title="mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors"><code class="xref py py-obj docutils literal"><span class="pre">fit_allele_specific_predictors</span></code></a> method
@@ -504,7 +510,7 @@ for demonstration purposes; to fit real models you would usually train for
 more epochs.</p>
 <p>Now we can generate predictions:</p>
 <div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">new_predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">([</span><span class="s2">&quot;SYNPEPII&quot;</span><span class="p">],</span> <span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-B*57:01&quot;</span><span class="p">)</span>
-<span class="go">array([ 646.95296974])</span>
+<span class="go">array([ 397.96727852])</span>
 </pre></div>
 </div>
 <p>We can save our predictor to the specified directory on disk by running:</p>
@@ -544,10 +550,10 @@ Here is a simple example of doing so:</p>
 <span class="gp">... </span>   <span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
 <span class="gp">... </span>   <span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">measurement_value</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
 <span class="gp">... </span>   <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="go">Epoch   0 / 500: loss=0.517541. Min val loss (None) at epoch None</span>
-<span class="go">Early stopping at epoch 123 / 500: loss=0.0134412. Min val loss (0.0730387568474) at epoch 112</span>
+<span class="go">Epoch   0 / 500: loss=0.563312. Min val loss (None) at epoch None</span>
+<span class="go">Early stopping at epoch 118 / 500: loss=0.0131871. Min val loss (0.0634722188115) at epoch 107</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">network</span><span class="o">.</span><span class="n">predict</span><span class="p">([</span><span class="s2">&quot;SIINFEKLL&quot;</span><span class="p">])</span>
-<span class="go">array([ 22386.81984987])</span>
+<span class="go">array([ 24880.80535373])</span>
 </pre></div>
 </div>
 <div class="section" id="supported-alleles-and-peptide-lengths">

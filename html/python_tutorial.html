@@ -268,25 +268,25 @@ some models.</p>
 <span class="go">Train on 112 samples, validate on 28 samples</span>
 <span class="go">Epoch 1/1</span>
 
-<span class="go">112/112 [==============================] - 0s 3ms/step - loss: 0.3411 - val_loss: 0.2964</span>
-<span class="go">Epoch   0 /   5: loss=0.341122. Min val loss (None) at epoch None</span>
+<span class="go">112/112 [==============================] - 0s 4ms/step - loss: 0.3438 - val_loss: 0.3021</span>
+<span class="go">Epoch   0 /   5: loss=0.343776. Min val loss (None) at epoch None</span>
 <span class="go">Train on 112 samples, validate on 28 samples</span>
 <span class="go">Epoch 1/1</span>
 
-<span class="go">112/112 [==============================] - 0s 36us/step - loss: 0.3174 - val_loss: 0.2858</span>
+<span class="go">112/112 [==============================] - 0s 36us/step - loss: 0.3168 - val_loss: 0.2827</span>
 <span class="go">Train on 112 samples, validate on 28 samples</span>
 <span class="go">Epoch 1/1</span>
 
-<span class="go">112/112 [==============================] - 0s 34us/step - loss: 0.2980 - val_loss: 0.2780</span>
+<span class="go">112/112 [==============================] - 0s 35us/step - loss: 0.2968 - val_loss: 0.2680</span>
 <span class="go">Train on 112 samples, validate on 28 samples</span>
 <span class="go">Epoch 1/1</span>
 
-<span class="go">112/112 [==============================] - 0s 37us/step - loss: 0.2846 - val_loss: 0.2719</span>
+<span class="go">112/112 [==============================] - 0s 35us/step - loss: 0.2840 - val_loss: 0.2560</span>
 <span class="go">Train on 112 samples, validate on 28 samples</span>
 <span class="go">Epoch 1/1</span>
 
-<span class="go">112/112 [==============================] - 0s 37us/step - loss: 0.2720 - val_loss: 0.2673</span>
-<span class="go">[&lt;mhcflurry.class1_neural_network.Class1NeuralNetwork object at 0x120e8bcd0&gt;]</span>
+<span class="go">112/112 [==============================] - 0s 36us/step - loss: 0.2703 - val_loss: 0.2464</span>
+<span class="go">[&lt;mhcflurry.class1_neural_network.Class1NeuralNetwork object at 0x121e00910&gt;]</span>
 </pre></div>
 </div>
 <p>The <a class="reference internal" href="api.html#mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors" title="mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors"><code class="xref py py-obj docutils literal"><span class="pre">fit_allele_specific_predictors</span></code></a> method
@@ -296,7 +296,7 @@ for demonstration purposes; to fit real models you would usually train for
 more epochs.</p>
 <p>Now we can generate predictions:</p>
 <div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">new_predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">([</span><span class="s2">&quot;SYNPEPII&quot;</span><span class="p">],</span> <span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-B*57:01&quot;</span><span class="p">)</span>
-<span class="go">array([ 1497.81838989])</span>
+<span class="go">array([ 1187.61204475])</span>
 </pre></div>
 </div>
 <p>We can save our predictor to the specified directory on disk by running:</p>
@@ -336,10 +336,10 @@ Here is a simple example of doing so:</p>
 <span class="gp">... </span>   <span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
 <span class="gp">... </span>   <span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">measurement_value</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
 <span class="gp">... </span>   <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="go">Epoch   0 / 500: loss=0.536847. Min val loss (None) at epoch None</span>
-<span class="go">Early stopping at epoch 110 / 500: loss=0.0165637. Min val loss (0.0830419361591) at epoch 99</span>
+<span class="go">Epoch   0 / 500: loss=0.531311. Min val loss (None) at epoch None</span>
+<span class="go">Early stopping at epoch 160 / 500: loss=0.0138145. Min val loss (0.0356928259134) at epoch 149</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">network</span><span class="o">.</span><span class="n">predict</span><span class="p">([</span><span class="s2">&quot;SIINFEKLL&quot;</span><span class="p">])</span>
-<span class="go">array([ 21423.0201184])</span>
+<span class="go">array([ 27399.69442154])</span>
 </pre></div>
 </div>
 </div>
