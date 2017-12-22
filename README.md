@@ -3,7 +3,7 @@
 # mhcflurry
 [MHC I](https://en.wikipedia.org/wiki/Major_histocompatibility_complex) ligand
 prediction package with competitive accuracy and a fast and 
-[documented](http://www.hammerlab.org/mhcflurry/) open source codebase.
+[documented](http://www.hammerlab.org/mhcflurry/) implementation.
 
 MHCflurry supports Class I peptide/MHC binding affinity prediction using
 ensembles of allele-specific models. It runs on Python versions 2.7 and 3.4+ using
