@@ -1,0 +1,37 @@
+[
+    {
+        "n_models": 12,
+        "max_epochs": 500,
+        "patience": 10,
+        "early_stopping": true,
+        "validation_split": 0.2,
+
+        "random_negative_rate": 0.0,
+        "random_negative_constant": 25,
+
+        "use_embedding": false,
+        "kmer_size": 15,
+        "batch_normalization": false,
+        "locally_connected_layers": [
+            {
+                "filters": 8,
+                "activation": "tanh",
+                "kernel_size": 3
+            },
+            {
+                "filters": 8,
+                "activation": "tanh",
+                "kernel_size": 3
+            }
+        ],
+        "activation": "relu",
+        "output_activation": "sigmoid",
+        "layer_sizes": [
+            16
+        ],
+        "random_negative_affinity_min": 20000.0,
+        "random_negative_affinity_max": 50000.0,
+        "dense_layer_l1_regularization": 0.001,
+        "dropout_probability": 0.0
+    }
+]

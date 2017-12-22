@@ -1,0 +1,50 @@
+sudo: false  # Use container-based infrastructure
+language: python
+python:
+  - "2.7"
+  - "3.6"
+before_install:
+  # Commands below copied from: http://conda.pydata.org/docs/travis.html
+  # We do this conditionally because it saves us some downloading if the
+  # version is the same.
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
+    else
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    fi
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  # reset the shell's lookup table for program name to path mappings
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  # Useful for debugging any issues with conda
+  - conda info -a
+addons:
+  apt:
+    packages:
+    # install pandoc for use with pypandoc for converting the README
+    # from markdown to RST
+    - pandoc
+install:
+  - >
+      conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
+      numpy scipy nose pandas matplotlib mkl-service tensorflow theano
+  - source activate test-environment
+  - pip install pypandoc pylint
+  - pip install -r requirements.txt
+  - pip install .
+  - pip install coveralls
+env:
+  global:
+    - PYTHONHASHSEED=0 
+  matrix:
+    - KERAS_BACKEND=theano
+    - KERAS_BACKEND=tensorflow
+script:
+  # download data and models, then run tests
+  - mhcflurry-downloads fetch
+  - mhcflurry-downloads info  # just to test this command works
+  - nosetests test -sv --with-coverage --cover-package=mhcflurry  && ./lint.sh
+after_success:
+  coveralls
