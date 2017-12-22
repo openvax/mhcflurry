@@ -53,6 +53,7 @@ help:
 .PHONY: generate
 generate:
 	sphinx-apidoc -M -f -o _build/ ../mhcflurry
+	mhcflurry-downloads fetch models_class1 cross_validation_class1
 	python generate.py \
 	    --out-models-cv-rst _build/_models_cv.rst \
 	    --out-models-architecture-png _build/_models_architecture.png \
