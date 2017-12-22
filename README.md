@@ -1,7 +1,8 @@
+[![Build Status](https://travis-ci.org/hammerlab/mhcflurry.svg?branch=master)](https://travis-ci.org/hammerlab/mhcflurry) [![Coverage Status](https://coveralls.io/repos/github/hammerlab/mhcflurry/badge.svg?branch=master)](https://coveralls.io/github/hammerlab/mhcflurry?branch=master)
+
 # mhcflurry
 Open source peptide/MHC I binding affinity prediction. Competitive accuracy, fast,
-and [documented](http://www.hammerlab.org/mhcflurry/).
-[![Build Status](https://travis-ci.org/hammerlab/mhcflurry.svg?branch=master)](https://travis-ci.org/hammerlab/mhcflurry) [![Coverage Status](https://coveralls.io/repos/github/hammerlab/mhcflurry/badge.svg?branch=master)](https://coveralls.io/github/hammerlab/mhcflurry?branch=master)
+[documented](http://www.hammerlab.org/mhcflurry/).
 
 MHCflurry supports Class I peptide/MHC binding affinity prediction using
 ensembles of allele-specific models. You can fit MHCflurry models to your own data
