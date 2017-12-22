@@ -6,8 +6,9 @@ prediction package with competitive accuracy and a fast and
 [documented](http://www.hammerlab.org/mhcflurry/) implementation.
 
 MHCflurry supports Class I peptide/MHC binding affinity prediction using
-ensembles of allele-specific models. It runs on Python versions 2.7 and 3.4+ using
-the [keras](https://keras.io) neural network library.
+ensembles of allele-specific models. It runs on Python 2.7 and 3.4+ using
+the [keras](https://keras.io) neural network library. It exposes [command-line](http://www.hammerlab.org/mhcflurry/commandline_tutorial.html)
+and [Python library](http://www.hammerlab.org/mhcflurry/python_tutorial.html) interfaces.
 
 If you find MHCflurry useful in your research please cite:
 
