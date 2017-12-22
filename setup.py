@@ -24,7 +24,7 @@ from setuptools import setup
 PY2 = (sys.version_info.major == 2)
 
 readme_dir = os.path.dirname(__file__)
-readme_filename = os.path.join(readme_dir, 'README.rst')
+readme_filename = os.path.join(readme_dir, 'README.md')
 
 try:
     with open(readme_filename, 'r') as f:
