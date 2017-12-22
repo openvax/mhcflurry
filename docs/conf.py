@@ -18,6 +18,13 @@ import os
 import re
 import textwrap
 import logging
+import subprocess
+
+# Added by tim
+import keras  # to avoid "Using Tensorflow" message later
+if os.environ.get("READTHEDOCS"):
+    # For rtd builds, call "make generate" first.
+    subprocess.check_call("make generate", shell=True)
 
 # Hack added by tim for bug in autoprogram extension under Python 2.
 from sphinx.util.pycompat import indent  # pylint: disable=import-error
