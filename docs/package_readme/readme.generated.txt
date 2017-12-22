@@ -11,20 +11,19 @@ mhcflurry
 
 Open source neural network models for peptide-MHC binding affinity prediction
 
-MHCflurry is a Python package for peptide/MHC I binding affinity
-prediction. It provides competitive accuracy with a fast, documented,
-open source implementation.
+MHCflurry is an open source package for peptide/MHC I binding affinity
+prediction. It provides competitive accuracy with a fast and
+documented implementation.
 
 You can download pre-trained MHCflurry models fit to affinity
-measurements deposited in IEDB. See the
-“downloads_generation/models_class1” directory in the repository for
-the workflow used to train these predictors. Users with their own data
-can also fit their own MHCflurry models.
+measurements deposited in IEDB or train a MHCflurry predictor on your
+own data.
 
 Currently only allele-specific prediction is implemented, in which
 separate models are trained for each allele. The released models
 therefore support a fixed set of common class I alleles for which
-sufficient published training data is available.
+sufficient published training data is available (see Supported alleles
+and peptide lengths).
 
 MHCflurry supports Python versions 2.7 and 3.4+. It uses the Keras
 neural network library via either the Tensorflow or Theano backends.
@@ -42,16 +41,16 @@ Installation (pip)
 
 Install the package:
 
-   pip install mhcflurry
+   $ pip install mhcflurry
 
 Then download our datasets and trained models:
 
-   mhcflurry-downloads fetch
+   $ mhcflurry-downloads fetch
 
 From a checkout you can run the unit tests with:
 
-   pip install nose
-   nosetests .
+   $ pip install nose
+   $ nosetests .
 
 
 Using conda
@@ -61,13 +60,13 @@ You can alternatively get up and running with a conda environment as
 follows. Some users have reported that this can avoid problems
 installing tensorflow.
 
-   conda create -q -n mhcflurry-env python=3.6 'tensorflow>=1.1.2'
-   source activate mhcflurry-env
+   $ conda create -q -n mhcflurry-env python=3.6 'tensorflow>=1.1.2'
+   $ source activate mhcflurry-env
 
 Then continue as above:
 
-   pip install mhcflurry
-   mhcflurry-downloads fetch
+   $ pip install mhcflurry
+   $ mhcflurry-downloads fetch
 
 
 Command-line tutorial
@@ -109,6 +108,9 @@ specific directory. To get the path to downloaded data, you can use:
 
    $ mhcflurry-downloads path models_class1
    /Users/tim/Library/Application Support/mhcflurry/4/1.0.0/models_class1/
+
+Note: The code we use for generating the downloads is in the
+  "downloads_generation" directory in the repository.
 
 
 Generating predictions
@@ -229,8 +231,8 @@ information.
        --mhc-peptide-lengths 8,9,10,11
        --extract-subsequences
        --output-csv /tmp/subsequence_predictions.csv
-   2017-12-21 14:26:39,143 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles ['HLA-A*02:01', 'HLA-A*03:01'] and epitope lengths [8, 9, 10, 11]
-   2017-12-21 14:26:45,471 - mhctools.cli.script - INFO - 
+   2017-12-21 16:29:58,003 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles ['HLA-A*02:01', 'HLA-A*03:01'] and epitope lengths [8, 9, 10, 11]
+   2017-12-21 16:30:03,062 - mhctools.cli.script - INFO - 
    ...
    [1192 rows x 8 columns]
    Wrote: /tmp/subsequence_predictions.csv
@@ -240,8 +242,8 @@ specified lengths:
 
    $ head -n 3 /tmp/subsequence_predictions.csv
    source_sequence_name,offset,peptide,allele,affinity,percentile_rank,prediction_method_name,length
-   protein2,42,AARYSAFY,HLA-A*02:01,33829.639361000336,73.7865875,mhcflurry,8
-   protein2,42,AARYSAFYN,HLA-A*02:01,29747.41688667342,60.34871249999998,mhcflurry,9
+   protein2,42,AARYSAFY,HLA-A*03:01,5744.344274398671,4.739962499999998,mhcflurry,8
+   protein2,42,AARYSAFYN,HLA-A*03:01,10576.536440802967,8.399187499999996,mhcflurry,9
 
 
 Python library tutorial
@@ -444,8 +446,6 @@ peptides of length 8-15 and the following 124 alleles:
    Mamu-B*17:04, Mamu-B*39:01, Mamu-B*52:01, Mamu-B*66:01, Mamu-B*83:01,
    Mamu-B*87:01, Patr-A*01:01, Patr-A*03:01, Patr-A*04:01, Patr-A*07:01,
    Patr-A*09:01, Patr-B*01:01, Patr-B*13:01, Patr-B*24:01
-
-[image: Build Status][image] [image: Coverage Status][image]
 
 
 mhcflurry

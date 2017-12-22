@@ -1,5 +1,9 @@
+.. _commandline_tutorial:
+
 Command-line tutorial
 =====================
+
+.. _downloading:
 
 Downloading models
 ------------------
@@ -12,17 +16,22 @@ are distributed separately from the pip package and may be downloaded with the
 
     $ mhcflurry-downloads fetch models_class1
 
+Files downloaded with :ref:`mhcflurry-downloads` are stored in a platform-specific
+directory. To get the path to downloaded data, you can use:
+
+.. command-output:: mhcflurry-downloads path models_class1
+    :nostderr:
+
 We also release a few other "downloads," such as curated training data and some
 experimental models. To see what you have downloaded, run:
 
 .. command-output:: mhcflurry-downloads info
     :nostderr:
 
-Files downloaded with :ref:`mhcflurry-downloads` are stored in a platform-specific
-directory. To get the path to downloaded data, you can use:
+.. note::
 
-.. command-output:: mhcflurry-downloads path models_class1
-    :nostderr:
+    The code we use for *generating* the downloads is in the
+    ``downloads_generation`` directory in the repository.
 
 
 Generating predictions

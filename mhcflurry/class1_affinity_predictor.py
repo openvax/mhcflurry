@@ -6,6 +6,7 @@ import sys
 import time
 import warnings
 from os.path import join, exists
+from os import mkdir
 
 import mhcnames
 import numpy
@@ -24,12 +25,11 @@ from mhcflurry.regression_target import to_ic50
 class Class1AffinityPredictor(object):
     """
     High-level interface for peptide/MHC I binding affinity prediction.
-    
-    This is the class most users will want to use.
-    
-    This class delegates to one or more `Class1NeuralNetwork` instances.
-    It supports prediction across multiple alleles using ensembles of single-
-    or pan-allele predictors.
+
+    This class manages low-level `Class1NeuralNetwork` instances, each of which
+    wraps a single Keras network. The purpose of `Class1AffinityPredictor` is to
+    implement ensembles, handling of multiple alleles, and predictor loading and
+    saving.
     """
     def __init__(
             self,
@@ -186,7 +186,8 @@ class Class1AffinityPredictor(object):
 
     def save(self, models_dir, model_names_to_write=None):
         """
-        Serialize the predictor to a directory on disk.
+        Serialize the predictor to a directory on disk. If the directory does
+        not exist it will be created.
         
         The serialization format consists of a file called "manifest.csv" with
         the configurations of each Class1NeuralNetwork, along with per-network
@@ -212,6 +213,9 @@ class Class1AffinityPredictor(object):
         if model_names_to_write is None:
             # Write all models
             model_names_to_write = self.manifest_df.model_name.values
+
+        if not exists(models_dir):
+            mkdir(models_dir)
 
         sub_manifest_df = self.manifest_df.ix[
             self.manifest_df.model_name.isin(model_names_to_write)

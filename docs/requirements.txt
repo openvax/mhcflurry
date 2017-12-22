@@ -1,7 +1,9 @@
-sphinx-autorun
+sphinx
+sphinxcontrib-autorun2
 sphinxcontrib-programoutput
 sphinxcontrib-autoprogram
-sphinx
+sphinx-rtd-theme
 numpydoc
 pypandoc
 mhctools
+pydot

@@ -1,3 +1,5 @@
+.. _models_supported_alleles:
+
 Supported alleles and peptide lengths
 =====================================
 

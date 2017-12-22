@@ -1,177 +1,158 @@
 Python library tutorial
 =======================
 
+Predicting
+----------
+
 The MHCflurry Python API exposes additional options and features beyond those
 supported by the commandline tools. This tutorial gives a basic overview
 of the most important functionality. See the :ref:`API-documentation` for further details.
 
 The `~mhcflurry.Class1AffinityPredictor` class is the primary user-facing interface.
-
+Use the `~mhcflurry.Class1AffinityPredictor.load` static method to load a
+trained predictor from disk. With no arguments this method will load the predictor
+released with MHCflurry (see :ref:`downloading`\ ). If you pass a path to a
+models directory, then it will load that predictor instead.
 
 .. runblock:: pycon
 
-    >>> import mhcflurry
-    >>> print("MHCflurry version: %s" % (mhcflurry.__version__))
-    >>>
-    >>> # Load downloaded predictor
-    >>> predictor = mhcflurry.Class1AffinityPredictor.load()
-    >>> print(predictor.supported_alleles)
+    >>> from mhcflurry import Class1AffinityPredictor
+    >>> predictor = Class1AffinityPredictor.load()
+    >>> predictor.supported_alleles[:10]
 
+With a predictor loaded we can now generate some binding predictions:
 
+.. runblock:: pycon
 
-::
+    >>> predictor.predict(allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
 
+.. note::
 
-    # coding: utf-8
+    MHCflurry normalizes allele names using the `mhcnames <https://github.com/hammerlab/mhcnames>`__
+    package. Names like ``HLA-A0201`` or ``A*02:01`` will be
+    normalized to ``HLA-A*02:01``, so most naming conventions can be used
+    with methods such as `~mhcflurry.Class1AffinityPredictor.predict`.
 
-    # In[22]:
+For more detailed results, we can use
+`~mhcflurry.Class1AffinityPredictor.predict_to_dataframe`.
 
-    import pandas
-    import numpy
-    import seaborn
-    import logging
-    from matplotlib import pyplot
+.. runblock:: pycon
 
-    import mhcflurry
+    >>> predictor.predict_to_dataframe(allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
 
+Instead of a single allele and multiple peptides, we may need predictions for
+allele/peptide pairs. We can predict across pairs by specifying
+the `alleles` argument instead of `allele`. The list of alleles
+must be the same length as the list of peptides (i.e. it is predicting over pairs,
+*not* taking the cross product).
 
+.. runblock:: pycon
 
-    # # Download data and models
+    >>> predictor.predict(alleles=["HLA-A0201", "HLA-B*57:01"], peptides=["SIINFEKL", "SIINFEQL"])
 
-    # In[2]:
+Training
+--------
 
-    get_ipython().system('mhcflurry-downloads fetch')
+Let's fit our own MHCflurry predictor. First we need some training data. If you
+haven't already, run this in a shell to download the MHCflurry training data:
 
+.. code-block:: shell
 
-    # # Making predictions with `Class1AffinityPredictor`
+    $ mhcflurry-downloads fetch data_curated
 
-    # In[3]:
+We can get the path to this data from Python using `mhcflurry.downloads.get_path`:
 
-    help(mhcflurry.Class1AffinityPredictor)
+.. runblock:: pycon
 
+    >>> from mhcflurry.downloads import get_path
+    >>> data_path = get_path("data_curated", "curated_training_data.csv.bz2")
+    >>> data_path
 
-    # In[4]:
+Now let's load it with pandas and filter to reasonably-sized peptides:
 
-    downloaded_predictor = mhcflurry.Class1AffinityPredictor.load()
+.. runblock:: pycon
 
+    >>> import pandas
+    >>> df = pandas.read_csv(data_path)
+    >>> df = df.loc[(df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)]
+    >>> df.head(5)
 
-    # In[5]:
+We'll make an untrained `~mhcflurry.Class1AffinityPredictor` and then call
+`~mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors` to fit
+some models.
 
-    downloaded_predictor.predict(allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
+.. runblock:: pycon
 
+    >>> new_predictor = Class1AffinityPredictor()
+    >>> single_allele_train_data = df.loc[df.allele == "HLA-B*57:01"].sample(100)
+    >>> new_predictor.fit_allele_specific_predictors(
+    ...    n_models=1,
+    ...    architecture_hyperparameters={
+    ...         "layer_sizes": [16],
+    ...         "max_epochs": 5,
+    ...         "random_negative_constant": 5,
+    ...    },
+    ...    peptides=single_allele_train_data.peptide.values,
+    ...    affinities=single_allele_train_data.measurement_value.values,
+    ...    allele="HLA-B*57:01")
 
-    # In[6]:
+The `~mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors` method
+can be called any number of times on the same instance to build up ensembles
+of models across alleles. The `architecture_hyperparameters` we specified are
+for demonstration purposes; to fit real models you would usually train for
+more epochs.
 
-    downloaded_predictor.predict_to_dataframe(allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
+Now we can generate predictions:
 
+.. runblock:: pycon
 
-    # In[7]:
+    >>> new_predictor.predict(["SYNPEPII"], allele="HLA-B*57:01")
 
-    downloaded_predictor.predict_to_dataframe(alleles=["HLA-A0201", "HLA-B*57:01"], peptides=["SIINFEKL", "SIINFEQL"])
+We can save our predictor to the specified directory on disk by running:
 
+.. runblock:: pycon
 
-    # In[8]:
+    >>> new_predictor.save("/tmp/new-predictor")
 
-    downloaded_predictor.predict_to_dataframe(
-        allele="HLA-A0201",
-        peptides=["SIINFEKL", "SIINFEQL"],
-        include_individual_model_predictions=True)
+and restore it:
 
+.. runblock:: pycon
 
-    # In[9]:
+    >>> new_predictor2 = Class1AffinityPredictor.load("/tmp/new-predictor")
+    >>> new_predictor2.supported_alleles
 
-    downloaded_predictor.predict_to_dataframe(
-        allele="HLA-A0201",
-        peptides=["SIINFEKL", "SIINFEQL", "TAAAALANGGGGGGGG"],
-        throw=False)  # Without throw=False, you'll get a ValueError for invalid peptides or alleles
 
+Lower level interface
+---------------------
 
-    # # Instantiating a `Class1AffinityPredictor`  from a saved model on disk
+The high-level `Class1AffinityPredictor` delegates to low-level
+`~mhcflurry.Class1NeuralNetwork` objects, each of which represents
+a single neural network. The purpose of `~mhcflurry.Class1AffinityPredictor`
+is to implement several important features:
 
-    # In[10]:
+ensembles
+    More than one neural network can be used to generate each prediction. The
+    predictions returned to the user are the geometric mean of the individual
+    model predictions. This gives higher accuracy in most situations
 
-    models_dir = mhcflurry.downloads.get_path("models_class1", "models")
-    models_dir
+multiple alleles
+    A `~mhcflurry.Class1NeuralNetwork` generates predictions for only a single
+    allele. The `~mhcflurry.Class1AffinityPredictor` maps alleles to the
+    relevant `~mhcflurry.Class1NeuralNetwork` instances
 
+serialization
+    Loading and saving predictors is implemented in `~mhcflurry.Class1AffinityPredictor`.
 
-    # In[11]:
+Sometimes it's easiest to work directly with `~mhcflurry.Class1NeuralNetwork`.
+Here is a simple example of doing so:
 
-    # This will be the same predictor we instantiated above. We're just being explicit about what models to load.
-    downloaded_predictor = mhcflurry.Class1AffinityPredictor.load(models_dir)
-    downloaded_predictor.predict(["SIINFEKL", "SIQNPEKP", "SYNFPEPI"], allele="HLA-A0301")
+.. runblock:: pycon
 
-
-    # # Fit a model: first load some data
-
-    # In[12]:
-
-    # This is the data the downloaded models were trained on
-    data_path = mhcflurry.downloads.get_path("data_curated", "curated_training_data.csv.bz2")
-    data_path
-
-
-    # In[13]:
-
-    data_df = pandas.read_csv(data_path)
-    data_df
-
-
-    # # Fit a model: Low level `Class1NeuralNetwork` interface
-
-    # In[14]:
-
-    # We'll use mostly the default hyperparameters here. Could also specify them as kwargs.
-    new_model = mhcflurry.Class1NeuralNetwork(layer_sizes=[16])
-    new_model.hyperparameters
-
-
-    # In[16]:
-
-    train_data = data_df.loc[
-        (data_df.allele == "HLA-B*57:01") &
-        (data_df.peptide.str.len() >= 8) &
-        (data_df.peptide.str.len() <= 15)
-    ]
-    get_ipython().magic('time new_model.fit(train_data.peptide.values, train_data.measurement_value.values)')
-
-
-    # In[17]:
-
-    new_model.predict(["SYNPEPII"])
-
-
-    # # Fit a model: high level `Class1AffinityPredictor` interface
-
-    # In[18]:
-
-    affinity_predictor = mhcflurry.Class1AffinityPredictor()
-
-    # This can be called any number of times, for example on different alleles, to build up the ensembles.
-    affinity_predictor.fit_allele_specific_predictors(
-        n_models=1,
-        architecture_hyperparameters={"layer_sizes": [16], "max_epochs": 10},
-        peptides=train_data.peptide.values,
-        affinities=train_data.measurement_value.values,
-        allele="HLA-B*57:01",
-    )
-
-
-    # In[19]:
-
-    affinity_predictor.predict(["SYNPEPII"], allele="HLA-B*57:01")
-
-
-    # # Save and restore the fit model
-
-    # In[20]:
-
-    get_ipython().system('mkdir /tmp/saved-affinity-predictor')
-    affinity_predictor.save("/tmp/saved-affinity-predictor")
-    get_ipython().system('ls /tmp/saved-affinity-predictor')
-
-
-    # In[21]:
-
-    affinity_predictor2 = mhcflurry.Class1AffinityPredictor.load("/tmp/saved-affinity-predictor")
-    affinity_predictor2.predict(["SYNPEPII"], allele="HLA-B*57:01")
+    >>> from mhcflurry import Class1NeuralNetwork
+    >>> network = Class1NeuralNetwork()
+    >>> network.fit(
+    ...    single_allele_train_data.peptide.values,
+    ...    single_allele_train_data.measurement_value.values,
+    ...    verbose=0)
+    >>> network.predict(["SIINFEKLL"])
 

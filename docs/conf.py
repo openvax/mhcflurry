@@ -16,6 +16,13 @@
 import sys
 import os
 import re
+import textwrap
+import logging
+
+# Hack added by tim for bug in autoprogram extension under Python 2.
+from sphinx.util.pycompat import indent
+textwrap.indent = indent
+logging.disable(logging.ERROR)
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -38,7 +45,8 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'numpydoc',
-    'sphinx_autorun',
+    #'sphinx_autorun',
+    'sphinxcontrib.autorun2',
     'sphinxcontrib.programoutput',
     'sphinxcontrib.autoprogram',
 ]
@@ -80,6 +88,7 @@ release = version
 
 # Added by tim
 autodoc_member_order = 'bysource'
+autoclass_content = 'both'
 
 # Added by tim
 suppress_warnings = ['image.nonlocal_uri']
@@ -176,7 +185,7 @@ html_theme = 'sphinx_rtd_theme'
 # If not None, a 'Last updated on:' timestamp is inserted at every page
 # bottom, using the given strftime format.
 # The empty string is equivalent to '%b %d, %Y'.
-#html_last_updated_fmt = None
+html_last_updated_fmt = ""
 
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.
@@ -190,10 +199,10 @@ html_theme = 'sphinx_rtd_theme'
 #html_additional_pages = {}
 
 # If false, no module index is generated.
-#html_domain_indices = True
+html_domain_indices = False
 
 # If false, no index is generated.
-#html_use_index = True
+html_use_index = False
 
 # If true, the index is split into individual pages for each letter.
 #html_split_index = False

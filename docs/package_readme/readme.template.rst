@@ -8,7 +8,6 @@
 .. include:: /python_tutorial.rst
 
 .. include:: /models_supported_alleles.rst
-|Build Status| |Coverage Status|
 
 mhcflurry
 =========

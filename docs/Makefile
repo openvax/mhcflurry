@@ -52,7 +52,7 @@ help:
 # Added by Tim:
 .PHONY: generate
 generate:
-	sphinx-apidoc -f -o _build/ ../mhcflurry
+	sphinx-apidoc -M -f -o _build/ ../mhcflurry
 	python generate.py \
 	    --out-models-cv-rst _build/_models_cv.rst \
 	    --out-models-architecture-png _build/_models_architecture.png \
@@ -63,11 +63,11 @@ generate:
 # Added by Tim:
 .PHONY: readme
 readme: text
-	rm -f package_readme/readme.generated.rst
+	rm -f package_readme/readme.generated.txt
 	cat package_readme/readme_header.rst \
 	    _build/text/package_readme/readme.template.txt \
-	    > package_readme/readme.generated.rst
-	chmod 444 package_readme/readme.generated.rst  # read only
+	    > package_readme/readme.generated.txt
+	chmod 444 package_readme/readme.generated.txt  # read only
 
 .PHONY: clean
 clean:

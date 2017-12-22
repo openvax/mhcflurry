@@ -1,8 +1,6 @@
 MHCflurry documentation
 =====================================
 
-Contents:
-
 .. toctree::
    :maxdepth: 3
 
@@ -13,12 +11,4 @@ Contents:
    models
    commandline_tools
    api
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
 

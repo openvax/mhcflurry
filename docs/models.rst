@@ -21,7 +21,6 @@ Architecture diagram:
 
 .. image:: /_build/_models_architecture.png
 
-
 Cross validation performance
 -------------------------------------------------------------
 

@@ -107,7 +107,7 @@ def go(argv):
         df = pandas.read_csv(args.cv_summary_csv)
         sub_df = df.loc[
             df.kind == "ensemble"
-            ].sort_values("allele").dropna().copy().reset_index(drop=True)
+            ].sort_values("allele").copy().reset_index(drop=True)
         sub_df["Allele"] = sub_df.allele
         sub_df["CV Training Size"] = sub_df.train_size.astype(int)
         sub_df["AUC"] = sub_df.auc

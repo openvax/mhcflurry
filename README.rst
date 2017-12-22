@@ -1,1 +1,1 @@
-docs/package_readme/readme.generated.rst
+docs/package_readme/readme.generated.txt
