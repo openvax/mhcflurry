@@ -1,0 +1,1050 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Details on the released models &mdash; MHCflurry 1.0.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="MHCflurry 1.0.0 documentation" href="index.html"/>
+        <link rel="next" title="Command-line reference" href="commandline_tools.html"/>
+        <link rel="prev" title="Supported alleles and peptide lengths" href="models_supported_alleles.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Details on the released models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#neural-network-architecture">Neural network architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cross-validation-performance">Cross validation performance</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Details on the released models</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/models.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="details-on-the-released-models">
+<h1>Details on the released models<a class="headerlink" href="#details-on-the-released-models" title="Permalink to this headline">¶</a></h1>
+<p>The released MHCflurry predictor consists of an ensemble of eight models for each
+supported allele. Each model in the ensemble was trained on a random 80% sample
+of the data for the allele, and the remaining 20% was used for early stopping.
+All models use the same architecture. The predictions are taken to be the geometric
+mean of the nM binding affinity predictions of the individual models. The script
+we run to train these models is in “downloads-generation/models_class1/GENERATE.sh”
+in the repository.</p>
+<div class="section" id="neural-network-architecture">
+<h2>Neural network architecture<a class="headerlink" href="#neural-network-architecture" title="Permalink to this headline">¶</a></h2>
+<p>The neural network architecture is quite simple, consisting of a locally
+connected layer, a dense layer, and a sigmoid output.</p>
+<p>Layers and parameters summary:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">_________________________________________________________________</span>
+<span class="n">Layer</span> <span class="p">(</span><span class="nb">type</span><span class="p">)</span>                 <span class="n">Output</span> <span class="n">Shape</span>              <span class="n">Param</span> <span class="c1">#</span>
+<span class="o">=================================================================</span>
+<span class="n">peptide</span> <span class="p">(</span><span class="n">InputLayer</span><span class="p">)</span>         <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">21</span><span class="p">)</span>            <span class="mi">0</span>
+<span class="n">_________________________________________________________________</span>
+<span class="n">lc_0</span> <span class="p">(</span><span class="n">LocallyConnected1D</span><span class="p">)</span>    <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">13</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>             <span class="mi">6656</span>
+<span class="n">_________________________________________________________________</span>
+<span class="n">flattened_0</span> <span class="p">(</span><span class="n">Flatten</span><span class="p">)</span>        <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">104</span><span class="p">)</span>               <span class="mi">0</span>
+<span class="n">_________________________________________________________________</span>
+<span class="n">dense_0</span> <span class="p">(</span><span class="n">Dense</span><span class="p">)</span>              <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span>                <span class="mi">1680</span>
+<span class="n">_________________________________________________________________</span>
+<span class="n">output</span> <span class="p">(</span><span class="n">Dense</span><span class="p">)</span>               <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>                 <span class="mi">17</span>
+<span class="o">=================================================================</span>
+<span class="n">Total</span> <span class="n">params</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span><span class="mi">353</span>
+<span class="n">Trainable</span> <span class="n">params</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span><span class="mi">353</span>
+<span class="n">Non</span><span class="o">-</span><span class="n">trainable</span> <span class="n">params</span><span class="p">:</span> <span class="mi">0</span>
+<span class="n">_________________________________________________________________</span>
+</pre></div>
+</div>
+<p>Architecture diagram:</p>
+<img alt="_images/_models_architecture.png" src="_images/_models_architecture.png" />
+</div>
+<div class="section" id="cross-validation-performance">
+<h2>Cross validation performance<a class="headerlink" href="#cross-validation-performance" title="Permalink to this headline">¶</a></h2>
+<p>The accuracy of the MHCflurry downloadable models was estimated using 5-fold cross
+validation on the training data. The values shown here are the mean cross validation
+scores across folds.</p>
+<p>The AUC and F1 estimates use a 500 nM cutoff for distinguishing strong-binders
+from weak- or non-binders. The Kendall Tau score gives the rank correlation
+between the predicted and measured affinities; it uses no cutoff.</p>
+<p>Showing estimated performance for 124 alleles.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="26%" />
+<col width="30%" />
+<col width="11%" />
+<col width="11%" />
+<col width="21%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Allele</th>
+<th class="head">CV Training Size</th>
+<th class="head">AUC</th>
+<th class="head">F1</th>
+<th class="head">Kendall Tau</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>BoLA-6*13:01</td>
+<td>72</td>
+<td>0.979</td>
+<td>0.122</td>
+<td>0.400</td>
+</tr>
+<tr class="row-odd"><td>Eqca-1*01:01</td>
+<td>542</td>
+<td>0.956</td>
+<td>0.133</td>
+<td>0.529</td>
+</tr>
+<tr class="row-even"><td>H-2-Db</td>
+<td>3636</td>
+<td>0.894</td>
+<td>0.146</td>
+<td>0.550</td>
+</tr>
+<tr class="row-odd"><td>H-2-Dd</td>
+<td>377</td>
+<td>0.957</td>
+<td>0.186</td>
+<td>0.337</td>
+</tr>
+<tr class="row-even"><td>H-2-Kb</td>
+<td>3848</td>
+<td>0.885</td>
+<td>0.150</td>
+<td>0.536</td>
+</tr>
+<tr class="row-odd"><td>H-2-Kd</td>
+<td>1224</td>
+<td>0.875</td>
+<td>0.147</td>
+<td>0.472</td>
+</tr>
+<tr class="row-even"><td>H-2-Kk</td>
+<td>456</td>
+<td>0.888</td>
+<td>0.152</td>
+<td>0.446</td>
+</tr>
+<tr class="row-odd"><td>H-2-Ld</td>
+<td>392</td>
+<td>0.884</td>
+<td>0.149</td>
+<td>0.487</td>
+</tr>
+<tr class="row-even"><td>HLA-A*01:01</td>
+<td>4084</td>
+<td>0.943</td>
+<td>0.132</td>
+<td>0.415</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*02:01</td>
+<td>13884</td>
+<td>0.914</td>
+<td>0.157</td>
+<td>0.554</td>
+</tr>
+<tr class="row-even"><td>HLA-A*02:02</td>
+<td>3350</td>
+<td>0.917</td>
+<td>0.165</td>
+<td>0.628</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*02:03</td>
+<td>5066</td>
+<td>0.949</td>
+<td>0.168</td>
+<td>0.669</td>
+</tr>
+<tr class="row-even"><td>HLA-A*02:05</td>
+<td>90</td>
+<td>0.971</td>
+<td>0.181</td>
+<td>0.501</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*02:06</td>
+<td>4542</td>
+<td>0.895</td>
+<td>0.159</td>
+<td>0.585</td>
+</tr>
+<tr class="row-even"><td>HLA-A*02:07</td>
+<td>89</td>
+<td>0.902</td>
+<td>0.057</td>
+<td>0.625</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*02:11</td>
+<td>870</td>
+<td>0.937</td>
+<td>0.154</td>
+<td>0.622</td>
+</tr>
+<tr class="row-even"><td>HLA-A*02:12</td>
+<td>946</td>
+<td>0.938</td>
+<td>0.154</td>
+<td>0.586</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*02:16</td>
+<td>736</td>
+<td>0.934</td>
+<td>0.150</td>
+<td>0.514</td>
+</tr>
+<tr class="row-even"><td>HLA-A*02:17</td>
+<td>276</td>
+<td>0.801</td>
+<td>0.140</td>
+<td>0.485</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*02:19</td>
+<td>996</td>
+<td>0.957</td>
+<td>0.163</td>
+<td>0.501</td>
+</tr>
+<tr class="row-even"><td>HLA-A*02:50</td>
+<td>108</td>
+<td>0.983</td>
+<td>0.152</td>
+<td>0.654</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*03:01</td>
+<td>6312</td>
+<td>0.918</td>
+<td>0.141</td>
+<td>0.550</td>
+</tr>
+<tr class="row-even"><td>HLA-A*11:01</td>
+<td>5564</td>
+<td>0.938</td>
+<td>0.160</td>
+<td>0.613</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*23:01</td>
+<td>2005</td>
+<td>0.946</td>
+<td>0.150</td>
+<td>0.547</td>
+</tr>
+<tr class="row-even"><td>HLA-A*24:01</td>
+<td>64</td>
+<td>0.587</td>
+<td>0.000</td>
+<td>0.062</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*24:02</td>
+<td>3650</td>
+<td>0.902</td>
+<td>0.133</td>
+<td>0.540</td>
+</tr>
+<tr class="row-even"><td>HLA-A*24:03</td>
+<td>981</td>
+<td>0.976</td>
+<td>0.182</td>
+<td>0.515</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*25:01</td>
+<td>768</td>
+<td>0.994</td>
+<td>0.150</td>
+<td>0.399</td>
+</tr>
+<tr class="row-even"><td>HLA-A*26:01</td>
+<td>3544</td>
+<td>0.939</td>
+<td>0.115</td>
+<td>0.365</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*26:02</td>
+<td>514</td>
+<td>0.980</td>
+<td>0.178</td>
+<td>0.622</td>
+</tr>
+<tr class="row-even"><td>HLA-A*26:03</td>
+<td>429</td>
+<td>0.981</td>
+<td>0.094</td>
+<td>0.464</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*29:02</td>
+<td>2132</td>
+<td>0.886</td>
+<td>0.127</td>
+<td>0.541</td>
+</tr>
+<tr class="row-even"><td>HLA-A*30:01</td>
+<td>2570</td>
+<td>0.939</td>
+<td>0.166</td>
+<td>0.529</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*30:02</td>
+<td>1884</td>
+<td>0.805</td>
+<td>0.116</td>
+<td>0.443</td>
+</tr>
+<tr class="row-even"><td>HLA-A*31:01</td>
+<td>4598</td>
+<td>0.935</td>
+<td>0.148</td>
+<td>0.591</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*32:01</td>
+<td>907</td>
+<td>0.946</td>
+<td>0.164</td>
+<td>0.631</td>
+</tr>
+<tr class="row-even"><td>HLA-A*32:07</td>
+<td>69</td>
+<td>0.438</td>
+<td>0.044</td>
+<td>0.098</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*33:01</td>
+<td>2880</td>
+<td>0.941</td>
+<td>0.148</td>
+<td>0.565</td>
+</tr>
+<tr class="row-even"><td>HLA-A*66:01</td>
+<td>81</td>
+<td>1.000</td>
+<td>0.000</td>
+<td>0.516</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*68:01</td>
+<td>3397</td>
+<td>0.924</td>
+<td>0.158</td>
+<td>0.638</td>
+</tr>
+<tr class="row-even"><td>HLA-A*68:02</td>
+<td>4471</td>
+<td>0.944</td>
+<td>0.152</td>
+<td>0.560</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*68:23</td>
+<td>65</td>
+<td>0.938</td>
+<td>0.000</td>
+<td>0.328</td>
+</tr>
+<tr class="row-even"><td>HLA-A*69:01</td>
+<td>2060</td>
+<td>0.948</td>
+<td>0.106</td>
+<td>0.317</td>
+</tr>
+<tr class="row-odd"><td>HLA-A*80:01</td>
+<td>933</td>
+<td>0.970</td>
+<td>0.141</td>
+<td>0.431</td>
+</tr>
+<tr class="row-even"><td>HLA-B*07:01</td>
+<td>163</td>
+<td>0.879</td>
+<td>0.119</td>
+<td>0.463</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*07:02</td>
+<td>4412</td>
+<td>0.951</td>
+<td>0.157</td>
+<td>0.568</td>
+</tr>
+<tr class="row-even"><td>HLA-B*08:01</td>
+<td>2876</td>
+<td>0.942</td>
+<td>0.138</td>
+<td>0.524</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*08:02</td>
+<td>815</td>
+<td>0.989</td>
+<td>0.044</td>
+<td>0.388</td>
+</tr>
+<tr class="row-even"><td>HLA-B*08:03</td>
+<td>376</td>
+<td>0.967</td>
+<td>0.080</td>
+<td>0.328</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*14:02</td>
+<td>179</td>
+<td>0.982</td>
+<td>0.141</td>
+<td>0.462</td>
+</tr>
+<tr class="row-even"><td>HLA-B*15:01</td>
+<td>4057</td>
+<td>0.953</td>
+<td>0.166</td>
+<td>0.561</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*15:02</td>
+<td>150</td>
+<td>0.838</td>
+<td>0.133</td>
+<td>0.317</td>
+</tr>
+<tr class="row-even"><td>HLA-B*15:03</td>
+<td>559</td>
+<td>0.940</td>
+<td>0.178</td>
+<td>0.676</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*15:09</td>
+<td>673</td>
+<td>0.946</td>
+<td>0.031</td>
+<td>0.426</td>
+</tr>
+<tr class="row-even"><td>HLA-B*15:17</td>
+<td>1161</td>
+<td>0.955</td>
+<td>0.168</td>
+<td>0.555</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*15:42</td>
+<td>290</td>
+<td>0.736</td>
+<td>0.000</td>
+<td>-0.082</td>
+</tr>
+<tr class="row-even"><td>HLA-B*18:01</td>
+<td>2194</td>
+<td>0.914</td>
+<td>0.092</td>
+<td>0.384</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*27:01</td>
+<td>201</td>
+<td>0.945</td>
+<td>0.169</td>
+<td>0.551</td>
+</tr>
+<tr class="row-even"><td>HLA-B*27:03</td>
+<td>725</td>
+<td>0.994</td>
+<td>0.000</td>
+<td>0.204</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*27:04</td>
+<td>67</td>
+<td>0.800</td>
+<td>0.000</td>
+<td>0.374</td>
+</tr>
+<tr class="row-even"><td>HLA-B*27:05</td>
+<td>2960</td>
+<td>0.950</td>
+<td>0.154</td>
+<td>0.538</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*27:06</td>
+<td>63</td>
+<td>0.667</td>
+<td>0.000</td>
+<td>-0.138</td>
+</tr>
+<tr class="row-even"><td>HLA-B*27:20</td>
+<td>72</td>
+<td>nan</td>
+<td>0.087</td>
+<td>0.020</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*35:01</td>
+<td>3188</td>
+<td>0.913</td>
+<td>0.146</td>
+<td>0.539</td>
+</tr>
+<tr class="row-even"><td>HLA-B*35:03</td>
+<td>229</td>
+<td>0.986</td>
+<td>0.080</td>
+<td>0.365</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*35:08</td>
+<td>132</td>
+<td>0.704</td>
+<td>0.171</td>
+<td>0.259</td>
+</tr>
+<tr class="row-even"><td>HLA-B*37:01</td>
+<td>78</td>
+<td>0.625</td>
+<td>0.000</td>
+<td>0.348</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*38:01</td>
+<td>417</td>
+<td>0.981</td>
+<td>0.177</td>
+<td>0.605</td>
+</tr>
+<tr class="row-even"><td>HLA-B*39:01</td>
+<td>1324</td>
+<td>0.951</td>
+<td>0.152</td>
+<td>0.501</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*40:01</td>
+<td>2756</td>
+<td>0.956</td>
+<td>0.152</td>
+<td>0.511</td>
+</tr>
+<tr class="row-even"><td>HLA-B*40:02</td>
+<td>867</td>
+<td>0.916</td>
+<td>0.147</td>
+<td>0.624</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*42:01</td>
+<td>169</td>
+<td>0.794</td>
+<td>0.040</td>
+<td>0.406</td>
+</tr>
+<tr class="row-even"><td>HLA-B*44:01</td>
+<td>58</td>
+<td>0.625</td>
+<td>0.000</td>
+<td>0.192</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*44:02</td>
+<td>1772</td>
+<td>0.943</td>
+<td>0.142</td>
+<td>0.479</td>
+</tr>
+<tr class="row-even"><td>HLA-B*44:03</td>
+<td>1184</td>
+<td>0.926</td>
+<td>0.142</td>
+<td>0.625</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*45:01</td>
+<td>863</td>
+<td>0.961</td>
+<td>0.122</td>
+<td>0.600</td>
+</tr>
+<tr class="row-even"><td>HLA-B*45:06</td>
+<td>288</td>
+<td>0.500</td>
+<td>0.000</td>
+<td>0.121</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*46:01</td>
+<td>1465</td>
+<td>0.938</td>
+<td>0.137</td>
+<td>0.356</td>
+</tr>
+<tr class="row-even"><td>HLA-B*48:01</td>
+<td>706</td>
+<td>0.947</td>
+<td>0.084</td>
+<td>0.443</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*51:01</td>
+<td>2332</td>
+<td>0.914</td>
+<td>0.111</td>
+<td>0.453</td>
+</tr>
+<tr class="row-even"><td>HLA-B*53:01</td>
+<td>1414</td>
+<td>0.921</td>
+<td>0.147</td>
+<td>0.605</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*54:01</td>
+<td>972</td>
+<td>0.967</td>
+<td>0.155</td>
+<td>0.564</td>
+</tr>
+<tr class="row-even"><td>HLA-B*57:01</td>
+<td>2310</td>
+<td>0.948</td>
+<td>0.147</td>
+<td>0.521</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*58:01</td>
+<td>3002</td>
+<td>0.954</td>
+<td>0.156</td>
+<td>0.515</td>
+</tr>
+<tr class="row-even"><td>HLA-B*73:01</td>
+<td>104</td>
+<td>0.913</td>
+<td>0.000</td>
+<td>0.576</td>
+</tr>
+<tr class="row-odd"><td>HLA-B*83:01</td>
+<td>270</td>
+<td>0.958</td>
+<td>0.133</td>
+<td>0.398</td>
+</tr>
+<tr class="row-even"><td>HLA-C*03:03</td>
+<td>131</td>
+<td>0.867</td>
+<td>0.173</td>
+<td>0.612</td>
+</tr>
+<tr class="row-odd"><td>HLA-C*03:04</td>
+<td>265</td>
+<td>0.840</td>
+<td>0.116</td>
+<td>0.491</td>
+</tr>
+<tr class="row-even"><td>HLA-C*04:01</td>
+<td>417</td>
+<td>0.683</td>
+<td>0.057</td>
+<td>0.293</td>
+</tr>
+<tr class="row-odd"><td>HLA-C*05:01</td>
+<td>179</td>
+<td>0.923</td>
+<td>0.169</td>
+<td>0.616</td>
+</tr>
+<tr class="row-even"><td>HLA-C*06:02</td>
+<td>311</td>
+<td>0.904</td>
+<td>0.130</td>
+<td>0.583</td>
+</tr>
+<tr class="row-odd"><td>HLA-C*07:01</td>
+<td>353</td>
+<td>0.717</td>
+<td>0.000</td>
+<td>0.193</td>
+</tr>
+<tr class="row-even"><td>HLA-C*07:02</td>
+<td>139</td>
+<td>0.690</td>
+<td>0.120</td>
+<td>0.209</td>
+</tr>
+<tr class="row-odd"><td>HLA-C*08:02</td>
+<td>108</td>
+<td>0.909</td>
+<td>0.109</td>
+<td>0.481</td>
+</tr>
+<tr class="row-even"><td>HLA-C*12:03</td>
+<td>137</td>
+<td>0.828</td>
+<td>0.169</td>
+<td>0.101</td>
+</tr>
+<tr class="row-odd"><td>HLA-C*14:02</td>
+<td>194</td>
+<td>0.820</td>
+<td>0.159</td>
+<td>0.431</td>
+</tr>
+<tr class="row-even"><td>HLA-C*15:02</td>
+<td>144</td>
+<td>0.783</td>
+<td>0.050</td>
+<td>0.364</td>
+</tr>
+<tr class="row-odd"><td>Mamu-A*01:01</td>
+<td>2072</td>
+<td>0.909</td>
+<td>0.163</td>
+<td>0.599</td>
+</tr>
+<tr class="row-even"><td>Mamu-A*02:01</td>
+<td>1086</td>
+<td>0.896</td>
+<td>0.153</td>
+<td>0.570</td>
+</tr>
+<tr class="row-odd"><td>Mamu-A*02:0102</td>
+<td>116</td>
+<td>0.882</td>
+<td>0.133</td>
+<td>0.554</td>
+</tr>
+<tr class="row-even"><td>Mamu-A*07:01</td>
+<td>544</td>
+<td>0.983</td>
+<td>0.176</td>
+<td>0.645</td>
+</tr>
+<tr class="row-odd"><td>Mamu-A*07:0103</td>
+<td>81</td>
+<td>0.575</td>
+<td>0.000</td>
+<td>0.158</td>
+</tr>
+<tr class="row-even"><td>Mamu-A*11:01</td>
+<td>1008</td>
+<td>0.885</td>
+<td>0.144</td>
+<td>0.561</td>
+</tr>
+<tr class="row-odd"><td>Mamu-A*22:01</td>
+<td>551</td>
+<td>0.973</td>
+<td>0.177</td>
+<td>0.628</td>
+</tr>
+<tr class="row-even"><td>Mamu-A*26:01</td>
+<td>164</td>
+<td>0.891</td>
+<td>0.062</td>
+<td>0.515</td>
+</tr>
+<tr class="row-odd"><td>Mamu-B*01:01</td>
+<td>705</td>
+<td>0.989</td>
+<td>0.168</td>
+<td>0.366</td>
+</tr>
+<tr class="row-even"><td>Mamu-B*03:01</td>
+<td>916</td>
+<td>0.982</td>
+<td>0.174</td>
+<td>0.682</td>
+</tr>
+<tr class="row-odd"><td>Mamu-B*08:01</td>
+<td>901</td>
+<td>0.951</td>
+<td>0.156</td>
+<td>0.709</td>
+</tr>
+<tr class="row-even"><td>Mamu-B*10:01</td>
+<td>127</td>
+<td>0.774</td>
+<td>0.053</td>
+<td>0.279</td>
+</tr>
+<tr class="row-odd"><td>Mamu-B*17:01</td>
+<td>1320</td>
+<td>0.942</td>
+<td>0.151</td>
+<td>0.647</td>
+</tr>
+<tr class="row-even"><td>Mamu-B*17:04</td>
+<td>1096</td>
+<td>0.924</td>
+<td>0.138</td>
+<td>0.633</td>
+</tr>
+<tr class="row-odd"><td>Mamu-B*39:01</td>
+<td>366</td>
+<td>0.862</td>
+<td>0.143</td>
+<td>0.603</td>
+</tr>
+<tr class="row-even"><td>Mamu-B*52:01</td>
+<td>714</td>
+<td>0.903</td>
+<td>0.172</td>
+<td>0.609</td>
+</tr>
+<tr class="row-odd"><td>Mamu-B*66:01</td>
+<td>80</td>
+<td>0.633</td>
+<td>0.025</td>
+<td>0.120</td>
+</tr>
+<tr class="row-even"><td>Mamu-B*83:01</td>
+<td>345</td>
+<td>0.938</td>
+<td>0.154</td>
+<td>0.673</td>
+</tr>
+<tr class="row-odd"><td>Mamu-B*87:01</td>
+<td>124</td>
+<td>0.745</td>
+<td>0.080</td>
+<td>0.433</td>
+</tr>
+<tr class="row-even"><td>Patr-A*01:01</td>
+<td>363</td>
+<td>0.938</td>
+<td>0.127</td>
+<td>0.592</td>
+</tr>
+<tr class="row-odd"><td>Patr-A*03:01</td>
+<td>303</td>
+<td>0.921</td>
+<td>0.027</td>
+<td>0.463</td>
+</tr>
+<tr class="row-even"><td>Patr-A*04:01</td>
+<td>261</td>
+<td>0.894</td>
+<td>0.044</td>
+<td>0.571</td>
+</tr>
+<tr class="row-odd"><td>Patr-A*07:01</td>
+<td>489</td>
+<td>0.858</td>
+<td>0.133</td>
+<td>0.500</td>
+</tr>
+<tr class="row-even"><td>Patr-A*09:01</td>
+<td>524</td>
+<td>0.845</td>
+<td>0.133</td>
+<td>0.552</td>
+</tr>
+<tr class="row-odd"><td>Patr-B*01:01</td>
+<td>630</td>
+<td>0.892</td>
+<td>0.125</td>
+<td>0.572</td>
+</tr>
+<tr class="row-even"><td>Patr-B*13:01</td>
+<td>201</td>
+<td>0.877</td>
+<td>0.167</td>
+<td>0.510</td>
+</tr>
+<tr class="row-odd"><td>Patr-B*24:01</td>
+<td>259</td>
+<td>0.945</td>
+<td>0.168</td>
+<td>0.597</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="commandline_tools.html" class="btn btn-neutral float-right" title="Command-line reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="models_supported_alleles.html" class="btn btn-neutral" title="Supported alleles and peptide lengths" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Timothy O&#39;Donnell.
+      Last updated on Dec 22, 2017.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
