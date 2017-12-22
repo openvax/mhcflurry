@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/hammerlab/mhcflurry.svg?branch=master)](https://travis-ci.org/hammerlab/mhcflurry) [![Coverage Status](https://coveralls.io/repos/github/hammerlab/mhcflurry/badge.svg?branch=master)](https://coveralls.io/github/hammerlab/mhcflurry?branch=master)
 
 # mhcflurry
-[MHC I](https://en.wikipedia.org/wiki/Major_histocompatibility_complex) ligand
+[MHC I](https://en.wikipedia.org/wiki/MHC_class_I) ligand
 prediction package with competitive accuracy and a fast and 
 [documented](http://www.hammerlab.org/mhcflurry/) implementation.
 
