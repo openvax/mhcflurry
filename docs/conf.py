@@ -20,8 +20,10 @@ import textwrap
 import logging
 
 # Hack added by tim for bug in autoprogram extension under Python 2.
-from sphinx.util.pycompat import indent
+from sphinx.util.pycompat import indent  # pylint: disable=import-error
 textwrap.indent = indent
+
+# Disable logging (added by tim)
 logging.disable(logging.ERROR)
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -45,10 +47,10 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'numpydoc',
-    #'sphinx_autorun',
     'sphinxcontrib.autorun2',
     'sphinxcontrib.programoutput',
     'sphinxcontrib.autoprogram',
+    'sphinx.ext.githubpages',
 ]
 
 # Add any paths that contain templates here, relative to this directory.

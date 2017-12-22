@@ -23,7 +23,7 @@ directory. To get the path to downloaded data, you can use:
     :nostderr:
 
 We also release a few other "downloads," such as curated training data and some
-experimental models. To see what you have downloaded, run:
+experimental models. To see what's available and what you have downloaded, run:
 
 .. command-output:: mhcflurry-downloads info
     :nostderr:
@@ -38,7 +38,7 @@ Generating predictions
 ----------------------
 
 The :ref:`mhcflurry-predict` command generates predictions from the command-line.
-By default it will use the pre-trained models you downloaded above but other
+By default it will use the pre-trained models you downloaded above; other
 models can be used by specifying the ``--models`` argument.
 
 Running:
@@ -53,7 +53,7 @@ Running:
 results in a file like this:
 
 .. command-output::
-    head -n 3 /tmp/predictions.csv
+    cat /tmp/predictions.csv
 
 The predictions are given as affinities (KD) in nM in the ``mhcflurry_prediction``
 column. The other fields give the 5-95 percentile predictions across
@@ -62,7 +62,7 @@ a large number of random peptides tested on that allele.
 
 The predictions shown above were generated with MHCflurry |version|. Different versions of
 MHCflurry can give considerably different results. Even
-on the same version, your exact predictions may vary (up to about 1 nM) depending
+on the same version, exact predictions may vary (up to about 1 nM) depending
 on the Keras backend and other details.
 
 In most cases you'll want to specify the input as a CSV file instead of passing

@@ -8,12 +8,12 @@ additional column giving MHCflurry binding affinity predictions:
 
     $ mhcflurry-predict INPUT.csv --out RESULT.csv
 
-The input CSV file is expected to contain columns 'allele' and 'peptide'.
-The predictions are written to a column called 'mhcflurry_prediction'.
-These default column names may be changed with the --allele-column,
---peptide-column, and --prediction-column options.
+The input CSV file is expected to contain columns ``allele`` and ``peptide``.
+The predictions are written to a column called ``mhcflurry_prediction``.
+These default column names may be changed with the `--allele-column`,
+`--peptide-column`, and `--prediction-column` options.
 
-If --out is not specified, results are writtent to standard out.
+If `--out` is not specified, results are written to standard out.
 
 You can also run on alleles and peptides specified on the commandline, in
 which case predictions are written for all combinations of alleles and

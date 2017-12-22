@@ -71,7 +71,11 @@ readme: text
 
 .PHONY: clean
 clean:
+	# Added by tim: preserve html/.git
+	rm -rf $(BUILDDIR)/html/*
+	mv $(BUILDDIR)/html /tmp/html-bk
 	rm -rf $(BUILDDIR)/*
+	mv /tmp/html-bk $(BUILDDIR)/html
 
 .PHONY: html
 html:
