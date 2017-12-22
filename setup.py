@@ -33,6 +33,13 @@ except:
     logging.warning("Failed to load %s" % readme_filename)
     readme = ""
 
+try:
+    import pypandoc
+    readme = pypandoc.convert(readme, to='rst', format='md')
+except:
+    logging.warn("Conversion of long_description from MD to RST failed")
+    pass
+
 with open('mhcflurry/__init__.py', 'r') as f:
     version = re.search(
         r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
