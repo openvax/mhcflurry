@@ -1,0 +1,899 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mhcflurry.class1_neural_network &mdash; MHCflurry 1.0.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="MHCflurry 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../models.html">Details on the released models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>mhcflurry.class1_neural_network</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mhcflurry.class1_neural_network</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span> <span class="nn">pandas</span>
+
+<span class="kn">from</span> <span class="nn">mhcflurry.hyperparameters</span> <span class="k">import</span> <span class="n">HyperparameterDefaults</span>
+
+<span class="kn">from</span> <span class="nn">mhcflurry.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span>
+<span class="kn">from</span> <span class="nn">mhcflurry.amino_acid</span> <span class="k">import</span> <span class="n">available_vector_encodings</span><span class="p">,</span> <span class="n">vector_encoding_length</span>
+<span class="kn">from</span> <span class="nn">mhcflurry.regression_target</span> <span class="k">import</span> <span class="n">to_ic50</span><span class="p">,</span> <span class="n">from_ic50</span>
+<span class="kn">from</span> <span class="nn">mhcflurry.common</span> <span class="k">import</span> <span class="n">random_peptides</span><span class="p">,</span> <span class="n">amino_acid_distribution</span>
+
+
+<div class="viewcode-block" id="Class1NeuralNetwork"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork">[docs]</a><span class="k">class</span> <span class="nc">Class1NeuralNetwork</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Low level class I predictor consisting of a single neural network.</span>
+<span class="sd">    </span>
+<span class="sd">    Both single allele and pan-allele prediction are supported, but pan-allele</span>
+<span class="sd">    is in development and not yet well performing.</span>
+<span class="sd">    </span>
+<span class="sd">    Users will generally use Class1AffinityPredictor, which gives a higher-level</span>
+<span class="sd">    interface and supports ensembles.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">network_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
+        <span class="n">kmer_size</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+        <span class="n">use_embedding</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">peptide_amino_acid_encoding</span><span class="o">=</span><span class="s2">&quot;one-hot&quot;</span><span class="p">,</span>
+        <span class="n">embedding_input_dim</span><span class="o">=</span><span class="mi">21</span><span class="p">,</span>
+        <span class="n">embedding_output_dim</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+        <span class="n">pseudosequence_use_embedding</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">layer_sizes</span><span class="o">=</span><span class="p">[</span><span class="mi">32</span><span class="p">],</span>
+        <span class="n">dense_layer_l1_regularization</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
+        <span class="n">dense_layer_l2_regularization</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">activation</span><span class="o">=</span><span class="s2">&quot;relu&quot;</span><span class="p">,</span>
+        <span class="n">init</span><span class="o">=</span><span class="s2">&quot;glorot_uniform&quot;</span><span class="p">,</span>
+        <span class="n">output_activation</span><span class="o">=</span><span class="s2">&quot;sigmoid&quot;</span><span class="p">,</span>
+        <span class="n">dropout_probability</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">batch_normalization</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">embedding_init_method</span><span class="o">=</span><span class="s2">&quot;glorot_uniform&quot;</span><span class="p">,</span>
+        <span class="n">locally_connected_layers</span><span class="o">=</span><span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;filters&quot;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+                <span class="s2">&quot;activation&quot;</span><span class="p">:</span> <span class="s2">&quot;tanh&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;kernel_size&quot;</span><span class="p">:</span> <span class="mi">3</span>
+            <span class="p">}</span>
+        <span class="p">],</span>
+    <span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Hyperparameters (and their default values) that affect the neural network</span>
+<span class="sd">    architecture.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">compile_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
+        <span class="n">loss</span><span class="o">=</span><span class="s2">&quot;mse&quot;</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="o">=</span><span class="s2">&quot;rmsprop&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Loss and optimizer hyperparameters. Any values supported by keras may be</span>
+<span class="sd">    used.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">input_encoding_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
+        <span class="n">left_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">right_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Number of amino acid residues that are given fixed positions on the each</span>
+<span class="sd">    side in the variable length encoding.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">fit_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
+        <span class="n">max_epochs</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+        <span class="n">take_best_epoch</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># currently unused</span>
+        <span class="n">validation_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
+        <span class="n">early_stopping</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">minibatch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+        <span class="n">random_negative_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">random_negative_constant</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span>
+        <span class="n">random_negative_affinity_min</span><span class="o">=</span><span class="mf">20000.0</span><span class="p">,</span>
+        <span class="n">random_negative_affinity_max</span><span class="o">=</span><span class="mf">50000.0</span><span class="p">,</span>
+        <span class="n">random_negative_match_distribution</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">random_negative_distribution_smoothing</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Hyperparameters for neural network training.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">early_stopping_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
+        <span class="n">patience</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">monitor</span><span class="o">=</span><span class="s1">&#39;val_loss&#39;</span><span class="p">,</span>  <span class="c1"># currently unused</span>
+        <span class="n">min_delta</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>  <span class="c1"># currently unused</span>
+        <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>  <span class="c1"># currently unused</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span>  <span class="c1"># currently unused</span>
+    <span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Hyperparameters for early stopping.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">hyperparameter_defaults</span> <span class="o">=</span> <span class="n">network_hyperparameter_defaults</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+        <span class="n">compile_hyperparameter_defaults</span><span class="p">)</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+        <span class="n">input_encoding_hyperparameter_defaults</span><span class="p">)</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+        <span class="n">fit_hyperparameter_defaults</span><span class="p">)</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+        <span class="n">early_stopping_hyperparameter_defaults</span><span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Combined set of all supported hyperparameters and their default values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">hyperparameters</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameter_defaults</span><span class="o">.</span><span class="n">with_defaults</span><span class="p">(</span>
+            <span class="n">hyperparameters</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_network</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">network_json</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_seconds</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_num_points</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">KERAS_MODELS_CACHE</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Process-wide keras model cache, a map from: architecture JSON string to</span>
+<span class="sd">    (Keras model, existing network weights)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.borrow_cached_network"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.borrow_cached_network">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">borrow_cached_network</span><span class="p">(</span><span class="n">klass</span><span class="p">,</span> <span class="n">network_json</span><span class="p">,</span> <span class="n">network_weights</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a keras Model with the specified architecture and weights.</span>
+<span class="sd">        As an optimization, when possible this will reuse architectures from a</span>
+<span class="sd">        process-wide cache.</span>
+
+<span class="sd">        The returned object is &quot;borrowed&quot; in the sense that its weights can</span>
+<span class="sd">        change later after subsequent calls to this method from other objects.</span>
+
+<span class="sd">        If you&#39;re using this from a parallel implementation you&#39;ll need to</span>
+<span class="sd">        hold a lock while using the returned object.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        network_json : string of JSON</span>
+<span class="sd">        network_weights : list of numpy.array</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        keras.models.Model</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">network_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">network_json</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="p">:</span>
+            <span class="c1"># Cache miss.</span>
+            <span class="kn">import</span> <span class="nn">keras.models</span>
+            <span class="n">network</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">model_from_json</span><span class="p">(</span><span class="n">network_json</span><span class="p">)</span>
+            <span class="n">existing_weights</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Cache hit.</span>
+            <span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">existing_weights</span><span class="p">)</span> <span class="o">=</span> <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="p">[</span><span class="n">network_json</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">existing_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">network_weights</span><span class="p">:</span>
+            <span class="n">network</span><span class="o">.</span><span class="n">set_weights</span><span class="p">(</span><span class="n">network_weights</span><span class="p">)</span>
+            <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="p">[</span><span class="n">network_json</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">network_weights</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">network</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.network"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.network">[docs]</a>    <span class="k">def</span> <span class="nf">network</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">borrow</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the keras model associated with this predictor.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        borrow : bool</span>
+<span class="sd">            Whether to return a cached model if possible. See</span>
+<span class="sd">            borrow_cached_network for details</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        keras.models.Model</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">network_json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">borrow</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">borrow_cached_network</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">network_json</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="kn">import</span> <span class="nn">keras.models</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_network</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">model_from_json</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">network_json</span><span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_network</span><span class="o">.</span><span class="n">set_weights</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">network_json</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.update_network_description"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.update_network_description">[docs]</a>    <span class="k">def</span> <span class="nf">update_network_description</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">network_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.get_config"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.get_config">[docs]</a>    <span class="k">def</span> <span class="nf">get_config</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        serialize to a dict all attributes except model weights</span>
+<span class="sd">        </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_network_description</span><span class="p">()</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;_network&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;network_weights&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.from_config"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.from_config">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        deserialize from a dict returned by get_config().</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        config : dict</span>
+<span class="sd">        weights : list of array, optional</span>
+<span class="sd">            Network weights to restore</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Class1NeuralNetwork</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;hyperparameters&#39;</span><span class="p">))</span>
+        <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">config</span><span class="p">),</span> <span class="n">config</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+        <span class="n">instance</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+        <span class="n">instance</span><span class="o">.</span><span class="n">network_weights</span> <span class="o">=</span> <span class="n">weights</span>
+        <span class="k">return</span> <span class="n">instance</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.get_weights"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.get_weights">[docs]</a>    <span class="k">def</span> <span class="nf">get_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the network weights</span>
+<span class="sd">        </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list of numpy.array giving weights for each layer</span>
+<span class="sd">        or None if there is no network</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_network_description</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span></div>
+
+    <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        serialize to a dict. Model weights are included. For pickle support.</span>
+<span class="sd">        </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_network_description</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_network_description</span><span class="p">()</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;_network&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.peptides_to_network_input"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.peptides_to_network_input">[docs]</a>    <span class="k">def</span> <span class="nf">peptides_to_network_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Encode peptides to the fixed-length encoding expected by the neural</span>
+<span class="sd">        network (which depends on the architecture).</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        peptides : EncodableSequences or list of string</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">encoder</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;use_embedding&#39;</span><span class="p">]</span> <span class="ow">or</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;peptide_amino_acid_encoding&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;embedding&quot;</span><span class="p">):</span>
+            <span class="n">encoded</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">variable_length_to_fixed_length_categorical</span><span class="p">(</span>
+                <span class="n">max_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;kmer_size&#39;</span><span class="p">],</span>
+                <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">input_encoding_hyperparameter_defaults</span><span class="o">.</span><span class="n">subselect</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;peptide_amino_acid_encoding&#39;</span><span class="p">]</span> <span class="ow">in</span>
+                    <span class="n">available_vector_encodings</span><span class="p">()):</span>
+            <span class="n">encoded</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">variable_length_to_fixed_length_vector_encoding</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;peptide_amino_acid_encoding&#39;</span><span class="p">],</span>
+                <span class="n">max_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;kmer_size&#39;</span><span class="p">],</span>
+                <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">input_encoding_hyperparameter_defaults</span><span class="o">.</span><span class="n">subselect</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unsupported peptide_amino_acid_encoding: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span>
+                             <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;peptide_amino_acid_encoding&#39;</span><span class="p">])</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">encoded</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">encoded</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">supported_peptide_lengths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        (minimum, maximum) lengths of peptides supported, inclusive.</span>
+<span class="sd">        </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        (int, int) tuple</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;left_edge&#39;</span><span class="p">]</span> <span class="o">+</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;right_edge&#39;</span><span class="p">],</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;kmer_size&#39;</span><span class="p">])</span>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.pseudosequence_to_network_input"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.pseudosequence_to_network_input">[docs]</a>    <span class="k">def</span> <span class="nf">pseudosequence_to_network_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pseudosequences</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Encode pseudosequences to the fixed-length encoding expected by the neural</span>
+<span class="sd">        network (which depends on the architecture).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        pseudosequences : EncodableSequences or list of string</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">encoder</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">pseudosequences</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;pseudosequence_use_embedding&#39;</span><span class="p">]:</span>
+            <span class="n">encoded</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">fixed_length_categorical</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+            <span class="c1"># encoded = encoder.fixed_length_one_hot()</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">encoded</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">pseudosequences</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">encoded</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.fit"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.fit">[docs]</a>    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">peptides</span><span class="p">,</span>
+            <span class="n">affinities</span><span class="p">,</span>
+            <span class="n">allele_pseudosequences</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">sample_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">progress_preamble</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fit the neural network.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        peptides : EncodableSequences or list of string</span>
+<span class="sd">        </span>
+<span class="sd">        affinities : list of float</span>
+<span class="sd">            nM affinities. Must be same length of as peptides.</span>
+<span class="sd">        </span>
+<span class="sd">        allele_pseudosequences : EncodableSequences or list of string, optional</span>
+<span class="sd">            If not specified, the model will be a single-allele predictor.</span>
+<span class="sd">            </span>
+<span class="sd">        sample_weights : list of float, optional</span>
+<span class="sd">            If not specified, all samples (including random negatives added</span>
+<span class="sd">            during training) will have equal weight. If specified, the random</span>
+<span class="sd">            negatives will be assigned weight=1.0.</span>
+<span class="sd">        </span>
+<span class="sd">        verbose : int</span>
+<span class="sd">            Keras verbosity level</span>
+
+<span class="sd">        progress_preamble : string</span>
+<span class="sd">            Optional string of information to include in each progress update</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_num_points</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+
+        <span class="n">encodable_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+        <span class="n">peptide_encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">encodable_peptides</span><span class="p">)</span>
+
+        <span class="n">length_counts</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">encodable_peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+
+        <span class="n">num_random_negative</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">):</span>
+            <span class="n">num_random_negative</span><span class="p">[</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="n">length_counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_rate&#39;</span><span class="p">]</span> <span class="o">+</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_constant&#39;</span><span class="p">])</span>
+        <span class="n">num_random_negative</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">num_random_negative</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Random negative counts per length:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())))</span>
+
+        <span class="n">aa_distribution</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_match_distribution&#39;</span><span class="p">]:</span>
+            <span class="n">aa_distribution</span> <span class="o">=</span> <span class="n">amino_acid_distribution</span><span class="p">(</span>
+                <span class="n">encodable_peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">,</span>
+                <span class="n">smoothing</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                    <span class="s1">&#39;random_negative_distribution_smoothing&#39;</span><span class="p">])</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Using amino acid distribution for random negative:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="nb">str</span><span class="p">(</span><span class="n">aa_distribution</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())))</span>
+
+        <span class="n">y_values</span> <span class="o">=</span> <span class="n">from_ic50</span><span class="p">(</span><span class="n">affinities</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y_values</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y_values</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+        <span class="n">x_dict_without_random_negatives</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;peptide&#39;</span><span class="p">:</span> <span class="n">peptide_encoding</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">pseudosequence_length</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">allele_pseudosequences</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">pseudosequences_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pseudosequence_to_network_input</span><span class="p">(</span>
+                <span class="n">allele_pseudosequences</span><span class="p">)</span>
+            <span class="n">pseudosequence_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pseudosequences_input</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">x_dict_without_random_negatives</span><span class="p">[</span><span class="s1">&#39;pseudosequence&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">pseudosequences_input</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_network</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_network</span><span class="p">(</span>
+                <span class="n">pseudosequence_length</span><span class="o">=</span><span class="n">pseudosequence_length</span><span class="p">,</span>
+                <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">network_hyperparameter_defaults</span><span class="o">.</span><span class="n">subselect</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">compile</span><span class="p">()</span>
+
+        <span class="n">y_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;output&quot;</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                <span class="n">from_ic50</span><span class="p">(</span>
+                    <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                            <span class="s1">&#39;random_negative_affinity_min&#39;</span><span class="p">],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                            <span class="s1">&#39;random_negative_affinity_max&#39;</span><span class="p">],</span>
+                        <span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">()))),</span>
+                <span class="n">y_values</span><span class="p">,</span>
+            <span class="p">]),</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">sample_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sample_weights_with_random_negatives</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">())),</span>
+                <span class="n">sample_weights</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sample_weights_with_random_negatives</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">val_losses</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">min_val_loss_iteration</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">min_val_loss</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="n">last_progress_print</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;max_epochs&#39;</span><span class="p">]):</span>
+            <span class="n">random_negative_peptides_list</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span> <span class="ow">in</span> <span class="n">num_random_negative</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+                <span class="n">random_negative_peptides_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="n">random_peptides</span><span class="p">(</span>
+                        <span class="n">count</span><span class="p">,</span>
+                        <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">,</span>
+                        <span class="n">distribution</span><span class="o">=</span><span class="n">aa_distribution</span><span class="p">))</span>
+            <span class="n">random_negative_peptides_encoding</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span>
+                    <span class="n">random_negative_peptides_list</span><span class="p">))</span>
+
+            <span class="n">x_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;peptide&quot;</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                    <span class="n">random_negative_peptides_encoding</span><span class="p">,</span>
+                    <span class="n">peptide_encoding</span><span class="p">,</span>
+                <span class="p">])</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides_encoding</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+                <span class="k">else</span> <span class="n">peptide_encoding</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">pseudosequence_length</span><span class="p">:</span>
+                <span class="c1"># TODO: add random pseudosequences for random negative peptides</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                    <span class="s2">&quot;Allele pseudosequences unsupported with random negatives&quot;</span><span class="p">)</span>
+
+            <span class="n">fit_history</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+                <span class="n">x_dict_with_random_negatives</span><span class="p">,</span>
+                <span class="n">y_dict_with_random_negatives</span><span class="p">,</span>
+                <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">batch_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;minibatch_size&#39;</span><span class="p">],</span>
+                <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
+                <span class="n">epochs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">validation_split</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;validation_split&#39;</span><span class="p">],</span>
+                <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weights_with_random_negatives</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">fit_history</span><span class="o">.</span><span class="n">history</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+            <span class="c1"># Print progress no more often than once every few seconds.</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">last_progress_print</span> <span class="ow">or</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">last_progress_print</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">((</span><span class="n">progress_preamble</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span>
+                       <span class="s2">&quot;Epoch </span><span class="si">%3d</span><span class="s2"> / </span><span class="si">%3d</span><span class="s2">: loss=</span><span class="si">%g</span><span class="s2">. &quot;</span>
+                       <span class="s2">&quot;Min val loss (</span><span class="si">%s</span><span class="s2">) at epoch </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                           <span class="n">i</span><span class="p">,</span>
+                           <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;max_epochs&#39;</span><span class="p">],</span>
+                           <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                           <span class="nb">str</span><span class="p">(</span><span class="n">min_val_loss</span><span class="p">),</span>
+                           <span class="n">min_val_loss_iteration</span><span class="p">))</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+                <span class="n">last_progress_print</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;validation_split&#39;</span><span class="p">]:</span>
+                <span class="n">val_loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span><span class="p">[</span><span class="s1">&#39;val_loss&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">val_losses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">val_loss</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">min_val_loss</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">val_loss</span> <span class="o">&lt;=</span> <span class="n">min_val_loss</span><span class="p">:</span>
+                    <span class="n">min_val_loss</span> <span class="o">=</span> <span class="n">val_loss</span>
+                    <span class="n">min_val_loss_iteration</span> <span class="o">=</span> <span class="n">i</span>
+
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;early_stopping&#39;</span><span class="p">]:</span>
+                    <span class="n">threshold</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">min_val_loss_iteration</span> <span class="o">+</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;patience&#39;</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="n">threshold</span><span class="p">:</span>
+                        <span class="nb">print</span><span class="p">((</span><span class="n">progress_preamble</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span>
+                            <span class="s2">&quot;Early stopping at epoch </span><span class="si">%3d</span><span class="s2"> / </span><span class="si">%3d</span><span class="s2">: loss=</span><span class="si">%g</span><span class="s2">. &quot;</span>
+                            <span class="s2">&quot;Min val loss (</span><span class="si">%s</span><span class="s2">) at epoch </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                                <span class="n">i</span><span class="p">,</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;max_epochs&#39;</span><span class="p">],</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                                <span class="nb">str</span><span class="p">(</span><span class="n">min_val_loss</span><span class="p">),</span>
+                                <span class="n">min_val_loss_iteration</span><span class="p">))</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+                        <span class="k">break</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_seconds</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.predict"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.predict">[docs]</a>    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">allele_pseudosequences</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4096</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Predict affinities</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        peptides : EncodableSequences or list of string</span>
+<span class="sd">        </span>
+<span class="sd">        allele_pseudosequences : EncodableSequences or list of string, optional</span>
+<span class="sd">            Only required when this model is a pan-allele model</span>
+
+<span class="sd">        batch_size : int</span>
+<span class="sd">            batch_size passed to Keras</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array of nM affinity predictions </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x_dict</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;peptide&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">allele_pseudosequences</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">pseudosequences_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pseudosequence_to_network_input</span><span class="p">(</span>
+                <span class="n">allele_pseudosequences</span><span class="p">)</span>
+            <span class="n">x_dict</span><span class="p">[</span><span class="s1">&#39;pseudosequence&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pseudosequences_input</span>
+
+        <span class="n">network</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">(</span><span class="n">borrow</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">raw_predictions</span> <span class="o">=</span> <span class="n">network</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">x_dict</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span>
+        <span class="n">predictions</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">raw_predictions</span><span class="p">,</span> <span class="n">dtype</span> <span class="o">=</span> <span class="s2">&quot;float64&quot;</span><span class="p">)[:,</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">to_ic50</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.compile"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.compile">[docs]</a>    <span class="k">def</span> <span class="nf">compile</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compile the keras model. Used internally.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">()</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+            <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_hyperparameter_defaults</span><span class="o">.</span><span class="n">subselect</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.make_network"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.make_network">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">make_network</span><span class="p">(</span>
+            <span class="n">pseudosequence_length</span><span class="p">,</span>
+            <span class="n">kmer_size</span><span class="p">,</span>
+            <span class="n">peptide_amino_acid_encoding</span><span class="p">,</span>
+            <span class="n">use_embedding</span><span class="p">,</span>
+            <span class="n">embedding_input_dim</span><span class="p">,</span>
+            <span class="n">embedding_output_dim</span><span class="p">,</span>
+            <span class="n">pseudosequence_use_embedding</span><span class="p">,</span>
+            <span class="n">layer_sizes</span><span class="p">,</span>
+            <span class="n">dense_layer_l1_regularization</span><span class="p">,</span>
+            <span class="n">dense_layer_l2_regularization</span><span class="p">,</span>
+            <span class="n">activation</span><span class="p">,</span>
+            <span class="n">init</span><span class="p">,</span>
+            <span class="n">output_activation</span><span class="p">,</span>
+            <span class="n">dropout_probability</span><span class="p">,</span>
+            <span class="n">batch_normalization</span><span class="p">,</span>
+            <span class="n">embedding_init_method</span><span class="p">,</span>
+            <span class="n">locally_connected_layers</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Helper function to make a keras network for class1 affinity prediction.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># We import keras here to avoid tensorflow debug output, etc. unless we</span>
+        <span class="c1"># are actually about to use Keras.</span>
+
+        <span class="kn">from</span> <span class="nn">keras.layers</span> <span class="k">import</span> <span class="n">Input</span>
+        <span class="kn">import</span> <span class="nn">keras.layers</span>
+        <span class="kn">from</span> <span class="nn">keras.layers.core</span> <span class="k">import</span> <span class="n">Dense</span><span class="p">,</span> <span class="n">Flatten</span><span class="p">,</span> <span class="n">Dropout</span>
+        <span class="kn">from</span> <span class="nn">keras.layers.embeddings</span> <span class="k">import</span> <span class="n">Embedding</span>
+        <span class="kn">from</span> <span class="nn">keras.layers.normalization</span> <span class="k">import</span> <span class="n">BatchNormalization</span>
+
+        <span class="k">if</span> <span class="n">use_embedding</span> <span class="ow">or</span> <span class="n">peptide_amino_acid_encoding</span> <span class="o">==</span> <span class="s2">&quot;embedding&quot;</span><span class="p">:</span>
+            <span class="n">peptide_input</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span>
+                <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">kmer_size</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;int32&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;peptide&#39;</span><span class="p">)</span>
+            <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Embedding</span><span class="p">(</span>
+                <span class="n">input_dim</span><span class="o">=</span><span class="n">embedding_input_dim</span><span class="p">,</span>
+                <span class="n">output_dim</span><span class="o">=</span><span class="n">embedding_output_dim</span><span class="p">,</span>
+                <span class="n">input_length</span><span class="o">=</span><span class="n">kmer_size</span><span class="p">,</span>
+                <span class="n">embeddings_initializer</span><span class="o">=</span><span class="n">embedding_init_method</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;peptide_embedding&quot;</span><span class="p">)(</span><span class="n">peptide_input</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">peptide_input</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span>
+                <span class="n">shape</span><span class="o">=</span><span class="p">(</span>
+                    <span class="n">kmer_size</span><span class="p">,</span>
+                    <span class="n">vector_encoding_length</span><span class="p">(</span><span class="n">peptide_amino_acid_encoding</span><span class="p">)),</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float32&#39;</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="s1">&#39;peptide&#39;</span><span class="p">)</span>
+            <span class="n">current_layer</span> <span class="o">=</span> <span class="n">peptide_input</span>
+
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">peptide_input</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">locally_connected_params</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">locally_connected_layers</span><span class="p">):</span>
+            <span class="n">current_layer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">LocallyConnected1D</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;lc_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">locally_connected_params</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
+
+        <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Flatten</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;flattened_0&quot;</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">batch_normalization</span><span class="p">:</span>
+            <span class="n">current_layer</span> <span class="o">=</span> <span class="n">BatchNormalization</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;batch_norm_early&quot;</span><span class="p">)(</span>
+                <span class="n">current_layer</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">dropout_probability</span><span class="p">:</span>
+            <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Dropout</span><span class="p">(</span><span class="n">dropout_probability</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;dropout_early&quot;</span><span class="p">)(</span>
+                <span class="n">current_layer</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">pseudosequence_length</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">pseudosequence_use_embedding</span><span class="p">:</span>
+                <span class="n">pseudosequence_input</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span>
+                    <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">pseudosequence_length</span><span class="p">,),</span>
+                    <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;int32&#39;</span><span class="p">,</span>
+                    <span class="n">name</span><span class="o">=</span><span class="s1">&#39;pseudosequence&#39;</span><span class="p">)</span>
+                <span class="n">pseudo_embedding_layer</span> <span class="o">=</span> <span class="n">Embedding</span><span class="p">(</span>
+                    <span class="n">input_dim</span><span class="o">=</span><span class="n">embedding_input_dim</span><span class="p">,</span>
+                    <span class="n">output_dim</span><span class="o">=</span><span class="n">embedding_output_dim</span><span class="p">,</span>
+                    <span class="n">input_length</span><span class="o">=</span><span class="n">pseudosequence_length</span><span class="p">,</span>
+                    <span class="n">embeddings_initializer</span><span class="o">=</span><span class="n">embedding_init_method</span><span class="p">)(</span>
+                    <span class="n">pseudosequence_input</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">pseudosequence_input</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span>
+                    <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">pseudosequence_length</span><span class="p">,</span> <span class="mi">21</span><span class="p">),</span>
+                    <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float32&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;peptide&#39;</span><span class="p">)</span>
+                <span class="n">pseudo_embedding_layer</span> <span class="o">=</span> <span class="n">pseudosequence_input</span>
+            <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pseudosequence_input</span><span class="p">)</span>
+            <span class="n">pseudo_embedding_layer</span> <span class="o">=</span> <span class="n">Flatten</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;flattened_1&quot;</span><span class="p">)(</span>
+                <span class="n">pseudo_embedding_layer</span><span class="p">)</span>
+
+            <span class="n">current_layer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                <span class="n">current_layer</span><span class="p">,</span> <span class="n">pseudo_embedding_layer</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;concatenated_0&quot;</span><span class="p">)</span>
+            
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">layer_size</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">layer_sizes</span><span class="p">):</span>
+            <span class="n">kernel_regularizer</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">l1</span> <span class="o">=</span> <span class="n">dense_layer_l1_regularization</span>
+            <span class="n">l2</span> <span class="o">=</span> <span class="n">dense_layer_l2_regularization</span>
+            <span class="k">if</span> <span class="n">l1</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">l2</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">kernel_regularizer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">regularizers</span><span class="o">.</span><span class="n">l1_l2</span><span class="p">(</span><span class="n">l1</span><span class="p">,</span> <span class="n">l2</span><span class="p">)</span>
+
+            <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Dense</span><span class="p">(</span>
+                <span class="n">layer_size</span><span class="p">,</span>
+                <span class="n">activation</span><span class="o">=</span><span class="n">activation</span><span class="p">,</span>
+                <span class="n">kernel_regularizer</span><span class="o">=</span><span class="n">kernel_regularizer</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;dense_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">batch_normalization</span><span class="p">:</span>
+                <span class="n">current_layer</span> <span class="o">=</span> <span class="n">BatchNormalization</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;batch_norm_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">)</span>\
+                    <span class="p">(</span><span class="n">current_layer</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">dropout_probability</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Dropout</span><span class="p">(</span>
+                    <span class="n">dropout_probability</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;dropout_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
+
+        <span class="n">output</span> <span class="o">=</span> <span class="n">Dense</span><span class="p">(</span>
+            <span class="mi">1</span><span class="p">,</span>
+            <span class="n">kernel_initializer</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
+            <span class="n">activation</span><span class="o">=</span><span class="n">output_activation</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;output&quot;</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">(</span>
+            <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+            <span class="n">outputs</span><span class="o">=</span><span class="p">[</span><span class="n">output</span><span class="p">],</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;predictor&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">model</span></div></div>
+</pre></div>
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Timothy O&#39;Donnell.
+      Last updated on Dec 22, 2017.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
