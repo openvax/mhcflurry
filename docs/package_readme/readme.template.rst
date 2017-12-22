@@ -1,5 +1,3 @@
-:orphan:
-
 .. include:: /intro.rst
     :start-line: 3
 
