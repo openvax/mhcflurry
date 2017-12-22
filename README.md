@@ -2,17 +2,12 @@
 
 # mhcflurry
 [MHC I](https://en.wikipedia.org/wiki/Major_histocompatibility_complex) ligand
-prediction package with competitive accuracy and a fast, easily installed, and 
+prediction package with competitive accuracy and a fast and 
 [documented](http://www.hammerlab.org/mhcflurry/) open source codebase.
 
 MHCflurry supports Class I peptide/MHC binding affinity prediction using
-ensembles of allele-specific models. You can fit MHCflurry models to your own data
-or download models that we fit to data from
-[IEDB](http://www.iedb.org/home_v3.php) and [Kim 2014](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241).
-
-MHCflurry runs on Python versions 2.7 and 3.4+. It uses the [keras](https://keras.io)
-neural network library via either the Tensorflow or Theano backends. GPUs may
-optionally be used for a generally modest speed improvement.
+ensembles of allele-specific models. It runs on Python versions 2.7 and 3.4+ using
+the [keras](https://keras.io) neural network library.
 
 If you find MHCflurry useful in your research please cite:
 
