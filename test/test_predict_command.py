@@ -32,7 +32,7 @@ def test_csv():
         for delete in deletes:
             os.unlink(delete)
 
-    assert_equal(result.shape, (3, 6))
+    assert_equal(result.shape, (3, 7))
 
 
 def test_no_csv():
@@ -55,7 +55,8 @@ def test_no_csv():
         for delete in deletes:
             os.unlink(delete)
 
-    assert_equal(result.shape, (6, 5))
+    print(result)
+    assert_equal(result.shape, (6, 6))
     sub_result1 = result.ix[result.peptide == "SIINFEKL"].set_index("allele")
     assert (
         sub_result1.ix["H-2-Kb"].mhcflurry1_prediction <

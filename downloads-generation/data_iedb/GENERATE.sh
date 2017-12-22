@@ -1,5 +1,7 @@
 #!/bin/bash
-
+#
+# Download latest MHC I ligand data from IEDB.
+#
 set -e
 set -x
 

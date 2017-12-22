@@ -1,6 +1,6 @@
 from numpy.testing import assert_equal
 
-from mhcflurry.class1_affinity_prediction import Class1NeuralNetwork
+from mhcflurry.class1_neural_network import Class1NeuralNetwork
 
 
 def test_all_combinations_of_hyperparameters():

@@ -1,5 +1,9 @@
 #!/bin/bash
-
+#
+# Train standard MHCflurry Class I models.
+# Calls mhcflurry-class1-train-allele-specific-models on curated training data
+# using the hyperparameters in "hyperparameters.yaml".
+#
 set -e
 set -x
 
@@ -31,7 +35,8 @@ time mhcflurry-class1-train-allele-specific-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
-    --min-measurements-per-allele 200
+    --percent-rank-calibration-num-peptides-per-length 1000000 \
+    --min-measurements-per-allele 75
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt

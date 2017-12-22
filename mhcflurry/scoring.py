@@ -4,7 +4,7 @@ from __future__ import (
     absolute_import,
 )
 import logging
-import sklearn
+import sklearn.metrics
 import numpy
 import scipy
 

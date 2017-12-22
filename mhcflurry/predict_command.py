@@ -1,16 +1,3 @@
-# Copyright (c) 2016. Mount Sinai School of Medicine
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 '''
 Run MHCflurry predictor on specified peptide/allele pairs.
 
@@ -19,20 +6,20 @@ Examples:
 Write a CSV file containing the contents of INPUT.csv plus an
 additional column giving MHCflurry binding affinity predictions:
 
-    mhcflurry-predict INPUT.csv --out RESULT.csv
+    $ mhcflurry-predict INPUT.csv --out RESULT.csv
 
-The input CSV file is expected to contain columns 'allele' and 'peptide'.
-The predictions are written to a column called 'mhcflurry_prediction'.
-These default column names may be changed with the --allele-column,
---peptide-column, and --prediction-column options.
+The input CSV file is expected to contain columns ``allele`` and ``peptide``.
+The predictions are written to a column called ``mhcflurry_prediction``.
+These default column names may be changed with the `--allele-column`,
+`--peptide-column`, and `--prediction-column` options.
 
-If --out is not specified, results are writtent to standard out.
+If `--out` is not specified, results are written to standard out.
 
 You can also run on alleles and peptides specified on the commandline, in
 which case predictions are written for all combinations of alleles and
 peptides:
 
-    mhcflurry-predict --alleles HLA-A0201 H-2Kb --peptides SIINFEKL DENDREKLLL
+    $ mhcflurry-predict --alleles HLA-A0201 H-2Kb --peptides SIINFEKL DENDREKLLL
 '''
 from __future__ import (
     print_function,
@@ -47,7 +34,7 @@ import logging
 import pandas
 
 from .downloads import get_path
-from .class1_affinity_prediction import Class1AffinityPredictor
+from .class1_affinity_predictor import Class1AffinityPredictor
 
 
 parser = argparse.ArgumentParser(

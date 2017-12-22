@@ -3,21 +3,22 @@ numpy.random.seed(0)
 import time
 import cProfile
 import pstats
+import collections
 
 import pandas
 
 from mhcflurry import Class1AffinityPredictor
+from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.common import random_peptides
-
-NUM = 10000
 
 DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
 
+NUM = 10000
 
 def test_speed(profile=False):
-    starts = {}
-    timings = {}
-    profilers = {}
+    starts = collections.OrderedDict()
+    timings = collections.OrderedDict()
+    profilers = collections.OrderedDict()
 
     def start(name):
         starts[name] = time.time()
@@ -30,6 +31,7 @@ def test_speed(profile=False):
         if profile:
             profilers[name].disable()
 
+
     start("first")
     DOWNLOADED_PREDICTOR.predict(["SIINFEKL"], allele="HLA-A*02:01")
     end("first")
@@ -38,6 +40,16 @@ def test_speed(profile=False):
     start("pred_%d" % NUM)
     DOWNLOADED_PREDICTOR.predict(peptides, allele="HLA-A*02:01")
     end("pred_%d" % NUM)
+
+    NUM2 = 10000
+    peptides = EncodableSequences.create(random_peptides(NUM2, length=13))
+    start("encode_blosum_%d" % NUM2)
+    peptides.variable_length_to_fixed_length_vector_encoding("BLOSUM62")
+    end("encode_blosum_%d" % NUM2)
+
+    start("pred_already_encoded_%d" % NUM2)
+    DOWNLOADED_PREDICTOR.predict(peptides, allele="HLA-A*02:01")
+    end("pred_already_encoded_%d" % NUM2)
 
     print("SPEED BENCHMARK")
     print("Results:\n%s" % str(pandas.Series(timings)))
@@ -55,4 +67,5 @@ if __name__ == '__main__':
 
     # Leave in ipython
     locals().update(result)
-    import ipdb ; ipdb.set_trace()
+    import ipdb  # pylint: disable=import-error
+    ipdb.set_trace()

@@ -1,5 +1,9 @@
 #!/bin/bash
-
+#
+# Create "curated" training data, which combines an IEDB download with additional
+# published data, removes unusable entries, normalizes allele name, and performs
+# other filtering and standardization.
+#
 set -e
 set -x
 

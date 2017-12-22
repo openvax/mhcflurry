@@ -1,10 +1,9 @@
 six
 numpy>=1.11
-pandas>=0.13.1
-Keras==2.0.9
+pandas>=0.20.3
+Keras>=2.0.9
 tensorflow>=1.1.0
 appdirs
 scikit-learn
-typechecks
 mhcnames
 pyyaml

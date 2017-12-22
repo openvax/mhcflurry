@@ -5,23 +5,12 @@ import logging
 import numpy
 import pandas
 
-import keras.models
-import keras.layers.pooling
-import keras.regularizers
-from keras.layers import Input
-import keras.layers
-from keras.layers.core import Dense, Flatten, Dropout
-from keras.layers.embeddings import Embedding
-from keras.layers.normalization import BatchNormalization
-
 from mhcflurry.hyperparameters import HyperparameterDefaults
 
-from ..encodable_sequences import (
-    EncodableSequences,
-    available_vector_encodings,
-    vector_encoding_length)
-from ..regression_target import to_ic50, from_ic50
-from ..common import random_peptides, amino_acid_distribution
+from mhcflurry.encodable_sequences import EncodableSequences
+from mhcflurry.amino_acid import available_vector_encodings, vector_encoding_length
+from mhcflurry.regression_target import to_ic50, from_ic50
+from mhcflurry.common import random_peptides, amino_acid_distribution
 
 
 class Class1NeuralNetwork(object):
@@ -56,35 +45,46 @@ class Class1NeuralNetwork(object):
                 "filters": 8,
                 "activation": "tanh",
                 "kernel_size": 3
-            },
-            {
-                "filters": 8,
-                "activation": "tanh",
-                "kernel_size": 3
             }
         ],
     )
+    """
+    Hyperparameters (and their default values) that affect the neural network
+    architecture.
+    """
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
         loss="mse",
         optimizer="rmsprop",
     )
+    """
+    Loss and optimizer hyperparameters. Any values supported by keras may be
+    used.
+    """
 
     input_encoding_hyperparameter_defaults = HyperparameterDefaults(
         left_edge=4,
         right_edge=4)
+    """
+    Number of amino acid residues that are given fixed positions on the each
+    side in the variable length encoding.
+    """
 
     fit_hyperparameter_defaults = HyperparameterDefaults(
         max_epochs=500,
         take_best_epoch=False,  # currently unused
         validation_split=0.2,
         early_stopping=True,
+        minibatch_size=128,
         random_negative_rate=0.0,
         random_negative_constant=25,
         random_negative_affinity_min=20000.0,
         random_negative_affinity_max=50000.0,
         random_negative_match_distribution=True,
         random_negative_distribution_smoothing=0.0)
+    """
+    Hyperparameters for neural network training.
+    """
 
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
         patience=10,
@@ -93,12 +93,18 @@ class Class1NeuralNetwork(object):
         verbose=1,  # currently unused
         mode='auto'  # currently unused
     )
+    """
+    Hyperparameters for early stopping.
+    """
 
     hyperparameter_defaults = network_hyperparameter_defaults.extend(
         compile_hyperparameter_defaults).extend(
         input_encoding_hyperparameter_defaults).extend(
         fit_hyperparameter_defaults).extend(
         early_stopping_hyperparameter_defaults)
+    """
+    Combined set of all supported hyperparameters and their default values.
+    """
 
     def __init__(self, **hyperparameters):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
@@ -112,9 +118,11 @@ class Class1NeuralNetwork(object):
         self.fit_seconds = None
         self.fit_num_points = None
 
-    # Process-wide keras model cache.
-    # architecture JSON string -> (Keras model, existing network weights)
     KERAS_MODELS_CACHE = {}
+    """
+    Process-wide keras model cache, a map from: architecture JSON string to
+    (Keras model, existing network weights)
+    """
 
     @classmethod
     def borrow_cached_network(klass, network_json, network_weights):
@@ -141,6 +149,7 @@ class Class1NeuralNetwork(object):
         assert network_weights is not None
         if network_json not in klass.KERAS_MODELS_CACHE:
             # Cache miss.
+            import keras.models
             network = keras.models.model_from_json(network_json)
             existing_weights = None
         else:
@@ -171,6 +180,7 @@ class Class1NeuralNetwork(object):
                     self.network_json,
                     self.network_weights)
             else:
+                import keras.models
                 self._network = keras.models.model_from_json(self.network_json)
                 if self.network_weights is not None:
                     self._network.set_weights(self.network_weights)
@@ -323,7 +333,8 @@ class Class1NeuralNetwork(object):
             affinities,
             allele_pseudosequences=None,
             sample_weights=None,
-            verbose=1):
+            verbose=1,
+            progress_preamble=""):
         """
         Fit the neural network.
         
@@ -344,6 +355,9 @@ class Class1NeuralNetwork(object):
         
         verbose : int
             Keras verbosity level
+
+        progress_preamble : string
+            Optional string of information to include in each progress update
         """
 
         self.fit_num_points = len(peptides)
@@ -421,6 +435,7 @@ class Class1NeuralNetwork(object):
 
         self.loss_history = collections.defaultdict(list)
         start = time.time()
+        last_progress_print = None
         for i in range(self.hyperparameters['max_epochs']):
             random_negative_peptides_list = []
             for (length, count) in num_random_negative.iteritems():
@@ -449,6 +464,7 @@ class Class1NeuralNetwork(object):
                 x_dict_with_random_negatives,
                 y_dict_with_random_negatives,
                 shuffle=True,
+                batch_size=self.hyperparameters['minibatch_size'],
                 verbose=verbose,
                 epochs=1,
                 validation_split=self.hyperparameters['validation_split'],
@@ -457,12 +473,17 @@ class Class1NeuralNetwork(object):
             for (key, value) in fit_history.history.items():
                 self.loss_history[key].extend(value)
 
-            logging.info(
-                "Epoch %3d / %3d: loss=%g. Min val loss at epoch %s" % (
-                    i,
-                    self.hyperparameters['max_epochs'],
-                    self.loss_history['loss'][-1],
-                    min_val_loss_iteration))
+            # Print progress no more often than once every few seconds.
+            if not last_progress_print or time.time() - last_progress_print > 5:
+                print((progress_preamble + " " +
+                       "Epoch %3d / %3d: loss=%g. "
+                       "Min val loss (%s) at epoch %s" % (
+                           i,
+                           self.hyperparameters['max_epochs'],
+                           self.loss_history['loss'][-1],
+                           str(min_val_loss),
+                           min_val_loss_iteration)).strip())
+                last_progress_print = time.time()
 
             if self.hyperparameters['validation_split']:
                 val_loss = self.loss_history['val_loss'][-1]
@@ -477,11 +498,18 @@ class Class1NeuralNetwork(object):
                         min_val_loss_iteration +
                         self.hyperparameters['patience'])
                     if i > threshold:
-                        logging.info("Early stopping")
+                        print((progress_preamble + " " +
+                            "Early stopping at epoch %3d / %3d: loss=%g. "
+                            "Min val loss (%s) at epoch %s" % (
+                                i,
+                                self.hyperparameters['max_epochs'],
+                                self.loss_history['loss'][-1],
+                                str(min_val_loss),
+                                min_val_loss_iteration)).strip())
                         break
         self.fit_seconds = time.time() - start
 
-    def predict(self, peptides, allele_pseudosequences=None):
+    def predict(self, peptides, allele_pseudosequences=None, batch_size=4096):
         """
         Predict affinities
         
@@ -491,6 +519,9 @@ class Class1NeuralNetwork(object):
         
         allele_pseudosequences : EncodableSequences or list of string, optional
             Only required when this model is a pan-allele model
+
+        batch_size : int
+            batch_size passed to Keras
 
         Returns
         -------
@@ -503,8 +534,10 @@ class Class1NeuralNetwork(object):
             pseudosequences_input = self.pseudosequence_to_network_input(
                 allele_pseudosequences)
             x_dict['pseudosequence'] = pseudosequences_input
-        (predictions,) = numpy.array(
-            self.network(borrow=True).predict(x_dict), dtype="float64").T
+
+        network = self.network(borrow=True)
+        raw_predictions = network.predict(x_dict, batch_size=batch_size)
+        predictions = numpy.array(raw_predictions, dtype = "float64")[:,0]
         return to_ic50(predictions)
 
     def compile(self):
@@ -537,6 +570,16 @@ class Class1NeuralNetwork(object):
         """
         Helper function to make a keras network for class1 affinity prediction.
         """
+
+        # We import keras here to avoid tensorflow debug output, etc. unless we
+        # are actually about to use Keras.
+
+        from keras.layers import Input
+        import keras.layers
+        from keras.layers.core import Dense, Flatten, Dropout
+        from keras.layers.embeddings import Embedding
+        from keras.layers.normalization import BatchNormalization
+
         if use_embedding or peptide_amino_acid_encoding == "embedding":
             peptide_input = Input(
                 shape=(kmer_size,), dtype='int32', name='peptide')
@@ -626,7 +669,4 @@ class Class1NeuralNetwork(object):
             inputs=inputs,
             outputs=[output],
             name="predictor")
-
-        print("*** ARCHITECTURE ***")
-        model.summary()
         return model

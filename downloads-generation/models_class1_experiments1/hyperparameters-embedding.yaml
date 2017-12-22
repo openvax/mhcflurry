@@ -8,7 +8,7 @@
 # OPTIMIZATION
 ##########################################
 "max_epochs": 500,
-"patience": 20,
+"patience": 10,
 "early_stopping": true,
 "validation_split": 0.2,
 "minibatch_size": 128,
@@ -25,8 +25,8 @@
 # PEPTIDE REPRESENTATION
 ##########################################
 # One of "one-hot", "embedding", or "BLOSUM62".
-"peptide_amino_acid_encoding": "BLOSUM62",
-"use_embedding": false,  # maintained for backward compatability
+"peptide_amino_acid_encoding": "embedding",
+"use_embedding": true,  # maintained for backward compatability
 "embedding_output_dim": 8,  # only used if using embedding
 "kmer_size": 15,
 
@@ -42,7 +42,9 @@
 ],
 "activation": "relu",
 "output_activation": "sigmoid",
-"layer_sizes": [16],
+"layer_sizes": [
+   16
+],
 "dense_layer_l1_regularization": 0.001,
 "batch_normalization": false,
 "dropout_probability": 0.0,

@@ -2,7 +2,7 @@ import numpy
 import pandas
 numpy.random.seed(0)
 
-from mhcflurry import Class1NeuralNetwork
+from mhcflurry.class1_neural_network import Class1NeuralNetwork
 
 from nose.tools import eq_
 from numpy import testing
