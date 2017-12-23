@@ -315,18 +315,18 @@ sequences:</p>
     --mhc-peptide-lengths 8,9,10,11
     --extract-subsequences
     --output-csv /tmp/subsequence_predictions.csv
-2017-12-22 15:54:45,264 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles [&#39;HLA-A*02:01&#39;, &#39;HLA-A*03:01&#39;] and epitope lengths [8, 9, 10, 11]
-2017-12-22 15:54:49,676 - mhctools.mhcflurry - INFO - BindingPrediction(peptide=&#39;AARYSAFY&#39;, allele=&#39;HLA-A*03:01&#39;, affinity=5744.3443, percentile_rank=None, source_sequence_name=None, offset=0, prediction_method_name=&#39;mhcflurry&#39;)
+2017-12-22 19:15:24,528 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles [&#39;HLA-A*02:01&#39;, &#39;HLA-A*03:01&#39;] and epitope lengths [8, 9, 10, 11]
+2017-12-22 19:15:28,365 - mhctools.cli.script - INFO - 
 ...
-
 [1192 rows x 8 columns]
+Wrote: /tmp/subsequence_predictions.csv
 </pre></div>
 </div>
 <p>This will write a file giving predictions for all subsequences of the specified lengths:</p>
 <div class="highlight-text"><div class="highlight"><pre><span></span>$ head -n 3 /tmp/subsequence_predictions.csv
-,source_sequence_name,offset,peptide,allele,affinity,percentile_rank,prediction_method_name,length
-0,protein2,42,AARYSAFY,HLA-A*03:01,5744.3442744,,mhcflurry,8
-1,protein2,42,AARYSAFYN,HLA-A*03:01,10576.5364408,,mhcflurry,9
+source_sequence_name,offset,peptide,allele,affinity,percentile_rank,prediction_method_name,length
+protein2,42,AARYSAFY,HLA-A*03:01,5744.3442744,4.7399625,mhcflurry,8
+protein2,42,AARYSAFYN,HLA-A*03:01,10576.5364408,8.3991875,mhcflurry,9
 </pre></div>
 </div>
 </div>

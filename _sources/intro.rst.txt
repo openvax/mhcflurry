@@ -55,7 +55,7 @@ tensorflow.
 
 .. code-block:: shell
 
-    $ conda create -q -n mhcflurry-env python=3.6 'tensorflow>=1.1.2'
+    $ conda create -q -n mhcflurry-env python=3.6 tensorflow
     $ source activate mhcflurry-env
 
 Then continue as above:
