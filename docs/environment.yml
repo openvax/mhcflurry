@@ -8,8 +8,11 @@ dependencies:
 - numpy=1.12.1=py27_0
 - openssl=1.0.2l=0
 - pbr=1.10.0=py27_0
+- pip=9.0.1=py27_1
 - protobuf=3.2.0=py27_0
+- python=2.7.13=0
 - readline=6.2=2
+- setuptools=36.4.0=py27_1
 - six=1.10.0=py27_0
 - sqlite=3.13.0=0
 - tensorflow=1.1.0=np112py27_0
@@ -33,6 +36,7 @@ dependencies:
   - keras==2.1.2
   - markupsafe==1.0
   - memoized-property==1.0.3
+  - mhcflurry (/Users/tim/sinai/git/mhcflurry)==1.0.0
   - mhcnames==0.3.11
   - mhctools==1.6.8
   - numpydoc==0.7.0
@@ -65,3 +69,5 @@ dependencies:
   - typing==3.6.2
   - urllib3==1.22
   - varcode==0.5.15
+prefix: /Users/tim/miniconda3/envs/mhcflurry-minimal-2.7
+
