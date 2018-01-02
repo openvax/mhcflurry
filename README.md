@@ -39,4 +39,4 @@ $ mhcflurry-predict \
 Wrote: /tmp/predictions.csv
 ```
 
-See the [documentation]http://openvax.github.io/mhcflurry/) for more details.
+See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
