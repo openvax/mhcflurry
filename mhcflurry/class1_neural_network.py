@@ -5,12 +5,13 @@ import logging
 import numpy
 import pandas
 
-from mhcflurry.hyperparameters import HyperparameterDefaults
+from .hyperparameters import HyperparameterDefaults
 
-from mhcflurry.encodable_sequences import EncodableSequences
-from mhcflurry.amino_acid import available_vector_encodings, vector_encoding_length
-from mhcflurry.regression_target import to_ic50, from_ic50
-from mhcflurry.common import random_peptides, amino_acid_distribution
+from .encodable_sequences import EncodableSequences
+from .amino_acid import available_vector_encodings, vector_encoding_length
+from .regression_target import to_ic50, from_ic50
+from .common import random_peptides, amino_acid_distribution
+from .loss_with_inequalities import encode_y, LOSSES
 
 
 class Class1NeuralNetwork(object):
@@ -332,7 +333,9 @@ class Class1NeuralNetwork(object):
             peptides,
             affinities,
             allele_pseudosequences=None,
+            inequalities=None,
             sample_weights=None,
+            shuffle_permutation=None,
             verbose=1,
             progress_preamble=""):
         """
@@ -347,12 +350,24 @@ class Class1NeuralNetwork(object):
         
         allele_pseudosequences : EncodableSequences or list of string, optional
             If not specified, the model will be a single-allele predictor.
+
+        inequalities : list of string, each element one of ">", "<", or "=".
+            Inequalities to use for fitting. Same length as affinities.
+            Each element must be one of ">", "<", or "=". For example, a ">"
+            will train on y_pred > y_true for that element in the training set.
+            Requires using a custom losses that support inequalities (e.g.
+            mse_with_ineqalities).
+            If None all inequalities are taken to be "=".
             
         sample_weights : list of float, optional
             If not specified, all samples (including random negatives added
             during training) will have equal weight. If specified, the random
             negatives will be assigned weight=1.0.
-        
+
+        shuffle_permutation : list of int, optional
+            Permutation (integer list) of same length as peptides and affinities
+            If None, then a random permutation will be generated.
+
         verbose : int
             Keras verbosity level
 
@@ -391,6 +406,18 @@ class Class1NeuralNetwork(object):
 
         y_values = from_ic50(affinities)
         assert numpy.isnan(y_values).sum() == 0, numpy.isnan(y_values).sum()
+        if inequalities is not None:
+            # Reverse inequalities because from_ic50() flips the direction
+            # (i.e. lower affinity results in higher y values).
+            adjusted_inequalities = pandas.Series(inequalities).map({
+                "=": "=",
+                ">": "<",
+                "<": ">",
+            }).values
+        else:
+            adjusted_inequalities = numpy.tile("=", len(y_values))
+        if len(adjusted_inequalities) != len(y_values):
+            raise ValueError("Inequalities and y_values must have same length")
 
         x_dict_without_random_negatives = {
             'peptide': peptide_encoding,
@@ -406,40 +433,81 @@ class Class1NeuralNetwork(object):
         # Shuffle y_values and the contents of x_dict_without_random_negatives
         # This ensures different data is used for the test set for early stopping
         # when multiple models are trained.
-        shuffle_permutation = numpy.random.permutation(len(y_values))
+        if shuffle_permutation is None:
+            shuffle_permutation = numpy.random.permutation(len(y_values))
         y_values = y_values[shuffle_permutation]
         peptide_encoding = peptide_encoding[shuffle_permutation]
+        adjusted_inequalities = adjusted_inequalities[shuffle_permutation]
         for key in x_dict_without_random_negatives:
             x_dict_without_random_negatives[key] = (
                 x_dict_without_random_negatives[key][shuffle_permutation])
         if sample_weights is not None:
             sample_weights = sample_weights[shuffle_permutation]
 
+        if self.hyperparameters['loss'] in LOSSES:
+            # Using a custom loss that supports inequalities
+            loss_name_or_function = LOSSES[self.hyperparameters['loss']]
+            loss_supports_inequalities = True
+        else:
+            # Using a regular keras loss. No inequalities supported.
+            loss_name_or_function = self.hyperparameters['loss']
+            loss_supports_inequalities = False
+
+            if any(inequality != "=" for inequality in adjusted_inequalities):
+                raise ValueError("Loss %s does not support inequalities" % (
+                    loss_name_or_function))
+
         if self.network() is None:
             self._network = self.make_network(
                 pseudosequence_length=pseudosequence_length,
                 **self.network_hyperparameter_defaults.subselect(
                     self.hyperparameters))
-            self.compile()
+            self.network().compile(
+                loss=loss_name_or_function,
+                optimizer=self.hyperparameters['optimizer'])
 
-        y_dict_with_random_negatives = {
-            "output": numpy.concatenate([
-                from_ic50(
-                    numpy.random.uniform(
-                        self.hyperparameters[
-                            'random_negative_affinity_min'],
-                        self.hyperparameters[
-                            'random_negative_affinity_max'],
-                        int(num_random_negative.sum()))),
-                y_values,
-            ]),
-        }
+        if loss_supports_inequalities:
+            # Do not sample negative affinities: just use an inequality.
+            random_negative_ic50 = self.hyperparameters['random_negative_affinity_min']
+            random_negative_target = from_ic50(random_negative_ic50)
+
+            y_dict_with_random_negatives = {
+                "output": numpy.concatenate([
+                    numpy.tile(
+                        random_negative_target, int(num_random_negative.sum())),
+                    y_values,
+                ]),
+            }
+            # Note: we are using "<" here not ">" because the inequalities are
+            # now in target-space (0-1) not affinity-space.
+            adjusted_inequalities_with_random_negatives = (
+                ["<"] * int(num_random_negative.sum()) +
+                list(adjusted_inequalities))
+        else:
+            # Randomly sample random negative affinities
+            y_dict_with_random_negatives = {
+                "output": numpy.concatenate([
+                    from_ic50(
+                        numpy.random.uniform(
+                            self.hyperparameters[
+                                'random_negative_affinity_min'],
+                            self.hyperparameters[
+                                'random_negative_affinity_max'],
+                            int(num_random_negative.sum()))),
+                    y_values,
+                ]),
+            }
         if sample_weights is not None:
             sample_weights_with_random_negatives = numpy.concatenate([
                 numpy.ones(int(num_random_negative.sum())),
                 sample_weights])
         else:
             sample_weights_with_random_negatives = None
+
+        if loss_supports_inequalities:
+            y_dict_with_random_negatives['output'] = encode_y(
+                y_dict_with_random_negatives['output'],
+                adjusted_inequalities_with_random_negatives)
 
         val_losses = []
         min_val_loss_iteration = None
@@ -551,14 +619,6 @@ class Class1NeuralNetwork(object):
         raw_predictions = network.predict(x_dict, batch_size=batch_size)
         predictions = numpy.array(raw_predictions, dtype = "float64")[:,0]
         return to_ic50(predictions)
-
-    def compile(self):
-        """
-        Compile the keras model. Used internally.
-        """
-        self.network().compile(
-            **self.compile_hyperparameter_defaults.subselect(
-                self.hyperparameters))
 
     @staticmethod
     def make_network(

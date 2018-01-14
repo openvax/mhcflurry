@@ -259,7 +259,7 @@ def process_work(
     train_data = data.sample(frac=1.0)
     (model,) = predictor.fit_allele_specific_predictors(
         n_models=1,
-        architecture_hyperparameters=hyperparameters,
+        architecture_hyperparameters_list=[hyperparameters],
         allele=allele,
         peptides=train_data.peptide.values,
         affinities=train_data.measurement_value.values,
