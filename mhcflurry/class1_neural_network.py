@@ -403,6 +403,18 @@ class Class1NeuralNetwork(object):
             x_dict_without_random_negatives['pseudosequence'] = (
                 pseudosequences_input)
 
+        # Shuffle y_values and the contents of x_dict_without_random_negatives
+        # This ensures different data is used for the test set for early stopping
+        # when multiple models are trained.
+        shuffle_permutation = numpy.random.permutation(len(y_values))
+        y_values = y_values[shuffle_permutation]
+        peptide_encoding = peptide_encoding[shuffle_permutation]
+        for key in x_dict_without_random_negatives:
+            x_dict_without_random_negatives[key] = (
+                x_dict_without_random_negatives[key][shuffle_permutation])
+        if sample_weights is not None:
+            sample_weights = sample_weights[shuffle_permutation]
+
         if self.network() is None:
             self._network = self.make_network(
                 pseudosequence_length=pseudosequence_length,
