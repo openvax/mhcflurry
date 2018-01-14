@@ -362,10 +362,11 @@ class Class1AffinityPredictor(object):
     def fit_allele_specific_predictors(
             self,
             n_models,
-            architecture_hyperparameters,
+            architecture_hyperparameters_list,
             allele,
             peptides,
             affinities,
+            inequalities=None,
             models_dir_for_save=None,
             verbose=1,
             progress_preamble=""):
@@ -381,7 +382,7 @@ class Class1AffinityPredictor(object):
         n_models : int
             Number of neural networks to fit
         
-        architecture_hyperparameters : dict 
+        architecture_hyperparameters_list : list of dict
                
         allele : string
         
@@ -389,6 +390,9 @@ class Class1AffinityPredictor(object):
         
         affinities : list of float
             nM affinities
+
+        inequalities : list of string, each element one of ">", "<", or "="
+            See Class1NeuralNetwork.fit for details.
         
         models_dir_for_save : string, optional
             If specified, the Class1AffinityPredictor is (incrementally) written
@@ -406,35 +410,81 @@ class Class1AffinityPredictor(object):
         """
 
         allele = mhcnames.normalize_allele_name(allele)
-        models = self._fit_predictors(
-            n_models=n_models,
-            architecture_hyperparameters=architecture_hyperparameters,
-            peptides=peptides,
-            affinities=affinities,
-            allele_pseudosequences=None,
-            verbose=verbose,
-            progress_preamble=progress_preamble)
-
         if allele not in self.allele_to_allele_specific_models:
             self.allele_to_allele_specific_models[allele] = []
 
-        models_list = []
-        for (i, model) in enumerate(models):
-            model_name = self.model_name(allele, i)
-            models_list.append(model)  # models is a generator
+        encodable_peptides = EncodableSequences.create(peptides)
+
+        n_architectures = len(architecture_hyperparameters_list)
+        if n_models > 1 or n_architectures > 1:
+            # Adjust progress info to indicate number of models and
+            # architectures.
+            pieces = []
+            if n_models > 1:
+                pieces.append("Model {model_num:2d} / {n_models:2d}")
+            if n_architectures > 1:
+                pieces.append(
+                    "Architecture {architecture_num:2d} / {n_architectures:2d}"
+                    " (best so far: {best_num:2d)")
+            progress_preamble_template = "[ %s ] {user_progress_preamble}" % (
+                ", ".join(pieces))
+        else:
+            # Just use the user-provided progress message.
+            progress_preamble_template = "{user_progress_preamble}"
+
+        models = []
+        for model_num in range(n_models):
+            shuffle_permutation = numpy.random.permutation(len(affinities))
+
+            best_num = None
+            best_loss = None
+            best_model = None
+            for (architecture_num, architecture_hyperparameters) in enumerate(
+                    architecture_hyperparameters_list):
+                model = Class1NeuralNetwork(**architecture_hyperparameters)
+                model.fit(
+                    encodable_peptides,
+                    affinities,
+                    shuffle_permutation=shuffle_permutation,
+                    inequalities=inequalities,
+                    verbose=verbose,
+                    progress_preamble=progress_preamble_template.format(
+                        user_progress_preamble=progress_preamble,
+                        best_num=best_num,
+                        model_num=model_num,
+                        n_models=n_models,
+                        architecture_num=architecture_num,
+                        n_architectures=n_architectures))
+
+
+                if n_architectures > 1:
+                    # We require val_loss (i.e. a validation set) if we have
+                    # multiple architectures.
+                    loss = model.loss_history['val_loss'][-1]
+                else:
+                    loss = None
+                if loss is None or best_loss is None or best_loss > loss:
+                    best_loss = best_loss
+                    best_num = architecture_num
+                    best_model = model
+                del model
+
+            model_name = self.model_name(allele, model_num)
             row = pandas.Series(collections.OrderedDict([
                 ("model_name", model_name),
                 ("allele", allele),
-                ("config_json", json.dumps(model.get_config())),
-                ("model", model),
+                ("config_json", json.dumps(best_model.get_config())),
+                ("model", best_model),
             ])).to_frame().T
             self.manifest_df = pandas.concat(
                 [self.manifest_df, row], ignore_index=True)
-            self.allele_to_allele_specific_models[allele].append(model)
+            self.allele_to_allele_specific_models[allele].append(best_model)
             if models_dir_for_save:
                 self.save(
                     models_dir_for_save, model_names_to_write=[model_name])
-        return models_list
+            models.append(best_model)
+
+        return models
 
     def fit_class1_pan_allele_models(
             self,
@@ -486,19 +536,19 @@ class Class1AffinityPredictor(object):
         alleles = pandas.Series(alleles).map(mhcnames.normalize_allele_name)
         allele_pseudosequences = alleles.map(self.allele_to_pseudosequence)
 
-        models = self._fit_predictors(
-            n_models=n_models,
-            architecture_hyperparameters=architecture_hyperparameters,
-            peptides=peptides,
-            affinities=affinities,
-            allele_pseudosequences=allele_pseudosequences,
-            verbose=verbose,
-            progress_preamble=progress_preamble)
+        encodable_peptides = EncodableSequences.create(peptides)
+        models = []
+        for i in range(n_models):
+            logging.info("Training model %d / %d" % (i + 1, n_models))
+            model = Class1NeuralNetwork(**architecture_hyperparameters)
+            model.fit(
+                encodable_peptides,
+                affinities,
+                allele_pseudosequences=allele_pseudosequences,
+                verbose=verbose,
+                progress_preamble=progress_preamble)
 
-        models_list = []
-        for (i, model) in enumerate(models):
             model_name = self.model_name("pan-class1", i)
-            models_list.append(model)  # models is a generator
             self.class1_pan_allele_models.append(model)
             row = pandas.Series(collections.OrderedDict([
                 ("model_name", model_name),
@@ -511,46 +561,9 @@ class Class1AffinityPredictor(object):
             if models_dir_for_save:
                 self.save(
                     models_dir_for_save, model_names_to_write=[model_name])
-        return models_list
+            models.append(model)
 
-    def _fit_predictors(
-            self,
-            n_models,
-            architecture_hyperparameters,
-            peptides,
-            affinities,
-            allele_pseudosequences,
-            verbose=1,
-            progress_preamble = ""):
-        """
-        Private helper method
-        
-        Parameters
-        ----------
-        n_models : int
-        architecture_hyperparameters : dict
-        peptides : EncodableSequences or list of string
-        affinities : list of float
-        allele_pseudosequences : EncodableSequences or list of string
-        verbose : int
-        progress_preamble : string
-            Optional string of information to include in each progress update
-
-        Returns
-        -------
-        generator of `Class1NeuralNetwork`
-        """
-        encodable_peptides = EncodableSequences.create(peptides)
-        for i in range(n_models):
-            logging.info("Training model %d / %d" % (i + 1, n_models))
-            model = Class1NeuralNetwork(**architecture_hyperparameters)
-            model.fit(
-                encodable_peptides,
-                affinities,
-                allele_pseudosequences=allele_pseudosequences,
-                verbose=verbose,
-                progress_preamble=progress_preamble)
-            yield model
+        return models
 
     def calibrate_percentile_ranks(
             self,

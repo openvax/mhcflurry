@@ -92,7 +92,7 @@ def test_a1_known_epitopes_in_newly_trained_model():
     predictor = Class1AffinityPredictor()
     predictor.fit_allele_specific_predictors(
         n_models=2,
-        architecture_hyperparameters=hyperparameters,
+        architecture_hyperparameters_list=[hyperparameters],
         allele=allele,
         peptides=df.peptide.values,
         affinities=df.measurement_value.values,
@@ -153,7 +153,7 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
     predictor = Class1AffinityPredictor()
     predictor.fit_allele_specific_predictors(
         n_models=2,
-        architecture_hyperparameters=hyperparameters,
+        architecture_hyperparameters_list=[hyperparameters],
         allele=allele,
         peptides=df.peptide.values,
         affinities=df.measurement_value.values,
