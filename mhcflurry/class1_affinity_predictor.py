@@ -14,12 +14,12 @@ import pandas
 from numpy.testing import assert_equal
 from six import string_types
 
-from mhcflurry.class1_neural_network import Class1NeuralNetwork
-from mhcflurry.common import random_peptides
-from mhcflurry.downloads import get_path
-from mhcflurry.encodable_sequences import EncodableSequences
-from mhcflurry.percent_rank_transform import PercentRankTransform
-from mhcflurry.regression_target import to_ic50
+from .class1_neural_network import Class1NeuralNetwork
+from .common import random_peptides
+from .downloads import get_path
+from .encodable_sequences import EncodableSequences
+from .percent_rank_transform import PercentRankTransform
+from .regression_target import to_ic50
 
 
 class Class1AffinityPredictor(object):
@@ -368,7 +368,7 @@ class Class1AffinityPredictor(object):
             affinities,
             inequalities=None,
             models_dir_for_save=None,
-            verbose=1,
+            verbose=0,
             progress_preamble=""):
         """
         Fit one or more allele specific predictors for a single allele using a
@@ -425,7 +425,7 @@ class Class1AffinityPredictor(object):
             if n_architectures > 1:
                 pieces.append(
                     "Architecture {architecture_num:2d} / {n_architectures:2d}"
-                    " (best so far: {best_num:2d)")
+                    " (best so far: {best_num})")
             progress_preamble_template = "[ %s ] {user_progress_preamble}" % (
                 ", ".join(pieces))
         else:
@@ -450,12 +450,11 @@ class Class1AffinityPredictor(object):
                     verbose=verbose,
                     progress_preamble=progress_preamble_template.format(
                         user_progress_preamble=progress_preamble,
-                        best_num=best_num,
-                        model_num=model_num,
+                        best_num="n/a" if best_num is None else best_num + 1,
+                        model_num=model_num + 1,
                         n_models=n_models,
-                        architecture_num=architecture_num,
+                        architecture_num=architecture_num + 1,
                         n_architectures=n_architectures))
-
 
                 if n_architectures > 1:
                     # We require val_loss (i.e. a validation set) if we have
@@ -464,10 +463,13 @@ class Class1AffinityPredictor(object):
                 else:
                     loss = None
                 if loss is None or best_loss is None or best_loss > loss:
-                    best_loss = best_loss
+                    best_loss = loss
                     best_num = architecture_num
                     best_model = model
                 del model
+
+            if n_architectures > 1:
+                print("Selected architecture %d." % (best_num + 1))
 
             model_name = self.model_name(allele, model_num)
             row = pandas.Series(collections.OrderedDict([

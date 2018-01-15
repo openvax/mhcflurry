@@ -4,9 +4,6 @@ Train single allele models
 """
 import sys
 import argparse
-import json
-import os
-import pickle
 
 import pandas
 
@@ -37,13 +34,20 @@ parser.add_argument(
     required=True,
     help="Result file")
 
-QUALITATIVE_TO_AFFINITY = {
-    "Negative": 50000.0,
-    "Positive": 100.0,
-    "Positive-High": 50.0,
-    "Positive-Intermediate": 500.0,
-    "Positive-Low": 5000.0,
+QUALITATIVE_TO_AFFINITY_AND_INEQUALITY = {
+    "Negative": (20000.0, ">"),
+    "Positive": (500.0, "<"),
+    "Positive-High": (100.0, "<"),
+    "Positive-Intermediate": (1000.0, "<"),
+    "Positive-Low": (5000.0, "<"),
 }
+QUALITATIVE_TO_AFFINITY = dict(
+    (key, value[0]) for (key, value)
+    in QUALITATIVE_TO_AFFINITY_AND_INEQUALITY.items())
+QUALITATIVE_TO_INEQUALITY = dict(
+    (key, value[1]) for (key, value)
+    in QUALITATIVE_TO_AFFINITY_AND_INEQUALITY.items())
+
 
 EXCLUDE_IEDB_ALLELES = [
     "HLA class I",
@@ -60,6 +64,7 @@ def load_data_kim2014(filename):
         True: "quantitative",
         False: "qualitative",
     })
+    df["measurement_inequality"] = df.inequality
     df["original_allele"] = df.mhc
     df["peptide"] = df.sequence
     df["allele"] = df.mhc.map(normalize_allele_name)
@@ -99,24 +104,28 @@ def load_data_iedb(iedb_csv, include_qualitative=True):
 
     quantitative = iedb_df.ix[iedb_df["Units"] == "nM"].copy()
     quantitative["measurement_type"] = "quantitative"
+    quantitative["measurement_inequality"] = "="
     print("Quantitative measurements: %d" % len(quantitative))
 
     qualitative = iedb_df.ix[iedb_df["Units"] != "nM"].copy()
     qualitative["measurement_type"] = "qualitative"
     print("Qualitative measurements: %d" % len(qualitative))
-    non_mass_spec_qualitative = qualitative.ix[
-        (~qualitative["Method/Technique"].str.contains("mass spec"))
-    ].copy()
-    non_mass_spec_qualitative["Quantitative measurement"] = (
-        non_mass_spec_qualitative["Qualitative Measure"].map(
-            QUALITATIVE_TO_AFFINITY))
-    print("Qualitative measurements after dropping MS: %d" % (
-        len(non_mass_spec_qualitative)))
+    #qualitative = qualitative.ix[
+    #    (~qualitative["Method/Technique"].str.contains("mass spec"))
+    #].copy()
+
+    qualitative["Quantitative measurement"] = (
+        qualitative["Qualitative Measure"].map(QUALITATIVE_TO_AFFINITY))
+    qualitative["measurement_inequality"] = (
+        qualitative["Qualitative Measure"].map(QUALITATIVE_TO_INEQUALITY))
+
+    print("Qualitative measurements (possibly after dropping MS): %d" % (
+        len(qualitative)))
 
     iedb_df = pandas.concat(
         (
             ([quantitative]) +
-            ([non_mass_spec_qualitative] if include_qualitative else [])),
+            ([qualitative] if include_qualitative else [])),
         ignore_index=True)
 
     print("IEDB measurements per allele:\n%s" % iedb_df.allele.value_counts())
@@ -145,6 +154,7 @@ def load_data_iedb(iedb_csv, include_qualitative=True):
         "Quantitative measurement"
     ].values
     train_data["measurement_source"] = iedb_df.category.values
+    train_data["measurement_inequality"] = iedb_df.measurement_inequality.values
 
     train_data["allele"] = iedb_df["allele"].values
     train_data["original_allele"] = iedb_df["Allele Name"].values
@@ -181,6 +191,7 @@ def run():
         "allele",
         "peptide",
         "measurement_value",
+        "measurement_inequality",
         "measurement_type",
         "measurement_source",
         "original_allele",

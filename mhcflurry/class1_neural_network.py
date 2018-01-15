@@ -444,9 +444,17 @@ class Class1NeuralNetwork(object):
         if sample_weights is not None:
             sample_weights = sample_weights[shuffle_permutation]
 
-        if self.hyperparameters['loss'] in LOSSES:
+        if self.hyperparameters['loss'].startswith("custom:"):
             # Using a custom loss that supports inequalities
-            loss_name_or_function = LOSSES[self.hyperparameters['loss']]
+            try:
+                loss_name_or_function = LOSSES[
+                    self.hyperparameters['loss'].replace("custom:", "")
+                ]
+            except KeyError:
+                raise ValueError(
+                    "No such custom loss function: %s. Supported losses are: %s" % (
+                        self.hyperparameters['loss'],
+                        ", ".join(["custom:" + loss_name for loss_name in LOSSES])))
             loss_supports_inequalities = True
         else:
             # Using a regular keras loss. No inequalities supported.

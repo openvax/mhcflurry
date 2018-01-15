@@ -25,14 +25,14 @@ between 4 - 5:
 from keras import backend as K
 
 import pandas
-import numpy
+from numpy import isnan, array
 
 LOSSES = {}
 
 
 def encode_y(y, inequalities=None):
-    y = numpy.array(y, dtype="float32")
-    if y.isnan().any():
+    y = array(y, dtype="float32")
+    if isnan(y).any():
         raise ValueError("y contains NaN")
     if (y > 1.0).any():
         raise ValueError("y contains values > 1.0")
@@ -47,14 +47,14 @@ def encode_y(y, inequalities=None):
             '<': 2,
             '>': 4,
         }).values
-        if offsets.isnan().any():
+        if isnan(offsets).any():
             raise ValueError("Invalid inequality. Must be =, <, or >")
         encoded = y + offsets
-    assert not encoded.isnan().any()
+    assert not isnan(encoded).any()
     return encoded
 
 
-def mse_with_ineqalities(y_true, y_pred):
+def mse_with_inequalities(y_true, y_pred):
     # Handle (=) inequalities
     diff1 = y_pred - y_true
     diff1 *= K.cast(y_true >= 0.0, "float32")
@@ -75,4 +75,4 @@ def mse_with_ineqalities(y_true, y_pred):
         K.sum(K.square(diff1), axis=-1) +
         K.sum(K.square(diff2), axis=-1) +
         K.sum(K.square(diff3), axis=-1))
-LOSSES["mse_with_ineqalities"] = mse_with_ineqalities
+LOSSES["mse_with_inequalities"] = mse_with_inequalities
