@@ -11,7 +11,7 @@ from .encodable_sequences import EncodableSequences
 from .amino_acid import available_vector_encodings, vector_encoding_length
 from .regression_target import to_ic50, from_ic50
 from .common import random_peptides, amino_acid_distribution
-from .loss_with_inequalities import encode_y, LOSSES
+from .custom_loss import CUSTOM_LOSSES
 
 
 class Class1NeuralNetwork(object):
@@ -447,23 +447,29 @@ class Class1NeuralNetwork(object):
         if self.hyperparameters['loss'].startswith("custom:"):
             # Using a custom loss that supports inequalities
             try:
-                loss_name_or_function = LOSSES[
+                custom_loss = CUSTOM_LOSSES[
                     self.hyperparameters['loss'].replace("custom:", "")
                 ]
             except KeyError:
                 raise ValueError(
                     "No such custom loss function: %s. Supported losses are: %s" % (
                         self.hyperparameters['loss'],
-                        ", ".join(["custom:" + loss_name for loss_name in LOSSES])))
-            loss_supports_inequalities = True
+                        ", ".join([
+                            "custom:" + loss_name for loss_name in CUSTOM_LOSSES
+                        ])))
+            loss_name_or_function = custom_loss.loss
+            loss_supports_inequalities = custom_loss.supports_inequalities
+            loss_encode_y_function = custom_loss.encode_y
         else:
             # Using a regular keras loss. No inequalities supported.
             loss_name_or_function = self.hyperparameters['loss']
             loss_supports_inequalities = False
+            loss_encode_y_function = None
 
-            if any(inequality != "=" for inequality in adjusted_inequalities):
-                raise ValueError("Loss %s does not support inequalities" % (
-                    loss_name_or_function))
+        if not loss_supports_inequalities and (
+                any(inequality != "=" for inequality in adjusted_inequalities)):
+            raise ValueError("Loss %s does not support inequalities" % (
+                loss_name_or_function))
 
         if self.network() is None:
             self._network = self.make_network(
@@ -512,8 +518,8 @@ class Class1NeuralNetwork(object):
         else:
             sample_weights_with_random_negatives = None
 
-        if loss_supports_inequalities:
-            y_dict_with_random_negatives['output'] = encode_y(
+        if loss_encode_y_function is not None:
+            y_dict_with_random_negatives['output'] = loss_encode_y_function(
                 y_dict_with_random_negatives['output'],
                 adjusted_inequalities_with_random_negatives)
 
