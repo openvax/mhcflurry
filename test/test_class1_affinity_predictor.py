@@ -96,6 +96,7 @@ def test_a1_known_epitopes_in_newly_trained_model():
         allele=allele,
         peptides=df.peptide.values,
         affinities=df.measurement_value.values,
+        verbose=0,
     )
 
     predict_and_check("HLA-A*01:01", "EVDPIGHLY", predictor=predictor)
@@ -157,6 +158,7 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
         allele=allele,
         peptides=df.peptide.values,
         affinities=df.measurement_value.values,
+        verbose=0,
     )
     predictor.calibrate_percentile_ranks(num_peptides_per_length=1000)
     ic50_pred = predictor.predict(df.peptide.values, allele=allele)

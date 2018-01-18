@@ -13,6 +13,7 @@ from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
+
 def test_class1_neural_network_a0205_training_accuracy():
     # Memorize the dataset.
     hyperparameters = dict(
@@ -80,7 +81,7 @@ def test_class1_neural_network_a0205_training_accuracy():
         dense_layer_l1_regularization=0.0,
         dropout_probability=0.0)
     predictor2 = Class1NeuralNetwork(**hyperparameters2)
-    predictor2.fit(df.peptide.values, df.measurement_value.values)
+    predictor2.fit(df.peptide.values, df.measurement_value.values, verbose=0)
     eq_(predictor.network().to_json(), predictor2.network().to_json())
 
 
