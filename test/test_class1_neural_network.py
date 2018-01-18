@@ -171,7 +171,7 @@ def test_inequalities():
     assert_almost_equal(
         df_nonbinders.prediction2.mean(),
         df_nonbinders.prediction1.mean(),
-        delta=2000)
+        delta=3000)
 
     # prediction3 non-binders should be weaker on average than prediction2 (or 1)
     # non-binders, since prediction3 has a (>) inequality for these peptides.
@@ -185,5 +185,5 @@ def test_inequalities():
     assert_almost_equal(
         df_binders.prediction3.mean(),
         df_binders.prediction1.mean(),
-        delta=2000)
+        delta=3000)
 
