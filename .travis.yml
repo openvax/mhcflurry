@@ -37,7 +37,8 @@ install:
   - pip install coveralls
 env:
   global:
-    - PYTHONHASHSEED=0 
+    - PYTHONHASHSEED=0
+    - MKL_THREADING_LAYER=GNU  # for theano
   matrix:
     - KERAS_BACKEND=theano
     - KERAS_BACKEND=tensorflow
