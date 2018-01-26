@@ -40,7 +40,7 @@ parser.add_argument(
     default=[],
     help="Path to Abelin Immunity 2017 mass-spec hits")
 parser.add_argument(
-    "--include-mass-spec",
+    "--include-iedb-mass-spec",
     action="store_true",
     default=False,
     help="Include mass-spec observations in IEDB")
@@ -237,7 +237,7 @@ def run():
 
     dfs = []
     for filename in args.data_iedb:
-        df = load_data_iedb(filename, include_mass_spec=args.include_mass_spec)
+        df = load_data_iedb(filename, include_mass_spec=args.include_iedb_mass_spec)
         dfs.append(df)
     for filename in args.data_kim2014:
         df = load_data_kim2014(filename)
