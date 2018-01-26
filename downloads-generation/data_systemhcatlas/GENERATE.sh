@@ -1,16 +1,14 @@
 #!/bin/bash
 #
-# Train standard MHCflurry Class I models.
-# Calls mhcflurry-class1-train-allele-specific-models on curated training data
-# using the hyperparameters in "hyperparameters.yaml".
+# Download some published MHC I ligands identified by mass-spec
+#
 #
 set -e
 set -x
 
-DOWNLOAD_NAME=models_class1
+DOWNLOAD_NAME=data_systemhcatlas
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
-SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 
 mkdir -p "$SCRATCH_DIR"
 rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
@@ -23,20 +21,14 @@ exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 # Log some environment info
 date
 pip freeze
+# git rev-parse HEAD
 git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-mkdir models
+wget --quiet https://github.com/openvax/mhcflurry/releases/download/pre-1.1/systemhc.20171121.combined.csv.bz2
 
-cp $SCRIPT_DIR/hyperparameters.yaml .
-
-time mhcflurry-class1-train-allele-specific-models \
-    --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
-    --hyperparameters hyperparameters.yaml \
-    --out-models-dir models \
-    --percent-rank-calibration-num-peptides-per-length 1000000 \
-    --min-measurements-per-allele 75
+mv systemhc.20171121.combined.csv.bz2 data.csv.bz2
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
