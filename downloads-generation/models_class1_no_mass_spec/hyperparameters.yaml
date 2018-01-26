@@ -10,13 +10,14 @@
 "max_epochs": 500,
 "patience": 20,
 "early_stopping": true,
-"validation_split": 0.2,
-"minibatch_size": 128,
+"validation_split": 0.1,
+"minibatch_size": 512,
+"loss": "custom:mse_with_inequalities",
 
 ##########################################
 # RANDOM NEGATIVE PEPTIDES
 ##########################################
-"random_negative_rate": 0.0,
+"random_negative_rate": 0.2,
 "random_negative_constant": 25,
 "random_negative_affinity_min": 20000.0,
 "random_negative_affinity_max": 50000.0,
