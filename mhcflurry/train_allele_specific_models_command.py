@@ -53,6 +53,11 @@ parser.add_argument(
     default=False,
     help="Use only quantitative training data")
 parser.add_argument(
+    "--ignore-inequalities",
+    action="store_true",
+    default=False,
+    help="Do not use affinity value inequalities even when present in data")
+parser.add_argument(
     "--percent-rank-calibration-num-peptides-per-length",
     type=int,
     metavar="N",
@@ -114,6 +119,10 @@ def run(argv=sys.argv[1:]):
             df.measurement_type == "quantitative"
         ]
         print("Subselected to quantitative: %s" % (str(df.shape)))
+
+    if args.ignore_inequalities and "measurement_inequality" in df.columns:
+        print("Dropping measurement_inequality column")
+        del df["measurement_inequality"]
 
     allele_counts = df.allele.value_counts()
 
@@ -263,6 +272,9 @@ def process_work(
         allele=allele,
         peptides=train_data.peptide.values,
         affinities=train_data.measurement_value.values,
+        inequalities=(
+            train_data.measurement_inequality.values
+            if "measurement_inequality" in train_data.columns else None),
         models_dir_for_save=save_to,
         progress_preamble=progress_preamble,
         verbose=verbose)
