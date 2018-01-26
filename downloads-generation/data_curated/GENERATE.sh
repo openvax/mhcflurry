@@ -30,6 +30,7 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 cp $SCRIPT_DIR/curate.py .
 
+# No mass-spec data
 time python curate.py \
     --data-iedb \
         "$(mhcflurry-downloads path data_iedb)/mhc_ligand_full.csv.bz2" \
@@ -37,6 +38,9 @@ time python curate.py \
         "$(mhcflurry-downloads path data_published)/bdata.20130222.mhci.public.1.txt" \
     --out-csv curated_training_data.no_mass_spec.csv
 
+# With mass-spec data
+# Note that we STILL drop mass-spec data from IEDB here, since this data seems
+# low-quality.
 time python curate.py \
     --data-iedb \
         "$(mhcflurry-downloads path data_iedb)/mhc_ligand_full.csv.bz2" \
