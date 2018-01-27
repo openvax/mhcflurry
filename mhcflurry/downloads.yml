@@ -20,6 +20,10 @@ releases:
     1.1.0:
         compatibility-version: 2
         downloads:
+            - name: models_class1
+              url: http://github.com/hammerlab/mhcflurry/releases/download/pre-1.1/models_class1.tar.bz2
+              default: true
+
             - name: models_class1_no_mass_spec
               url: http://github.com/hammerlab/mhcflurry/releases/download/pre-1.1/models_class1.20180116.tar.bz2
               default: true
