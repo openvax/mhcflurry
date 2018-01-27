@@ -215,15 +215,16 @@ def run(argv=sys.argv[1:]):
             # which it adds models to, so no merging is required. It also saves
             # as it goes so no saving is required at the end.
             start = time.time()
-
             for _ in tqdm.trange(len(work_items)):
                 item = work_items.pop(0)  # want to keep freeing up memory
                 work_predictor = work_entrypoint(item)
                 assert work_predictor is predictor
+            assert not work_items
 
     print("*" * 30)
-    print("Trained %d networks in %0.2f sec." % (
-        len(predictor.neural_networks), time.time() - start))
+    training_time = time.time() - start
+    print("Trained affinity predictor with %d networks in %0.2f sec." % (
+        len(predictor.neural_networks), training_time))
     print("*" * 30)
 
     if args.percent_rank_calibration_num_peptides_per_length > 0:
@@ -232,13 +233,18 @@ def run(argv=sys.argv[1:]):
         predictor.calibrate_percentile_ranks(
             num_peptides_per_length=args.percent_rank_calibration_num_peptides_per_length,
             worker_pool=worker_pool)
+        percent_rank_calibration_time = time.time() - start
         print("Finished calibrating percent ranks in %0.2f sec." % (
-            time.time() - start))
+            percent_rank_calibration_time))
         predictor.save(args.out_models_dir, model_names_to_write=[])
 
     if worker_pool:
         worker_pool.close()
         worker_pool.join()
+
+    print("Train time: %0.2f sec. Percent rank calibration time: %0.2f sec." % (
+        training_time, percent_rank_calibration_time))
+    print("Predictor written to: %s" % args.out_models_dir)
 
 
 def work_entrypoint(item):
