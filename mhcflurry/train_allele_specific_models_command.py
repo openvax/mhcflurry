@@ -215,35 +215,25 @@ def run(argv=sys.argv[1:]):
             # as it goes so no saving is required at the end.
             start = time.time()
             data_trained_on = 0
-            while work_items:
-                item = work_items.pop(0)
+
+            for _ in tqdm.trange(len(work_items)):
+                item = work_items.pop(0)  # want to keep freeing up memory
                 work_predictor = work_entrypoint(item)
                 assert work_predictor is predictor
-
-                # When running in serial we try to estimate time remaining.
-                data_trained_on += len(item['data'])
-                progress = float(data_trained_on) / total_data_to_train_on
-                time_elapsed = time.time() - start
-                total_time = time_elapsed / progress
-                print(
-                    "Estimated total training time: %0.2f min, "
-                    "remaining: %0.2f min" % (
-                        total_time / 60,
-                        (total_time - time_elapsed) / 60))
-
-
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
 
     if args.percent_rank_calibration_num_peptides_per_length > 0:
         start = time.time()
         print("Performing percent rank calibration.")
         predictor.calibrate_percentile_ranks(
-            num_peptides_per_length=args.percent_rank_calibration_num_peptides_per_length)
+            num_peptides_per_length=args.percent_rank_calibration_num_peptides_per_length,
+            worker_pool=worker_pool)
         print("Finished calibrating percent ranks in %0.2f sec." % (
             time.time() - start))
         predictor.save(args.out_models_dir, model_names_to_write=[])
+
+    if worker_pool:
+        worker_pool.close()
+        worker_pool.join()
 
 
 def work_entrypoint(item):
