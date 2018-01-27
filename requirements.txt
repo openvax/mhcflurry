@@ -7,3 +7,4 @@ appdirs
 scikit-learn
 mhcnames
 pyyaml
+tqdm

@@ -83,6 +83,7 @@ def run_and_check(n_jobs=0):
     print("Deleting: %s" % models_dir)
     shutil.rmtree(models_dir)
 
+
 def Xtest_run_parallel():
     run_and_check(n_jobs=3)
 
