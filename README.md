@@ -34,7 +34,7 @@ You can now generate predictions:
 $ mhcflurry-predict \
        --alleles HLA-A0201 HLA-A0301 \
        --peptides SIINFEKL SIINFEKD SIINFEKQ \
-       --out /tmp/predictions.csv \
+       --out /tmp/predictions.csv
        
 Wrote: /tmp/predictions.csv
 ```

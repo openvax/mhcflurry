@@ -12,9 +12,10 @@ from multiprocessing import Pool
 import pandas
 import yaml
 from mhcnames import normalize_allele_name
+import tqdm  # progress bar
 
-from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
-from mhcflurry.common import configure_logging
+from .class1_affinity_predictor import Class1AffinityPredictor
+from .common import configure_logging, set_keras_backend
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -88,10 +89,13 @@ parser.add_argument(
     default=1,
     type=int,
     metavar="N",
-    help="Parallelization jobs. Experimental. Does NOT work with tensorflow. "
+    help="Parallelization jobs. Experimental. "
     "Set to 1 for serial run. Set to 0 to use number of cores. "
     "Default: %(default)s.")
-
+parser.add_argument(
+    "--backend",
+    choices=("tensorflow-gpu", "tensorflow-cpu"),
+    help="Keras backend. If not specified will use system default.")
 
 def run(argv=sys.argv[1:]):
     # On sigusr1 print stack trace
@@ -99,6 +103,9 @@ def run(argv=sys.argv[1:]):
     signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
 
     args = parser.parse_args(argv)
+
+    if args.backend:
+        set_keras_backend(args.backend)
 
     configure_logging(verbose=args.verbosity > 1)
 
@@ -190,7 +197,14 @@ def run(argv=sys.argv[1:]):
 
         if worker_pool:
             print("Processing %d work items in parallel." % len(work_items))
-            predictors = worker_pool.map(work_entrypoint, work_items, chunksize=1)
+
+            predictors = list(
+                tqdm.tqdm(
+                    worker_pool.imap_unordered(
+                        work_entrypoint, work_items, chunksize=1),
+                    ascii=True,
+                    total=len(work_items)))
+
             print("Merging %d predictors fit in parallel." % (len(predictors)))
             predictor = Class1AffinityPredictor.merge([predictor] + predictors)
             print("Saving merged predictor to: %s" % args.out_models_dir)

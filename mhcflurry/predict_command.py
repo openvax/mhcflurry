@@ -109,6 +109,11 @@ output_args.add_argument(
     metavar="NAME",
     default="mhcflurry_",
     help="Prefix for output column names. Default: '%(default)s'")
+output_args.add_argument(
+    "--output-delimiter",
+    metavar="CHAR",
+    default=",",
+    help="Delimiter character for results. Default: '%(default)s'")
 
 
 model_args = parser.add_argument_group(title="Optional model settings")
@@ -128,6 +133,10 @@ model_args.add_argument(
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
+
+    # It's hard to pass a tab in a shell, so we correct a common error:
+    if args.output_delimiter == "\\t":
+        args.output_delimiter = "\t"
 
     models_dir = args.models
     if models_dir is None:
@@ -200,7 +209,7 @@ def run(argv=sys.argv[1:]):
             df[args.prediction_column_prefix + col] = predictions[col]
 
     if args.out:
-        df.to_csv(args.out, index=False)
+        df.to_csv(args.out, index=False, sep=args.output_delimiter)
         print("Wrote: %s" % args.out)
     else:
-        df.to_csv(sys.stdout, index=False)
+        df.to_csv(sys.stdout, index=False, sep=args.output_delimiter)

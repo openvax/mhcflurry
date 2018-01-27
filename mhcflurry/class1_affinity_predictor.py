@@ -248,7 +248,6 @@ class Class1AffinityPredictor(object):
         ]
         pandas.DataFrame(rows).to_csv(
             info_path, sep="\t", header=False, index=False)
-        print("Wrote: %s" % info_path)
 
         if self.allele_to_percent_rank_transform:
             percent_ranks_df = None

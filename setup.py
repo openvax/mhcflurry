@@ -57,6 +57,7 @@ if __name__ == '__main__':
         'scikit-learn',
         'mhcnames',
         'pyyaml',
+        'tqdm',
     ]
     if PY2:
         # concurrent.futures is a standard library in Py3 but Py2

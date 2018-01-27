@@ -11,7 +11,7 @@
 "patience": 20,
 "early_stopping": true,
 "validation_split": 0.1,
-"minibatch_size": 512,
+"minibatch_size": 128,
 "loss": "custom:mse_with_inequalities",
 
 ##########################################
