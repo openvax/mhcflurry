@@ -162,6 +162,7 @@ def run(argv=sys.argv[1:]):
         os.mkdir(args.out_models_dir)
         print("Done.")
 
+    start = time.time()
     for (h, hyperparameters) in enumerate(hyperparameters_lst):
         n_models = None
         if 'n_models' in hyperparameters:
@@ -214,16 +215,20 @@ def run(argv=sys.argv[1:]):
             # which it adds models to, so no merging is required. It also saves
             # as it goes so no saving is required at the end.
             start = time.time()
-            data_trained_on = 0
 
             for _ in tqdm.trange(len(work_items)):
                 item = work_items.pop(0)  # want to keep freeing up memory
                 work_predictor = work_entrypoint(item)
                 assert work_predictor is predictor
 
+    print("*" * 30)
+    print("Trained %d networks in %0.2f sec." % (
+        len(predictor.neural_networks), time.time() - start))
+    print("*" * 30)
+
     if args.percent_rank_calibration_num_peptides_per_length > 0:
-        start = time.time()
         print("Performing percent rank calibration.")
+        start = time.time()
         predictor.calibrate_percentile_ranks(
             num_peptides_per_length=args.percent_rank_calibration_num_peptides_per_length,
             worker_pool=worker_pool)
@@ -290,7 +295,6 @@ def process_work(
         model.network(borrow=True).summary()
 
     return predictor
-
 
 
 if __name__ == '__main__':
