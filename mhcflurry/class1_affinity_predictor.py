@@ -9,10 +9,12 @@ from os.path import join, exists
 from os import mkdir
 from socket import gethostname
 from getpass import getuser
+from functools import partial
 
 import mhcnames
 import numpy
 import pandas
+import tqdm  # progress bars
 from numpy.testing import assert_equal
 from six import string_types
 
@@ -588,7 +590,8 @@ class Class1AffinityPredictor(object):
             num_peptides_per_length=int(1e5),
             alleles=None,
             bins=None,
-            quiet=False):
+            quiet=False,
+            worker_pool=None):
         """
         Compute the cumulative distribution of ic50 values for a set of alleles
         over a large universe of random peptides, to enable computing quantiles in
@@ -626,6 +629,8 @@ class Class1AffinityPredictor(object):
             for length in lengths:
                 peptides.extend(
                     random_peptides(num_peptides_per_length, length))
+
+
 
         if quiet:
             def msg(s):
@@ -948,3 +953,100 @@ class Class1AffinityPredictor(object):
         ]
         loaded.close()
         return weights
+
+    def calibrate_percentile_ranks(
+            self,
+            peptides=None,
+            num_peptides_per_length=int(1e5),
+            alleles=None,
+            bins=None,
+            worker_pool=None):
+        """
+        Compute the cumulative distribution of ic50 values for a set of alleles
+        over a large universe of random peptides, to enable computing quantiles in
+        this distribution later.
+
+        Parameters
+        ----------
+        peptides : sequence of string, optional
+            Peptides to use
+        num_peptides_per_length : int, optional
+            If peptides argument is not specified, then num_peptides_per_length
+            peptides are randomly sampled from a uniform distribution for each
+            supported length
+        alleles : sequence of string, optional
+            Alleles to perform calibration for. If not specified all supported
+            alleles will be calibrated.
+        bins : object
+            Anything that can be passed to numpy.histogram's "bins" argument
+            can be used here, i.e. either an integer or a sequence giving bin
+            edges. This is in ic50 space.
+        worker_pool : multiprocessing.Pool, optional
+            If specified multiple alleles will be calibrated in parallel
+        """
+        if bins is None:
+            bins = to_ic50(numpy.linspace(1, 0, 1000))
+
+        if alleles is None:
+            alleles = self.supported_alleles
+
+        if peptides is None:
+            peptides = []
+            lengths = range(
+                self.supported_peptide_lengths[0],
+                self.supported_peptide_lengths[1] + 1)
+            for length in lengths:
+                peptides.extend(
+                    random_peptides(num_peptides_per_length, length))
+
+        encoded_peptides = EncodableSequences.create(peptides)
+
+        if worker_pool and len(alleles) > 1:
+            # Run in parallel
+            do_work = partial(
+                _calibrate_percentile_ranks,
+                predictor=self,
+                peptides=encoded_peptides,
+                bins=bins)
+            list_of_singleton_alleles = [ [allele] for allele in alleles ]
+            results = worker_pool.imap_unordered(
+                do_work, list_of_singleton_alleles, chunksize=1)
+
+            # Add progress bar
+            results = tqdm.tqdm(results, ascii=True, total=len(alleles))
+
+            # Merge results
+            for partial_dict in results:
+                self.allele_to_percent_rank_transform.update(partial_dict)
+        else:
+            # Run in serial
+            self.allele_to_percent_rank_transform.update(
+                _calibrate_percentile_ranks(
+                    alleles=alleles,
+                    predictor=self,
+                    peptides=encoded_peptides,
+                    bins=bins))
+
+
+def _calibrate_percentile_ranks(alleles, predictor, peptides, bins):
+    """
+    Private helper function.
+
+    Parameters
+    ----------
+    alleles
+    predictor
+    peptides
+    bins
+
+    Returns
+    -------
+
+    """
+    result = {}
+    for (i, allele) in enumerate(alleles):
+        predictions = predictor.predict(peptides, allele=allele)
+        transform = PercentRankTransform()
+        transform.fit(predictions, bins=bins)
+        result[allele] = transform
+    return result
