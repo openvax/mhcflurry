@@ -7,6 +7,8 @@ import time
 import warnings
 from os.path import join, exists
 from os import mkdir
+from socket import gethostname
+from getpass import getuser
 
 import mhcnames
 import numpy
@@ -20,6 +22,7 @@ from .downloads import get_path
 from .encodable_sequences import EncodableSequences
 from .percent_rank_transform import PercentRankTransform
 from .regression_target import to_ic50
+from .version import __version__
 
 
 class Class1AffinityPredictor(object):
@@ -193,7 +196,8 @@ class Class1AffinityPredictor(object):
         the configurations of each Class1NeuralNetwork, along with per-network
         files giving the model weights. If there are pan-allele predictors in
         the ensemble, the allele pseudosequences are also stored in the
-        directory.
+        directory. There is also a small file "index.txt" with basic metadata:
+        when the models were trained, by whom, on what host.
         
         Parameters
         ----------
@@ -233,6 +237,18 @@ class Class1AffinityPredictor(object):
         manifest_path = join(models_dir, "manifest.csv")
         write_manifest_df.to_csv(manifest_path, index=False)
         logging.info("Wrote: %s" % manifest_path)
+
+        # Write "info.txt"
+        info_path = join(models_dir, "info.txt")
+        rows = [
+            ("trained on", time.asctime()),
+            ("package   ", "mhcflurry %s" % __version__),
+            ("hostname  ", gethostname()),
+            ("user      ", getuser()),
+        ]
+        pandas.DataFrame(rows).to_csv(
+            info_path, sep="\t", header=False, index=False)
+        print("Wrote: %s" % info_path)
 
         if self.allele_to_percent_rank_transform:
             percent_ranks_df = None
