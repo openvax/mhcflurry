@@ -57,12 +57,13 @@ def run_and_check(n_jobs=0):
         json.dump(HYPERPARAMETERS, fd)
 
     args = [
-        "--data", get_path("data_curated", "curated_training_data.csv.bz2"),
+        "--data", get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"),
         "--hyperparameters", hyperparameters_filename,
         "--allele", "HLA-A*02:01", "HLA-A*01:01", "HLA-A*03:01",
         "--out-models-dir", models_dir,
         "--percent-rank-calibration-num-peptides-per-length", "10000",
         "--parallelization-num-jobs", str(n_jobs),
+        "--ignore-inequalities",
     ]
     print("Running with args: %s" % args)
     train_allele_specific_models_command.run(args)

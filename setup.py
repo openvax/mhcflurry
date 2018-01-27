@@ -40,7 +40,7 @@ except:
     logging.warning("Conversion of long_description from MD to RST failed")
     pass
 
-with open('mhcflurry/__init__.py', 'r') as f:
+with open('mhcflurry/version.py', 'r') as f:
     version = re.search(
         r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
         f.read(),
