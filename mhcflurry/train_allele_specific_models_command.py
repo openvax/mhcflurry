@@ -99,16 +99,16 @@ parser.add_argument(
     default=1,
     type=int,
     metavar="N",
-    help="Parallelization jobs. Experimental. "
-    "Set to 1 for serial run. Set to 0 to use number of cores. "
+    help="Number of processes to parallelize training over. "
+    "Set to 1 for serial run. Set to 0 to use number of cores. Experimental."
     "Default: %(default)s.")
 parser.add_argument(
     "--calibration-num-jobs",
     default=1,
     type=int,
     metavar="N",
-    help="Parallelization jobs. Experimental. "
-    "Set to 1 for serial run. Set to 0 to use number of cores. "
+    help="Number of processes to parallelize percent rank calibration over. "
+    "Set to 1 for serial run. Set to 0 to use number of cores. Experimental."
     "Default: %(default)s.")
 parser.add_argument(
     "--backend",
@@ -186,6 +186,7 @@ def run(argv=sys.argv[1:]):
         print("Done.")
 
     start = time.time()
+    work_items = []
     for (h, hyperparameters) in enumerate(hyperparameters_lst):
         n_models = None
         if 'n_models' in hyperparameters:
@@ -198,7 +199,6 @@ def run(argv=sys.argv[1:]):
         if args.max_epochs:
             hyperparameters['max_epochs'] = args.max_epochs
 
-        work_items = []
         for (i, allele) in enumerate(df.allele.unique()):
             for model_group in range(n_models):
                 work_dict = {
@@ -217,30 +217,29 @@ def run(argv=sys.argv[1:]):
                 }
                 work_items.append(work_dict)
 
-        if worker_pool:
-            print("Processing %d work items in parallel." % len(work_items))
+    if worker_pool:
+        print("Processing %d work items in parallel." % len(work_items))
+        predictors = list(
+            tqdm.tqdm(
+                worker_pool.imap_unordered(
+                    train_model_entrypoint, work_items, chunksize=1),
+                ascii=True,
+                total=len(work_items)))
 
-            predictors = list(
-                tqdm.tqdm(
-                    worker_pool.imap_unordered(
-                        train_model_entrypoint, work_items, chunksize=1),
-                    ascii=True,
-                    total=len(work_items)))
-
-            print("Merging %d predictors fit in parallel." % (len(predictors)))
-            predictor = Class1AffinityPredictor.merge([predictor] + predictors)
-            print("Saving merged predictor to: %s" % args.out_models_dir)
-            predictor.save(args.out_models_dir)
-        else:
-            # Run in serial. In this case, every worker is passed the same predictor,
-            # which it adds models to, so no merging is required. It also saves
-            # as it goes so no saving is required at the end.
-            start = time.time()
-            for _ in tqdm.trange(len(work_items)):
-                item = work_items.pop(0)  # want to keep freeing up memory
-                work_predictor = train_model_entrypoint(item)
-                assert work_predictor is predictor
-            assert not work_items
+        print("Merging %d predictors fit in parallel." % (len(predictors)))
+        predictor = Class1AffinityPredictor.merge([predictor] + predictors)
+        print("Saving merged predictor to: %s" % args.out_models_dir)
+        predictor.save(args.out_models_dir)
+    else:
+        # Run in serial. In this case, every worker is passed the same predictor,
+        # which it adds models to, so no merging is required. It also saves
+        # as it goes so no saving is required at the end.
+        start = time.time()
+        for _ in tqdm.trange(len(work_items)):
+            item = work_items.pop(0)  # want to keep freeing up memory
+            work_predictor = train_model_entrypoint(item)
+            assert work_predictor is predictor
+        assert not work_items
 
     print("*" * 30)
     training_time = time.time() - start
@@ -252,18 +251,18 @@ def run(argv=sys.argv[1:]):
         worker_pool.close()
         worker_pool.join()
 
+    start = time.time()
     if args.percent_rank_calibration_num_peptides_per_length > 0:
         alleles = list(predictor.supported_alleles)
         first_allele = alleles.pop(0)
 
         print("Performing percent rank calibration. Calibrating first allele.")
-        start = time.time()
         encoded_peptides = predictor.calibrate_percentile_ranks(
             alleles=[first_allele],
             num_peptides_per_length=args.percent_rank_calibration_num_peptides_per_length)
-        percent_rank_calibration_time = time.time() - start
+        assert encoded_peptides.encoding_cache  # must have cached the encoding
         print("Finished calibrating percent ranks for first allele in %0.2f sec." % (
-            percent_rank_calibration_time))
+            time.time() - start))
         print("Calibrating %d additional alleles." % len(alleles))
 
         if args.calibration_num_jobs == 1:
@@ -297,6 +296,8 @@ def run(argv=sys.argv[1:]):
             predictor.allele_to_percent_rank_transform.update(result)
         print("Done calibrating %d additional alleles." % len(alleles))
         predictor.save(args.out_models_dir, model_names_to_write=[])
+
+    percent_rank_calibration_time = time.time() - start
 
     if worker_pool:
         worker_pool.close()
@@ -360,6 +361,9 @@ def train_model(
 
     if allele_num == 0 and model_group == 0:
         # For the first model for the first allele, print the architecture.
+        print("*** HYPERPARAMETER SET %d***" %
+              (hyperparameter_set_num + 1))
+        print(hyperparameters)
         print("*** ARCHITECTURE FOR HYPERPARAMETER SET %d***" %
               (hyperparameter_set_num + 1))
         model.network(borrow=True).summary()
