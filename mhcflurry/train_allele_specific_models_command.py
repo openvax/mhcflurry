@@ -275,7 +275,7 @@ def run(argv=sys.argv[1:]):
             results = (
                 calibrate_percentile_ranks(
                     allele=allele,
-                    predictor=predictor,
+                    predictor=args.out_model_dir,
                     peptides=encoded_peptides)
                 for allele in alleles)
         else:
@@ -383,6 +383,8 @@ def calibrate_percentile_ranks(allele, predictor, peptides=None):
     global GLOBAL_DATA
     if peptides is None:
         peptides = GLOBAL_DATA["calibration_peptides"]
+    if isinstance(predictor, str):
+        predictor = Class1AffinityPredictor.load(predictor)
     predictor.calibrate_percentile_ranks(
         peptides=peptides,
         alleles=[allele])
