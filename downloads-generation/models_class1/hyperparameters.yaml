@@ -10,7 +10,7 @@
 "max_epochs": 500,
 "patience": 20,
 "early_stopping": true,
-"validation_split": 0.1,
+"validation_split": 0.2,
 "minibatch_size": 128,
 "loss": "custom:mse_with_inequalities",
 
