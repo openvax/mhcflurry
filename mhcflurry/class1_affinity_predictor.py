@@ -933,7 +933,7 @@ class Class1AffinityPredictor(object):
         encoded_peptides = EncodableSequences.create(peptides)
 
         for (i, allele) in enumerate(alleles):
-            predictions = self.predict(peptides, allele=allele)
+            predictions = self.predict(encoded_peptides, allele=allele)
             transform = PercentRankTransform()
             transform.fit(predictions, bins=bins)
             self.allele_to_percent_rank_transform[allele] = transform

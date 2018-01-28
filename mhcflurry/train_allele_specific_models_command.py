@@ -9,6 +9,7 @@ import time
 import traceback
 from multiprocessing import Pool
 from functools import partial
+from pprint import pprint
 
 import pandas
 import yaml
@@ -363,7 +364,7 @@ def train_model(
         # For the first model for the first allele, print the architecture.
         print("*** HYPERPARAMETER SET %d***" %
               (hyperparameter_set_num + 1))
-        print(hyperparameters)
+        pprint(hyperparameters)
         print("*** ARCHITECTURE FOR HYPERPARAMETER SET %d***" %
               (hyperparameter_set_num + 1))
         model.network(borrow=True).summary()
