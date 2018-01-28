@@ -933,6 +933,10 @@ class Class1AffinityPredictor(object):
 
         if worker_pool and len(alleles) > 1:
             # Run in parallel
+
+            # Performance hack.
+            self.neural_networks[0].peptides_to_network_input(encoded_peptides)
+
             do_work = partial(
                 _calibrate_percentile_ranks,
                 predictor=self,
