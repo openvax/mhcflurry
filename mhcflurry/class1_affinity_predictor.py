@@ -933,11 +933,6 @@ class Class1AffinityPredictor(object):
 
         if worker_pool and len(alleles) > 1:
             # Run in parallel
-
-            # Performance hack.
-            for network in self.neural_networks:
-                network.peptides_to_network_input(encoded_peptides)
-
             do_work = partial(
                 _calibrate_percentile_ranks,
                 predictor=self,
@@ -969,13 +964,14 @@ def _calibrate_percentile_ranks(alleles, predictor, peptides, bins):
 
     Parameters
     ----------
-    alleles
-    predictor
-    peptides
-    bins
+    alleles : list of string
+    predictor : Class1AffinityPredictor
+    peptides : list of string or EncodableSequences
+    bins : object
 
     Returns
     -------
+    dict : allele -> percentile rank transform
 
     """
     result = {}

@@ -85,7 +85,15 @@ parser.add_argument(
     help="Keras verbosity. Default: %(default)s",
     default=0)
 parser.add_argument(
-    "--parallelization-num-jobs",
+    "--train-num-jobs",
+    default=1,
+    type=int,
+    metavar="N",
+    help="Parallelization jobs. Experimental. "
+    "Set to 1 for serial run. Set to 0 to use number of cores. "
+    "Default: %(default)s.")
+parser.add_argument(
+    "--calibration-num-jobs",
     default=1,
     type=int,
     metavar="N",
