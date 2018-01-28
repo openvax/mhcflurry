@@ -275,7 +275,7 @@ def run(argv=sys.argv[1:]):
             results = (
                 calibrate_percentile_ranks(
                     allele=allele,
-                    predictor=args.out_model_dir,
+                    predictor=predictor,
                     peptides=encoded_peptides)
                 for allele in alleles)
         else:
@@ -292,7 +292,7 @@ def run(argv=sys.argv[1:]):
             results = worker_pool.imap_unordered(
                 partial(
                     calibrate_percentile_ranks,
-                    predictor=predictor),
+                    predictor=args.out_models_dir),
                 alleles,
                 chunksize=1)
 
