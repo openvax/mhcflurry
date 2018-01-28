@@ -17,6 +17,7 @@ from mhcnames import normalize_allele_name
 import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
+from .class1_neural_network import Class1NeuralNetwork
 from .common import configure_logging, set_keras_backend
 
 
@@ -281,10 +282,11 @@ def run(argv=sys.argv[1:]):
             # Store peptides in global variable so they are in shared memory
             # after fork, instead of needing to be pickled.
             GLOBAL_DATA["calibration_peptides"] = encoded_peptides
+            Class1NeuralNetwork.clear_model_cache()
             worker_pool = Pool(
                 processes=(
                     args.calibration_num_jobs
-                    if args.train_num_jobs else None))
+                    if args.calibration_num_jobs else None))
             print("Using worker pool: %s" % str(worker_pool))
             results = worker_pool.imap_unordered(
                 partial(
@@ -376,6 +378,7 @@ def calibrate_percentile_ranks(allele, predictor, peptides=None):
     """
     Private helper function.
     """
+    global GLOBAL_DATA
     if peptides is None:
         peptides = GLOBAL_DATA["calibration_peptides"]
     predictor.calibrate_percentile_ranks(

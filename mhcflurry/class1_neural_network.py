@@ -126,6 +126,13 @@ class Class1NeuralNetwork(object):
     """
 
     @classmethod
+    def clear_model_cache(klass):
+        """
+        Clear the Keras model cache.
+        """
+        klass.KERAS_MODELS_CACHE.clear()
+
+    @classmethod
     def borrow_cached_network(klass, network_json, network_weights):
         """
         Return a keras Model with the specified architecture and weights.
