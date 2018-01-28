@@ -62,8 +62,7 @@ def run_and_check(n_jobs=0):
         "--allele", "HLA-A*02:01", "HLA-A*01:01", "HLA-A*03:01",
         "--out-models-dir", models_dir,
         "--percent-rank-calibration-num-peptides-per-length", "10000",
-        "--train-num-jobs", str(n_jobs),
-        "--calibration-num-jobs", str(n_jobs),
+        "--num-jobs", str(n_jobs),
         "--ignore-inequalities",
     ]
     print("Running with args: %s" % args)

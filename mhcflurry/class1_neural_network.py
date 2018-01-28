@@ -600,7 +600,7 @@ class Class1NeuralNetwork(object):
                         self.hyperparameters['patience'])
                     if i > threshold:
                         print((progress_preamble + " " +
-                            "Early stopping at epoch %3d / %3d: loss=%g. "
+                            "Stopping at epoch %3d / %3d: loss=%g. "
                             "Min val loss (%s) at epoch %s" % (
                                 i,
                                 self.hyperparameters['max_epochs'],
