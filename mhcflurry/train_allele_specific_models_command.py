@@ -381,6 +381,9 @@ def calibrate_percentile_ranks(allele, predictor, peptides=None):
     Private helper function.
     """
     global GLOBAL_DATA
+    Class1NeuralNetwork.clear_model_cache()
+    import keras.backend as K
+    K.clear_session()
     if peptides is None:
         peptides = GLOBAL_DATA["calibration_peptides"]
     if isinstance(predictor, str):
