@@ -584,76 +584,6 @@ class Class1AffinityPredictor(object):
 
         return models
 
-    def calibrate_percentile_ranks(
-            self,
-            peptides=None,
-            num_peptides_per_length=int(1e5),
-            alleles=None,
-            bins=None,
-            quiet=False,
-            worker_pool=None):
-        """
-        Compute the cumulative distribution of ic50 values for a set of alleles
-        over a large universe of random peptides, to enable computing quantiles in
-        this distribution later.
-
-        Parameters
-        ----------
-        peptides : sequence of string, optional
-            Peptides to use
-        num_peptides_per_length : int, optional
-            If peptides argument is not specified, then num_peptides_per_length
-            peptides are randomly sampled from a uniform distribution for each
-            supported length
-        alleles : sequence of string, optional
-            Alleles to perform calibration for. If not specified all supported
-            alleles will be calibrated.
-        bins : object
-            Anything that can be passed to numpy.histogram's "bins" argument
-            can be used here, i.e. either an integer or a sequence giving bin
-            edges. This is in ic50 space.
-        quiet : boolean
-            If False (default), status updates will be printed to stdout.
-        """
-        if bins is None:
-            bins = to_ic50(numpy.linspace(1, 0, 1000))
-
-        if alleles is None:
-            alleles = self.supported_alleles
-
-        if peptides is None:
-            peptides = []
-            lengths = range(
-                self.supported_peptide_lengths[0],
-                self.supported_peptide_lengths[1] + 1)
-            for length in lengths:
-                peptides.extend(
-                    random_peptides(num_peptides_per_length, length))
-
-
-
-        if quiet:
-            def msg(s):
-                pass
-        else:
-            def msg(s):
-                print(s)
-                sys.stdout.flush()
-
-        encoded_peptides = EncodableSequences.create(peptides)
-        for (i, allele) in enumerate(alleles):
-            msg("Calibrating percentile ranks for allele %03d/%03d: %s" % (
-                i + 1, len(alleles), allele))
-            start = time.time()
-            predictions = self.predict(encoded_peptides, allele=allele)
-            msg("Generated %d predictions in %0.2f sec." % (
-                len(predictions), time.time() - start))
-            transform = PercentRankTransform()
-            transform.fit(predictions, bins=bins)
-            self.allele_to_percent_rank_transform[allele] = transform
-            msg("Done calibrating allele %s in %0.2f sec." % (
-                allele, time.time() - start))
-
     def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
         """
         Return percentile ranks for the given ic50 affinities and alleles.
@@ -1003,6 +933,11 @@ class Class1AffinityPredictor(object):
 
         if worker_pool and len(alleles) > 1:
             # Run in parallel
+
+            # Performance hack.
+            for network in self.neural_networks:
+                network.peptides_to_network_input(encoded_peptides)
+
             do_work = partial(
                 _calibrate_percentile_ranks,
                 predictor=self,

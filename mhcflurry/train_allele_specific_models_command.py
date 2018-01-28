@@ -223,8 +223,8 @@ def run(argv=sys.argv[1:]):
 
     print("*" * 30)
     training_time = time.time() - start
-    print("Trained affinity predictor with %d networks in %0.2f sec." % (
-        len(predictor.neural_networks), training_time))
+    print("Trained affinity predictor with %d networks in %0.2f min." % (
+        len(predictor.neural_networks), training_time / 60.0))
     print("*" * 30)
 
     if args.percent_rank_calibration_num_peptides_per_length > 0:
@@ -242,8 +242,8 @@ def run(argv=sys.argv[1:]):
         worker_pool.close()
         worker_pool.join()
 
-    print("Train time: %0.2f sec. Percent rank calibration time: %0.2f sec." % (
-        training_time, percent_rank_calibration_time))
+    print("Train time: %0.2f min. Percent rank calibration time: %0.2f min." % (
+        training_time / 60.0, percent_rank_calibration_time / 60.0))
     print("Predictor written to: %s" % args.out_models_dir)
 
 
