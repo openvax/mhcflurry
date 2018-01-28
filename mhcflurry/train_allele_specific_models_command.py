@@ -8,6 +8,7 @@ import sys
 import time
 import traceback
 from multiprocessing import Pool
+from functools import partial
 
 import pandas
 import yaml
@@ -16,6 +17,9 @@ import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import configure_logging, set_keras_backend
+
+GLOBAL_DATA = {}
+
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -106,6 +110,8 @@ parser.add_argument(
     help="Keras backend. If not specified will use system default.")
 
 def run(argv=sys.argv[1:]):
+    global GLOBAL_DATA
+
     # On sigusr1 print stack trace
     print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
     signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
@@ -210,7 +216,7 @@ def run(argv=sys.argv[1:]):
             predictors = list(
                 tqdm.tqdm(
                     worker_pool.imap_unordered(
-                        work_entrypoint, work_items, chunksize=1),
+                        train_model_entrypoint, work_items, chunksize=1),
                     ascii=True,
                     total=len(work_items)))
 
@@ -225,7 +231,7 @@ def run(argv=sys.argv[1:]):
             start = time.time()
             for _ in tqdm.trange(len(work_items)):
                 item = work_items.pop(0)  # want to keep freeing up memory
-                work_predictor = work_entrypoint(item)
+                work_predictor = train_model_entrypoint(item)
                 assert work_predictor is predictor
             assert not work_items
 
@@ -240,24 +246,46 @@ def run(argv=sys.argv[1:]):
         worker_pool.join()
 
     if args.percent_rank_calibration_num_peptides_per_length > 0:
+        alleles = list(predictor.supported_alleles)
+        first_allele = alleles.pop(0)
+
+        print("Performing percent rank calibration. Calibrating first allele.")
+        start = time.time()
+        encoded_peptides = predictor.calibrate_percentile_ranks(
+            alleles=[first_allele],
+            num_peptides_per_length=args.percent_rank_calibration_num_peptides_per_length)
+        percent_rank_calibration_time = time.time() - start
+        print("Finished calibrating percent ranks for first allele in %0.2f sec." % (
+            percent_rank_calibration_time))
+        print("Calibrating %d additional alleles." % len(alleles))
+
         if args.calibration_num_jobs == 1:
             # Serial run
             worker_pool = None
+            results = (
+                calibrate_percentile_ranks(
+                    allele=allele,
+                    predictor=predictor,
+                    peptides=encoded_peptides)
+                for allele in alleles)
         else:
+            # Parallel run
+            # Store peptides in global variable so they are in shared memory
+            # after fork, instead of needing to be pickled.
+            GLOBAL_DATA["calibration_peptides"] = encoded_peptides
             worker_pool = Pool(
                 processes=(
                     args.calibration_num_jobs
                     if args.train_num_jobs else None))
             print("Using worker pool: %s" % str(worker_pool))
+            results = worker_pool.imap_unordered(
+                partial(
+                    calibrate_percentile_ranks,
+                    predictor=predictor), alleles, chunksize=1)
 
-        print("Performing percent rank calibration.")
-        start = time.time()
-        predictor.calibrate_percentile_ranks(
-            num_peptides_per_length=args.percent_rank_calibration_num_peptides_per_length,
-            worker_pool=worker_pool)
-        percent_rank_calibration_time = time.time() - start
-        print("Finished calibrating percent ranks in %0.2f sec." % (
-            percent_rank_calibration_time))
+        for result in tqdm.tqdm(results, ascii=True, total=len(alleles)):
+            predictor.allele_to_percent_rank_transform.update(result)
+        print("Done calibrating %d additional alleles." % len(alleles))
         predictor.save(args.out_models_dir, model_names_to_write=[])
 
     if worker_pool:
@@ -269,11 +297,11 @@ def run(argv=sys.argv[1:]):
     print("Predictor written to: %s" % args.out_models_dir)
 
 
-def work_entrypoint(item):
-    return process_work(**item)
+def train_model_entrypoint(item):
+    return train_model(**item)
 
 
-def process_work(
+def train_model(
         model_group,
         n_models,
         allele_num,
@@ -323,6 +351,20 @@ def process_work(
         model.network(borrow=True).summary()
 
     return predictor
+
+
+def calibrate_percentile_ranks(allele, predictor, peptides=None):
+    """
+    Private helper function.
+    """
+    if peptides is None:
+        peptides = GLOBAL_DATA["calibration_peptides"]
+    predictor.calibrate_percentile_ranks(
+        peptides=peptides,
+        alleles=[allele])
+    return {
+        allele: predictor.allele_to_percent_rank_transform[allele],
+    }
 
 
 if __name__ == '__main__':

@@ -889,8 +889,7 @@ class Class1AffinityPredictor(object):
             peptides=None,
             num_peptides_per_length=int(1e5),
             alleles=None,
-            bins=None,
-            worker_pool=None):
+            bins=None):
         """
         Compute the cumulative distribution of ic50 values for a set of alleles
         over a large universe of random peptides, to enable computing quantiles in
@@ -898,7 +897,7 @@ class Class1AffinityPredictor(object):
 
         Parameters
         ----------
-        peptides : sequence of string, optional
+        peptides : sequence of string or EncodableSequences, optional
             Peptides to use
         num_peptides_per_length : int, optional
             If peptides argument is not specified, then num_peptides_per_length
@@ -911,8 +910,10 @@ class Class1AffinityPredictor(object):
             Anything that can be passed to numpy.histogram's "bins" argument
             can be used here, i.e. either an integer or a sequence giving bin
             edges. This is in ic50 space.
-        worker_pool : multiprocessing.Pool, optional
-            If specified multiple alleles will be calibrated in parallel
+
+        Returns
+        ----------
+        EncodableSequences : peptides used for calibration
         """
         if bins is None:
             bins = to_ic50(numpy.linspace(1, 0, 1000))
@@ -931,57 +932,12 @@ class Class1AffinityPredictor(object):
 
         encoded_peptides = EncodableSequences.create(peptides)
 
-        if worker_pool and len(alleles) > 1:
-            # Run in parallel
+        for (i, allele) in enumerate(alleles):
+            predictions = self.predict(peptides, allele=allele)
+            transform = PercentRankTransform()
+            transform.fit(predictions, bins=bins)
+            self.allele_to_percent_rank_transform[allele] = transform
 
-            # Performance hack.
-            self.neural_networks[0].peptides_to_network_input(encoded_peptides)
-
-            do_work = partial(
-                _calibrate_percentile_ranks,
-                predictor=self,
-                peptides=encoded_peptides,
-                bins=bins)
-            list_of_singleton_alleles = [ [allele] for allele in alleles ]
-            results = worker_pool.imap_unordered(
-                do_work, list_of_singleton_alleles, chunksize=1)
-
-            # Add progress bar
-            results = tqdm.tqdm(results, ascii=True, total=len(alleles))
-
-            # Merge results
-            for partial_dict in results:
-                self.allele_to_percent_rank_transform.update(partial_dict)
-        else:
-            # Run in serial
-            self.allele_to_percent_rank_transform.update(
-                _calibrate_percentile_ranks(
-                    alleles=alleles,
-                    predictor=self,
-                    peptides=encoded_peptides,
-                    bins=bins))
+        return encoded_peptides
 
 
-def _calibrate_percentile_ranks(alleles, predictor, peptides, bins):
-    """
-    Private helper function.
-
-    Parameters
-    ----------
-    alleles : list of string
-    predictor : Class1AffinityPredictor
-    peptides : list of string or EncodableSequences
-    bins : object
-
-    Returns
-    -------
-    dict : allele -> percentile rank transform
-
-    """
-    result = {}
-    for (i, allele) in enumerate(alleles):
-        predictions = predictor.predict(peptides, allele=allele)
-        transform = PercentRankTransform()
-        transform.fit(predictions, bins=bins)
-        result[allele] = transform
-    return result
