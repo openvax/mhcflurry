@@ -171,6 +171,7 @@ def run(argv=sys.argv[1:]):
     predictor = Class1AffinityPredictor()
     if args.train_num_jobs == 1:
         # Serial run
+        print("Running in serial.")
         worker_pool = None
     else:
         worker_pool = Pool(
@@ -267,6 +268,7 @@ def run(argv=sys.argv[1:]):
 
         if args.calibration_num_jobs == 1:
             # Serial run
+            print("Running in serial.")
             worker_pool = None
             results = (
                 calibrate_percentile_ranks(
@@ -287,7 +289,9 @@ def run(argv=sys.argv[1:]):
             results = worker_pool.imap_unordered(
                 partial(
                     calibrate_percentile_ranks,
-                    predictor=predictor), alleles, chunksize=1)
+                    predictor=predictor),
+                alleles,
+                chunksize=1)
 
         for result in tqdm.tqdm(results, ascii=True, total=len(alleles)):
             predictor.allele_to_percent_rank_transform.update(result)
