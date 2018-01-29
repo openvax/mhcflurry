@@ -232,7 +232,8 @@ def run(argv=sys.argv[1:]):
                     worker_pool.imap_unordered(
                         train_model_entrypoint, work_items, chunksize=1),
                     ascii=True,
-                    total=len(work_items)))
+                    total=len(work_items)),
+                key=lambda pair: pair[0])
         ]
 
         print("Merging %d predictors fit in parallel." % (len(predictors)))
@@ -243,7 +244,6 @@ def run(argv=sys.argv[1:]):
         # Run in serial. In this case, every worker is passed the same predictor,
         # which it adds models to, so no merging is required. It also saves
         # as it goes so no saving is required at the end.
-        start = time.time()
         for _ in tqdm.trange(len(work_items)):
             item = work_items.pop(0)  # want to keep freeing up memory
             (_, work_predictor) = train_model_entrypoint(item)
