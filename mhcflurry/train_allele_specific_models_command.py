@@ -103,11 +103,13 @@ parser.add_argument(
     default=0)
 parser.add_argument(
     "--num-jobs",
-    default=1,
+    default=[1],
     type=int,
     metavar="N",
+    nargs="+",
     help="Number of processes to parallelize training and percent rank "
-    "calibration over. Experimental. "
+    "calibration over, respectively. Experimental. If only one value is specified "
+    "then the same number of jobs is used for both phases."
     "Set to 1 for serial run. Set to 0 to use number of cores. Default: %(default)s.")
 parser.add_argument(
     "--backend",
@@ -169,15 +171,15 @@ def run(argv=sys.argv[1:]):
     GLOBAL_DATA["train_data"] = df
 
     predictor = Class1AffinityPredictor()
-    if args.num_jobs == 1:
+    if args.num_jobs[0] == 1:
         # Serial run
         print("Running in serial.")
         worker_pool = None
     else:
         worker_pool = Pool(
             processes=(
-                args.num_jobs
-                if args.num_jobs else None))
+                args.num_jobs[0]
+                if args.num_jobs[0] else None))
         print("Using worker pool: %s" % str(worker_pool))
 
     if args.out_models_dir and not os.path.exists(args.out_models_dir):
@@ -219,12 +221,19 @@ def run(argv=sys.argv[1:]):
 
     if worker_pool:
         print("Processing %d work items in parallel." % len(work_items))
-        predictors = list(
-            tqdm.tqdm(
-                worker_pool.imap_unordered(
-                    train_model_entrypoint, work_items, chunksize=1),
-                ascii=True,
-                total=len(work_items)))
+
+        # We sort here so the predictors are in order of hyperparameter set num.
+        # This is convenient so that the neural networks get merged for each
+        # allele in the same order.
+        predictors = [
+            predictor for (_, predictor)
+            in sorted(
+                tqdm.tqdm(
+                    worker_pool.imap_unordered(
+                        train_model_entrypoint, work_items, chunksize=1),
+                    ascii=True,
+                    total=len(work_items)))
+        ]
 
         print("Merging %d predictors fit in parallel." % (len(predictors)))
         predictor = Class1AffinityPredictor.merge([predictor] + predictors)
@@ -237,7 +246,7 @@ def run(argv=sys.argv[1:]):
         start = time.time()
         for _ in tqdm.trange(len(work_items)):
             item = work_items.pop(0)  # want to keep freeing up memory
-            work_predictor = train_model_entrypoint(item)
+            (_, work_predictor) = train_model_entrypoint(item)
             assert work_predictor is predictor
         assert not work_items
 
@@ -270,7 +279,7 @@ def run(argv=sys.argv[1:]):
             time.time() - start))
         print("Calibrating percent rank calibration for %d alleles." % len(alleles))
 
-        if args.num_jobs == 1:
+        if args.num_jobs[-1] == 1:
             # Serial run
             print("Running in serial.")
             worker_pool = None
@@ -287,8 +296,8 @@ def run(argv=sys.argv[1:]):
             GLOBAL_DATA["calibration_peptides"] = encoded_peptides
             worker_pool = Pool(
                 processes=(
-                    args.num_jobs
-                    if args.num_jobs else None))
+                    args.num_jobs[-1]
+                    if args.num_jobs[-1] else None))
             print("Using worker pool: %s" % str(worker_pool))
             results = worker_pool.imap_unordered(
                 partial(
@@ -374,7 +383,7 @@ def train_model(
               (hyperparameter_set_num + 1))
         model.network(borrow=True).summary()
 
-    return predictor
+    return (hyperparameter_set_num, predictor)
 
 
 def calibrate_percentile_ranks(allele, predictor, peptides=None):
