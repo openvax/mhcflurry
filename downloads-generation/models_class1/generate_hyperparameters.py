@@ -71,6 +71,6 @@ for dense_layer_size in [64, 16]:
                 new["locally_connected_layers"] = [lc_layer]
             elif num_lc == 2:
                 new["locally_connected_layers"] = [lc_layer, deepcopy(lc_layer)]
-                grid.append(new)
+            grid.append(new)
 
 dump(grid, stdout)
