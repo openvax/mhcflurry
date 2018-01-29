@@ -9,12 +9,10 @@ from os.path import join, exists
 from os import mkdir
 from socket import gethostname
 from getpass import getuser
-from functools import partial
 
 import mhcnames
 import numpy
 import pandas
-import tqdm  # progress bars
 from numpy.testing import assert_equal
 from six import string_types
 
@@ -25,6 +23,7 @@ from .encodable_sequences import EncodableSequences
 from .percent_rank_transform import PercentRankTransform
 from .regression_target import to_ic50
 from .version import __version__
+from .ensemble_centrality import CENTRALITY_MEASURES
 
 
 class Class1AffinityPredictor(object):
@@ -672,7 +671,8 @@ class Class1AffinityPredictor(object):
             allele=None,
             throw=True,
             include_individual_model_predictions=False,
-            include_percentile_ranks=True):
+            include_percentile_ranks=True,
+            centrality_measure="robust_mean"):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
@@ -701,6 +701,9 @@ class Class1AffinityPredictor(object):
             If True, a "prediction_percentile" column will be included giving the
             percentile ranks. If no percentile rank information is available,
             this will be ignored with a warning.
+        centrality_measure : string or callable
+            Measure of central tendency to use to combine predictions in the
+            ensemble.
 
         Returns
         -------
@@ -817,9 +820,15 @@ class Class1AffinityPredictor(object):
         df_predictions = df[
             [c for c in df.columns if c.startswith("model_")]
         ]
+
+        if callable(centrality_measure):
+            centrality_function = centrality_measure
+        else:
+            centrality_function = CENTRALITY_MEASURES[centrality_measure]
+
         logs = numpy.log(df_predictions)
-        log_means = logs.mean(1)
-        df["prediction"] = numpy.exp(log_means)
+        log_centers = centrality_function(logs.values)
+        df["prediction"] = numpy.exp(log_centers)
         df["prediction_low"] = numpy.exp(logs.quantile(0.05, axis=1))
         df["prediction_high"] = numpy.exp(logs.quantile(0.95, axis=1))
 

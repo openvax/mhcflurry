@@ -29,7 +29,7 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 mkdir models
 
-cp $SCRIPT_DIR/hyperparameters.yaml .
+python $SCRIPT_DIR/generate_hyperparameters.py > hyperparameters.yaml
 
 time mhcflurry-class1-train-allele-specific-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
@@ -37,7 +37,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --out-models-dir models \
     --percent-rank-calibration-num-peptides-per-length 1000000 \
     --min-measurements-per-allele 75 \
-    --num-jobs 0
+    --num-jobs 32
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
