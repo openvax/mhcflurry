@@ -629,7 +629,13 @@ class Class1AffinityPredictor(object):
                 sub_df.affinity, allele=allele, throw=throw)
         return df.result.values
 
-    def predict(self, peptides, alleles=None, allele=None, throw=True):
+    def predict(
+            self,
+            peptides,
+            alleles=None,
+            allele=None,
+            throw=True,
+            centrality_measure="robust_mean"):
         """
         Predict nM binding affinities.
         
@@ -650,6 +656,9 @@ class Class1AffinityPredictor(object):
             If True, a ValueError will be raised in the case of unsupported
             alleles or peptide lengths. If False, a warning will be logged and
             the predictions for the unsupported alleles or peptides will be NaN.
+        centrality_measure : string or callable
+            Measure of central tendency to use to combine predictions in the
+            ensemble. Options include: mean, median, robust_mean.
 
         Returns
         -------
@@ -661,6 +670,7 @@ class Class1AffinityPredictor(object):
             allele=allele,
             throw=throw,
             include_percentile_ranks=False,
+            centrality_measure=centrality_measure,
         )
         return df.prediction.values
 
@@ -703,7 +713,7 @@ class Class1AffinityPredictor(object):
             this will be ignored with a warning.
         centrality_measure : string or callable
             Measure of central tendency to use to combine predictions in the
-            ensemble.
+            ensemble. Options include: mean, median, robust_mean.
 
         Returns
         -------
