@@ -37,7 +37,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --out-models-dir models \
     --percent-rank-calibration-num-peptides-per-length 1000000 \
     --min-measurements-per-allele 75 \
-    --num-jobs 32 8
+    --num-jobs 32 16
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
