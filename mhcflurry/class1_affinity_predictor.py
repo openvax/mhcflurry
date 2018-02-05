@@ -18,7 +18,7 @@ from six import string_types
 
 from .class1_neural_network import Class1NeuralNetwork
 from .common import random_peptides
-from .downloads import get_path
+from .downloads import get_default_class1_models_dir
 from .encodable_sequences import EncodableSequences
 from .percent_rank_transform import PercentRankTransform
 from .regression_target import to_ic50
@@ -283,7 +283,7 @@ class Class1AffinityPredictor(object):
         `Class1AffinityPredictor` instance
         """
         if models_dir is None:
-            models_dir = get_path("models_class1", "models")
+            models_dir = get_default_class1_models_dir()
 
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)

@@ -229,15 +229,13 @@ def info_subcommand(args):
 
     downloads = get_current_release_downloads()
 
-    format_string = "%-40s  %-12s   %-12s  %-20s "
-    print(format_string % (
-        "DOWNLOAD NAME", "DOWNLOADED?", "DEFAULT?", "URL"))
+    format_string = "%-40s  %-12s  %-20s "
+    print(format_string % ("DOWNLOAD NAME", "DOWNLOADED?", "URL"))
 
     for (item, info) in downloads.items():
         print(format_string % (
             item,
             yes_no(info['downloaded']),
-            yes_no(info['metadata']['default']),
             info['metadata']["url"]))
 
 
