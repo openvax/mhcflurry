@@ -35,7 +35,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2" \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
-    --percent-rank-calibration-num-peptides-per-length 1000000 \
+    --percent-rank-calibration-num-peptides-per-length 100000 \
     --min-measurements-per-allele 75 \
     --num-jobs 32 16
 
