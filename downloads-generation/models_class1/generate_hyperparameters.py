@@ -49,7 +49,7 @@ base_hyperparameters = {
             "kernel_size": 3
         }
     ],
-    "activation": "relu",
+    "activation": "tanh",
     "output_activation": "sigmoid",
     "layer_sizes": [16],
     "dense_layer_l1_regularization": 0.001,
@@ -58,19 +58,22 @@ base_hyperparameters = {
 }
 
 grid = []
-for dense_layer_size in [64, 16]:
-    for num_lc in [0, 1, 2]:
-        for lc_kernel_size in [3, 5]:
-            new = deepcopy(base_hyperparameters)
-            new["layer_sizes"] = [dense_layer_size]
-            (lc_layer,) = new["locally_connected_layers"]
-            lc_layer['kernel_size'] = lc_kernel_size
-            if num_lc == 0:
-                new["locally_connected_layers"] = []
-            elif num_lc == 1:
-                new["locally_connected_layers"] = [lc_layer]
-            elif num_lc == 2:
-                new["locally_connected_layers"] = [lc_layer, deepcopy(lc_layer)]
-            grid.append(new)
+for dense_layer_size in [64, 32, 16]:
+    for l1 in [0.001, 0.01, 0.0]:
+        for num_lc in [0, 1, 2]:
+            for lc_kernel_size in [3, 5]:
+                new = deepcopy(base_hyperparameters)
+                new["layer_sizes"] = [dense_layer_size]
+                new["dense_layer_l1_regularization"] = l1
+                (lc_layer,) = new["locally_connected_layers"]
+                lc_layer['kernel_size'] = lc_kernel_size
+                if num_lc == 0:
+                    new["locally_connected_layers"] = []
+                elif num_lc == 1:
+                    new["locally_connected_layers"] = [lc_layer]
+                elif num_lc == 2:
+                    new["locally_connected_layers"] = [lc_layer, deepcopy(lc_layer)]
+                if not grid or new not in grid:
+                    grid.append(new)
 
 dump(grid, stdout)
