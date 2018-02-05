@@ -9,7 +9,7 @@ from __future__ import (
 )
 import logging
 import yaml
-from os.path import join, exists
+from os.path import join, exists, relpath
 from pipes import quote
 from os import environ
 from collections import OrderedDict
@@ -20,11 +20,14 @@ ENVIRONMENT_VARIABLES = [
     "MHCFLURRY_DATA_DIR",
     "MHCFLURRY_DOWNLOADS_CURRENT_RELEASE",
     "MHCFLURRY_DOWNLOADS_DIR",
+    "MHCFLURRY_DEFAULT_CLASS1_MODELS"
 ]
 
 _DOWNLOADS_DIR = None
 _CURRENT_RELEASE = None
 _METADATA = None
+_MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR = environ.get(
+    "MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR")
 
 
 def get_downloads_dir():
@@ -49,6 +52,37 @@ def get_downloads_metadata():
     if _METADATA is None:
         _METADATA = yaml.load(resource_string(__name__, "downloads.yml"))
     return _METADATA
+
+
+def get_default_class1_models_dir(test_exists=True):
+    """
+    Return the absolute path to the default class1 models dir.
+
+    If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR is set to an
+    absolute path, return that path. If it's set to a relative path (i.e. does
+    not start with /) then return that path taken to be relative to the mhcflurry
+    downloads dir.
+
+    If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR is NOT set,
+    then return the path to downloaded models in the "models_class1" download.
+
+    Parameters
+    ----------
+
+    test_exists : boolean, optional
+        Whether to raise an exception of the path does not exist
+
+    Returns
+    -------
+    string : absolute path
+    """
+    if _MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR:
+        result = join(get_downloads_dir(), _MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR)
+        if test_exists and not exists(result):
+            raise IOError("No such directory: %s" % result)
+        return result
+    else:
+        return get_path("models_class1", "models", test_exists=test_exists)
 
 
 def get_current_release_downloads():

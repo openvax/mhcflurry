@@ -33,7 +33,7 @@ import logging
 
 import pandas
 
-from .downloads import get_path
+from .downloads import get_default_class1_models_dir
 from .class1_affinity_predictor import Class1AffinityPredictor
 
 
@@ -122,7 +122,7 @@ model_args.add_argument(
     metavar="DIR",
     default=None,
     help="Directory containing models. "
-    "Default: %s" % get_path("models_class1", "models", test_exists=False))
+    "Default: %s" % get_default_class1_models_dir(test_exists=False))
 model_args.add_argument(
     "--include-individual-model-predictions",
     action="store_true",
@@ -143,7 +143,7 @@ def run(argv=sys.argv[1:]):
         # The reason we set the default here instead of in the argument parser is that
         # we want to test_exists at this point, so the user gets a message instructing
         # them to download the models if needed.
-        models_dir = get_path("models_class1", "models")
+        models_dir = get_default_class1_models_dir(test_exists=True)
     predictor = Class1AffinityPredictor.load(models_dir)
 
     # The following two are informative commands that can come 
