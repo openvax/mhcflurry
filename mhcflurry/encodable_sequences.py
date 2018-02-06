@@ -104,7 +104,6 @@ class EncodableSequences(object):
         -------
         numpy.array with shape (num sequences, max_length, m) where m is
         vector_encoding_length(vector_encoding_name)
-
         """
         cache_key = (
             "fixed_length_vector_encoding",

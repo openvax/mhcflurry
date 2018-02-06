@@ -27,11 +27,13 @@ class Class1NeuralNetwork(object):
 
     network_hyperparameter_defaults = HyperparameterDefaults(
         kmer_size=15,
-        use_embedding=False,
         peptide_amino_acid_encoding="one-hot",
         embedding_input_dim=21,
         embedding_output_dim=8,
-        pseudosequence_use_embedding=False,
+        allele_dense_layer_sizes=[],
+        peptide_dense_layer_sizes=[],
+        peptide_allele_merge_method="multiply",
+        peptide_allele_merge_activation="",
         layer_sizes=[32],
         dense_layer_l1_regularization=0.001,
         dense_layer_l2_regularization=0.0,
@@ -107,9 +109,41 @@ class Class1NeuralNetwork(object):
     Combined set of all supported hyperparameters and their default values.
     """
 
+    # Hyperparameter renames.
+    # These are updated from time to time as new versions are developed. It
+    # provides a primitive way to allow new code to work with models trained
+    # using older code.
+    # None indicates the hyperparameter has been dropped.
+    hyperparameter_renames = {
+        "use_embedding": None,
+        "pseudosequence_use_embedding": None,
+    }
+
+    @classmethod
+    def apply_hyperparameter_renames(cls, hyperparameters):
+        """
+        Handle hyperparameter renames.
+
+        Parameters
+        ----------
+        hyperparameters : dict
+
+        Returns
+        -------
+        dict : updated hyperparameters
+
+        """
+        for (from_name, to_name) in cls.hyperparameter_renames.items():
+            if from_name in hyperparameters:
+                value = hyperparameters.pop(from_name)
+                if to_name:
+                    hyperparameters[to_name] = value
+        return hyperparameters
+
+
     def __init__(self, **hyperparameters):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
-            hyperparameters)
+            self.apply_hyperparameter_renames(hyperparameters))
 
         self._network = None
         self.network_json = None
@@ -278,8 +312,7 @@ class Class1NeuralNetwork(object):
         numpy.array
         """
         encoder = EncodableSequences.create(peptides)
-        if (self.hyperparameters['use_embedding'] or
-                self.hyperparameters['peptide_amino_acid_encoding'] == "embedding"):
+        if (self.hyperparameters['peptide_amino_acid_encoding'] == "embedding"):
             encoded = encoder.variable_length_to_fixed_length_categorical(
                 max_length=self.hyperparameters['kmer_size'],
                 **self.input_encoding_hyperparameter_defaults.subselect(
@@ -313,33 +346,26 @@ class Class1NeuralNetwork(object):
             self.hyperparameters['right_edge'],
         self.hyperparameters['kmer_size'])
 
-    def pseudosequence_to_network_input(self, pseudosequences):
+    def allele_encoding_to_network_input(self, allele_encoding):
         """
-        Encode pseudosequences to the fixed-length encoding expected by the neural
+        Encode alleles to the fixed-length encoding expected by the neural
         network (which depends on the architecture).
 
         Parameters
         ----------
-        pseudosequences : EncodableSequences or list of string
+        allele_encoding : AlleleEncoding
 
         Returns
         -------
         numpy.array
         """
-        encoder = EncodableSequences.create(pseudosequences)
-        if self.hyperparameters['pseudosequence_use_embedding']:
-            encoded = encoder.fixed_length_categorical()
-        else:
-            raise NotImplementedError
-            # encoded = encoder.fixed_length_one_hot()
-        assert len(encoded) == len(pseudosequences)
-        return encoded
+        return allele_encoding.fixed_length_sequences("BLOSUM62")
 
     def fit(
             self,
             peptides,
             affinities,
-            allele_pseudosequences=None,
+            allele_encoding=None,
             inequalities=None,
             sample_weights=None,
             shuffle_permutation=None,
@@ -355,7 +381,7 @@ class Class1NeuralNetwork(object):
         affinities : list of float
             nM affinities. Must be same length of as peptides.
         
-        allele_pseudosequences : EncodableSequences or list of string, optional
+        allele_encoding : AlleleEncoding, optional
             If not specified, the model will be a single-allele predictor.
 
         inequalities : list of string, each element one of ">", "<", or "=".
@@ -429,13 +455,12 @@ class Class1NeuralNetwork(object):
         x_dict_without_random_negatives = {
             'peptide': peptide_encoding,
         }
-        pseudosequence_length = None
-        if allele_pseudosequences is not None:
-            pseudosequences_input = self.pseudosequence_to_network_input(
-                allele_pseudosequences)
-            pseudosequence_length = len(pseudosequences_input[0])
-            x_dict_without_random_negatives['pseudosequence'] = (
-                pseudosequences_input)
+        allele_encoding_dims = None
+        if allele_encoding is not None:
+            allele_encoding_input = self.allele_encoding_to_network_input(
+                allele_encoding)
+            allele_encoding_dims = allele_encoding_input.shape[1:]
+            x_dict_without_random_negatives['allele'] = allele_encoding_input
 
         # Shuffle y_values and the contents of x_dict_without_random_negatives
         # This ensures different data is used for the test set for early stopping
@@ -480,7 +505,7 @@ class Class1NeuralNetwork(object):
 
         if self.network() is None:
             self._network = self.make_network(
-                pseudosequence_length=pseudosequence_length,
+                allele_encoding_dims=allele_encoding_dims,
                 **self.network_hyperparameter_defaults.subselect(
                     self.hyperparameters))
             self.network().compile(
@@ -537,6 +562,7 @@ class Class1NeuralNetwork(object):
         self.loss_history = collections.defaultdict(list)
         start = time.time()
         last_progress_print = None
+        x_dict_with_random_negatives = {}
         for i in range(self.hyperparameters['max_epochs']):
             random_negative_peptides_list = []
             for (length, count) in num_random_negative.iteritems():
@@ -545,21 +571,45 @@ class Class1NeuralNetwork(object):
                         count,
                         length=length,
                         distribution=aa_distribution))
+            random_negative_peptides = EncodableSequences.create(
+                random_negative_peptides_list)
             random_negative_peptides_encoding = (
-                self.peptides_to_network_input(
-                    random_negative_peptides_list))
+                self.peptides_to_network_input(random_negative_peptides))
 
-            x_dict_with_random_negatives = {
-                "peptide": numpy.concatenate([
-                    random_negative_peptides_encoding,
-                    peptide_encoding,
-                ]) if len(random_negative_peptides_encoding) > 0
-                else peptide_encoding
-            }
-            if pseudosequence_length:
-                # TODO: add random pseudosequences for random negative peptides
-                raise NotImplementedError(
-                    "Allele pseudosequences unsupported with random negatives")
+            if not x_dict_with_random_negatives:
+                if len(random_negative_peptides) > 0:
+                    x_dict_with_random_negatives["peptide"] = numpy.concatenate([
+                        random_negative_peptides_encoding,
+                        peptide_encoding,
+                    ])
+                    if 'allele' in x_dict_without_random_negatives:
+                        x_dict_with_random_negatives['allele'] = numpy.concatenate([
+                            x_dict_without_random_negatives['allele'][
+                                numpy.random.choice(
+                                    x_dict_without_random_negatives[
+                                        'allele'].shape[0],
+                                    size=len(random_negative_peptides_list))],
+                            x_dict_without_random_negatives['allele']
+                        ])
+                else:
+                    x_dict_with_random_negatives = (
+                        x_dict_without_random_negatives)
+            else:
+                # Update x_dict_with_random_negatives in place.
+                # This is more memory efficient than recreating it as above.
+                if len(random_negative_peptides) > 0:
+                    x_dict_with_random_negatives["peptide"][:len(random_negative_peptides)] = (
+                        random_negative_peptides_encoding
+                    )
+                    if 'allele' in x_dict_with_random_negatives:
+                        x_dict_with_random_negatives['allele'][:len(random_negative_peptides)] = (
+                            x_dict_with_random_negatives['allele'][
+                                len(random_negative_peptides) + numpy.random.choice(
+                                    x_dict_with_random_negatives['allele'].shape[0] -
+                                    len(random_negative_peptides),
+                                    size=len(random_negative_peptides))
+                            ]
+                        )
 
             fit_history = self.network().fit(
                 x_dict_with_random_negatives,
@@ -610,7 +660,7 @@ class Class1NeuralNetwork(object):
                         break
         self.fit_seconds = time.time() - start
 
-    def predict(self, peptides, allele_pseudosequences=None, batch_size=4096):
+    def predict(self, peptides, allele_encoding=None, batch_size=4096):
         """
         Predict affinities
         
@@ -618,7 +668,7 @@ class Class1NeuralNetwork(object):
         ----------
         peptides : EncodableSequences or list of string
         
-        allele_pseudosequences : EncodableSequences or list of string, optional
+        allele_pseudosequences : AlleleEncoding, optional
             Only required when this model is a pan-allele model
 
         batch_size : int
@@ -631,7 +681,7 @@ class Class1NeuralNetwork(object):
         x_dict = {
             'peptide': self.peptides_to_network_input(peptides)
         }
-        if allele_pseudosequences is not None:
+        if allele_encoding is not None:
             pseudosequences_input = self.pseudosequence_to_network_input(
                 allele_pseudosequences)
             x_dict['pseudosequence'] = pseudosequences_input
@@ -643,13 +693,15 @@ class Class1NeuralNetwork(object):
 
     @staticmethod
     def make_network(
-            pseudosequence_length,
+            allele_encoding_dims,
             kmer_size,
             peptide_amino_acid_encoding,
-            use_embedding,
             embedding_input_dim,
             embedding_output_dim,
-            pseudosequence_use_embedding,
+            allele_dense_layer_sizes,
+            peptide_dense_layer_sizes,
+            peptide_allele_merge_method,
+            peptide_allele_merge_activation,
             layer_sizes,
             dense_layer_l1_regularization,
             dense_layer_l2_regularization,
@@ -673,7 +725,7 @@ class Class1NeuralNetwork(object):
         from keras.layers.embeddings import Embedding
         from keras.layers.normalization import BatchNormalization
 
-        if use_embedding or peptide_amino_acid_encoding == "embedding":
+        if peptide_amino_acid_encoding == "embedding":
             peptide_input = Input(
                 shape=(kmer_size,), dtype='int32', name='peptide')
             current_layer = Embedding(
@@ -693,12 +745,25 @@ class Class1NeuralNetwork(object):
 
         inputs = [peptide_input]
 
+        kernel_regularizer = None
+        l1 = dense_layer_l1_regularization
+        l2 = dense_layer_l2_regularization
+        if l1 > 0 or l2 > 0:
+            kernel_regularizer = keras.regularizers.l1_l2(l1, l2)
+
         for (i, locally_connected_params) in enumerate(locally_connected_layers):
             current_layer = keras.layers.LocallyConnected1D(
                 name="lc_%d" % i,
                 **locally_connected_params)(current_layer)
 
         current_layer = Flatten(name="flattened_0")(current_layer)
+
+        for (i, layer_size) in enumerate(peptide_dense_layer_sizes):
+            current_layer = Dense(
+                layer_size,
+                name="peptide_dense_%d" % i,
+                kernel_regularizer=kernel_regularizer,
+                activation=activation)(current_layer)
 
         if batch_normalization:
             current_layer = BatchNormalization(name="batch_norm_early")(
@@ -708,37 +773,44 @@ class Class1NeuralNetwork(object):
             current_layer = Dropout(dropout_probability, name="dropout_early")(
                 current_layer)
 
-        if pseudosequence_length:
-            if pseudosequence_use_embedding:
-                pseudosequence_input = Input(
-                    shape=(pseudosequence_length,),
-                    dtype='int32',
-                    name='pseudosequence')
-                pseudo_embedding_layer = Embedding(
-                    input_dim=embedding_input_dim,
-                    output_dim=embedding_output_dim,
-                    input_length=pseudosequence_length,
-                    embeddings_initializer=embedding_init_method)(
-                    pseudosequence_input)
-            else:
-                pseudosequence_input = Input(
-                    shape=(pseudosequence_length, 21),
-                    dtype='float32', name='peptide')
-                pseudo_embedding_layer = pseudosequence_input
-            inputs.append(pseudosequence_input)
-            pseudo_embedding_layer = Flatten(name="flattened_1")(
-                pseudo_embedding_layer)
+        if allele_encoding_dims:
+            allele_input = Input(
+                shape=allele_encoding_dims,
+                dtype='int32',
+                name='peptide')
+            inputs.append(allele_input)
+            allele_embedding_layer = Flatten(name="allele_flat")(allele_input)
 
-            current_layer = keras.layers.concatenate([
-                current_layer, pseudo_embedding_layer], name="concatenated_0")
+            for (i, layer_size) in enumerate(allele_dense_layer_sizes):
+                allele_embedding_layer = Dense(
+                    layer_size,
+                    name="allele_dense_%d" % i,
+                    kernel_regularizer=kernel_regularizer,
+                    activation=activation)(allele_embedding_layer)
+
+            if peptide_allele_merge_method == 'concatenate':
+                current_layer = keras.layers.concatenate([
+                    current_layer, allele_embedding_layer
+                ], name="allele_peptide_merged")
+            elif peptide_allele_merge_method == 'multiply':
+                current_layer = keras.layers.multiply([
+                    current_layer, allele_embedding_layer
+                ], name="allele_peptide_merged")
+
+                current_layer = keras.layers.concatenate(
+                    [current_layer, allele_embedding_layer], name="concatenated_0")
+            else:
+                raise ValueError(
+                    "Unsupported peptide_allele_encoding_merge_method: %s"
+                    % peptide_allele_merge_method)
+
+            if peptide_allele_merge_activation:
+                current_layer = keras.layers.Activation(
+                    peptide_allele_merge_activation,
+                    name="alelle_peptide_merged_%s" %
+                         peptide_allele_merge_activation)(current_layer)
             
         for (i, layer_size) in enumerate(layer_sizes):
-            kernel_regularizer = None
-            l1 = dense_layer_l1_regularization
-            l2 = dense_layer_l2_regularization
-            if l1 > 0 or l2 > 0:
-                kernel_regularizer = keras.regularizers.l1_l2(l1, l2)
-
             current_layer = Dense(
                 layer_size,
                 activation=activation,
