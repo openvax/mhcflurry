@@ -24,6 +24,7 @@ from .percent_rank_transform import PercentRankTransform
 from .regression_target import to_ic50
 from .version import __version__
 from .ensemble_centrality import CENTRALITY_MEASURES
+from .allele_encoding import AlleleEncoding
 
 
 class Class1AffinityPredictor(object):
@@ -39,7 +40,7 @@ class Class1AffinityPredictor(object):
             self,
             allele_to_allele_specific_models=None,
             class1_pan_allele_models=None,
-            allele_to_pseudosequence=None,
+            allele_to_fixed_length_sequence=None,
             manifest_df=None,
             allele_to_percent_rank_transform=None):
         """
@@ -51,7 +52,7 @@ class Class1AffinityPredictor(object):
         class1_pan_allele_models : list of `Class1NeuralNetwork`
             Ensemble of pan-allele models.
         
-        allele_to_pseudosequence : dict of string -> string
+        allele_to_fixed_length_sequence : dict of string -> string
             Required only if class1_pan_allele_models is specified.
         
         manifest_df : `pandas.DataFrame`, optional
@@ -70,11 +71,11 @@ class Class1AffinityPredictor(object):
             class1_pan_allele_models = []
 
         if class1_pan_allele_models:
-            assert allele_to_pseudosequence, "Pseudosequences required"
+            assert allele_to_fixed_length_sequence, "Allele sequences required"
 
         self.allele_to_allele_specific_models = allele_to_allele_specific_models
         self.class1_pan_allele_models = class1_pan_allele_models
-        self.allele_to_pseudosequence = allele_to_pseudosequence
+        self.allele_to_fixed_length_sequence = allele_to_fixed_length_sequence
 
         if manifest_df is None:
             rows = []
@@ -140,7 +141,7 @@ class Class1AffinityPredictor(object):
 
         allele_to_allele_specific_models = collections.defaultdict(list)
         class1_pan_allele_models = []
-        allele_to_pseudosequence = predictors[0].allele_to_pseudosequence
+        allele_to_fixed_length_sequence = predictors[0].allele_to_fixed_length_sequence
 
         for predictor in predictors:
             for (allele, networks) in (
@@ -152,7 +153,7 @@ class Class1AffinityPredictor(object):
         return Class1AffinityPredictor(
             allele_to_allele_specific_models=allele_to_allele_specific_models,
             class1_pan_allele_models=class1_pan_allele_models,
-            allele_to_pseudosequence=allele_to_pseudosequence
+            allele_to_fixed_length_sequence=allele_to_fixed_length_sequence
         )
 
     @property
@@ -165,8 +166,8 @@ class Class1AffinityPredictor(object):
         list of string
         """
         result = set(self.allele_to_allele_specific_models)
-        if self.allele_to_pseudosequence:
-            result = result.union(self.allele_to_pseudosequence)
+        if self.allele_to_fixed_length_sequence:
+            result = result.union(self.allele_to_fixed_length_sequence)
         return sorted(result)
 
     @property
@@ -196,7 +197,7 @@ class Class1AffinityPredictor(object):
         The serialization format consists of a file called "manifest.csv" with
         the configurations of each Class1NeuralNetwork, along with per-network
         files giving the model weights. If there are pan-allele predictors in
-        the ensemble, the allele pseudosequences are also stored in the
+        the ensemble, the allele sequences are also stored in the
         directory. There is also a small file "index.txt" with basic metadata:
         when the models were trained, by whom, on what host.
         
@@ -249,6 +250,15 @@ class Class1AffinityPredictor(object):
         ]
         pandas.DataFrame(rows).to_csv(
             info_path, sep="\t", header=False, index=False)
+
+        if self.allele_to_fixed_length_sequence is not None:
+            allele_to_sequence_df = pandas.DataFrame(
+                list(self.allele_to_fixed_length_sequence.items()),
+                columns=['allele', 'sequence']
+            )
+            allele_to_sequence_df.to_csv(
+                join(models_dir, "allele_sequences.csv"), index=False)
+            logging.info("Wrote: %s" % join(models_dir, "allele_sequences.csv"))
 
         if self.allele_to_percent_rank_transform:
             percent_ranks_df = None
@@ -310,10 +320,10 @@ class Class1AffinityPredictor(object):
 
         manifest_df["model"] = all_models
 
-        pseudosequences = None
-        if exists(join(models_dir, "pseudosequences.csv")):
-            pseudosequences = pandas.read_csv(
-                join(models_dir, "pseudosequences.csv"),
+        allele_to_fixed_length_sequence = None
+        if exists(join(models_dir, "allele_sequences.csv")):
+            allele_to_fixed_length_sequence = pandas.read_csv(
+                join(models_dir, "allele_sequences.csv"),
                 index_col="allele").to_dict()
 
         allele_to_percent_rank_transform = {}
@@ -325,10 +335,10 @@ class Class1AffinityPredictor(object):
                     PercentRankTransform.from_series(percent_ranks_df[allele]))
 
         logging.info(
-            "Loaded %d class1 pan allele predictors, %d pseudosequences, "
+            "Loaded %d class1 pan allele predictors, %d allele sequences, "
             "%d percent rank distributions, and %d allele specific models: %s" % (
                 len(class1_pan_allele_models),
-                len(pseudosequences) if pseudosequences else 0,
+                len(allele_to_fixed_length_sequence) if allele_to_fixed_length_sequence else 0,
                 len(allele_to_percent_rank_transform),
                 sum(len(v) for v in allele_to_allele_specific_models.values()),
                 ", ".join(
@@ -339,7 +349,7 @@ class Class1AffinityPredictor(object):
         result = Class1AffinityPredictor(
             allele_to_allele_specific_models=allele_to_allele_specific_models,
             class1_pan_allele_models=class1_pan_allele_models,
-            allele_to_pseudosequence=pseudosequences,
+            allele_to_fixed_length_sequence=allele_to_fixed_length_sequence,
             manifest_df=manifest_df,
             allele_to_percent_rank_transform=allele_to_percent_rank_transform,
         )
@@ -516,6 +526,7 @@ class Class1AffinityPredictor(object):
             alleles,
             peptides,
             affinities,
+            inequalities,
             models_dir_for_save=None,
             verbose=1,
             progress_preamble=""):
@@ -534,12 +545,15 @@ class Class1AffinityPredictor(object):
         architecture_hyperparameters : dict
         
         alleles : list of string
-            Allele names (not pseudosequences) corresponding to each peptide 
+            Allele names (not sequences) corresponding to each peptide
         
         peptides : `EncodableSequences` or list of string
         
         affinities : list of float
             nM affinities
+
+        inequalities : list of string, each element one of ">", "<", or "="
+            See Class1NeuralNetwork.fit for details.
         
         models_dir_for_save : string, optional
             If specified, the Class1AffinityPredictor is (incrementally) written
@@ -557,7 +571,9 @@ class Class1AffinityPredictor(object):
         """
 
         alleles = pandas.Series(alleles).map(mhcnames.normalize_allele_name)
-        allele_pseudosequences = alleles.map(self.allele_to_pseudosequence)
+        allele_encoding = AlleleEncoding(
+            alleles,
+            allele_to_fixed_length_sequence=self.allele_to_fixed_length_sequence)
 
         encodable_peptides = EncodableSequences.create(peptides)
         models = []
@@ -567,7 +583,8 @@ class Class1AffinityPredictor(object):
             model.fit(
                 encodable_peptides,
                 affinities,
-                allele_pseudosequences=allele_pseudosequences,
+                inequalities=inequalities,
+                allele_encoding=allele_encoding,
                 verbose=verbose,
                 progress_preamble=progress_preamble)
 
@@ -777,27 +794,27 @@ class Class1AffinityPredictor(object):
             unsupported_alleles = [
                 allele for allele in
                 df.normalized_allele.unique()
-                if allele not in self.allele_to_pseudosequence
+                if allele not in self.allele_to_fixed_length_sequence
             ]
             if unsupported_alleles:
                 msg = (
-                    "No pseudosequences for allele(s): %s.\n"
+                    "No sequences for allele(s): %s.\n"
                     "Supported alleles: %s" % (
                         " ".join(unsupported_alleles),
-                        " ".join(sorted(self.allele_to_pseudosequence))))
+                        " ".join(sorted(self.allele_to_fixed_length_sequence))))
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
             mask = df.supported_peptide_length
             if mask.sum() > 0:
-                masked_allele_pseudosequences = (
-                    df.ix[mask].normalized_allele.map(
-                        self.allele_to_pseudosequence))
+                masked_allele_encoding = AlleleEncoding(
+                    df.loc[mask].normalized_allele,
+                    allele_to_fixed_length_sequence=self.allele_to_fixed_length_sequence)
                 masked_peptides = peptides.sequences[mask]
                 for (i, model) in enumerate(self.class1_pan_allele_models):
                     df.loc[mask, "model_pan_%d" % i] = model.predict(
                         masked_peptides,
-                        allele_pseudosequences=masked_allele_pseudosequences)
+                        allele_encoding=masked_allele_encoding)
 
         if self.allele_to_allele_specific_models:
             query_alleles = df.normalized_allele.unique()

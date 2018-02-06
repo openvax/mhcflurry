@@ -370,7 +370,7 @@ class Class1NeuralNetwork(object):
         -------
         numpy.array
         """
-        return allele_encoding.fixed_length_sequences("BLOSUM62")
+        return allele_encoding.fixed_length_vector_encoded_sequences("BLOSUM62")
 
     def fit(
             self,
@@ -693,9 +693,8 @@ class Class1NeuralNetwork(object):
             'peptide': self.peptides_to_network_input(peptides)
         }
         if allele_encoding is not None:
-            pseudosequences_input = self.pseudosequence_to_network_input(
-                allele_pseudosequences)
-            x_dict['pseudosequence'] = pseudosequences_input
+            allele_input = self.allele_encoding_to_network_input(allele_encoding)
+            x_dict['allele'] = allele_input
 
         network = self.network(borrow=True)
         raw_predictions = network.predict(x_dict, batch_size=batch_size)
@@ -787,8 +786,8 @@ class Class1NeuralNetwork(object):
         if allele_encoding_dims:
             allele_input = Input(
                 shape=allele_encoding_dims,
-                dtype='int32',
-                name='peptide')
+                dtype='float32',
+                name='allele')
             inputs.append(allele_input)
             allele_embedding_layer = Flatten(name="allele_flat")(allele_input)
 
@@ -807,9 +806,6 @@ class Class1NeuralNetwork(object):
                 current_layer = keras.layers.multiply([
                     current_layer, allele_embedding_layer
                 ], name="allele_peptide_merged")
-
-                current_layer = keras.layers.concatenate(
-                    [current_layer, allele_embedding_layer], name="concatenated_0")
             else:
                 raise ValueError(
                     "Unsupported peptide_allele_encoding_merge_method: %s"
