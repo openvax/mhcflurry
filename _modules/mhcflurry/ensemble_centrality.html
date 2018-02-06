@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.regression_target &mdash; MHCflurry 1.1.0 documentation</title>
+  <title>mhcflurry.ensemble_centrality &mdash; MHCflurry 1.1.0 documentation</title>
   
 
   
@@ -141,7 +141,7 @@
         
           <li><a href="../index.html">Module code</a> &raquo;</li>
         
-      <li>mhcflurry.regression_target</li>
+      <li>mhcflurry.ensemble_centrality</li>
     
     
       <li class="wy-breadcrumbs-aside">
@@ -158,43 +158,44 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <h1>Source code for mhcflurry.regression_target</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">numpy</span>
+  <h1>Source code for mhcflurry.ensemble_centrality</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Measures of centrality (e.g. mean) used to combine predictions across an</span>
+<span class="sd">ensemble. The input to these functions are log affinities, and they are expected</span>
+<span class="sd">to return a centrality measure also in log-space.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span>
 
 
-<div class="viewcode-block" id="from_ic50"><a class="viewcode-back" href="../../api.html#mhcflurry.regression_target.from_ic50">[docs]</a><span class="k">def</span> <span class="nf">from_ic50</span><span class="p">(</span><span class="n">ic50</span><span class="p">,</span> <span class="n">max_ic50</span><span class="o">=</span><span class="mf">50000.0</span><span class="p">):</span>
+<div class="viewcode-block" id="robust_mean"><a class="viewcode-back" href="../../api.html#mhcflurry.ensemble_centrality.robust_mean">[docs]</a><span class="k">def</span> <span class="nf">robust_mean</span><span class="p">(</span><span class="n">log_values</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Convert ic50s to regression targets in the range [0.0, 1.0].</span>
-<span class="sd">    </span>
+<span class="sd">    Mean of values falling within the 25-75 percentiles.</span>
+
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
-<span class="sd">    ic50 : numpy.array of float</span>
+<span class="sd">    log_values : 2-d numpy.array</span>
+<span class="sd">        Center is computed along the second axis (i.e. per row).</span>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
-<span class="sd">    numpy.array of float</span>
+<span class="sd">    center : numpy.array of length log_values.shape[1]</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">ic50</span><span class="p">)</span> <span class="o">/</span> <span class="n">numpy</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">max_ic50</span><span class="p">))</span>
-    <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span>
-        <span class="mf">1.0</span><span class="p">,</span>
-        <span class="n">numpy</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span></div>
+    <span class="k">if</span> <span class="n">log_values</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="c1"># Too few values to use robust mean.</span>
+        <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">log_values</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">log_values</span> <span class="o">&lt;=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">nanpercentile</span><span class="p">(</span><span class="n">log_values</span><span class="p">,</span> <span class="mi">75</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span> <span class="o">&amp;</span>
+        <span class="p">(</span><span class="n">log_values</span> <span class="o">&gt;=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">nanpercentile</span><span class="p">(</span><span class="n">log_values</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))))</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">log_values</span> <span class="o">*</span> <span class="n">mask</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">mask</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
 
-
-<div class="viewcode-block" id="to_ic50"><a class="viewcode-back" href="../../api.html#mhcflurry.regression_target.to_ic50">[docs]</a><span class="k">def</span> <span class="nf">to_ic50</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">max_ic50</span><span class="o">=</span><span class="mf">50000.0</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Convert regression targets in the range [0.0, 1.0] to ic50s in the range</span>
-<span class="sd">    [0, 50000.0].</span>
-<span class="sd">    </span>
-<span class="sd">    Parameters</span>
-<span class="sd">    ----------</span>
-<span class="sd">    x : numpy.array of float</span>
-
-<span class="sd">    Returns</span>
-<span class="sd">    -------</span>
-<span class="sd">    numpy.array of float</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">max_ic50</span> <span class="o">**</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">x</span><span class="p">)</span></div>
+<span class="n">CENTRALITY_MEASURES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;mean&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">nanmean</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="s2">&quot;median&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">nanmedian</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="s2">&quot;robust_mean&quot;</span><span class="p">:</span> <span class="n">robust_mean</span><span class="p">,</span>
+<span class="p">}</span>
 </pre></div>
 
            </div>

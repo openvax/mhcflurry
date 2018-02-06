@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.train_allele_specific_models_command &mdash; MHCflurry 1.0.0 documentation</title>
+  <title>mhcflurry.train_allele_specific_models_command &mdash; MHCflurry 1.1.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.0.0 documentation" href="../../index.html"/>
+    <link rel="top" title="MHCflurry 1.1.0 documentation" href="../../index.html"/>
         <link rel="up" title="Module code" href="../index.html"/> 
 
   
@@ -63,7 +63,7 @@
             
             
               <div class="version">
-                1.0.0
+                1.1.0
               </div>
             
           
@@ -169,13 +169,31 @@
 <span class="kn">import</span> <span class="nn">time</span>
 <span class="kn">import</span> <span class="nn">traceback</span>
 <span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="k">import</span> <span class="n">Pool</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">pprint</span> <span class="k">import</span> <span class="n">pprint</span>
 
 <span class="kn">import</span> <span class="nn">pandas</span>
 <span class="kn">import</span> <span class="nn">yaml</span>
 <span class="kn">from</span> <span class="nn">mhcnames</span> <span class="k">import</span> <span class="n">normalize_allele_name</span>
+<span class="kn">import</span> <span class="nn">tqdm</span>  <span class="c1"># progress bar</span>
 
-<span class="kn">from</span> <span class="nn">mhcflurry.class1_affinity_predictor</span> <span class="k">import</span> <span class="n">Class1AffinityPredictor</span>
-<span class="kn">from</span> <span class="nn">mhcflurry.common</span> <span class="k">import</span> <span class="n">configure_logging</span>
+<span class="kn">from</span> <span class="nn">.class1_affinity_predictor</span> <span class="k">import</span> <span class="n">Class1AffinityPredictor</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">configure_logging</span><span class="p">,</span> <span class="n">set_keras_backend</span>
+
+
+<span class="c1"># To avoid pickling large matrices to send to child processes when running in</span>
+<span class="c1"># parallel, we use this global variable as a place to store data. Data that is</span>
+<span class="c1"># stored here before creating the thread pool will be inherited to the child</span>
+<span class="c1"># processes upon fork() call, allowing us to share large data with the workers</span>
+<span class="c1"># efficiently.</span>
+<span class="n">GLOBAL_DATA</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<span class="c1"># Note on parallelization:</span>
+<span class="c1"># It seems essential currently (tensorflow==1.4.1) that no processes are forked</span>
+<span class="c1"># after tensorflow has been used at all, which includes merely importing</span>
+<span class="c1"># keras.backend. So we must make sure not to use tensorflow in the main process</span>
+<span class="c1"># if we are running in parallel.</span>
 
 <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
 
@@ -214,6 +232,11 @@
     <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Use only quantitative training data&quot;</span><span class="p">)</span>
 <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--ignore-inequalities&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Do not use affinity value inequalities even when present in data&quot;</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
     <span class="s2">&quot;--percent-rank-calibration-num-peptides-per-length&quot;</span><span class="p">,</span>
     <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
     <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
@@ -240,21 +263,32 @@
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Keras verbosity. Default: </span><span class="si">%(default)s</span><span class="s2">&quot;</span><span class="p">,</span>
     <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
-    <span class="s2">&quot;--parallelization-num-jobs&quot;</span><span class="p">,</span>
-    <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="s2">&quot;--num-jobs&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
     <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
     <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
-    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Parallelization jobs. Experimental. Does NOT work with tensorflow. &quot;</span>
-    <span class="s2">&quot;Set to 1 for serial run. Set to 0 to use number of cores. &quot;</span>
-    <span class="s2">&quot;Default: </span><span class="si">%(default)s</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;+&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Number of processes to parallelize training and percent rank &quot;</span>
+    <span class="s2">&quot;calibration over, respectively. Experimental. If only one value is specified &quot;</span>
+    <span class="s2">&quot;then the same number of jobs is used for both phases.&quot;</span>
+    <span class="s2">&quot;Set to 1 for serial run. Set to 0 to use number of cores. Default: </span><span class="si">%(default)s</span><span class="s2">.&quot;</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--backend&quot;</span><span class="p">,</span>
+    <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;tensorflow-gpu&quot;</span><span class="p">,</span> <span class="s2">&quot;tensorflow-cpu&quot;</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Keras backend. If not specified will use system default.&quot;</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="run"><a class="viewcode-back" href="../../api.html#mhcflurry.train_allele_specific_models_command.run">[docs]</a><span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+    <span class="k">global</span> <span class="n">GLOBAL_DATA</span>
+
     <span class="c1"># On sigusr1 print stack trace</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;To show stack trace, run:</span><span class="se">\n</span><span class="s2">kill -s USR1 </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">())</span>
     <span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGUSR1</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">sig</span><span class="p">,</span> <span class="n">frame</span><span class="p">:</span> <span class="n">traceback</span><span class="o">.</span><span class="n">print_stack</span><span class="p">())</span>
 
     <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">backend</span><span class="p">:</span>
+        <span class="n">set_keras_backend</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">backend</span><span class="p">)</span>
 
     <span class="n">configure_logging</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">verbosity</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span>
 
@@ -276,6 +310,10 @@
         <span class="p">]</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Subselected to quantitative: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
 
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">ignore_inequalities</span> <span class="ow">and</span> <span class="s2">&quot;measurement_inequality&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Dropping measurement_inequality column&quot;</span><span class="p">)</span>
+        <span class="k">del</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;measurement_inequality&quot;</span><span class="p">]</span>
+
     <span class="n">allele_counts</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">allele</span><span class="p">:</span>
@@ -291,15 +329,18 @@
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Selected </span><span class="si">%d</span><span class="s2"> alleles: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">),</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">alleles</span><span class="p">)))</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Training data: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
 
+    <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;train_data&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span>
+
     <span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="p">()</span>
-    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">parallelization_num_jobs</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
         <span class="c1"># Serial run</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running in serial.&quot;</span><span class="p">)</span>
         <span class="n">worker_pool</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">worker_pool</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">(</span>
             <span class="n">processes</span><span class="o">=</span><span class="p">(</span>
-                <span class="n">args</span><span class="o">.</span><span class="n">parallelization_num_jobs</span>
-                <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">parallelization_num_jobs</span> <span class="k">else</span> <span class="kc">None</span><span class="p">))</span>
+                <span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">else</span> <span class="kc">None</span><span class="p">))</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Using worker pool: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">worker_pool</span><span class="p">))</span>
 
     <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">):</span>
@@ -307,6 +348,8 @@
         <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Done.&quot;</span><span class="p">)</span>
 
+    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">work_items</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">hyperparameters</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">hyperparameters_lst</span><span class="p">):</span>
         <span class="n">n_models</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="s1">&#39;n_models&#39;</span> <span class="ow">in</span> <span class="n">hyperparameters</span><span class="p">:</span>
@@ -319,10 +362,7 @@
         <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">max_epochs</span><span class="p">:</span>
             <span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;max_epochs&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">max_epochs</span>
 
-        <span class="n">work_items</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">total_data_to_train_on</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">sub_df</span><span class="p">))</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;allele&quot;</span><span class="p">)):</span>
-            <span class="n">total_data_to_train_on</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)</span> <span class="o">*</span> <span class="n">n_models</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">allele</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">unique</span><span class="p">()):</span>
             <span class="k">for</span> <span class="n">model_group</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_models</span><span class="p">):</span>
                 <span class="n">work_dict</span> <span class="o">=</span> <span class="p">{</span>
                     <span class="s1">&#39;model_group&#39;</span><span class="p">:</span> <span class="n">model_group</span><span class="p">,</span>
@@ -332,7 +372,7 @@
                     <span class="s1">&#39;hyperparameter_set_num&#39;</span><span class="p">:</span> <span class="n">h</span><span class="p">,</span>
                     <span class="s1">&#39;num_hyperparameter_sets&#39;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">hyperparameters_lst</span><span class="p">),</span>
                     <span class="s1">&#39;allele&#39;</span><span class="p">:</span> <span class="n">allele</span><span class="p">,</span>
-                    <span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">sub_df</span><span class="p">,</span>
+                    <span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># subselect from GLOBAL_DATA[&quot;train_data&quot;]</span>
                     <span class="s1">&#39;hyperparameters&#39;</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="p">,</span>
                     <span class="s1">&#39;verbose&#39;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">verbosity</span><span class="p">,</span>
                     <span class="s1">&#39;predictor&#39;</span><span class="p">:</span> <span class="n">predictor</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">worker_pool</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
@@ -340,55 +380,114 @@
                 <span class="p">}</span>
                 <span class="n">work_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">work_dict</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">worker_pool</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Processing </span><span class="si">%d</span><span class="s2"> work items in parallel.&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">))</span>
-            <span class="n">predictors</span> <span class="o">=</span> <span class="n">worker_pool</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">work_entrypoint</span><span class="p">,</span> <span class="n">work_items</span><span class="p">,</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Merging </span><span class="si">%d</span><span class="s2"> predictors fit in parallel.&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">predictors</span><span class="p">)))</span>
-            <span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">merge</span><span class="p">([</span><span class="n">predictor</span><span class="p">]</span> <span class="o">+</span> <span class="n">predictors</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Saving merged predictor to: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
-            <span class="n">predictor</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">worker_pool</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Processing </span><span class="si">%d</span><span class="s2"> work items in parallel.&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">))</span>
+
+        <span class="c1"># We sort here so the predictors are in order of hyperparameter set num.</span>
+        <span class="c1"># This is convenient so that the neural networks get merged for each</span>
+        <span class="c1"># allele in the same order.</span>
+        <span class="n">predictors</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">predictor</span> <span class="k">for</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">predictor</span><span class="p">)</span>
+            <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span>
+                <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span>
+                    <span class="n">worker_pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span>
+                        <span class="n">train_model_entrypoint</span><span class="p">,</span> <span class="n">work_items</span><span class="p">,</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+                    <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">)),</span>
+                <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">pair</span><span class="p">:</span> <span class="n">pair</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="p">]</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Merging </span><span class="si">%d</span><span class="s2"> predictors fit in parallel.&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">predictors</span><span class="p">)))</span>
+        <span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">merge</span><span class="p">([</span><span class="n">predictor</span><span class="p">]</span> <span class="o">+</span> <span class="n">predictors</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Saving merged predictor to: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
+        <span class="n">predictor</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Run in serial. In this case, every worker is passed the same predictor,</span>
+        <span class="c1"># which it adds models to, so no merging is required. It also saves</span>
+        <span class="c1"># as it goes so no saving is required at the end.</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">trange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">)):</span>
+            <span class="n">item</span> <span class="o">=</span> <span class="n">work_items</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># want to keep freeing up memory</span>
+            <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">work_predictor</span><span class="p">)</span> <span class="o">=</span> <span class="n">train_model_entrypoint</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="n">work_predictor</span> <span class="ow">is</span> <span class="n">predictor</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">work_items</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;*&quot;</span> <span class="o">*</span> <span class="mi">30</span><span class="p">)</span>
+    <span class="n">training_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Trained affinity predictor with </span><span class="si">%d</span><span class="s2"> networks in </span><span class="si">%0.2f</span><span class="s2"> min.&quot;</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">predictor</span><span class="o">.</span><span class="n">neural_networks</span><span class="p">),</span> <span class="n">training_time</span> <span class="o">/</span> <span class="mf">60.0</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;*&quot;</span> <span class="o">*</span> <span class="mi">30</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">worker_pool</span><span class="p">:</span>
+        <span class="n">worker_pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">worker_pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+        <span class="n">worker_pool</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">percent_rank_calibration_num_peptides_per_length</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">alleles</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">predictor</span><span class="o">.</span><span class="n">supported_alleles</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Performing percent rank calibration. Encoding peptides.&quot;</span><span class="p">)</span>
+        <span class="n">encoded_peptides</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">calibrate_percentile_ranks</span><span class="p">(</span>
+            <span class="n">alleles</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># don&#39;t actually do any calibration, just return peptides</span>
+            <span class="n">num_peptides_per_length</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">percent_rank_calibration_num_peptides_per_length</span><span class="p">)</span>
+
+        <span class="c1"># Now we encode the peptides for each neural network, so the encoding</span>
+        <span class="c1"># becomes cached.</span>
+        <span class="k">for</span> <span class="n">network</span> <span class="ow">in</span> <span class="n">predictor</span><span class="o">.</span><span class="n">neural_networks</span><span class="p">:</span>
+            <span class="n">network</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">encoded_peptides</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">encoded_peptides</span><span class="o">.</span><span class="n">encoding_cache</span>  <span class="c1"># must have cached the encoding</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Finished encoding peptides for percent ranks in </span><span class="si">%0.2f</span><span class="s2"> sec.&quot;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">))</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Calibrating percent rank calibration for </span><span class="si">%d</span><span class="s2"> alleles.&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># Serial run</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running in serial.&quot;</span><span class="p">)</span>
+            <span class="n">worker_pool</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">results</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">calibrate_percentile_ranks</span><span class="p">(</span>
+                    <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
+                    <span class="n">predictor</span><span class="o">=</span><span class="n">predictor</span><span class="p">,</span>
+                    <span class="n">peptides</span><span class="o">=</span><span class="n">encoded_peptides</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Run in serial. In this case, every worker is passed the same predictor,</span>
-            <span class="c1"># which it adds models to, so no merging is required. It also saves</span>
-            <span class="c1"># as it goes so no saving is required at the end.</span>
-            <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-            <span class="n">data_trained_on</span> <span class="o">=</span> <span class="mi">0</span>
-            <span class="k">while</span> <span class="n">work_items</span><span class="p">:</span>
-                <span class="n">item</span> <span class="o">=</span> <span class="n">work_items</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-                <span class="n">work_predictor</span> <span class="o">=</span> <span class="n">work_entrypoint</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-                <span class="k">assert</span> <span class="n">work_predictor</span> <span class="ow">is</span> <span class="n">predictor</span>
+            <span class="c1"># Parallel run</span>
+            <span class="c1"># Store peptides in global variable so they are in shared memory</span>
+            <span class="c1"># after fork, instead of needing to be pickled.</span>
+            <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;calibration_peptides&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">encoded_peptides</span>
+            <span class="n">worker_pool</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">(</span>
+                <span class="n">processes</span><span class="o">=</span><span class="p">(</span>
+                    <span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">else</span> <span class="kc">None</span><span class="p">))</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Using worker pool: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">worker_pool</span><span class="p">))</span>
+            <span class="n">results</span> <span class="o">=</span> <span class="n">worker_pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span>
+                <span class="n">partial</span><span class="p">(</span>
+                    <span class="n">calibrate_percentile_ranks</span><span class="p">,</span>
+                    <span class="n">predictor</span><span class="o">=</span><span class="n">predictor</span><span class="p">),</span>
+                <span class="n">alleles</span><span class="p">,</span>
+                <span class="n">chunksize</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
-                <span class="c1"># When running in serial we try to estimate time remaining.</span>
-                <span class="n">data_trained_on</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">])</span>
-                <span class="n">progress</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">data_trained_on</span><span class="p">)</span> <span class="o">/</span> <span class="n">total_data_to_train_on</span>
-                <span class="n">time_elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
-                <span class="n">total_time</span> <span class="o">=</span> <span class="n">time_elapsed</span> <span class="o">/</span> <span class="n">progress</span>
-                <span class="nb">print</span><span class="p">(</span>
-                    <span class="s2">&quot;Estimated total training time: </span><span class="si">%0.2f</span><span class="s2"> min, &quot;</span>
-                    <span class="s2">&quot;remaining: </span><span class="si">%0.2f</span><span class="s2"> min&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                        <span class="n">total_time</span> <span class="o">/</span> <span class="mi">60</span><span class="p">,</span>
-                        <span class="p">(</span><span class="n">total_time</span> <span class="o">-</span> <span class="n">time_elapsed</span><span class="p">)</span> <span class="o">/</span> <span class="mi">60</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">)):</span>
+            <span class="n">predictor</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
 
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Done calibrating </span><span class="si">%d</span><span class="s2"> additional alleles.&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">))</span>
+        <span class="n">predictor</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">,</span> <span class="n">model_names_to_write</span><span class="o">=</span><span class="p">[])</span>
+
+    <span class="n">percent_rank_calibration_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
 
     <span class="k">if</span> <span class="n">worker_pool</span><span class="p">:</span>
         <span class="n">worker_pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
         <span class="n">worker_pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
 
-    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">percent_rank_calibration_num_peptides_per_length</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Performing percent rank calibration.&quot;</span><span class="p">)</span>
-        <span class="n">predictor</span><span class="o">.</span><span class="n">calibrate_percentile_ranks</span><span class="p">(</span>
-            <span class="n">num_peptides_per_length</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">percent_rank_calibration_num_peptides_per_length</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Finished calibrating percent ranks in </span><span class="si">%0.2f</span><span class="s2"> sec.&quot;</span> <span class="o">%</span> <span class="p">(</span>
-            <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">))</span>
-        <span class="n">predictor</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">,</span> <span class="n">model_names_to_write</span><span class="o">=</span><span class="p">[])</span></div>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Train time: </span><span class="si">%0.2f</span><span class="s2"> min. Percent rank calibration time: </span><span class="si">%0.2f</span><span class="s2"> min.&quot;</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="n">training_time</span> <span class="o">/</span> <span class="mf">60.0</span><span class="p">,</span> <span class="n">percent_rank_calibration_time</span> <span class="o">/</span> <span class="mf">60.0</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Predictor written to: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="work_entrypoint"><a class="viewcode-back" href="../../api.html#mhcflurry.train_allele_specific_models_command.work_entrypoint">[docs]</a><span class="k">def</span> <span class="nf">work_entrypoint</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">process_work</span><span class="p">(</span><span class="o">**</span><span class="n">item</span><span class="p">)</span></div>
+<div class="viewcode-block" id="train_model_entrypoint"><a class="viewcode-back" href="../../api.html#mhcflurry.train_allele_specific_models_command.train_model_entrypoint">[docs]</a><span class="k">def</span> <span class="nf">train_model_entrypoint</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">train_model</span><span class="p">(</span><span class="o">**</span><span class="n">item</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="process_work"><a class="viewcode-back" href="../../api.html#mhcflurry.train_allele_specific_models_command.process_work">[docs]</a><span class="k">def</span> <span class="nf">process_work</span><span class="p">(</span>
+<div class="viewcode-block" id="train_model"><a class="viewcode-back" href="../../api.html#mhcflurry.train_allele_specific_models_command.train_model">[docs]</a><span class="k">def</span> <span class="nf">train_model</span><span class="p">(</span>
         <span class="n">model_group</span><span class="p">,</span>
         <span class="n">n_models</span><span class="p">,</span>
         <span class="n">allele_num</span><span class="p">,</span>
@@ -405,6 +504,10 @@
     <span class="k">if</span> <span class="n">predictor</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="p">()</span>
 
+    <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">full_data</span> <span class="o">=</span> <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;train_data&quot;</span><span class="p">]</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">full_data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">full_data</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="n">allele</span><span class="p">]</span>
+
     <span class="n">progress_preamble</span> <span class="o">=</span> <span class="p">(</span>
         <span class="s2">&quot;[</span><span class="si">%2d</span><span class="s2"> / </span><span class="si">%2d</span><span class="s2"> hyperparameters] &quot;</span>
         <span class="s2">&quot;[</span><span class="si">%4d</span><span class="s2"> / </span><span class="si">%4d</span><span class="s2"> alleles] &quot;</span>
@@ -420,22 +523,42 @@
     <span class="n">train_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">frac</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
     <span class="p">(</span><span class="n">model</span><span class="p">,)</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">fit_allele_specific_predictors</span><span class="p">(</span>
         <span class="n">n_models</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-        <span class="n">architecture_hyperparameters</span><span class="o">=</span><span class="n">hyperparameters</span><span class="p">,</span>
+        <span class="n">architecture_hyperparameters_list</span><span class="o">=</span><span class="p">[</span><span class="n">hyperparameters</span><span class="p">],</span>
         <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
         <span class="n">peptides</span><span class="o">=</span><span class="n">train_data</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
         <span class="n">affinities</span><span class="o">=</span><span class="n">train_data</span><span class="o">.</span><span class="n">measurement_value</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+        <span class="n">inequalities</span><span class="o">=</span><span class="p">(</span>
+            <span class="n">train_data</span><span class="o">.</span><span class="n">measurement_inequality</span><span class="o">.</span><span class="n">values</span>
+            <span class="k">if</span> <span class="s2">&quot;measurement_inequality&quot;</span> <span class="ow">in</span> <span class="n">train_data</span><span class="o">.</span><span class="n">columns</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
         <span class="n">models_dir_for_save</span><span class="o">=</span><span class="n">save_to</span><span class="p">,</span>
         <span class="n">progress_preamble</span><span class="o">=</span><span class="n">progress_preamble</span><span class="p">,</span>
         <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">allele_num</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">model_group</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="c1"># For the first model for the first allele, print the architecture.</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;*** HYPERPARAMETER SET </span><span class="si">%d</span><span class="s2">***&quot;</span> <span class="o">%</span>
+              <span class="p">(</span><span class="n">hyperparameter_set_num</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="n">pprint</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;*** ARCHITECTURE FOR HYPERPARAMETER SET </span><span class="si">%d</span><span class="s2">***&quot;</span> <span class="o">%</span>
               <span class="p">(</span><span class="n">hyperparameter_set_num</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
         <span class="n">model</span><span class="o">.</span><span class="n">network</span><span class="p">(</span><span class="n">borrow</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
 
-    <span class="k">return</span> <span class="n">predictor</span></div>
+    <span class="k">return</span> <span class="p">(</span><span class="n">hyperparameter_set_num</span><span class="p">,</span> <span class="n">predictor</span><span class="p">)</span></div>
 
+
+<div class="viewcode-block" id="calibrate_percentile_ranks"><a class="viewcode-back" href="../../api.html#mhcflurry.train_allele_specific_models_command.calibrate_percentile_ranks">[docs]</a><span class="k">def</span> <span class="nf">calibrate_percentile_ranks</span><span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">predictor</span><span class="p">,</span> <span class="n">peptides</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Private helper function.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">GLOBAL_DATA</span>
+    <span class="k">if</span> <span class="n">peptides</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">peptides</span> <span class="o">=</span> <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;calibration_peptides&quot;</span><span class="p">]</span>
+    <span class="n">predictor</span><span class="o">.</span><span class="n">calibrate_percentile_ranks</span><span class="p">(</span>
+        <span class="n">peptides</span><span class="o">=</span><span class="n">peptides</span><span class="p">,</span>
+        <span class="n">alleles</span><span class="o">=</span><span class="p">[</span><span class="n">allele</span><span class="p">])</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="n">allele</span><span class="p">:</span> <span class="n">predictor</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="p">[</span><span class="n">allele</span><span class="p">],</span>
+    <span class="p">}</span></div>
 
 
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
@@ -455,7 +578,7 @@
   <div role="contentinfo">
     <p>
         &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Dec 22, 2017.
+      Last updated on Feb 06, 2018.
 
     </p>
   </div>
@@ -477,7 +600,7 @@
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../../',
-            VERSION:'1.0.0',
+            VERSION:'1.1.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

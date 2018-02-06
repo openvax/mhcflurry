@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>API Documentation &mdash; MHCflurry 1.0.0 documentation</title>
+  <title>API Documentation &mdash; MHCflurry 1.1.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="MHCflurry 1.0.0 documentation" href="index.html"/>
+    <link rel="top" title="MHCflurry 1.1.0 documentation" href="index.html"/>
         <link rel="prev" title="Command-line reference" href="commandline_tools.html"/> 
 
   
@@ -63,7 +63,7 @@
             
             
               <div class="version">
-                1.0.0
+                1.1.0
               </div>
             
           
@@ -96,19 +96,23 @@
 <li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.allele_encoding">mhcflurry.allele_encoding module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.amino_acid">mhcflurry.amino_acid module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.class1_affinity_predictor">mhcflurry.class1_affinity_predictor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.class1_neural_network">mhcflurry.class1_neural_network module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.common">mhcflurry.common module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.custom_loss">mhcflurry.custom_loss module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.downloads">mhcflurry.downloads module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.downloads_command">mhcflurry.downloads_command module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.encodable_sequences">mhcflurry.encodable_sequences module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.ensemble_centrality">mhcflurry.ensemble_centrality module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.hyperparameters">mhcflurry.hyperparameters module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.percent_rank_transform">mhcflurry.percent_rank_transform module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.predict_command">mhcflurry.predict_command module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.regression_target">mhcflurry.regression_target module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.scoring">mhcflurry.scoring module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.train_allele_specific_models_command">mhcflurry.train_allele_specific_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mhcflurry.version">mhcflurry.version module</a></li>
 </ul>
 </li>
 </ul>
@@ -178,7 +182,7 @@
 <span id="id1"></span><span id="api-documentation"></span><h1>API Documentation<a class="headerlink" href="#module-mhcflurry" title="Permalink to this headline">¶</a></h1>
 <dl class="class">
 <dt id="mhcflurry.Class1AffinityPredictor">
-<em class="property">class </em><code class="descclassname">mhcflurry.</code><code class="descname">Class1AffinityPredictor</code><span class="sig-paren">(</span><em>allele_to_allele_specific_models=None</em>, <em>class1_pan_allele_models=None</em>, <em>allele_to_pseudosequence=None</em>, <em>manifest_df=None</em>, <em>allele_to_percent_rank_transform=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">mhcflurry.</code><code class="descname">Class1AffinityPredictor</code><span class="sig-paren">(</span><em>allele_to_allele_specific_models=None</em>, <em>class1_pan_allele_models=None</em>, <em>allele_to_fixed_length_sequence=None</em>, <em>manifest_df=None</em>, <em>allele_to_percent_rank_transform=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
 <p>High-level interface for peptide/MHC I binding affinity prediction.</p>
 <p>This class manages low-level <a class="reference internal" href="#mhcflurry.Class1NeuralNetwork" title="mhcflurry.Class1NeuralNetwork"><code class="xref py py-obj docutils literal"><span class="pre">Class1NeuralNetwork</span></code></a> instances, each of which
@@ -197,7 +201,7 @@ saving.</p>
 <blockquote>
 <div><p>Ensemble of pan-allele models.</p>
 </div></blockquote>
-<p><strong>allele_to_pseudosequence</strong> : dict of string -&gt; string</p>
+<p><strong>allele_to_fixed_length_sequence</strong> : dict of string -&gt; string</p>
 <blockquote>
 <div><p>Required only if class1_pan_allele_models is specified.</p>
 </div></blockquote>
@@ -218,7 +222,7 @@ automatically based on the supplied models.</p>
 </table>
 <dl class="method">
 <dt id="mhcflurry.Class1AffinityPredictor.calibrate_percentile_ranks">
-<code class="descname">calibrate_percentile_ranks</code><span class="sig-paren">(</span><em>peptides=None</em>, <em>num_peptides_per_length=100000</em>, <em>alleles=None</em>, <em>bins=None</em>, <em>quiet=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.calibrate_percentile_ranks"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor.calibrate_percentile_ranks" title="Permalink to this definition">¶</a></dt>
+<code class="descname">calibrate_percentile_ranks</code><span class="sig-paren">(</span><em>peptides=None</em>, <em>num_peptides_per_length=100000</em>, <em>alleles=None</em>, <em>bins=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.calibrate_percentile_ranks"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor.calibrate_percentile_ranks" title="Permalink to this definition">¶</a></dt>
 <dd><p>Compute the cumulative distribution of ic50 values for a set of alleles
 over a large universe of random peptides, to enable computing quantiles in
 this distribution later.</p>
@@ -226,7 +230,7 @@ this distribution later.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>peptides</strong> : sequence of string, optional</p>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>peptides</strong> : sequence of string or EncodableSequences, optional</p>
 <blockquote>
 <div><p>Peptides to use</p>
 </div></blockquote>
@@ -247,10 +251,9 @@ alleles will be calibrated.</p>
 can be used here, i.e. either an integer or a sequence giving bin
 edges. This is in ic50 space.</p>
 </div></blockquote>
-<p><strong>quiet</strong> : boolean</p>
-<blockquote class="last">
-<div><p>If False (default), status updates will be printed to stdout.</p>
-</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><strong>EncodableSequences</strong> : peptides used for calibration</p>
 </td>
 </tr>
 </tbody>
@@ -259,7 +262,7 @@ edges. This is in ic50 space.</p>
 
 <dl class="method">
 <dt id="mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors">
-<code class="descname">fit_allele_specific_predictors</code><span class="sig-paren">(</span><em>n_models</em>, <em>architecture_hyperparameters</em>, <em>allele</em>, <em>peptides</em>, <em>affinities</em>, <em>models_dir_for_save=None</em>, <em>verbose=1</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.fit_allele_specific_predictors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors" title="Permalink to this definition">¶</a></dt>
+<code class="descname">fit_allele_specific_predictors</code><span class="sig-paren">(</span><em>n_models</em>, <em>architecture_hyperparameters_list</em>, <em>allele</em>, <em>peptides</em>, <em>affinities</em>, <em>inequalities=None</em>, <em>models_dir_for_save=None</em>, <em>verbose=0</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.fit_allele_specific_predictors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors" title="Permalink to this definition">¶</a></dt>
 <dd><p>Fit one or more allele specific predictors for a single allele using a
 single neural network architecture.</p>
 <p>The new predictors are saved in the Class1AffinityPredictor instance
@@ -272,12 +275,21 @@ and will be used on subsequent calls to <a class="reference internal" href="#mhc
 <blockquote>
 <div><p>Number of neural networks to fit</p>
 </div></blockquote>
-<p><strong>architecture_hyperparameters</strong> : dict</p>
+<p><strong>architecture_hyperparameters_list</strong> : list of dict</p>
+<blockquote>
+<div><p>List of hyperparameters. If more than one set of hyperparameters
+are specified, model selection over them is performed and model
+with the lowest validation loss is selected for each fold.</p>
+</div></blockquote>
 <p><strong>allele</strong> : string</p>
 <p><strong>peptides</strong> : <code class="xref py py-obj docutils literal"><span class="pre">EncodableSequences</span></code> or list of string</p>
 <p><strong>affinities</strong> : list of float</p>
 <blockquote>
 <div><p>nM affinities</p>
+</div></blockquote>
+<p><strong>inequalities</strong> : list of string, each element one of “&gt;”, “&lt;”, or “=”</p>
+<blockquote>
+<div><p>See Class1NeuralNetwork.fit for details.</p>
 </div></blockquote>
 <p><strong>models_dir_for_save</strong> : string, optional</p>
 <blockquote>
@@ -303,7 +315,7 @@ to the given models dir after each neural network is fit.</p>
 
 <dl class="method">
 <dt id="mhcflurry.Class1AffinityPredictor.fit_class1_pan_allele_models">
-<code class="descname">fit_class1_pan_allele_models</code><span class="sig-paren">(</span><em>n_models</em>, <em>architecture_hyperparameters</em>, <em>alleles</em>, <em>peptides</em>, <em>affinities</em>, <em>models_dir_for_save=None</em>, <em>verbose=1</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.fit_class1_pan_allele_models"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor.fit_class1_pan_allele_models" title="Permalink to this definition">¶</a></dt>
+<code class="descname">fit_class1_pan_allele_models</code><span class="sig-paren">(</span><em>n_models</em>, <em>architecture_hyperparameters</em>, <em>alleles</em>, <em>peptides</em>, <em>affinities</em>, <em>inequalities</em>, <em>models_dir_for_save=None</em>, <em>verbose=1</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.fit_class1_pan_allele_models"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor.fit_class1_pan_allele_models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Fit one or more pan-allele predictors using a single neural network
 architecture.</p>
 <p>The new predictors are saved in the Class1AffinityPredictor instance
@@ -319,12 +331,16 @@ and will be used on subsequent calls to <a class="reference internal" href="#mhc
 <p><strong>architecture_hyperparameters</strong> : dict</p>
 <p><strong>alleles</strong> : list of string</p>
 <blockquote>
-<div><p>Allele names (not pseudosequences) corresponding to each peptide</p>
+<div><p>Allele names (not sequences) corresponding to each peptide</p>
 </div></blockquote>
 <p><strong>peptides</strong> : <code class="xref py py-obj docutils literal"><span class="pre">EncodableSequences</span></code> or list of string</p>
 <p><strong>affinities</strong> : list of float</p>
 <blockquote>
 <div><p>nM affinities</p>
+</div></blockquote>
+<p><strong>inequalities</strong> : list of string, each element one of “&gt;”, “&lt;”, or “=”</p>
+<blockquote>
+<div><p>See Class1NeuralNetwork.fit for details.</p>
 </div></blockquote>
 <p><strong>models_dir_for_save</strong> : string, optional</p>
 <blockquote>
@@ -479,7 +495,7 @@ for those percentile ranks.</p>
 
 <dl class="method">
 <dt id="mhcflurry.Class1AffinityPredictor.predict">
-<code class="descname">predict</code><span class="sig-paren">(</span><em>peptides</em>, <em>alleles=None</em>, <em>allele=None</em>, <em>throw=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.predict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor.predict" title="Permalink to this definition">¶</a></dt>
+<code class="descname">predict</code><span class="sig-paren">(</span><em>peptides</em>, <em>alleles=None</em>, <em>allele=None</em>, <em>throw=True</em>, <em>centrality_measure='robust_mean'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.predict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor.predict" title="Permalink to this definition">¶</a></dt>
 <dd><p>Predict nM binding affinities.</p>
 <p>If multiple predictors are available for an allele, the predictions are
 the geometric means of the individual model predictions.</p>
@@ -500,6 +516,11 @@ corresponding to each peptide.</p>
 alleles or peptide lengths. If False, a warning will be logged and
 the predictions for the unsupported alleles or peptides will be NaN.</p>
 </div></blockquote>
+<p><strong>centrality_measure</strong> : string or callable</p>
+<blockquote>
+<div><p>Measure of central tendency to use to combine predictions in the
+ensemble. Options include: mean, median, robust_mean.</p>
+</div></blockquote>
 </td>
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">numpy.array of predictions</p>
@@ -511,7 +532,7 @@ the predictions for the unsupported alleles or peptides will be NaN.</p>
 
 <dl class="method">
 <dt id="mhcflurry.Class1AffinityPredictor.predict_to_dataframe">
-<code class="descname">predict_to_dataframe</code><span class="sig-paren">(</span><em>peptides</em>, <em>alleles=None</em>, <em>allele=None</em>, <em>throw=True</em>, <em>include_individual_model_predictions=False</em>, <em>include_percentile_ranks=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.predict_to_dataframe"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor.predict_to_dataframe" title="Permalink to this definition">¶</a></dt>
+<code class="descname">predict_to_dataframe</code><span class="sig-paren">(</span><em>peptides</em>, <em>alleles=None</em>, <em>allele=None</em>, <em>throw=True</em>, <em>include_individual_model_predictions=False</em>, <em>include_percentile_ranks=True</em>, <em>centrality_measure='robust_mean'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.predict_to_dataframe"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1AffinityPredictor.predict_to_dataframe" title="Permalink to this definition">¶</a></dt>
 <dd><p>Predict nM binding affinities. Gives more detailed output than <a class="reference internal" href="#mhcflurry.Class1AffinityPredictor.predict" title="mhcflurry.Class1AffinityPredictor.predict"><code class="xref py py-obj docutils literal"><span class="pre">predict</span></code></a>
 method, including 5-95% prediction intervals.</p>
 <p>If multiple predictors are available for an allele, the predictions are
@@ -544,6 +565,11 @@ columns in the result dataframe.</p>
 percentile ranks. If no percentile rank information is available,
 this will be ignored with a warning.</p>
 </div></blockquote>
+<p><strong>centrality_measure</strong> : string or callable</p>
+<blockquote>
+<div><p>Measure of central tendency to use to combine predictions in the
+ensemble. Options include: mean, median, robust_mean.</p>
+</div></blockquote>
 </td>
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><code class="xref py py-obj docutils literal"><span class="pre">pandas.DataFrame</span></code> of predictions</p>
@@ -561,8 +587,9 @@ not exist it will be created.</p>
 <p>The serialization format consists of a file called “manifest.csv” with
 the configurations of each Class1NeuralNetwork, along with per-network
 files giving the model weights. If there are pan-allele predictors in
-the ensemble, the allele pseudosequences are also stored in the
-directory.</p>
+the ensemble, the allele sequences are also stored in the
+directory. There is also a small file “index.txt” with basic metadata:
+when the models were trained, by whom, on what host.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -666,6 +693,39 @@ interface and supports ensembles.</p>
 <code class="descname">KERAS_MODELS_CACHE</code><em class="property"> = {}</em><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.KERAS_MODELS_CACHE" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
+<dl class="method">
+<dt id="mhcflurry.Class1NeuralNetwork.allele_encoding_to_network_input">
+<code class="descname">allele_encoding_to_network_input</code><span class="sig-paren">(</span><em>allele_encoding</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.allele_encoding_to_network_input"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.allele_encoding_to_network_input" title="Permalink to this definition">¶</a></dt>
+<dd><p>Encode alleles to the fixed-length encoding expected by the neural
+network (which depends on the architecture).</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>allele_encoding</strong> : AlleleEncoding</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">numpy.array</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="mhcflurry.Class1NeuralNetwork.apply_hyperparameter_renames">
+<em class="property">classmethod </em><code class="descname">apply_hyperparameter_renames</code><span class="sig-paren">(</span><em>hyperparameters</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.apply_hyperparameter_renames"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.apply_hyperparameter_renames" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle hyperparameter renames.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>hyperparameters</strong> : dict</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><strong>dict</strong> : updated hyperparameters</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 <dl class="classmethod">
 <dt id="mhcflurry.Class1NeuralNetwork.borrow_cached_network">
 <em class="property">classmethod </em><code class="descname">borrow_cached_network</code><span class="sig-paren">(</span><em>klass</em>, <em>network_json</em>, <em>network_weights</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.borrow_cached_network"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.borrow_cached_network" title="Permalink to this definition">¶</a></dt>
@@ -691,10 +751,10 @@ hold a lock while using the returned object.</p>
 </table>
 </dd></dl>
 
-<dl class="method">
-<dt id="mhcflurry.Class1NeuralNetwork.compile">
-<code class="descname">compile</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.compile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.compile" title="Permalink to this definition">¶</a></dt>
-<dd><p>Compile the keras model. Used internally.</p>
+<dl class="classmethod">
+<dt id="mhcflurry.Class1NeuralNetwork.clear_model_cache">
+<em class="property">classmethod </em><code class="descname">clear_model_cache</code><span class="sig-paren">(</span><em>klass</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.clear_model_cache"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.clear_model_cache" title="Permalink to this definition">¶</a></dt>
+<dd><p>Clear the Keras model cache.</p>
 </dd></dl>
 
 <dl class="attribute">
@@ -709,7 +769,7 @@ hold a lock while using the returned object.</p>
 
 <dl class="method">
 <dt id="mhcflurry.Class1NeuralNetwork.fit">
-<code class="descname">fit</code><span class="sig-paren">(</span><em>peptides</em>, <em>affinities</em>, <em>allele_pseudosequences=None</em>, <em>sample_weights=None</em>, <em>verbose=1</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.fit" title="Permalink to this definition">¶</a></dt>
+<code class="descname">fit</code><span class="sig-paren">(</span><em>peptides</em>, <em>affinities</em>, <em>allele_encoding=None</em>, <em>inequalities=None</em>, <em>sample_weights=None</em>, <em>shuffle_permutation=None</em>, <em>verbose=1</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.fit" title="Permalink to this definition">¶</a></dt>
 <dd><p>Fit the neural network.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -720,15 +780,29 @@ hold a lock while using the returned object.</p>
 <blockquote>
 <div><p>nM affinities. Must be same length of as peptides.</p>
 </div></blockquote>
-<p><strong>allele_pseudosequences</strong> : EncodableSequences or list of string, optional</p>
+<p><strong>allele_encoding</strong> : AlleleEncoding, optional</p>
 <blockquote>
 <div><p>If not specified, the model will be a single-allele predictor.</p>
+</div></blockquote>
+<p><strong>inequalities</strong> : list of string, each element one of “&gt;”, “&lt;”, or “=”.</p>
+<blockquote>
+<div><p>Inequalities to use for fitting. Same length as affinities.
+Each element must be one of “&gt;”, “&lt;”, or “=”. For example, a “&gt;”
+will train on y_pred &gt; y_true for that element in the training set.
+Requires using a custom losses that support inequalities (e.g.
+mse_with_ineqalities).
+If None all inequalities are taken to be “=”.</p>
 </div></blockquote>
 <p><strong>sample_weights</strong> : list of float, optional</p>
 <blockquote>
 <div><p>If not specified, all samples (including random negatives added
 during training) will have equal weight. If specified, the random
 negatives will be assigned weight=1.0.</p>
+</div></blockquote>
+<p><strong>shuffle_permutation</strong> : list of int, optional</p>
+<blockquote>
+<div><p>Permutation (integer list) of same length as peptides and affinities
+If None, then a random permutation will be generated.</p>
 </div></blockquote>
 <p><strong>verbose</strong> : int</p>
 <blockquote>
@@ -751,7 +825,7 @@ negatives will be assigned weight=1.0.</p>
 
 <dl class="classmethod">
 <dt id="mhcflurry.Class1NeuralNetwork.from_config">
-<em class="property">classmethod </em><code class="descname">from_config</code><span class="sig-paren">(</span><em>config</em>, <em>weights=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.from_config"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.from_config" title="Permalink to this definition">¶</a></dt>
+<em class="property">classmethod </em><code class="descname">from_config</code><span class="sig-paren">(</span><em>config</em>, <em>weights=None</em>, <em>weights_loader=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.from_config"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.from_config" title="Permalink to this definition">¶</a></dt>
 <dd><p>deserialize from a dict returned by get_config().</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -761,6 +835,10 @@ negatives will be assigned weight=1.0.</p>
 <p><strong>weights</strong> : list of array, optional</p>
 <blockquote>
 <div><p>Network weights to restore</p>
+</div></blockquote>
+<p><strong>weights_loader</strong> : callable, optional</p>
+<blockquote>
+<div><p>Function to call (no arguments) to load weights when needed</p>
 </div></blockquote>
 </td>
 </tr>
@@ -807,13 +885,26 @@ negatives will be assigned weight=1.0.</p>
 <dd></dd></dl>
 
 <dl class="attribute">
+<dt id="mhcflurry.Class1NeuralNetwork.hyperparameter_renames">
+<code class="descname">hyperparameter_renames</code><em class="property"> = {'use_embedding': None, 'pseudosequence_use_embedding': None}</em><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.hyperparameter_renames" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
 <dt id="mhcflurry.Class1NeuralNetwork.input_encoding_hyperparameter_defaults">
 <code class="descname">input_encoding_hyperparameter_defaults</code><em class="property"> = &lt;mhcflurry.hyperparameters.HyperparameterDefaults object&gt;</em><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.input_encoding_hyperparameter_defaults" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
+<dl class="method">
+<dt id="mhcflurry.Class1NeuralNetwork.load_weights">
+<code class="descname">load_weights</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.load_weights"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.load_weights" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load weights by evaluating self.network_weights_loader, if needed.</p>
+<p>After calling this, self.network_weights_loader will be None and
+self.network_weights will be the weights list, if available.</p>
+</dd></dl>
+
 <dl class="staticmethod">
 <dt id="mhcflurry.Class1NeuralNetwork.make_network">
-<em class="property">static </em><code class="descname">make_network</code><span class="sig-paren">(</span><em>pseudosequence_length</em>, <em>kmer_size</em>, <em>peptide_amino_acid_encoding</em>, <em>use_embedding</em>, <em>embedding_input_dim</em>, <em>embedding_output_dim</em>, <em>pseudosequence_use_embedding</em>, <em>layer_sizes</em>, <em>dense_layer_l1_regularization</em>, <em>dense_layer_l2_regularization</em>, <em>activation</em>, <em>init</em>, <em>output_activation</em>, <em>dropout_probability</em>, <em>batch_normalization</em>, <em>embedding_init_method</em>, <em>locally_connected_layers</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.make_network"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.make_network" title="Permalink to this definition">¶</a></dt>
+<em class="property">static </em><code class="descname">make_network</code><span class="sig-paren">(</span><em>allele_encoding_dims</em>, <em>kmer_size</em>, <em>peptide_amino_acid_encoding</em>, <em>embedding_input_dim</em>, <em>embedding_output_dim</em>, <em>allele_dense_layer_sizes</em>, <em>peptide_dense_layer_sizes</em>, <em>peptide_allele_merge_method</em>, <em>peptide_allele_merge_activation</em>, <em>layer_sizes</em>, <em>dense_layer_l1_regularization</em>, <em>dense_layer_l2_regularization</em>, <em>activation</em>, <em>init</em>, <em>output_activation</em>, <em>dropout_probability</em>, <em>batch_normalization</em>, <em>embedding_init_method</em>, <em>locally_connected_layers</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.make_network"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.make_network" title="Permalink to this definition">¶</a></dt>
 <dd><p>Helper function to make a keras network for class1 affinity prediction.</p>
 </dd></dl>
 
@@ -863,14 +954,14 @@ network (which depends on the architecture).</p>
 
 <dl class="method">
 <dt id="mhcflurry.Class1NeuralNetwork.predict">
-<code class="descname">predict</code><span class="sig-paren">(</span><em>peptides</em>, <em>allele_pseudosequences=None</em>, <em>batch_size=4096</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.predict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.predict" title="Permalink to this definition">¶</a></dt>
+<code class="descname">predict</code><span class="sig-paren">(</span><em>peptides</em>, <em>allele_encoding=None</em>, <em>batch_size=4096</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.predict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.predict" title="Permalink to this definition">¶</a></dt>
 <dd><p>Predict affinities</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>peptides</strong> : EncodableSequences or list of string</p>
-<p><strong>allele_pseudosequences</strong> : EncodableSequences or list of string, optional</p>
+<p><strong>allele_pseudosequences</strong> : AlleleEncoding, optional</p>
 <blockquote>
 <div><p>Only required when this model is a pan-allele model</p>
 </div></blockquote>
@@ -882,23 +973,6 @@ network (which depends on the architecture).</p>
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">numpy.array of nM affinity predictions</p>
 </td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="mhcflurry.Class1NeuralNetwork.pseudosequence_to_network_input">
-<code class="descname">pseudosequence_to_network_input</code><span class="sig-paren">(</span><em>pseudosequences</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.pseudosequence_to_network_input"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.Class1NeuralNetwork.pseudosequence_to_network_input" title="Permalink to this definition">¶</a></dt>
-<dd><p>Encode pseudosequences to the fixed-length encoding expected by the neural
-network (which depends on the architecture).</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>pseudosequences</strong> : EncodableSequences or list of string</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">numpy.array</td>
 </tr>
 </tbody>
 </table>
@@ -927,6 +1001,56 @@ network (which depends on the architecture).</p>
 
 <div class="section" id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="module-mhcflurry.allele_encoding">
+<span id="mhcflurry-allele-encoding-module"></span><h2>mhcflurry.allele_encoding module<a class="headerlink" href="#module-mhcflurry.allele_encoding" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="mhcflurry.allele_encoding.AlleleEncoding">
+<em class="property">class </em><code class="descclassname">mhcflurry.allele_encoding.</code><code class="descname">AlleleEncoding</code><span class="sig-paren">(</span><em>alleles</em>, <em>allele_to_fixed_length_sequence=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/allele_encoding.html#AlleleEncoding"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.allele_encoding.AlleleEncoding" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>A place to cache encodings for a (potentially large) sequence of alleles.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>alleles</strong> : list of string</p>
+<blockquote>
+<div><p>Allele names</p>
+</div></blockquote>
+<p><strong>allele_to_fixed_length_sequence</strong> : dict of str -&gt; str</p>
+<blockquote class="last">
+<div><p>Allele name to fixed lengths sequence (“pseudosequence”)</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="mhcflurry.allele_encoding.AlleleEncoding.fixed_length_vector_encoded_sequences">
+<code class="descname">fixed_length_vector_encoded_sequences</code><span class="sig-paren">(</span><em>vector_encoding_name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/allele_encoding.html#AlleleEncoding.fixed_length_vector_encoded_sequences"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.allele_encoding.AlleleEncoding.fixed_length_vector_encoded_sequences" title="Permalink to this definition">¶</a></dt>
+<dd><p>Encode alleles.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>vector_encoding_name</strong> : string</p>
+<blockquote>
+<div><p>How to represent amino acids.
+One of “BLOSUM62”, “one-hot”, etc. Full list of supported vector
+encodings is given by available_vector_encodings() in amino_acid.</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">numpy.array with shape (num sequences, sequence length, m) where m is</p>
+<p class="last">vector_encoding_length(vector_encoding_name)</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 <div class="section" id="module-mhcflurry.amino_acid">
 <span id="mhcflurry-amino-acid-module"></span><h2>mhcflurry.amino_acid module<a class="headerlink" href="#module-mhcflurry.amino_acid" title="Permalink to this headline">¶</a></h2>
@@ -1013,7 +1137,7 @@ entirely by integer position in the dataframe.</p>
 <span id="mhcflurry-class1-affinity-predictor-module"></span><h2>mhcflurry.class1_affinity_predictor module<a class="headerlink" href="#module-mhcflurry.class1_affinity_predictor" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="mhcflurry.class1_affinity_predictor.Class1AffinityPredictor">
-<em class="property">class </em><code class="descclassname">mhcflurry.class1_affinity_predictor.</code><code class="descname">Class1AffinityPredictor</code><span class="sig-paren">(</span><em>allele_to_allele_specific_models=None</em>, <em>class1_pan_allele_models=None</em>, <em>allele_to_pseudosequence=None</em>, <em>manifest_df=None</em>, <em>allele_to_percent_rank_transform=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">mhcflurry.class1_affinity_predictor.</code><code class="descname">Class1AffinityPredictor</code><span class="sig-paren">(</span><em>allele_to_allele_specific_models=None</em>, <em>class1_pan_allele_models=None</em>, <em>allele_to_fixed_length_sequence=None</em>, <em>manifest_df=None</em>, <em>allele_to_percent_rank_transform=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
 <p>High-level interface for peptide/MHC I binding affinity prediction.</p>
 <p>This class manages low-level <code class="xref py py-obj docutils literal"><span class="pre">Class1NeuralNetwork</span></code> instances, each of which
@@ -1032,7 +1156,7 @@ saving.</p>
 <blockquote>
 <div><p>Ensemble of pan-allele models.</p>
 </div></blockquote>
-<p><strong>allele_to_pseudosequence</strong> : dict of string -&gt; string</p>
+<p><strong>allele_to_fixed_length_sequence</strong> : dict of string -&gt; string</p>
 <blockquote>
 <div><p>Required only if class1_pan_allele_models is specified.</p>
 </div></blockquote>
@@ -1120,8 +1244,9 @@ not exist it will be created.</p>
 <p>The serialization format consists of a file called “manifest.csv” with
 the configurations of each Class1NeuralNetwork, along with per-network
 files giving the model weights. If there are pan-allele predictors in
-the ensemble, the allele pseudosequences are also stored in the
-directory.</p>
+the ensemble, the allele sequences are also stored in the
+directory. There is also a small file “index.txt” with basic metadata:
+when the models were trained, by whom, on what host.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1206,7 +1331,7 @@ incremental updates during training.</p>
 
 <dl class="method">
 <dt id="mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.fit_allele_specific_predictors">
-<code class="descname">fit_allele_specific_predictors</code><span class="sig-paren">(</span><em>n_models</em>, <em>architecture_hyperparameters</em>, <em>allele</em>, <em>peptides</em>, <em>affinities</em>, <em>models_dir_for_save=None</em>, <em>verbose=1</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.fit_allele_specific_predictors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.fit_allele_specific_predictors" title="Permalink to this definition">¶</a></dt>
+<code class="descname">fit_allele_specific_predictors</code><span class="sig-paren">(</span><em>n_models</em>, <em>architecture_hyperparameters_list</em>, <em>allele</em>, <em>peptides</em>, <em>affinities</em>, <em>inequalities=None</em>, <em>models_dir_for_save=None</em>, <em>verbose=0</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.fit_allele_specific_predictors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.fit_allele_specific_predictors" title="Permalink to this definition">¶</a></dt>
 <dd><p>Fit one or more allele specific predictors for a single allele using a
 single neural network architecture.</p>
 <p>The new predictors are saved in the Class1AffinityPredictor instance
@@ -1219,12 +1344,21 @@ and will be used on subsequent calls to <a class="reference internal" href="#mhc
 <blockquote>
 <div><p>Number of neural networks to fit</p>
 </div></blockquote>
-<p><strong>architecture_hyperparameters</strong> : dict</p>
+<p><strong>architecture_hyperparameters_list</strong> : list of dict</p>
+<blockquote>
+<div><p>List of hyperparameters. If more than one set of hyperparameters
+are specified, model selection over them is performed and model
+with the lowest validation loss is selected for each fold.</p>
+</div></blockquote>
 <p><strong>allele</strong> : string</p>
 <p><strong>peptides</strong> : <code class="xref py py-obj docutils literal"><span class="pre">EncodableSequences</span></code> or list of string</p>
 <p><strong>affinities</strong> : list of float</p>
 <blockquote>
 <div><p>nM affinities</p>
+</div></blockquote>
+<p><strong>inequalities</strong> : list of string, each element one of “&gt;”, “&lt;”, or “=”</p>
+<blockquote>
+<div><p>See Class1NeuralNetwork.fit for details.</p>
 </div></blockquote>
 <p><strong>models_dir_for_save</strong> : string, optional</p>
 <blockquote>
@@ -1250,7 +1384,7 @@ to the given models dir after each neural network is fit.</p>
 
 <dl class="method">
 <dt id="mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.fit_class1_pan_allele_models">
-<code class="descname">fit_class1_pan_allele_models</code><span class="sig-paren">(</span><em>n_models</em>, <em>architecture_hyperparameters</em>, <em>alleles</em>, <em>peptides</em>, <em>affinities</em>, <em>models_dir_for_save=None</em>, <em>verbose=1</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.fit_class1_pan_allele_models"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.fit_class1_pan_allele_models" title="Permalink to this definition">¶</a></dt>
+<code class="descname">fit_class1_pan_allele_models</code><span class="sig-paren">(</span><em>n_models</em>, <em>architecture_hyperparameters</em>, <em>alleles</em>, <em>peptides</em>, <em>affinities</em>, <em>inequalities</em>, <em>models_dir_for_save=None</em>, <em>verbose=1</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.fit_class1_pan_allele_models"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.fit_class1_pan_allele_models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Fit one or more pan-allele predictors using a single neural network
 architecture.</p>
 <p>The new predictors are saved in the Class1AffinityPredictor instance
@@ -1266,12 +1400,16 @@ and will be used on subsequent calls to <a class="reference internal" href="#mhc
 <p><strong>architecture_hyperparameters</strong> : dict</p>
 <p><strong>alleles</strong> : list of string</p>
 <blockquote>
-<div><p>Allele names (not pseudosequences) corresponding to each peptide</p>
+<div><p>Allele names (not sequences) corresponding to each peptide</p>
 </div></blockquote>
 <p><strong>peptides</strong> : <code class="xref py py-obj docutils literal"><span class="pre">EncodableSequences</span></code> or list of string</p>
 <p><strong>affinities</strong> : list of float</p>
 <blockquote>
 <div><p>nM affinities</p>
+</div></blockquote>
+<p><strong>inequalities</strong> : list of string, each element one of “&gt;”, “&lt;”, or “=”</p>
+<blockquote>
+<div><p>See Class1NeuralNetwork.fit for details.</p>
 </div></blockquote>
 <p><strong>models_dir_for_save</strong> : string, optional</p>
 <blockquote>
@@ -1289,47 +1427,6 @@ to the given models dir after each neural network is fit.</p>
 </td>
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">list of <code class="xref py py-obj docutils literal"><span class="pre">Class1NeuralNetwork</span></code></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.calibrate_percentile_ranks">
-<code class="descname">calibrate_percentile_ranks</code><span class="sig-paren">(</span><em>peptides=None</em>, <em>num_peptides_per_length=100000</em>, <em>alleles=None</em>, <em>bins=None</em>, <em>quiet=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.calibrate_percentile_ranks"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.calibrate_percentile_ranks" title="Permalink to this definition">¶</a></dt>
-<dd><p>Compute the cumulative distribution of ic50 values for a set of alleles
-over a large universe of random peptides, to enable computing quantiles in
-this distribution later.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>peptides</strong> : sequence of string, optional</p>
-<blockquote>
-<div><p>Peptides to use</p>
-</div></blockquote>
-<p><strong>num_peptides_per_length</strong> : int, optional</p>
-<blockquote>
-<div><p>If peptides argument is not specified, then num_peptides_per_length
-peptides are randomly sampled from a uniform distribution for each
-supported length</p>
-</div></blockquote>
-<p><strong>alleles</strong> : sequence of string, optional</p>
-<blockquote>
-<div><p>Alleles to perform calibration for. If not specified all supported
-alleles will be calibrated.</p>
-</div></blockquote>
-<p><strong>bins</strong> : object</p>
-<blockquote>
-<div><p>Anything that can be passed to numpy.histogram’s “bins” argument
-can be used here, i.e. either an integer or a sequence giving bin
-edges. This is in ic50 space.</p>
-</div></blockquote>
-<p><strong>quiet</strong> : boolean</p>
-<blockquote class="last">
-<div><p>If False (default), status updates will be printed to stdout.</p>
-</div></blockquote>
 </td>
 </tr>
 </tbody>
@@ -1369,7 +1466,7 @@ for those percentile ranks.</p>
 
 <dl class="method">
 <dt id="mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.predict">
-<code class="descname">predict</code><span class="sig-paren">(</span><em>peptides</em>, <em>alleles=None</em>, <em>allele=None</em>, <em>throw=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.predict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.predict" title="Permalink to this definition">¶</a></dt>
+<code class="descname">predict</code><span class="sig-paren">(</span><em>peptides</em>, <em>alleles=None</em>, <em>allele=None</em>, <em>throw=True</em>, <em>centrality_measure='robust_mean'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.predict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.predict" title="Permalink to this definition">¶</a></dt>
 <dd><p>Predict nM binding affinities.</p>
 <p>If multiple predictors are available for an allele, the predictions are
 the geometric means of the individual model predictions.</p>
@@ -1390,6 +1487,11 @@ corresponding to each peptide.</p>
 alleles or peptide lengths. If False, a warning will be logged and
 the predictions for the unsupported alleles or peptides will be NaN.</p>
 </div></blockquote>
+<p><strong>centrality_measure</strong> : string or callable</p>
+<blockquote>
+<div><p>Measure of central tendency to use to combine predictions in the
+ensemble. Options include: mean, median, robust_mean.</p>
+</div></blockquote>
 </td>
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">numpy.array of predictions</p>
@@ -1401,7 +1503,7 @@ the predictions for the unsupported alleles or peptides will be NaN.</p>
 
 <dl class="method">
 <dt id="mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.predict_to_dataframe">
-<code class="descname">predict_to_dataframe</code><span class="sig-paren">(</span><em>peptides</em>, <em>alleles=None</em>, <em>allele=None</em>, <em>throw=True</em>, <em>include_individual_model_predictions=False</em>, <em>include_percentile_ranks=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.predict_to_dataframe"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.predict_to_dataframe" title="Permalink to this definition">¶</a></dt>
+<code class="descname">predict_to_dataframe</code><span class="sig-paren">(</span><em>peptides</em>, <em>alleles=None</em>, <em>allele=None</em>, <em>throw=True</em>, <em>include_individual_model_predictions=False</em>, <em>include_percentile_ranks=True</em>, <em>centrality_measure='robust_mean'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.predict_to_dataframe"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.predict_to_dataframe" title="Permalink to this definition">¶</a></dt>
 <dd><p>Predict nM binding affinities. Gives more detailed output than <a class="reference internal" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.predict" title="mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.predict"><code class="xref py py-obj docutils literal"><span class="pre">predict</span></code></a>
 method, including 5-95% prediction intervals.</p>
 <p>If multiple predictors are available for an allele, the predictions are
@@ -1433,6 +1535,11 @@ columns in the result dataframe.</p>
 <div><p>If True, a “prediction_percentile” column will be included giving the
 percentile ranks. If no percentile rank information is available,
 this will be ignored with a warning.</p>
+</div></blockquote>
+<p><strong>centrality_measure</strong> : string or callable</p>
+<blockquote>
+<div><p>Measure of central tendency to use to combine predictions in the
+ensemble. Options include: mean, median, robust_mean.</p>
 </div></blockquote>
 </td>
 </tr>
@@ -1479,6 +1586,46 @@ created with <a class="reference internal" href="#mhcflurry.class1_affinity_pred
 </td>
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">list of array</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.calibrate_percentile_ranks">
+<code class="descname">calibrate_percentile_ranks</code><span class="sig-paren">(</span><em>peptides=None</em>, <em>num_peptides_per_length=100000</em>, <em>alleles=None</em>, <em>bins=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_affinity_predictor.html#Class1AffinityPredictor.calibrate_percentile_ranks"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_affinity_predictor.Class1AffinityPredictor.calibrate_percentile_ranks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the cumulative distribution of ic50 values for a set of alleles
+over a large universe of random peptides, to enable computing quantiles in
+this distribution later.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>peptides</strong> : sequence of string or EncodableSequences, optional</p>
+<blockquote>
+<div><p>Peptides to use</p>
+</div></blockquote>
+<p><strong>num_peptides_per_length</strong> : int, optional</p>
+<blockquote>
+<div><p>If peptides argument is not specified, then num_peptides_per_length
+peptides are randomly sampled from a uniform distribution for each
+supported length</p>
+</div></blockquote>
+<p><strong>alleles</strong> : sequence of string, optional</p>
+<blockquote>
+<div><p>Alleles to perform calibration for. If not specified all supported
+alleles will be calibrated.</p>
+</div></blockquote>
+<p><strong>bins</strong> : object</p>
+<blockquote>
+<div><p>Anything that can be passed to numpy.histogram’s “bins” argument
+can be used here, i.e. either an integer or a sequence giving bin
+edges. This is in ic50 space.</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><strong>EncodableSequences</strong> : peptides used for calibration</p>
 </td>
 </tr>
 </tbody>
@@ -1539,10 +1686,37 @@ side in the variable length encoding.</p>
 </dd></dl>
 
 <dl class="attribute">
+<dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.hyperparameter_renames">
+<code class="descname">hyperparameter_renames</code><em class="property"> = {'use_embedding': None, 'pseudosequence_use_embedding': None}</em><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.hyperparameter_renames" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.apply_hyperparameter_renames">
+<em class="property">classmethod </em><code class="descname">apply_hyperparameter_renames</code><span class="sig-paren">(</span><em>hyperparameters</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.apply_hyperparameter_renames"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.apply_hyperparameter_renames" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle hyperparameter renames.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>hyperparameters</strong> : dict</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><strong>dict</strong> : updated hyperparameters</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="attribute">
 <dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.KERAS_MODELS_CACHE">
 <code class="descname">KERAS_MODELS_CACHE</code><em class="property"> = {}</em><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.KERAS_MODELS_CACHE" title="Permalink to this definition">¶</a></dt>
 <dd><p>Process-wide keras model cache, a map from: architecture JSON string to
 (Keras model, existing network weights)</p>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.clear_model_cache">
+<em class="property">classmethod </em><code class="descname">clear_model_cache</code><span class="sig-paren">(</span><em>klass</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.clear_model_cache"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.clear_model_cache" title="Permalink to this definition">¶</a></dt>
+<dd><p>Clear the Keras model cache.</p>
 </dd></dl>
 
 <dl class="classmethod">
@@ -1613,7 +1787,7 @@ borrow_cached_network for details</p>
 
 <dl class="classmethod">
 <dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.from_config">
-<em class="property">classmethod </em><code class="descname">from_config</code><span class="sig-paren">(</span><em>config</em>, <em>weights=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.from_config"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.from_config" title="Permalink to this definition">¶</a></dt>
+<em class="property">classmethod </em><code class="descname">from_config</code><span class="sig-paren">(</span><em>config</em>, <em>weights=None</em>, <em>weights_loader=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.from_config"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.from_config" title="Permalink to this definition">¶</a></dt>
 <dd><p>deserialize from a dict returned by get_config().</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1624,6 +1798,10 @@ borrow_cached_network for details</p>
 <blockquote>
 <div><p>Network weights to restore</p>
 </div></blockquote>
+<p><strong>weights_loader</strong> : callable, optional</p>
+<blockquote>
+<div><p>Function to call (no arguments) to load weights when needed</p>
+</div></blockquote>
 </td>
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Class1NeuralNetwork</p>
@@ -1631,6 +1809,14 @@ borrow_cached_network for details</p>
 </tr>
 </tbody>
 </table>
+</dd></dl>
+
+<dl class="method">
+<dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.load_weights">
+<code class="descname">load_weights</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.load_weights"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.load_weights" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load weights by evaluating self.network_weights_loader, if needed.</p>
+<p>After calling this, self.network_weights_loader will be None and
+self.network_weights will be the weights list, if available.</p>
 </dd></dl>
 
 <dl class="method">
@@ -1681,15 +1867,15 @@ network (which depends on the architecture).</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.pseudosequence_to_network_input">
-<code class="descname">pseudosequence_to_network_input</code><span class="sig-paren">(</span><em>pseudosequences</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.pseudosequence_to_network_input"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.pseudosequence_to_network_input" title="Permalink to this definition">¶</a></dt>
-<dd><p>Encode pseudosequences to the fixed-length encoding expected by the neural
+<dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.allele_encoding_to_network_input">
+<code class="descname">allele_encoding_to_network_input</code><span class="sig-paren">(</span><em>allele_encoding</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.allele_encoding_to_network_input"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.allele_encoding_to_network_input" title="Permalink to this definition">¶</a></dt>
+<dd><p>Encode alleles to the fixed-length encoding expected by the neural
 network (which depends on the architecture).</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>pseudosequences</strong> : EncodableSequences or list of string</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>allele_encoding</strong> : AlleleEncoding</td>
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">numpy.array</td>
 </tr>
@@ -1699,7 +1885,7 @@ network (which depends on the architecture).</p>
 
 <dl class="method">
 <dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.fit">
-<code class="descname">fit</code><span class="sig-paren">(</span><em>peptides</em>, <em>affinities</em>, <em>allele_pseudosequences=None</em>, <em>sample_weights=None</em>, <em>verbose=1</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.fit" title="Permalink to this definition">¶</a></dt>
+<code class="descname">fit</code><span class="sig-paren">(</span><em>peptides</em>, <em>affinities</em>, <em>allele_encoding=None</em>, <em>inequalities=None</em>, <em>sample_weights=None</em>, <em>shuffle_permutation=None</em>, <em>verbose=1</em>, <em>progress_preamble=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.fit" title="Permalink to this definition">¶</a></dt>
 <dd><p>Fit the neural network.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1710,15 +1896,29 @@ network (which depends on the architecture).</p>
 <blockquote>
 <div><p>nM affinities. Must be same length of as peptides.</p>
 </div></blockquote>
-<p><strong>allele_pseudosequences</strong> : EncodableSequences or list of string, optional</p>
+<p><strong>allele_encoding</strong> : AlleleEncoding, optional</p>
 <blockquote>
 <div><p>If not specified, the model will be a single-allele predictor.</p>
+</div></blockquote>
+<p><strong>inequalities</strong> : list of string, each element one of “&gt;”, “&lt;”, or “=”.</p>
+<blockquote>
+<div><p>Inequalities to use for fitting. Same length as affinities.
+Each element must be one of “&gt;”, “&lt;”, or “=”. For example, a “&gt;”
+will train on y_pred &gt; y_true for that element in the training set.
+Requires using a custom losses that support inequalities (e.g.
+mse_with_ineqalities).
+If None all inequalities are taken to be “=”.</p>
 </div></blockquote>
 <p><strong>sample_weights</strong> : list of float, optional</p>
 <blockquote>
 <div><p>If not specified, all samples (including random negatives added
 during training) will have equal weight. If specified, the random
 negatives will be assigned weight=1.0.</p>
+</div></blockquote>
+<p><strong>shuffle_permutation</strong> : list of int, optional</p>
+<blockquote>
+<div><p>Permutation (integer list) of same length as peptides and affinities
+If None, then a random permutation will be generated.</p>
 </div></blockquote>
 <p><strong>verbose</strong> : int</p>
 <blockquote>
@@ -1736,14 +1936,14 @@ negatives will be assigned weight=1.0.</p>
 
 <dl class="method">
 <dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.predict">
-<code class="descname">predict</code><span class="sig-paren">(</span><em>peptides</em>, <em>allele_pseudosequences=None</em>, <em>batch_size=4096</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.predict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.predict" title="Permalink to this definition">¶</a></dt>
+<code class="descname">predict</code><span class="sig-paren">(</span><em>peptides</em>, <em>allele_encoding=None</em>, <em>batch_size=4096</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.predict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.predict" title="Permalink to this definition">¶</a></dt>
 <dd><p>Predict affinities</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>peptides</strong> : EncodableSequences or list of string</p>
-<p><strong>allele_pseudosequences</strong> : EncodableSequences or list of string, optional</p>
+<p><strong>allele_pseudosequences</strong> : AlleleEncoding, optional</p>
 <blockquote>
 <div><p>Only required when this model is a pan-allele model</p>
 </div></blockquote>
@@ -1760,15 +1960,9 @@ negatives will be assigned weight=1.0.</p>
 </table>
 </dd></dl>
 
-<dl class="method">
-<dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.compile">
-<code class="descname">compile</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.compile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.compile" title="Permalink to this definition">¶</a></dt>
-<dd><p>Compile the keras model. Used internally.</p>
-</dd></dl>
-
 <dl class="staticmethod">
 <dt id="mhcflurry.class1_neural_network.Class1NeuralNetwork.make_network">
-<em class="property">static </em><code class="descname">make_network</code><span class="sig-paren">(</span><em>pseudosequence_length</em>, <em>kmer_size</em>, <em>peptide_amino_acid_encoding</em>, <em>use_embedding</em>, <em>embedding_input_dim</em>, <em>embedding_output_dim</em>, <em>pseudosequence_use_embedding</em>, <em>layer_sizes</em>, <em>dense_layer_l1_regularization</em>, <em>dense_layer_l2_regularization</em>, <em>activation</em>, <em>init</em>, <em>output_activation</em>, <em>dropout_probability</em>, <em>batch_normalization</em>, <em>embedding_init_method</em>, <em>locally_connected_layers</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.make_network"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.make_network" title="Permalink to this definition">¶</a></dt>
+<em class="property">static </em><code class="descname">make_network</code><span class="sig-paren">(</span><em>allele_encoding_dims</em>, <em>kmer_size</em>, <em>peptide_amino_acid_encoding</em>, <em>embedding_input_dim</em>, <em>embedding_output_dim</em>, <em>allele_dense_layer_sizes</em>, <em>peptide_dense_layer_sizes</em>, <em>peptide_allele_merge_method</em>, <em>peptide_allele_merge_activation</em>, <em>layer_sizes</em>, <em>dense_layer_l1_regularization</em>, <em>dense_layer_l2_regularization</em>, <em>activation</em>, <em>init</em>, <em>output_activation</em>, <em>dropout_probability</em>, <em>batch_normalization</em>, <em>embedding_init_method</em>, <em>locally_connected_layers</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/class1_neural_network.html#Class1NeuralNetwork.make_network"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.class1_neural_network.Class1NeuralNetwork.make_network" title="Permalink to this definition">¶</a></dt>
 <dd><p>Helper function to make a keras network for class1 affinity prediction.</p>
 </dd></dl>
 
@@ -1777,6 +1971,14 @@ negatives will be assigned weight=1.0.</p>
 </div>
 <div class="section" id="module-mhcflurry.common">
 <span id="mhcflurry-common-module"></span><h2>mhcflurry.common module<a class="headerlink" href="#module-mhcflurry.common" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="mhcflurry.common.set_keras_backend">
+<code class="descclassname">mhcflurry.common.</code><code class="descname">set_keras_backend</code><span class="sig-paren">(</span><em>backend</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/common.html#set_keras_backend"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.common.set_keras_backend" title="Permalink to this definition">¶</a></dt>
+<dd><p>Configure Keras backend to use GPU or CPU. Only tensorflow is supported.</p>
+<p>Must be called before Keras has been imported.</p>
+<p>backend must be ‘tensorflow-cpu’ or ‘tensorflow-gpu’.</p>
+</dd></dl>
+
 <dl class="function">
 <dt id="mhcflurry.common.configure_logging">
 <code class="descclassname">mhcflurry.common.</code><code class="descname">configure_logging</code><span class="sig-paren">(</span><em>verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/common.html#configure_logging"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.common.configure_logging" title="Permalink to this definition">¶</a></dt>
@@ -1850,6 +2052,64 @@ distribution is used.</p>
 </dd></dl>
 
 </div>
+<div class="section" id="module-mhcflurry.custom_loss">
+<span id="mhcflurry-custom-loss-module"></span><h2>mhcflurry.custom_loss module<a class="headerlink" href="#module-mhcflurry.custom_loss" title="Permalink to this headline">¶</a></h2>
+<p>Custom loss functions.</p>
+<p>For losses supporting inequalities, each training data point is associated with
+one of (=), (&lt;), or (&gt;). For e.g. (&gt;) inequalities, penalization is applied only
+if the prediction is less than the given value.</p>
+<dl class="class">
+<dt id="mhcflurry.custom_loss.MSEWithInequalities">
+<em class="property">class </em><code class="descclassname">mhcflurry.custom_loss.</code><code class="descname">MSEWithInequalities</code><a class="reference internal" href="_modules/mhcflurry/custom_loss.html#MSEWithInequalities"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.custom_loss.MSEWithInequalities" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>Supports training a regressor on data that includes inequalities
+(e.g. x &lt; 100). Mean square error is used as the loss for elements with
+an (=) inequality. For elements with e.g. a (&gt; 0.5) inequality, then the loss
+for that element is (y - 0.5)^2 (standard MSE) if y &lt; 500 and 0 otherwise.</p>
+<p>This loss assumes that the normal range for y_true and y_pred is 0 - 1. As a
+hack, the implementation uses other intervals for y_pred to encode the
+inequality information.</p>
+<p>y_true is interpreted as follows:</p>
+<dl class="docutils">
+<dt>between 0 - 1</dt>
+<dd>Regular MSE loss is used. Penality (y_pred - y_true)**2 is applied if
+y_pred is greater or less than y_true.</dd>
+<dt>between 2 - 3:</dt>
+<dd>Treated as a “&lt;” inequality. Penality (y_pred - (y_true - 2))**2 is
+applied only if y_pred is greater than y_true - 2.</dd>
+<dt>between 4 - 5:</dt>
+<dd>Treated as a “&gt;” inequality. Penality (y_pred - (y_true - 4))**2 is
+applied only if y_pred is less than y_true - 4.</dd>
+</dl>
+<dl class="attribute">
+<dt id="mhcflurry.custom_loss.MSEWithInequalities.name">
+<code class="descname">name</code><em class="property"> = 'mse_with_inequalities'</em><a class="headerlink" href="#mhcflurry.custom_loss.MSEWithInequalities.name" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="mhcflurry.custom_loss.MSEWithInequalities.supports_inequalities">
+<code class="descname">supports_inequalities</code><em class="property"> = True</em><a class="headerlink" href="#mhcflurry.custom_loss.MSEWithInequalities.supports_inequalities" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="mhcflurry.custom_loss.MSEWithInequalities.encode_y">
+<em class="property">static </em><code class="descname">encode_y</code><span class="sig-paren">(</span><em>y</em>, <em>inequalities=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/custom_loss.html#MSEWithInequalities.encode_y"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.custom_loss.MSEWithInequalities.encode_y" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="mhcflurry.custom_loss.MSEWithInequalities.loss">
+<em class="property">static </em><code class="descname">loss</code><span class="sig-paren">(</span><em>y_true</em>, <em>y_pred</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/custom_loss.html#MSEWithInequalities.loss"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.custom_loss.MSEWithInequalities.loss" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="attribute">
+<dt id="mhcflurry.custom_loss.cls">
+<code class="descclassname">mhcflurry.custom_loss.</code><code class="descname">cls</code><a class="headerlink" href="#mhcflurry.custom_loss.cls" title="Permalink to this definition">¶</a></dt>
+<dd><p>alias of <a class="reference internal" href="#mhcflurry.custom_loss.MSEWithInequalities" title="mhcflurry.custom_loss.MSEWithInequalities"><code class="xref py py-class docutils literal"><span class="pre">MSEWithInequalities</span></code></a></p>
+</dd></dl>
+
+</div>
 <div class="section" id="module-mhcflurry.downloads">
 <span id="mhcflurry-downloads-module"></span><h2>mhcflurry.downloads module<a class="headerlink" href="#module-mhcflurry.downloads" title="Permalink to this headline">¶</a></h2>
 <p>Manage local downloaded data.</p>
@@ -1869,6 +2129,33 @@ distribution is used.</p>
 <dt id="mhcflurry.downloads.get_downloads_metadata">
 <code class="descclassname">mhcflurry.downloads.</code><code class="descname">get_downloads_metadata</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/downloads.html#get_downloads_metadata"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.downloads.get_downloads_metadata" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the contents of downloads.yml as a dict</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="mhcflurry.downloads.get_default_class1_models_dir">
+<code class="descclassname">mhcflurry.downloads.</code><code class="descname">get_default_class1_models_dir</code><span class="sig-paren">(</span><em>test_exists=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/downloads.html#get_default_class1_models_dir"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.downloads.get_default_class1_models_dir" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the absolute path to the default class1 models dir.</p>
+<p>If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR is set to an
+absolute path, return that path. If it’s set to a relative path (i.e. does
+not start with /) then return that path taken to be relative to the mhcflurry
+downloads dir.</p>
+<p>If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR is NOT set,
+then return the path to downloaded models in the “models_class1” download.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>test_exists</strong> : boolean, optional</p>
+<blockquote>
+<div><p>Whether to raise an exception of the path does not exist</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><strong>string</strong> : absolute path</p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="function">
@@ -1950,6 +2237,167 @@ data if the file does not exist</p>
 <dt id="mhcflurry.downloads_command.yes_no">
 <code class="descclassname">mhcflurry.downloads_command.</code><code class="descname">yes_no</code><span class="sig-paren">(</span><em>boolean</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/downloads_command.html#yes_no"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.downloads_command.yes_no" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
+
+<dl class="class">
+<dt id="mhcflurry.downloads_command.TqdmUpTo">
+<em class="property">class </em><code class="descclassname">mhcflurry.downloads_command.</code><code class="descname">TqdmUpTo</code><span class="sig-paren">(</span><em>iterable=None</em>, <em>desc=None</em>, <em>total=None</em>, <em>leave=True</em>, <em>file=None</em>, <em>ncols=None</em>, <em>mininterval=0.1</em>, <em>maxinterval=10.0</em>, <em>miniters=None</em>, <em>ascii=None</em>, <em>disable=False</em>, <em>unit='it'</em>, <em>unit_scale=False</em>, <em>dynamic_ncols=False</em>, <em>smoothing=0.3</em>, <em>bar_format=None</em>, <em>initial=0</em>, <em>position=None</em>, <em>postfix=None</em>, <em>unit_divisor=1000</em>, <em>gui=False</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/downloads_command.html#TqdmUpTo"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.downloads_command.TqdmUpTo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">tqdm._tqdm.tqdm</span></code></p>
+<p>Provides <code class="xref py py-obj docutils literal"><span class="pre">update_to(n)</span></code> which uses <code class="xref py py-obj docutils literal"><span class="pre">tqdm.update(delta_n)</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>iterable</strong> : iterable, optional</p>
+<blockquote>
+<div><p>Iterable to decorate with a progressbar.
+Leave blank to manually manage the updates.</p>
+</div></blockquote>
+<p><strong>desc</strong> : str, optional</p>
+<blockquote>
+<div><p>Prefix for the progressbar.</p>
+</div></blockquote>
+<p><strong>total</strong> : int, optional</p>
+<blockquote>
+<div><p>The number of expected iterations. If unspecified,
+len(iterable) is used if possible. As a last resort, only basic
+progress statistics are displayed (no ETA, no progressbar).
+If <code class="xref py py-obj docutils literal"><span class="pre">gui</span></code> is True and this parameter needs subsequent updating,
+specify an initial arbitrary large positive integer,
+e.g. int(9e9).</p>
+</div></blockquote>
+<p><strong>leave</strong> : bool, optional</p>
+<blockquote>
+<div><p>If [default: True], keeps all traces of the progressbar
+upon termination of iteration.</p>
+</div></blockquote>
+<p><strong>file</strong> : <code class="xref py py-obj docutils literal"><span class="pre">io.TextIOWrapper</span></code> or <code class="xref py py-obj docutils literal"><span class="pre">io.StringIO</span></code>, optional</p>
+<blockquote>
+<div><p>Specifies where to output the progress messages
+(default: sys.stderr). Uses <code class="xref py py-obj docutils literal"><span class="pre">file.write(str)</span></code> and <code class="xref py py-obj docutils literal"><span class="pre">file.flush()</span></code>
+methods.</p>
+</div></blockquote>
+<p><strong>ncols</strong> : int, optional</p>
+<blockquote>
+<div><p>The width of the entire output message. If specified,
+dynamically resizes the progressbar to stay within this bound.
+If unspecified, attempts to use environment width. The
+fallback is a meter width of 10 and no limit for the counter and
+statistics. If 0, will not print any meter (only stats).</p>
+</div></blockquote>
+<p><strong>mininterval</strong> : float, optional</p>
+<blockquote>
+<div><p>Minimum progress display update interval, in seconds [default: 0.1].</p>
+</div></blockquote>
+<p><strong>maxinterval</strong> : float, optional</p>
+<blockquote>
+<div><p>Maximum progress display update interval, in seconds [default: 10].
+Automatically adjusts <code class="xref py py-obj docutils literal"><span class="pre">miniters</span></code> to correspond to <code class="xref py py-obj docutils literal"><span class="pre">mininterval</span></code>
+after long display update lag. Only works if <code class="xref py py-obj docutils literal"><span class="pre">dynamic_miniters</span></code>
+or monitor thread is enabled.</p>
+</div></blockquote>
+<p><strong>miniters</strong> : int, optional</p>
+<blockquote>
+<div><p>Minimum progress display update interval, in iterations.
+If 0 and <code class="xref py py-obj docutils literal"><span class="pre">dynamic_miniters</span></code>, will automatically adjust to equal
+<code class="xref py py-obj docutils literal"><span class="pre">mininterval</span></code> (more CPU efficient, good for tight loops).
+If &gt; 0, will skip display of specified number of iterations.
+Tweak this and <code class="xref py py-obj docutils literal"><span class="pre">mininterval</span></code> to get very efficient loops.
+If your progress is erratic with both fast and slow iterations
+(network, skipping items, etc) you should set miniters=1.</p>
+</div></blockquote>
+<p><strong>ascii</strong> : bool, optional</p>
+<blockquote>
+<div><p>If unspecified or False, use unicode (smooth blocks) to fill
+the meter. The fallback is to use ASCII characters <code class="xref py py-obj docutils literal"><span class="pre">1-9</span> <span class="pre">#</span></code>.</p>
+</div></blockquote>
+<p><strong>disable</strong> : bool, optional</p>
+<blockquote>
+<div><p>Whether to disable the entire progressbar wrapper
+[default: False]. If set to None, disable on non-TTY.</p>
+</div></blockquote>
+<p><strong>unit</strong> : str, optional</p>
+<blockquote>
+<div><p>String that will be used to define the unit of each iteration
+[default: it].</p>
+</div></blockquote>
+<p><strong>unit_scale</strong> : bool or int or float, optional</p>
+<blockquote>
+<div><p>If 1 or True, the number of iterations will be reduced/scaled
+automatically and a metric prefix following the
+International System of Units standard will be added
+(kilo, mega, etc.) [default: False]. If any other non-zero
+number, will scale <code class="xref py py-obj docutils literal"><span class="pre">total</span></code> and <code class="xref py py-obj docutils literal"><span class="pre">n</span></code>.</p>
+</div></blockquote>
+<p><strong>dynamic_ncols</strong> : bool, optional</p>
+<blockquote>
+<div><p>If set, constantly alters <code class="xref py py-obj docutils literal"><span class="pre">ncols</span></code> to the environment (allowing
+for window resizes) [default: False].</p>
+</div></blockquote>
+<p><strong>smoothing</strong> : float, optional</p>
+<blockquote>
+<div><p>Exponential moving average smoothing factor for speed estimates
+(ignored in GUI mode). Ranges from 0 (average speed) to 1
+(current/instantaneous speed) [default: 0.3].</p>
+</div></blockquote>
+<p><strong>bar_format</strong> : str, optional</p>
+<blockquote>
+<div><p>Specify a custom bar string formatting. May impact performance.
+If unspecified, will use ‘{l_bar}{bar}{r_bar}’, where l_bar is
+‘{desc}: {percentage:3.0f}%|’ and r_bar is
+‘| {n_fmt}/{total_fmt} [{elapsed}&lt;{remaining}, {rate_fmt}]’
+Possible vars: bar, n, n_fmt, total, total_fmt, percentage,
+rate, rate_fmt, elapsed, remaining, l_bar, r_bar, desc.
+Note that a trailing “: ” is automatically removed after {desc}
+if the latter is empty.</p>
+</div></blockquote>
+<p><strong>initial</strong> : int, optional</p>
+<blockquote>
+<div><p>The initial counter value. Useful when restarting a progress
+bar [default: 0].</p>
+</div></blockquote>
+<p><strong>position</strong> : int, optional</p>
+<blockquote>
+<div><p>Specify the line offset to print this bar (starting from 0)
+Automatic if unspecified.
+Useful to manage multiple bars at once (eg, from threads).</p>
+</div></blockquote>
+<p><strong>postfix</strong> : dict, optional</p>
+<blockquote>
+<div><p>Specify additional stats to display at the end of the bar.
+Note: postfix is a dict ({‘key’: value} pairs) for this method,
+not a string.</p>
+</div></blockquote>
+<p><strong>unit_divisor</strong> : float, optional</p>
+<blockquote>
+<div><p>[default: 1000], ignored unless <code class="xref py py-obj docutils literal"><span class="pre">unit_scale</span></code> is True.</p>
+</div></blockquote>
+<p><strong>gui</strong> : bool, optional</p>
+<blockquote>
+<div><p>WARNING: internal parameter - do not use.
+Use tqdm_gui(…) instead. If set, will attempt to use
+matplotlib animations for a graphical output [default: False].</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><strong>out</strong> : decorated iterator.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="mhcflurry.downloads_command.TqdmUpTo.update_to">
+<code class="descname">update_to</code><span class="sig-paren">(</span><em>b=1</em>, <em>bsize=1</em>, <em>tsize=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/downloads_command.html#TqdmUpTo.update_to"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.downloads_command.TqdmUpTo.update_to" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="docutils">
+<dt>b <span class="classifier-delimiter">:</span> <span class="classifier">int, optional</span></dt>
+<dd>Number of blocks transferred so far [default: 1].</dd>
+<dt>bsize <span class="classifier-delimiter">:</span> <span class="classifier">int, optional</span></dt>
+<dd>Size of each block (in tqdm units) [default: 1].</dd>
+<dt>tsize <span class="classifier-delimiter">:</span> <span class="classifier">int, optional</span></dt>
+<dd>Total size (in tqdm units). If [default: None] remains unchanged.</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
 
 <dl class="function">
 <dt id="mhcflurry.downloads_command.fetch_subcommand">
@@ -2072,6 +2520,33 @@ with the X character filling in the blanks.</p>
 </table>
 </dd></dl>
 
+</dd></dl>
+
+</div>
+<div class="section" id="module-mhcflurry.ensemble_centrality">
+<span id="mhcflurry-ensemble-centrality-module"></span><h2>mhcflurry.ensemble_centrality module<a class="headerlink" href="#module-mhcflurry.ensemble_centrality" title="Permalink to this headline">¶</a></h2>
+<p>Measures of centrality (e.g. mean) used to combine predictions across an
+ensemble. The input to these functions are log affinities, and they are expected
+to return a centrality measure also in log-space.</p>
+<dl class="function">
+<dt id="mhcflurry.ensemble_centrality.robust_mean">
+<code class="descclassname">mhcflurry.ensemble_centrality.</code><code class="descname">robust_mean</code><span class="sig-paren">(</span><em>log_values</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/ensemble_centrality.html#robust_mean"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.ensemble_centrality.robust_mean" title="Permalink to this definition">¶</a></dt>
+<dd><p>Mean of values falling within the 25-75 percentiles.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>log_values</strong> : 2-d numpy.array</p>
+<blockquote>
+<div><p>Center is computed along the second axis (i.e. per row).</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><strong>center</strong> : numpy.array of length log_values.shape[1]</p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 </div>
@@ -2311,15 +2786,24 @@ peptides:</p>
 <dd></dd></dl>
 
 <dl class="function">
-<dt id="mhcflurry.train_allele_specific_models_command.work_entrypoint">
-<code class="descclassname">mhcflurry.train_allele_specific_models_command.</code><code class="descname">work_entrypoint</code><span class="sig-paren">(</span><em>item</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/train_allele_specific_models_command.html#work_entrypoint"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.train_allele_specific_models_command.work_entrypoint" title="Permalink to this definition">¶</a></dt>
+<dt id="mhcflurry.train_allele_specific_models_command.train_model_entrypoint">
+<code class="descclassname">mhcflurry.train_allele_specific_models_command.</code><code class="descname">train_model_entrypoint</code><span class="sig-paren">(</span><em>item</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/train_allele_specific_models_command.html#train_model_entrypoint"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.train_allele_specific_models_command.train_model_entrypoint" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
-<dt id="mhcflurry.train_allele_specific_models_command.process_work">
-<code class="descclassname">mhcflurry.train_allele_specific_models_command.</code><code class="descname">process_work</code><span class="sig-paren">(</span><em>model_group</em>, <em>n_models</em>, <em>allele_num</em>, <em>n_alleles</em>, <em>hyperparameter_set_num</em>, <em>num_hyperparameter_sets</em>, <em>allele</em>, <em>data</em>, <em>hyperparameters</em>, <em>verbose</em>, <em>predictor</em>, <em>save_to</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/train_allele_specific_models_command.html#process_work"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.train_allele_specific_models_command.process_work" title="Permalink to this definition">¶</a></dt>
+<dt id="mhcflurry.train_allele_specific_models_command.train_model">
+<code class="descclassname">mhcflurry.train_allele_specific_models_command.</code><code class="descname">train_model</code><span class="sig-paren">(</span><em>model_group</em>, <em>n_models</em>, <em>allele_num</em>, <em>n_alleles</em>, <em>hyperparameter_set_num</em>, <em>num_hyperparameter_sets</em>, <em>allele</em>, <em>data</em>, <em>hyperparameters</em>, <em>verbose</em>, <em>predictor</em>, <em>save_to</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/train_allele_specific_models_command.html#train_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.train_allele_specific_models_command.train_model" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
+<dl class="function">
+<dt id="mhcflurry.train_allele_specific_models_command.calibrate_percentile_ranks">
+<code class="descclassname">mhcflurry.train_allele_specific_models_command.</code><code class="descname">calibrate_percentile_ranks</code><span class="sig-paren">(</span><em>allele</em>, <em>predictor</em>, <em>peptides=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/train_allele_specific_models_command.html#calibrate_percentile_ranks"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mhcflurry.train_allele_specific_models_command.calibrate_percentile_ranks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Private helper function.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-mhcflurry.version">
+<span id="mhcflurry-version-module"></span><h2>mhcflurry.version module<a class="headerlink" href="#module-mhcflurry.version" title="Permalink to this headline">¶</a></h2>
 </div>
 </div>
 
@@ -2344,7 +2828,7 @@ peptides:</p>
   <div role="contentinfo">
     <p>
         &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Dec 22, 2017.
+      Last updated on Feb 06, 2018.
 
     </p>
   </div>
@@ -2366,7 +2850,7 @@ peptides:</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'./',
-            VERSION:'1.0.0',
+            VERSION:'1.1.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

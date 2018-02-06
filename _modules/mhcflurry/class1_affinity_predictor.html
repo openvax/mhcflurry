@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.class1_affinity_predictor &mdash; MHCflurry 1.0.0 documentation</title>
+  <title>mhcflurry.class1_affinity_predictor &mdash; MHCflurry 1.1.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.0.0 documentation" href="../../index.html"/>
+    <link rel="top" title="MHCflurry 1.1.0 documentation" href="../../index.html"/>
         <link rel="up" title="Module code" href="../index.html"/> 
 
   
@@ -63,7 +63,7 @@
             
             
               <div class="version">
-                1.0.0
+                1.1.0
               </div>
             
           
@@ -163,11 +163,13 @@
 <span class="kn">import</span> <span class="nn">hashlib</span>
 <span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">sys</span>
 <span class="kn">import</span> <span class="nn">time</span>
 <span class="kn">import</span> <span class="nn">warnings</span>
-<span class="kn">from</span> <span class="nn">os.path</span> <span class="k">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">exists</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="k">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">exists</span><span class="p">,</span> <span class="n">abspath</span>
 <span class="kn">from</span> <span class="nn">os</span> <span class="k">import</span> <span class="n">mkdir</span>
+<span class="kn">from</span> <span class="nn">socket</span> <span class="k">import</span> <span class="n">gethostname</span>
+<span class="kn">from</span> <span class="nn">getpass</span> <span class="k">import</span> <span class="n">getuser</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span>
 
 <span class="kn">import</span> <span class="nn">mhcnames</span>
 <span class="kn">import</span> <span class="nn">numpy</span>
@@ -175,12 +177,15 @@
 <span class="kn">from</span> <span class="nn">numpy.testing</span> <span class="k">import</span> <span class="n">assert_equal</span>
 <span class="kn">from</span> <span class="nn">six</span> <span class="k">import</span> <span class="n">string_types</span>
 
-<span class="kn">from</span> <span class="nn">mhcflurry.class1_neural_network</span> <span class="k">import</span> <span class="n">Class1NeuralNetwork</span>
-<span class="kn">from</span> <span class="nn">mhcflurry.common</span> <span class="k">import</span> <span class="n">random_peptides</span>
-<span class="kn">from</span> <span class="nn">mhcflurry.downloads</span> <span class="k">import</span> <span class="n">get_path</span>
-<span class="kn">from</span> <span class="nn">mhcflurry.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span>
-<span class="kn">from</span> <span class="nn">mhcflurry.percent_rank_transform</span> <span class="k">import</span> <span class="n">PercentRankTransform</span>
-<span class="kn">from</span> <span class="nn">mhcflurry.regression_target</span> <span class="k">import</span> <span class="n">to_ic50</span>
+<span class="kn">from</span> <span class="nn">.class1_neural_network</span> <span class="k">import</span> <span class="n">Class1NeuralNetwork</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">random_peptides</span>
+<span class="kn">from</span> <span class="nn">.downloads</span> <span class="k">import</span> <span class="n">get_default_class1_models_dir</span>
+<span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span>
+<span class="kn">from</span> <span class="nn">.percent_rank_transform</span> <span class="k">import</span> <span class="n">PercentRankTransform</span>
+<span class="kn">from</span> <span class="nn">.regression_target</span> <span class="k">import</span> <span class="n">to_ic50</span>
+<span class="kn">from</span> <span class="nn">.version</span> <span class="k">import</span> <span class="n">__version__</span>
+<span class="kn">from</span> <span class="nn">.ensemble_centrality</span> <span class="k">import</span> <span class="n">CENTRALITY_MEASURES</span>
+<span class="kn">from</span> <span class="nn">.allele_encoding</span> <span class="k">import</span> <span class="n">AlleleEncoding</span>
 
 
 <div class="viewcode-block" id="Class1AffinityPredictor"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor">[docs]</a><span class="k">class</span> <span class="nc">Class1AffinityPredictor</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
@@ -196,7 +201,7 @@
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">allele_to_allele_specific_models</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">class1_pan_allele_models</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-            <span class="n">allele_to_pseudosequence</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">allele_to_fixed_length_sequence</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">manifest_df</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">allele_to_percent_rank_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -208,7 +213,7 @@
 <span class="sd">        class1_pan_allele_models : list of `Class1NeuralNetwork`</span>
 <span class="sd">            Ensemble of pan-allele models.</span>
 <span class="sd">        </span>
-<span class="sd">        allele_to_pseudosequence : dict of string -&gt; string</span>
+<span class="sd">        allele_to_fixed_length_sequence : dict of string -&gt; string</span>
 <span class="sd">            Required only if class1_pan_allele_models is specified.</span>
 <span class="sd">        </span>
 <span class="sd">        manifest_df : `pandas.DataFrame`, optional</span>
@@ -227,11 +232,11 @@
             <span class="n">class1_pan_allele_models</span> <span class="o">=</span> <span class="p">[]</span>
 
         <span class="k">if</span> <span class="n">class1_pan_allele_models</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="n">allele_to_pseudosequence</span><span class="p">,</span> <span class="s2">&quot;Pseudosequences required&quot;</span>
+            <span class="k">assert</span> <span class="n">allele_to_fixed_length_sequence</span><span class="p">,</span> <span class="s2">&quot;Allele sequences required&quot;</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_allele_specific_models</span> <span class="o">=</span> <span class="n">allele_to_allele_specific_models</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">class1_pan_allele_models</span> <span class="o">=</span> <span class="n">class1_pan_allele_models</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_pseudosequence</span> <span class="o">=</span> <span class="n">allele_to_pseudosequence</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_fixed_length_sequence</span> <span class="o">=</span> <span class="n">allele_to_fixed_length_sequence</span>
 
         <span class="k">if</span> <span class="n">manifest_df</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
@@ -297,7 +302,7 @@
 
         <span class="n">allele_to_allele_specific_models</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
         <span class="n">class1_pan_allele_models</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">allele_to_pseudosequence</span> <span class="o">=</span> <span class="n">predictors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">allele_to_pseudosequence</span>
+        <span class="n">allele_to_fixed_length_sequence</span> <span class="o">=</span> <span class="n">predictors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">allele_to_fixed_length_sequence</span>
 
         <span class="k">for</span> <span class="n">predictor</span> <span class="ow">in</span> <span class="n">predictors</span><span class="p">:</span>
             <span class="k">for</span> <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">networks</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span>
@@ -309,7 +314,7 @@
         <span class="k">return</span> <span class="n">Class1AffinityPredictor</span><span class="p">(</span>
             <span class="n">allele_to_allele_specific_models</span><span class="o">=</span><span class="n">allele_to_allele_specific_models</span><span class="p">,</span>
             <span class="n">class1_pan_allele_models</span><span class="o">=</span><span class="n">class1_pan_allele_models</span><span class="p">,</span>
-            <span class="n">allele_to_pseudosequence</span><span class="o">=</span><span class="n">allele_to_pseudosequence</span>
+            <span class="n">allele_to_fixed_length_sequence</span><span class="o">=</span><span class="n">allele_to_fixed_length_sequence</span>
         <span class="p">)</span></div>
 
     <span class="nd">@property</span>
@@ -322,8 +327,8 @@
 <span class="sd">        list of string</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">result</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_allele_specific_models</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_pseudosequence</span><span class="p">:</span>
-            <span class="n">result</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_pseudosequence</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_fixed_length_sequence</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_fixed_length_sequence</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
 
     <span class="nd">@property</span>
@@ -353,8 +358,9 @@
 <span class="sd">        The serialization format consists of a file called &quot;manifest.csv&quot; with</span>
 <span class="sd">        the configurations of each Class1NeuralNetwork, along with per-network</span>
 <span class="sd">        files giving the model weights. If there are pan-allele predictors in</span>
-<span class="sd">        the ensemble, the allele pseudosequences are also stored in the</span>
-<span class="sd">        directory.</span>
+<span class="sd">        the ensemble, the allele sequences are also stored in the</span>
+<span class="sd">        directory. There is also a small file &quot;index.txt&quot; with basic metadata:</span>
+<span class="sd">        when the models were trained, by whom, on what host.</span>
 <span class="sd">        </span>
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -395,6 +401,26 @@
         <span class="n">write_manifest_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Wrote: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">manifest_path</span><span class="p">)</span>
 
+        <span class="c1"># Write &quot;info.txt&quot;</span>
+        <span class="n">info_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;info.txt&quot;</span><span class="p">)</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s2">&quot;trained on&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">asctime</span><span class="p">()),</span>
+            <span class="p">(</span><span class="s2">&quot;package   &quot;</span><span class="p">,</span> <span class="s2">&quot;mhcflurry </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">__version__</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;hostname  &quot;</span><span class="p">,</span> <span class="n">gethostname</span><span class="p">()),</span>
+            <span class="p">(</span><span class="s2">&quot;user      &quot;</span><span class="p">,</span> <span class="n">getuser</span><span class="p">()),</span>
+        <span class="p">]</span>
+        <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span>
+            <span class="n">info_path</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_fixed_length_sequence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">allele_to_sequence_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_fixed_length_sequence</span><span class="o">.</span><span class="n">items</span><span class="p">()),</span>
+                <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">,</span> <span class="s1">&#39;sequence&#39;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">allele_to_sequence_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span>
+                <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;allele_sequences.csv&quot;</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Wrote: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;allele_sequences.csv&quot;</span><span class="p">))</span>
+
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="p">:</span>
             <span class="n">percent_ranks_df</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">for</span> <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">transform</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -428,7 +454,7 @@
 <span class="sd">        `Class1AffinityPredictor` instance</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">models_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">models_dir</span> <span class="o">=</span> <span class="n">get_path</span><span class="p">(</span><span class="s2">&quot;models_class1&quot;</span><span class="p">,</span> <span class="s2">&quot;models&quot;</span><span class="p">)</span>
+            <span class="n">models_dir</span> <span class="o">=</span> <span class="n">get_default_class1_models_dir</span><span class="p">()</span>
 
         <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;manifest.csv&quot;</span><span class="p">)</span>
         <span class="n">manifest_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">,</span> <span class="n">nrows</span><span class="o">=</span><span class="n">max_models</span><span class="p">)</span>
@@ -439,9 +465,14 @@
         <span class="k">for</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">row</span><span class="p">)</span> <span class="ow">in</span> <span class="n">manifest_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
             <span class="n">weights_filename</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">weights_path</span><span class="p">(</span>
                 <span class="n">models_dir</span><span class="p">,</span> <span class="n">row</span><span class="o">.</span><span class="n">model_name</span><span class="p">)</span>
-            <span class="n">weights</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load_weights</span><span class="p">(</span><span class="n">weights_filename</span><span class="p">)</span>
             <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">config_json</span><span class="p">)</span>
-            <span class="n">model</span> <span class="o">=</span> <span class="n">Class1NeuralNetwork</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">weights</span><span class="p">)</span>
+
+            <span class="c1"># We will lazy-load weights when the network is used.</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="n">Class1NeuralNetwork</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span>
+                <span class="n">config</span><span class="p">,</span>
+                <span class="n">weights_loader</span><span class="o">=</span><span class="n">partial</span><span class="p">(</span>
+                    <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load_weights</span><span class="p">,</span>
+                    <span class="n">abspath</span><span class="p">(</span><span class="n">weights_filename</span><span class="p">)))</span>
             <span class="k">if</span> <span class="n">row</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="s2">&quot;pan-class1&quot;</span><span class="p">:</span>
                 <span class="n">class1_pan_allele_models</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
@@ -450,10 +481,10 @@
 
         <span class="n">manifest_df</span><span class="p">[</span><span class="s2">&quot;model&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">all_models</span>
 
-        <span class="n">pseudosequences</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;pseudosequences.csv&quot;</span><span class="p">)):</span>
-            <span class="n">pseudosequences</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
-                <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;pseudosequences.csv&quot;</span><span class="p">),</span>
+        <span class="n">allele_to_fixed_length_sequence</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;allele_sequences.csv&quot;</span><span class="p">)):</span>
+            <span class="n">allele_to_fixed_length_sequence</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+                <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;allele_sequences.csv&quot;</span><span class="p">),</span>
                 <span class="n">index_col</span><span class="o">=</span><span class="s2">&quot;allele&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
 
         <span class="n">allele_to_percent_rank_transform</span> <span class="o">=</span> <span class="p">{}</span>
@@ -465,10 +496,10 @@
                     <span class="n">PercentRankTransform</span><span class="o">.</span><span class="n">from_series</span><span class="p">(</span><span class="n">percent_ranks_df</span><span class="p">[</span><span class="n">allele</span><span class="p">]))</span>
 
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="s2">&quot;Loaded </span><span class="si">%d</span><span class="s2"> class1 pan allele predictors, </span><span class="si">%d</span><span class="s2"> pseudosequences, &quot;</span>
+            <span class="s2">&quot;Loaded </span><span class="si">%d</span><span class="s2"> class1 pan allele predictors, </span><span class="si">%d</span><span class="s2"> allele sequences, &quot;</span>
             <span class="s2">&quot;</span><span class="si">%d</span><span class="s2"> percent rank distributions, and </span><span class="si">%d</span><span class="s2"> allele specific models: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
                 <span class="nb">len</span><span class="p">(</span><span class="n">class1_pan_allele_models</span><span class="p">),</span>
-                <span class="nb">len</span><span class="p">(</span><span class="n">pseudosequences</span><span class="p">)</span> <span class="k">if</span> <span class="n">pseudosequences</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">allele_to_fixed_length_sequence</span><span class="p">)</span> <span class="k">if</span> <span class="n">allele_to_fixed_length_sequence</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
                 <span class="nb">len</span><span class="p">(</span><span class="n">allele_to_percent_rank_transform</span><span class="p">),</span>
                 <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">allele_to_allele_specific_models</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span>
                 <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
@@ -479,7 +510,7 @@
         <span class="n">result</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="p">(</span>
             <span class="n">allele_to_allele_specific_models</span><span class="o">=</span><span class="n">allele_to_allele_specific_models</span><span class="p">,</span>
             <span class="n">class1_pan_allele_models</span><span class="o">=</span><span class="n">class1_pan_allele_models</span><span class="p">,</span>
-            <span class="n">allele_to_pseudosequence</span><span class="o">=</span><span class="n">pseudosequences</span><span class="p">,</span>
+            <span class="n">allele_to_fixed_length_sequence</span><span class="o">=</span><span class="n">allele_to_fixed_length_sequence</span><span class="p">,</span>
             <span class="n">manifest_df</span><span class="o">=</span><span class="n">manifest_df</span><span class="p">,</span>
             <span class="n">allele_to_percent_rank_transform</span><span class="o">=</span><span class="n">allele_to_percent_rank_transform</span><span class="p">,</span>
         <span class="p">)</span>
@@ -523,12 +554,13 @@
 <div class="viewcode-block" id="Class1AffinityPredictor.fit_allele_specific_predictors"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors">[docs]</a>    <span class="k">def</span> <span class="nf">fit_allele_specific_predictors</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">n_models</span><span class="p">,</span>
-            <span class="n">architecture_hyperparameters</span><span class="p">,</span>
+            <span class="n">architecture_hyperparameters_list</span><span class="p">,</span>
             <span class="n">allele</span><span class="p">,</span>
             <span class="n">peptides</span><span class="p">,</span>
             <span class="n">affinities</span><span class="p">,</span>
+            <span class="n">inequalities</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">models_dir_for_save</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-            <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
             <span class="n">progress_preamble</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Fit one or more allele specific predictors for a single allele using a</span>
@@ -542,7 +574,10 @@
 <span class="sd">        n_models : int</span>
 <span class="sd">            Number of neural networks to fit</span>
 <span class="sd">        </span>
-<span class="sd">        architecture_hyperparameters : dict </span>
+<span class="sd">        architecture_hyperparameters_list : list of dict</span>
+<span class="sd">            List of hyperparameters. If more than one set of hyperparameters</span>
+<span class="sd">            are specified, model selection over them is performed and model</span>
+<span class="sd">            with the lowest validation loss is selected for each fold.</span>
 <span class="sd">               </span>
 <span class="sd">        allele : string</span>
 <span class="sd">        </span>
@@ -550,6 +585,9 @@
 <span class="sd">        </span>
 <span class="sd">        affinities : list of float</span>
 <span class="sd">            nM affinities</span>
+
+<span class="sd">        inequalities : list of string, each element one of &quot;&gt;&quot;, &quot;&lt;&quot;, or &quot;=&quot;</span>
+<span class="sd">            See Class1NeuralNetwork.fit for details.</span>
 <span class="sd">        </span>
 <span class="sd">        models_dir_for_save : string, optional</span>
 <span class="sd">            If specified, the Class1AffinityPredictor is (incrementally) written</span>
@@ -567,35 +605,83 @@
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="n">allele</span> <span class="o">=</span> <span class="n">mhcnames</span><span class="o">.</span><span class="n">normalize_allele_name</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span>
-        <span class="n">models</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_predictors</span><span class="p">(</span>
-            <span class="n">n_models</span><span class="o">=</span><span class="n">n_models</span><span class="p">,</span>
-            <span class="n">architecture_hyperparameters</span><span class="o">=</span><span class="n">architecture_hyperparameters</span><span class="p">,</span>
-            <span class="n">peptides</span><span class="o">=</span><span class="n">peptides</span><span class="p">,</span>
-            <span class="n">affinities</span><span class="o">=</span><span class="n">affinities</span><span class="p">,</span>
-            <span class="n">allele_pseudosequences</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-            <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
-            <span class="n">progress_preamble</span><span class="o">=</span><span class="n">progress_preamble</span><span class="p">)</span>
-
         <span class="k">if</span> <span class="n">allele</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_allele_specific_models</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_allele_specific_models</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
 
-        <span class="n">models_list</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">models</span><span class="p">):</span>
-            <span class="n">model_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
-            <span class="n">models_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>  <span class="c1"># models is a generator</span>
+        <span class="n">encodable_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+
+        <span class="n">n_architectures</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">architecture_hyperparameters_list</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n_models</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">n_architectures</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># Adjust progress info to indicate number of models and</span>
+            <span class="c1"># architectures.</span>
+            <span class="n">pieces</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="n">n_models</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">pieces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;Model </span><span class="si">{model_num:2d}</span><span class="s2"> / </span><span class="si">{n_models:2d}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">n_architectures</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">pieces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="s2">&quot;Architecture </span><span class="si">{architecture_num:2d}</span><span class="s2"> / </span><span class="si">{n_architectures:2d}</span><span class="s2">&quot;</span>
+                    <span class="s2">&quot; (best so far: </span><span class="si">{best_num}</span><span class="s2">)&quot;</span><span class="p">)</span>
+            <span class="n">progress_preamble_template</span> <span class="o">=</span> <span class="s2">&quot;[ </span><span class="si">%s</span><span class="s2"> ] </span><span class="si">{user_progress_preamble}</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pieces</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Just use the user-provided progress message.</span>
+            <span class="n">progress_preamble_template</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{user_progress_preamble}</span><span class="s2">&quot;</span>
+
+        <span class="n">models</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">model_num</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_models</span><span class="p">):</span>
+            <span class="n">shuffle_permutation</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">affinities</span><span class="p">))</span>
+
+            <span class="n">best_num</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">best_loss</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">best_model</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">architecture_num</span><span class="p">,</span> <span class="n">architecture_hyperparameters</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+                    <span class="n">architecture_hyperparameters_list</span><span class="p">):</span>
+                <span class="n">model</span> <span class="o">=</span> <span class="n">Class1NeuralNetwork</span><span class="p">(</span><span class="o">**</span><span class="n">architecture_hyperparameters</span><span class="p">)</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+                    <span class="n">encodable_peptides</span><span class="p">,</span>
+                    <span class="n">affinities</span><span class="p">,</span>
+                    <span class="n">shuffle_permutation</span><span class="o">=</span><span class="n">shuffle_permutation</span><span class="p">,</span>
+                    <span class="n">inequalities</span><span class="o">=</span><span class="n">inequalities</span><span class="p">,</span>
+                    <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
+                    <span class="n">progress_preamble</span><span class="o">=</span><span class="n">progress_preamble_template</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">user_progress_preamble</span><span class="o">=</span><span class="n">progress_preamble</span><span class="p">,</span>
+                        <span class="n">best_num</span><span class="o">=</span><span class="s2">&quot;n/a&quot;</span> <span class="k">if</span> <span class="n">best_num</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">best_num</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                        <span class="n">model_num</span><span class="o">=</span><span class="n">model_num</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                        <span class="n">n_models</span><span class="o">=</span><span class="n">n_models</span><span class="p">,</span>
+                        <span class="n">architecture_num</span><span class="o">=</span><span class="n">architecture_num</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                        <span class="n">n_architectures</span><span class="o">=</span><span class="n">n_architectures</span><span class="p">))</span>
+
+                <span class="k">if</span> <span class="n">n_architectures</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="c1"># We require val_loss (i.e. a validation set) if we have</span>
+                    <span class="c1"># multiple architectures.</span>
+                    <span class="n">loss</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">loss_history</span><span class="p">[</span><span class="s1">&#39;val_loss&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">loss</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">if</span> <span class="n">loss</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">best_loss</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">best_loss</span> <span class="o">&gt;</span> <span class="n">loss</span><span class="p">:</span>
+                    <span class="n">best_loss</span> <span class="o">=</span> <span class="n">loss</span>
+                    <span class="n">best_num</span> <span class="o">=</span> <span class="n">architecture_num</span>
+                    <span class="n">best_model</span> <span class="o">=</span> <span class="n">model</span>
+                <span class="k">del</span> <span class="n">model</span>
+
+            <span class="k">if</span> <span class="n">n_architectures</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Selected architecture </span><span class="si">%d</span><span class="s2">.&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">best_num</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+
+            <span class="n">model_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">model_num</span><span class="p">)</span>
             <span class="n">row</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">([</span>
                 <span class="p">(</span><span class="s2">&quot;model_name&quot;</span><span class="p">,</span> <span class="n">model_name</span><span class="p">),</span>
                 <span class="p">(</span><span class="s2">&quot;allele&quot;</span><span class="p">,</span> <span class="n">allele</span><span class="p">),</span>
-                <span class="p">(</span><span class="s2">&quot;config_json&quot;</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">get_config</span><span class="p">())),</span>
-                <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="n">model</span><span class="p">),</span>
+                <span class="p">(</span><span class="s2">&quot;config_json&quot;</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">best_model</span><span class="o">.</span><span class="n">get_config</span><span class="p">())),</span>
+                <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="n">best_model</span><span class="p">),</span>
             <span class="p">]))</span><span class="o">.</span><span class="n">to_frame</span><span class="p">()</span><span class="o">.</span><span class="n">T</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">manifest_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
                 <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">manifest_df</span><span class="p">,</span> <span class="n">row</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_allele_specific_models</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_allele_specific_models</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">best_model</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">models_dir_for_save</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
                     <span class="n">models_dir_for_save</span><span class="p">,</span> <span class="n">model_names_to_write</span><span class="o">=</span><span class="p">[</span><span class="n">model_name</span><span class="p">])</span>
-        <span class="k">return</span> <span class="n">models_list</span></div>
+            <span class="n">models</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">best_model</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">models</span></div>
 
 <div class="viewcode-block" id="Class1AffinityPredictor.fit_class1_pan_allele_models"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.fit_class1_pan_allele_models">[docs]</a>    <span class="k">def</span> <span class="nf">fit_class1_pan_allele_models</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
@@ -604,6 +690,7 @@
             <span class="n">alleles</span><span class="p">,</span>
             <span class="n">peptides</span><span class="p">,</span>
             <span class="n">affinities</span><span class="p">,</span>
+            <span class="n">inequalities</span><span class="p">,</span>
             <span class="n">models_dir_for_save</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
             <span class="n">progress_preamble</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
@@ -622,12 +709,15 @@
 <span class="sd">        architecture_hyperparameters : dict</span>
 <span class="sd">        </span>
 <span class="sd">        alleles : list of string</span>
-<span class="sd">            Allele names (not pseudosequences) corresponding to each peptide </span>
+<span class="sd">            Allele names (not sequences) corresponding to each peptide</span>
 <span class="sd">        </span>
 <span class="sd">        peptides : `EncodableSequences` or list of string</span>
 <span class="sd">        </span>
 <span class="sd">        affinities : list of float</span>
 <span class="sd">            nM affinities</span>
+
+<span class="sd">        inequalities : list of string, each element one of &quot;&gt;&quot;, &quot;&lt;&quot;, or &quot;=&quot;</span>
+<span class="sd">            See Class1NeuralNetwork.fit for details.</span>
 <span class="sd">        </span>
 <span class="sd">        models_dir_for_save : string, optional</span>
 <span class="sd">            If specified, the Class1AffinityPredictor is (incrementally) written</span>
@@ -645,21 +735,24 @@
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="n">alleles</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">alleles</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">mhcnames</span><span class="o">.</span><span class="n">normalize_allele_name</span><span class="p">)</span>
-        <span class="n">allele_pseudosequences</span> <span class="o">=</span> <span class="n">alleles</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_pseudosequence</span><span class="p">)</span>
+        <span class="n">allele_encoding</span> <span class="o">=</span> <span class="n">AlleleEncoding</span><span class="p">(</span>
+            <span class="n">alleles</span><span class="p">,</span>
+            <span class="n">allele_to_fixed_length_sequence</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_fixed_length_sequence</span><span class="p">)</span>
 
-        <span class="n">models</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_predictors</span><span class="p">(</span>
-            <span class="n">n_models</span><span class="o">=</span><span class="n">n_models</span><span class="p">,</span>
-            <span class="n">architecture_hyperparameters</span><span class="o">=</span><span class="n">architecture_hyperparameters</span><span class="p">,</span>
-            <span class="n">peptides</span><span class="o">=</span><span class="n">peptides</span><span class="p">,</span>
-            <span class="n">affinities</span><span class="o">=</span><span class="n">affinities</span><span class="p">,</span>
-            <span class="n">allele_pseudosequences</span><span class="o">=</span><span class="n">allele_pseudosequences</span><span class="p">,</span>
-            <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
-            <span class="n">progress_preamble</span><span class="o">=</span><span class="n">progress_preamble</span><span class="p">)</span>
+        <span class="n">encodable_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+        <span class="n">models</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_models</span><span class="p">):</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Training model </span><span class="si">%d</span><span class="s2"> / </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_models</span><span class="p">))</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="n">Class1NeuralNetwork</span><span class="p">(</span><span class="o">**</span><span class="n">architecture_hyperparameters</span><span class="p">)</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+                <span class="n">encodable_peptides</span><span class="p">,</span>
+                <span class="n">affinities</span><span class="p">,</span>
+                <span class="n">inequalities</span><span class="o">=</span><span class="n">inequalities</span><span class="p">,</span>
+                <span class="n">allele_encoding</span><span class="o">=</span><span class="n">allele_encoding</span><span class="p">,</span>
+                <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
+                <span class="n">progress_preamble</span><span class="o">=</span><span class="n">progress_preamble</span><span class="p">)</span>
 
-        <span class="n">models_list</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">models</span><span class="p">):</span>
             <span class="n">model_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="p">(</span><span class="s2">&quot;pan-class1&quot;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
-            <span class="n">models_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>  <span class="c1"># models is a generator</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">class1_pan_allele_models</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
             <span class="n">row</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">([</span>
                 <span class="p">(</span><span class="s2">&quot;model_name&quot;</span><span class="p">,</span> <span class="n">model_name</span><span class="p">),</span>
@@ -672,113 +765,9 @@
             <span class="k">if</span> <span class="n">models_dir_for_save</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
                     <span class="n">models_dir_for_save</span><span class="p">,</span> <span class="n">model_names_to_write</span><span class="o">=</span><span class="p">[</span><span class="n">model_name</span><span class="p">])</span>
-        <span class="k">return</span> <span class="n">models_list</span></div>
+            <span class="n">models</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_fit_predictors</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span>
-            <span class="n">n_models</span><span class="p">,</span>
-            <span class="n">architecture_hyperparameters</span><span class="p">,</span>
-            <span class="n">peptides</span><span class="p">,</span>
-            <span class="n">affinities</span><span class="p">,</span>
-            <span class="n">allele_pseudosequences</span><span class="p">,</span>
-            <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-            <span class="n">progress_preamble</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Private helper method</span>
-<span class="sd">        </span>
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        n_models : int</span>
-<span class="sd">        architecture_hyperparameters : dict</span>
-<span class="sd">        peptides : EncodableSequences or list of string</span>
-<span class="sd">        affinities : list of float</span>
-<span class="sd">        allele_pseudosequences : EncodableSequences or list of string</span>
-<span class="sd">        verbose : int</span>
-<span class="sd">        progress_preamble : string</span>
-<span class="sd">            Optional string of information to include in each progress update</span>
-
-<span class="sd">        Returns</span>
-<span class="sd">        -------</span>
-<span class="sd">        generator of `Class1NeuralNetwork`</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">encodable_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_models</span><span class="p">):</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Training model </span><span class="si">%d</span><span class="s2"> / </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_models</span><span class="p">))</span>
-            <span class="n">model</span> <span class="o">=</span> <span class="n">Class1NeuralNetwork</span><span class="p">(</span><span class="o">**</span><span class="n">architecture_hyperparameters</span><span class="p">)</span>
-            <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
-                <span class="n">encodable_peptides</span><span class="p">,</span>
-                <span class="n">affinities</span><span class="p">,</span>
-                <span class="n">allele_pseudosequences</span><span class="o">=</span><span class="n">allele_pseudosequences</span><span class="p">,</span>
-                <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
-                <span class="n">progress_preamble</span><span class="o">=</span><span class="n">progress_preamble</span><span class="p">)</span>
-            <span class="k">yield</span> <span class="n">model</span>
-
-<div class="viewcode-block" id="Class1AffinityPredictor.calibrate_percentile_ranks"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.calibrate_percentile_ranks">[docs]</a>    <span class="k">def</span> <span class="nf">calibrate_percentile_ranks</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span>
-            <span class="n">peptides</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-            <span class="n">num_peptides_per_length</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="mf">1e5</span><span class="p">),</span>
-            <span class="n">alleles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-            <span class="n">bins</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-            <span class="n">quiet</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Compute the cumulative distribution of ic50 values for a set of alleles</span>
-<span class="sd">        over a large universe of random peptides, to enable computing quantiles in</span>
-<span class="sd">        this distribution later.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        peptides : sequence of string, optional</span>
-<span class="sd">            Peptides to use</span>
-<span class="sd">        num_peptides_per_length : int, optional</span>
-<span class="sd">            If peptides argument is not specified, then num_peptides_per_length</span>
-<span class="sd">            peptides are randomly sampled from a uniform distribution for each</span>
-<span class="sd">            supported length</span>
-<span class="sd">        alleles : sequence of string, optional</span>
-<span class="sd">            Alleles to perform calibration for. If not specified all supported</span>
-<span class="sd">            alleles will be calibrated.</span>
-<span class="sd">        bins : object</span>
-<span class="sd">            Anything that can be passed to numpy.histogram&#39;s &quot;bins&quot; argument</span>
-<span class="sd">            can be used here, i.e. either an integer or a sequence giving bin</span>
-<span class="sd">            edges. This is in ic50 space.</span>
-<span class="sd">        quiet : boolean</span>
-<span class="sd">            If False (default), status updates will be printed to stdout.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">bins</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">bins</span> <span class="o">=</span> <span class="n">to_ic50</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1000</span><span class="p">))</span>
-
-        <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">alleles</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">supported_alleles</span>
-
-        <span class="k">if</span> <span class="n">peptides</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">peptides</span> <span class="o">=</span> <span class="p">[]</span>
-            <span class="n">lengths</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">supported_peptide_lengths</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">supported_peptide_lengths</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
-                <span class="n">peptides</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                    <span class="n">random_peptides</span><span class="p">(</span><span class="n">num_peptides_per_length</span><span class="p">,</span> <span class="n">length</span><span class="p">))</span>
-
-        <span class="k">if</span> <span class="n">quiet</span><span class="p">:</span>
-            <span class="k">def</span> <span class="nf">msg</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
-                <span class="k">pass</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">def</span> <span class="nf">msg</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
-                <span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
-                <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-
-        <span class="n">encoded_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
-        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">allele</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alleles</span><span class="p">):</span>
-            <span class="n">msg</span><span class="p">(</span><span class="s2">&quot;Calibrating percentile ranks for allele </span><span class="si">%03d</span><span class="s2">/</span><span class="si">%03d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">),</span> <span class="n">allele</span><span class="p">))</span>
-            <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-            <span class="n">predictions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">encoded_peptides</span><span class="p">,</span> <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">)</span>
-            <span class="n">msg</span><span class="p">(</span><span class="s2">&quot;Generated </span><span class="si">%d</span><span class="s2"> predictions in </span><span class="si">%0.2f</span><span class="s2"> sec.&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                <span class="nb">len</span><span class="p">(</span><span class="n">predictions</span><span class="p">),</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">))</span>
-            <span class="n">transform</span> <span class="o">=</span> <span class="n">PercentRankTransform</span><span class="p">()</span>
-            <span class="n">transform</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">predictions</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">bins</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="n">transform</span>
-            <span class="n">msg</span><span class="p">(</span><span class="s2">&quot;Done calibrating allele </span><span class="si">%s</span><span class="s2"> in </span><span class="si">%0.2f</span><span class="s2"> sec.&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                <span class="n">allele</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">))</span></div>
+        <span class="k">return</span> <span class="n">models</span></div>
 
 <div class="viewcode-block" id="Class1AffinityPredictor.percentile_ranks"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.percentile_ranks">[docs]</a>    <span class="k">def</span> <span class="nf">percentile_ranks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">affinities</span><span class="p">,</span> <span class="n">allele</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">alleles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -826,7 +815,13 @@
                 <span class="n">sub_df</span><span class="o">.</span><span class="n">affinity</span><span class="p">,</span> <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span> <span class="n">throw</span><span class="o">=</span><span class="n">throw</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">values</span></div>
 
-<div class="viewcode-block" id="Class1AffinityPredictor.predict"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.predict">[docs]</a>    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">alleles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">allele</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<div class="viewcode-block" id="Class1AffinityPredictor.predict"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.predict">[docs]</a>    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">peptides</span><span class="p">,</span>
+            <span class="n">alleles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">allele</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">centrality_measure</span><span class="o">=</span><span class="s2">&quot;robust_mean&quot;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict nM binding affinities.</span>
 <span class="sd">        </span>
@@ -847,6 +842,9 @@
 <span class="sd">            If True, a ValueError will be raised in the case of unsupported</span>
 <span class="sd">            alleles or peptide lengths. If False, a warning will be logged and</span>
 <span class="sd">            the predictions for the unsupported alleles or peptides will be NaN.</span>
+<span class="sd">        centrality_measure : string or callable</span>
+<span class="sd">            Measure of central tendency to use to combine predictions in the</span>
+<span class="sd">            ensemble. Options include: mean, median, robust_mean.</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
@@ -858,6 +856,7 @@
             <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
             <span class="n">throw</span><span class="o">=</span><span class="n">throw</span><span class="p">,</span>
             <span class="n">include_percentile_ranks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">centrality_measure</span><span class="o">=</span><span class="n">centrality_measure</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">prediction</span><span class="o">.</span><span class="n">values</span></div>
 
@@ -868,7 +867,8 @@
             <span class="n">allele</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="n">include_individual_model_predictions</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-            <span class="n">include_percentile_ranks</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">include_percentile_ranks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">centrality_measure</span><span class="o">=</span><span class="s2">&quot;robust_mean&quot;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict nM binding affinities. Gives more detailed output than `predict`</span>
 <span class="sd">        method, including 5-95% prediction intervals.</span>
@@ -897,6 +897,9 @@
 <span class="sd">            If True, a &quot;prediction_percentile&quot; column will be included giving the</span>
 <span class="sd">            percentile ranks. If no percentile rank information is available,</span>
 <span class="sd">            this will be ignored with a warning.</span>
+<span class="sd">        centrality_measure : string or callable</span>
+<span class="sd">            Measure of central tendency to use to combine predictions in the</span>
+<span class="sd">            ensemble. Options include: mean, median, robust_mean.</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
@@ -955,27 +958,27 @@
             <span class="n">unsupported_alleles</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="n">allele</span> <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span>
                 <span class="n">df</span><span class="o">.</span><span class="n">normalized_allele</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
-                <span class="k">if</span> <span class="n">allele</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_pseudosequence</span>
+                <span class="k">if</span> <span class="n">allele</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_fixed_length_sequence</span>
             <span class="p">]</span>
             <span class="k">if</span> <span class="n">unsupported_alleles</span><span class="p">:</span>
                 <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="s2">&quot;No pseudosequences for allele(s): </span><span class="si">%s</span><span class="s2">.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="s2">&quot;No sequences for allele(s): </span><span class="si">%s</span><span class="s2">.</span><span class="se">\n</span><span class="s2">&quot;</span>
                     <span class="s2">&quot;Supported alleles: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
                         <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unsupported_alleles</span><span class="p">),</span>
-                        <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_pseudosequence</span><span class="p">))))</span>
+                        <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_fixed_length_sequence</span><span class="p">))))</span>
                 <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">throw</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
             <span class="n">mask</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">supported_peptide_length</span>
             <span class="k">if</span> <span class="n">mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="n">masked_allele_pseudosequences</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="n">df</span><span class="o">.</span><span class="n">ix</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span><span class="o">.</span><span class="n">normalized_allele</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_pseudosequence</span><span class="p">))</span>
+                <span class="n">masked_allele_encoding</span> <span class="o">=</span> <span class="n">AlleleEncoding</span><span class="p">(</span>
+                    <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span><span class="o">.</span><span class="n">normalized_allele</span><span class="p">,</span>
+                    <span class="n">allele_to_fixed_length_sequence</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_fixed_length_sequence</span><span class="p">)</span>
                 <span class="n">masked_peptides</span> <span class="o">=</span> <span class="n">peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
                 <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">class1_pan_allele_models</span><span class="p">):</span>
                     <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask</span><span class="p">,</span> <span class="s2">&quot;model_pan_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
                         <span class="n">masked_peptides</span><span class="p">,</span>
-                        <span class="n">allele_pseudosequences</span><span class="o">=</span><span class="n">masked_allele_pseudosequences</span><span class="p">)</span>
+                        <span class="n">allele_encoding</span><span class="o">=</span><span class="n">masked_allele_encoding</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_allele_specific_models</span><span class="p">:</span>
             <span class="n">query_alleles</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">normalized_allele</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
@@ -1013,9 +1016,15 @@
         <span class="n">df_predictions</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span>
             <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;model_&quot;</span><span class="p">)]</span>
         <span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">callable</span><span class="p">(</span><span class="n">centrality_measure</span><span class="p">):</span>
+            <span class="n">centrality_function</span> <span class="o">=</span> <span class="n">centrality_measure</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">centrality_function</span> <span class="o">=</span> <span class="n">CENTRALITY_MEASURES</span><span class="p">[</span><span class="n">centrality_measure</span><span class="p">]</span>
+
         <span class="n">logs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">df_predictions</span><span class="p">)</span>
-        <span class="n">log_means</span> <span class="o">=</span> <span class="n">logs</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;prediction&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_means</span><span class="p">)</span>
+        <span class="n">log_centers</span> <span class="o">=</span> <span class="n">centrality_function</span><span class="p">(</span><span class="n">logs</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;prediction&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_centers</span><span class="p">)</span>
         <span class="n">df</span><span class="p">[</span><span class="s2">&quot;prediction_low&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">logs</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
         <span class="n">df</span><span class="p">[</span><span class="s2">&quot;prediction_high&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">logs</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.95</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
 
@@ -1078,7 +1087,65 @@
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">loaded</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
         <span class="p">]</span>
         <span class="n">loaded</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">weights</span></div></div>
+        <span class="k">return</span> <span class="n">weights</span></div>
+
+<div class="viewcode-block" id="Class1AffinityPredictor.calibrate_percentile_ranks"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.calibrate_percentile_ranks">[docs]</a>    <span class="k">def</span> <span class="nf">calibrate_percentile_ranks</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">peptides</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">num_peptides_per_length</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="mf">1e5</span><span class="p">),</span>
+            <span class="n">alleles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">bins</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute the cumulative distribution of ic50 values for a set of alleles</span>
+<span class="sd">        over a large universe of random peptides, to enable computing quantiles in</span>
+<span class="sd">        this distribution later.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        peptides : sequence of string or EncodableSequences, optional</span>
+<span class="sd">            Peptides to use</span>
+<span class="sd">        num_peptides_per_length : int, optional</span>
+<span class="sd">            If peptides argument is not specified, then num_peptides_per_length</span>
+<span class="sd">            peptides are randomly sampled from a uniform distribution for each</span>
+<span class="sd">            supported length</span>
+<span class="sd">        alleles : sequence of string, optional</span>
+<span class="sd">            Alleles to perform calibration for. If not specified all supported</span>
+<span class="sd">            alleles will be calibrated.</span>
+<span class="sd">        bins : object</span>
+<span class="sd">            Anything that can be passed to numpy.histogram&#39;s &quot;bins&quot; argument</span>
+<span class="sd">            can be used here, i.e. either an integer or a sequence giving bin</span>
+<span class="sd">            edges. This is in ic50 space.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        ----------</span>
+<span class="sd">        EncodableSequences : peptides used for calibration</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">bins</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">bins</span> <span class="o">=</span> <span class="n">to_ic50</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1000</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">alleles</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">supported_alleles</span>
+
+        <span class="k">if</span> <span class="n">peptides</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">peptides</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">lengths</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">supported_peptide_lengths</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">supported_peptide_lengths</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
+                <span class="n">peptides</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="n">random_peptides</span><span class="p">(</span><span class="n">num_peptides_per_length</span><span class="p">,</span> <span class="n">length</span><span class="p">))</span>
+
+        <span class="n">encoded_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">allele</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alleles</span><span class="p">):</span>
+            <span class="n">predictions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">encoded_peptides</span><span class="p">,</span> <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">)</span>
+            <span class="n">transform</span> <span class="o">=</span> <span class="n">PercentRankTransform</span><span class="p">()</span>
+            <span class="n">transform</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">predictions</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">bins</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="n">transform</span>
+
+        <span class="k">return</span> <span class="n">encoded_peptides</span></div></div>
+
+
 </pre></div>
 
            </div>
@@ -1094,7 +1161,7 @@
   <div role="contentinfo">
     <p>
         &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Dec 22, 2017.
+      Last updated on Feb 06, 2018.
 
     </p>
   </div>
@@ -1116,7 +1183,7 @@
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../../',
-            VERSION:'1.0.0',
+            VERSION:'1.1.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

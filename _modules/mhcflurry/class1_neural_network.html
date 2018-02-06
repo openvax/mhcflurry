@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.class1_neural_network &mdash; MHCflurry 1.0.0 documentation</title>
+  <title>mhcflurry.class1_neural_network &mdash; MHCflurry 1.1.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.0.0 documentation" href="../../index.html"/>
+    <link rel="top" title="MHCflurry 1.1.0 documentation" href="../../index.html"/>
         <link rel="up" title="Module code" href="../index.html"/> 
 
   
@@ -63,7 +63,7 @@
             
             
               <div class="version">
-                1.0.0
+                1.1.0
               </div>
             
           
@@ -166,12 +166,13 @@
 <span class="kn">import</span> <span class="nn">numpy</span>
 <span class="kn">import</span> <span class="nn">pandas</span>
 
-<span class="kn">from</span> <span class="nn">mhcflurry.hyperparameters</span> <span class="k">import</span> <span class="n">HyperparameterDefaults</span>
+<span class="kn">from</span> <span class="nn">.hyperparameters</span> <span class="k">import</span> <span class="n">HyperparameterDefaults</span>
 
-<span class="kn">from</span> <span class="nn">mhcflurry.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span>
-<span class="kn">from</span> <span class="nn">mhcflurry.amino_acid</span> <span class="k">import</span> <span class="n">available_vector_encodings</span><span class="p">,</span> <span class="n">vector_encoding_length</span>
-<span class="kn">from</span> <span class="nn">mhcflurry.regression_target</span> <span class="k">import</span> <span class="n">to_ic50</span><span class="p">,</span> <span class="n">from_ic50</span>
-<span class="kn">from</span> <span class="nn">mhcflurry.common</span> <span class="k">import</span> <span class="n">random_peptides</span><span class="p">,</span> <span class="n">amino_acid_distribution</span>
+<span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span>
+<span class="kn">from</span> <span class="nn">.amino_acid</span> <span class="k">import</span> <span class="n">available_vector_encodings</span><span class="p">,</span> <span class="n">vector_encoding_length</span>
+<span class="kn">from</span> <span class="nn">.regression_target</span> <span class="k">import</span> <span class="n">to_ic50</span><span class="p">,</span> <span class="n">from_ic50</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">random_peptides</span><span class="p">,</span> <span class="n">amino_acid_distribution</span>
+<span class="kn">from</span> <span class="nn">.custom_loss</span> <span class="k">import</span> <span class="n">CUSTOM_LOSSES</span>
 
 
 <div class="viewcode-block" id="Class1NeuralNetwork"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork">[docs]</a><span class="k">class</span> <span class="nc">Class1NeuralNetwork</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
@@ -187,11 +188,13 @@
 
     <span class="n">network_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
         <span class="n">kmer_size</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
-        <span class="n">use_embedding</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
         <span class="n">peptide_amino_acid_encoding</span><span class="o">=</span><span class="s2">&quot;one-hot&quot;</span><span class="p">,</span>
         <span class="n">embedding_input_dim</span><span class="o">=</span><span class="mi">21</span><span class="p">,</span>
         <span class="n">embedding_output_dim</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
-        <span class="n">pseudosequence_use_embedding</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">allele_dense_layer_sizes</span><span class="o">=</span><span class="p">[],</span>
+        <span class="n">peptide_dense_layer_sizes</span><span class="o">=</span><span class="p">[],</span>
+        <span class="n">peptide_allele_merge_method</span><span class="o">=</span><span class="s2">&quot;multiply&quot;</span><span class="p">,</span>
+        <span class="n">peptide_allele_merge_activation</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
         <span class="n">layer_sizes</span><span class="o">=</span><span class="p">[</span><span class="mi">32</span><span class="p">],</span>
         <span class="n">dense_layer_l1_regularization</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
         <span class="n">dense_layer_l2_regularization</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
@@ -267,13 +270,46 @@
 <span class="sd">    Combined set of all supported hyperparameters and their default values.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
+    <span class="c1"># Hyperparameter renames.</span>
+    <span class="c1"># These are updated from time to time as new versions are developed. It</span>
+    <span class="c1"># provides a primitive way to allow new code to work with models trained</span>
+    <span class="c1"># using older code.</span>
+    <span class="c1"># None indicates the hyperparameter has been dropped.</span>
+    <span class="n">hyperparameter_renames</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;use_embedding&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;pseudosequence_use_embedding&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">}</span>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.apply_hyperparameter_renames"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.apply_hyperparameter_renames">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">apply_hyperparameter_renames</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">hyperparameters</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handle hyperparameter renames.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        hyperparameters : dict</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict : updated hyperparameters</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">from_name</span><span class="p">,</span> <span class="n">to_name</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">hyperparameter_renames</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">from_name</span> <span class="ow">in</span> <span class="n">hyperparameters</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">from_name</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">to_name</span><span class="p">:</span>
+                    <span class="n">hyperparameters</span><span class="p">[</span><span class="n">to_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">return</span> <span class="n">hyperparameters</span></div>
+
+
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">hyperparameters</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameter_defaults</span><span class="o">.</span><span class="n">with_defaults</span><span class="p">(</span>
-            <span class="n">hyperparameters</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">apply_hyperparameter_renames</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">))</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_network</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">network_json</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">network_weights_loader</span> <span class="o">=</span> <span class="kc">None</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fit_seconds</span> <span class="o">=</span> <span class="kc">None</span>
@@ -284,6 +320,13 @@
 <span class="sd">    Process-wide keras model cache, a map from: architecture JSON string to</span>
 <span class="sd">    (Keras model, existing network weights)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.clear_model_cache"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.clear_model_cache">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">clear_model_cache</span><span class="p">(</span><span class="n">klass</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Clear the Keras model cache.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.borrow_cached_network"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.borrow_cached_network">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">borrow_cached_network</span><span class="p">(</span><span class="n">klass</span><span class="p">,</span> <span class="n">network_json</span><span class="p">,</span> <span class="n">network_weights</span><span class="p">):</span>
@@ -336,6 +379,7 @@
 <span class="sd">        keras.models.Model</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">network_json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">load_weights</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">borrow</span><span class="p">:</span>
                 <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">borrow_cached_network</span><span class="p">(</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">network_json</span><span class="p">,</span>
@@ -366,10 +410,11 @@
         <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
         <span class="n">result</span><span class="p">[</span><span class="s1">&#39;_network&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">result</span><span class="p">[</span><span class="s1">&#39;network_weights&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;network_weights_loader&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">result</span></div>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.from_config"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.from_config">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weights_loader</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        deserialize from a dict returned by get_config().</span>
 <span class="sd">        </span>
@@ -378,6 +423,8 @@
 <span class="sd">        config : dict</span>
 <span class="sd">        weights : list of array, optional</span>
 <span class="sd">            Network weights to restore</span>
+<span class="sd">        weights_loader : callable, optional</span>
+<span class="sd">            Function to call (no arguments) to load weights when needed</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
@@ -388,7 +435,19 @@
         <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">config</span><span class="p">),</span> <span class="n">config</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
         <span class="n">instance</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
         <span class="n">instance</span><span class="o">.</span><span class="n">network_weights</span> <span class="o">=</span> <span class="n">weights</span>
+        <span class="n">instance</span><span class="o">.</span><span class="n">network_weights_loader</span> <span class="o">=</span> <span class="n">weights_loader</span>
         <span class="k">return</span> <span class="n">instance</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.load_weights"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.load_weights">[docs]</a>    <span class="k">def</span> <span class="nf">load_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load weights by evaluating self.network_weights_loader, if needed.</span>
+
+<span class="sd">        After calling this, self.network_weights_loader will be None and</span>
+<span class="sd">        self.network_weights will be the weights list, if available.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">network_weights_loader</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">network_weights_loader</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">network_weights_loader</span> <span class="o">=</span> <span class="kc">None</span></div>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.get_weights"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.get_weights">[docs]</a>    <span class="k">def</span> <span class="nf">get_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -400,6 +459,7 @@
 <span class="sd">        or None if there is no network</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">update_network_description</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">load_weights</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span></div>
 
     <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -412,7 +472,7 @@
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">update_network_description</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">update_network_description</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">load_weights</span><span class="p">()</span>
         <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
         <span class="n">result</span><span class="p">[</span><span class="s1">&#39;_network&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">result</span>
@@ -431,8 +491,7 @@
 <span class="sd">        numpy.array</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">encoder</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
-        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;use_embedding&#39;</span><span class="p">]</span> <span class="ow">or</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;peptide_amino_acid_encoding&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;embedding&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;peptide_amino_acid_encoding&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;embedding&quot;</span><span class="p">):</span>
             <span class="n">encoded</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">variable_length_to_fixed_length_categorical</span><span class="p">(</span>
                 <span class="n">max_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;kmer_size&#39;</span><span class="p">],</span>
                 <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">input_encoding_hyperparameter_defaults</span><span class="o">.</span><span class="n">subselect</span><span class="p">(</span>
@@ -466,34 +525,29 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;right_edge&#39;</span><span class="p">],</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;kmer_size&#39;</span><span class="p">])</span>
 
-<div class="viewcode-block" id="Class1NeuralNetwork.pseudosequence_to_network_input"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.pseudosequence_to_network_input">[docs]</a>    <span class="k">def</span> <span class="nf">pseudosequence_to_network_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pseudosequences</span><span class="p">):</span>
+<div class="viewcode-block" id="Class1NeuralNetwork.allele_encoding_to_network_input"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.allele_encoding_to_network_input">[docs]</a>    <span class="k">def</span> <span class="nf">allele_encoding_to_network_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele_encoding</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Encode pseudosequences to the fixed-length encoding expected by the neural</span>
+<span class="sd">        Encode alleles to the fixed-length encoding expected by the neural</span>
 <span class="sd">        network (which depends on the architecture).</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        pseudosequences : EncodableSequences or list of string</span>
+<span class="sd">        allele_encoding : AlleleEncoding</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
 <span class="sd">        numpy.array</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">encoder</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">pseudosequences</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;pseudosequence_use_embedding&#39;</span><span class="p">]:</span>
-            <span class="n">encoded</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">fixed_length_categorical</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
-            <span class="c1"># encoded = encoder.fixed_length_one_hot()</span>
-        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">encoded</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">pseudosequences</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">encoded</span></div>
+        <span class="k">return</span> <span class="n">allele_encoding</span><span class="o">.</span><span class="n">fixed_length_vector_encoded_sequences</span><span class="p">(</span><span class="s2">&quot;BLOSUM62&quot;</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.fit"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.fit">[docs]</a>    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">peptides</span><span class="p">,</span>
             <span class="n">affinities</span><span class="p">,</span>
-            <span class="n">allele_pseudosequences</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">allele_encoding</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">inequalities</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">sample_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">shuffle_permutation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
             <span class="n">progress_preamble</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -506,14 +560,26 @@
 <span class="sd">        affinities : list of float</span>
 <span class="sd">            nM affinities. Must be same length of as peptides.</span>
 <span class="sd">        </span>
-<span class="sd">        allele_pseudosequences : EncodableSequences or list of string, optional</span>
+<span class="sd">        allele_encoding : AlleleEncoding, optional</span>
 <span class="sd">            If not specified, the model will be a single-allele predictor.</span>
+
+<span class="sd">        inequalities : list of string, each element one of &quot;&gt;&quot;, &quot;&lt;&quot;, or &quot;=&quot;.</span>
+<span class="sd">            Inequalities to use for fitting. Same length as affinities.</span>
+<span class="sd">            Each element must be one of &quot;&gt;&quot;, &quot;&lt;&quot;, or &quot;=&quot;. For example, a &quot;&gt;&quot;</span>
+<span class="sd">            will train on y_pred &gt; y_true for that element in the training set.</span>
+<span class="sd">            Requires using a custom losses that support inequalities (e.g.</span>
+<span class="sd">            mse_with_ineqalities).</span>
+<span class="sd">            If None all inequalities are taken to be &quot;=&quot;.</span>
 <span class="sd">            </span>
 <span class="sd">        sample_weights : list of float, optional</span>
 <span class="sd">            If not specified, all samples (including random negatives added</span>
 <span class="sd">            during training) will have equal weight. If specified, the random</span>
 <span class="sd">            negatives will be assigned weight=1.0.</span>
-<span class="sd">        </span>
+
+<span class="sd">        shuffle_permutation : list of int, optional</span>
+<span class="sd">            Permutation (integer list) of same length as peptides and affinities</span>
+<span class="sd">            If None, then a random permutation will be generated.</span>
+
 <span class="sd">        verbose : int</span>
 <span class="sd">            Keras verbosity level</span>
 
@@ -552,43 +618,121 @@
 
         <span class="n">y_values</span> <span class="o">=</span> <span class="n">from_ic50</span><span class="p">(</span><span class="n">affinities</span><span class="p">)</span>
         <span class="k">assert</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y_values</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y_values</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">inequalities</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Reverse inequalities because from_ic50() flips the direction</span>
+            <span class="c1"># (i.e. lower affinity results in higher y values).</span>
+            <span class="n">adjusted_inequalities</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">inequalities</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">({</span>
+                <span class="s2">&quot;=&quot;</span><span class="p">:</span> <span class="s2">&quot;=&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;&gt;&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;&lt;&quot;</span><span class="p">:</span> <span class="s2">&quot;&gt;&quot;</span><span class="p">,</span>
+            <span class="p">})</span><span class="o">.</span><span class="n">values</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">adjusted_inequalities</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_values</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">adjusted_inequalities</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_values</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Inequalities and y_values must have same length&quot;</span><span class="p">)</span>
 
         <span class="n">x_dict_without_random_negatives</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s1">&#39;peptide&#39;</span><span class="p">:</span> <span class="n">peptide_encoding</span><span class="p">,</span>
         <span class="p">}</span>
-        <span class="n">pseudosequence_length</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="k">if</span> <span class="n">allele_pseudosequences</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">pseudosequences_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pseudosequence_to_network_input</span><span class="p">(</span>
-                <span class="n">allele_pseudosequences</span><span class="p">)</span>
-            <span class="n">pseudosequence_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pseudosequences_input</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-            <span class="n">x_dict_without_random_negatives</span><span class="p">[</span><span class="s1">&#39;pseudosequence&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">pseudosequences_input</span><span class="p">)</span>
+        <span class="n">allele_encoding_dims</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">allele_encoding</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">allele_encoding_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_encoding_to_network_input</span><span class="p">(</span>
+                <span class="n">allele_encoding</span><span class="p">)</span>
+            <span class="n">allele_encoding_dims</span> <span class="o">=</span> <span class="n">allele_encoding_input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="n">x_dict_without_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">allele_encoding_input</span>
+
+        <span class="c1"># Shuffle y_values and the contents of x_dict_without_random_negatives</span>
+        <span class="c1"># This ensures different data is used for the test set for early stopping</span>
+        <span class="c1"># when multiple models are trained.</span>
+        <span class="k">if</span> <span class="n">shuffle_permutation</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">shuffle_permutation</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y_values</span><span class="p">))</span>
+        <span class="n">y_values</span> <span class="o">=</span> <span class="n">y_values</span><span class="p">[</span><span class="n">shuffle_permutation</span><span class="p">]</span>
+        <span class="n">peptide_encoding</span> <span class="o">=</span> <span class="n">peptide_encoding</span><span class="p">[</span><span class="n">shuffle_permutation</span><span class="p">]</span>
+        <span class="n">adjusted_inequalities</span> <span class="o">=</span> <span class="n">adjusted_inequalities</span><span class="p">[</span><span class="n">shuffle_permutation</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">x_dict_without_random_negatives</span><span class="p">:</span>
+            <span class="n">x_dict_without_random_negatives</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">x_dict_without_random_negatives</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="n">shuffle_permutation</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">sample_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sample_weights</span> <span class="o">=</span> <span class="n">sample_weights</span><span class="p">[</span><span class="n">shuffle_permutation</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;custom:&quot;</span><span class="p">):</span>
+            <span class="c1"># Using a custom loss that supports inequalities</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">custom_loss</span> <span class="o">=</span> <span class="n">CUSTOM_LOSSES</span><span class="p">[</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;custom:&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="p">]</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;No such custom loss function: </span><span class="si">%s</span><span class="s2">. Supported losses are: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">],</span>
+                        <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
+                            <span class="s2">&quot;custom:&quot;</span> <span class="o">+</span> <span class="n">loss_name</span> <span class="k">for</span> <span class="n">loss_name</span> <span class="ow">in</span> <span class="n">CUSTOM_LOSSES</span>
+                        <span class="p">])))</span>
+            <span class="n">loss_name_or_function</span> <span class="o">=</span> <span class="n">custom_loss</span><span class="o">.</span><span class="n">loss</span>
+            <span class="n">loss_supports_inequalities</span> <span class="o">=</span> <span class="n">custom_loss</span><span class="o">.</span><span class="n">supports_inequalities</span>
+            <span class="n">loss_encode_y_function</span> <span class="o">=</span> <span class="n">custom_loss</span><span class="o">.</span><span class="n">encode_y</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Using a regular keras loss. No inequalities supported.</span>
+            <span class="n">loss_name_or_function</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">]</span>
+            <span class="n">loss_supports_inequalities</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">loss_encode_y_function</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">loss_supports_inequalities</span> <span class="ow">and</span> <span class="p">(</span>
+                <span class="nb">any</span><span class="p">(</span><span class="n">inequality</span> <span class="o">!=</span> <span class="s2">&quot;=&quot;</span> <span class="k">for</span> <span class="n">inequality</span> <span class="ow">in</span> <span class="n">adjusted_inequalities</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Loss </span><span class="si">%s</span><span class="s2"> does not support inequalities&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">loss_name_or_function</span><span class="p">))</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_network</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_network</span><span class="p">(</span>
-                <span class="n">pseudosequence_length</span><span class="o">=</span><span class="n">pseudosequence_length</span><span class="p">,</span>
+                <span class="n">allele_encoding_dims</span><span class="o">=</span><span class="n">allele_encoding_dims</span><span class="p">,</span>
                 <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">network_hyperparameter_defaults</span><span class="o">.</span><span class="n">subselect</span><span class="p">(</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">))</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">compile</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">()</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+                <span class="n">loss</span><span class="o">=</span><span class="n">loss_name_or_function</span><span class="p">,</span>
+                <span class="n">optimizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;optimizer&#39;</span><span class="p">])</span>
 
-        <span class="n">y_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;output&quot;</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
-                <span class="n">from_ic50</span><span class="p">(</span>
-                    <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
-                            <span class="s1">&#39;random_negative_affinity_min&#39;</span><span class="p">],</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
-                            <span class="s1">&#39;random_negative_affinity_max&#39;</span><span class="p">],</span>
-                        <span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">()))),</span>
-                <span class="n">y_values</span><span class="p">,</span>
-            <span class="p">]),</span>
-        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">loss_supports_inequalities</span><span class="p">:</span>
+            <span class="c1"># Do not sample negative affinities: just use an inequality.</span>
+            <span class="n">random_negative_ic50</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_affinity_min&#39;</span><span class="p">]</span>
+            <span class="n">random_negative_target</span> <span class="o">=</span> <span class="n">from_ic50</span><span class="p">(</span><span class="n">random_negative_ic50</span><span class="p">)</span>
+
+            <span class="n">y_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;output&quot;</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                    <span class="n">numpy</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span>
+                        <span class="n">random_negative_target</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">())),</span>
+                    <span class="n">y_values</span><span class="p">,</span>
+                <span class="p">]),</span>
+            <span class="p">}</span>
+            <span class="c1"># Note: we are using &quot;&lt;&quot; here not &quot;&gt;&quot; because the inequalities are</span>
+            <span class="c1"># now in target-space (0-1) not affinity-space.</span>
+            <span class="n">adjusted_inequalities_with_random_negatives</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">[</span><span class="s2">&quot;&lt;&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span> <span class="o">+</span>
+                <span class="nb">list</span><span class="p">(</span><span class="n">adjusted_inequalities</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Randomly sample random negative affinities</span>
+            <span class="n">y_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;output&quot;</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                    <span class="n">from_ic50</span><span class="p">(</span>
+                        <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                                <span class="s1">&#39;random_negative_affinity_min&#39;</span><span class="p">],</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                                <span class="s1">&#39;random_negative_affinity_max&#39;</span><span class="p">],</span>
+                            <span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">()))),</span>
+                    <span class="n">y_values</span><span class="p">,</span>
+                <span class="p">]),</span>
+            <span class="p">}</span>
         <span class="k">if</span> <span class="n">sample_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">sample_weights_with_random_negatives</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
                 <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">())),</span>
                 <span class="n">sample_weights</span><span class="p">])</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">sample_weights_with_random_negatives</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">loss_encode_y_function</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">y_dict_with_random_negatives</span><span class="p">[</span><span class="s1">&#39;output&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">loss_encode_y_function</span><span class="p">(</span>
+                <span class="n">y_dict_with_random_negatives</span><span class="p">[</span><span class="s1">&#39;output&#39;</span><span class="p">],</span>
+                <span class="n">adjusted_inequalities_with_random_negatives</span><span class="p">)</span>
 
         <span class="n">val_losses</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">min_val_loss_iteration</span> <span class="o">=</span> <span class="kc">None</span>
@@ -597,6 +741,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
         <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
         <span class="n">last_progress_print</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">x_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;max_epochs&#39;</span><span class="p">]):</span>
             <span class="n">random_negative_peptides_list</span> <span class="o">=</span> <span class="p">[]</span>
             <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span> <span class="ow">in</span> <span class="n">num_random_negative</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
@@ -605,21 +750,45 @@
                         <span class="n">count</span><span class="p">,</span>
                         <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">,</span>
                         <span class="n">distribution</span><span class="o">=</span><span class="n">aa_distribution</span><span class="p">))</span>
+            <span class="n">random_negative_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+                <span class="n">random_negative_peptides_list</span><span class="p">)</span>
             <span class="n">random_negative_peptides_encoding</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span>
-                    <span class="n">random_negative_peptides_list</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">))</span>
 
-            <span class="n">x_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{</span>
-                <span class="s2">&quot;peptide&quot;</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
-                    <span class="n">random_negative_peptides_encoding</span><span class="p">,</span>
-                    <span class="n">peptide_encoding</span><span class="p">,</span>
-                <span class="p">])</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides_encoding</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
-                <span class="k">else</span> <span class="n">peptide_encoding</span>
-            <span class="p">}</span>
-            <span class="k">if</span> <span class="n">pseudosequence_length</span><span class="p">:</span>
-                <span class="c1"># TODO: add random pseudosequences for random negative peptides</span>
-                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                    <span class="s2">&quot;Allele pseudosequences unsupported with random negatives&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">x_dict_with_random_negatives</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s2">&quot;peptide&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                        <span class="n">random_negative_peptides_encoding</span><span class="p">,</span>
+                        <span class="n">peptide_encoding</span><span class="p">,</span>
+                    <span class="p">])</span>
+                    <span class="k">if</span> <span class="s1">&#39;allele&#39;</span> <span class="ow">in</span> <span class="n">x_dict_without_random_negatives</span><span class="p">:</span>
+                        <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                            <span class="n">x_dict_without_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">][</span>
+                                <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+                                    <span class="n">x_dict_without_random_negatives</span><span class="p">[</span>
+                                        <span class="s1">&#39;allele&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                                    <span class="n">size</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides_list</span><span class="p">))],</span>
+                            <span class="n">x_dict_without_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">]</span>
+                        <span class="p">])</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">x_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">x_dict_without_random_negatives</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Update x_dict_with_random_negatives in place.</span>
+                <span class="c1"># This is more memory efficient than recreating it as above.</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s2">&quot;peptide&quot;</span><span class="p">][:</span><span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">random_negative_peptides_encoding</span>
+                    <span class="p">)</span>
+                    <span class="k">if</span> <span class="s1">&#39;allele&#39;</span> <span class="ow">in</span> <span class="n">x_dict_with_random_negatives</span><span class="p">:</span>
+                        <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">][:</span><span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span>
+                            <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">][</span>
+                                <span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">)</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+                                    <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span>
+                                    <span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">),</span>
+                                    <span class="n">size</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">))</span>
+                            <span class="p">]</span>
+                        <span class="p">)</span>
 
             <span class="n">fit_history</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
                 <span class="n">x_dict_with_random_negatives</span><span class="p">,</span>
@@ -660,7 +829,7 @@
                         <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;patience&#39;</span><span class="p">])</span>
                     <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="n">threshold</span><span class="p">:</span>
                         <span class="nb">print</span><span class="p">((</span><span class="n">progress_preamble</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span>
-                            <span class="s2">&quot;Early stopping at epoch </span><span class="si">%3d</span><span class="s2"> / </span><span class="si">%3d</span><span class="s2">: loss=</span><span class="si">%g</span><span class="s2">. &quot;</span>
+                            <span class="s2">&quot;Stopping at epoch </span><span class="si">%3d</span><span class="s2"> / </span><span class="si">%3d</span><span class="s2">: loss=</span><span class="si">%g</span><span class="s2">. &quot;</span>
                             <span class="s2">&quot;Min val loss (</span><span class="si">%s</span><span class="s2">) at epoch </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
                                 <span class="n">i</span><span class="p">,</span>
                                 <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;max_epochs&#39;</span><span class="p">],</span>
@@ -670,7 +839,7 @@
                         <span class="k">break</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fit_seconds</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span></div>
 
-<div class="viewcode-block" id="Class1NeuralNetwork.predict"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.predict">[docs]</a>    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">allele_pseudosequences</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4096</span><span class="p">):</span>
+<div class="viewcode-block" id="Class1NeuralNetwork.predict"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.predict">[docs]</a>    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">allele_encoding</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4096</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict affinities</span>
 <span class="sd">        </span>
@@ -678,7 +847,7 @@
 <span class="sd">        ----------</span>
 <span class="sd">        peptides : EncodableSequences or list of string</span>
 <span class="sd">        </span>
-<span class="sd">        allele_pseudosequences : EncodableSequences or list of string, optional</span>
+<span class="sd">        allele_pseudosequences : AlleleEncoding, optional</span>
 <span class="sd">            Only required when this model is a pan-allele model</span>
 
 <span class="sd">        batch_size : int</span>
@@ -691,33 +860,26 @@
         <span class="n">x_dict</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s1">&#39;peptide&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
         <span class="p">}</span>
-        <span class="k">if</span> <span class="n">allele_pseudosequences</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">pseudosequences_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pseudosequence_to_network_input</span><span class="p">(</span>
-                <span class="n">allele_pseudosequences</span><span class="p">)</span>
-            <span class="n">x_dict</span><span class="p">[</span><span class="s1">&#39;pseudosequence&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pseudosequences_input</span>
+        <span class="k">if</span> <span class="n">allele_encoding</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">allele_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_encoding_to_network_input</span><span class="p">(</span><span class="n">allele_encoding</span><span class="p">)</span>
+            <span class="n">x_dict</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">allele_input</span>
 
         <span class="n">network</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">(</span><span class="n">borrow</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">raw_predictions</span> <span class="o">=</span> <span class="n">network</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">x_dict</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span>
         <span class="n">predictions</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">raw_predictions</span><span class="p">,</span> <span class="n">dtype</span> <span class="o">=</span> <span class="s2">&quot;float64&quot;</span><span class="p">)[:,</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">to_ic50</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Class1NeuralNetwork.compile"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.compile">[docs]</a>    <span class="k">def</span> <span class="nf">compile</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Compile the keras model. Used internally.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">()</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-            <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_hyperparameter_defaults</span><span class="o">.</span><span class="n">subselect</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">))</span></div>
-
 <div class="viewcode-block" id="Class1NeuralNetwork.make_network"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.make_network">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">make_network</span><span class="p">(</span>
-            <span class="n">pseudosequence_length</span><span class="p">,</span>
+            <span class="n">allele_encoding_dims</span><span class="p">,</span>
             <span class="n">kmer_size</span><span class="p">,</span>
             <span class="n">peptide_amino_acid_encoding</span><span class="p">,</span>
-            <span class="n">use_embedding</span><span class="p">,</span>
             <span class="n">embedding_input_dim</span><span class="p">,</span>
             <span class="n">embedding_output_dim</span><span class="p">,</span>
-            <span class="n">pseudosequence_use_embedding</span><span class="p">,</span>
+            <span class="n">allele_dense_layer_sizes</span><span class="p">,</span>
+            <span class="n">peptide_dense_layer_sizes</span><span class="p">,</span>
+            <span class="n">peptide_allele_merge_method</span><span class="p">,</span>
+            <span class="n">peptide_allele_merge_activation</span><span class="p">,</span>
             <span class="n">layer_sizes</span><span class="p">,</span>
             <span class="n">dense_layer_l1_regularization</span><span class="p">,</span>
             <span class="n">dense_layer_l2_regularization</span><span class="p">,</span>
@@ -741,7 +903,7 @@
         <span class="kn">from</span> <span class="nn">keras.layers.embeddings</span> <span class="k">import</span> <span class="n">Embedding</span>
         <span class="kn">from</span> <span class="nn">keras.layers.normalization</span> <span class="k">import</span> <span class="n">BatchNormalization</span>
 
-        <span class="k">if</span> <span class="n">use_embedding</span> <span class="ow">or</span> <span class="n">peptide_amino_acid_encoding</span> <span class="o">==</span> <span class="s2">&quot;embedding&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">peptide_amino_acid_encoding</span> <span class="o">==</span> <span class="s2">&quot;embedding&quot;</span><span class="p">:</span>
             <span class="n">peptide_input</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span>
                 <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">kmer_size</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;int32&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;peptide&#39;</span><span class="p">)</span>
             <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Embedding</span><span class="p">(</span>
@@ -761,12 +923,25 @@
 
         <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">peptide_input</span><span class="p">]</span>
 
+        <span class="n">kernel_regularizer</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">l1</span> <span class="o">=</span> <span class="n">dense_layer_l1_regularization</span>
+        <span class="n">l2</span> <span class="o">=</span> <span class="n">dense_layer_l2_regularization</span>
+        <span class="k">if</span> <span class="n">l1</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">l2</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">kernel_regularizer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">regularizers</span><span class="o">.</span><span class="n">l1_l2</span><span class="p">(</span><span class="n">l1</span><span class="p">,</span> <span class="n">l2</span><span class="p">)</span>
+
         <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">locally_connected_params</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">locally_connected_layers</span><span class="p">):</span>
             <span class="n">current_layer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">LocallyConnected1D</span><span class="p">(</span>
                 <span class="n">name</span><span class="o">=</span><span class="s2">&quot;lc_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">,</span>
                 <span class="o">**</span><span class="n">locally_connected_params</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
 
         <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Flatten</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;flattened_0&quot;</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">layer_size</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">peptide_dense_layer_sizes</span><span class="p">):</span>
+            <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Dense</span><span class="p">(</span>
+                <span class="n">layer_size</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;peptide_dense_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">,</span>
+                <span class="n">kernel_regularizer</span><span class="o">=</span><span class="n">kernel_regularizer</span><span class="p">,</span>
+                <span class="n">activation</span><span class="o">=</span><span class="n">activation</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">batch_normalization</span><span class="p">:</span>
             <span class="n">current_layer</span> <span class="o">=</span> <span class="n">BatchNormalization</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;batch_norm_early&quot;</span><span class="p">)(</span>
@@ -776,37 +951,41 @@
             <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Dropout</span><span class="p">(</span><span class="n">dropout_probability</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;dropout_early&quot;</span><span class="p">)(</span>
                 <span class="n">current_layer</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">pseudosequence_length</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">pseudosequence_use_embedding</span><span class="p">:</span>
-                <span class="n">pseudosequence_input</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span>
-                    <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">pseudosequence_length</span><span class="p">,),</span>
-                    <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;int32&#39;</span><span class="p">,</span>
-                    <span class="n">name</span><span class="o">=</span><span class="s1">&#39;pseudosequence&#39;</span><span class="p">)</span>
-                <span class="n">pseudo_embedding_layer</span> <span class="o">=</span> <span class="n">Embedding</span><span class="p">(</span>
-                    <span class="n">input_dim</span><span class="o">=</span><span class="n">embedding_input_dim</span><span class="p">,</span>
-                    <span class="n">output_dim</span><span class="o">=</span><span class="n">embedding_output_dim</span><span class="p">,</span>
-                    <span class="n">input_length</span><span class="o">=</span><span class="n">pseudosequence_length</span><span class="p">,</span>
-                    <span class="n">embeddings_initializer</span><span class="o">=</span><span class="n">embedding_init_method</span><span class="p">)(</span>
-                    <span class="n">pseudosequence_input</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">pseudosequence_input</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span>
-                    <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">pseudosequence_length</span><span class="p">,</span> <span class="mi">21</span><span class="p">),</span>
-                    <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float32&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;peptide&#39;</span><span class="p">)</span>
-                <span class="n">pseudo_embedding_layer</span> <span class="o">=</span> <span class="n">pseudosequence_input</span>
-            <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pseudosequence_input</span><span class="p">)</span>
-            <span class="n">pseudo_embedding_layer</span> <span class="o">=</span> <span class="n">Flatten</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;flattened_1&quot;</span><span class="p">)(</span>
-                <span class="n">pseudo_embedding_layer</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">allele_encoding_dims</span><span class="p">:</span>
+            <span class="n">allele_input</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span>
+                <span class="n">shape</span><span class="o">=</span><span class="n">allele_encoding_dims</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float32&#39;</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="s1">&#39;allele&#39;</span><span class="p">)</span>
+            <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">allele_input</span><span class="p">)</span>
+            <span class="n">allele_embedding_layer</span> <span class="o">=</span> <span class="n">Flatten</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;allele_flat&quot;</span><span class="p">)(</span><span class="n">allele_input</span><span class="p">)</span>
 
-            <span class="n">current_layer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
-                <span class="n">current_layer</span><span class="p">,</span> <span class="n">pseudo_embedding_layer</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;concatenated_0&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">layer_size</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">allele_dense_layer_sizes</span><span class="p">):</span>
+                <span class="n">allele_embedding_layer</span> <span class="o">=</span> <span class="n">Dense</span><span class="p">(</span>
+                    <span class="n">layer_size</span><span class="p">,</span>
+                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;allele_dense_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">,</span>
+                    <span class="n">kernel_regularizer</span><span class="o">=</span><span class="n">kernel_regularizer</span><span class="p">,</span>
+                    <span class="n">activation</span><span class="o">=</span><span class="n">activation</span><span class="p">)(</span><span class="n">allele_embedding_layer</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">peptide_allele_merge_method</span> <span class="o">==</span> <span class="s1">&#39;concatenate&#39;</span><span class="p">:</span>
+                <span class="n">current_layer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                    <span class="n">current_layer</span><span class="p">,</span> <span class="n">allele_embedding_layer</span>
+                <span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;allele_peptide_merged&quot;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">peptide_allele_merge_method</span> <span class="o">==</span> <span class="s1">&#39;multiply&#39;</span><span class="p">:</span>
+                <span class="n">current_layer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">multiply</span><span class="p">([</span>
+                    <span class="n">current_layer</span><span class="p">,</span> <span class="n">allele_embedding_layer</span>
+                <span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;allele_peptide_merged&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Unsupported peptide_allele_encoding_merge_method: </span><span class="si">%s</span><span class="s2">&quot;</span>
+                    <span class="o">%</span> <span class="n">peptide_allele_merge_method</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">peptide_allele_merge_activation</span><span class="p">:</span>
+                <span class="n">current_layer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">Activation</span><span class="p">(</span>
+                    <span class="n">peptide_allele_merge_activation</span><span class="p">,</span>
+                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;alelle_peptide_merged_</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span>
+                         <span class="n">peptide_allele_merge_activation</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
             
         <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">layer_size</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">layer_sizes</span><span class="p">):</span>
-            <span class="n">kernel_regularizer</span> <span class="o">=</span> <span class="kc">None</span>
-            <span class="n">l1</span> <span class="o">=</span> <span class="n">dense_layer_l1_regularization</span>
-            <span class="n">l2</span> <span class="o">=</span> <span class="n">dense_layer_l2_regularization</span>
-            <span class="k">if</span> <span class="n">l1</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">l2</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="n">kernel_regularizer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">regularizers</span><span class="o">.</span><span class="n">l1_l2</span><span class="p">(</span><span class="n">l1</span><span class="p">,</span> <span class="n">l2</span><span class="p">)</span>
-
             <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Dense</span><span class="p">(</span>
                 <span class="n">layer_size</span><span class="p">,</span>
                 <span class="n">activation</span><span class="o">=</span><span class="n">activation</span><span class="p">,</span>
@@ -846,7 +1025,7 @@
   <div role="contentinfo">
     <p>
         &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Dec 22, 2017.
+      Last updated on Feb 06, 2018.
 
     </p>
   </div>
@@ -868,7 +1047,7 @@
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../../',
-            VERSION:'1.0.0',
+            VERSION:'1.1.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

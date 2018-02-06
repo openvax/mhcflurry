@@ -65,7 +65,7 @@ We can get the path to this data from Python using `mhcflurry.downloads.get_path
 .. runblock:: pycon
 
     >>> from mhcflurry.downloads import get_path
-    >>> data_path = get_path("data_curated", "curated_training_data.csv.bz2")
+    >>> data_path = get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2")
     >>> data_path
 
 Now let's load it with pandas and filter to reasonably-sized peptides:
@@ -87,14 +87,15 @@ some models.
     >>> single_allele_train_data = df.loc[df.allele == "HLA-B*57:01"].sample(100)
     >>> new_predictor.fit_allele_specific_predictors(
     ...    n_models=1,
-    ...    architecture_hyperparameters={
+    ...    architecture_hyperparameters_list=[{
     ...         "layer_sizes": [16],
     ...         "max_epochs": 5,
     ...         "random_negative_constant": 5,
-    ...    },
+    ...    }],
     ...    peptides=single_allele_train_data.peptide.values,
     ...    affinities=single_allele_train_data.measurement_value.values,
     ...    allele="HLA-B*57:01")
+
 
 The `~mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors` method
 can be called any number of times on the same instance to build up ensembles

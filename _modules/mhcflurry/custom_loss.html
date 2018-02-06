@@ -1,0 +1,323 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mhcflurry.custom_loss &mdash; MHCflurry 1.1.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="MHCflurry 1.1.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.1.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../models.html">Details on the released models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>mhcflurry.custom_loss</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mhcflurry.custom_loss</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Custom loss functions.</span>
+
+<span class="sd">For losses supporting inequalities, each training data point is associated with</span>
+<span class="sd">one of (=), (&lt;), or (&gt;). For e.g. (&gt;) inequalities, penalization is applied only</span>
+<span class="sd">if the prediction is less than the given value.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">pandas</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="k">import</span> <span class="n">isnan</span><span class="p">,</span> <span class="n">array</span>
+
+<span class="n">CUSTOM_LOSSES</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<div class="viewcode-block" id="MSEWithInequalities"><a class="viewcode-back" href="../../api.html#mhcflurry.custom_loss.MSEWithInequalities">[docs]</a><span class="k">class</span> <span class="nc">MSEWithInequalities</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Supports training a regressor on data that includes inequalities</span>
+<span class="sd">    (e.g. x &lt; 100). Mean square error is used as the loss for elements with</span>
+<span class="sd">    an (=) inequality. For elements with e.g. a (&gt; 0.5) inequality, then the loss</span>
+<span class="sd">    for that element is (y - 0.5)^2 (standard MSE) if y &lt; 500 and 0 otherwise.</span>
+
+<span class="sd">    This loss assumes that the normal range for y_true and y_pred is 0 - 1. As a</span>
+<span class="sd">    hack, the implementation uses other intervals for y_pred to encode the</span>
+<span class="sd">    inequality information.</span>
+
+<span class="sd">    y_true is interpreted as follows:</span>
+
+<span class="sd">    between 0 - 1</span>
+<span class="sd">       Regular MSE loss is used. Penality (y_pred - y_true)**2 is applied if</span>
+<span class="sd">       y_pred is greater or less than y_true.</span>
+
+<span class="sd">    between 2 - 3:</span>
+<span class="sd">       Treated as a &quot;&lt;&quot; inequality. Penality (y_pred - (y_true - 2))**2 is</span>
+<span class="sd">       applied only if y_pred is greater than y_true - 2.</span>
+
+<span class="sd">    between 4 - 5:</span>
+<span class="sd">       Treated as a &quot;&gt;&quot; inequality. Penality (y_pred - (y_true - 4))**2 is</span>
+<span class="sd">       applied only if y_pred is less than y_true - 4.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;mse_with_inequalities&quot;</span>
+    <span class="n">supports_inequalities</span> <span class="o">=</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="MSEWithInequalities.encode_y"><a class="viewcode-back" href="../../api.html#mhcflurry.custom_loss.MSEWithInequalities.encode_y">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">encode_y</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">inequalities</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">array</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;float32&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">isnan</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;y contains NaN&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">y</span> <span class="o">&gt;</span> <span class="mf">1.0</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;y contains values &gt; 1.0&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">y</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;y contains values &lt; 0.0&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">inequalities</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">encoded</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">offsets</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">inequalities</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">({</span>
+                <span class="s1">&#39;=&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s1">&#39;&gt;&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="s1">&#39;&lt;&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+            <span class="p">})</span><span class="o">.</span><span class="n">values</span>
+            <span class="k">if</span> <span class="n">isnan</span><span class="p">(</span><span class="n">offsets</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid inequality. Must be =, &lt;, or &gt;&quot;</span><span class="p">)</span>
+            <span class="n">encoded</span> <span class="o">=</span> <span class="n">y</span> <span class="o">+</span> <span class="n">offsets</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">isnan</span><span class="p">(</span><span class="n">encoded</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">encoded</span></div>
+
+<div class="viewcode-block" id="MSEWithInequalities.loss"><a class="viewcode-back" href="../../api.html#mhcflurry.custom_loss.MSEWithInequalities.loss">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">loss</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">):</span>
+        <span class="c1"># We always delay import of Keras so that mhcflurry can be imported initially</span>
+        <span class="c1"># without tensorflow debug output, etc.</span>
+        <span class="kn">from</span> <span class="nn">keras</span> <span class="k">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
+
+        <span class="c1"># Handle (=) inequalities</span>
+        <span class="n">diff1</span> <span class="o">=</span> <span class="n">y_pred</span> <span class="o">-</span> <span class="n">y_true</span>
+        <span class="n">diff1</span> <span class="o">*=</span> <span class="n">K</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">y_true</span> <span class="o">&gt;=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;float32&quot;</span><span class="p">)</span>
+        <span class="n">diff1</span> <span class="o">*=</span> <span class="n">K</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">y_true</span> <span class="o">&lt;=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;float32&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Handle (&gt;) inequalities</span>
+        <span class="n">diff2</span> <span class="o">=</span> <span class="n">y_pred</span> <span class="o">-</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">-</span> <span class="mf">2.0</span><span class="p">)</span>
+        <span class="n">diff2</span> <span class="o">*=</span> <span class="n">K</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">y_true</span> <span class="o">&gt;=</span> <span class="mf">2.0</span><span class="p">,</span> <span class="s2">&quot;float32&quot;</span><span class="p">)</span>
+        <span class="n">diff2</span> <span class="o">*=</span> <span class="n">K</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">y_true</span> <span class="o">&lt;=</span> <span class="mf">3.0</span><span class="p">,</span> <span class="s2">&quot;float32&quot;</span><span class="p">)</span>
+        <span class="n">diff2</span> <span class="o">*=</span> <span class="n">K</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">diff2</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;float32&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Handle (&lt;) inequalities</span>
+        <span class="n">diff3</span> <span class="o">=</span> <span class="n">y_pred</span> <span class="o">-</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">-</span> <span class="mf">4.0</span><span class="p">)</span>
+        <span class="n">diff3</span> <span class="o">*=</span> <span class="n">K</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">y_true</span> <span class="o">&gt;=</span> <span class="mf">4.0</span><span class="p">,</span> <span class="s2">&quot;float32&quot;</span><span class="p">)</span>
+        <span class="n">diff3</span> <span class="o">*=</span> <span class="n">K</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">diff3</span> <span class="o">&gt;</span> <span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;float32&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">K</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">diff1</span><span class="p">),</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span>
+            <span class="n">K</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">diff2</span><span class="p">),</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span>
+            <span class="n">K</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">diff3</span><span class="p">),</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">))</span></div></div>
+
+<span class="c1"># Register custom losses.</span>
+<span class="k">for</span> <span class="bp">cls</span> <span class="ow">in</span> <span class="p">[</span><span class="n">MSEWithInequalities</span><span class="p">]:</span>
+    <span class="n">CUSTOM_LOSSES</span><span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Timothy O&#39;Donnell.
+      Last updated on Feb 06, 2018.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.1.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

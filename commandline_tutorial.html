@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Command-line tutorial &mdash; MHCflurry 1.0.0 documentation</title>
+  <title>Command-line tutorial &mdash; MHCflurry 1.1.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="MHCflurry 1.0.0 documentation" href="index.html"/>
+    <link rel="top" title="MHCflurry 1.1.0 documentation" href="index.html"/>
         <link rel="next" title="Python library tutorial" href="python_tutorial.html"/>
         <link rel="prev" title="Introduction and setup" href="intro.html"/> 
 
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.0.0
+                1.1.0
               </div>
             
           
@@ -178,7 +178,7 @@ are distributed separately from the pip package and may be downloaded with the
 <p>Files downloaded with <a class="reference internal" href="commandline_tools.html#mhcflurry-downloads"><span class="std std-ref">mhcflurry-downloads</span></a> are stored in a platform-specific
 directory. To get the path to downloaded data, you can use:</p>
 <div class="highlight-text"><div class="highlight"><pre><span></span>$ mhcflurry-downloads path models_class1
-/Users/tim/Library/Application Support/mhcflurry/4/1.0.0/models_class1/
+/Users/tim/Library/Application Support/mhcflurry/4/1.1.0/models_class1/
 </pre></div>
 </div>
 <p>We also release a few other “downloads,” such as curated training data and some
@@ -188,18 +188,21 @@ Environment variables
   MHCFLURRY_DATA_DIR                  [unset or empty]
   MHCFLURRY_DOWNLOADS_CURRENT_RELEASE [unset or empty]
   MHCFLURRY_DOWNLOADS_DIR             [unset or empty]
+  MHCFLURRY_DEFAULT_CLASS1_MODELS     [unset or empty]
 
 Configuration
-  current release                     = 1.0.0                
-  downloads dir                       = &#39;/Users/tim/Library/Application Support/mhcflurry/4/1.0.0&#39; [exists]
+  current release                     = 1.1.0                
+  downloads dir                       = &#39;/Users/tim/Library/Application Support/mhcflurry/4/1.1.0&#39; [exists]
 
-DOWNLOAD NAME                             DOWNLOADED?    DEFAULT?      URL                  
-models_class1                             YES            YES           http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/models_class1.tar.bz2 
-models_class1_experiments1                NO             NO            http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/models_class1_experiments1.tar.bz2 
-cross_validation_class1                   YES            NO            http://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/cross_validation_class1.tar.bz2 
-data_iedb                                 NO             NO            https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/data_iedb.tar.bz2 
-data_kim2014                              NO             NO            http://github.com/hammerlab/mhcflurry/releases/download/0.9.1/data_kim2014.tar.bz2 
-data_curated                              YES            YES           https://github.com/hammerlab/mhcflurry/releases/download/pre-1.0/data_curated.tar.bz2
+DOWNLOAD NAME                             DOWNLOADED?   URL                  
+models_class1                             YES           http://github.com/openvax/mhcflurry/releases/download/pre-1.1/models_class1.20180205.tar.bz2 
+models_class1_no_mass_spec                YES           http://github.com/openvax/mhcflurry/releases/download/pre-1.1/models_class1_no_mass_spec.20180205.tar.bz2 
+models_class1_experiments1                NO            http://github.com/openvax/mhcflurry/releases/download/pre-1.1/models_class1_experiments1.tar.bz2 
+cross_validation_class1                   YES           http://github.com/openvax/mhcflurry/releases/download/pre-1.1/cross_validation_class1.tar.bz2 
+data_iedb                                 YES           https://github.com/openvax/mhcflurry/releases/download/pre-1.0/data_iedb.tar.bz2 
+data_published                            YES           http://github.com/openvax/mhcflurry/releases/download/pre-1.1/data_published.tar.bz2 
+data_systemhcatlas                        YES           http://github.com/openvax/mhcflurry/releases/download/pre-1.1/data_systemhcatlas.tar.bz2 
+data_curated                              YES           https://github.com/openvax/mhcflurry/releases/download/pre-1.1/data_curated.tar.bz2
 </pre></div>
 </div>
 <div class="admonition note">
@@ -224,19 +227,19 @@ Wrote: /tmp/predictions.csv
 <p>results in a file like this:</p>
 <div class="highlight-text"><div class="highlight"><pre><span></span>$ cat /tmp/predictions.csv
 allele,peptide,mhcflurry_prediction,mhcflurry_prediction_low,mhcflurry_prediction_high,mhcflurry_prediction_percentile
-HLA-A0201,SIINFEKL,4899.04784343,2767.76365395,7269.68364294,6.5097875
-HLA-A0201,SIINFEKD,21050.420243,16834.6585914,24129.0460917,34.297175
-HLA-A0201,SIINFEKQ,21048.4726578,16736.5612549,24111.0131144,34.297175
-HLA-A0301,SIINFEKL,28227.2989092,24826.3079098,32714.285974,33.9512125
-HLA-A0301,SIINFEKD,30816.7212184,27685.5084708,36037.3259046,41.225775
-HLA-A0301,SIINFEKQ,24183.0210465,19346.154182,32263.7124753,24.8109625
+HLA-A0201,SIINFEKL,1750.95223187,740.081767258,4506.66943771,3.05625
+HLA-A0201,SIINFEKD,14437.8010376,7914.32900112,21924.4383345,23.92
+HLA-A0201,SIINFEKQ,13223.5643645,5786.45282681,20799.0937811,21.138125
+HLA-A0301,SIINFEKL,11430.5003522,3447.90928611,21796.1348046,13.843875
+HLA-A0301,SIINFEKD,18772.3909539,6736.80228669,33855.179144,28.640125
+HLA-A0301,SIINFEKQ,12037.8490984,3258.27814483,22632.2561843,14.869
 </pre></div>
 </div>
 <p>The predictions are given as affinities (KD) in nM in the <code class="docutils literal"><span class="pre">mhcflurry_prediction</span></code>
 column. The other fields give the 5-95 percentile predictions across
 the models in the ensemble and the quantile of the affinity prediction among
 a large number of random peptides tested on that allele.</p>
-<p>The predictions shown above were generated with MHCflurry 1.0.0. Different versions of
+<p>The predictions shown above were generated with MHCflurry 1.1.0. Different versions of
 MHCflurry can give considerably different results. Even
 on the same version, exact predictions may vary (up to about 1 nM) depending
 on the Keras backend and other details.</p>
@@ -259,13 +262,13 @@ with a command like:</p>
 <p>MHCflurry predictors are serialized to disk as many files in a directory. The
 command above will write the models to the output directory specified by the
 <code class="docutils literal"><span class="pre">--out-models-dir</span></code> argument. This directory has files like:</p>
-<div class="highlight-text"><div class="highlight"><pre><span></span>manifest.csv
+<div class="highlight-text"><div class="highlight"><pre><span></span>info.txt
+manifest.csv
 percent_ranks.csv
-weights_BOLA-6*13:01-0-1e6e7c0610ac68f8.npz
 ...
-weights_PATR-B*24:01-0-e12e0ee723833110.npz
-weights_PATR-B*24:01-0-ec4a36529321d868.npz
-weights_PATR-B*24:01-0-fd5a340098d3a9f4.npz
+weights_PATR-B*24:01-7-74f801f2b922bea2.npz
+weights_PATR-B*24:01-8-55de1dedfa0cc63e.npz
+weights_PATR-B*24:01-9-30315246fa31cb8f.npz
 </pre></div>
 </div>
 <p>The <code class="docutils literal"><span class="pre">manifest.csv</span></code> file gives metadata for all the models used in the predictor.
@@ -280,10 +283,10 @@ training data. The data we use for our released predictors can be downloaded wit
 </pre></div>
 </div>
 <p>It looks like this:</p>
-<div class="highlight-text"><div class="highlight"><pre><span></span>$ bzcat &quot;$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2&quot; | head -n 3
-allele,peptide,measurement_value,measurement_type,measurement_source,original_allele
-BoLA-1*21:01,AENDTLVVSV,7817.0,quantitative,Barlow - purified MHC/competitive/fluorescence,BoLA-1*02101
-BoLA-1*21:01,NQFNGGCLLV,1086.0,quantitative,Barlow - purified MHC/direct/fluorescence,BoLA-1*02101
+<div class="highlight-text"><div class="highlight"><pre><span></span>$ bzcat &quot;$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2&quot; | head -n 3
+allele,peptide,measurement_value,measurement_inequality,measurement_type,measurement_source,original_allele
+BoLA-1*21:01,AENDTLVVSV,7817.0,=,quantitative,Barlow - purified MHC/competitive/fluorescence,BoLA-1*02101
+BoLA-1*21:01,NQFNGGCLLV,1086.0,=,quantitative,Barlow - purified MHC/direct/fluorescence,BoLA-1*02101
 </pre></div>
 </div>
 </div>
@@ -315,8 +318,8 @@ sequences:</p>
     --mhc-peptide-lengths 8,9,10,11
     --extract-subsequences
     --output-csv /tmp/subsequence_predictions.csv
-2017-12-22 19:15:24,528 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles [&#39;HLA-A*02:01&#39;, &#39;HLA-A*03:01&#39;] and epitope lengths [8, 9, 10, 11]
-2017-12-22 19:15:28,365 - mhctools.cli.script - INFO - 
+2018-02-06 13:20:10,970 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles [&#39;HLA-A*02:01&#39;, &#39;HLA-A*03:01&#39;] and epitope lengths [8, 9, 10, 11]
+2018-02-06 13:20:56,616 - mhctools.cli.script - INFO - 
 ...
 [1192 rows x 8 columns]
 Wrote: /tmp/subsequence_predictions.csv
@@ -325,8 +328,8 @@ Wrote: /tmp/subsequence_predictions.csv
 <p>This will write a file giving predictions for all subsequences of the specified lengths:</p>
 <div class="highlight-text"><div class="highlight"><pre><span></span>$ head -n 3 /tmp/subsequence_predictions.csv
 source_sequence_name,offset,peptide,allele,affinity,percentile_rank,prediction_method_name,length
-protein2,42,AARYSAFY,HLA-A*03:01,5744.3442744,4.7399625,mhcflurry,8
-protein2,42,AARYSAFYN,HLA-A*03:01,10576.5364408,8.3991875,mhcflurry,9
+protein2,42,AARYSAFY,HLA-A*03:01,1148.38981388,1.74425,mhcflurry,8
+protein2,42,AARYSAFYN,HLA-A*03:01,16075.7786973,22.574625,mhcflurry,9
 </pre></div>
 </div>
 </div>
@@ -355,7 +358,7 @@ protein2,42,AARYSAFYN,HLA-A*03:01,10576.5364408,8.3991875,mhcflurry,9
   <div role="contentinfo">
     <p>
         &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Dec 22, 2017.
+      Last updated on Feb 06, 2018.
 
     </p>
   </div>
@@ -377,7 +380,7 @@ protein2,42,AARYSAFYN,HLA-A*03:01,10576.5364408,8.3991875,mhcflurry,9
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'./',
-            VERSION:'1.0.0',
+            VERSION:'1.1.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

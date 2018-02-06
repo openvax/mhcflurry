@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Command-line reference &mdash; MHCflurry 1.0.0 documentation</title>
+  <title>Command-line reference &mdash; MHCflurry 1.1.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="MHCflurry 1.0.0 documentation" href="index.html"/>
+    <link rel="top" title="MHCflurry 1.1.0 documentation" href="index.html"/>
         <link rel="next" title="API Documentation" href="api.html"/>
         <link rel="prev" title="Details on the released models" href="models.html"/> 
 
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.0.0
+                1.1.0
               </div>
             
           
@@ -196,7 +196,8 @@ peptides:</p>
 <span class="go">                             [--peptides PEPTIDE [PEPTIDE ...]]</span>
 <span class="go">                             [--allele-column NAME] [--peptide-column NAME]</span>
 <span class="go">                             [--no-throw] [--out OUTPUT.csv]</span>
-<span class="go">                             [--prediction-column-prefix NAME] [--models DIR]</span>
+<span class="go">                             [--prediction-column-prefix NAME]</span>
+<span class="go">                             [--output-delimiter CHAR] [--models DIR]</span>
 <span class="go">                             [--include-individual-model-predictions]</span>
 <span class="go">                             [INPUT.csv]</span>
 </pre></div>
@@ -268,9 +269,15 @@ peptides:</p>
 </dd></dl>
 
 <dl class="option">
+<dt id="cmdoption-mhcflurry-predict-output-delimiter">
+<code class="descname">--output-delimiter</code><code class="descclassname"> &lt;char&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-output-delimiter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Delimiter character for results. Default: ‘,’</p>
+</dd></dl>
+
+<dl class="option">
 <dt id="cmdoption-mhcflurry-predict-models">
 <code class="descname">--models</code><code class="descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-models" title="Permalink to this definition">¶</a></dt>
-<dd><p>Directory containing models. Default: /Users/tim/Library/Application Support/mhcflurry/4/1.0.0/models_class1/models</p>
+<dd><p>Directory containing models. Default: /Users/tim/Library/Application Support/mhcflurry/4/1.1.0/models_class1/models</p>
 </dd></dl>
 
 <dl class="option">
@@ -329,6 +336,12 @@ peptides:</p>
 </dd></dl>
 
 <dl class="option">
+<dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-ignore-inequalities">
+<code class="descname">--ignore-inequalities</code><code class="descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-ignore-inequalities" title="Permalink to this definition">¶</a></dt>
+<dd><p>Do not use affinity value inequalities even when present in data</p>
+</dd></dl>
+
+<dl class="option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-percent-rank-calibration-num-peptides-per-length">
 <code class="descname">--percent-rank-calibration-num-peptides-per-length</code><code class="descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-percent-rank-calibration-num-peptides-per-length" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of peptides per length to use to calibrate percent ranks. Set to 0 to disable percent rank calibration. The resulting models will not support percent ranks. Default: 100000.</p>
@@ -353,9 +366,15 @@ peptides:</p>
 </dd></dl>
 
 <dl class="option">
-<dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-parallelization-num-jobs">
-<code class="descname">--parallelization-num-jobs</code><code class="descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-parallelization-num-jobs" title="Permalink to this definition">¶</a></dt>
-<dd><p>Parallelization jobs. Experimental. Does NOT work with tensorflow. Set to 1 for serial run. Set to 0 to use number of cores. Default: 1.</p>
+<dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-num-jobs">
+<code class="descname">--num-jobs</code><code class="descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-num-jobs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of processes to parallelize training and percent rank calibration over, respectively. Experimental. If only one value is specified then the same number of jobs is used for both phases.Set to 1 for serial run. Set to 0 to use number of cores. Default: [1].</p>
+</dd></dl>
+
+<dl class="option">
+<dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-backend">
+<code class="descname">--backend</code><code class="descclassname"> {tensorflow-gpu,tensorflow-cpu}</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-backend" title="Permalink to this definition">¶</a></dt>
+<dd><p>Keras backend. If not specified will use system default.</p>
 </dd></dl>
 
 </div>
@@ -421,7 +440,7 @@ peptides:</p>
 <dl class="option">
 <dt id="cmdoption-mhcflurry-downloads-fetch-release">
 <code class="descname">--release</code><code class="descclassname"> &lt;release&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-fetch-release" title="Permalink to this definition">¶</a></dt>
-<dd><p>Release to download. Default: 1.0.0</p>
+<dd><p>Release to download. Default: 1.1.0</p>
 </dd></dl>
 
 </div>
@@ -480,7 +499,7 @@ peptides:</p>
   <div role="contentinfo">
     <p>
         &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Dec 22, 2017.
+      Last updated on Feb 06, 2018.
 
     </p>
   </div>
@@ -502,7 +521,7 @@ peptides:</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'./',
-            VERSION:'1.0.0',
+            VERSION:'1.1.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

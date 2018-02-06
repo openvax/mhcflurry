@@ -1,0 +1,297 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mhcflurry.allele_encoding &mdash; MHCflurry 1.1.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="MHCflurry 1.1.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.1.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../models.html">Details on the released models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>mhcflurry.allele_encoding</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mhcflurry.allele_encoding</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span> <span class="nn">pandas</span>
+
+<span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">amino_acid</span>
+
+<div class="viewcode-block" id="AlleleEncoding"><a class="viewcode-back" href="../../api.html#mhcflurry.allele_encoding.AlleleEncoding">[docs]</a><span class="k">class</span> <span class="nc">AlleleEncoding</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">alleles</span><span class="p">,</span>
+            <span class="n">allele_to_fixed_length_sequence</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        A place to cache encodings for a (potentially large) sequence of alleles.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        alleles : list of string</span>
+<span class="sd">            Allele names</span>
+
+<span class="sd">        allele_to_fixed_length_sequence : dict of str -&gt; str</span>
+<span class="sd">            Allele name to fixed lengths sequence (&quot;pseudosequence&quot;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">alleles</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">alleles</span><span class="p">)</span>
+
+        <span class="n">all_alleles</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">alleles</span><span class="o">.</span><span class="n">unique</span><span class="p">()))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_index</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">allele</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">all_alleles</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">indices</span> <span class="o">=</span> <span class="n">alleles</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_index</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">allele_to_fixed_length_sequence</span><span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">all_alleles</span><span class="p">],</span>
+            <span class="n">index</span><span class="o">=</span><span class="n">all_alleles</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="AlleleEncoding.fixed_length_vector_encoded_sequences"><a class="viewcode-back" href="../../api.html#mhcflurry.allele_encoding.AlleleEncoding.fixed_length_vector_encoded_sequences">[docs]</a>    <span class="k">def</span> <span class="nf">fixed_length_vector_encoded_sequences</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vector_encoding_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Encode alleles.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        vector_encoding_name : string</span>
+<span class="sd">            How to represent amino acids.</span>
+<span class="sd">            One of &quot;BLOSUM62&quot;, &quot;one-hot&quot;, etc. Full list of supported vector</span>
+<span class="sd">            encodings is given by available_vector_encodings() in amino_acid.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array with shape (num sequences, sequence length, m) where m is</span>
+<span class="sd">        vector_encoding_length(vector_encoding_name)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;fixed_length_vector_encoding&quot;</span><span class="p">,</span>
+            <span class="n">vector_encoding_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cache_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">:</span>
+            <span class="n">index_encoded_matrix</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">index_encoding</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">fixed_length_sequences</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+                <span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">)</span>
+            <span class="n">vector_encoded</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">fixed_vectors_encoding</span><span class="p">(</span>
+                <span class="n">index_encoded_matrix</span><span class="p">,</span>
+                <span class="n">amino_acid</span><span class="o">.</span><span class="n">ENCODING_DATA_FRAMES</span><span class="p">[</span><span class="n">vector_encoding_name</span><span class="p">])</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">vector_encoded</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span></div></div>
+
+
+</pre></div>
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Timothy O&#39;Donnell.
+      Last updated on Feb 06, 2018.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.1.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
