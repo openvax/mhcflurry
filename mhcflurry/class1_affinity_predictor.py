@@ -2,13 +2,13 @@ import collections
 import hashlib
 import json
 import logging
-import sys
 import time
 import warnings
-from os.path import join, exists
+from os.path import join, exists, abspath
 from os import mkdir
 from socket import gethostname
 from getpass import getuser
+from functools import partial
 
 import mhcnames
 import numpy
@@ -294,9 +294,14 @@ class Class1AffinityPredictor(object):
         for (_, row) in manifest_df.iterrows():
             weights_filename = Class1AffinityPredictor.weights_path(
                 models_dir, row.model_name)
-            weights = Class1AffinityPredictor.load_weights(weights_filename)
             config = json.loads(row.config_json)
-            model = Class1NeuralNetwork.from_config(config, weights=weights)
+
+            # We will lazy-load weights when the network is used.
+            model = Class1NeuralNetwork.from_config(
+                config,
+                weights_loader=partial(
+                    Class1AffinityPredictor.load_weights,
+                    abspath(weights_filename)))
             if row.allele == "pan-class1":
                 class1_pan_allele_models.append(model)
             else:
