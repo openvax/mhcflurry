@@ -249,6 +249,7 @@ class Class1NeuralNetwork(object):
         result = dict(self.__dict__)
         result['_network'] = None
         result['network_weights'] = None
+        result['network_weights_loader'] = None
         return result
 
     @classmethod
@@ -277,6 +278,12 @@ class Class1NeuralNetwork(object):
         return instance
 
     def load_weights(self):
+        """
+        Load weights by evaluating self.network_weights_loader, if needed.
+
+        After calling this, self.network_weights_loader will be None and
+        self.network_weights will be the weights list, if available.
+        """
         if self.network_weights_loader:
             self.network_weights = self.network_weights_loader()
             self.network_weights_loader = None

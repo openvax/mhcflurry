@@ -56,7 +56,6 @@ generate:
 	mhcflurry-downloads fetch models_class1 cross_validation_class1
 	python generate.py \
 	    --out-models-cv-rst _build/_models_cv.rst \
-	    --out-models-architecture-png _build/_models_architecture.png \
 	    --out-models-info-rst _build/_models_info.rst \
 	    --out-models-supported-alleles-rst _build/_models_supported_alleles.rst
 

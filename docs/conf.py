@@ -86,7 +86,7 @@ author = 'Timothy O\'Donnell'
 
 # The short X.Y version.
 # Added by Tim: reading version from mhcflurry __init__.py as in setup.py
-with open('../mhcflurry/__init__.py', 'r') as f:
+with open('../mhcflurry/version.py', 'r') as f:
     version = re.search(
         r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
         f.read(),

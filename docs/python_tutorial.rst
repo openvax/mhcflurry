@@ -65,7 +65,7 @@ We can get the path to this data from Python using `mhcflurry.downloads.get_path
 .. runblock:: pycon
 
     >>> from mhcflurry.downloads import get_path
-    >>> data_path = get_path("data_curated", "curated_training_data.csv.bz2")
+    >>> data_path = get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2")
     >>> data_path
 
 Now let's load it with pandas and filter to reasonably-sized peptides:
