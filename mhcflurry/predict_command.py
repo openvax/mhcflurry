@@ -35,6 +35,7 @@ import pandas
 
 from .downloads import get_default_class1_models_dir
 from .class1_affinity_predictor import Class1AffinityPredictor
+from .version import __version__
 
 
 parser = argparse.ArgumentParser(
@@ -61,7 +62,11 @@ helper_args.add_argument(
     default=False,
     help="Prints the list of supported peptide lengths and exits"
 )
-
+helper_args.add_argument(
+    "--version",
+    action="version",
+    version="mhcflurry %s" % __version__,
+)
 
 input_args = parser.add_argument_group(title="Required input arguments")
 input_args.add_argument(
