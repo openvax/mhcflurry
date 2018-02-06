@@ -30,7 +30,8 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-cp $SCRIPT_DIR/hyperparameters.yaml .
+python $SCRIPT_DIR/generate_hyperparameters.py > hyperparameters.yaml
+
 cp $SCRIPT_DIR/split_folds.py .
 cp $SCRIPT_DIR/score.py .
 
