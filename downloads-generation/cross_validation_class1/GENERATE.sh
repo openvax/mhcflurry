@@ -30,12 +30,13 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-cp $SCRIPT_DIR/hyperparameters.yaml .
+python $SCRIPT_DIR/generate_hyperparameters.py > hyperparameters.yaml
+
 cp $SCRIPT_DIR/split_folds.py .
 cp $SCRIPT_DIR/score.py .
 
 time python split_folds.py \
-    "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+    "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
     --min-measurements-per-allele 75 \
     --folds $NFOLDS \
     --random-state 1 \
@@ -52,6 +53,7 @@ do
         --hyperparameters hyperparameters.yaml \
         --out-models-dir models.fold_${fold} \
         --min-measurements-per-allele 0 \
+        --num-jobs 8 \
         --percent-rank-calibration-num-peptides-per-length 0 \
     2>&1 | tee -a LOG.train.fold_${fold}.txt &
 done

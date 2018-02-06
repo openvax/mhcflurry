@@ -37,10 +37,10 @@ try:
     import pypandoc
     readme = pypandoc.convert(readme, to='rst', format='md')
 except:
-    logging.warn("Conversion of long_description from MD to RST failed")
+    logging.warning("Conversion of long_description from MD to RST failed")
     pass
 
-with open('mhcflurry/__init__.py', 'r') as f:
+with open('mhcflurry/version.py', 'r') as f:
     version = re.search(
         r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
         f.read(),
@@ -57,6 +57,7 @@ if __name__ == '__main__':
         'scikit-learn',
         'mhcnames',
         'pyyaml',
+        'tqdm',
     ]
     if PY2:
         # concurrent.futures is a standard library in Py3 but Py2

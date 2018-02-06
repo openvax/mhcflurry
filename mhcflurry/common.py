@@ -2,11 +2,40 @@ from __future__ import print_function, division, absolute_import
 import collections
 import logging
 import sys
+import os
 
 import numpy
 import pandas
 
 from . import amino_acid
+
+
+def set_keras_backend(backend):
+    """
+    Configure Keras backend to use GPU or CPU. Only tensorflow is supported.
+
+    Must be called before Keras has been imported.
+
+    backend must be 'tensorflow-cpu' or 'tensorflow-gpu'.
+    """
+    os.environ["KERAS_BACKEND"] = "tensorflow"
+
+    if backend == "tensorflow-cpu":
+        print("Forcing tensorflow/CPU backend.")
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        device_count = {'CPU': 1, 'GPU': 0}
+    elif backend == "tensorflow-gpu":
+        print("Forcing tensorflow/GPU backend.")
+        device_count = {'CPU': 0, 'GPU': 1}
+    else:
+        raise ValueError("Unsupported backend: %s" % backend)
+
+    import tensorflow
+    from keras import backend as K
+    config = tensorflow.ConfigProto(
+        device_count=device_count)
+    session = tensorflow.Session(config=config)
+    K.set_session(session)
 
 
 def configure_logging(verbose=False):

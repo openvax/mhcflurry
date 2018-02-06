@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# Download some published MHC I ligand data from a location on Dropbox.
+# Download some published MHC I ligands identified by mass-spec
 #
 #
 set -e
 set -x
 
-DOWNLOAD_NAME=data_kim2014
+DOWNLOAD_NAME=data_systemhcatlas
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
@@ -26,9 +26,9 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.2009.mhci.public.1.txt
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.20130222.mhci.public.1.txt
-wget --quiet https://dl.dropboxusercontent.com/u/3967524/bdata.2013.mhci.public.blind.1.txt
+wget --quiet https://github.com/openvax/mhcflurry/releases/download/pre-1.1/systemhc.20171121.combined.csv.bz2
+
+mv systemhc.20171121.combined.csv.bz2 data.csv.bz2
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt

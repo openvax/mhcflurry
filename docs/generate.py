@@ -4,11 +4,14 @@ Generate certain RST files used in documentation.
 
 import sys
 import argparse
+import json
 from textwrap import wrap
+from collections import OrderedDict
 
 import pypandoc
 import pandas
 from keras.utils.vis_utils import plot_model
+from tabulate import tabulate
 
 from mhcflurry import __version__
 from mhcflurry.downloads import get_path
@@ -89,18 +92,66 @@ def go(argv):
         # Architecture information rst
         if predictor is None:
             predictor = Class1AffinityPredictor.load(args.class1_models_dir)
-        network = predictor.neural_networks[0].network()
-        lines = []
-        network.summary(print_fn=lines.append)
+
+        representative_networks = OrderedDict()
+        for network in predictor.neural_networks:
+            config = json.dumps(network.hyperparameters)
+            if config not in representative_networks:
+                representative_networks[config] = network
+
+        all_hyperparameters = [
+            network.hyperparameters for network in representative_networks.values()
+        ]
+        hyperparameter_keys =  all_hyperparameters[0].keys()
+        assert all(
+            hyperparameters.keys() == hyperparameter_keys
+            for hyperparameters in all_hyperparameters)
+
+        constant_hyperparameter_keys = [
+            k for k in hyperparameter_keys
+            if all([
+                hyperparameters[k] == all_hyperparameters[0][k]
+                for hyperparameters in all_hyperparameters
+            ])
+        ]
+        constant_hypeparameters = dict(
+            (key, all_hyperparameters[0][key])
+            for key in sorted(constant_hyperparameter_keys)
+        )
+
+        def write_hyperparameters(fd, hyperparameters):
+            rows = []
+            for key in sorted(hyperparameters.keys()):
+                rows.append((key, json.dumps(hyperparameters[key])))
+            fd.write("\n")
+            fd.write(
+                tabulate(rows, ["Hyperparameter", "Value"], tablefmt="grid"))
 
         with open(args.out_models_info_rst, "w") as fd:
-            fd.write("Layers and parameters summary: ")
-            fd.write("\n\n::\n\n")
-            for line in lines:
-                fd.write("    ")
-                fd.write(line)
+            fd.write("Hyperparameters shared by all %d architectures:\n" %
+                len(representative_networks))
+            write_hyperparameters(fd, constant_hypeparameters)
+            fd.write("\n")
+            for (i, network) in enumerate(representative_networks.values()):
+                lines = []
+                network.network().summary(print_fn=lines.append)
+
+                fd.write("Architecture %d / %d:\n" % (
+                    (i + 1, len(representative_networks))))
+                fd.write("+" * 40)
                 fd.write("\n")
-            print("Wrote: %s" % args.out_models_info_rst)
+                write_hyperparameters(
+                    fd,
+                    dict(
+                        (key, value)
+                        for (key, value) in network.hyperparameters.items()
+                        if key not in constant_hypeparameters))
+                fd.write("\n\n::\n\n")
+                for line in lines:
+                    fd.write("    ")
+                    fd.write(line)
+                    fd.write("\n")
+        print("Wrote: %s" % args.out_models_info_rst)
 
     if args.out_models_cv_rst:
         # Models cv output

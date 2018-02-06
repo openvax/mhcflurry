@@ -28,6 +28,7 @@ from pipes import quote
 import errno
 import tarfile
 from tempfile import mkstemp
+from tqdm import tqdm
 try:
     from urllib.request import urlretrieve
 except ImportError:
@@ -120,6 +121,23 @@ def yes_no(boolean):
     return "YES" if boolean else "NO"
 
 
+# For progress bar on download. See https://pypi.python.org/pypi/tqdm
+class TqdmUpTo(tqdm):
+    """Provides `update_to(n)` which uses `tqdm.update(delta_n)`."""
+    def update_to(self, b=1, bsize=1, tsize=None):
+        """
+        b  : int, optional
+            Number of blocks transferred so far [default: 1].
+        bsize  : int, optional
+            Size of each block (in tqdm units) [default: 1].
+        tsize  : int, optional
+            Total size (in tqdm units). If [default: None] remains unchanged.
+        """
+        if tsize is not None:
+            self.total = tsize
+        self.update(b * bsize - self.n)  # will also set self.n = b * bsize
+
+
 def fetch_subcommand(args):
     def qprint(msg):
         if not args.quiet:
@@ -167,16 +185,18 @@ def fetch_subcommand(args):
             yes_no(item in items_to_fetch),
             info['metadata']["url"]))
 
-    # TODO: Add a download progress bar?
-    # See http://stackoverflow.com/questions/51212/how-to-write-a-download-progress-indicator-in-python
-    # Also may want to extract into somewhere temporary and then rename to
-    # making an incomplete extract if the process is killed.
+    # TODO: may want to extract into somewhere temporary and then rename to
+    # avoid making an incomplete extract if the process is killed.
     for item in items_to_fetch:
         metadata = downloads[item]['metadata']
         (temp_fd, target_path) = mkstemp()
         try:
             qprint("Downloading: %s" % metadata['url'])
-            urlretrieve(metadata['url'], target_path)
+            urlretrieve(
+                metadata['url'],
+                target_path,
+                reporthook=TqdmUpTo(
+                    unit='B', unit_scale=True, miniters=1).update_to)
             qprint("Downloaded to: %s" % quote(target_path))
 
             tar = tarfile.open(target_path, 'r:bz2')
@@ -191,7 +211,9 @@ def fetch_subcommand(args):
                     "Archive has suspicious names: %s" % bad_names)
             result_dir = get_path(item, test_exists=False)
             os.mkdir(result_dir)
-            tar.extractall(path=result_dir)
+
+            for member in tqdm(tar.getmembers(), desc='Extracting'):
+                tar.extractall(path=result_dir, members=[member])
             tar.close()
             qprint("Extracted %d files to: %s" % (
                 len(names), quote(result_dir)))
@@ -229,15 +251,13 @@ def info_subcommand(args):
 
     downloads = get_current_release_downloads()
 
-    format_string = "%-40s  %-12s   %-12s  %-20s "
-    print(format_string % (
-        "DOWNLOAD NAME", "DOWNLOADED?", "DEFAULT?", "URL"))
+    format_string = "%-40s  %-12s  %-20s "
+    print(format_string % ("DOWNLOAD NAME", "DOWNLOADED?", "URL"))
 
     for (item, info) in downloads.items():
         print(format_string % (
             item,
             yes_no(info['downloaded']),
-            yes_no(info['metadata']['default']),
             info['metadata']["url"]))
 
 

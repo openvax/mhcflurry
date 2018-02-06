@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/hammerlab/mhcflurry.svg?branch=master)](https://travis-ci.org/hammerlab/mhcflurry) [![Coverage Status](https://coveralls.io/repos/github/hammerlab/mhcflurry/badge.svg?branch=master)](https://coveralls.io/github/hammerlab/mhcflurry?branch=master)
+[![Build Status](https://travis-ci.org/openvax/mhcflurry.svg?branch=master)](https://travis-ci.org/openvax/mhcflurry)
 
 # mhcflurry
 [MHC I](https://en.wikipedia.org/wiki/MHC_class_I) ligand
@@ -34,7 +34,7 @@ You can now generate predictions:
 $ mhcflurry-predict \
        --alleles HLA-A0201 HLA-A0301 \
        --peptides SIINFEKL SIINFEKD SIINFEKQ \
-       --out /tmp/predictions.csv \
+       --out /tmp/predictions.csv
        
 Wrote: /tmp/predictions.csv
 ```

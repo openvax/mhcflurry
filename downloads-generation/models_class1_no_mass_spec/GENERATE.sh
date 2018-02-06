@@ -7,7 +7,7 @@
 set -e
 set -x
 
-DOWNLOAD_NAME=models_class1
+DOWNLOAD_NAME=models_class1_no_mass_spec
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
@@ -32,7 +32,7 @@ mkdir models
 python $SCRIPT_DIR/generate_hyperparameters.py > hyperparameters.yaml
 
 time mhcflurry-class1-train-allele-specific-models \
-    --data "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
+    --data "$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2" \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
     --percent-rank-calibration-num-peptides-per-length 100000 \

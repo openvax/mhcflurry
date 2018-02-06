@@ -5,12 +5,13 @@ import logging
 import numpy
 import pandas
 
-from mhcflurry.hyperparameters import HyperparameterDefaults
+from .hyperparameters import HyperparameterDefaults
 
-from mhcflurry.encodable_sequences import EncodableSequences
-from mhcflurry.amino_acid import available_vector_encodings, vector_encoding_length
-from mhcflurry.regression_target import to_ic50, from_ic50
-from mhcflurry.common import random_peptides, amino_acid_distribution
+from .encodable_sequences import EncodableSequences
+from .amino_acid import available_vector_encodings, vector_encoding_length
+from .regression_target import to_ic50, from_ic50
+from .common import random_peptides, amino_acid_distribution
+from .custom_loss import CUSTOM_LOSSES
 
 
 class Class1NeuralNetwork(object):
@@ -26,11 +27,13 @@ class Class1NeuralNetwork(object):
 
     network_hyperparameter_defaults = HyperparameterDefaults(
         kmer_size=15,
-        use_embedding=False,
         peptide_amino_acid_encoding="one-hot",
         embedding_input_dim=21,
         embedding_output_dim=8,
-        pseudosequence_use_embedding=False,
+        allele_dense_layer_sizes=[],
+        peptide_dense_layer_sizes=[],
+        peptide_allele_merge_method="multiply",
+        peptide_allele_merge_activation="",
         layer_sizes=[32],
         dense_layer_l1_regularization=0.001,
         dense_layer_l2_regularization=0.0,
@@ -106,13 +109,46 @@ class Class1NeuralNetwork(object):
     Combined set of all supported hyperparameters and their default values.
     """
 
+    # Hyperparameter renames.
+    # These are updated from time to time as new versions are developed. It
+    # provides a primitive way to allow new code to work with models trained
+    # using older code.
+    # None indicates the hyperparameter has been dropped.
+    hyperparameter_renames = {
+        "use_embedding": None,
+        "pseudosequence_use_embedding": None,
+    }
+
+    @classmethod
+    def apply_hyperparameter_renames(cls, hyperparameters):
+        """
+        Handle hyperparameter renames.
+
+        Parameters
+        ----------
+        hyperparameters : dict
+
+        Returns
+        -------
+        dict : updated hyperparameters
+
+        """
+        for (from_name, to_name) in cls.hyperparameter_renames.items():
+            if from_name in hyperparameters:
+                value = hyperparameters.pop(from_name)
+                if to_name:
+                    hyperparameters[to_name] = value
+        return hyperparameters
+
+
     def __init__(self, **hyperparameters):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
-            hyperparameters)
+            self.apply_hyperparameter_renames(hyperparameters))
 
         self._network = None
         self.network_json = None
         self.network_weights = None
+        self.network_weights_loader = None
 
         self.loss_history = None
         self.fit_seconds = None
@@ -123,6 +159,13 @@ class Class1NeuralNetwork(object):
     Process-wide keras model cache, a map from: architecture JSON string to
     (Keras model, existing network weights)
     """
+
+    @classmethod
+    def clear_model_cache(klass):
+        """
+        Clear the Keras model cache.
+        """
+        klass.KERAS_MODELS_CACHE.clear()
 
     @classmethod
     def borrow_cached_network(klass, network_json, network_weights):
@@ -175,6 +218,7 @@ class Class1NeuralNetwork(object):
         keras.models.Model
         """
         if self._network is None and self.network_json is not None:
+            self.load_weights()
             if borrow:
                 return self.borrow_cached_network(
                     self.network_json,
@@ -205,10 +249,11 @@ class Class1NeuralNetwork(object):
         result = dict(self.__dict__)
         result['_network'] = None
         result['network_weights'] = None
+        result['network_weights_loader'] = None
         return result
 
     @classmethod
-    def from_config(cls, config, weights=None):
+    def from_config(cls, config, weights=None, weights_loader=None):
         """
         deserialize from a dict returned by get_config().
         
@@ -217,6 +262,8 @@ class Class1NeuralNetwork(object):
         config : dict
         weights : list of array, optional
             Network weights to restore
+        weights_loader : callable, optional
+            Function to call (no arguments) to load weights when needed
 
         Returns
         -------
@@ -227,7 +274,19 @@ class Class1NeuralNetwork(object):
         assert all(hasattr(instance, key) for key in config), config.keys()
         instance.__dict__.update(config)
         instance.network_weights = weights
+        instance.network_weights_loader = weights_loader
         return instance
+
+    def load_weights(self):
+        """
+        Load weights by evaluating self.network_weights_loader, if needed.
+
+        After calling this, self.network_weights_loader will be None and
+        self.network_weights will be the weights list, if available.
+        """
+        if self.network_weights_loader:
+            self.network_weights = self.network_weights_loader()
+            self.network_weights_loader = None
 
     def get_weights(self):
         """
@@ -239,6 +298,7 @@ class Class1NeuralNetwork(object):
         or None if there is no network
         """
         self.update_network_description()
+        self.load_weights()
         return self.network_weights
 
     def __getstate__(self):
@@ -251,7 +311,7 @@ class Class1NeuralNetwork(object):
 
         """
         self.update_network_description()
-        self.update_network_description()
+        self.load_weights()
         result = dict(self.__dict__)
         result['_network'] = None
         return result
@@ -270,8 +330,7 @@ class Class1NeuralNetwork(object):
         numpy.array
         """
         encoder = EncodableSequences.create(peptides)
-        if (self.hyperparameters['use_embedding'] or
-                self.hyperparameters['peptide_amino_acid_encoding'] == "embedding"):
+        if (self.hyperparameters['peptide_amino_acid_encoding'] == "embedding"):
             encoded = encoder.variable_length_to_fixed_length_categorical(
                 max_length=self.hyperparameters['kmer_size'],
                 **self.input_encoding_hyperparameter_defaults.subselect(
@@ -305,34 +364,29 @@ class Class1NeuralNetwork(object):
             self.hyperparameters['right_edge'],
         self.hyperparameters['kmer_size'])
 
-    def pseudosequence_to_network_input(self, pseudosequences):
+    def allele_encoding_to_network_input(self, allele_encoding):
         """
-        Encode pseudosequences to the fixed-length encoding expected by the neural
+        Encode alleles to the fixed-length encoding expected by the neural
         network (which depends on the architecture).
 
         Parameters
         ----------
-        pseudosequences : EncodableSequences or list of string
+        allele_encoding : AlleleEncoding
 
         Returns
         -------
         numpy.array
         """
-        encoder = EncodableSequences.create(pseudosequences)
-        if self.hyperparameters['pseudosequence_use_embedding']:
-            encoded = encoder.fixed_length_categorical()
-        else:
-            raise NotImplementedError
-            # encoded = encoder.fixed_length_one_hot()
-        assert len(encoded) == len(pseudosequences)
-        return encoded
+        return allele_encoding.fixed_length_vector_encoded_sequences("BLOSUM62")
 
     def fit(
             self,
             peptides,
             affinities,
-            allele_pseudosequences=None,
+            allele_encoding=None,
+            inequalities=None,
             sample_weights=None,
+            shuffle_permutation=None,
             verbose=1,
             progress_preamble=""):
         """
@@ -345,14 +399,26 @@ class Class1NeuralNetwork(object):
         affinities : list of float
             nM affinities. Must be same length of as peptides.
         
-        allele_pseudosequences : EncodableSequences or list of string, optional
+        allele_encoding : AlleleEncoding, optional
             If not specified, the model will be a single-allele predictor.
+
+        inequalities : list of string, each element one of ">", "<", or "=".
+            Inequalities to use for fitting. Same length as affinities.
+            Each element must be one of ">", "<", or "=". For example, a ">"
+            will train on y_pred > y_true for that element in the training set.
+            Requires using a custom losses that support inequalities (e.g.
+            mse_with_ineqalities).
+            If None all inequalities are taken to be "=".
             
         sample_weights : list of float, optional
             If not specified, all samples (including random negatives added
             during training) will have equal weight. If specified, the random
             negatives will be assigned weight=1.0.
-        
+
+        shuffle_permutation : list of int, optional
+            Permutation (integer list) of same length as peptides and affinities
+            If None, then a random permutation will be generated.
+
         verbose : int
             Keras verbosity level
 
@@ -391,43 +457,121 @@ class Class1NeuralNetwork(object):
 
         y_values = from_ic50(affinities)
         assert numpy.isnan(y_values).sum() == 0, numpy.isnan(y_values).sum()
+        if inequalities is not None:
+            # Reverse inequalities because from_ic50() flips the direction
+            # (i.e. lower affinity results in higher y values).
+            adjusted_inequalities = pandas.Series(inequalities).map({
+                "=": "=",
+                ">": "<",
+                "<": ">",
+            }).values
+        else:
+            adjusted_inequalities = numpy.tile("=", len(y_values))
+        if len(adjusted_inequalities) != len(y_values):
+            raise ValueError("Inequalities and y_values must have same length")
 
         x_dict_without_random_negatives = {
             'peptide': peptide_encoding,
         }
-        pseudosequence_length = None
-        if allele_pseudosequences is not None:
-            pseudosequences_input = self.pseudosequence_to_network_input(
-                allele_pseudosequences)
-            pseudosequence_length = len(pseudosequences_input[0])
-            x_dict_without_random_negatives['pseudosequence'] = (
-                pseudosequences_input)
+        allele_encoding_dims = None
+        if allele_encoding is not None:
+            allele_encoding_input = self.allele_encoding_to_network_input(
+                allele_encoding)
+            allele_encoding_dims = allele_encoding_input.shape[1:]
+            x_dict_without_random_negatives['allele'] = allele_encoding_input
+
+        # Shuffle y_values and the contents of x_dict_without_random_negatives
+        # This ensures different data is used for the test set for early stopping
+        # when multiple models are trained.
+        if shuffle_permutation is None:
+            shuffle_permutation = numpy.random.permutation(len(y_values))
+        y_values = y_values[shuffle_permutation]
+        peptide_encoding = peptide_encoding[shuffle_permutation]
+        adjusted_inequalities = adjusted_inequalities[shuffle_permutation]
+        for key in x_dict_without_random_negatives:
+            x_dict_without_random_negatives[key] = (
+                x_dict_without_random_negatives[key][shuffle_permutation])
+        if sample_weights is not None:
+            sample_weights = sample_weights[shuffle_permutation]
+
+        if self.hyperparameters['loss'].startswith("custom:"):
+            # Using a custom loss that supports inequalities
+            try:
+                custom_loss = CUSTOM_LOSSES[
+                    self.hyperparameters['loss'].replace("custom:", "")
+                ]
+            except KeyError:
+                raise ValueError(
+                    "No such custom loss function: %s. Supported losses are: %s" % (
+                        self.hyperparameters['loss'],
+                        ", ".join([
+                            "custom:" + loss_name for loss_name in CUSTOM_LOSSES
+                        ])))
+            loss_name_or_function = custom_loss.loss
+            loss_supports_inequalities = custom_loss.supports_inequalities
+            loss_encode_y_function = custom_loss.encode_y
+        else:
+            # Using a regular keras loss. No inequalities supported.
+            loss_name_or_function = self.hyperparameters['loss']
+            loss_supports_inequalities = False
+            loss_encode_y_function = None
+
+        if not loss_supports_inequalities and (
+                any(inequality != "=" for inequality in adjusted_inequalities)):
+            raise ValueError("Loss %s does not support inequalities" % (
+                loss_name_or_function))
 
         if self.network() is None:
             self._network = self.make_network(
-                pseudosequence_length=pseudosequence_length,
+                allele_encoding_dims=allele_encoding_dims,
                 **self.network_hyperparameter_defaults.subselect(
                     self.hyperparameters))
-            self.compile()
+            self.network().compile(
+                loss=loss_name_or_function,
+                optimizer=self.hyperparameters['optimizer'])
 
-        y_dict_with_random_negatives = {
-            "output": numpy.concatenate([
-                from_ic50(
-                    numpy.random.uniform(
-                        self.hyperparameters[
-                            'random_negative_affinity_min'],
-                        self.hyperparameters[
-                            'random_negative_affinity_max'],
-                        int(num_random_negative.sum()))),
-                y_values,
-            ]),
-        }
+        if loss_supports_inequalities:
+            # Do not sample negative affinities: just use an inequality.
+            random_negative_ic50 = self.hyperparameters['random_negative_affinity_min']
+            random_negative_target = from_ic50(random_negative_ic50)
+
+            y_dict_with_random_negatives = {
+                "output": numpy.concatenate([
+                    numpy.tile(
+                        random_negative_target, int(num_random_negative.sum())),
+                    y_values,
+                ]),
+            }
+            # Note: we are using "<" here not ">" because the inequalities are
+            # now in target-space (0-1) not affinity-space.
+            adjusted_inequalities_with_random_negatives = (
+                ["<"] * int(num_random_negative.sum()) +
+                list(adjusted_inequalities))
+        else:
+            # Randomly sample random negative affinities
+            y_dict_with_random_negatives = {
+                "output": numpy.concatenate([
+                    from_ic50(
+                        numpy.random.uniform(
+                            self.hyperparameters[
+                                'random_negative_affinity_min'],
+                            self.hyperparameters[
+                                'random_negative_affinity_max'],
+                            int(num_random_negative.sum()))),
+                    y_values,
+                ]),
+            }
         if sample_weights is not None:
             sample_weights_with_random_negatives = numpy.concatenate([
                 numpy.ones(int(num_random_negative.sum())),
                 sample_weights])
         else:
             sample_weights_with_random_negatives = None
+
+        if loss_encode_y_function is not None:
+            y_dict_with_random_negatives['output'] = loss_encode_y_function(
+                y_dict_with_random_negatives['output'],
+                adjusted_inequalities_with_random_negatives)
 
         val_losses = []
         min_val_loss_iteration = None
@@ -436,6 +580,7 @@ class Class1NeuralNetwork(object):
         self.loss_history = collections.defaultdict(list)
         start = time.time()
         last_progress_print = None
+        x_dict_with_random_negatives = {}
         for i in range(self.hyperparameters['max_epochs']):
             random_negative_peptides_list = []
             for (length, count) in num_random_negative.iteritems():
@@ -444,21 +589,45 @@ class Class1NeuralNetwork(object):
                         count,
                         length=length,
                         distribution=aa_distribution))
+            random_negative_peptides = EncodableSequences.create(
+                random_negative_peptides_list)
             random_negative_peptides_encoding = (
-                self.peptides_to_network_input(
-                    random_negative_peptides_list))
+                self.peptides_to_network_input(random_negative_peptides))
 
-            x_dict_with_random_negatives = {
-                "peptide": numpy.concatenate([
-                    random_negative_peptides_encoding,
-                    peptide_encoding,
-                ]) if len(random_negative_peptides_encoding) > 0
-                else peptide_encoding
-            }
-            if pseudosequence_length:
-                # TODO: add random pseudosequences for random negative peptides
-                raise NotImplementedError(
-                    "Allele pseudosequences unsupported with random negatives")
+            if not x_dict_with_random_negatives:
+                if len(random_negative_peptides) > 0:
+                    x_dict_with_random_negatives["peptide"] = numpy.concatenate([
+                        random_negative_peptides_encoding,
+                        peptide_encoding,
+                    ])
+                    if 'allele' in x_dict_without_random_negatives:
+                        x_dict_with_random_negatives['allele'] = numpy.concatenate([
+                            x_dict_without_random_negatives['allele'][
+                                numpy.random.choice(
+                                    x_dict_without_random_negatives[
+                                        'allele'].shape[0],
+                                    size=len(random_negative_peptides_list))],
+                            x_dict_without_random_negatives['allele']
+                        ])
+                else:
+                    x_dict_with_random_negatives = (
+                        x_dict_without_random_negatives)
+            else:
+                # Update x_dict_with_random_negatives in place.
+                # This is more memory efficient than recreating it as above.
+                if len(random_negative_peptides) > 0:
+                    x_dict_with_random_negatives["peptide"][:len(random_negative_peptides)] = (
+                        random_negative_peptides_encoding
+                    )
+                    if 'allele' in x_dict_with_random_negatives:
+                        x_dict_with_random_negatives['allele'][:len(random_negative_peptides)] = (
+                            x_dict_with_random_negatives['allele'][
+                                len(random_negative_peptides) + numpy.random.choice(
+                                    x_dict_with_random_negatives['allele'].shape[0] -
+                                    len(random_negative_peptides),
+                                    size=len(random_negative_peptides))
+                            ]
+                        )
 
             fit_history = self.network().fit(
                 x_dict_with_random_negatives,
@@ -499,7 +668,7 @@ class Class1NeuralNetwork(object):
                         self.hyperparameters['patience'])
                     if i > threshold:
                         print((progress_preamble + " " +
-                            "Early stopping at epoch %3d / %3d: loss=%g. "
+                            "Stopping at epoch %3d / %3d: loss=%g. "
                             "Min val loss (%s) at epoch %s" % (
                                 i,
                                 self.hyperparameters['max_epochs'],
@@ -509,7 +678,7 @@ class Class1NeuralNetwork(object):
                         break
         self.fit_seconds = time.time() - start
 
-    def predict(self, peptides, allele_pseudosequences=None, batch_size=4096):
+    def predict(self, peptides, allele_encoding=None, batch_size=4096):
         """
         Predict affinities
         
@@ -517,7 +686,7 @@ class Class1NeuralNetwork(object):
         ----------
         peptides : EncodableSequences or list of string
         
-        allele_pseudosequences : EncodableSequences or list of string, optional
+        allele_pseudosequences : AlleleEncoding, optional
             Only required when this model is a pan-allele model
 
         batch_size : int
@@ -530,33 +699,26 @@ class Class1NeuralNetwork(object):
         x_dict = {
             'peptide': self.peptides_to_network_input(peptides)
         }
-        if allele_pseudosequences is not None:
-            pseudosequences_input = self.pseudosequence_to_network_input(
-                allele_pseudosequences)
-            x_dict['pseudosequence'] = pseudosequences_input
+        if allele_encoding is not None:
+            allele_input = self.allele_encoding_to_network_input(allele_encoding)
+            x_dict['allele'] = allele_input
 
         network = self.network(borrow=True)
         raw_predictions = network.predict(x_dict, batch_size=batch_size)
         predictions = numpy.array(raw_predictions, dtype = "float64")[:,0]
         return to_ic50(predictions)
 
-    def compile(self):
-        """
-        Compile the keras model. Used internally.
-        """
-        self.network().compile(
-            **self.compile_hyperparameter_defaults.subselect(
-                self.hyperparameters))
-
     @staticmethod
     def make_network(
-            pseudosequence_length,
+            allele_encoding_dims,
             kmer_size,
             peptide_amino_acid_encoding,
-            use_embedding,
             embedding_input_dim,
             embedding_output_dim,
-            pseudosequence_use_embedding,
+            allele_dense_layer_sizes,
+            peptide_dense_layer_sizes,
+            peptide_allele_merge_method,
+            peptide_allele_merge_activation,
             layer_sizes,
             dense_layer_l1_regularization,
             dense_layer_l2_regularization,
@@ -580,7 +742,7 @@ class Class1NeuralNetwork(object):
         from keras.layers.embeddings import Embedding
         from keras.layers.normalization import BatchNormalization
 
-        if use_embedding or peptide_amino_acid_encoding == "embedding":
+        if peptide_amino_acid_encoding == "embedding":
             peptide_input = Input(
                 shape=(kmer_size,), dtype='int32', name='peptide')
             current_layer = Embedding(
@@ -600,12 +762,25 @@ class Class1NeuralNetwork(object):
 
         inputs = [peptide_input]
 
+        kernel_regularizer = None
+        l1 = dense_layer_l1_regularization
+        l2 = dense_layer_l2_regularization
+        if l1 > 0 or l2 > 0:
+            kernel_regularizer = keras.regularizers.l1_l2(l1, l2)
+
         for (i, locally_connected_params) in enumerate(locally_connected_layers):
             current_layer = keras.layers.LocallyConnected1D(
                 name="lc_%d" % i,
                 **locally_connected_params)(current_layer)
 
         current_layer = Flatten(name="flattened_0")(current_layer)
+
+        for (i, layer_size) in enumerate(peptide_dense_layer_sizes):
+            current_layer = Dense(
+                layer_size,
+                name="peptide_dense_%d" % i,
+                kernel_regularizer=kernel_regularizer,
+                activation=activation)(current_layer)
 
         if batch_normalization:
             current_layer = BatchNormalization(name="batch_norm_early")(
@@ -615,37 +790,41 @@ class Class1NeuralNetwork(object):
             current_layer = Dropout(dropout_probability, name="dropout_early")(
                 current_layer)
 
-        if pseudosequence_length:
-            if pseudosequence_use_embedding:
-                pseudosequence_input = Input(
-                    shape=(pseudosequence_length,),
-                    dtype='int32',
-                    name='pseudosequence')
-                pseudo_embedding_layer = Embedding(
-                    input_dim=embedding_input_dim,
-                    output_dim=embedding_output_dim,
-                    input_length=pseudosequence_length,
-                    embeddings_initializer=embedding_init_method)(
-                    pseudosequence_input)
-            else:
-                pseudosequence_input = Input(
-                    shape=(pseudosequence_length, 21),
-                    dtype='float32', name='peptide')
-                pseudo_embedding_layer = pseudosequence_input
-            inputs.append(pseudosequence_input)
-            pseudo_embedding_layer = Flatten(name="flattened_1")(
-                pseudo_embedding_layer)
+        if allele_encoding_dims:
+            allele_input = Input(
+                shape=allele_encoding_dims,
+                dtype='float32',
+                name='allele')
+            inputs.append(allele_input)
+            allele_embedding_layer = Flatten(name="allele_flat")(allele_input)
 
-            current_layer = keras.layers.concatenate([
-                current_layer, pseudo_embedding_layer], name="concatenated_0")
+            for (i, layer_size) in enumerate(allele_dense_layer_sizes):
+                allele_embedding_layer = Dense(
+                    layer_size,
+                    name="allele_dense_%d" % i,
+                    kernel_regularizer=kernel_regularizer,
+                    activation=activation)(allele_embedding_layer)
+
+            if peptide_allele_merge_method == 'concatenate':
+                current_layer = keras.layers.concatenate([
+                    current_layer, allele_embedding_layer
+                ], name="allele_peptide_merged")
+            elif peptide_allele_merge_method == 'multiply':
+                current_layer = keras.layers.multiply([
+                    current_layer, allele_embedding_layer
+                ], name="allele_peptide_merged")
+            else:
+                raise ValueError(
+                    "Unsupported peptide_allele_encoding_merge_method: %s"
+                    % peptide_allele_merge_method)
+
+            if peptide_allele_merge_activation:
+                current_layer = keras.layers.Activation(
+                    peptide_allele_merge_activation,
+                    name="alelle_peptide_merged_%s" %
+                         peptide_allele_merge_activation)(current_layer)
             
         for (i, layer_size) in enumerate(layer_sizes):
-            kernel_regularizer = None
-            l1 = dense_layer_l1_regularization
-            l2 = dense_layer_l2_regularization
-            if l1 > 0 or l2 > 0:
-                kernel_regularizer = keras.regularizers.l1_l2(l1, l2)
-
             current_layer = Dense(
                 layer_size,
                 activation=activation,
