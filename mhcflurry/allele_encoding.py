@@ -37,7 +37,7 @@ class AlleleEncoding(object):
 
         self.encoding_cache = {}
 
-    def fixed_length_sequences(self, vector_encoding_name):
+    def fixed_length_vector_encoded_sequences(self, vector_encoding_name):
         """
         Encode alleles.
 
@@ -57,14 +57,13 @@ class AlleleEncoding(object):
             "fixed_length_vector_encoding",
             vector_encoding_name)
         if cache_key not in self.encoding_cache:
-            index_encoded_matrix = amino_acid.fixed_vectors_encoding(
+            index_encoded_matrix = amino_acid.index_encoding(
                 self.fixed_length_sequences.values,
-                amino_acid.COMMON_AMINO_ACIDS_WITH_UNKNOWN)
+                amino_acid.AMINO_ACID_INDEX)
             vector_encoded = amino_acid.fixed_vectors_encoding(
                 index_encoded_matrix,
                 amino_acid.ENCODING_DATA_FRAMES[vector_encoding_name])
-            vector_encoded_df = pandas.DataFrame(vector_encoded)
-            result = vector_encoded_df.iloc[self.indices]
+            result = vector_encoded[self.indices]
             self.encoding_cache[cache_key] = result
         return self.encoding_cache[cache_key]
 
