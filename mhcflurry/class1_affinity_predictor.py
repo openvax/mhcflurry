@@ -414,6 +414,9 @@ class Class1AffinityPredictor(object):
             Number of neural networks to fit
         
         architecture_hyperparameters_list : list of dict
+            List of hyperparameters. If more than one set of hyperparameters
+            are specified, model selection over them is performed and model
+            with the lowest validation loss is selected for each fold.
                
         allele : string
         

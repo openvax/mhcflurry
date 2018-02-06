@@ -10,7 +10,7 @@ class AlleleEncoding(object):
             alleles,
             allele_to_fixed_length_sequence=None):
         """
-        A place to cache encoding for a (potentially large) sequence of alleles.
+        A place to cache encodings for a (potentially large) sequence of alleles.
 
         Parameters
         ----------
