@@ -148,6 +148,7 @@ class Class1NeuralNetwork(object):
         self._network = None
         self.network_json = None
         self.network_weights = None
+        self.network_weights_loader = None
 
         self.loss_history = None
         self.fit_seconds = None
@@ -217,6 +218,7 @@ class Class1NeuralNetwork(object):
         keras.models.Model
         """
         if self._network is None and self.network_json is not None:
+            self.load_weights()
             if borrow:
                 return self.borrow_cached_network(
                     self.network_json,
@@ -250,7 +252,7 @@ class Class1NeuralNetwork(object):
         return result
 
     @classmethod
-    def from_config(cls, config, weights=None):
+    def from_config(cls, config, weights=None, weights_loader=None):
         """
         deserialize from a dict returned by get_config().
         
@@ -259,6 +261,8 @@ class Class1NeuralNetwork(object):
         config : dict
         weights : list of array, optional
             Network weights to restore
+        weights_loader : callable, optional
+            Function to call (no arguments) to load weights when needed
 
         Returns
         -------
@@ -269,7 +273,13 @@ class Class1NeuralNetwork(object):
         assert all(hasattr(instance, key) for key in config), config.keys()
         instance.__dict__.update(config)
         instance.network_weights = weights
+        instance.network_weights_loader = weights_loader
         return instance
+
+    def load_weights(self):
+        if self.network_weights_loader:
+            self.network_weights = self.network_weights_loader()
+            self.network_weights_loader = None
 
     def get_weights(self):
         """
@@ -281,6 +291,7 @@ class Class1NeuralNetwork(object):
         or None if there is no network
         """
         self.update_network_description()
+        self.load_weights()
         return self.network_weights
 
     def __getstate__(self):
@@ -293,7 +304,7 @@ class Class1NeuralNetwork(object):
 
         """
         self.update_network_description()
-        self.update_network_description()
+        self.load_weights()
         result = dict(self.__dict__)
         result['_network'] = None
         return result

@@ -231,7 +231,6 @@ def run(argv=sys.argv[1:]):
                 tqdm.tqdm(
                     worker_pool.imap_unordered(
                         train_model_entrypoint, work_items, chunksize=1),
-                    ascii=True,
                     total=len(work_items)),
                 key=lambda pair: pair[0])
         ]
@@ -306,7 +305,7 @@ def run(argv=sys.argv[1:]):
                 alleles,
                 chunksize=1)
 
-        for result in tqdm.tqdm(results, ascii=True, total=len(alleles)):
+        for result in tqdm.tqdm(results, total=len(alleles)):
             predictor.allele_to_percent_rank_transform.update(result)
 
         print("Done calibrating %d additional alleles." % len(alleles))
