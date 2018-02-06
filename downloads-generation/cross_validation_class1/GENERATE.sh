@@ -53,6 +53,7 @@ do
         --hyperparameters hyperparameters.yaml \
         --out-models-dir models.fold_${fold} \
         --min-measurements-per-allele 0 \
+        --num-jobs 8 \
         --percent-rank-calibration-num-peptides-per-length 0 \
     2>&1 | tee -a LOG.train.fold_${fold}.txt &
 done
