@@ -1,6 +1,6 @@
 """
-Train single allele models
-
+Filter and combine various peptide/MHC datasets to derive a composite training set,
+optionally including eluted peptides identified by mass-spec.
 """
 import sys
 import argparse
