@@ -1,6 +1,7 @@
 import time
 import collections
 import logging
+import json
 
 import numpy
 import pandas
@@ -190,17 +191,26 @@ class Class1NeuralNetwork(object):
         keras.models.Model
         """
         assert network_weights is not None
-        if network_json not in klass.KERAS_MODELS_CACHE:
+        key = klass.keras_network_cache_key(network_json)
+        if key not in klass.KERAS_MODELS_CACHE:
             # Cache miss.
             import keras.models
             network = keras.models.model_from_json(network_json)
             existing_weights = None
         else:
             # Cache hit.
-            (network, existing_weights) = klass.KERAS_MODELS_CACHE[network_json]
+            (network, existing_weights) = klass.KERAS_MODELS_CACHE[key]
         if existing_weights is not network_weights:
             network.set_weights(network_weights)
-            klass.KERAS_MODELS_CACHE[network_json] = (network, network_weights)
+            klass.KERAS_MODELS_CACHE[key] = (network, network_weights)
+
+
+        # As an added safety check we overwrite the fit method on the returned
+        # model to throw an error if it is called.
+        def throw(*args, **kwargs):
+            raise NotImplementedError("Do not call fit on cached model.")
+
+        network.fit = throw
         return network
 
     def network(self, borrow=False):
@@ -236,6 +246,20 @@ class Class1NeuralNetwork(object):
         if self._network is not None:
             self.network_json = self._network.to_json()
             self.network_weights = self._network.get_weights()
+
+    @staticmethod
+    def keras_network_cache_key(network_json):
+        # As an optimization, we remove anything about regularization as these
+        # do not affect predictions.
+        def drop_properties(d):
+            if 'kernel_regularizer' in d:
+                del d['kernel_regularizer']
+            return d
+
+        description = json.loads(
+            network_json,
+            object_hook=drop_properties)
+        return json.dumps(description)
 
     def get_config(self):
         """
