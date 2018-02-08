@@ -707,7 +707,7 @@ class Class1AffinityPredictor(object):
             throw=True,
             include_individual_model_predictions=False,
             include_percentile_ranks=True,
-            centrality_measure="robust_mean"):
+            centrality_measure="mean"):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
@@ -748,6 +748,8 @@ class Class1AffinityPredictor(object):
             raise TypeError("peptides must be a list or array, not a string")
         if isinstance(alleles, string_types):
             raise TypeError("alleles must be a list or array, not a string")
+        if allele is None and alleles is None:
+            raise ValueError("Must specify 'allele' or 'alleles'.")
         if allele is not None:
             if alleles is not None:
                 raise ValueError("Specify exactly one of allele or alleles")
