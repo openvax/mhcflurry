@@ -29,6 +29,8 @@ import errno
 import tarfile
 from tempfile import mkstemp
 from tqdm import tqdm
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
+
 try:
     from urllib.request import urlretrieve
 except ImportError:
