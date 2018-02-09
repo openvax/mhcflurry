@@ -26,7 +26,7 @@ from .common import configure_logging, set_keras_backend
 # parallel, we use this global variable as a place to store data. Data that is
 # stored here before creating the thread pool will be inherited to the child
 # processes upon fork() call, allowing us to share large data with the workers
-# efficiently.
+# via shared memory.
 GLOBAL_DATA = {}
 
 
@@ -119,7 +119,11 @@ parser.add_argument(
     help="Keras backend. If not specified will use system default.")
 parser.add_argument(
     "--gpus",
-    type=int)
+    type=int,
+    metavar="N",
+    help="Number of GPUs to attempt to parallelize across. Requires running "
+    "in parallel.")
+
 
 def run(argv=sys.argv[1:]):
     global GLOBAL_DATA
@@ -174,28 +178,30 @@ def run(argv=sys.argv[1:]):
 
     predictor = Class1AffinityPredictor()
     if args.num_jobs[0] == 1:
-        # Serial run
+        # Serial run.
         print("Running in serial.")
         worker_pool = None
         if args.backend:
             set_keras_backend(args.backend)
 
     else:
+        # Parallel run.
         env_queue = None
         if args.gpus:
+            print("Attempting to round-robin assign each worker a GPU.")
+
+            # We assign each worker to a GPU using the CUDA_VISIBLE_DEVICES
+            # environment variable. To do this, we push environment variables
+            # onto a queue. Each worker reads a single item from the queue,
+            # which is a list of environment variables to set.
             next_device = itertools.cycle([
-                "%d" % num
-                for num in range(args.gpus)
+                "%d" % num for num in range(args.gpus)
             ])
-            queue_items = []
-            for num in range(args.num_jobs[0]):
-                queue_items.append([
-                    ("CUDA_VISIBLE_DEVICES", next(next_device)),
-                ])
-        
-            print("Attempting to round-robin assign each worker a GPU", queue_items)
             env_queue = Queue()
-            for item in queue_items:
+            for num in range(args.num_jobs[0]):
+                item = [
+                    ("CUDA_VISIBLE_DEVICES", next(next_device)),
+                ]
                 env_queue.put(item)
 
         worker_pool = Pool(
@@ -238,6 +244,7 @@ def run(argv=sys.argv[1:]):
                     'data': None,  # subselect from GLOBAL_DATA["train_data"]
                     'hyperparameters': hyperparameters,
                     'verbose': args.verbosity,
+                    'progress_print_interval': None if worker_pool else 5.0,
                     'predictor': predictor if not worker_pool else None,
                     'save_to': args.out_models_dir if not worker_pool else None,
                 }
@@ -361,6 +368,7 @@ def train_model(
         data,
         hyperparameters,
         verbose,
+        progress_print_interval,
         predictor,
         save_to):
 
@@ -395,6 +403,7 @@ def train_model(
             if "measurement_inequality" in train_data.columns else None),
         models_dir_for_save=save_to,
         progress_preamble=progress_preamble,
+        progress_print_interval=progress_print_interval,
         verbose=verbose)
 
     if allele_num == 0 and model_group == 0:
@@ -427,6 +436,8 @@ def calibrate_percentile_ranks(allele, predictor, peptides=None):
 def worker_init(env_queue=None):
     global GLOBAL_DATA
 
+    # The env_queue provides a way for each worker to be configured with a
+    # specific set of environment variables. We use it to assign GPUs to workers.
     if env_queue:
         settings = env_queue.get()
         print("Setting: ", settings)

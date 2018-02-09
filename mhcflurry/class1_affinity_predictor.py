@@ -400,7 +400,8 @@ class Class1AffinityPredictor(object):
             inequalities=None,
             models_dir_for_save=None,
             verbose=0,
-            progress_preamble=""):
+            progress_preamble="",
+            progress_print_interval=5.0):
         """
         Fit one or more allele specific predictors for a single allele using a
         single neural network architecture.
@@ -437,6 +438,9 @@ class Class1AffinityPredictor(object):
 
         progress_preamble : string
             Optional string of information to include in each progress update
+
+        progress_print_interval : float
+            How often (in seconds) to print progress. Set to None to disable.
 
         Returns
         -------
@@ -488,7 +492,8 @@ class Class1AffinityPredictor(object):
                         model_num=model_num + 1,
                         n_models=n_models,
                         architecture_num=architecture_num + 1,
-                        n_architectures=n_architectures))
+                        n_architectures=n_architectures),
+                    progress_print_interval=progress_print_interval)
 
                 if n_architectures > 1:
                     # We require val_loss (i.e. a validation set) if we have
@@ -532,7 +537,8 @@ class Class1AffinityPredictor(object):
             inequalities,
             models_dir_for_save=None,
             verbose=1,
-            progress_preamble=""):
+            progress_preamble="",
+            progress_print_interval=5.0):
         """
         Fit one or more pan-allele predictors using a single neural network
         architecture.
@@ -568,6 +574,9 @@ class Class1AffinityPredictor(object):
         progress_preamble : string
             Optional string of information to include in each progress update
 
+        progress_print_interval : float
+            How often (in seconds) to print progress. Set to None to disable.
+
         Returns
         -------
         list of `Class1NeuralNetwork`
@@ -589,7 +598,8 @@ class Class1AffinityPredictor(object):
                 inequalities=inequalities,
                 allele_encoding=allele_encoding,
                 verbose=verbose,
-                progress_preamble=progress_preamble)
+                progress_preamble=progress_preamble,
+                progress_print_interval=progress_print_interval)
 
             model_name = self.model_name("pan-class1", i)
             self.class1_pan_allele_models.append(model)

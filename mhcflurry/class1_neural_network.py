@@ -418,7 +418,8 @@ class Class1NeuralNetwork(object):
             sample_weights=None,
             shuffle_permutation=None,
             verbose=1,
-            progress_preamble=""):
+            progress_preamble="",
+            progress_print_interval=5.0):
         """
         Fit the neural network.
         
@@ -454,6 +455,10 @@ class Class1NeuralNetwork(object):
 
         progress_preamble : string
             Optional string of information to include in each progress update
+
+        progress_print_interval : float
+            How often (in seconds) to print progress update. Set to None to
+            disable.
         """
 
         self.fit_num_points = len(peptides)
@@ -673,7 +678,10 @@ class Class1NeuralNetwork(object):
                 self.loss_history[key].extend(value)
 
             # Print progress no more often than once every few seconds.
-            if not last_progress_print or time.time() - last_progress_print > 5:
+            if progress_print_interval is not None and (
+                    not last_progress_print or (
+                        time.time() - last_progress_print
+                        > progress_print_interval)):
                 print((progress_preamble + " " +
                        "Epoch %3d / %3d: loss=%g. "
                        "Min val loss (%s) at epoch %s" % (
@@ -697,14 +705,15 @@ class Class1NeuralNetwork(object):
                         min_val_loss_iteration +
                         self.hyperparameters['patience'])
                     if i > threshold:
-                        print((progress_preamble + " " +
-                            "Stopping at epoch %3d / %3d: loss=%g. "
-                            "Min val loss (%s) at epoch %s" % (
-                                i,
-                                self.hyperparameters['max_epochs'],
-                                self.loss_history['loss'][-1],
-                                str(min_val_loss),
-                                min_val_loss_iteration)).strip())
+                        if progress_print_interval is not None:
+                            print((progress_preamble + " " +
+                                "Stopping at epoch %3d / %3d: loss=%g. "
+                                "Min val loss (%s) at epoch %s" % (
+                                    i,
+                                    self.hyperparameters['max_epochs'],
+                                    self.loss_history['loss'][-1],
+                                    str(min_val_loss),
+                                    min_val_loss_iteration)).strip())
                         break
         self.fit_seconds = time.time() - start
 
