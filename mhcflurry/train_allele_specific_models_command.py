@@ -194,9 +194,10 @@ def run(argv=sys.argv[1:]):
             # environment variable. To do this, we push environment variables
             # onto a queue. Each worker reads a single item from the queue,
             # which is a list of environment variables to set.
+            cpus = 16
             next_device = itertools.cycle([
                 "%d" % num for num in range(args.gpus)
-            ])
+            ] + ["" for num in range(cpus)])
             env_queue = Queue()
             for num in range(args.num_jobs[0]):
                 item = [
