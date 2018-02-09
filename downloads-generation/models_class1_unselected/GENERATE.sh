@@ -37,7 +37,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --out-models-dir models \
     --percent-rank-calibration-num-peptides-per-length 0 \
     --min-measurements-per-allele 75 \
-    --num-jobs 32 16
+    --num-jobs 32 --gpus 4 --backend tensorflow-default
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt

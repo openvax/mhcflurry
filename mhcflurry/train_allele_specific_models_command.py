@@ -7,7 +7,8 @@ import signal
 import sys
 import time
 import traceback
-from multiprocessing import Pool
+import itertools
+from multiprocessing import Pool, Queue
 from functools import partial
 from pprint import pprint
 
@@ -114,9 +115,11 @@ parser.add_argument(
     "Set to 1 for serial run. Set to 0 to use number of cores. Default: %(default)s.")
 parser.add_argument(
     "--backend",
-    choices=("tensorflow-gpu", "tensorflow-cpu"),
+    choices=("tensorflow-gpu", "tensorflow-cpu", "tensorflow-default"),
     help="Keras backend. If not specified will use system default.")
-
+parser.add_argument(
+    "--gpus",
+    type=int)
 
 def run(argv=sys.argv[1:]):
     global GLOBAL_DATA
@@ -126,9 +129,6 @@ def run(argv=sys.argv[1:]):
     signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
 
     args = parser.parse_args(argv)
-
-    if args.backend:
-        set_keras_backend(args.backend)
 
     configure_logging(verbose=args.verbosity > 1)
 
@@ -170,14 +170,37 @@ def run(argv=sys.argv[1:]):
     print("Training data: %s" % (str(df.shape)))
 
     GLOBAL_DATA["train_data"] = df
+    GLOBAL_DATA["args"] = args
 
     predictor = Class1AffinityPredictor()
     if args.num_jobs[0] == 1:
         # Serial run
         print("Running in serial.")
         worker_pool = None
+        if args.backend:
+            set_keras_backend(args.backend)
+
     else:
+        env_queue = None
+        if args.gpus:
+            next_device = itertools.cycle([
+                "%d" % num
+                for num in range(args.gpus)
+            ])
+            queue_items = []
+            for num in range(args.num_jobs[0]):
+                queue_items.append([
+                    ("CUDA_VISIBLE_DEVICES", next(next_device)),
+                ])
+        
+            print("Attempting to round-robin assign each worker a GPU", queue_items)
+            env_queue = Queue()
+            for item in queue_items:
+                env_queue.put(item)
+
         worker_pool = Pool(
+            initializer=worker_init,
+            initargs=(env_queue,),
             processes=(
                 args.num_jobs[0]
                 if args.num_jobs[0] else None))
@@ -400,6 +423,18 @@ def calibrate_percentile_ranks(allele, predictor, peptides=None):
         allele: predictor.allele_to_percent_rank_transform[allele],
     }
 
+
+def worker_init(env_queue=None):
+    global GLOBAL_DATA
+
+    if env_queue:
+        settings = env_queue.get()
+        print("Setting: ", settings)
+        os.environ.update(settings)
+        
+    command_args = GLOBAL_DATA['args']
+    if command_args.backend:
+        set_keras_backend(command_args.backend)
 
 if __name__ == '__main__':
     run()

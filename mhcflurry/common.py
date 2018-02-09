@@ -27,6 +27,9 @@ def set_keras_backend(backend):
     elif backend == "tensorflow-gpu":
         print("Forcing tensorflow/GPU backend.")
         device_count = {'CPU': 0, 'GPU': 1}
+    elif backend == "tensorflow-default":
+        print("Forcing tensorflow backend.")
+        device_count = None
     else:
         raise ValueError("Unsupported backend: %s" % backend)
 
@@ -34,6 +37,7 @@ def set_keras_backend(backend):
     from keras import backend as K
     config = tensorflow.ConfigProto(
         device_count=device_count)
+    config.gpu_options.allow_growth=True 
     session = tensorflow.Session(config=config)
     K.set_session(session)
 
