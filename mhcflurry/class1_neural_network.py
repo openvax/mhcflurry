@@ -102,11 +102,21 @@ class Class1NeuralNetwork(object):
     Hyperparameters for early stopping.
     """
 
+    miscelaneous_hyperparameter_defaults = HyperparameterDefaults(
+        train_data={'subset': 'all', 'num_poitns': None},
+    )
+    """
+    Miscelaneous hyperaparameters. These parameters are not used by this class
+    but may be interpreted by other code.
+    """
+
     hyperparameter_defaults = network_hyperparameter_defaults.extend(
         compile_hyperparameter_defaults).extend(
         input_encoding_hyperparameter_defaults).extend(
         fit_hyperparameter_defaults).extend(
-        early_stopping_hyperparameter_defaults)
+        early_stopping_hyperparameter_defaults).extend(
+        miscelaneous_hyperparameter_defaults
+    )
     """
     Combined set of all supported hyperparameters and their default values.
     """

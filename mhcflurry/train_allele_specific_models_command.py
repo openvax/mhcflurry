@@ -403,6 +403,18 @@ def train_model(
         full_data = GLOBAL_DATA["train_data"]
         data = full_data.loc[full_data.allele == allele]
 
+    subset = hyperparameters.get("train_data", {}).get("subset", "all")
+    if subset == "quantitative":
+        data = data.loc[
+            data.measurement_type == "quantitative"
+        ]
+    elif subset == "all":
+        pass
+    else:
+        raise ValueError("Unsupported subset: %s" % subset)
+
+    hyperparameters.setdefault("train_data", {})["num_points"] = len(data)
+
     progress_preamble = (
         "[%2d / %2d hyperparameters] "
         "[%4d / %4d alleles] "

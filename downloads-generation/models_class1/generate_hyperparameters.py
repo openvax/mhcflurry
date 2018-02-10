@@ -55,26 +55,33 @@ base_hyperparameters = {
     "dense_layer_l1_regularization": None,
     "batch_normalization": False,
     "dropout_probability": 0.0,
+
+    ##########################################
+    # TRAINING Data
+    ##########################################
+    "train_data": {"subset": "all"},
 }
 
 grid = []
-for minibatch_size in [32, 128, 512]:
-    for dense_layer_size in [8, 16, 32, 64, 128]:
-        for l1 in [0.0, 0.001, 0.01, 0.1]:
-            for num_lc in [0, 1, 2]:
-                for lc_kernel_size in [3, 5]:
-                    new = deepcopy(base_hyperparameters)
-                    new["layer_sizes"] = [dense_layer_size]
-                    new["dense_layer_l1_regularization"] = l1
-                    (lc_layer,) = new["locally_connected_layers"]
-                    lc_layer['kernel_size'] = lc_kernel_size
-                    if num_lc == 0:
-                        new["locally_connected_layers"] = []
-                    elif num_lc == 1:
-                        new["locally_connected_layers"] = [lc_layer]
-                    elif num_lc == 2:
-                        new["locally_connected_layers"] = [lc_layer, deepcopy(lc_layer)]
-                    if not grid or new not in grid:
-                        grid.append(new)
+for train_subset in ["all", "quantitative"]:
+    for minibatch_size in [128, 512]:
+        for dense_layer_size in [8, 16, 32, 64]:
+            for l1 in [0.0, 0.001, 0.01]:
+                for num_lc in [0, 1, 2]:
+                    for lc_kernel_size in [3, 5]:
+                        new = deepcopy(base_hyperparameters)
+                        new["train_data"]["subset"] = train_subset
+                        new["layer_sizes"] = [dense_layer_size]
+                        new["dense_layer_l1_regularization"] = l1
+                        (lc_layer,) = new["locally_connected_layers"]
+                        lc_layer['kernel_size'] = lc_kernel_size
+                        if num_lc == 0:
+                            new["locally_connected_layers"] = []
+                        elif num_lc == 1:
+                            new["locally_connected_layers"] = [lc_layer]
+                        elif num_lc == 2:
+                            new["locally_connected_layers"] = [lc_layer, deepcopy(lc_layer)]
+                        if not grid or new not in grid:
+                            grid.append(new)
 
 dump(grid, stdout)
