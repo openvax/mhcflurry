@@ -309,7 +309,7 @@ def run(argv=sys.argv[1:]):
         # as it goes so no saving is required at the end.
         for _ in tqdm.trange(len(work_items)):
             item = work_items.pop(0)  # want to keep freeing up memory
-            (_, work_predictor) = train_model_entrypoint(item)
+            work_predictor = train_model_entrypoint(item)
             assert work_predictor is predictor
         assert not work_items
 
