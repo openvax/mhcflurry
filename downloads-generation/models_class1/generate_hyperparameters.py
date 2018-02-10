@@ -10,7 +10,7 @@ base_hyperparameters = {
     ##########################################
     # ENSEMBLE SIZE
     ##########################################
-    "n_models": 8,
+    "n_models": 4,
 
     ##########################################
     # OPTIMIZATION
@@ -66,7 +66,7 @@ grid = []
 for train_subset in ["all", "quantitative"]:
     for minibatch_size in [128]:
         for dense_layer_size in [8, 16, 32, 64]:
-            for l1 in [0.0, 0.001, 0.01]:
+            for l1 in [0.0, 0.001]:
                 for num_lc in [0, 1, 2]:
                     for lc_kernel_size in [3, 5]:
                         new = deepcopy(base_hyperparameters)
