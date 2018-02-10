@@ -7,6 +7,7 @@ import signal
 import sys
 import time
 import traceback
+import random
 from multiprocessing import Pool, Queue, cpu_count
 from functools import partial
 from pprint import pprint
@@ -271,6 +272,10 @@ def run(argv=sys.argv[1:]):
 
     if worker_pool:
         print("Processing %d work items in parallel." % len(work_items))
+
+        # The estimated time to completion is more accurate if we randomize
+        # the order of the work.
+        random.shuffle(work_items)
 
         # We sort here so the predictors are in order of hyperparameter set num.
         # This is convenient so that the neural networks get merged for each
