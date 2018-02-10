@@ -31,13 +31,16 @@ mkdir models
 
 python $SCRIPT_DIR/generate_hyperparameters.py > hyperparameters.yaml
 
+GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
+echo "Detected GPUS: $GPUS"
+
 time mhcflurry-class1-train-allele-specific-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2" \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
     --percent-rank-calibration-num-peptides-per-length 0 \
     --min-measurements-per-allele 75 \
-    --num-jobs 32 --gpus 4 --backend tensorflow-default
+    --num-jobs 32 --gpus $GPUS --max-workers-per-gpu 2
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
