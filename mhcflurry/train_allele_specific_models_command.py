@@ -68,11 +68,6 @@ parser.add_argument(
     default=50,
     help="Train models for alleles with >=N measurements.")
 parser.add_argument(
-    "--only-quantitative",
-    action="store_true",
-    default=False,
-    help="Use only quantitative training data")
-parser.add_argument(
     "--ignore-inequalities",
     action="store_true",
     default=False,
@@ -155,17 +150,13 @@ def run(argv=sys.argv[1:]):
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
 
-    if args.only_quantitative:
-        df = df.loc[
-            df.measurement_type == "quantitative"
-        ]
-        print("Subselected to quantitative: %s" % (str(df.shape)))
-
     if args.ignore_inequalities and "measurement_inequality" in df.columns:
         print("Dropping measurement_inequality column")
         del df["measurement_inequality"]
 
-    allele_counts = df.allele.value_counts()
+    # Allele counts are in terms of quantitative data only.
+    allele_counts = (
+        df.loc[df.measurement_type == "quantitative"].allele.value_counts())
 
     if args.allele:
         alleles = [normalize_allele_name(a) for a in args.allele]
