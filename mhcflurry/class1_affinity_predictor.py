@@ -156,6 +156,56 @@ class Class1AffinityPredictor(object):
             allele_to_fixed_length_sequence=allele_to_fixed_length_sequence
         )
 
+    def merge_in_place(self, others):
+        """
+        Add the models present other predictors into the current predictor.
+
+        Parameters
+        ----------
+        others : list of Class1AffinityPredictor
+            Other predictors to merge into the current predictor.
+
+        Returns
+        -------
+        list of string : names of newly added models
+        """
+
+        new_model_names = []
+        for predictor in others:
+            for model in predictor.class1_pan_allele_models:
+                model_name = self.model_name(
+                    "pan-class1",
+                    len(self.class1_pan_allele_models))
+                self.class1_pan_allele_models.append(model)
+                row = pandas.Series(collections.OrderedDict([
+                    ("model_name", model_name),
+                    ("allele", "pan-class1"),
+                    ("config_json", json.dumps(model.get_config())),
+                    ("model", model),
+                ])).to_frame().T
+                self.manifest_df = pandas.concat(
+                    [self.manifest_df, row], ignore_index=True)
+                new_model_names.append(model_name)
+
+            for allele in predictor.allele_to_allele_specific_models:
+                if allele not in self.allele_to_allele_specific_models:
+                    self.allele_to_allele_specific_models[allele] = []
+                current_models = self.allele_to_allele_specific_models[allele]
+                for model in predictor.allele_to_allele_specific_models[allele]:
+                    model_name = self.model_name(allele, len(current_models))
+                    row = pandas.Series(collections.OrderedDict([
+                        ("model_name", model_name),
+                        ("allele", allele),
+                        ("config_json", json.dumps(model.get_config())),
+                        ("model", model),
+                    ])).to_frame().T
+                    self.manifest_df = pandas.concat(
+                        [self.manifest_df, row], ignore_index=True)
+                    current_models.append(model)
+                    new_model_names.append(model_name)
+
+        return new_model_names
+
     @property
     def supported_alleles(self):
         """
