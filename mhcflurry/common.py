@@ -10,15 +10,27 @@ import pandas
 from . import amino_acid
 
 
-def set_keras_backend(backend):
+def set_keras_backend(backend=None, gpu_device_nums=None):
     """
     Configure Keras backend to use GPU or CPU. Only tensorflow is supported.
 
-    Must be called before Keras has been imported.
+    Parameters
+    ----------
+    backend : string, optional
+        one of 'tensorflow-default', 'tensorflow-cpu', 'tensorflow-gpu'
 
-    backend must be 'tensorflow-cpu' or 'tensorflow-gpu'.
+    gpu_device_nums : list of int, optional
+        GPU devices to potentially use
+
     """
     os.environ["KERAS_BACKEND"] = "tensorflow"
+
+    if not backend:
+        backend = "tensorflow-default"
+
+    if gpu_device_nums is not None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(
+            [str(i) for i in gpu_device_nums])
 
     if backend == "tensorflow-cpu":
         print("Forcing tensorflow/CPU backend.")
