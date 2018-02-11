@@ -43,7 +43,7 @@ time mhcflurry-class1-train-allele-specific-models \
     --out-models-dir models \
     --percent-rank-calibration-num-peptides-per-length 0 \
     --min-measurements-per-allele 75 \
-    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2
+    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 20
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
