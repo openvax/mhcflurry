@@ -1,5 +1,5 @@
 from multiprocessing import Pool, Queue, cpu_count
-from queue import Empty
+from six.moves.queue import Empty
 from multiprocessing.util import Finalize
 from pprint import pprint
 
