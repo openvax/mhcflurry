@@ -70,6 +70,7 @@ for train_subset in ["all", "quantitative"]:
                 for num_lc in [0, 1, 2]:
                     for lc_kernel_size in [3, 5]:
                         new = deepcopy(base_hyperparameters)
+                        new["minibatch_size"] = minibatch_size
                         new["train_data"]["subset"] = train_subset
                         new["layer_sizes"] = [dense_layer_size]
                         new["dense_layer_l1_regularization"] = l1
