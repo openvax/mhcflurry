@@ -8,11 +8,7 @@ import sys
 import time
 import traceback
 import random
-from multiprocessing import Pool, Queue, cpu_count
-from queue import Empty
-from multiprocessing.util import Finalize
 from functools import partial
-from pprint import pprint
 
 import pandas
 import yaml
@@ -22,6 +18,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import configure_logging, set_keras_backend
+from .parallelism import make_worker_pool, cpu_count
 
 
 # To avoid pickling large matrices to send to child processes when running in
@@ -140,82 +137,6 @@ parser.add_argument(
     default=None,
     help="Restart workers after N tasks. Workaround for tensorflow memory "
     "leaks. Requires Python >=3.2.")
-
-
-def make_worker_pool(
-        processes=None,
-        initializer=None,
-        initializer_kwargs_per_process=None,
-        max_tasks_per_worker=None):
-    """
-    Convenience wrapper to create a multiprocessing.Pool.
-
-    Parameters
-    ----------
-    processes : int
-        Number of workers. Default: num CPUs.
-
-    initializer : function, optional
-        Init function to call in each worker
-
-    initializer_kwargs_per_process : list of dict, optional
-        Arguments to pass to initializer function for each worker. Length of
-        list must equal the number of workers.
-
-    max_tasks_per_worker : int, optional
-        Restart workers after this many tasks. Requires Python >=3.2.
-
-    Returns
-    -------
-    multiprocessing.Pool
-    """
-
-    if not processes:
-        processes = cpu_count()
-
-    pool_kwargs = {
-        'processes': processes,
-    }
-    if max_tasks_per_worker:
-        pool_kwargs["maxtasksperchild"] = max_tasks_per_worker
-
-    if initializer:
-        if initializer_kwargs_per_process:
-            assert len(initializer_kwargs_per_process) == processes
-            kwargs_queue = Queue()
-            kwargs_queue2 = Queue()
-            for kwargs in initializer_kwargs_per_process:
-                kwargs_queue.put(kwargs)
-                kwargs_queue2.put(kwargs)
-            pool_kwargs["initializer"] = worker_init_entry_point
-            pool_kwargs["initargs"] = (initializer, kwargs_queue, kwargs_queue2)
-        else:
-            pool_kwargs["initializer"] = initializer
-
-    worker_pool = Pool(**pool_kwargs)
-    print("Started pool: %s" % str(worker_pool))
-    pprint(pool_kwargs)
-    return worker_pool
-
-
-def worker_init_entry_point(
-        init_function, arg_queue=None, round_robin_arg_queue=None):
-    kwargs = {}
-    if arg_queue:
-        try:
-            kwargs = arg_queue.get(block=False)
-        except Empty:
-            print("Argument queue empty. Using round robin arg queue.")
-            kwargs = round_robin_arg_queue.get(block=True)
-            round_robin_arg_queue.put(kwargs)
-
-        # On exit we add the init args back to the queue so restarted workers
-        # (e.g. when when running with maxtasksperchild) will pickup init
-        # arguments from a previously exited worker.
-        Finalize(None, arg_queue.put, (kwargs,), exitpriority=1)
-
-    print("Initializing worker: %s" % str(kwargs))
-    init_function(**kwargs)
 
 
 def run(argv=sys.argv[1:]):

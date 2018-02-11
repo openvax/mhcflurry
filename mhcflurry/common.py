@@ -32,7 +32,7 @@ def set_keras_backend(backend=None, gpu_device_nums=None):
         os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(
             [str(i) for i in gpu_device_nums])
 
-    if backend == "tensorflow-cpu":
+    if backend == "tensorflow-cpu" or not gpu_device_nums:
         print("Forcing tensorflow/CPU backend.")
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
         device_count = {'CPU': 1, 'GPU': 0}
