@@ -1,5 +1,5 @@
 from multiprocessing import Pool, Queue, cpu_count
-from six.moves.queue import Empty
+from six.moves import queue
 from multiprocessing.util import Finalize
 from pprint import pprint
 
@@ -86,7 +86,7 @@ def worker_init_entry_point(
     if arg_queue:
         try:
             kwargs = arg_queue.get(block=False)
-        except Empty:
+        except queue.Empty:
             print("Argument queue empty. Using round robin arg queue.")
             kwargs = backup_arg_queue.get(block=True)
             backup_arg_queue.put(kwargs)
