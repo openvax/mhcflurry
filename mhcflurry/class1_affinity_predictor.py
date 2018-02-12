@@ -1046,4 +1046,31 @@ class Class1AffinityPredictor(object):
 
         return encoded_peptides
 
+    def filter_networks(self, predicate):
+        """
+        Return a new Class1AffinityPredictor containing a subset of this
+        predictor's neural networks.
 
+        Parameters
+        ----------
+        predicate : Class1NeuralNetwork -> boolean
+            Function specifying which neural networks to include
+
+        Returns
+        -------
+        Class1AffinityPredictor
+        """
+        allele_to_allele_specific_models = {}
+        for (allele, models) in self.allele_to_allele_specific_models.items():
+            allele_to_allele_specific_models[allele] = [
+                m for m in models if predicate(m)
+            ]
+        class1_pan_allele_models = [
+            m for m in self.class1_pan_allele_models if predicate(m)
+        ]
+
+        return Class1AffinityPredictor(
+            allele_to_allele_specific_models=allele_to_allele_specific_models,
+            class1_pan_allele_models=class1_pan_allele_models,
+            allele_to_fixed_length_sequence=self.allele_to_fixed_length_sequence,
+        )
