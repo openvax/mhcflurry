@@ -38,6 +38,7 @@ PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
 time mhcflurry-class1-train-allele-specific-models \
+    --allele HLA-A*02:01 HLA-A*01:01 HLA-A*03:01 HLA-A*11:01 HLA-A*24:02 HLA-B*07:02 HLA-B*15:01 \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2" \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
