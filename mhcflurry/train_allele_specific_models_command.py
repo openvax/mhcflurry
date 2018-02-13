@@ -10,6 +10,7 @@ import traceback
 import random
 from functools import partial
 
+import numpy
 import pandas
 import yaml
 from mhcnames import normalize_allele_name
@@ -472,6 +473,9 @@ def calibrate_percentile_ranks(allele, predictor, peptides=None):
 
 
 def worker_init(keras_backend=None, gpu_device_nums=None):
+    # Each worker needs distinct random numbers
+    numpy.random.seed()
+    random.seed()
     if keras_backend or gpu_device_nums:
         print("WORKER pid=%d assigned GPU devices: %s" % (
             os.getpid(), gpu_device_nums))

@@ -64,7 +64,7 @@ base_hyperparameters = {
 
 grid = []
 for train_subset in ["all", "quantitative"]:
-    for minibatch_size in [32]:
+    for minibatch_size in [128]:
         for dense_layer_size in [8, 16, 32, 64]:
             for l1 in [0.0, 0.001]:
                 for num_lc in [0, 1, 2]:
