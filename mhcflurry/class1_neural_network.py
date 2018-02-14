@@ -61,6 +61,7 @@ class Class1NeuralNetwork(object):
     compile_hyperparameter_defaults = HyperparameterDefaults(
         loss="custom:mse_with_inequalities",
         optimizer="rmsprop",
+        learning_rate=None,
     )
     """
     Loss and optimizer hyperparameters. Any values supported by keras may be
@@ -574,6 +575,12 @@ class Class1NeuralNetwork(object):
             self.network().compile(
                 loss=loss_name_or_function,
                 optimizer=self.hyperparameters['optimizer'])
+
+        if self.hyperparameters['learning_rate'] is not None:
+            from keras import backend as K
+            K.set_value(
+                self.network().optimizer.lr,
+                self.hyperparameters['learning_rate'])
 
         if loss_supports_inequalities:
             # Do not sample negative affinities: just use an inequality.
