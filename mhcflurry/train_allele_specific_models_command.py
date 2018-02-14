@@ -497,7 +497,7 @@ def train_model(
         print(alleles)
         data = data.loc[data.allele.isin(alleles)]
         assert len(data) >= pretrain_min_points, (len(data), pretrain_min_points)
-        data = (data.allele == allele).astype(int).values
+        train_rounds = (data.allele == allele).astype(int).values
     else:
         train_rounds = None
         data = data.loc[data.allele == allele]
