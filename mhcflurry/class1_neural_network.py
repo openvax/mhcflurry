@@ -103,7 +103,7 @@ class Class1NeuralNetwork(object):
     """
 
     miscelaneous_hyperparameter_defaults = HyperparameterDefaults(
-        train_data={'subset': 'all', 'num_poitns': None},
+        train_data={'subset': 'all'},
     )
     """
     Miscelaneous hyperaparameters. These parameters are not used by this class
