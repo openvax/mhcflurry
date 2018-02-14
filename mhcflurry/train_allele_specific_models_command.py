@@ -475,12 +475,12 @@ def train_model(
 
     pretrain_min_points = hyperparameters['train_data']['pretrain_min_points']
 
-    full_data = GLOBAL_DATA["train_data"]
+    data = GLOBAL_DATA["train_data"]
 
     subset = hyperparameters.get("train_data", {}).get("subset", "all")
     if subset == "quantitative":
-        data = full_data.loc[
-            full_data.measurement_type == "quantitative"
+        data = data.loc[
+            data.measurement_type == "quantitative"
         ]
     elif subset == "all":
         pass
