@@ -448,13 +448,14 @@ class Class1AffinityPredictor(object):
             peptides,
             affinities,
             inequalities=None,
+            train_rounds=None,
             models_dir_for_save=None,
             verbose=0,
             progress_preamble="",
             progress_print_interval=5.0):
         """
-        Fit one or more allele specific predictors for a single allele using a
-        single neural network architecture.
+        Fit one or more allele specific predictors for a single allele using one
+        or more neural network architectures.
         
         The new predictors are saved in the Class1AffinityPredictor instance
         and will be used on subsequent calls to `predict`.
@@ -465,9 +466,7 @@ class Class1AffinityPredictor(object):
             Number of neural networks to fit
         
         architecture_hyperparameters_list : list of dict
-            List of hyperparameters. If more than one set of hyperparameters
-            are specified, model selection over them is performed and model
-            with the lowest validation loss is selected for each fold.
+            List of hyperparameter sets.
                
         allele : string
         
@@ -478,6 +477,10 @@ class Class1AffinityPredictor(object):
 
         inequalities : list of string, each element one of ">", "<", or "="
             See Class1NeuralNetwork.fit for details.
+
+        train_rounds : sequence of int
+            Each training point i will be used on training rounds r for which
+            train_rounds[i] > r, r >= 0.
         
         models_dir_for_save : string, optional
             If specified, the Class1AffinityPredictor is (incrementally) written
@@ -502,78 +505,76 @@ class Class1AffinityPredictor(object):
             self.allele_to_allele_specific_models[allele] = []
 
         encodable_peptides = EncodableSequences.create(peptides)
+        peptides_affinities_inequalities_per_round = [
+            (encodable_peptides, affinities, inequalities)
+        ]
+
+        if train_rounds is not None:
+            for round in range(1, train_rounds.max() + 1):
+                round_mask = train_rounds >= round
+                sub_encodable_peptides = EncodableSequences.create(
+                    encodable_peptides.sequences[round_mask])
+                peptides_affinities_inequalities_per_round.append((
+                    sub_encodable_peptides,
+                    affinities[round_mask],
+                    None if inequalities is None else inequalities[round_mask]))
+        n_rounds = len(peptides_affinities_inequalities_per_round)
 
         n_architectures = len(architecture_hyperparameters_list)
-        if n_models > 1 or n_architectures > 1:
-            # Adjust progress info to indicate number of models and
-            # architectures.
-            pieces = []
-            if n_models > 1:
-                pieces.append("Model {model_num:2d} / {n_models:2d}")
-            if n_architectures > 1:
-                pieces.append(
-                    "Architecture {architecture_num:2d} / {n_architectures:2d}"
-                    " (best so far: {best_num})")
-            progress_preamble_template = "[ %s ] {user_progress_preamble}" % (
-                ", ".join(pieces))
-        else:
-            # Just use the user-provided progress message.
-            progress_preamble_template = "{user_progress_preamble}"
+
+        # Adjust progress info to indicate number of models and
+        # architectures.
+        pieces = []
+        if n_models > 1:
+            pieces.append("Model {model_num:2d} / {n_models:2d}")
+        if n_architectures > 1:
+            pieces.append(
+                "Architecture {architecture_num:2d} / {n_architectures:2d}")
+        if len(peptides_affinities_inequalities_per_round) > 1:
+            pieces.append("Round {round:2d} / {n_rounds:2d}")
+        pieces.append("{n_peptides:4d} peptides")
+        progress_preamble_template = "[ %s ] {user_progress_preamble}" % (
+            ", ".join(pieces))
 
         models = []
         for model_num in range(n_models):
-            shuffle_permutation = numpy.random.permutation(len(affinities))
-
-            best_num = None
-            best_loss = None
-            best_model = None
             for (architecture_num, architecture_hyperparameters) in enumerate(
                     architecture_hyperparameters_list):
                 model = Class1NeuralNetwork(**architecture_hyperparameters)
-                model.fit(
-                    encodable_peptides,
-                    affinities,
-                    shuffle_permutation=shuffle_permutation,
-                    inequalities=inequalities,
-                    verbose=verbose,
-                    progress_preamble=progress_preamble_template.format(
-                        user_progress_preamble=progress_preamble,
-                        best_num="n/a" if best_num is None else best_num + 1,
-                        model_num=model_num + 1,
-                        n_models=n_models,
-                        architecture_num=architecture_num + 1,
-                        n_architectures=n_architectures),
-                    progress_print_interval=progress_print_interval)
+                for round_num in range(n_rounds):
+                    (round_peptides, round_affinities, round_inequalities) = (
+                        peptides_affinities_inequalities_per_round[round_num]
+                    )
+                    model.fit(
+                        round_peptides,
+                        round_affinities,
+                        inequalities=round_inequalities,
+                        verbose=verbose,
+                        progress_preamble=progress_preamble_template.format(
+                            n_peptides=len(round_peptides),
+                            round=round_num,
+                            n_rounds=n_rounds,
+                            user_progress_preamble=progress_preamble,
+                            model_num=model_num + 1,
+                            n_models=n_models,
+                            architecture_num=architecture_num + 1,
+                            n_architectures=n_architectures),
+                        progress_print_interval=progress_print_interval)
 
-                if n_architectures > 1:
-                    # We require val_loss (i.e. a validation set) if we have
-                    # multiple architectures.
-                    loss = model.loss_history['val_loss'][-1]
-                else:
-                    loss = None
-                if loss is None or best_loss is None or best_loss > loss:
-                    best_loss = loss
-                    best_num = architecture_num
-                    best_model = model
-                del model
-
-            if n_architectures > 1:
-                print("Selected architecture %d." % (best_num + 1))
-
-            model_name = self.model_name(allele, model_num)
-            row = pandas.Series(collections.OrderedDict([
-                ("model_name", model_name),
-                ("allele", allele),
-                ("config_json", json.dumps(best_model.get_config())),
-                ("model", best_model),
-            ])).to_frame().T
-            self.manifest_df = pandas.concat(
-                [self.manifest_df, row], ignore_index=True)
-            self.allele_to_allele_specific_models[allele].append(best_model)
-            if models_dir_for_save:
-                self.save(
-                    models_dir_for_save, model_names_to_write=[model_name])
-            models.append(best_model)
+                model_name = self.model_name(allele, model_num)
+                row = pandas.Series(collections.OrderedDict([
+                    ("model_name", model_name),
+                    ("allele", allele),
+                    ("config_json", json.dumps(model.get_config())),
+                    ("model", model),
+                ])).to_frame().T
+                self.manifest_df = pandas.concat(
+                    [self.manifest_df, row], ignore_index=True)
+                self.allele_to_allele_specific_models[allele].append(model)
+                if models_dir_for_save:
+                    self.save(
+                        models_dir_for_save, model_names_to_write=[model_name])
+                models.append(model)
 
         return models
 

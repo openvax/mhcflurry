@@ -99,7 +99,7 @@ class Class1NeuralNetwork(object):
     """
 
     miscelaneous_hyperparameter_defaults = HyperparameterDefaults(
-        train_data={'subset': 'all'},
+        train_data={},
     )
     """
     Miscelaneous hyperaparameters. These parameters are not used by this class
@@ -165,7 +165,7 @@ class Class1NeuralNetwork(object):
 
         self.loss_history = None
         self.fit_seconds = None
-        self.fit_num_points = None
+        self.fit_num_points = []
 
         self.prediction_cache = weakref.WeakKeyDictionary()
 
@@ -472,7 +472,7 @@ class Class1NeuralNetwork(object):
             disable.
         """
 
-        self.fit_num_points = len(peptides)
+        self.fit_num_points.append(len(peptides))
 
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)

@@ -29,6 +29,8 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 mkdir models
 
+cp $SCRIPT_DIR/class1_pseudosequences.csv .
+
 python $SCRIPT_DIR/generate_hyperparameters.py > hyperparameters.yaml
 
 GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
@@ -39,6 +41,7 @@ echo "Detected processors: $PROCESSORS"
 
 time mhcflurry-class1-train-allele-specific-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2" \
+    --allele-sequences class1_pseudosequences.csv \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
     --percent-rank-calibration-num-peptides-per-length 0 \
