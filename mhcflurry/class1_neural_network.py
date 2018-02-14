@@ -29,7 +29,7 @@ class Class1NeuralNetwork(object):
 
     network_hyperparameter_defaults = HyperparameterDefaults(
         kmer_size=15,
-        peptide_amino_acid_encoding="one-hot",
+        peptide_amino_acid_encoding="BLOSUM62",
         embedding_input_dim=21,
         embedding_output_dim=8,
         allele_dense_layer_sizes=[],
@@ -39,7 +39,7 @@ class Class1NeuralNetwork(object):
         layer_sizes=[32],
         dense_layer_l1_regularization=0.001,
         dense_layer_l2_regularization=0.0,
-        activation="relu",
+        activation="tanh",
         init="glorot_uniform",
         output_activation="sigmoid",
         dropout_probability=0.0,
@@ -59,7 +59,7 @@ class Class1NeuralNetwork(object):
     """
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
-        loss="mse",
+        loss="custom:mse_with_inequalities",
         optimizer="rmsprop",
     )
     """
@@ -78,10 +78,10 @@ class Class1NeuralNetwork(object):
     fit_hyperparameter_defaults = HyperparameterDefaults(
         max_epochs=500,
         take_best_epoch=False,  # currently unused
-        validation_split=0.2,
+        validation_split=0.1,
         early_stopping=True,
         minibatch_size=128,
-        random_negative_rate=0.0,
+        random_negative_rate=0.2,
         random_negative_constant=25,
         random_negative_affinity_min=20000.0,
         random_negative_affinity_max=50000.0,
