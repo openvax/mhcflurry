@@ -77,7 +77,6 @@ class Class1NeuralNetwork(object):
 
     fit_hyperparameter_defaults = HyperparameterDefaults(
         max_epochs=500,
-        take_best_epoch=False,  # currently unused
         validation_split=0.1,
         early_stopping=True,
         minibatch_size=128,
@@ -92,11 +91,7 @@ class Class1NeuralNetwork(object):
     """
 
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
-        patience=10,
-        monitor='val_loss',  # currently unused
-        min_delta=0,  # currently unused
-        verbose=1,  # currently unused
-        mode='auto'  # currently unused
+        patience=20,
     )
     """
     Hyperparameters for early stopping.
@@ -129,6 +124,11 @@ class Class1NeuralNetwork(object):
     hyperparameter_renames = {
         "use_embedding": None,
         "pseudosequence_use_embedding": None,
+        "monitor": None,
+        "min_delta": None,
+        "verbose": None,
+        "mode": None,
+        "take_best_epoch": None,
     }
 
     @classmethod
