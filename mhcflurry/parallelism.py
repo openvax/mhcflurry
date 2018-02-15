@@ -1,3 +1,5 @@
+import traceback
+import sys
 from multiprocessing import Pool, Queue, cpu_count
 from six.moves import queue
 from multiprocessing.util import Finalize
@@ -98,3 +100,28 @@ def worker_init_entry_point(
 
     print("Initializing worker: %s" % str(kwargs))
     init_function(**kwargs)
+
+
+# Solution suggested in https://bugs.python.org/issue13831
+class WrapException(Exception):
+    """
+    Add traceback info to exception so exceptions raised in worker processes
+    can still show traceback info when re-raised in the parent.
+    """
+    def __init__(self):
+        exc_type, exc_value, exc_tb = sys.exc_info()
+        self.exception = exc_value
+        self.formatted = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    def __str__(self):
+        return '%s\nOriginal traceback:\n%s' % (Exception.__str__(self), self.formatted)
+
+
+def call_wrapped(function, *args, **kwargs):
+    try:
+        return function(*args, **kwargs)
+    except:
+        raise WrapException()
+
+
+def call_wrapped_kwargs(function, kwargs):
+    return call_wrapped(function, **kwargs)

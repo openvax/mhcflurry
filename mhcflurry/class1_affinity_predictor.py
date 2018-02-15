@@ -510,14 +510,15 @@ class Class1AffinityPredictor(object):
         ]
 
         if train_rounds is not None:
-            for round in range(1, train_rounds.max() + 1):
-                round_mask = train_rounds >= round
-                sub_encodable_peptides = EncodableSequences.create(
-                    encodable_peptides.sequences[round_mask])
-                peptides_affinities_inequalities_per_round.append((
-                    sub_encodable_peptides,
-                    affinities[round_mask],
-                    None if inequalities is None else inequalities[round_mask]))
+            for round in sorted(set(train_rounds)):
+                round_mask = train_rounds > round
+                if round_mask.any():
+                    sub_encodable_peptides = EncodableSequences.create(
+                        encodable_peptides.sequences[round_mask])
+                    peptides_affinities_inequalities_per_round.append((
+                        sub_encodable_peptides,
+                        affinities[round_mask],
+                        None if inequalities is None else inequalities[round_mask]))
         n_rounds = len(peptides_affinities_inequalities_per_round)
 
         n_architectures = len(architecture_hyperparameters_list)

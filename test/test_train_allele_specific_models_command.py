@@ -2,10 +2,10 @@ import json
 import os
 import shutil
 import tempfile
+import subprocess
 
 from numpy.testing import assert_array_less, assert_equal
 
-from mhcflurry import train_allele_specific_models_command
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 
@@ -57,6 +57,7 @@ def run_and_check(n_jobs=0):
         json.dump(HYPERPARAMETERS, fd)
 
     args = [
+        "mhcflurry-class1-train-allele-specific-models",
         "--data", get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"),
         "--hyperparameters", hyperparameters_filename,
         "--allele", "HLA-A*02:01", "HLA-A*01:01", "HLA-A*03:01",
@@ -66,7 +67,7 @@ def run_and_check(n_jobs=0):
         "--ignore-inequalities",
     ]
     print("Running with args: %s" % args)
-    train_allele_specific_models_command.run(args)
+    subprocess.check_call(args)
 
     result = Class1AffinityPredictor.load(models_dir)
     predictions = result.predict(
@@ -84,8 +85,9 @@ def run_and_check(n_jobs=0):
     shutil.rmtree(models_dir)
 
 
-def Xtest_run_parallel():
-    run_and_check(n_jobs=3)
+if os.environ.get("KERAS_BACKEND") != "theano":
+    def test_run_parallel():
+        run_and_check(n_jobs=3)
 
 
 def test_run_serial():

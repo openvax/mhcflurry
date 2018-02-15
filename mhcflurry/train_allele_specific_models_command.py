@@ -20,7 +20,8 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import configure_logging, set_keras_backend
-from .parallelism import make_worker_pool, cpu_count
+from .parallelism import (
+    make_worker_pool, cpu_count, call_wrapped, call_wrapped_kwargs)
 from .hyperparameters import HyperparameterDefaults
 from .allele_encoding import AlleleEncoding
 
@@ -327,7 +328,9 @@ def run(argv=sys.argv[1:]):
         random.shuffle(work_items)
 
         results_generator = worker_pool.imap_unordered(
-            train_model_entry_point, work_items, chunksize=1)
+            partial(call_wrapped_kwargs, train_model),
+            work_items,
+            chunksize=1)
 
         unsaved_predictors = []
         last_save_time = time.time()
@@ -361,7 +364,7 @@ def run(argv=sys.argv[1:]):
         # as it goes so no saving is required at the end.
         for _ in tqdm.trange(len(work_items)):
             item = work_items.pop(0)  # want to keep freeing up memory
-            work_predictor = train_model_entry_point(item)
+            work_predictor = train_model(**item)
             assert work_predictor is predictor
         assert not work_items
 
@@ -418,14 +421,13 @@ def run(argv=sys.argv[1:]):
 
             results = worker_pool.imap_unordered(
                 partial(
-                    calibrate_percentile_ranks,
+                    partial(call_wrapped, calibrate_percentile_ranks),
                     predictor=predictor),
                 alleles,
                 chunksize=1)
 
         for result in tqdm.tqdm(results, total=len(alleles)):
             predictor.allele_to_percent_rank_transform.update(result)
-
         print("Done calibrating %d additional alleles." % len(alleles))
         predictor.save(args.out_models_dir, model_names_to_write=[])
 
@@ -438,10 +440,6 @@ def run(argv=sys.argv[1:]):
     print("Train time: %0.2f min. Percent rank calibration time: %0.2f min." % (
         training_time / 60.0, percent_rank_calibration_time / 60.0))
     print("Predictor written to: %s" % args.out_models_dir)
-
-
-def train_model_entry_point(item):
-    return train_model(**item)
 
 
 def alleles_by_similarity(allele):

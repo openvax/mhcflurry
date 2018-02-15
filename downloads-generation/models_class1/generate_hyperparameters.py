@@ -59,7 +59,7 @@ base_hyperparameters = {
     ##########################################
     # TRAINING Data
     ##########################################
-    "train_data": {"subset": "all", "pretrain_min_points": 10000},
+    "train_data": {"subset": "all", "pretrain_min_points": 1000},
 }
 
 grid = []
