@@ -163,10 +163,7 @@ class Class1NeuralNetwork(object):
         self.network_weights = None
         self.network_weights_loader = None
 
-        self.loss_history = None
-        self.fit_seconds = None
-        self.fit_num_points = []
-
+        self.fit_info = []
         self.prediction_cache = weakref.WeakKeyDictionary()
 
     KERAS_MODELS_CACHE = {}
@@ -310,7 +307,6 @@ class Class1NeuralNetwork(object):
         """
         config = dict(config)
         instance = cls(**config.pop('hyperparameters'))
-        assert all(hasattr(instance, key) for key in config), config.keys()
         instance.__dict__.update(config)
         instance.network_weights = weights
         instance.network_weights_loader = weights_loader
@@ -471,9 +467,6 @@ class Class1NeuralNetwork(object):
             How often (in seconds) to print progress update. Set to None to
             disable.
         """
-
-        self.fit_num_points.append(len(peptides))
-
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
 
@@ -629,7 +622,7 @@ class Class1NeuralNetwork(object):
         min_val_loss_iteration = None
         min_val_loss = None
 
-        self.loss_history = collections.defaultdict(list)
+        fit_info = collections.defaultdict(list)
         start = time.time()
         last_progress_print = None
         x_dict_with_random_negatives = {}
@@ -692,7 +685,7 @@ class Class1NeuralNetwork(object):
                 sample_weight=sample_weights_with_random_negatives)
 
             for (key, value) in fit_history.history.items():
-                self.loss_history[key].extend(value)
+                fit_info[key].extend(value)
 
             # Print progress no more often than once every few seconds.
             if progress_print_interval is not None and (
@@ -704,13 +697,13 @@ class Class1NeuralNetwork(object):
                        "Min val loss (%s) at epoch %s" % (
                            i,
                            self.hyperparameters['max_epochs'],
-                           self.loss_history['loss'][-1],
+                           fit_info['loss'][-1],
                            str(min_val_loss),
                            min_val_loss_iteration)).strip())
                 last_progress_print = time.time()
 
             if self.hyperparameters['validation_split']:
-                val_loss = self.loss_history['val_loss'][-1]
+                val_loss = fit_info['val_loss'][-1]
                 val_losses.append(val_loss)
 
                 if min_val_loss is None or val_loss <= min_val_loss:
@@ -728,11 +721,14 @@ class Class1NeuralNetwork(object):
                                 "Min val loss (%s) at epoch %s" % (
                                     i,
                                     self.hyperparameters['max_epochs'],
-                                    self.loss_history['loss'][-1],
+                                    fit_info['loss'][-1],
                                     str(min_val_loss),
                                     min_val_loss_iteration)).strip())
                         break
-        self.fit_seconds = time.time() - start
+
+        fit_info["time"] = time.time() - start
+        fit_info["num_points"] = len(peptides)
+        self.fit_info.append(dict(fit_info))
 
     def predict(self, peptides, allele_encoding=None, batch_size=4096):
         """
