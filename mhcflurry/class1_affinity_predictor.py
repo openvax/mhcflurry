@@ -27,6 +27,11 @@ from .ensemble_centrality import CENTRALITY_MEASURES
 from .allele_encoding import AlleleEncoding
 
 
+# Default function for combining predictions across models in an ensemble.
+# See ensemble_centrality.py for other options.
+DEFAULT_CENTRALITY_MEASURE = "mean"
+
+
 class Class1AffinityPredictor(object):
     """
     High-level interface for peptide/MHC I binding affinity prediction.
@@ -722,7 +727,7 @@ class Class1AffinityPredictor(object):
             alleles=None,
             allele=None,
             throw=True,
-            centrality_measure="robust_mean"):
+            centrality_measure=DEFAULT_CENTRALITY_MEASURE):
         """
         Predict nM binding affinities.
         
@@ -757,6 +762,7 @@ class Class1AffinityPredictor(object):
             allele=allele,
             throw=throw,
             include_percentile_ranks=False,
+            include_confidence_intervals=False,
             centrality_measure=centrality_measure,
         )
         return df.prediction.values
@@ -769,7 +775,8 @@ class Class1AffinityPredictor(object):
             throw=True,
             include_individual_model_predictions=False,
             include_percentile_ranks=True,
-            centrality_measure="mean"):
+            include_confidence_intervals=True,
+            centrality_measure=DEFAULT_CENTRALITY_MEASURE):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
@@ -812,18 +819,22 @@ class Class1AffinityPredictor(object):
             raise TypeError("alleles must be a list or array, not a string")
         if allele is None and alleles is None:
             raise ValueError("Must specify 'allele' or 'alleles'.")
+
+        peptides = EncodableSequences.create(peptides)
+        df = pandas.DataFrame({
+            'peptide': peptides.sequences,
+        })
+
         if allele is not None:
             if alleles is not None:
                 raise ValueError("Specify exactly one of allele or alleles")
-            alleles = [allele] * len(peptides)
+            df["allele"] = allele
+            df["normalized_allele"] = mhcnames.normalize_allele_name(allele)
+        else:
+            df["allele"] = numpy.array(alleles)
+            df["normalized_allele"] = df.allele.map(
+                mhcnames.normalize_allele_name)
 
-        alleles = numpy.array(alleles)
-        peptides = EncodableSequences.create(peptides)
-
-        df = pandas.DataFrame({
-            'peptide': peptides.sequences,
-            'allele': alleles,
-        })
         if len(df) == 0:
             # No predictions.
             logging.warning("Predicting for 0 peptides.")
@@ -836,9 +847,6 @@ class Class1AffinityPredictor(object):
                     'prediction_high'
                 ])
             return empty_result
-
-        df["normalized_allele"] = df.allele.map(
-            mhcnames.normalize_allele_name)
 
         (min_peptide_length, max_peptide_length) = (
             self.supported_peptide_lengths)
@@ -928,8 +936,9 @@ class Class1AffinityPredictor(object):
         logs = numpy.log(df_predictions)
         log_centers = centrality_function(logs.values)
         df["prediction"] = numpy.exp(log_centers)
-        df["prediction_low"] = numpy.exp(logs.quantile(0.05, axis=1))
-        df["prediction_high"] = numpy.exp(logs.quantile(0.95, axis=1))
+        if include_confidence_intervals:
+            df["prediction_low"] = numpy.exp(logs.quantile(0.05, axis=1))
+            df["prediction_high"] = numpy.exp(logs.quantile(0.95, axis=1))
 
         if include_individual_model_predictions:
             columns = sorted(df.columns, key=lambda c: c.startswith('model_'))

@@ -217,3 +217,30 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
     assert not numpy.isnan(ic50_pred[1])
     assert numpy.isnan(ic50_pred[2])
 
+
+def test_predict_implementations_equivalent():
+    for allele in ["HLA-A02:01", "A02:02"]:
+        for centrality_measure in ["mean", "robust_mean"]:
+            peptides = ["SIINFEKL", "SYYNFIIIKL", "SIINKFELQY"]
+
+            pred1 = DOWNLOADED_PREDICTOR.predict(
+                allele=allele,
+                peptides=peptides + ["SSSN"],
+                throw=False,
+                centrality_measure=centrality_measure)
+            pred2 = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+                allele=allele,
+                peptides=peptides + ["SSSN"],
+                throw=False,
+                centrality_measure=centrality_measure).prediction.values
+            testing.assert_equal(pred1, pred2)
+
+            pred1 = DOWNLOADED_PREDICTOR.predict(
+                allele=allele,
+                peptides=peptides,
+                centrality_measure=centrality_measure)
+            pred2 = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+                allele=allele,
+                peptides=peptides,
+                centrality_measure=centrality_measure).prediction.values
+            testing.assert_equal(pred1, pred2)
