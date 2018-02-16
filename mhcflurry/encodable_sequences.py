@@ -38,7 +38,7 @@ class EncodableSequences(object):
         self.sequences_df = pandas.DataFrame({
             "sequence": numpy.array(sequences),
         })
-        self.sequences_df["sequence_length"] = self.sequences.str.len()
+        self.sequences_df["sequence_length"] = self.sequences_df.sequence.str.len()
         self.min_length = self.sequences_df.sequence_length.min()
         self.max_length = self.sequences_df.sequence_length.max()
         self.sequences = self.sequences_df.sequence.values
