@@ -821,9 +821,7 @@ class Class1AffinityPredictor(object):
             raise ValueError("Must specify 'allele' or 'alleles'.")
 
         peptides = EncodableSequences.create(peptides)
-        df = pandas.DataFrame({
-            'peptide': peptides.sequences,
-        })
+        df = peptides.sequences_df.rename(columns={'sequence': 'peptide'})
 
         if allele is not None:
             if alleles is not None:
@@ -948,6 +946,7 @@ class Class1AffinityPredictor(object):
             ]
         columns.remove("normalized_allele")
         columns.remove("supported_peptide_length")
+        columns.remove("sequence_length")
 
         if include_percentile_ranks:
             if self.allele_to_percent_rank_transform:
