@@ -848,20 +848,29 @@ class Class1AffinityPredictor(object):
 
         (min_peptide_length, max_peptide_length) = (
             self.supported_peptide_lengths)
-        df["supported_peptide_length"] = (
-            (df.peptide.str.len() >= min_peptide_length) &
-            (df.peptide.str.len() <= max_peptide_length))
-        if (~df.supported_peptide_length).any():
-            msg = (
-                "%d peptides have lengths outside of supported range [%d, %d]: "
-                "%s" % (
-                    (~df.supported_peptide_length).sum(),
-                    min_peptide_length,
-                    max_peptide_length,
-                    str(df.ix[~df.supported_peptide_length].peptide.unique())))
-            logging.warning(msg)
-            if throw:
-                raise ValueError(msg)
+
+        if (peptides.min_length < min_peptide_length or
+                peptides.max_length > max_peptide_length):
+            # Only compute this if needed
+            all_peptide_lengths_supported = False
+            df["supported_peptide_length"] = (
+                (df.sequence_length.len() >= min_peptide_length) &
+                (df.sequence_length.len() <= max_peptide_length))
+            if (~df.supported_peptide_length).any():
+                msg = (
+                    "%d peptides have lengths outside of supported range [%d, %d]: "
+                    "%s" % (
+                        (~df.supported_peptide_length).sum(),
+                        min_peptide_length,
+                        max_peptide_length,
+                        str(df.ix[~df.supported_peptide_length].peptide.unique())))
+                logging.warning(msg)
+                if throw:
+                    raise ValueError(msg)
+        else:
+            # Handle common case efficiently.
+            df["supported_peptide_length"] = True
+            all_peptide_lengths_supported = True
 
         if self.class1_pan_allele_models:
             unsupported_alleles = [
@@ -904,12 +913,16 @@ class Class1AffinityPredictor(object):
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
+
             for allele in query_alleles:
                 models = self.allele_to_allele_specific_models.get(allele, [])
-                mask = (
-                    (df.normalized_allele == allele) &
-                    df.supported_peptide_length).values
-                if mask.all():
+                if len(query_alleles) == 1 and all_peptide_lengths_supported:
+                    mask = None
+                else:
+                    mask = (
+                        (df.normalized_allele == allele) &
+                        df.supported_peptide_length).values
+                if mask is None or mask.all():
                     # Common case optimization
                     for (i, model) in enumerate(models):
                         df["model_single_%d" % i] = model.predict(peptides)
