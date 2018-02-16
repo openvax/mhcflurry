@@ -827,11 +827,14 @@ class Class1AffinityPredictor(object):
             if alleles is not None:
                 raise ValueError("Specify exactly one of allele or alleles")
             df["allele"] = allele
-            df["normalized_allele"] = mhcnames.normalize_allele_name(allele)
+            normalized_allele = mhcnames.normalize_allele_name(allele)
+            df["normalized_allele"] = normalized_allele
+            unique_alleles = [normalized_allele]
         else:
             df["allele"] = numpy.array(alleles)
             df["normalized_allele"] = df.allele.map(
                 mhcnames.normalize_allele_name)
+            unique_alleles = df.normalized_allele.unique()
 
         if len(df) == 0:
             # No predictions.
@@ -854,8 +857,8 @@ class Class1AffinityPredictor(object):
             # Only compute this if needed
             all_peptide_lengths_supported = False
             df["supported_peptide_length"] = (
-                (df.sequence_length.len() >= min_peptide_length) &
-                (df.sequence_length.len() <= max_peptide_length))
+                (df.sequence_length >= min_peptide_length) &
+                (df.sequence_length <= max_peptide_length))
             if (~df.supported_peptide_length).any():
                 msg = (
                     "%d peptides have lengths outside of supported range [%d, %d]: "
@@ -899,9 +902,8 @@ class Class1AffinityPredictor(object):
                         allele_encoding=masked_allele_encoding)
 
         if self.allele_to_allele_specific_models:
-            query_alleles = df.normalized_allele.unique()
             unsupported_alleles = [
-                allele for allele in query_alleles
+                allele for allele in unique_alleles
                 if not self.allele_to_allele_specific_models.get(allele)
             ]
             if unsupported_alleles:
@@ -914,9 +916,9 @@ class Class1AffinityPredictor(object):
                 if throw:
                     raise ValueError(msg)
 
-            for allele in query_alleles:
+            for allele in unique_alleles:
                 models = self.allele_to_allele_specific_models.get(allele, [])
-                if len(query_alleles) == 1 and all_peptide_lengths_supported:
+                if len(unique_alleles) == 1 and all_peptide_lengths_supported:
                     mask = None
                 else:
                     mask = (
