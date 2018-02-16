@@ -37,8 +37,8 @@ class EncodableSequences(object):
             raise ValueError("Sequence of strings is required")
         self.sequences_df = pandas.DataFrame({
             "sequence": numpy.array(sequences),
-            "sequence_length": numpy.array(sequences),
         })
+        self.sequences_df["sequence_length"] = self.sequences.str.len()
         self.min_length = self.sequences_df.sequence_length.min()
         self.max_length = self.sequences_df.sequence_length.max()
         self.sequences = self.sequences_df.sequence.values
