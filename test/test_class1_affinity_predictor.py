@@ -233,7 +233,7 @@ def test_predict_implementations_equivalent():
                 peptides=peptides + ["SSSN"],
                 throw=False,
                 centrality_measure=centrality_measure).prediction.values
-            testing.assert_equal(pred1, pred2)
+            testing.assert_almost_equal(pred1, pred2, decimal=2)
 
             pred1 = DOWNLOADED_PREDICTOR.predict(
                 allele=allele,
@@ -243,4 +243,4 @@ def test_predict_implementations_equivalent():
                 allele=allele,
                 peptides=peptides,
                 centrality_measure=centrality_measure).prediction.values
-            testing.assert_equal(pred1, pred2)
+            testing.assert_almost_equal(pred1, pred2, decimal=2)
