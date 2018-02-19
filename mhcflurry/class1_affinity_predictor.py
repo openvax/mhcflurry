@@ -107,6 +107,21 @@ class Class1AffinityPredictor(object):
         if not allele_to_percent_rank_transform:
             allele_to_percent_rank_transform = {}
         self.allele_to_percent_rank_transform = allele_to_percent_rank_transform
+        self._cache = {}
+
+    def clear_cache(self):
+        """
+        Clear values cached based on the neural networks in this predictor.
+
+        Users should call this after mutating any of the following:
+            - class1_pan_allele_models
+            - allele_to_allele_specific_models
+            - allele_to_fixed_length_sequence
+
+        Methods that mutate these instance variables will call this method on
+        their own if needed.
+        """
+        self._cache.clear()
 
     @property
     def neural_networks(self):
@@ -209,6 +224,7 @@ class Class1AffinityPredictor(object):
                     current_models.append(model)
                     new_model_names.append(model_name)
 
+        self.clear_cache()
         return new_model_names
 
     @property
@@ -220,10 +236,12 @@ class Class1AffinityPredictor(object):
         -------
         list of string
         """
-        result = set(self.allele_to_allele_specific_models)
-        if self.allele_to_fixed_length_sequence:
-            result = result.union(self.allele_to_fixed_length_sequence)
-        return sorted(result)
+        if 'supported_alleles' not in self._cache:
+            result = set(self.allele_to_allele_specific_models)
+            if self.allele_to_fixed_length_sequence:
+                result = result.union(self.allele_to_fixed_length_sequence)
+            self._cache["supported_alleles"] = sorted(result)
+        return self._cache["supported_alleles"]
 
     @property
     def supported_peptide_lengths(self):
@@ -236,13 +254,15 @@ class Class1AffinityPredictor(object):
         (int, int) tuple
 
         """
-        models = list(self.class1_pan_allele_models)
-        for allele_models in self.allele_to_allele_specific_models.values():
-            models.extend(allele_models)
-        length_ranges = [model.supported_peptide_lengths for model in models]
-        return (
-            max(lower for (lower, upper) in length_ranges),
-            min(upper for (lower, upper) in length_ranges))
+        if 'supported_peptide_lengths' not in self._cache:
+            length_ranges = set(
+                network.supported_peptide_lengths
+                for network in self.neural_networks)
+            result = (
+                max(lower for (lower, upper) in length_ranges),
+                min(upper for (lower, upper) in length_ranges))
+            self._cache["supported_peptide_lengths"] = result
+        return self._cache["supported_peptide_lengths"]
 
     def save(self, models_dir, model_names_to_write=None):
         """
@@ -582,6 +602,7 @@ class Class1AffinityPredictor(object):
                         models_dir_for_save, model_names_to_write=[model_name])
                 models.append(model)
 
+        self.clear_cache()
         return models
 
     def fit_class1_pan_allele_models(
@@ -673,6 +694,7 @@ class Class1AffinityPredictor(object):
                     models_dir_for_save, model_names_to_write=[model_name])
             models.append(model)
 
+        self.clear_cache()
         return models
 
     def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
@@ -821,7 +843,9 @@ class Class1AffinityPredictor(object):
             raise ValueError("Must specify 'allele' or 'alleles'.")
 
         peptides = EncodableSequences.create(peptides)
-        df = peptides.sequences_df.rename(columns={'sequence': 'peptide'})
+        df = pandas.DataFrame({
+            'peptide': peptides.sequences
+        }, copy=False)
 
         if allele is not None:
             if alleles is not None:
@@ -856,9 +880,10 @@ class Class1AffinityPredictor(object):
                 peptides.max_length > max_peptide_length):
             # Only compute this if needed
             all_peptide_lengths_supported = False
+            sequence_length = df.peptide.str.len()
             df["supported_peptide_length"] = (
-                (df.sequence_length >= min_peptide_length) &
-                (df.sequence_length <= max_peptide_length))
+                (sequence_length >= min_peptide_length) &
+                (sequence_length <= max_peptide_length))
             if (~df.supported_peptide_length).any():
                 msg = (
                     "%d peptides have lengths outside of supported range [%d, %d]: "
@@ -874,6 +899,16 @@ class Class1AffinityPredictor(object):
             # Handle common case efficiently.
             df["supported_peptide_length"] = True
             all_peptide_lengths_supported = True
+
+        num_pan_models = len(self.class1_pan_allele_models)
+        max_single_allele_models = max(
+            len(self.allele_to_allele_specific_models.get(allele, []))
+            for allele in unique_alleles
+        )
+        predictions_array = numpy.zeros(
+            shape=(df.shape[0], num_pan_models + max_single_allele_models),
+            dtype="float64")
+        predictions_array[:] = numpy.nan
 
         if self.class1_pan_allele_models:
             unsupported_alleles = [
@@ -897,7 +932,7 @@ class Class1AffinityPredictor(object):
                     allele_to_fixed_length_sequence=self.allele_to_fixed_length_sequence)
                 masked_peptides = peptides.sequences[mask]
                 for (i, model) in enumerate(self.class1_pan_allele_models):
-                    df.loc[mask, "model_pan_%d" % i] = model.predict(
+                    predictions_array[mask, i] = model.predict(
                         masked_peptides,
                         allele_encoding=masked_allele_encoding)
 
@@ -927,41 +962,41 @@ class Class1AffinityPredictor(object):
                 if mask is None or mask.all():
                     # Common case optimization
                     for (i, model) in enumerate(models):
-                        df["model_single_%d" % i] = model.predict(peptides)
+                        predictions_array[:, num_pan_models + i] = (
+                            model.predict(peptides))
                 elif mask.sum() > 0:
-                    allele_peptides = EncodableSequences.create(
+                    peptides_for_allele = EncodableSequences.create(
                         df.ix[mask].peptide.values)
                     for (i, model) in enumerate(models):
-                        df.loc[
-                            mask, "model_single_%d" % i
-                        ] = model.predict(allele_peptides)
-
-        # Geometric mean
-        df_predictions = df[
-            [c for c in df.columns if c.startswith("model_")]
-        ]
+                        predictions_array[
+                            mask,
+                            num_pan_models + i,
+                        ] = model.predict(peptides_for_allele)
 
         if callable(centrality_measure):
             centrality_function = centrality_measure
         else:
             centrality_function = CENTRALITY_MEASURES[centrality_measure]
 
-        logs = numpy.log(df_predictions)
-        log_centers = centrality_function(logs.values)
+        logs = numpy.log(predictions_array)
+        log_centers = centrality_function(logs)
         df["prediction"] = numpy.exp(log_centers)
+
         if include_confidence_intervals:
-            df["prediction_low"] = numpy.exp(logs.quantile(0.05, axis=1))
-            df["prediction_high"] = numpy.exp(logs.quantile(0.95, axis=1))
+            df["prediction_low"] = numpy.exp(numpy.percentile(logs, 5.0, axis=1))
+            df["prediction_high"] = numpy.exp(numpy.percentile(logs, 95.0, axis=1))
+
+        del df["normalized_allele"]
+        del df["supported_peptide_length"]
 
         if include_individual_model_predictions:
-            columns = sorted(df.columns, key=lambda c: c.startswith('model_'))
-        else:
-            columns = [
-                c for c in df.columns if c not in df_predictions.columns
-            ]
-        columns.remove("normalized_allele")
-        columns.remove("supported_peptide_length")
-        columns.remove("sequence_length")
+            for i in range(num_pan_models):
+                df["model_pan_%d" % i] = predictions_array[:, i]
+
+            for i in range(max_single_allele_models):
+                df["model_single_%d" % i] = predictions_array[
+                    :, num_pan_models + i
+                ]
 
         if include_percentile_ranks:
             if self.allele_to_percent_rank_transform:
@@ -969,10 +1004,9 @@ class Class1AffinityPredictor(object):
                     df.prediction,
                     alleles=df.normalized_allele.values,
                     throw=throw)
-                columns.append("prediction_percentile")
             else:
                 warnings.warn("No percentile rank information available.")
-        return df[columns].copy()
+        return df
 
     @staticmethod
     def save_weights(weights_list, filename):
