@@ -12,7 +12,7 @@ from mhcflurry.downloads import get_path
 HYPERPARAMETERS = [
     {
         "n_models": 2,
-        "max_epochs": 20,
+        "max_epochs": 100,
         "patience": 10,
         "early_stopping": True,
         "validation_split": 0.2,
