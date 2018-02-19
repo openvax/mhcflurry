@@ -350,7 +350,7 @@ def run(argv=sys.argv[1:]):
                         len(new_model_names),
                         time.time() - save_start,
                         args.out_models_dir))
-                unsaved_predictors.clear()
+                unsaved_predictors = []
                 last_save_time = time.time()
 
         print("Saving final predictor to: %s" % args.out_models_dir)
