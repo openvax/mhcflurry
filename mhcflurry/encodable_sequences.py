@@ -35,13 +35,12 @@ class EncodableSequences(object):
     def __init__(self, sequences):
         if not all(isinstance(obj, string_types) for obj in sequences):
             raise ValueError("Sequence of strings is required")
-        self.sequences_df = pandas.DataFrame({
-            "sequence": numpy.array(sequences),
-        })
-        self.sequences_df["sequence_length"] = self.sequences_df.sequence.str.len()
-        self.min_length = self.sequences_df.sequence_length.min()
-        self.max_length = self.sequences_df.sequence_length.max()
-        self.sequences = self.sequences_df.sequence.values
+        self.sequences = numpy.array(sequences)
+        lengths = pandas.Series(self.sequences).str.len()
+
+        self.min_length = lengths.min()
+        self.max_length = lengths.max()
+
         self.encoding_cache = {}
         self.fixed_sequence_length = None
         if len(self.sequences) > 0 and all(

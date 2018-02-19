@@ -986,9 +986,6 @@ class Class1AffinityPredictor(object):
             df["prediction_low"] = numpy.exp(numpy.percentile(logs, 5.0, axis=1))
             df["prediction_high"] = numpy.exp(numpy.percentile(logs, 95.0, axis=1))
 
-        del df["normalized_allele"]
-        del df["supported_peptide_length"]
-
         if include_individual_model_predictions:
             for i in range(num_pan_models):
                 df["model_pan_%d" % i] = predictions_array[:, i]
@@ -1006,6 +1003,9 @@ class Class1AffinityPredictor(object):
                     throw=throw)
             else:
                 warnings.warn("No percentile rank information available.")
+
+        del df["supported_peptide_length"]
+        del df["normalized_allele"]
         return df
 
     @staticmethod
