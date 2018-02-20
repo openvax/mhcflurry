@@ -132,6 +132,7 @@ def run(argv=sys.argv[1:]):
     else:
         alleles = input_predictor.supported_alleles
 
+    metadata_dfs = {}
     if args.data:
         df = pandas.read_csv(args.data)
         print("Loaded data: %s" % (str(df.shape)))
@@ -145,7 +146,6 @@ def run(argv=sys.argv[1:]):
         df = df.loc[df.allele.isin(alleles)].dropna()
         print("Selected %d alleles: %s" % (len(alleles), ' '.join(alleles)))
 
-        metadata_dfs = {}
         if args.exclude_data:
             exclude_df = pandas.read_csv(args.exclude_data)
             metadata_dfs["model_selection_exclude"] = exclude_df
