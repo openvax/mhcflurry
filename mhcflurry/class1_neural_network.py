@@ -81,7 +81,7 @@ class Class1NeuralNetwork(object):
         validation_split=0.1,
         early_stopping=True,
         minibatch_size=128,
-        random_negative_rate=0.2,
+        random_negative_rate=0.0,
         random_negative_constant=25,
         random_negative_affinity_min=20000.0,
         random_negative_affinity_max=50000.0,

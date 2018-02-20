@@ -64,7 +64,6 @@ def run_and_check(n_jobs=0):
         "--allele", "HLA-A*02:01", "HLA-A*03:01",
         "--out-models-dir", models_dir,
         "--num-jobs", str(n_jobs),
-        "--ignore-inequalities",
     ]
     print("Running with args: %s" % args)
     subprocess.check_call(args)
@@ -117,7 +116,6 @@ def run_and_check_with_model_selection(n_jobs=1):
         "--allele", "HLA-A*02:01", "HLA-A*03:01",
         "--out-models-dir", models_dir1,
         "--num-jobs", str(n_jobs),
-        "--ignore-inequalities",
         "--held-out-fraction-reciprocal", "10",
         "--n-models", "1",
     ]
