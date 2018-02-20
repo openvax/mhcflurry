@@ -1,5 +1,6 @@
 import traceback
 import sys
+import os
 from multiprocessing import Pool, Queue, cpu_count
 from six.moves import queue
 from multiprocessing.util import Finalize
@@ -9,6 +10,106 @@ import random
 import numpy
 
 from .common import set_keras_backend
+
+
+def add_worker_pool_args(parser):
+    group = parser.add_argument_group("Worker pool")
+
+    group.add_argument(
+        "--num-jobs",
+        default=1,
+        type=int,
+        metavar="N",
+        help="Number of processes to parallelize training over. Experimental. "
+             "Set to 1 for serial run. Set to 0 to use number of cores. Default: %(default)s.")
+    group.add_argument(
+        "--backend",
+        choices=("tensorflow-gpu", "tensorflow-cpu", "tensorflow-default"),
+        help="Keras backend. If not specified will use system default.")
+    group.add_argument(
+        "--gpus",
+        type=int,
+        metavar="N",
+        help="Number of GPUs to attempt to parallelize across. Requires running "
+             "in parallel.")
+    group.add_argument(
+        "--max-workers-per-gpu",
+        type=int,
+        metavar="N",
+        default=1000,
+        help="Maximum number of workers to assign to a GPU. Additional tasks will "
+             "run on CPU.")
+    group.add_argument(
+        "--max-tasks-per-worker",
+        type=int,
+        metavar="N",
+        default=None,
+        help="Restart workers after N tasks. Workaround for tensorflow memory "
+             "leaks. Requires Python >=3.2.")
+
+
+def worker_pool_with_gpu_assignments_from_args(args):
+    return worker_pool_with_gpu_assignments(
+        num_jobs=args.num_jobs,
+        num_gpus=args.gpus,
+        backend=args.backend,
+        max_workers_per_gpu=args.max_workers_per_gpu,
+        max_tasks_per_worker=args.max_tasks_per_worker
+    )
+
+
+def worker_pool_with_gpu_assignments(
+        num_jobs,
+        num_gpus=0,
+        backend=None,
+        max_workers_per_gpu=1,
+        max_tasks_per_worker=None):
+
+    num_workers = num_jobs if num_jobs else cpu_count()
+
+    if num_workers == 1:
+        if backend:
+            set_keras_backend(backend)
+        return None
+
+    worker_init_kwargs = None
+    if num_gpus:
+        print("Attempting to round-robin assign each worker a GPU.")
+        if backend != "tensorflow-default":
+            print("Forcing keras backend to be tensorflow-default")
+            backend = "tensorflow-default"
+
+        gpu_assignments_remaining = dict((
+            (gpu, max_workers_per_gpu) for gpu in range(num_gpus)
+        ))
+        worker_init_kwargs = []
+        for worker_num in range(num_workers):
+            if gpu_assignments_remaining:
+                # Use a GPU
+                gpu_num = sorted(
+                    gpu_assignments_remaining,
+                    key=lambda key: gpu_assignments_remaining[key])[0]
+                gpu_assignments_remaining[gpu_num] -= 1
+                if not gpu_assignments_remaining[gpu_num]:
+                    del gpu_assignments_remaining[gpu_num]
+                gpu_assignment = [gpu_num]
+            else:
+                # Use CPU
+                gpu_assignment = []
+
+            worker_init_kwargs.append({
+                'gpu_device_nums': gpu_assignment,
+                'keras_backend': backend
+            })
+            print("Worker %d assigned GPUs: %s" % (
+                worker_num, gpu_assignment))
+
+    worker_pool = make_worker_pool(
+        processes=num_workers,
+        initializer=worker_init,
+        initializer_kwargs_per_process=worker_init_kwargs,
+        max_tasks_per_worker=max_tasks_per_worker)
+    return worker_pool
 
 
 def make_worker_pool(

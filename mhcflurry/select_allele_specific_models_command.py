@@ -20,7 +20,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .encodable_sequences import EncodableSequences
 from .common import configure_logging, random_peptides
-from .parallelism import make_worker_pool
+from .parallelism import worker_pool_with_gpu_assignments_from_args, add_worker_pool_args
 from .regression_target import from_ic50
 
 
@@ -94,21 +94,12 @@ parser.add_argument(
     default=100000,
     help="Num peptides per length to use for consensus scoring")
 parser.add_argument(
-    "--num-jobs",
-    default=1,
-    type=int,
-    metavar="N",
-    help="Number of processes to parallelize selection over. "
-    "Set to 1 for serial run. Set to 0 to use number of cores. Default: %(default)s.")
-parser.add_argument(
-    "--backend",
-    choices=("tensorflow-gpu", "tensorflow-cpu", "tensorflow-default"),
-    help="Keras backend. If not specified will use system default.")
-parser.add_argument(
     "--verbosity",
     type=int,
     help="Keras verbosity. Default: %(default)s",
     default=0)
+
+add_worker_pool_args(parser)
 
 
 def run(argv=sys.argv[1:]):
@@ -208,19 +199,17 @@ def run(argv=sys.argv[1:]):
     metadata_dfs["model_selection_data"] = df
     result_predictor = Class1AffinityPredictor(metadata_dataframes=metadata_dfs)
 
+    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+
     start = time.time()
-    if args.num_jobs == 1:
+
+    if worker_pool is None:
         # Serial run
         print("Running in serial.")
-        worker_pool = None
         results = (
             model_select(allele) for allele in alleles)
     else:
-        worker_pool = make_worker_pool(
-            processes=(
-                args.num_jobs
-                if args.num_jobs else None))
-
+        # Parallel run
         random.shuffle(alleles)
         results = worker_pool.imap_unordered(
             model_select,

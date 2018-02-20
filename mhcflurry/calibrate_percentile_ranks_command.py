@@ -21,7 +21,9 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import configure_logging
 from .parallelism import (
-    make_worker_pool, call_wrapped)
+    add_worker_pool_args,
+    worker_pool_with_gpu_assignments_from_args,
+    call_wrapped)
 
 
 # To avoid pickling large matrices to send to child processes when running in
@@ -32,7 +34,6 @@ from .parallelism import (
 GLOBAL_DATA = {}
 
 parser = argparse.ArgumentParser(usage=__doc__)
-
 
 parser.add_argument(
     "--models-dir",
@@ -53,25 +54,12 @@ parser.add_argument(
     help="Number of peptides per length to use to calibrate percent ranks. "
     "Default: %(default)s.")
 parser.add_argument(
-    "--num-jobs",
-    default=1,
-    type=int,
-    metavar="N",
-    help="Number of processes to parallelize over. "
-    "Set to 1 for serial run. Set to 0 to use number of cores. Default: %(default)s.")
-parser.add_argument(
-    "--max-tasks-per-worker",
-    type=int,
-    metavar="N",
-    default=None,
-    help="Restart workers after N tasks. Workaround for tensorflow memory "
-    "leaks. Requires Python >=3.2.")
-parser.add_argument(
     "--verbosity",
     type=int,
     help="Keras verbosity. Default: %(default)s",
     default=0)
 
+add_worker_pool_args(parser)
 
 def run(argv=sys.argv[1:]):
     global GLOBAL_DATA
@@ -109,10 +97,15 @@ def run(argv=sys.argv[1:]):
         time.time() - start))
     print("Calibrating percent rank calibration for %d alleles." % len(alleles))
 
-    if args.num_jobs == 1:
+    # Store peptides in global variable so they are in shared memory
+    # after fork, instead of needing to be pickled (when doing a parallel run).
+    GLOBAL_DATA["calibration_peptides"] = encoded_peptides
+
+    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+
+    if worker_pool is None:
         # Serial run
         print("Running in serial.")
-        worker_pool = None
         results = (
             calibrate_percentile_ranks(
                 allele=allele,
@@ -121,16 +114,6 @@ def run(argv=sys.argv[1:]):
             for allele in alleles)
     else:
         # Parallel run
-        # Store peptides in global variable so they are in shared memory
-        # after fork, instead of needing to be pickled.
-        GLOBAL_DATA["calibration_peptides"] = encoded_peptides
-
-        worker_pool = make_worker_pool(
-            processes=(
-                args.num_jobs
-                if args.num_jobs else None),
-            max_tasks_per_worker=args.max_tasks_per_worker)
-
         results = worker_pool.imap_unordered(
             partial(
                 partial(call_wrapped, calibrate_percentile_ranks),

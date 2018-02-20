@@ -28,6 +28,9 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 mkdir models
 
+GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
+echo "Detected GPUS: $GPUS"
+
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
@@ -35,12 +38,12 @@ time mhcflurry-class1-select-allele-specific-models \
     --models-dir "$(mhcflurry-downloads path models_class1_unselected)/models" \
     --out-models-dir models \
     --scoring consensus \
-    --num-jobs $(expr $PROCESSORS \* 2)
+    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
 
 time mhcflurry-calibrate-percentile-ranks \
     --models-dir models \
-    --num-jobs $(expr $PROCESSORS \* 2)
-    --num-peptides-per-length 100000
+    --num-peptides-per-length 100000 \
+    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt

@@ -21,7 +21,9 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import configure_logging, set_keras_backend
 from .parallelism import (
-    make_worker_pool, cpu_count, call_wrapped_kwargs, worker_init)
+    add_worker_pool_args,
+    worker_pool_with_gpu_assignments_from_args,
+    call_wrapped_kwargs)
 from .hyperparameters import HyperparameterDefaults
 from .allele_encoding import AlleleEncoding
 
@@ -58,12 +60,14 @@ parser.add_argument(
     metavar="FILE.json",
     required=True,
     help="JSON or YAML of hyperparameters")
+
 parser.add_argument(
     "--allele",
     default=None,
     nargs="+",
     help="Alleles to train models for. If not specified, all alleles with "
     "enough measurements will be used.")
+
 parser.add_argument(
     "--min-measurements-per-allele",
     type=int,
@@ -76,7 +80,7 @@ parser.add_argument(
     metavar="N",
     default=None,
     help="Hold out 1/N fraction of data (for e.g. subsequent model selection. "
-    "For example, specify 5 to hold out 20% of the data.")
+    "For example, specify 5 to hold out 20 percent of the data.")
 parser.add_argument(
     "--held-out-fraction-seed",
     type=int,
@@ -107,30 +111,6 @@ parser.add_argument(
     metavar="FILE.csv",
     help="Allele sequences file. Used for computing allele similarity matrix.")
 parser.add_argument(
-    "--num-jobs",
-    default=1,
-    type=int,
-    metavar="N",
-    help="Number of processes to parallelize training over. Experimental. "
-    "Set to 1 for serial run. Set to 0 to use number of cores. Default: %(default)s.")
-parser.add_argument(
-    "--backend",
-    choices=("tensorflow-gpu", "tensorflow-cpu", "tensorflow-default"),
-    help="Keras backend. If not specified will use system default.")
-parser.add_argument(
-    "--gpus",
-    type=int,
-    metavar="N",
-    help="Number of GPUs to attempt to parallelize across. Requires running "
-    "in parallel.")
-parser.add_argument(
-    "--max-workers-per-gpu",
-    type=int,
-    metavar="N",
-    default=1000,
-    help="Maximum number of workers to assign to a GPU. Additional tasks will "
-    "run on CPU.")
-parser.add_argument(
     "--save-interval",
     type=float,
     metavar="N",
@@ -138,18 +118,12 @@ parser.add_argument(
     help="Write models to disk every N seconds. Only affects parallel runs; "
     "serial runs write each model to disk as it is trained.")
 parser.add_argument(
-    "--max-tasks-per-worker",
-    type=int,
-    metavar="N",
-    default=None,
-    help="Restart workers after N tasks. Workaround for tensorflow memory "
-    "leaks. Requires Python >=3.2.")
-parser.add_argument(
     "--verbosity",
     type=int,
     help="Keras verbosity. Default: %(default)s",
     default=0)
 
+add_worker_pool_args(parser)
 
 TRAIN_DATA_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     subset="all",
@@ -286,52 +260,8 @@ def run(argv=sys.argv[1:]):
                 work_items.append(work_dict)
 
     start = time.time()
-    if serial_run:
-        # Serial run.
-        print("Running in serial.")
-        worker_pool = None
-        if args.backend:
-            set_keras_backend(args.backend)
-    else:
-        # Parallel run.
-        num_workers = args.num_jobs if args.num_jobs else cpu_count()
-        worker_init_kwargs = None
-        if args.gpus:
-            print("Attempting to round-robin assign each worker a GPU.")
-            if args.backend != "tensorflow-default":
-                print("Forcing keras backend to be tensorflow-default")
-                args.backend = "tensorflow-default"
 
-            gpu_assignments_remaining = dict((
-                (gpu, args.max_workers_per_gpu) for gpu in range(args.gpus)
-            ))
-            worker_init_kwargs = []
-            for worker_num in range(num_workers):
-                if gpu_assignments_remaining:
-                    # Use a GPU
-                    gpu_num = sorted(
-                        gpu_assignments_remaining,
-                        key=lambda key: gpu_assignments_remaining[key])[0]
-                    gpu_assignments_remaining[gpu_num] -= 1
-                    if not gpu_assignments_remaining[gpu_num]:
-                        del gpu_assignments_remaining[gpu_num]
-                    gpu_assignment = [gpu_num]
-                else:
-                    # Use CPU
-                    gpu_assignment = []
-
-                worker_init_kwargs.append({
-                    'gpu_device_nums': gpu_assignment,
-                    'keras_backend': args.backend
-                })
-                print("Worker %d assigned GPUs: %s" % (
-                    worker_num, gpu_assignment))
-
-        worker_pool = make_worker_pool(
-            processes=num_workers,
-            initializer=worker_init,
-            initializer_kwargs_per_process=worker_init_kwargs,
-            max_tasks_per_worker=args.max_tasks_per_worker)
+    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
 
     if worker_pool:
         print("Processing %d work items in parallel." % len(work_items))
