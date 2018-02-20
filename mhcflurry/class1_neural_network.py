@@ -753,8 +753,8 @@ class Class1NeuralNetwork(object):
         -------
         numpy.array of nM affinity predictions 
         """
+        assert self.prediction_cache is not None
         use_cache = (
-            self.prediction_cache is not None and
             allele_encoding is None and
             isinstance(peptides, EncodableSequences))
         if use_cache and peptides in self.prediction_cache:

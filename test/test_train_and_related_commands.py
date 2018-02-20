@@ -95,7 +95,7 @@ def run_and_check(n_jobs=0):
     shutil.rmtree(models_dir)
 
 
-def test_run_and_check_with_model_selection(n_jobs=1):
+def run_and_check_with_model_selection(n_jobs=1):
     models_dir1 = tempfile.mkdtemp(prefix="mhcflurry-test-models")
     hyperparameters_filename = os.path.join(
         models_dir1, "hyperparameters.yaml")
@@ -161,7 +161,9 @@ def test_run_and_check_with_model_selection(n_jobs=1):
 if os.environ.get("KERAS_BACKEND") != "theano":
     def test_run_parallel():
         run_and_check(n_jobs=2)
+        run_and_check_with_model_selection(n_jobs=2)
 
 
 def test_run_serial():
     run_and_check(n_jobs=1)
+    run_and_check_with_model_selection(n_jobs=1)
