@@ -44,7 +44,6 @@ time mhcflurry-class1-train-allele-specific-models \
     --allele-sequences class1_pseudosequences.csv \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
-    --percent-rank-calibration-num-peptides-per-length 0 \
     --held-out-fraction-reciprocal 10 \
     --min-measurements-per-allele 50 \
     --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
