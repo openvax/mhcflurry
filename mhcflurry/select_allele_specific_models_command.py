@@ -267,10 +267,10 @@ class ConsensusModelSelector(object):
         self.predictor = predictor
         self.model_selection_kwargs = model_selection_kwargs
 
-        # Run predictions for one allele so self.peptides caches the encoding.
-        self.predictor.predict(
-            allele=self.predictor.supported_alleles[0],
-            peptides=self.peptides)
+        # Encode the peptides for each neural network, so the encoding
+        # becomes cached.
+        for network in predictor.neural_networks:
+            network.peptides_to_network_input(self.peptides)
 
     def usable_for_allele(self, allele):
         return True
