@@ -219,8 +219,7 @@ def run(argv=sys.argv[1:]):
         worker_pool = make_worker_pool(
             processes=(
                 args.num_jobs
-                if args.num_jobs else None),
-            max_tasks_per_worker=args.max_tasks_per_worker)
+                if args.num_jobs else None))
 
         random.shuffle(alleles)
         results = worker_pool.imap_unordered(
