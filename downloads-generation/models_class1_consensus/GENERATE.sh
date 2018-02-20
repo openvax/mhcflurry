@@ -38,6 +38,7 @@ time mhcflurry-class1-select-allele-specific-models \
     --models-dir "$(mhcflurry-downloads path models_class1_unselected)/models" \
     --out-models-dir models \
     --scoring consensus \
+    --consensus-num-peptides-per-length 10000 \
     --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
 
 time mhcflurry-calibrate-percentile-ranks \
