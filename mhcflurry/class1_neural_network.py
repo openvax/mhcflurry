@@ -353,6 +353,13 @@ class Class1NeuralNetwork(object):
         result['prediction_cache'] = None
         return result
 
+    def __setstate__(self, state):
+        """
+        Deserialize. For pickle support.
+        """
+        self.__dict__.update(state)
+        self.prediction_cache = weakref.WeakKeyDictionary()
+
     def peptides_to_network_input(self, peptides):
         """
         Encode peptides to the fixed-length encoding expected by the neural

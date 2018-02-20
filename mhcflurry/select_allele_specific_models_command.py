@@ -153,6 +153,8 @@ def run(argv=sys.argv[1:]):
 
             df = df.loc[~df._excluded]
             print("Reduced data to: %s" % (str(df.shape)))
+
+        metadata_dfs["model_selection_data"] = df
     else:
         df = None
 
@@ -195,8 +197,7 @@ def run(argv=sys.argv[1:]):
         print("Attempting to create directory: %s" % args.out_models_dir)
         os.mkdir(args.out_models_dir)
         print("Done.")
-
-    metadata_dfs["model_selection_data"] = df
+    
     result_predictor = Class1AffinityPredictor(metadata_dataframes=metadata_dfs)
 
     worker_pool = worker_pool_with_gpu_assignments_from_args(args)
