@@ -10,6 +10,7 @@ import traceback
 import random
 from functools import partial
 
+import numpy
 import pandas
 import yaml
 from sklearn.metrics.pairwise import cosine_similarity
@@ -413,6 +414,8 @@ def train_model(
 
 
 def subselect_df_held_out(df, recriprocal_held_out_fraction=10, seed=0):
+    df["allele_peptide"] = df.allele + "_" + df.peptide
+
     kf = StratifiedKFold(
         n_splits=recriprocal_held_out_fraction,
         shuffle=True,
@@ -425,8 +428,12 @@ def subselect_df_held_out(df, recriprocal_held_out_fraction=10, seed=0):
             "binder" if row.measurement_value <= 500 else "nonbinder")
         for (_, row) in df.iterrows()
     ]
+
     (train, test) = next(kf.split(df, df.key))
-    return df.iloc[train]
+    selected_allele_peptides = df.iloc[train].allele_peptide.unique()
+    result_df = df.allele_peptide.isin(selected_allele_peptides)
+    del result_df["allele_peptide"]
+    return result_df
 
 if __name__ == '__main__':
     run()
