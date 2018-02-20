@@ -60,14 +60,12 @@ parser.add_argument(
     metavar="FILE.json",
     required=True,
     help="JSON or YAML of hyperparameters")
-
 parser.add_argument(
     "--allele",
     default=None,
     nargs="+",
     help="Alleles to train models for. If not specified, all alleles with "
     "enough measurements will be used.")
-
 parser.add_argument(
     "--min-measurements-per-allele",
     type=int,

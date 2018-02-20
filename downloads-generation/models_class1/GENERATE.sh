@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# Train standard MHCflurry Class I models.
-# Calls mhcflurry-class1-train-allele-specific-models on curated training data
-# using the hyperparameters in "hyperparameters.yaml".
+# Model select standard MHCflurry Class I models.
 #
 set -e
 set -x
@@ -29,15 +27,24 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 mkdir models
 
-python $SCRIPT_DIR/generate_hyperparameters.py > hyperparameters.yaml
+GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
+echo "Detected GPUS: $GPUS"
 
-time mhcflurry-class1-train-allele-specific-models \
-    --data "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
-    --hyperparameters hyperparameters.yaml \
+PROCESSORS=$(getconf _NPROCESSORS_ONLN)
+echo "Detected processors: $PROCESSORS"
+
+time mhcflurry-class1-select-allele-specific-models \
+    --models-dir "$(mhcflurry-downloads path models_class1_unselected)/models" \
     --out-models-dir models \
-    --percent-rank-calibration-num-peptides-per-length 100000 \
-    --min-measurements-per-allele 75 \
-    --num-jobs 32 16
+    --scoring mass-spec consensus \
+    --consensus-num-peptides-per-length 10000 \
+    --min-models 8 \
+    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
+
+time mhcflurry-calibrate-percentile-ranks \
+    --models-dir models \
+    --num-peptides-per-length 100000 \
+    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
