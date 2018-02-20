@@ -4,6 +4,11 @@ from multiprocessing import Pool, Queue, cpu_count
 from six.moves import queue
 from multiprocessing.util import Finalize
 from pprint import pprint
+import random
+
+import numpy
+
+from .common import set_keras_backend
 
 
 def make_worker_pool(
@@ -100,6 +105,17 @@ def worker_init_entry_point(
 
     print("Initializing worker: %s" % str(kwargs))
     init_function(**kwargs)
+
+
+def worker_init(keras_backend=None, gpu_device_nums=None):
+    # Each worker needs distinct random numbers
+    numpy.random.seed()
+    random.seed()
+    if keras_backend or gpu_device_nums:
+        print("WORKER pid=%d assigned GPU devices: %s" % (
+            os.getpid(), gpu_device_nums))
+        set_keras_backend(
+            keras_backend, gpu_device_nums=gpu_device_nums)
 
 
 # Solution suggested in https://bugs.python.org/issue13831

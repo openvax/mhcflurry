@@ -47,7 +47,8 @@ class Class1AffinityPredictor(object):
             class1_pan_allele_models=None,
             allele_to_fixed_length_sequence=None,
             manifest_df=None,
-            allele_to_percent_rank_transform=None):
+            allele_to_percent_rank_transform=None,
+            metadata_dataframes=None):
         """
         Parameters
         ----------
@@ -68,6 +69,10 @@ class Class1AffinityPredictor(object):
 
         allele_to_percent_rank_transform : dict of string -> `PercentRankTransform`, optional
             `PercentRankTransform` instances to use for each allele
+
+        metadata_dataframes : dict of string -> pandas.DataFrame, optional
+            Optional additional dataframes to write to the models dir when
+            save() is called. Useful for tracking provenance.
         """
 
         if allele_to_allele_specific_models is None:
@@ -107,6 +112,7 @@ class Class1AffinityPredictor(object):
         if not allele_to_percent_rank_transform:
             allele_to_percent_rank_transform = {}
         self.allele_to_percent_rank_transform = allele_to_percent_rank_transform
+        self.metadata_dataframes = metadata_dataframes
         self._cache = {}
 
     def clear_cache(self):
@@ -264,7 +270,7 @@ class Class1AffinityPredictor(object):
             self._cache["supported_peptide_lengths"] = result
         return self._cache["supported_peptide_lengths"]
 
-    def save(self, models_dir, model_names_to_write=None):
+    def save(self, models_dir, model_names_to_write=None, write_metadata=True):
         """
         Serialize the predictor to a directory on disk. If the directory does
         not exist it will be created.
@@ -284,6 +290,9 @@ class Class1AffinityPredictor(object):
         model_names_to_write : list of string, optional
             Only write the weights for the specified models. Useful for
             incremental updates during training.
+
+        write_metadata : boolean, optional
+            Whether to write optional metadata
         """
         num_models = len(self.class1_pan_allele_models) + sum(
             len(v) for v in self.allele_to_allele_specific_models.values())
@@ -315,16 +324,22 @@ class Class1AffinityPredictor(object):
         write_manifest_df.to_csv(manifest_path, index=False)
         logging.info("Wrote: %s" % manifest_path)
 
-        # Write "info.txt"
-        info_path = join(models_dir, "info.txt")
-        rows = [
-            ("trained on", time.asctime()),
-            ("package   ", "mhcflurry %s" % __version__),
-            ("hostname  ", gethostname()),
-            ("user      ", getuser()),
-        ]
-        pandas.DataFrame(rows).to_csv(
-            info_path, sep="\t", header=False, index=False)
+        if write_metadata:
+            # Write "info.txt"
+            info_path = join(models_dir, "info.txt")
+            rows = [
+                ("trained on", time.asctime()),
+                ("package   ", "mhcflurry %s" % __version__),
+                ("hostname  ", gethostname()),
+                ("user      ", getuser()),
+            ]
+            pandas.DataFrame(rows).to_csv(
+                info_path, sep="\t", header=False, index=False)
+
+            if self.metadata_dataframes:
+                for (name, df) in self.metadata_dataframes.items():
+                    metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
+                    df.to_csv(metadata_df_path, index=False, compression="bz2")
 
         if self.allele_to_fixed_length_sequence is not None:
             allele_to_sequence_df = pandas.DataFrame(
@@ -1133,3 +1148,92 @@ class Class1AffinityPredictor(object):
             class1_pan_allele_models=class1_pan_allele_models,
             allele_to_fixed_length_sequence=self.allele_to_fixed_length_sequence,
         )
+
+    def model_select(
+            self,
+            score_function,
+            alleles=None,
+            min_models=1,
+            max_models=10000):
+        """
+        Perform model selection using a user-specified scoring function.
+
+        Model selection is done using a "step up" variable selection procedure,
+        in which models are repeatedly added to an ensemble until the score
+        stops improving.
+
+        Parameters
+        ----------
+        score_function : Class1AffinityPredictor -> float function
+            Scoring function
+
+        alleles : list of string, optional
+            If not specified, model selection is performed for all alleles.
+
+        min_models : int, optional
+            Min models to select per allele
+
+        max_models : int, optional
+            Max models to select per allele
+
+        Returns
+        -------
+        Class1AffinityPredictor : predictor containing the selected models
+        """
+
+        if alleles is None:
+            alleles = self.supported_alleles
+
+        dfs = []
+        allele_to_allele_specific_models = {}
+        for allele in alleles:
+            df = pandas.DataFrame({
+                'model': self.allele_to_allele_specific_models[allele]
+            })
+            df["model_num"] = df.index
+            df["allele"] = allele
+            df["selected"] = False
+
+            round_num = 1
+
+            while not df.selected.all() and sum(df.selected) < max_models:
+                score_col = "score_%2d" % round_num
+                prev_score_col = "score_%2d" % (round_num - 1)
+
+                existing_selected = list(df[df.selected].model)
+                df[score_col] = [
+                    numpy.nan if row.selected else
+                    score_function(
+                        Class1AffinityPredictor(
+                            allele_to_allele_specific_models={
+                                allele: [row.model] + existing_selected
+                    }))
+                    for (_, row) in df.iterrows()
+                ]
+
+                if round_num > min_models and (
+                        df[score_col].max() < df[prev_score_col].max()):
+                    break
+
+                # In case of a tie, pick a model at random.
+                (best_model_index,) = df.loc[
+                    (df[score_col] == df[score_col].max())
+                ].sample(1).index
+                df.loc[best_model_index, "selected"] = True
+                round_num += 1
+
+            dfs.append(df)
+            print("Selected %d models for allele %s" % (
+            df.selected.sum(), allele))
+            allele_to_allele_specific_models[allele] = list(
+                df.loc[df.selected].model)
+
+        df = pandas.concat(dfs, ignore_index=True)
+
+        new_predictor = Class1AffinityPredictor(
+            allele_to_allele_specific_models,
+            metadata_dataframes={
+                "model_selection": df,
+            })
+        return new_predictor
+

@@ -10,10 +10,10 @@ import traceback
 import random
 from functools import partial
 
-import numpy
 import pandas
 import yaml
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.model_selection import StratifiedKFold
 from mhcnames import normalize_allele_name
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
@@ -21,7 +21,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import configure_logging, set_keras_backend
 from .parallelism import (
-    make_worker_pool, cpu_count, call_wrapped, call_wrapped_kwargs)
+    make_worker_pool, cpu_count, call_wrapped_kwargs, worker_init)
 from .hyperparameters import HyperparameterDefaults
 from .allele_encoding import AlleleEncoding
 
@@ -71,18 +71,24 @@ parser.add_argument(
     default=50,
     help="Train models for alleles with >=N measurements.")
 parser.add_argument(
+    "--held-out-fraction-reciprocal",
+    type=int,
+    metavar="N",
+    default=None,
+    help="Hold out 1/N fraction of data (for e.g. subsequent model selection. "
+    "For example, specify 5 to hold out 20% of the data.")
+parser.add_argument(
+    "--held-out-fraction-seed",
+    type=int,
+    metavar="N",
+    default=0,
+    help="Seed for randomizing which measurements are held out. Only matters "
+    "when --held-out-fraction is specified. Default: %(default)s.")
+parser.add_argument(
     "--ignore-inequalities",
     action="store_true",
     default=False,
     help="Do not use affinity value inequalities even when present in data")
-parser.add_argument(
-    "--percent-rank-calibration-num-peptides-per-length",
-    type=int,
-    metavar="N",
-    default=int(1e5),
-    help="Number of peptides per length to use to calibrate percent ranks. "
-    "Set to 0 to disable percent rank calibration. The resulting models will "
-    "not support percent ranks. Default: %(default)s.")
 parser.add_argument(
     "--n-models",
     type=int,
@@ -101,19 +107,11 @@ parser.add_argument(
     metavar="FILE.csv",
     help="Allele sequences file. Used for computing allele similarity matrix.")
 parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Keras verbosity. Default: %(default)s",
-    default=0)
-parser.add_argument(
     "--num-jobs",
-    default=[1],
+    default=1,
     type=int,
     metavar="N",
-    nargs="+",
-    help="Number of processes to parallelize training and percent rank "
-    "calibration over, respectively. Experimental. If only one value is specified "
-    "then the same number of jobs is used for both phases."
+    help="Number of processes to parallelize training over. Experimental. "
     "Set to 1 for serial run. Set to 0 to use number of cores. Default: %(default)s.")
 parser.add_argument(
     "--backend",
@@ -146,6 +144,11 @@ parser.add_argument(
     default=None,
     help="Restart workers after N tasks. Workaround for tensorflow memory "
     "leaks. Requires Python >=3.2.")
+parser.add_argument(
+    "--verbosity",
+    type=int,
+    help="Keras verbosity. Default: %(default)s",
+    default=0)
 
 
 TRAIN_DATA_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
@@ -196,8 +199,14 @@ def run(argv=sys.argv[1:]):
 
     # Allele names in data are assumed to be already normalized.
     df = df.loc[df.allele.isin(alleles)].dropna()
-
     print("Selected %d alleles: %s" % (len(alleles), ' '.join(alleles)))
+
+    if args.held_out_fraction_reciprocal:
+        df = subselect_df_held_out(
+            df,
+            recriprocal_held_out_fraction=args.held_out_fraction_reciprocal,
+            seed=args.held_out_fraction_seed)
+
     print("Training data: %s" % (str(df.shape)))
 
     GLOBAL_DATA["train_data"] = df
@@ -208,8 +217,11 @@ def run(argv=sys.argv[1:]):
         os.mkdir(args.out_models_dir)
         print("Done.")
 
-    predictor = Class1AffinityPredictor()
-    serial_run = args.num_jobs[0] == 1
+    predictor = Class1AffinityPredictor(
+        metadata_dataframes={
+            'train_data': df,
+        })
+    serial_run = args.num_jobs == 1
 
     work_items = []
     for (h, hyperparameters) in enumerate(hyperparameters_lst):
@@ -219,14 +231,15 @@ def run(argv=sys.argv[1:]):
         if args.n_models:
             n_models = args.n_models
         if not n_models:
-            raise ValueError("Specify --ensemble-size or n_models hyperparameter")
+            raise ValueError(
+                "Specify --ensemble-size or n_models hyperparameter")
 
         if args.max_epochs:
             hyperparameters['max_epochs'] = args.max_epochs
 
-        hyperparameters['train_data'] = TRAIN_DATA_HYPERPARAMETER_DEFAULTS.with_defaults(
-            hyperparameters.get('train_data', {})
-        )
+        hyperparameters['train_data'] = (
+            TRAIN_DATA_HYPERPARAMETER_DEFAULTS.with_defaults(
+                hyperparameters.get('train_data', {})))
 
         if hyperparameters['train_data']['pretrain_min_points'] and (
                 'allele_similarity_matrix' not in GLOBAL_DATA):
@@ -281,7 +294,7 @@ def run(argv=sys.argv[1:]):
             set_keras_backend(args.backend)
     else:
         # Parallel run.
-        num_workers = args.num_jobs[0] if args.num_jobs[0] else cpu_count()
+        num_workers = args.num_jobs if args.num_jobs else cpu_count()
         worker_init_kwargs = None
         if args.gpus:
             print("Attempting to round-robin assign each worker a GPU.")
@@ -342,7 +355,9 @@ def run(argv=sys.argv[1:]):
                 save_start = time.time()
                 new_model_names = predictor.merge_in_place(unsaved_predictors)
                 predictor.save(
-                    args.out_models_dir, model_names_to_write=new_model_names)
+                    args.out_models_dir,
+                    model_names_to_write=new_model_names,
+                    write_metadata=False)
                 print(
                     "Saved predictor (%d models total) including %d new models "
                     "in %0.2f sec to %s" % (
@@ -353,10 +368,7 @@ def run(argv=sys.argv[1:]):
                 unsaved_predictors = []
                 last_save_time = time.time()
 
-        print("Saving final predictor to: %s" % args.out_models_dir)
         predictor.merge_in_place(unsaved_predictors)
-        predictor.save(args.out_models_dir)  # write all models just to be sure
-        print("Done.")
 
     else:
         # Run in serial. In this case, every worker is passed the same predictor,
@@ -368,6 +380,10 @@ def run(argv=sys.argv[1:]):
             assert work_predictor is predictor
         assert not work_items
 
+    print("Saving final predictor to: %s" % args.out_models_dir)
+    predictor.save(args.out_models_dir)  # write all models just to be sure
+    print("Done.")
+
     print("*" * 30)
     training_time = time.time() - start
     print("Trained affinity predictor with %d networks in %0.2f min." % (
@@ -377,68 +393,7 @@ def run(argv=sys.argv[1:]):
     if worker_pool:
         worker_pool.close()
         worker_pool.join()
-        worker_pool = None
 
-    start = time.time()
-    if args.percent_rank_calibration_num_peptides_per_length > 0:
-        alleles = list(predictor.supported_alleles)
-
-        print("Performing percent rank calibration. Encoding peptides.")
-        encoded_peptides = predictor.calibrate_percentile_ranks(
-            alleles=[],  # don't actually do any calibration, just return peptides
-            num_peptides_per_length=args.percent_rank_calibration_num_peptides_per_length)
-
-        # Now we encode the peptides for each neural network, so the encoding
-        # becomes cached.
-        for network in predictor.neural_networks:
-            network.peptides_to_network_input(encoded_peptides)
-        assert encoded_peptides.encoding_cache  # must have cached the encoding
-        print("Finished encoding peptides for percent ranks in %0.2f sec." % (
-            time.time() - start))
-        print("Calibrating percent rank calibration for %d alleles." % len(alleles))
-
-        if args.num_jobs[-1] == 1:
-            # Serial run
-            print("Running in serial.")
-            worker_pool = None
-            results = (
-                calibrate_percentile_ranks(
-                    allele=allele,
-                    predictor=predictor,
-                    peptides=encoded_peptides)
-                for allele in alleles)
-        else:
-            # Parallel run
-            # Store peptides in global variable so they are in shared memory
-            # after fork, instead of needing to be pickled.
-            GLOBAL_DATA["calibration_peptides"] = encoded_peptides
-
-            worker_pool = make_worker_pool(
-                processes=(
-                    args.num_jobs[-1]
-                    if args.num_jobs[-1] else None),
-                max_tasks_per_worker=args.max_tasks_per_worker)
-
-            results = worker_pool.imap_unordered(
-                partial(
-                    partial(call_wrapped, calibrate_percentile_ranks),
-                    predictor=predictor),
-                alleles,
-                chunksize=1)
-
-        for result in tqdm.tqdm(results, total=len(alleles)):
-            predictor.allele_to_percent_rank_transform.update(result)
-        print("Done calibrating %d additional alleles." % len(alleles))
-        predictor.save(args.out_models_dir, model_names_to_write=[])
-
-    percent_rank_calibration_time = time.time() - start
-
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
-
-    print("Train time: %0.2f min. Percent rank calibration time: %0.2f min." % (
-        training_time / 60.0, percent_rank_calibration_time / 60.0))
     print("Predictor written to: %s" % args.out_models_dir)
 
 
@@ -448,7 +403,8 @@ def alleles_by_similarity(allele):
     if allele not in allele_similarity.columns:
         # Use random alleles
         print("No similar alleles for: %s" % allele)
-        return [allele] + list(allele_similarity.columns.to_series().sample(frac=1.0))
+        return [allele] + list(
+            allele_similarity.columns.to_series().sample(frac=1.0))
     return (
         allele_similarity[allele] + (
         allele_similarity.index == allele)  # force that we return specified allele first
@@ -528,30 +484,21 @@ def train_model(
     return predictor
 
 
-def calibrate_percentile_ranks(allele, predictor, peptides=None):
-    """
-    Private helper function.
-    """
-    global GLOBAL_DATA
-    if peptides is None:
-        peptides = GLOBAL_DATA["calibration_peptides"]
-    predictor.calibrate_percentile_ranks(
-        peptides=peptides,
-        alleles=[allele])
-    return {
-        allele: predictor.allele_to_percent_rank_transform[allele],
-    }
+def subselect_df_held_out(df, recriprocal_held_out_fraction=10, seed=0):
+    kf = StratifiedKFold(
+        n_splits=recriprocal_held_out_fraction,
+        shuffle=True,
+        random_state=seed)
 
-
-def worker_init(keras_backend=None, gpu_device_nums=None):
-    # Each worker needs distinct random numbers
-    numpy.random.seed()
-    random.seed()
-    if keras_backend or gpu_device_nums:
-        print("WORKER pid=%d assigned GPU devices: %s" % (
-            os.getpid(), gpu_device_nums))
-        set_keras_backend(
-            keras_backend, gpu_device_nums=gpu_device_nums)
+    # Stratify by both allele and binder vs. nonbinder.
+    df["key"] = [
+        "%s_%s" % (
+            row.allele,
+            "binder" if row.measurement_value <= 500 else "nonbinder")
+        for (_, row) in df.iterrows()
+    ]
+    (train, test) = next(kf.split(df, df.key))
+    return df.iloc[train]
 
 if __name__ == '__main__':
     run()

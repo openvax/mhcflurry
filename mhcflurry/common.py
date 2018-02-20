@@ -3,6 +3,8 @@ import collections
 import logging
 import sys
 import os
+from struct import unpack
+from hashlib import sha256
 
 import numpy
 import pandas
