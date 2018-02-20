@@ -414,6 +414,7 @@ def train_model(
 
 
 def subselect_df_held_out(df, recriprocal_held_out_fraction=10, seed=0):
+    df = df.copy()
     df["allele_peptide"] = df.allele + "_" + df.peptide
 
     kf = StratifiedKFold(
