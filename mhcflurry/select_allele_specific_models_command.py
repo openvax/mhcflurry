@@ -197,7 +197,7 @@ def run(argv=sys.argv[1:]):
         print("Attempting to create directory: %s" % args.out_models_dir)
         os.mkdir(args.out_models_dir)
         print("Done.")
-    
+
     result_predictor = Class1AffinityPredictor(metadata_dataframes=metadata_dfs)
 
     worker_pool = worker_pool_with_gpu_assignments_from_args(args)
@@ -230,7 +230,7 @@ def run(argv=sys.argv[1:]):
         worker_pool.join()
 
     print("Model selection time %0.2f min." % (model_selection_time / 60.0))
-    print("Predictor written to: %s" % args.models_dir)
+    print("Predictor written to: %s" % args.out_models_dir)
 
 
 def model_select(allele):

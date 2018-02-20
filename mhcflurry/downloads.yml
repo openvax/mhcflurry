@@ -28,6 +28,10 @@ releases:
               url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_unselected.20180216.tar.bz2
               default: false
 
+            - name: models_class1_consensus
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_consensus.tar.bz2
+              default: false
+
             - name: data_iedb
               url: https://github.com/openvax/mhcflurry/releases/download/pre-1.0/data_iedb.tar.bz2
               default: false
