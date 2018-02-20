@@ -431,7 +431,9 @@ def subselect_df_held_out(df, recriprocal_held_out_fraction=10, seed=0):
 
     (train, test) = next(kf.split(df, df.key))
     selected_allele_peptides = df.iloc[train].allele_peptide.unique()
-    result_df = df.allele_peptide.isin(selected_allele_peptides)
+    result_df = df.loc[
+        df.allele_peptide.isin(selected_allele_peptides)
+    ]
     del result_df["allele_peptide"]
     return result_df
 
