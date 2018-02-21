@@ -5,7 +5,7 @@
 set -e
 set -x
 
-DOWNLOAD_NAME=models_class1
+DOWNLOAD_NAME=models_class1_selected_no_mass_spec
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
@@ -33,8 +33,8 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
-python ./write_validation_data.py \
-    --include "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
+time python ./write_validation_data.py \
+    --include "$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2" \
     --exclude "$(mhcflurry-downloads path models_class1_unselected)/models/train_data.csv.bz2" \
     --only-alleles-present-in-exclude \
     --out-data test.csv \
@@ -42,7 +42,7 @@ python ./write_validation_data.py \
 
 wc -l test.csv
 
-mhcflurry-predict \
+time mhcflurry-predict \
     test.csv \
     --prediction-column-prefix "mhcflurry_unselected_" \
     --models "$(mhcflurry-downloads path models_class1_unselected)/models" \
@@ -52,14 +52,16 @@ wc -l test.csv
 
 
 time mhcflurry-class1-select-allele-specific-models \
-    --data "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
-    --exclude-data "$(mhcflurry-downloads path models_class1_unselected)/models/train_data.csv.bz2" \
+    --data test.csv \
     --models-dir "$(mhcflurry-downloads path models_class1_unselected)/models" \
     --out-models-dir models \
-    --out-unselected-predictions unselected_predictions.csv \
-    --scoring mass-spec consensus \
+    --scoring mse consensus \
     --consensus-num-peptides-per-length 10000 \
-    --min-models 8 \
+    --consensus-min-models 8 \
+    --consensus-max-models 8\
+    --mse-min-measurements 20 \
+    --mse-min-models 8 \
+    --mse-max-models 10000 \
     --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
 
 time mhcflurry-calibrate-percentile-ranks \

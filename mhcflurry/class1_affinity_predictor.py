@@ -1223,8 +1223,6 @@ class Class1AffinityPredictor(object):
                 round_num += 1
 
             dfs.append(df)
-            print("Selected %d models for allele %s" % (
-            df.selected.sum(), allele))
             allele_to_allele_specific_models[allele] = list(
                 df.loc[df.selected].model)
 

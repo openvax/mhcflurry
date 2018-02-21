@@ -59,29 +59,28 @@ parser.add_argument(
     required=True,
     help="Directory to write selected models")
 parser.add_argument(
+    "--out-unselected-predictions",
+    metavar="FILE.csv",
+    help="Write predictions for validation data using unselected predictor to "
+    "FILE.csv")
+parser.add_argument(
     "--allele",
     default=None,
     nargs="+",
     help="Alleles to select models for. If not specified, all alleles with "
     "enough measurements will be used.")
 parser.add_argument(
-    "--min-measurements-per-allele",
-    type=int,
-    metavar="N",
-    default=50,
-    help="Min number of data points required for data-driven model selection")
-parser.add_argument(
-    "--min-models",
+    "--mse-min-models",
     type=int,
     default=8,
     metavar="N",
-    help="Min number of models to select per allele")
+    help="Min number of models to select per allele when using MSE selector")
 parser.add_argument(
-    "--max-models",
+    "--mse-max-models",
     type=int,
     default=15,
     metavar="N",
-    help="Max number of models to select per allele")
+    help="Max number of models to select per allele when using MSE selector")
 parser.add_argument(
     "--scoring",
     nargs="+",
@@ -89,10 +88,29 @@ parser.add_argument(
     default=["mse", "consensus"],
     help="Scoring procedures to use in order")
 parser.add_argument(
+    "--consensus-min-models",
+    type=int,
+    default=8,
+    metavar="N",
+    help="Min number of models to select per allele when using consensus selector")
+parser.add_argument(
+    "--consensus-max-models",
+    type=int,
+    default=15,
+    metavar="N",
+    help="Max number of models to select per allele when using consensus selector")
+parser.add_argument(
     "--consensus-num-peptides-per-length",
     type=int,
     default=100000,
     help="Num peptides per length to use for consensus scoring")
+parser.add_argument(
+    "--mse-min-measurements",
+    type=int,
+    metavar="N",
+    default=50,
+    help="Min number of measurements required for an allele to use MSE model "
+    "selection")
 parser.add_argument(
     "--verbosity",
     type=int,
@@ -152,16 +170,20 @@ def run(argv=sys.argv[1:]):
             print(df.groupby("allele")._excluded.mean())
 
             df = df.loc[~df._excluded]
+            del df["_excluded"]
+            del df["_key"]
             print("Reduced data to: %s" % (str(df.shape)))
 
         metadata_dfs["model_selection_data"] = df
     else:
         df = None
 
-    model_selection_kwargs = {
-        'min_models': args.min_models,
-        'max_models': args.max_models,
-    }
+    if args.out_unselected_predictions:
+        df["unselected_prediction"] = input_predictor.predict(
+            alleles=df.allele.values,
+            peptides=df.peptide.values)
+        df.to_csv(args.out_unselected_predictions)
+        print("Wrote: %s" % args.out_unselected_predictions)
 
     selectors = {}
     for scoring in args.scoring:
@@ -169,13 +191,21 @@ def run(argv=sys.argv[1:]):
             selector = MSEModelSelector(
                 df=df,
                 predictor=input_predictor,
-                min_measurements=args.min_measurements_per_allele,
-                model_selection_kwargs=model_selection_kwargs)
+                min_measurements=args.mse_min_measurements,
+                model_selection_kwargs={
+                    'min_models': args.mse_min_models,
+                    'max_models': args.mse_max_models,
+                })
         elif scoring == "consensus":
             selector = ConsensusModelSelector(
                 predictor=input_predictor,
                 num_peptides_per_length=args.consensus_num_peptides_per_length,
-                model_selection_kwargs=model_selection_kwargs)
+                model_selection_kwargs={
+                    'min_models': args.consensus_min_models,
+                    'max_models': args.consensus_max_models,
+                })
+        else:
+            raise ValueError("Unsupported scoring method: %s" % scoring)
         selectors[scoring] = selector
 
     print("Selectors for alleles:")
