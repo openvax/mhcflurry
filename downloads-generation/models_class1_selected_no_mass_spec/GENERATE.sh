@@ -25,6 +25,8 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
+cp $SCRIPT_DIR/write_validation_data.py .
+
 mkdir models
 
 GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
@@ -42,14 +44,12 @@ time python ./write_validation_data.py \
 
 wc -l test.csv
 
-time mhcflurry-predict \
-    test.csv \
-    --prediction-column-prefix "mhcflurry_unselected_" \
-    --models "$(mhcflurry-downloads path models_class1_unselected)/models" \
-    --out test.csv
-
-wc -l test.csv
-
+#time mhcflurry-predict \
+#    test.csv \
+#    --prediction-column-prefix "mhcflurry_unselected_" \
+#    --models "$(mhcflurry-downloads path models_class1_unselected)/models" \
+#    --out test.csv
+#wc -l test.csv
 
 time mhcflurry-class1-select-allele-specific-models \
     --data test.csv \
