@@ -73,7 +73,6 @@ time mhcflurry-calibrate-percentile-ranks \
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
-bzip2 unselected_predictions.csv
 tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
 
 echo "Created archive: $SCRATCH_DIR/$DOWNLOAD_NAME.tar.bz2"
