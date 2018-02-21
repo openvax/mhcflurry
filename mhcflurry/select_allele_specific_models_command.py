@@ -70,6 +70,32 @@ parser.add_argument(
     help="Alleles to select models for. If not specified, all alleles with "
     "enough measurements will be used.")
 parser.add_argument(
+    "--mass-spec-min-measurements",
+    type=int,
+    metavar="N",
+    default=50,
+    help="Min number of measurements required for an allele to use mass-spec model "
+    "selection")
+parser.add_argument(
+    "--mass-spec-min-models",
+    type=int,
+    default=8,
+    metavar="N",
+    help="Min number of models to select per allele when using mass-spec selector")
+parser.add_argument(
+    "--mass-spec-max-models",
+    type=int,
+    default=1000,
+    metavar="N",
+    help="Max number of models to select per allele when using mass-spec selector")
+parser.add_argument(
+    "--mse-min-measurements",
+    type=int,
+    metavar="N",
+    default=50,
+    help="Min number of measurements required for an allele to use MSE model "
+    "selection")
+parser.add_argument(
     "--mse-min-models",
     type=int,
     default=8,
@@ -78,7 +104,7 @@ parser.add_argument(
 parser.add_argument(
     "--mse-max-models",
     type=int,
-    default=15,
+    default=1000,
     metavar="N",
     help="Max number of models to select per allele when using MSE selector")
 parser.add_argument(
@@ -96,7 +122,7 @@ parser.add_argument(
 parser.add_argument(
     "--consensus-max-models",
     type=int,
-    default=15,
+    default=1000,
     metavar="N",
     help="Max number of models to select per allele when using consensus selector")
 parser.add_argument(
@@ -105,12 +131,11 @@ parser.add_argument(
     default=100000,
     help="Num peptides per length to use for consensus scoring")
 parser.add_argument(
-    "--mse-min-measurements",
-    type=int,
-    metavar="N",
-    default=50,
-    help="Min number of measurements required for an allele to use MSE model "
-    "selection")
+    "--mass-spec-regex",
+    metavar="REGEX",
+    default="mass[- ]spec",
+    help="Regular expression for mass-spec data. Runs on measurement_source col."
+    "Default: %(default)s.")
 parser.add_argument(
     "--verbosity",
     type=int,
@@ -175,6 +200,9 @@ def run(argv=sys.argv[1:]):
             print("Reduced data to: %s" % (str(df.shape)))
 
         metadata_dfs["model_selection_data"] = df
+
+        df["mass_spec"] = df.measurement_source.str.contains(
+            args.mass_spec_regex)
     else:
         df = None
 
@@ -195,6 +223,16 @@ def run(argv=sys.argv[1:]):
                 model_selection_kwargs={
                     'min_models': args.mse_min_models,
                     'max_models': args.mse_max_models,
+                })
+        elif scoring == "mass-spec":
+            mass_spec_df = df.loc[df.mass_spec]
+            selector = MassSpecModelSelector(
+                df=mass_spec_df,
+                predictor=input_predictor,
+                min_measurements=args.mass_spec_min_measurements,
+                model_selection_kwargs={
+                    'min_models': args.mass_spec_min_models,
+                    'max_models': args.mass_spec_max_models,
                 })
         elif scoring == "consensus":
             selector = ConsensusModelSelector(
@@ -247,8 +285,16 @@ def run(argv=sys.argv[1:]):
             alleles,
             chunksize=1)
 
+    model_selection_dfs = []
     for result in tqdm.tqdm(results, total=len(alleles)):
+        model_selection_dfs.append(
+            result.metadata_dataframes['model_selection'])
         result_predictor.merge_in_place([result])
+
+    model_selection_df = pandas.concat(model_selection_dfs, ignore_index=True)
+    model_selection_df["selector"] = model_selection_df.allele.map(
+        allele_to_selector)
+    result_predictor.metadata_dataframes["model_selection"] = model_selection_df
 
     print("Done model selecting for %d alleles." % len(alleles))
     result_predictor.save(args.out_models_dir)
@@ -361,6 +407,66 @@ class MSEModelSelector(object):
         )
 
 
+class MassSpecModelSelector(object):
+    def __init__(
+            self,
+            df,
+            predictor,
+            decoys_per_length=5000,
+            model_selection_kwargs={},
+            min_measurements=100):
+
+        (min_length, max_length) = predictor.supported_peptide_lengths
+        decoys = []
+        for length in range(min_length, max_length + 1):
+            decoys.extend(
+                random_peptides(decoys_per_length, length=length))
+
+        # Index is peptide, columns are alleles
+        hit_matrix = df.groupby(["peptide", "allele"]).measurement_value.count().unstack().fillna(0).astype(bool)
+
+        decoy_matrix = pandas.DataFrame(
+            index=decoys, columns=hit_matrix.columns, dtype=bool)
+        decoy_matrix[:] = False
+        full_matrix = pandas.concat([hit_matrix, decoy_matrix]).sample(frac=1.0)
+
+        self.df = full_matrix
+        self.predictor = predictor
+        self.model_selection_kwargs = model_selection_kwargs
+        self.min_measurements = min_measurements
+
+        self.peptides = EncodableSequences.create(full_matrix.index.values)
+
+        # Encode the peptides for each neural network, so the encoding
+        # becomes cached.
+        for network in predictor.neural_networks:
+            network.peptides_to_network_input(self.peptides)
+
+    @staticmethod
+    def ppv(y_true, predictions):
+        df = pandas.DataFrame({"prediction": predictions, "y_true": y_true})
+        return df.sort_values("prediction", ascending=True)[
+            : int(y_true.sum())
+        ].y_true.mean()
+
+    def usable_for_allele(self, allele):
+        return allele in self.df.columns and (
+            self.df[allele].sum() >= self.min_measurements)
+
+    def score_function(self, allele, predictor):
+        predictions = predictor.predict(
+            allele=allele,
+            peptides=self.peptides,
+        )
+        return self.ppv(self.df[allele], predictions)
+
+    def select(self, allele):
+        return self.predictor.model_select(
+            score_function=partial(
+                self.score_function, allele),
+            alleles=[allele],
+            **self.model_selection_kwargs
+        )
 
 
 if __name__ == '__main__':

@@ -24,6 +24,7 @@ pip freeze
 git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
+cp $SCRIPT_DIR/write_validation_data.py .
 
 mkdir models
 
@@ -42,24 +43,27 @@ python ./write_validation_data.py \
 
 wc -l test.csv
 
-mhcflurry-predict \
-    test.csv \
-    --prediction-column-prefix "mhcflurry_unselected_" \
-    --models "$(mhcflurry-downloads path models_class1_unselected)/models" \
-    --out test.csv
-
-wc -l test.csv
-
+#mhcflurry-predict \
+#    test.csv \
+#    --prediction-column-prefix "mhcflurry_unselected_" \
+#    --models "$(mhcflurry-downloads path models_class1_unselected)/models" \
+#    --out test.csv
+#wc -l test.csv
 
 time mhcflurry-class1-select-allele-specific-models \
-    --data "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
-    --exclude-data "$(mhcflurry-downloads path models_class1_unselected)/models/train_data.csv.bz2" \
+    --data test.csv \
     --models-dir "$(mhcflurry-downloads path models_class1_unselected)/models" \
     --out-models-dir models \
-    --out-unselected-predictions unselected_predictions.csv \
-    --scoring mass-spec consensus \
+    --scoring mass-spec mse consensus \
     --consensus-num-peptides-per-length 10000 \
-    --min-models 8 \
+    --consensus-min-models 8 \
+    --consensus-max-models 8 \
+    --mse-min-measurements 20 \
+    --mse-min-models 8 \
+    --mse-max-models 10000 \
+    --mass-spec-min-measurements 500 \
+    --mass-spec-min-models 8 \
+    --mass-spec-max-models 10000 \
     --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
 
 time mhcflurry-calibrate-percentile-ranks \
