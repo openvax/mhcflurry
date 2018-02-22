@@ -8,8 +8,8 @@ import sys
 import time
 import traceback
 import random
-from functools import partial
 
+import numpy
 import pandas
 from scipy.stats import kendalltau
 
@@ -70,6 +70,24 @@ parser.add_argument(
     help="Alleles to select models for. If not specified, all alleles with "
     "enough measurements will be used.")
 parser.add_argument(
+    "--combined-min-models",
+    type=int,
+    default=8,
+    metavar="N",
+    help="Min number of models to select per allele when using combined selector")
+parser.add_argument(
+    "--combined-max-models",
+    type=int,
+    default=1000,
+    metavar="N",
+    help="Max number of models to select per allele when using combined selector")
+parser.add_argument(
+    "--combined-weights",
+    type=int,
+    nargs=3,
+    default=[1,1,1],
+    help="Weights for combined predictor in order: mass-spec MSE consensus")
+parser.add_argument(
     "--mass-spec-min-measurements",
     type=int,
     metavar="N",
@@ -110,7 +128,7 @@ parser.add_argument(
 parser.add_argument(
     "--scoring",
     nargs="+",
-    choices=("mse", "mass-spec", "consensus"),
+    choices=("combined-all", "mse", "mass-spec", "consensus"),
     default=["mse", "consensus"],
     help="Scoring procedures to use in order")
 parser.add_argument(
@@ -214,40 +232,60 @@ def run(argv=sys.argv[1:]):
         print("Wrote: %s" % args.out_unselected_predictions)
 
     selectors = {}
-    for scoring in args.scoring:
+    selector_to_model_selection_kwargs = {}
+
+    def make_simple_selector(scoring):
         if scoring == "mse":
+            model_selection_kwargs = {
+                'min_models': args.mse_min_models,
+                'max_models': args.mse_max_models,
+            }
             selector = MSEModelSelector(
                 df=df,
                 predictor=input_predictor,
-                min_measurements=args.mse_min_measurements,
-                model_selection_kwargs={
-                    'min_models': args.mse_min_models,
-                    'max_models': args.mse_max_models,
-                })
+                min_measurements=args.mse_min_measurements)
         elif scoring == "mass-spec":
             mass_spec_df = df.loc[df.mass_spec]
+            model_selection_kwargs = {
+                'min_models': args.mass_spec_min_models,
+                'max_models': args.mass_spec_max_models,
+            }
             selector = MassSpecModelSelector(
                 df=mass_spec_df,
                 predictor=input_predictor,
-                min_measurements=args.mass_spec_min_measurements,
-                model_selection_kwargs={
-                    'min_models': args.mass_spec_min_models,
-                    'max_models': args.mass_spec_max_models,
-                })
+                min_measurements=args.mass_spec_min_measurements)
         elif scoring == "consensus":
+            model_selection_kwargs = {
+                'min_models': args.consensus_min_models,
+                'max_models': args.consensus_max_models,
+            }
             selector = ConsensusModelSelector(
                 predictor=input_predictor,
-                num_peptides_per_length=args.consensus_num_peptides_per_length,
-                model_selection_kwargs={
-                    'min_models': args.consensus_min_models,
-                    'max_models': args.consensus_max_models,
-                })
+                num_peptides_per_length=args.consensus_num_peptides_per_length)
         else:
             raise ValueError("Unsupported scoring method: %s" % scoring)
+        return (selector, model_selection_kwargs)
+
+    for scoring in args.scoring:
+        if scoring == "combined-all":
+            model_selection_kwargs = {
+                'min_models': args.combined_min_models,
+                'max_models': args.combined_max_models,
+            }
+            selector = CombinedModelSelector([
+                make_simple_selector("mass-spec")[0],
+                make_simple_selector("mse")[0],
+                make_simple_selector("consensus")[0],
+            ], weights=args.combined_weights)
+        else:
+            (selector, model_selection_kwargs) = make_simple_selector(scoring)
+
         selectors[scoring] = selector
+        selector_to_model_selection_kwargs[scoring] = model_selection_kwargs
 
     print("Selectors for alleles:")
     allele_to_selector = {}
+    allele_to_model_selection_kwargs = {}
     for allele in alleles:
         selector = None
         for possible_selector in args.scoring:
@@ -258,8 +296,12 @@ def run(argv=sys.argv[1:]):
         if selector is None:
             raise ValueError("No selectors usable for allele: %s" % allele)
         allele_to_selector[allele] = selector
+        allele_to_model_selection_kwargs[allele] = (
+            selector_to_model_selection_kwargs[possible_selector])
 
+    GLOBAL_DATA["input_predictor"] = input_predictor
     GLOBAL_DATA["allele_to_selector"] = allele_to_selector
+    GLOBAL_DATA["allele_to_model_selection_kwargs"] = allele_to_model_selection_kwargs
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -311,8 +353,44 @@ def run(argv=sys.argv[1:]):
 
 def model_select(allele):
     global GLOBAL_DATA
+    predictor = GLOBAL_DATA["input_predictor"]
     selector = GLOBAL_DATA["allele_to_selector"][allele]
-    return selector.select(allele)
+    model_selection_kwargs = GLOBAL_DATA[
+        "allele_to_model_selection_kwargs"
+    ][allele]
+    return predictor.model_select(
+        score_function=selector.score_function(allele=allele),
+        alleles=[allele],
+        **model_selection_kwargs)
+
+
+class CombinedModelSelector(object):
+    def __init__(self, model_selectors, weights=None):
+        if weights is None:
+            weights = numpy.ones(shape=(len(model_selectors),))
+        self.model_selectors = model_selectors
+        self.weights = weights
+
+    def usable_for_allele(self, allele):
+        return any(
+            selector.usable_for_allele(allele)
+            for selector in self.model_selectors)
+
+    def score_function(self, allele):
+        score_functions_and_weights = [
+            (selector.score_function(allele=allele), weight)
+            for (selector, weight) in zip(self.model_selectors, self.weights)
+            if selector.usable_for_allele(allele)
+        ]
+
+        def score(predictor):
+            scores = numpy.array([
+                score_function(predictor) * weight
+                for (score_function, weight) in score_functions_and_weights
+            ])
+            print("Combining scores", scores)
+            return scores.sum()
+        return score
 
 
 class ConsensusModelSelector(object):
@@ -320,7 +398,7 @@ class ConsensusModelSelector(object):
             self,
             predictor,
             num_peptides_per_length=100000,
-            model_selection_kwargs={}):
+            multiply_score_by_value=10.0):
 
         (min_length, max_length) = predictor.supported_peptide_lengths
         peptides = []
@@ -330,7 +408,7 @@ class ConsensusModelSelector(object):
 
         self.peptides = EncodableSequences.create(peptides)
         self.predictor = predictor
-        self.model_selection_kwargs = model_selection_kwargs
+        self.multiply_score_by_value = multiply_score_by_value
 
         # Encode the peptides for each neural network, so the encoding
         # becomes cached.
@@ -340,24 +418,21 @@ class ConsensusModelSelector(object):
     def usable_for_allele(self, allele):
         return True
 
-    def score_function(self, allele, ensemble_predictions, predictor):
-        predictions = predictor.predict(
-            allele=allele,
-            peptides=self.peptides,
-        )
-        return kendalltau(predictions, ensemble_predictions).correlation
-
-    def select(self, allele):
+    def score_function(self, allele):
         full_ensemble_predictions = self.predictor.predict(
             allele=allele,
             peptides=self.peptides)
 
-        return self.predictor.model_select(
-            score_function=partial(
-                self.score_function, allele, full_ensemble_predictions),
-            alleles=[allele],
-            **self.model_selection_kwargs
-        )
+        def score(predictor):
+            predictions = predictor.predict(
+                allele=allele,
+                peptides=self.peptides,
+            )
+            return (
+                kendalltau(predictions, full_ensemble_predictions).correlation *
+                self.multiply_score_by_value)
+
+        return score
 
 
 class MSEModelSelector(object):
@@ -365,46 +440,42 @@ class MSEModelSelector(object):
             self,
             df,
             predictor,
-            model_selection_kwargs={},
-            min_measurements=1):
+            min_measurements=1,
+            multiply_score_by_data_size=True):
 
         self.df = df
         self.predictor = predictor
-        self.model_selection_kwargs = model_selection_kwargs
         self.min_measurements = min_measurements
+        self.multiply_score_by_data_size = multiply_score_by_data_size
 
     def usable_for_allele(self, allele):
         return (self.df.allele == allele).sum() >= self.min_measurements
 
-    @staticmethod
-    def score_function(allele, sub_df, peptides, predictor):
-        predictions = predictor.predict(
-            allele=allele,
-            peptides=peptides,
-        )
-        deviations = from_ic50(predictions) - from_ic50(sub_df.measurement_value)
-
-        if 'measurement_inequality' in sub_df.columns:
-            # Must reverse meaning of inequality since we are working with
-            # transformed 0-1 values, which are anti-correlated with the ic50s.
-            # The measurement_inequality column is given in terms of ic50s.
-            deviations.loc[
-                ((sub_df.measurement_inequality == "<") & (deviations > 0)) |
-                ((sub_df.measurement_inequality == ">") & (deviations < 0))
-            ] = 0.0
-
-        return -1 * (deviations**2).mean()
-
-    def select(self, allele):
+    def score_function(self, allele):
         sub_df = self.df.loc[self.df.allele == allele]
         peptides = EncodableSequences.create(sub_df.peptide.values)
 
-        return self.predictor.model_select(
-            score_function=partial(
-                self.score_function, allele, sub_df, peptides),
-            alleles=[allele],
-            **self.model_selection_kwargs
-        )
+        def score(predictor):
+            predictions = predictor.predict(
+                allele=allele,
+                peptides=peptides,
+            )
+            deviations = from_ic50(predictions) - from_ic50(
+                sub_df.measurement_value)
+
+            if 'measurement_inequality' in sub_df.columns:
+                # Must reverse meaning of inequality since we are working with
+                # transformed 0-1 values, which are anti-correlated with the ic50s.
+                # The measurement_inequality column is given in terms of ic50s.
+                deviations.loc[
+                    (
+                    (sub_df.measurement_inequality == "<") & (deviations > 0)) |
+                    ((sub_df.measurement_inequality == ">") & (deviations < 0))
+                    ] = 0.0
+
+            return -1 * (deviations ** 2).mean() * (
+                len(sub_df) if self.multiply_score_by_data_size else 1)
+        return score
 
 
 class MassSpecModelSelector(object):
@@ -413,8 +484,8 @@ class MassSpecModelSelector(object):
             df,
             predictor,
             decoys_per_length=5000,
-            model_selection_kwargs={},
-            min_measurements=100):
+            min_measurements=100,
+            multiply_score_by_data_size=True):
 
         (min_length, max_length) = predictor.supported_peptide_lengths
         decoys = []
@@ -432,8 +503,8 @@ class MassSpecModelSelector(object):
 
         self.df = full_matrix
         self.predictor = predictor
-        self.model_selection_kwargs = model_selection_kwargs
         self.min_measurements = min_measurements
+        self.multiply_score_by_data_size = multiply_score_by_data_size
 
         self.peptides = EncodableSequences.create(full_matrix.index.values)
 
@@ -453,20 +524,15 @@ class MassSpecModelSelector(object):
         return allele in self.df.columns and (
             self.df[allele].sum() >= self.min_measurements)
 
-    def score_function(self, allele, predictor):
-        predictions = predictor.predict(
-            allele=allele,
-            peptides=self.peptides,
-        )
-        return self.ppv(self.df[allele], predictions)
-
-    def select(self, allele):
-        return self.predictor.model_select(
-            score_function=partial(
-                self.score_function, allele),
-            alleles=[allele],
-            **self.model_selection_kwargs
-        )
+    def score_function(self, allele):
+        def score(predictor):
+            predictions = predictor.predict(
+                allele=allele,
+                peptides=self.peptides,
+            )
+            return self.ppv(self.df[allele], predictions) * (
+                self.df[allele].sum() if self.multiply_score_by_data_size else 1)
+        return score
 
 
 if __name__ == '__main__':

@@ -54,16 +54,9 @@ time mhcflurry-class1-select-allele-specific-models \
     --data test.csv \
     --models-dir "$(mhcflurry-downloads path models_class1_unselected)/models" \
     --out-models-dir models \
-    --scoring mass-spec mse consensus \
+    --scoring combined-all \
     --consensus-num-peptides-per-length 10000 \
-    --consensus-min-models 8 \
-    --consensus-max-models 8 \
-    --mse-min-measurements 20 \
-    --mse-min-models 8 \
-    --mse-max-models 10000 \
-    --mass-spec-min-measurements 500 \
-    --mass-spec-min-models 8 \
-    --mass-spec-max-models 10000 \
+    --combined-min-models 8 \
     --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
 
 time mhcflurry-calibrate-percentile-ranks \
