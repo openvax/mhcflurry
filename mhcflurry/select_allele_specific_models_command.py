@@ -530,7 +530,7 @@ class MassSpecModelSelector(object):
                 allele=allele,
                 peptides=self.peptides,
             )
-            return self.ppv(self.df[allele], predictions) * (
+            return self.ppv(self.df[allele].astype(float), predictions) * (
                 self.df[allele].sum() if self.multiply_score_by_data_size else 1)
         return score
 
