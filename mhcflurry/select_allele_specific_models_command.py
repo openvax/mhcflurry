@@ -388,7 +388,6 @@ class CombinedModelSelector(object):
                 score_function(predictor) * weight
                 for (score_function, weight) in score_functions_and_weights
             ])
-            print("Combining scores", scores)
             return scores.sum()
         return score
 
