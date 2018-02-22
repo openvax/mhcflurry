@@ -21,7 +21,11 @@ releases:
         compatibility-version: 2
         downloads:
             - name: models_class1
-              url: http://github.com/openvax/mhcflurry/releases/download/pre-1.1/models_class1.20180205.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1.20180222.tar.bz2
+              default: true
+
+            - name: models_class1_selected_no_mass_spec
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_selected_no_mass_spec.20180222.tar.bz2
               default: true
 
             - name: models_class1_unselected
