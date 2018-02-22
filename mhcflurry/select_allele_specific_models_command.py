@@ -473,7 +473,7 @@ class MSEModelSelector(object):
                     ((sub_df.measurement_inequality == ">") & (deviations < 0))
                     ] = 0.0
 
-            return -1 * (deviations ** 2).mean() * (
+            return  (1 - (deviations ** 2).mean()) * (
                 len(sub_df) if self.multiply_score_by_data_size else 1)
         return score
 
