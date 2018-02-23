@@ -86,8 +86,20 @@ class Class1AffinityPredictor(object):
         self.allele_to_allele_specific_models = allele_to_allele_specific_models
         self.class1_pan_allele_models = class1_pan_allele_models
         self.allele_to_fixed_length_sequence = allele_to_fixed_length_sequence
+        self._manifest_df = manifest_df
 
-        if manifest_df is None:
+        if not allele_to_percent_rank_transform:
+            allele_to_percent_rank_transform = {}
+        self.allele_to_percent_rank_transform = allele_to_percent_rank_transform
+        self.metadata_dataframes = metadata_dataframes
+        self._cache = {}
+
+    @property
+    def manifest_df(self):
+        if self._manifest_df is None:
+            # Make a manifest based on
+            #  - self.class1_pan_allele_models
+            #  - self.allele_to_allele_specific_models
             rows = []
             for (i, model) in enumerate(self.class1_pan_allele_models):
                 rows.append((
@@ -96,7 +108,8 @@ class Class1AffinityPredictor(object):
                     json.dumps(model.get_config()),
                     model
                 ))
-            for (allele, models) in self.allele_to_allele_specific_models.items():
+            for (allele,
+                 models) in self.allele_to_allele_specific_models.items():
                 for (i, model) in enumerate(models):
                     rows.append((
                         self.model_name(allele, i),
@@ -104,16 +117,10 @@ class Class1AffinityPredictor(object):
                         json.dumps(model.get_config()),
                         model
                     ))
-            manifest_df = pandas.DataFrame(
+            self._manifest_df = pandas.DataFrame(
                 rows,
                 columns=["model_name", "allele", "config_json", "model"])
-        self.manifest_df = manifest_df
-
-        if not allele_to_percent_rank_transform:
-            allele_to_percent_rank_transform = {}
-        self.allele_to_percent_rank_transform = allele_to_percent_rank_transform
-        self.metadata_dataframes = metadata_dataframes
-        self._cache = {}
+        return self._manifest_df
 
     def clear_cache(self):
         """
@@ -209,7 +216,7 @@ class Class1AffinityPredictor(object):
                     ("config_json", json.dumps(model.get_config())),
                     ("model", model),
                 ])).to_frame().T
-                self.manifest_df = pandas.concat(
+                self._manifest_df = pandas.concat(
                     [self.manifest_df, row], ignore_index=True)
                 new_model_names.append(model_name)
 
@@ -225,7 +232,7 @@ class Class1AffinityPredictor(object):
                         ("config_json", json.dumps(model.get_config())),
                         ("model", model),
                     ])).to_frame().T
-                    self.manifest_df = pandas.concat(
+                    self._manifest_df = pandas.concat(
                         [self.manifest_df, row], ignore_index=True)
                     current_models.append(model)
                     new_model_names.append(model_name)
@@ -609,7 +616,7 @@ class Class1AffinityPredictor(object):
                     ("config_json", json.dumps(model.get_config())),
                     ("model", model),
                 ])).to_frame().T
-                self.manifest_df = pandas.concat(
+                self._manifest_df = pandas.concat(
                     [self.manifest_df, row], ignore_index=True)
                 self.allele_to_allele_specific_models[allele].append(model)
                 if models_dir_for_save:
@@ -702,7 +709,7 @@ class Class1AffinityPredictor(object):
                 ("config_json", json.dumps(model.get_config())),
                 ("model", model),
             ])).to_frame().T
-            self.manifest_df = pandas.concat(
+            self._manifest_df = pandas.concat(
                 [self.manifest_df, row], ignore_index=True)
             if models_dir_for_save:
                 self.save(
@@ -1207,7 +1214,9 @@ class Class1AffinityPredictor(object):
                         Class1AffinityPredictor(
                             allele_to_allele_specific_models={
                                 allele: [row.model] + existing_selected
-                    }))
+                            }
+                        )
+                    )
                     for (_, row) in df.iterrows()
                 ]
 

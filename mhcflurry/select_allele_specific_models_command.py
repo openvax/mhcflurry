@@ -146,7 +146,7 @@ parser.add_argument(
 parser.add_argument(
     "--consensus-num-peptides-per-length",
     type=int,
-    default=100000,
+    default=10000,
     help="Num peptides per length to use for consensus scoring")
 parser.add_argument(
     "--mass-spec-regex",
@@ -364,6 +364,13 @@ def model_select(allele):
         **model_selection_kwargs)
 
 
+def cache_encoding(predictor, peptides):
+    # Encode the peptides for each neural network, so the encoding
+    # becomes cached.
+    for network in predictor.neural_networks:
+        network.peptides_to_network_input(peptides)
+
+
 class CombinedModelSelector(object):
     def __init__(self, model_selectors, weights=None):
         if weights is None:
@@ -396,7 +403,7 @@ class ConsensusModelSelector(object):
     def __init__(
             self,
             predictor,
-            num_peptides_per_length=100000,
+            num_peptides_per_length=10000,
             multiply_score_by_value=10.0):
 
         (min_length, max_length) = predictor.supported_peptide_lengths
@@ -408,11 +415,7 @@ class ConsensusModelSelector(object):
         self.peptides = EncodableSequences.create(peptides)
         self.predictor = predictor
         self.multiply_score_by_value = multiply_score_by_value
-
-        # Encode the peptides for each neural network, so the encoding
-        # becomes cached.
-        for network in predictor.neural_networks:
-            network.peptides_to_network_input(self.peptides)
+        cache_encoding(self.predictor, self.peptides)
 
     def usable_for_allele(self, allele):
         return True
@@ -513,11 +516,7 @@ class MassSpecModelSelector(object):
         self.multiply_score_by_data_size = multiply_score_by_data_size
 
         self.peptides = EncodableSequences.create(full_matrix.index.values)
-
-        # Encode the peptides for each neural network, so the encoding
-        # becomes cached.
-        for network in predictor.neural_networks:
-            network.peptides_to_network_input(self.peptides)
+        cache_encoding(self.predictor, self.peptides)
 
     @staticmethod
     def ppv(y_true, predictions):
