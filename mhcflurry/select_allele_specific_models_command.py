@@ -252,7 +252,7 @@ def run(argv=sys.argv[1:]):
                 'max_models': args.mse_max_models,
             }
             selector = MSEModelSelector(
-                df=df,
+                df=df.loc[~df.mass_spec],
                 predictor=input_predictor,
                 min_measurements=args.mse_min_measurements)
         elif scoring == "mass-spec":
