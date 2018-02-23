@@ -482,23 +482,30 @@ class MassSpecModelSelector(object):
             self,
             df,
             predictor,
-            decoys_per_length=5000,
+            decoys_per_length=0,
             min_measurements=100,
             multiply_score_by_data_size=True):
 
-        (min_length, max_length) = predictor.supported_peptide_lengths
-        decoys = []
-        for length in range(min_length, max_length + 1):
-            decoys.extend(
-                random_peptides(decoys_per_length, length=length))
-
         # Index is peptide, columns are alleles
-        hit_matrix = df.groupby(["peptide", "allele"]).measurement_value.count().unstack().fillna(0).astype(bool)
+        hit_matrix = df.groupby(
+            ["peptide", "allele"]).measurement_value.count().unstack().fillna(
+            0).astype(bool)
 
-        decoy_matrix = pandas.DataFrame(
-            index=decoys, columns=hit_matrix.columns, dtype=bool)
-        decoy_matrix[:] = False
-        full_matrix = pandas.concat([hit_matrix, decoy_matrix]).sample(frac=1.0)
+        if decoys_per_length:
+            (min_length, max_length) = predictor.supported_peptide_lengths
+            decoys = []
+            for length in range(min_length, max_length + 1):
+                decoys.extend(
+                    random_peptides(decoys_per_length, length=length))
+
+            decoy_matrix = pandas.DataFrame(
+                index=decoys, columns=hit_matrix.columns, dtype=bool)
+            decoy_matrix[:] = False
+            full_matrix = pandas.concat([hit_matrix, decoy_matrix])
+        else:
+            full_matrix = hit_matrix
+
+        full_matrix = full_matrix.sample(frac=1.0)
 
         self.df = full_matrix
         self.predictor = predictor
