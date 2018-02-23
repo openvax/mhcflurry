@@ -43,21 +43,17 @@ python ./write_validation_data.py \
 
 wc -l test.csv
 
-#mhcflurry-predict \
-#    test.csv \
-#    --prediction-column-prefix "mhcflurry_unselected_" \
-#    --models "$(mhcflurry-downloads path models_class1_unselected)/models" \
-#    --out test.csv
-#wc -l test.csv
-
 time mhcflurry-class1-select-allele-specific-models \
     --data test.csv \
     --models-dir "$(mhcflurry-downloads path models_class1_unselected)/models" \
     --out-models-dir models \
-    --scoring combined-all \
+    --scoring combined:mass-spec,mse,consensus \
     --consensus-num-peptides-per-length 10000 \
     --combined-min-models 8 \
-    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
+    --unselected-accuracy-scorer combined:mass-spec,mse \
+    --unselected-accuracy-percentile-threshold 95 \
+    --mass-spec-min-measurements 500 \
+    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 1
 
 time mhcflurry-calibrate-percentile-ranks \
     --models-dir models \

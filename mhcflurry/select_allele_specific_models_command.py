@@ -8,10 +8,11 @@ import sys
 import time
 import traceback
 import random
+from pprint import pprint
 
 import numpy
 import pandas
-from scipy.stats import kendalltau
+from scipy.stats import kendalltau, percentileofscore
 
 from mhcnames import normalize_allele_name
 import tqdm  # progress bar
@@ -64,6 +65,19 @@ parser.add_argument(
     help="Write predictions for validation data using unselected predictor to "
     "FILE.csv")
 parser.add_argument(
+    "--unselected-accuracy-scorer",
+    metavar="SCORER",
+    default="combined:mass-spec,mse")
+parser.add_argument(
+    "--unselected-accuracy-scorer-num-samples",
+    type=int,
+    default=1000)
+parser.add_argument(
+    "--unselected-accuracy-percentile-threshold",
+    type=float,
+    metavar="X",
+    default=95)
+parser.add_argument(
     "--allele",
     default=None,
     nargs="+",
@@ -82,16 +96,10 @@ parser.add_argument(
     metavar="N",
     help="Max number of models to select per allele when using combined selector")
 parser.add_argument(
-    "--combined-weights",
-    type=int,
-    nargs=3,
-    default=[1,1,1],
-    help="Weights for combined predictor in order: mass-spec MSE consensus")
-parser.add_argument(
     "--mass-spec-min-measurements",
     type=int,
     metavar="N",
-    default=50,
+    default=1,
     help="Min number of measurements required for an allele to use mass-spec model "
     "selection")
 parser.add_argument(
@@ -110,7 +118,7 @@ parser.add_argument(
     "--mse-min-measurements",
     type=int,
     metavar="N",
-    default=50,
+    default=1,
     help="Min number of measurements required for an allele to use MSE model "
     "selection")
 parser.add_argument(
@@ -128,7 +136,6 @@ parser.add_argument(
 parser.add_argument(
     "--scoring",
     nargs="+",
-    choices=("combined-all", "mse", "mass-spec", "consensus"),
     default=["mse", "consensus"],
     help="Scoring procedures to use in order")
 parser.add_argument(
@@ -235,36 +242,42 @@ def run(argv=sys.argv[1:]):
     selector_to_model_selection_kwargs = {}
 
     def make_selector(scoring):
+        if scoring in selectors:
+            return selectors[scoring]
+
         start = time.time()
-        if scoring == "combined-all":
+        if scoring.startswith("combined:"):
             model_selection_kwargs = {
                 'min_models': args.combined_min_models,
                 'max_models': args.combined_max_models,
             }
-            selector = CombinedModelSelector([
-                make_selector("mass-spec")[0],
-                make_selector("mse")[0],
-                make_selector("consensus")[0],
-            ], weights=args.combined_weights)
+            component_selectors = []
+            for component_selector in scoring.split(":", 1)[1].split(","):
+                component_selectors.append(
+                    make_selector(
+                        component_selector)[0])
+            selector = CombinedModelSelector(component_selectors)
         elif scoring == "mse":
             model_selection_kwargs = {
                 'min_models': args.mse_min_models,
                 'max_models': args.mse_max_models,
             }
+            min_measurements = args.mse_min_measurements
             selector = MSEModelSelector(
                 df=df.loc[~df.mass_spec],
                 predictor=input_predictor,
-                min_measurements=args.mse_min_measurements)
+                min_measurements=min_measurements)
         elif scoring == "mass-spec":
             mass_spec_df = df.loc[df.mass_spec]
             model_selection_kwargs = {
                 'min_models': args.mass_spec_min_models,
                 'max_models': args.mass_spec_max_models,
             }
+            min_measurements = args.mass_spec_min_measurements
             selector = MassSpecModelSelector(
                 df=mass_spec_df,
                 predictor=input_predictor,
-                min_measurements=args.mass_spec_min_measurements)
+                min_measurements=min_measurements)
         elif scoring == "consensus":
             model_selection_kwargs = {
                 'min_models': args.consensus_min_models,
@@ -281,9 +294,14 @@ def run(argv=sys.argv[1:]):
 
     for scoring in args.scoring:
         (selector, model_selection_kwargs) = make_selector(scoring)
-
         selectors[scoring] = selector
         selector_to_model_selection_kwargs[scoring] = model_selection_kwargs
+
+    unselected_accuracy_scorer = None
+    if args.unselected_accuracy_scorer:
+        unselected_accuracy_scorer = make_selector(args.unselected_accuracy_scorer)[0]
+        print("Using unselected accuracy scorer: %s" % unselected_accuracy_scorer)
+    GLOBAL_DATA["unselected_accuracy_scorer"] = unselected_accuracy_scorer
 
     print("Selectors for alleles:")
     allele_to_selector = {}
@@ -301,7 +319,9 @@ def run(argv=sys.argv[1:]):
         allele_to_model_selection_kwargs[allele] = (
             selector_to_model_selection_kwargs[possible_selector])
 
+    GLOBAL_DATA["args"] = args
     GLOBAL_DATA["input_predictor"] = input_predictor
+    GLOBAL_DATA["unselected_accuracy_scorer"] = unselected_accuracy_scorer
     GLOBAL_DATA["allele_to_selector"] = allele_to_selector
     GLOBAL_DATA["allele_to_model_selection_kwargs"] = allele_to_model_selection_kwargs
 
@@ -329,16 +349,31 @@ def run(argv=sys.argv[1:]):
             alleles,
             chunksize=1)
 
+    unselected_summary = []
     model_selection_dfs = []
     for result in tqdm.tqdm(results, total=len(alleles)):
-        model_selection_dfs.append(
-            result.metadata_dataframes['model_selection'])
-        result_predictor.merge_in_place([result])
+        pprint(result)
 
-    model_selection_df = pandas.concat(model_selection_dfs, ignore_index=True)
-    model_selection_df["selector"] = model_selection_df.allele.map(
-        allele_to_selector)
-    result_predictor.metadata_dataframes["model_selection"] = model_selection_df
+        summary_dict = dict(result)
+        summary_dict["retained"] = result["selected"] is not None
+        del summary_dict["selected"]
+
+        unselected_summary.append(summary_dict)
+        if result['selected'] is not None:
+            model_selection_dfs.append(
+                result['selected'].metadata_dataframes['model_selection'])
+            result_predictor.merge_in_place([result['selected']])
+
+    if model_selection_dfs:
+        model_selection_df = pandas.concat(
+            model_selection_dfs, ignore_index=True)
+        model_selection_df["selector"] = model_selection_df.allele.map(
+            allele_to_selector)
+        result_predictor.metadata_dataframes["model_selection"] = (
+            model_selection_df)
+
+    result_predictor.metadata_dataframes["unselected_summary"] = (
+        pandas.DataFrame(unselected_summary))
 
     print("Done model selecting for %d alleles." % len(alleles))
     result_predictor.save(args.out_models_dir)
@@ -353,17 +388,75 @@ def run(argv=sys.argv[1:]):
     print("Predictor written to: %s" % args.out_models_dir)
 
 
+class ScrambledPredictor(object):
+    def __init__(self, predictor):
+        self.predictor = predictor
+        self._predictions = {}
+        self._allele = None
+
+    def predict(self, peptides, allele):
+        if peptides not in self._predictions:
+            self._predictions[peptides] = pandas.Series(
+                self.predictor.predict(peptides=peptides, allele=allele))
+            self._allele = allele
+        assert allele == self._allele
+        return self._predictions[peptides].sample(frac=1.0).values
+
+
 def model_select(allele):
     global GLOBAL_DATA
-    predictor = GLOBAL_DATA["input_predictor"]
+    unselected_accuracy_scorer = GLOBAL_DATA["unselected_accuracy_scorer"]
     selector = GLOBAL_DATA["allele_to_selector"][allele]
     model_selection_kwargs = GLOBAL_DATA[
         "allele_to_model_selection_kwargs"
     ][allele]
-    return predictor.model_select(
-        score_function=selector.score_function(allele=allele),
-        alleles=[allele],
-        **model_selection_kwargs)
+    predictor = GLOBAL_DATA["input_predictor"]
+    args = GLOBAL_DATA["args"]
+    unselected_accuracy_scorer_samples = GLOBAL_DATA["args"].unselected_accuracy_scorer_num_samples
+
+    result_dict = {
+        "allele": allele
+    }
+
+    unselected_score = None
+    unselected_score_percentile = None
+    unselected_score_scrambled_mean = None
+    if unselected_accuracy_scorer:
+        unselected_score_function = (
+            unselected_accuracy_scorer.score_function(allele))
+
+        unselected_score = unselected_score_function(predictor)
+        scrambled_predictor = ScrambledPredictor(predictor)
+        scrambled_scores = numpy.array([
+            unselected_score_function(scrambled_predictor)
+            for _ in range(unselected_accuracy_scorer_samples)
+        ])
+        unselected_score_scrambled_mean = scrambled_scores.mean()
+        unselected_score_percentile = percentileofscore(
+            scrambled_scores, unselected_score)
+        print(
+            "Unselected score and percentile",
+            allele,
+            unselected_score,
+            unselected_score_percentile)
+
+    selected = None
+    threshold = args.unselected_accuracy_percentile_threshold
+    if unselected_score_percentile is None or unselected_score_percentile >= threshold:
+        selected = predictor.model_select(
+            score_function=selector.score_function(allele=allele),
+            alleles=[allele],
+            **model_selection_kwargs)
+
+    result_dict["unselected_score_plan"] = (
+        unselected_accuracy_scorer.plan_summary(allele)
+        if unselected_accuracy_scorer else None)
+    result_dict["selector_score_plan"] = selector.plan_summary(allele)
+    result_dict["unselected_accuracy_score_percentile"] = unselected_score_percentile
+    result_dict["unselected_score"] = unselected_score
+    result_dict["unselected_score_scrambled_mean"] = unselected_score_scrambled_mean
+    result_dict["selected"] = selected
+    return result_dict
 
 
 def cache_encoding(predictor, peptides):
