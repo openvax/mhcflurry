@@ -234,8 +234,19 @@ def run(argv=sys.argv[1:]):
     selectors = {}
     selector_to_model_selection_kwargs = {}
 
-    def make_simple_selector(scoring):
-        if scoring == "mse":
+    def make_selector(scoring):
+        start = time.time()
+        if scoring == "combined-all":
+            model_selection_kwargs = {
+                'min_models': args.combined_min_models,
+                'max_models': args.combined_max_models,
+            }
+            selector = CombinedModelSelector([
+                make_selector("mass-spec")[0],
+                make_selector("mse")[0],
+                make_selector("consensus")[0],
+            ], weights=args.combined_weights)
+        elif scoring == "mse":
             model_selection_kwargs = {
                 'min_models': args.mse_min_models,
                 'max_models': args.mse_max_models,
@@ -264,21 +275,12 @@ def run(argv=sys.argv[1:]):
                 num_peptides_per_length=args.consensus_num_peptides_per_length)
         else:
             raise ValueError("Unsupported scoring method: %s" % scoring)
+        print("Instantiated model selector %s in %0.2f sec." % (
+            scoring, time.time() - start))
         return (selector, model_selection_kwargs)
 
     for scoring in args.scoring:
-        if scoring == "combined-all":
-            model_selection_kwargs = {
-                'min_models': args.combined_min_models,
-                'max_models': args.combined_max_models,
-            }
-            selector = CombinedModelSelector([
-                make_simple_selector("mass-spec")[0],
-                make_simple_selector("mse")[0],
-                make_simple_selector("consensus")[0],
-            ], weights=args.combined_weights)
-        else:
-            (selector, model_selection_kwargs) = make_simple_selector(scoring)
+        (selector, model_selection_kwargs) = make_selector(scoring)
 
         selectors[scoring] = selector
         selector_to_model_selection_kwargs[scoring] = model_selection_kwargs
@@ -291,7 +293,7 @@ def run(argv=sys.argv[1:]):
         for possible_selector in args.scoring:
             if selectors[possible_selector].usable_for_allele(allele=allele):
                 selector = selectors[possible_selector]
-                print("%20s %s" % (allele, possible_selector))
+                print("%20s %s" % (allele, selector.plan_summary(allele)))
                 break
         if selector is None:
             raise ValueError("No selectors usable for allele: %s" % allele)
@@ -371,32 +373,71 @@ def cache_encoding(predictor, peptides):
         network.peptides_to_network_input(peptides)
 
 
+class ScoreFunction(object):
+    def __init__(self, function, summary=None):
+        self.function = function
+        self.summary = summary if summary else "(n/a)"
+
+    def __call__(self, *args, **kwargs):
+        return self.function(*args, **kwargs)
+
+
 class CombinedModelSelector(object):
     def __init__(self, model_selectors, weights=None):
         if weights is None:
             weights = numpy.ones(shape=(len(model_selectors),))
         self.model_selectors = model_selectors
-        self.weights = weights
+        self.selector_to_weight = dict(zip(self.model_selectors, weights))
 
     def usable_for_allele(self, allele):
         return any(
             selector.usable_for_allele(allele)
             for selector in self.model_selectors)
 
-    def score_function(self, allele):
-        score_functions_and_weights = [
-            (selector.score_function(allele=allele), weight)
-            for (selector, weight) in zip(self.model_selectors, self.weights)
-            if selector.usable_for_allele(allele)
+    def plan_summary(self, allele):
+        return self.score_function(allele, dry_run=True).summary
+
+    def score_function(self, allele, dry_run=False):
+        selector_to_max_weighted_score = {}
+        for selector in self.model_selectors:
+            weight = self.selector_to_weight[selector]
+            if selector.usable_for_allele(allele):
+                max_weighted_score = selector.max_absolute_value(allele) * weight
+            else:
+                max_weighted_score = 0
+            selector_to_max_weighted_score[selector] = max_weighted_score
+        max_total_score = sum(selector_to_max_weighted_score.values())
+
+        # Use only selectors that can contribute >1% to the total score
+        selectors_to_use = [
+            selector
+            for selector in self.model_selectors
+            if selector_to_max_weighted_score[selector] > max_total_score / 100.
         ]
 
-        def score(predictor):
-            scores = numpy.array([
-                score_function(predictor) * weight
-                for (score_function, weight) in score_functions_and_weights
-            ])
-            return scores.sum()
-        return score
+        summary = ", ".join([
+            "%s(|%.3f|)" % (
+                selector.plan_summary(allele),
+                selector_to_max_weighted_score[selector])
+            for selector in selectors_to_use
+        ])
+
+        if dry_run:
+            score = None
+        else:
+            score_functions_and_weights = [
+                (selector.score_function(allele=allele),
+                 self.selector_to_weight[selector])
+                for selector in selectors_to_use
+            ]
+
+            def score(predictor):
+                scores = numpy.array([
+                    score_function(predictor) * weight
+                    for (score_function, weight) in score_functions_and_weights
+                ])
+                return scores.sum()
+        return ScoreFunction(score, summary=summary)
 
 
 class ConsensusModelSelector(object):
@@ -420,6 +461,12 @@ class ConsensusModelSelector(object):
     def usable_for_allele(self, allele):
         return True
 
+    def max_absolute_value(self, allele):
+        return self.multiply_score_by_value
+
+    def plan_summary(self, allele):
+        return "consensus (%d points)" % len(self.peptides)
+
     def score_function(self, allele):
         full_ensemble_predictions = self.predictor.predict(
             allele=allele,
@@ -434,7 +481,8 @@ class ConsensusModelSelector(object):
                 kendalltau(predictions, full_ensemble_predictions).correlation *
                 self.multiply_score_by_value)
 
-        return score
+        return ScoreFunction(
+            score, summary=self.plan_summary(allele))
 
 
 class MSEModelSelector(object):
@@ -452,6 +500,15 @@ class MSEModelSelector(object):
 
     def usable_for_allele(self, allele):
         return (self.df.allele == allele).sum() >= self.min_measurements
+
+    def max_absolute_value(self, allele):
+        if self.multiply_score_by_data_size:
+            return (self.df.allele == allele).sum()
+        else:
+            return 1.0
+
+    def plan_summary(self, allele):
+        return self.score_function(allele).summary
 
     def score_function(self, allele):
         sub_df = self.df.loc[self.df.allele == allele]
@@ -477,7 +534,9 @@ class MSEModelSelector(object):
 
             return  (1 - (deviations ** 2).mean()) * (
                 len(sub_df) if self.multiply_score_by_data_size else 1)
-        return score
+
+        summary = "mse (%d points)" % (len(sub_df))
+        return ScoreFunction(score, summary=summary)
 
 
 class MassSpecModelSelector(object):
@@ -508,7 +567,7 @@ class MassSpecModelSelector(object):
         else:
             full_matrix = hit_matrix
 
-        full_matrix = full_matrix.sample(frac=1.0)
+        full_matrix = full_matrix.sample(frac=1.0).astype(float)
 
         self.df = full_matrix
         self.predictor = predictor
@@ -529,15 +588,28 @@ class MassSpecModelSelector(object):
         return allele in self.df.columns and (
             self.df[allele].sum() >= self.min_measurements)
 
+    def max_absolute_value(self, allele):
+        if self.multiply_score_by_data_size:
+            return self.df[allele].sum()
+        else:
+            return 1.0
+
+    def plan_summary(self, allele):
+        return self.score_function(allele).summary
+
     def score_function(self, allele):
+        total_hits = self.df[allele].sum()
+        total_decoys = (self.df[allele] == 0).sum()
+        multiplier = total_hits if self.multiply_score_by_data_size else 1
         def score(predictor):
             predictions = predictor.predict(
                 allele=allele,
                 peptides=self.peptides,
             )
-            return self.ppv(self.df[allele].astype(float), predictions) * (
-                self.df[allele].sum() if self.multiply_score_by_data_size else 1)
-        return score
+            return self.ppv(self.df[allele], predictions) * multiplier
+
+        summary = "mass-spec (%d hits / %d decoys)" % (total_hits, total_decoys)
+        return ScoreFunction(score, summary=summary)
 
 
 if __name__ == '__main__':
