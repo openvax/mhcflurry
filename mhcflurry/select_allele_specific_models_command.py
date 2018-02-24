@@ -661,7 +661,8 @@ class MassSpecModelSelector(object):
         else:
             full_matrix = hit_matrix
 
-        full_matrix = full_matrix.sample(frac=1.0).astype(float)
+        if len(full_matrix) > 0:
+            full_matrix = full_matrix.sample(frac=1.0).astype(float)
 
         self.df = full_matrix
         self.predictor = predictor
