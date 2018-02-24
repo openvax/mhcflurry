@@ -456,6 +456,7 @@ def model_select(allele):
     result_dict["unselected_score"] = unselected_score
     result_dict["unselected_score_scrambled_mean"] = unselected_score_scrambled_mean
     result_dict["selected"] = selected
+    result_dict["num_models"] = len(selected.neural_networks) if selected else None
     return result_dict
 
 
