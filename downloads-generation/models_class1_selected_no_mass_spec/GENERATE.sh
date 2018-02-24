@@ -44,25 +44,15 @@ time python ./write_validation_data.py \
 
 wc -l test.csv
 
-#time mhcflurry-predict \
-#    test.csv \
-#    --prediction-column-prefix "mhcflurry_unselected_" \
-#    --models "$(mhcflurry-downloads path models_class1_unselected)/models" \
-#    --out test.csv
-#wc -l test.csv
-
 time mhcflurry-class1-select-allele-specific-models \
     --data test.csv \
     --models-dir "$(mhcflurry-downloads path models_class1_unselected)/models" \
     --out-models-dir models \
-    --scoring mse consensus \
+    --scoring combined:mse,consensus \
     --consensus-num-peptides-per-length 10000 \
-    --consensus-min-models 8 \
-    --consensus-max-models 8\
-    --mse-min-measurements 20 \
-    --mse-min-models 8 \
-    --mse-max-models 10000 \
-    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
+    --combined-min-models 8 \
+    --combined-max-models 16 \
+    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 5
 
 time mhcflurry-calibrate-percentile-ranks \
     --models-dir models \
