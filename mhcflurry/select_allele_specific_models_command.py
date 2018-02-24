@@ -243,7 +243,8 @@ def run(argv=sys.argv[1:]):
 
     def make_selector(scoring):
         if scoring in selectors:
-            return selectors[scoring]
+            return (
+                selectors[scoring], selector_to_model_selection_kwargs[scoring])
 
         start = time.time()
         if scoring.startswith("combined:"):

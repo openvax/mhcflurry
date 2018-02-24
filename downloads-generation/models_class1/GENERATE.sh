@@ -50,6 +50,7 @@ time mhcflurry-class1-select-allele-specific-models \
     --scoring combined:mass-spec,mse,consensus \
     --consensus-num-peptides-per-length 10000 \
     --combined-min-models 8 \
+    --combined-max-models 16 \
     --unselected-accuracy-scorer combined:mass-spec,mse \
     --unselected-accuracy-percentile-threshold 95 \
     --mass-spec-min-measurements 500 \
