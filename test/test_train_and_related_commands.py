@@ -83,7 +83,7 @@ def run_and_check(n_jobs=0):
         peptides=["SLYNTVATL"],
         alleles=["HLA-A*02:01"])
     assert_equal(predictions.shape, (1,))
-    assert_array_less(predictions, 500)
+    assert_array_less(predictions, 1000)
     df = result.predict_to_dataframe(
             peptides=["SLYNTVATL"],
             alleles=["HLA-A*02:01"])
