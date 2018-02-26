@@ -18,7 +18,7 @@ HYPERPARAMETERS = [
     {
         "n_models": 2,
         "max_epochs": 500,
-        "patience": 10,
+        "patience": 5,
         "minibatch_size": 128,
         "early_stopping": True,
         "validation_split": 0.2,
