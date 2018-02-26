@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.class1_neural_network &mdash; MHCflurry 1.1.0 documentation</title>
+  <title>mhcflurry.class1_neural_network &mdash; MHCflurry 1.2.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.1.0 documentation" href="../../index.html"/>
+    <link rel="top" title="MHCflurry 1.2.0 documentation" href="../../index.html"/>
         <link rel="up" title="Module code" href="../index.html"/> 
 
   
@@ -63,7 +63,7 @@
             
             
               <div class="version">
-                1.1.0
+                1.2.0
               </div>
             
           
@@ -92,7 +92,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../models.html">Details on the released models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../models.html">Details on the released predictor</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
 </ul>
@@ -162,6 +162,8 @@
 <span></span><span class="kn">import</span> <span class="nn">time</span>
 <span class="kn">import</span> <span class="nn">collections</span>
 <span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">weakref</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span>
 <span class="kn">import</span> <span class="nn">pandas</span>
@@ -188,7 +190,7 @@
 
     <span class="n">network_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
         <span class="n">kmer_size</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
-        <span class="n">peptide_amino_acid_encoding</span><span class="o">=</span><span class="s2">&quot;one-hot&quot;</span><span class="p">,</span>
+        <span class="n">peptide_amino_acid_encoding</span><span class="o">=</span><span class="s2">&quot;BLOSUM62&quot;</span><span class="p">,</span>
         <span class="n">embedding_input_dim</span><span class="o">=</span><span class="mi">21</span><span class="p">,</span>
         <span class="n">embedding_output_dim</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
         <span class="n">allele_dense_layer_sizes</span><span class="o">=</span><span class="p">[],</span>
@@ -198,7 +200,7 @@
         <span class="n">layer_sizes</span><span class="o">=</span><span class="p">[</span><span class="mi">32</span><span class="p">],</span>
         <span class="n">dense_layer_l1_regularization</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
         <span class="n">dense_layer_l2_regularization</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-        <span class="n">activation</span><span class="o">=</span><span class="s2">&quot;relu&quot;</span><span class="p">,</span>
+        <span class="n">activation</span><span class="o">=</span><span class="s2">&quot;tanh&quot;</span><span class="p">,</span>
         <span class="n">init</span><span class="o">=</span><span class="s2">&quot;glorot_uniform&quot;</span><span class="p">,</span>
         <span class="n">output_activation</span><span class="o">=</span><span class="s2">&quot;sigmoid&quot;</span><span class="p">,</span>
         <span class="n">dropout_probability</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
@@ -218,8 +220,9 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">compile_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
-        <span class="n">loss</span><span class="o">=</span><span class="s2">&quot;mse&quot;</span><span class="p">,</span>
+        <span class="n">loss</span><span class="o">=</span><span class="s2">&quot;custom:mse_with_inequalities&quot;</span><span class="p">,</span>
         <span class="n">optimizer</span><span class="o">=</span><span class="s2">&quot;rmsprop&quot;</span><span class="p">,</span>
+        <span class="n">learning_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Loss and optimizer hyperparameters. Any values supported by keras may be</span>
@@ -236,8 +239,7 @@
 
     <span class="n">fit_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
         <span class="n">max_epochs</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
-        <span class="n">take_best_epoch</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># currently unused</span>
-        <span class="n">validation_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
+        <span class="n">validation_split</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
         <span class="n">early_stopping</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">minibatch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
         <span class="n">random_negative_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
@@ -251,21 +253,27 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">early_stopping_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
-        <span class="n">patience</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-        <span class="n">monitor</span><span class="o">=</span><span class="s1">&#39;val_loss&#39;</span><span class="p">,</span>  <span class="c1"># currently unused</span>
-        <span class="n">min_delta</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>  <span class="c1"># currently unused</span>
-        <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>  <span class="c1"># currently unused</span>
-        <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span>  <span class="c1"># currently unused</span>
+        <span class="n">patience</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Hyperparameters for early stopping.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">miscelaneous_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
+        <span class="n">train_data</span><span class="o">=</span><span class="p">{},</span>
+    <span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Miscelaneous hyperaparameters. These parameters are not used by this class</span>
+<span class="sd">    but may be interpreted by other code.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">hyperparameter_defaults</span> <span class="o">=</span> <span class="n">network_hyperparameter_defaults</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
         <span class="n">compile_hyperparameter_defaults</span><span class="p">)</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
         <span class="n">input_encoding_hyperparameter_defaults</span><span class="p">)</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
         <span class="n">fit_hyperparameter_defaults</span><span class="p">)</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-        <span class="n">early_stopping_hyperparameter_defaults</span><span class="p">)</span>
+        <span class="n">early_stopping_hyperparameter_defaults</span><span class="p">)</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+        <span class="n">miscelaneous_hyperparameter_defaults</span>
+    <span class="p">)</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Combined set of all supported hyperparameters and their default values.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -278,6 +286,11 @@
     <span class="n">hyperparameter_renames</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">&quot;use_embedding&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
         <span class="s2">&quot;pseudosequence_use_embedding&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;monitor&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;min_delta&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;verbose&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;take_best_epoch&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">}</span>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.apply_hyperparameter_renames"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.apply_hyperparameter_renames">[docs]</a>    <span class="nd">@classmethod</span>
@@ -311,9 +324,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">network_weights_loader</span> <span class="o">=</span> <span class="kc">None</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fit_seconds</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fit_num_points</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_info</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prediction_cache</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">WeakKeyDictionary</span><span class="p">()</span>
 
     <span class="n">KERAS_MODELS_CACHE</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="sd">&quot;&quot;&quot;</span>
@@ -351,17 +363,26 @@
 <span class="sd">        keras.models.Model</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">assert</span> <span class="n">network_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="k">if</span> <span class="n">network_json</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="p">:</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">klass</span><span class="o">.</span><span class="n">keras_network_cache_key</span><span class="p">(</span><span class="n">network_json</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="p">:</span>
             <span class="c1"># Cache miss.</span>
             <span class="kn">import</span> <span class="nn">keras.models</span>
             <span class="n">network</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">model_from_json</span><span class="p">(</span><span class="n">network_json</span><span class="p">)</span>
             <span class="n">existing_weights</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Cache hit.</span>
-            <span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">existing_weights</span><span class="p">)</span> <span class="o">=</span> <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="p">[</span><span class="n">network_json</span><span class="p">]</span>
+            <span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">existing_weights</span><span class="p">)</span> <span class="o">=</span> <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">existing_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">network_weights</span><span class="p">:</span>
             <span class="n">network</span><span class="o">.</span><span class="n">set_weights</span><span class="p">(</span><span class="n">network_weights</span><span class="p">)</span>
-            <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="p">[</span><span class="n">network_json</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">network_weights</span><span class="p">)</span>
+            <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">network_weights</span><span class="p">)</span>
+
+
+        <span class="c1"># As an added safety check we overwrite the fit method on the returned</span>
+        <span class="c1"># model to throw an error if it is called.</span>
+        <span class="k">def</span> <span class="nf">throw</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Do not call fit on cached model.&quot;</span><span class="p">)</span>
+
+        <span class="n">network</span><span class="o">.</span><span class="n">fit</span> <span class="o">=</span> <span class="n">throw</span>
         <span class="k">return</span> <span class="n">network</span></div>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.network"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.network">[docs]</a>    <span class="k">def</span> <span class="nf">network</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">borrow</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
@@ -398,6 +419,20 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">network_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span></div>
 
+<div class="viewcode-block" id="Class1NeuralNetwork.keras_network_cache_key"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.keras_network_cache_key">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">keras_network_cache_key</span><span class="p">(</span><span class="n">network_json</span><span class="p">):</span>
+        <span class="c1"># As an optimization, we remove anything about regularization as these</span>
+        <span class="c1"># do not affect predictions.</span>
+        <span class="k">def</span> <span class="nf">drop_properties</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
+            <span class="k">if</span> <span class="s1">&#39;kernel_regularizer&#39;</span> <span class="ow">in</span> <span class="n">d</span><span class="p">:</span>
+                <span class="k">del</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;kernel_regularizer&#39;</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">d</span>
+
+        <span class="n">description</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span>
+            <span class="n">network_json</span><span class="p">,</span>
+            <span class="n">object_hook</span><span class="o">=</span><span class="n">drop_properties</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">description</span><span class="p">)</span></div>
+
 <div class="viewcode-block" id="Class1NeuralNetwork.get_config"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.get_config">[docs]</a>    <span class="k">def</span> <span class="nf">get_config</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        serialize to a dict all attributes except model weights</span>
@@ -411,6 +446,7 @@
         <span class="n">result</span><span class="p">[</span><span class="s1">&#39;_network&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">result</span><span class="p">[</span><span class="s1">&#39;network_weights&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">result</span><span class="p">[</span><span class="s1">&#39;network_weights_loader&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;prediction_cache&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">result</span></div>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.from_config"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.from_config">[docs]</a>    <span class="nd">@classmethod</span>
@@ -432,10 +468,10 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">config</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
         <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;hyperparameters&#39;</span><span class="p">))</span>
-        <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">config</span><span class="p">),</span> <span class="n">config</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
         <span class="n">instance</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
         <span class="n">instance</span><span class="o">.</span><span class="n">network_weights</span> <span class="o">=</span> <span class="n">weights</span>
         <span class="n">instance</span><span class="o">.</span><span class="n">network_weights_loader</span> <span class="o">=</span> <span class="n">weights_loader</span>
+        <span class="n">instance</span><span class="o">.</span><span class="n">prediction_cache</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">WeakKeyDictionary</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">instance</span></div>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.load_weights"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.load_weights">[docs]</a>    <span class="k">def</span> <span class="nf">load_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -475,7 +511,15 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">load_weights</span><span class="p">()</span>
         <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
         <span class="n">result</span><span class="p">[</span><span class="s1">&#39;_network&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;prediction_cache&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Deserialize. For pickle support.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prediction_cache</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">WeakKeyDictionary</span><span class="p">()</span>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.peptides_to_network_input"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.peptides_to_network_input">[docs]</a>    <span class="k">def</span> <span class="nf">peptides_to_network_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -549,7 +593,8 @@
             <span class="n">sample_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">shuffle_permutation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-            <span class="n">progress_preamble</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+            <span class="n">progress_preamble</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="n">progress_print_interval</span><span class="o">=</span><span class="mf">5.0</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Fit the neural network.</span>
 <span class="sd">        </span>
@@ -585,10 +630,11 @@
 
 <span class="sd">        progress_preamble : string</span>
 <span class="sd">            Optional string of information to include in each progress update</span>
+
+<span class="sd">        progress_print_interval : float</span>
+<span class="sd">            How often (in seconds) to print progress update. Set to None to</span>
+<span class="sd">            disable.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">fit_num_points</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
-
         <span class="n">encodable_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
         <span class="n">peptide_encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">encodable_peptides</span><span class="p">)</span>
 
@@ -691,6 +737,12 @@
                 <span class="n">loss</span><span class="o">=</span><span class="n">loss_name_or_function</span><span class="p">,</span>
                 <span class="n">optimizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;optimizer&#39;</span><span class="p">])</span>
 
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;learning_rate&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="kn">from</span> <span class="nn">keras</span> <span class="k">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
+            <span class="n">K</span><span class="o">.</span><span class="n">set_value</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">()</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">lr</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;learning_rate&#39;</span><span class="p">])</span>
+
         <span class="k">if</span> <span class="n">loss_supports_inequalities</span><span class="p">:</span>
             <span class="c1"># Do not sample negative affinities: just use an inequality.</span>
             <span class="n">random_negative_ic50</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_affinity_min&#39;</span><span class="p">]</span>
@@ -738,7 +790,7 @@
         <span class="n">min_val_loss_iteration</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">min_val_loss</span> <span class="o">=</span> <span class="kc">None</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="n">fit_info</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
         <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
         <span class="n">last_progress_print</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">x_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{}</span>
@@ -801,22 +853,25 @@
                 <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weights_with_random_negatives</span><span class="p">)</span>
 
             <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">fit_history</span><span class="o">.</span><span class="n">history</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="n">fit_info</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 
             <span class="c1"># Print progress no more often than once every few seconds.</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">last_progress_print</span> <span class="ow">or</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">last_progress_print</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">progress_print_interval</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span>
+                    <span class="ow">not</span> <span class="n">last_progress_print</span> <span class="ow">or</span> <span class="p">(</span>
+                        <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">last_progress_print</span>
+                        <span class="o">&gt;</span> <span class="n">progress_print_interval</span><span class="p">)):</span>
                 <span class="nb">print</span><span class="p">((</span><span class="n">progress_preamble</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span>
                        <span class="s2">&quot;Epoch </span><span class="si">%3d</span><span class="s2"> / </span><span class="si">%3d</span><span class="s2">: loss=</span><span class="si">%g</span><span class="s2">. &quot;</span>
                        <span class="s2">&quot;Min val loss (</span><span class="si">%s</span><span class="s2">) at epoch </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
                            <span class="n">i</span><span class="p">,</span>
                            <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;max_epochs&#39;</span><span class="p">],</span>
-                           <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                           <span class="n">fit_info</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
                            <span class="nb">str</span><span class="p">(</span><span class="n">min_val_loss</span><span class="p">),</span>
                            <span class="n">min_val_loss_iteration</span><span class="p">))</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
                 <span class="n">last_progress_print</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
 
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;validation_split&#39;</span><span class="p">]:</span>
-                <span class="n">val_loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span><span class="p">[</span><span class="s1">&#39;val_loss&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">val_loss</span> <span class="o">=</span> <span class="n">fit_info</span><span class="p">[</span><span class="s1">&#39;val_loss&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
                 <span class="n">val_losses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">val_loss</span><span class="p">)</span>
 
                 <span class="k">if</span> <span class="n">min_val_loss</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">val_loss</span> <span class="o">&lt;=</span> <span class="n">min_val_loss</span><span class="p">:</span>
@@ -828,26 +883,35 @@
                         <span class="n">min_val_loss_iteration</span> <span class="o">+</span>
                         <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;patience&#39;</span><span class="p">])</span>
                     <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="n">threshold</span><span class="p">:</span>
-                        <span class="nb">print</span><span class="p">((</span><span class="n">progress_preamble</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span>
-                            <span class="s2">&quot;Stopping at epoch </span><span class="si">%3d</span><span class="s2"> / </span><span class="si">%3d</span><span class="s2">: loss=</span><span class="si">%g</span><span class="s2">. &quot;</span>
-                            <span class="s2">&quot;Min val loss (</span><span class="si">%s</span><span class="s2">) at epoch </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                                <span class="n">i</span><span class="p">,</span>
-                                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;max_epochs&#39;</span><span class="p">],</span>
-                                <span class="bp">self</span><span class="o">.</span><span class="n">loss_history</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
-                                <span class="nb">str</span><span class="p">(</span><span class="n">min_val_loss</span><span class="p">),</span>
-                                <span class="n">min_val_loss_iteration</span><span class="p">))</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+                        <span class="k">if</span> <span class="n">progress_print_interval</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="nb">print</span><span class="p">((</span><span class="n">progress_preamble</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span>
+                                <span class="s2">&quot;Stopping at epoch </span><span class="si">%3d</span><span class="s2"> / </span><span class="si">%3d</span><span class="s2">: loss=</span><span class="si">%g</span><span class="s2">. &quot;</span>
+                                <span class="s2">&quot;Min val loss (</span><span class="si">%s</span><span class="s2">) at epoch </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                                    <span class="n">i</span><span class="p">,</span>
+                                    <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;max_epochs&#39;</span><span class="p">],</span>
+                                    <span class="n">fit_info</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                                    <span class="nb">str</span><span class="p">(</span><span class="n">min_val_loss</span><span class="p">),</span>
+                                    <span class="n">min_val_loss_iteration</span><span class="p">))</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
                         <span class="k">break</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fit_seconds</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span></div>
+
+        <span class="n">fit_info</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+        <span class="n">fit_info</span><span class="p">[</span><span class="s2">&quot;num_points&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">fit_info</span><span class="p">))</span></div>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.predict"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.predict">[docs]</a>    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">allele_encoding</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4096</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Predict affinities</span>
-<span class="sd">        </span>
+<span class="sd">        Predict affinities.</span>
+
+<span class="sd">        If peptides are specified as EncodableSequences, then the predictions</span>
+<span class="sd">        will be cached for this predictor as long as the EncodableSequences object</span>
+<span class="sd">        remains in memory. The cache is keyed in the object identity of the</span>
+<span class="sd">        EncodableSequences, not the sequences themselves.</span>
+
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        peptides : EncodableSequences or list of string</span>
 <span class="sd">        </span>
-<span class="sd">        allele_pseudosequences : AlleleEncoding, optional</span>
+<span class="sd">        allele_encoding : AlleleEncoding, optional</span>
 <span class="sd">            Only required when this model is a pan-allele model</span>
 
 <span class="sd">        batch_size : int</span>
@@ -857,6 +921,13 @@
 <span class="sd">        -------</span>
 <span class="sd">        numpy.array of nM affinity predictions </span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">prediction_cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">use_cache</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">allele_encoding</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="n">peptides</span><span class="p">,</span> <span class="n">EncodableSequences</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">use_cache</span> <span class="ow">and</span> <span class="n">peptides</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prediction_cache</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">prediction_cache</span><span class="p">[</span><span class="n">peptides</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
         <span class="n">x_dict</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s1">&#39;peptide&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
         <span class="p">}</span>
@@ -867,7 +938,10 @@
         <span class="n">network</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">(</span><span class="n">borrow</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">raw_predictions</span> <span class="o">=</span> <span class="n">network</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">x_dict</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span>
         <span class="n">predictions</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">raw_predictions</span><span class="p">,</span> <span class="n">dtype</span> <span class="o">=</span> <span class="s2">&quot;float64&quot;</span><span class="p">)[:,</span><span class="mi">0</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">to_ic50</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span></div>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">to_ic50</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">use_cache</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">prediction_cache</span><span class="p">[</span><span class="n">peptides</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="n">result</span></div>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.make_network"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.make_network">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">make_network</span><span class="p">(</span>
@@ -1025,7 +1099,7 @@
   <div role="contentinfo">
     <p>
         &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Feb 06, 2018.
+      Last updated on Feb 26, 2018.
 
     </p>
   </div>
@@ -1047,7 +1121,7 @@
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../../',
-            VERSION:'1.1.0',
+            VERSION:'1.2.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

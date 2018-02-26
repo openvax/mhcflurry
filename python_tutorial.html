@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Python library tutorial &mdash; MHCflurry 1.1.0 documentation</title>
+  <title>Python library tutorial &mdash; MHCflurry 1.2.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="MHCflurry 1.1.0 documentation" href="index.html"/>
+    <link rel="top" title="MHCflurry 1.2.0 documentation" href="index.html"/>
         <link rel="next" title="Supported alleles and peptide lengths" href="models_supported_alleles.html"/>
         <link rel="prev" title="Command-line tutorial" href="commandline_tutorial.html"/> 
 
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.1.0
+                1.2.0
               </div>
             
           
@@ -98,7 +98,7 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
-<li class="toctree-l1"><a class="reference internal" href="models.html">Details on the released models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Details on the released predictor</a></li>
 <li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
 </ul>
@@ -184,7 +184,7 @@ models directory, then it will load that predictor instead.</p>
 </div>
 <p>With a predictor loaded we can now generate some binding predictions:</p>
 <div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-A0201&quot;</span><span class="p">,</span> <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SIINFEKL&quot;</span><span class="p">,</span> <span class="s2">&quot;SIINFEQL&quot;</span><span class="p">])</span>
-<span class="go">array([ 1750.95223187,  1675.80817417])</span>
+<span class="go">array([ 4571.98373389,  3583.33113994])</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -197,13 +197,13 @@ with methods such as <a class="reference internal" href="api.html#mhcflurry.Clas
 <p>For more detailed results, we can use
 <a class="reference internal" href="api.html#mhcflurry.Class1AffinityPredictor.predict_to_dataframe" title="mhcflurry.Class1AffinityPredictor.predict_to_dataframe"><code class="xref py py-obj docutils literal"><span class="pre">predict_to_dataframe</span></code></a>.</p>
 <div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span><span class="o">.</span><span class="n">predict_to_dataframe</span><span class="p">(</span><span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-A0201&quot;</span><span class="p">,</span> <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SIINFEKL&quot;</span><span class="p">,</span> <span class="s2">&quot;SIINFEQL&quot;</span><span class="p">])</span>
-<span class="go">      allele   peptide   prediction  prediction_low  prediction_high  \</span>
-<span class="go">0  HLA-A0201  SIINFEKL  1750.952232      740.081767      4506.669438   </span>
-<span class="go">1  HLA-A0201  SIINFEQL  1675.808174      686.418216      4061.080690   </span>
+<span class="go">    peptide     allele   prediction  prediction_low  prediction_high  \</span>
+<span class="go">0  SIINFEKL  HLA-A0201  4571.983734     2093.541620     11331.827657   </span>
+<span class="go">1  SIINFEQL  HLA-A0201  3583.331140     1388.942403     10621.888497   </span>
 
 <span class="go">   prediction_percentile  </span>
-<span class="go">0                3.05625  </span>
-<span class="go">1                2.96200  </span>
+<span class="go">0               6.381625  </span>
+<span class="go">1               5.284625  </span>
 </pre></div>
 </div>
 <p>Instead of a single allele and multiple peptides, we may need predictions for
@@ -212,7 +212,7 @@ the <code class="xref py py-obj docutils literal"><span class="pre">alleles</spa
 must be the same length as the list of peptides (i.e. it is predicting over pairs,
 <em>not</em> taking the cross product).</p>
 <div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">alleles</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;HLA-A0201&quot;</span><span class="p">,</span> <span class="s2">&quot;HLA-B*57:01&quot;</span><span class="p">],</span> <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SIINFEKL&quot;</span><span class="p">,</span> <span class="s2">&quot;SIINFEQL&quot;</span><span class="p">])</span>
-<span class="go">array([  1750.95218277,  14642.18972502])</span>
+<span class="go">array([  4571.98345747,  20648.92075372])</span>
 </pre></div>
 </div>
 </div>
@@ -227,7 +227,7 @@ haven’t already, run this in a shell to download the MHCflurry training data:<
 <div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mhcflurry.downloads</span> <span class="kn">import</span> <span class="n">get_path</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">data_path</span> <span class="o">=</span> <span class="n">get_path</span><span class="p">(</span><span class="s2">&quot;data_curated&quot;</span><span class="p">,</span> <span class="s2">&quot;curated_training_data.no_mass_spec.csv.bz2&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">data_path</span>
-<span class="go">&#39;/Users/tim/Library/Application Support/mhcflurry/4/1.1.0/data_curated/curated_training_data.no_mass_spec.csv.bz2&#39;</span>
+<span class="go">&#39;/Users/tim/Library/Application Support/mhcflurry/4/1.2.0/data_curated/curated_training_data.no_mass_spec.csv.bz2&#39;</span>
 </pre></div>
 </div>
 <p>Now let’s load it with pandas and filter to reasonably-sized peptides:</p>
@@ -272,18 +272,18 @@ some models.</p>
 <span class="gp">... </span>   <span class="n">peptides</span><span class="o">=</span><span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
 <span class="gp">... </span>   <span class="n">affinities</span><span class="o">=</span><span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">measurement_value</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
 <span class="gp">... </span>   <span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-B*57:01&quot;</span><span class="p">)</span>
-<span class="go">Epoch   0 /   5: loss=0.346043. Min val loss (None) at epoch None</span>
-<span class="go">[&lt;mhcflurry.class1_neural_network.Class1NeuralNetwork object at 0x12cfe5e90&gt;]</span>
+<span class="go">[  100 peptides ]  Epoch   0 /   5: loss=0.308307. Min val loss (None) at epoch None</span>
+<span class="go">[&lt;mhcflurry.class1_neural_network.Class1NeuralNetwork object at 0x121bd9ad0&gt;]</span>
 </pre></div>
 </div>
 <p>The <a class="reference internal" href="api.html#mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors" title="mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors"><code class="xref py py-obj docutils literal"><span class="pre">fit_allele_specific_predictors</span></code></a> method
 can be called any number of times on the same instance to build up ensembles
-of models across alleles. The <code class="xref py py-obj docutils literal"><span class="pre">architecture_hyperparameters</span></code> we specified are
+of models across alleles. The architecture hyperparameters we specified are
 for demonstration purposes; to fit real models you would usually train for
 more epochs.</p>
 <p>Now we can generate predictions:</p>
 <div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">new_predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">([</span><span class="s2">&quot;SYNPEPII&quot;</span><span class="p">],</span> <span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-B*57:01&quot;</span><span class="p">)</span>
-<span class="go">array([ 1172.84384439])</span>
+<span class="go">array([ 4481.70925883])</span>
 </pre></div>
 </div>
 <p>We can save our predictor to the specified directory on disk by running:</p>
@@ -323,10 +323,10 @@ Here is a simple example of doing so:</p>
 <span class="gp">... </span>   <span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
 <span class="gp">... </span>   <span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">measurement_value</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
 <span class="gp">... </span>   <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="go">Epoch   0 / 500: loss=0.52943. Min val loss (None) at epoch None</span>
-<span class="go">Stopping at epoch 138 / 500: loss=0.0125081. Min val loss (0.0673488304019) at epoch 127</span>
+<span class="go">Epoch   0 / 500: loss=0.45465. Min val loss (None) at epoch None</span>
+<span class="go">Stopping at epoch 106 / 500: loss=0.0104852. Min val loss (0.0363171696663) at epoch 85</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">network</span><span class="o">.</span><span class="n">predict</span><span class="p">([</span><span class="s2">&quot;SIINFEKLL&quot;</span><span class="p">])</span>
-<span class="go">array([ 28897.05591614])</span>
+<span class="go">array([ 27009.78916591])</span>
 </pre></div>
 </div>
 </div>
@@ -355,7 +355,7 @@ Here is a simple example of doing so:</p>
   <div role="contentinfo">
     <p>
         &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Feb 06, 2018.
+      Last updated on Feb 26, 2018.
 
     </p>
   </div>
@@ -377,7 +377,7 @@ Here is a simple example of doing so:</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'./',
-            VERSION:'1.1.0',
+            VERSION:'1.2.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

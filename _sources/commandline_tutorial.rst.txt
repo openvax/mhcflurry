@@ -80,7 +80,6 @@ with a command like:
     $ mhcflurry-class1-train-allele-specific-models \
         --data TRAINING_DATA.csv \
         --hyperparameters hyperparameters.yaml \
-        --percent-rank-calibration-num-peptides-per-length 1000000 \
         --min-measurements-per-allele 75 \
         --out-models-dir models
 
@@ -92,7 +91,7 @@ command above will write the models to the output directory specified by the
     ls "$(mhcflurry-downloads path models_class1)/models"
     :shell:
     :nostderr:
-    :ellipsis: 3,-3
+    :ellipsis: 4,-4
 
 The ``manifest.csv`` file gives metadata for all the models used in the predictor.
 There will be a ``weights_...`` file for each model giving its weights
