@@ -469,6 +469,10 @@ def cache_encoding(predictor, peptides):
 
 
 class ScoreFunction(object):
+    """
+    Thin wrapper over a score function (Class1AffinityPredictor -> float).
+    Used to keep a summary string associated with the function.
+    """
     def __init__(self, function, summary=None):
         self.function = function
         self.summary = summary if summary else "(n/a)"
@@ -478,6 +482,9 @@ class ScoreFunction(object):
 
 
 class CombinedModelSelector(object):
+    """
+    Model selector that computes a weighted average over other model selectors.
+    """
     def __init__(self, model_selectors, weights=None):
         if weights is None:
             weights = numpy.ones(shape=(len(model_selectors),))
@@ -536,6 +543,10 @@ class CombinedModelSelector(object):
 
 
 class ConsensusModelSelector(object):
+    """
+    Model selector that scores sub-ensembles based on their Kendall tau
+    consistency with the full ensemble over a set of random peptides.
+    """
     def __init__(
             self,
             predictor,
@@ -581,6 +592,10 @@ class ConsensusModelSelector(object):
 
 
 class MSEModelSelector(object):
+    """
+    Model selector that uses mean-squared error to score models. Inequalities
+    are supported.
+    """
     def __init__(
             self,
             df,
@@ -635,6 +650,10 @@ class MSEModelSelector(object):
 
 
 class MassSpecModelSelector(object):
+    """
+    Model selector that uses PPV of differentiating decoys from hits from
+    mass-spec experiments.
+    """
     def __init__(
             self,
             df,

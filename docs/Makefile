@@ -53,9 +53,9 @@ help:
 .PHONY: generate
 generate:
 	sphinx-apidoc -M -f -o _build/ ../mhcflurry
-	mhcflurry-downloads fetch models_class1 cross_validation_class1
+	mhcflurry-downloads fetch models_class1 models_class1_unselected
 	python generate.py \
-	    --out-models-cv-rst _build/_models_cv.rst \
+	    --out-alleles-info-rst _build/_alleles_info.rst \
 	    --out-models-info-rst _build/_models_info.rst \
 	    --out-models-supported-alleles-rst _build/_models_supported_alleles.rst
 

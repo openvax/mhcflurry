@@ -6,7 +6,8 @@ import sys
 import argparse
 import json
 from textwrap import wrap
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
+from os.path import join
 
 import pypandoc
 import pandas
@@ -33,7 +34,14 @@ parser.add_argument(
     help="Class1 models. Default: %(default)s",
 )
 parser.add_argument(
-    "--out-models-cv-rst",
+    "--class1-unselected-models-dir",
+    metavar="DIR",
+    default=get_path(
+        "models_class1_unselected", "models", test_exists=False),
+    help="Class1 unselected models. Default: %(default)s",
+)
+parser.add_argument(
+    "--out-alleles-info-rst",
     metavar="FILE.rst",
     help="rst output file",
 )
@@ -58,6 +66,7 @@ def go(argv):
     args = parser.parse_args(argv)
 
     predictor = None
+    unselected_predictor = None
 
     if args.out_models_supported_alleles_rst:
         # Supported alleles rst
@@ -78,6 +87,7 @@ def go(argv):
 
     if args.out_models_architecture_png:
         # Architecture diagram
+        raise NotImplementedError()  # for now
         if predictor is None:
             predictor = Class1AffinityPredictor.load(args.class1_models_dir)
         network = predictor.neural_networks[0].network()
@@ -92,15 +102,27 @@ def go(argv):
         # Architecture information rst
         if predictor is None:
             predictor = Class1AffinityPredictor.load(args.class1_models_dir)
+        if unselected_predictor is None:
+            unselected_predictor = Class1AffinityPredictor.load(
+                args.class1_unselected_models_dir)
 
-        representative_networks = OrderedDict()
-        for network in predictor.neural_networks:
-            config = json.dumps(network.hyperparameters)
-            if config not in representative_networks:
-                representative_networks[config] = network
+        config_to_network = {}
+        config_to_alleles = {}
+        for (allele, networks) in unselected_predictor.allele_to_allele_specific_models.items():
+            for network in networks:
+                config = json.dumps(network.hyperparameters)
+                if config not in config_to_network:
+                    config_to_network[config] = network
+                config_to_alleles[config] = []
+
+        for (allele, networks) in predictor.allele_to_allele_specific_models.items():
+            for network in networks:
+                config = json.dumps(network.hyperparameters)
+                assert config in config_to_network
+                config_to_alleles[config].append(allele)
 
         all_hyperparameters = [
-            network.hyperparameters for network in representative_networks.values()
+            network.hyperparameters for network in config_to_network.values()
         ]
         hyperparameter_keys =  all_hyperparameters[0].keys()
         assert all(
@@ -129,23 +151,64 @@ def go(argv):
 
         with open(args.out_models_info_rst, "w") as fd:
             fd.write("Hyperparameters shared by all %d architectures:\n" %
-                len(representative_networks))
+                len(config_to_network))
             write_hyperparameters(fd, constant_hypeparameters)
             fd.write("\n")
-            for (i, network) in enumerate(representative_networks.values()):
+
+            configs = sorted(
+                config_to_alleles,
+                key=lambda s: len(config_to_alleles[s]),
+                reverse=True)
+
+            for (i, config) in enumerate(configs):
+                network = config_to_network[config]
                 lines = []
                 network.network().summary(print_fn=lines.append)
 
-                fd.write("Architecture %d / %d:\n" % (
-                    (i + 1, len(representative_networks))))
+                specific_hyperparameters = dict(
+                    (key, value)
+                    for (key, value) in network.hyperparameters.items()
+                    if key not in constant_hypeparameters)
+
+                def name_component(key, value):
+                    if key == "locally_connected_layers":
+                        return "lc=%d" % len(value)
+                    elif key == "train_data":
+                        return value["subset"] + "-data"
+                    elif key == "layer_sizes":
+                        (value,) = value
+                        key = "size"
+                    elif key == "dense_layer_l1_regularization":
+                        if value == 0:
+                            return "no-reg"
+                        key = "reg"
+                    return "%s=%s" % (key, value)
+
+                def sort_key(component):
+                    if "lc" in component:
+                        return (1, component)
+                    if "reg" in component:
+                        return (2, component)
+                    return (0, component)
+
+                components = [
+                    name_component(key, value)
+                    for (key, value) in specific_hyperparameters.items()
+                ]
+                name = ",".join(sorted(components, key=sort_key))
+
+                fd.write("Architecture %d / %d %s\n" % (
+                    (i + 1, len(config_to_network), name)))
                 fd.write("+" * 40)
                 fd.write("\n")
+                fd.write(
+                    "Selected in the ensembles for %d alleles: *%s*.\n\n" % (
+                        len(config_to_alleles[config]),
+                        ", ".join(
+                            sorted(config_to_alleles[config]))))
                 write_hyperparameters(
                     fd,
-                    dict(
-                        (key, value)
-                        for (key, value) in network.hyperparameters.items()
-                        if key not in constant_hypeparameters))
+                    specific_hyperparameters)
                 fd.write("\n\n::\n\n")
                 for line in lines:
                     fd.write("    ")
@@ -153,30 +216,86 @@ def go(argv):
                     fd.write("\n")
         print("Wrote: %s" % args.out_models_info_rst)
 
-    if args.out_models_cv_rst:
+    if args.out_alleles_info_rst:
         # Models cv output
-        df = pandas.read_csv(args.cv_summary_csv)
-        sub_df = df.loc[
-            df.kind == "ensemble"
-            ].sort_values("allele").copy().reset_index(drop=True)
-        sub_df["Allele"] = sub_df.allele
-        sub_df["CV Training Size"] = sub_df.train_size.astype(int)
-        sub_df["AUC"] = sub_df.auc
-        sub_df["F1"] = sub_df.f1
-        sub_df["Kendall Tau"] = sub_df.tau
-        sub_df = sub_df[sub_df.columns[-5:]]
-        html = sub_df.to_html(
-            index=False,
-            float_format=lambda v: "%0.3f" % v,
-            justify="left")
-        rst = pypandoc.convert_text(html, format="html", to="rst")
+        df = pandas.read_csv(
+            join(args.class1_models_dir, "unselected_summary.csv.bz2"))
 
-        with open(args.out_models_cv_rst, "w") as fd:
+        train_df = pandas.read_csv(
+            join(args.class1_unselected_models_dir, "train_data.csv.bz2"))
+
+        quantitative_train_measurements_by_allele = train_df.loc[
+            train_df.measurement_type == "quantitative"
+        ].allele.value_counts()
+
+        train_measurements_by_allele = train_df.allele.value_counts()
+
+        df = df.sort_values("allele").copy()
+
+        df["scoring"] = df.unselected_score_plan.str.replace(
+            "\\(\\|[0-9.]+\\|\\)", "")
+        df["models selected"] = df["num_models"]
+
+        df["sanitized_scoring"] = df.scoring.map(
+            lambda s: s.replace("mass-spec", "").replace("mse", "").replace("(", "").replace(")", "").strip()
+        )
+
+        df["mass spec scoring"] = df.sanitized_scoring.map(
+            lambda s: s.split(",")[0] if "," in s else ""
+        )
+        df["mean square error scoring"] = df.sanitized_scoring.map(
+            lambda s: s.split(",")[-1]
+        )
+        df["unselected percentile"] = df.unselected_accuracy_score_percentile
+
+        df["train data (all)"] = df.allele.map(train_measurements_by_allele)
+        df["train data (quantitative)"] = df.allele.map(
+            quantitative_train_measurements_by_allele)
+
+        def write_df(df, fd):
+            rows = [
+                row for (_, row) in df.iterrows()
+            ]
+            fd.write("\n")
             fd.write(
-                "Showing estimated performance for %d alleles." % len(sub_df))
+                tabulate(rows,
+                    [col.replace("_", " ") for col in df.columns],
+                    tablefmt="grid"))
             fd.write("\n\n")
-            fd.write(rst)
-            print("Wrote: %s" % args.out_models_cv_rst)
+
+        with open(args.out_alleles_info_rst, "w") as fd:
+            fd.write("Supported alleles\n")
+            fd.write("+" * 80)
+            fd.write("\n\n")
+
+            common_cols = [
+                "allele",
+                "train data (all)",
+                "train data (quantitative)",
+                "mass spec scoring",
+                "mean square error scoring",
+                "unselected percentile",
+                "unselected_score",
+                "unselected_score_scrambled_mean",
+            ]
+
+            sub_df = df.loc[df.retained][common_cols + [
+                "models selected",
+            ]]
+            write_df(sub_df, fd)
+
+            fd.write("Rejected alleles\n")
+            fd.write("+" * 80)
+            fd.write("\n\n")
+            fd.write(
+                "Training for the following alleles was attempted but the "
+                "resulting models were excluded due to inadequate performance on "
+                "held out data.")
+            fd.write("\n\n")
+
+            sub_df = df.loc[~df.retained][common_cols].sort_values("allele")
+            write_df(sub_df, fd)
+            print("Wrote: %s" % args.out_alleles_info_rst)
 
 if __name__ == "__main__":
     go(sys.argv[1:])
