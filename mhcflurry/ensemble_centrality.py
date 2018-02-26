@@ -25,10 +25,13 @@ def robust_mean(log_values):
     if log_values.shape[1] <= 3:
         # Too few values to use robust mean.
         return numpy.nanmean(log_values, axis=1)
+    without_nans = numpy.nan_to_num(log_values)  # replace nan with 0
     mask = (
-        (log_values <= numpy.nanpercentile(log_values, 75, axis=1).reshape((-1, 1))) &
-        (log_values >= numpy.nanpercentile(log_values, 25, axis=1).reshape((-1, 1))))
-    return (log_values * mask.astype(float)).sum(1) / mask.sum(1)
+        (~numpy.isnan(log_values)) &
+        (without_nans <= numpy.nanpercentile(log_values, 75, axis=1).reshape((-1, 1))) &
+        (without_nans >= numpy.nanpercentile(log_values, 25, axis=1).reshape((-1, 1))))
+    return (without_nans * mask.astype(float)).sum(1) / mask.sum(1)
+
 
 CENTRALITY_MEASURES = {
     "mean": partial(numpy.nanmean, axis=1),

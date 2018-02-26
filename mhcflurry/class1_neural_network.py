@@ -1,6 +1,8 @@
 import time
 import collections
 import logging
+import json
+import weakref
 
 import numpy
 import pandas
@@ -27,7 +29,7 @@ class Class1NeuralNetwork(object):
 
     network_hyperparameter_defaults = HyperparameterDefaults(
         kmer_size=15,
-        peptide_amino_acid_encoding="one-hot",
+        peptide_amino_acid_encoding="BLOSUM62",
         embedding_input_dim=21,
         embedding_output_dim=8,
         allele_dense_layer_sizes=[],
@@ -37,7 +39,7 @@ class Class1NeuralNetwork(object):
         layer_sizes=[32],
         dense_layer_l1_regularization=0.001,
         dense_layer_l2_regularization=0.0,
-        activation="relu",
+        activation="tanh",
         init="glorot_uniform",
         output_activation="sigmoid",
         dropout_probability=0.0,
@@ -57,8 +59,9 @@ class Class1NeuralNetwork(object):
     """
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
-        loss="mse",
+        loss="custom:mse_with_inequalities",
         optimizer="rmsprop",
+        learning_rate=None,
     )
     """
     Loss and optimizer hyperparameters. Any values supported by keras may be
@@ -75,8 +78,7 @@ class Class1NeuralNetwork(object):
 
     fit_hyperparameter_defaults = HyperparameterDefaults(
         max_epochs=500,
-        take_best_epoch=False,  # currently unused
-        validation_split=0.2,
+        validation_split=0.1,
         early_stopping=True,
         minibatch_size=128,
         random_negative_rate=0.0,
@@ -90,21 +92,27 @@ class Class1NeuralNetwork(object):
     """
 
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
-        patience=10,
-        monitor='val_loss',  # currently unused
-        min_delta=0,  # currently unused
-        verbose=1,  # currently unused
-        mode='auto'  # currently unused
+        patience=20,
     )
     """
     Hyperparameters for early stopping.
+    """
+
+    miscelaneous_hyperparameter_defaults = HyperparameterDefaults(
+        train_data={},
+    )
+    """
+    Miscelaneous hyperaparameters. These parameters are not used by this class
+    but may be interpreted by other code.
     """
 
     hyperparameter_defaults = network_hyperparameter_defaults.extend(
         compile_hyperparameter_defaults).extend(
         input_encoding_hyperparameter_defaults).extend(
         fit_hyperparameter_defaults).extend(
-        early_stopping_hyperparameter_defaults)
+        early_stopping_hyperparameter_defaults).extend(
+        miscelaneous_hyperparameter_defaults
+    )
     """
     Combined set of all supported hyperparameters and their default values.
     """
@@ -117,6 +125,11 @@ class Class1NeuralNetwork(object):
     hyperparameter_renames = {
         "use_embedding": None,
         "pseudosequence_use_embedding": None,
+        "monitor": None,
+        "min_delta": None,
+        "verbose": None,
+        "mode": None,
+        "take_best_epoch": None,
     }
 
     @classmethod
@@ -150,9 +163,8 @@ class Class1NeuralNetwork(object):
         self.network_weights = None
         self.network_weights_loader = None
 
-        self.loss_history = None
-        self.fit_seconds = None
-        self.fit_num_points = None
+        self.fit_info = []
+        self.prediction_cache = weakref.WeakKeyDictionary()
 
     KERAS_MODELS_CACHE = {}
     """
@@ -190,17 +202,26 @@ class Class1NeuralNetwork(object):
         keras.models.Model
         """
         assert network_weights is not None
-        if network_json not in klass.KERAS_MODELS_CACHE:
+        key = klass.keras_network_cache_key(network_json)
+        if key not in klass.KERAS_MODELS_CACHE:
             # Cache miss.
             import keras.models
             network = keras.models.model_from_json(network_json)
             existing_weights = None
         else:
             # Cache hit.
-            (network, existing_weights) = klass.KERAS_MODELS_CACHE[network_json]
+            (network, existing_weights) = klass.KERAS_MODELS_CACHE[key]
         if existing_weights is not network_weights:
             network.set_weights(network_weights)
-            klass.KERAS_MODELS_CACHE[network_json] = (network, network_weights)
+            klass.KERAS_MODELS_CACHE[key] = (network, network_weights)
+
+
+        # As an added safety check we overwrite the fit method on the returned
+        # model to throw an error if it is called.
+        def throw(*args, **kwargs):
+            raise NotImplementedError("Do not call fit on cached model.")
+
+        network.fit = throw
         return network
 
     def network(self, borrow=False):
@@ -237,6 +258,20 @@ class Class1NeuralNetwork(object):
             self.network_json = self._network.to_json()
             self.network_weights = self._network.get_weights()
 
+    @staticmethod
+    def keras_network_cache_key(network_json):
+        # As an optimization, we remove anything about regularization as these
+        # do not affect predictions.
+        def drop_properties(d):
+            if 'kernel_regularizer' in d:
+                del d['kernel_regularizer']
+            return d
+
+        description = json.loads(
+            network_json,
+            object_hook=drop_properties)
+        return json.dumps(description)
+
     def get_config(self):
         """
         serialize to a dict all attributes except model weights
@@ -250,6 +285,7 @@ class Class1NeuralNetwork(object):
         result['_network'] = None
         result['network_weights'] = None
         result['network_weights_loader'] = None
+        result['prediction_cache'] = None
         return result
 
     @classmethod
@@ -271,10 +307,10 @@ class Class1NeuralNetwork(object):
         """
         config = dict(config)
         instance = cls(**config.pop('hyperparameters'))
-        assert all(hasattr(instance, key) for key in config), config.keys()
         instance.__dict__.update(config)
         instance.network_weights = weights
         instance.network_weights_loader = weights_loader
+        instance.prediction_cache = weakref.WeakKeyDictionary()
         return instance
 
     def load_weights(self):
@@ -314,7 +350,15 @@ class Class1NeuralNetwork(object):
         self.load_weights()
         result = dict(self.__dict__)
         result['_network'] = None
+        result['prediction_cache'] = None
         return result
+
+    def __setstate__(self, state):
+        """
+        Deserialize. For pickle support.
+        """
+        self.__dict__.update(state)
+        self.prediction_cache = weakref.WeakKeyDictionary()
 
     def peptides_to_network_input(self, peptides):
         """
@@ -388,7 +432,8 @@ class Class1NeuralNetwork(object):
             sample_weights=None,
             shuffle_permutation=None,
             verbose=1,
-            progress_preamble=""):
+            progress_preamble="",
+            progress_print_interval=5.0):
         """
         Fit the neural network.
         
@@ -424,10 +469,11 @@ class Class1NeuralNetwork(object):
 
         progress_preamble : string
             Optional string of information to include in each progress update
+
+        progress_print_interval : float
+            How often (in seconds) to print progress update. Set to None to
+            disable.
         """
-
-        self.fit_num_points = len(peptides)
-
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
 
@@ -530,6 +576,12 @@ class Class1NeuralNetwork(object):
                 loss=loss_name_or_function,
                 optimizer=self.hyperparameters['optimizer'])
 
+        if self.hyperparameters['learning_rate'] is not None:
+            from keras import backend as K
+            K.set_value(
+                self.network().optimizer.lr,
+                self.hyperparameters['learning_rate'])
+
         if loss_supports_inequalities:
             # Do not sample negative affinities: just use an inequality.
             random_negative_ic50 = self.hyperparameters['random_negative_affinity_min']
@@ -577,7 +629,7 @@ class Class1NeuralNetwork(object):
         min_val_loss_iteration = None
         min_val_loss = None
 
-        self.loss_history = collections.defaultdict(list)
+        fit_info = collections.defaultdict(list)
         start = time.time()
         last_progress_print = None
         x_dict_with_random_negatives = {}
@@ -640,22 +692,25 @@ class Class1NeuralNetwork(object):
                 sample_weight=sample_weights_with_random_negatives)
 
             for (key, value) in fit_history.history.items():
-                self.loss_history[key].extend(value)
+                fit_info[key].extend(value)
 
             # Print progress no more often than once every few seconds.
-            if not last_progress_print or time.time() - last_progress_print > 5:
+            if progress_print_interval is not None and (
+                    not last_progress_print or (
+                        time.time() - last_progress_print
+                        > progress_print_interval)):
                 print((progress_preamble + " " +
                        "Epoch %3d / %3d: loss=%g. "
                        "Min val loss (%s) at epoch %s" % (
                            i,
                            self.hyperparameters['max_epochs'],
-                           self.loss_history['loss'][-1],
+                           fit_info['loss'][-1],
                            str(min_val_loss),
                            min_val_loss_iteration)).strip())
                 last_progress_print = time.time()
 
             if self.hyperparameters['validation_split']:
-                val_loss = self.loss_history['val_loss'][-1]
+                val_loss = fit_info['val_loss'][-1]
                 val_losses.append(val_loss)
 
                 if min_val_loss is None or val_loss <= min_val_loss:
@@ -667,26 +722,35 @@ class Class1NeuralNetwork(object):
                         min_val_loss_iteration +
                         self.hyperparameters['patience'])
                     if i > threshold:
-                        print((progress_preamble + " " +
-                            "Stopping at epoch %3d / %3d: loss=%g. "
-                            "Min val loss (%s) at epoch %s" % (
-                                i,
-                                self.hyperparameters['max_epochs'],
-                                self.loss_history['loss'][-1],
-                                str(min_val_loss),
-                                min_val_loss_iteration)).strip())
+                        if progress_print_interval is not None:
+                            print((progress_preamble + " " +
+                                "Stopping at epoch %3d / %3d: loss=%g. "
+                                "Min val loss (%s) at epoch %s" % (
+                                    i,
+                                    self.hyperparameters['max_epochs'],
+                                    fit_info['loss'][-1],
+                                    str(min_val_loss),
+                                    min_val_loss_iteration)).strip())
                         break
-        self.fit_seconds = time.time() - start
+
+        fit_info["time"] = time.time() - start
+        fit_info["num_points"] = len(peptides)
+        self.fit_info.append(dict(fit_info))
 
     def predict(self, peptides, allele_encoding=None, batch_size=4096):
         """
-        Predict affinities
-        
+        Predict affinities.
+
+        If peptides are specified as EncodableSequences, then the predictions
+        will be cached for this predictor as long as the EncodableSequences object
+        remains in memory. The cache is keyed in the object identity of the
+        EncodableSequences, not the sequences themselves.
+
         Parameters
         ----------
         peptides : EncodableSequences or list of string
         
-        allele_pseudosequences : AlleleEncoding, optional
+        allele_encoding : AlleleEncoding, optional
             Only required when this model is a pan-allele model
 
         batch_size : int
@@ -696,6 +760,13 @@ class Class1NeuralNetwork(object):
         -------
         numpy.array of nM affinity predictions 
         """
+        assert self.prediction_cache is not None
+        use_cache = (
+            allele_encoding is None and
+            isinstance(peptides, EncodableSequences))
+        if use_cache and peptides in self.prediction_cache:
+            return self.prediction_cache[peptides].copy()
+
         x_dict = {
             'peptide': self.peptides_to_network_input(peptides)
         }
@@ -706,7 +777,10 @@ class Class1NeuralNetwork(object):
         network = self.network(borrow=True)
         raw_predictions = network.predict(x_dict, batch_size=batch_size)
         predictions = numpy.array(raw_predictions, dtype = "float64")[:,0]
-        return to_ic50(predictions)
+        result = to_ic50(predictions)
+        if use_cache:
+            self.prediction_cache[peptides] = result
+        return result
 
     @staticmethod
     def make_network(

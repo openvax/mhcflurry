@@ -27,7 +27,7 @@ _DOWNLOADS_DIR = None
 _CURRENT_RELEASE = None
 _METADATA = None
 _MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR = environ.get(
-    "MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR")
+    "MHCFLURRY_DEFAULT_CLASS1_MODELS")
 
 
 def get_downloads_dir():
@@ -58,12 +58,12 @@ def get_default_class1_models_dir(test_exists=True):
     """
     Return the absolute path to the default class1 models dir.
 
-    If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR is set to an
+    If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS is set to an
     absolute path, return that path. If it's set to a relative path (i.e. does
     not start with /) then return that path taken to be relative to the mhcflurry
     downloads dir.
 
-    If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR is NOT set,
+    If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS is NOT set,
     then return the path to downloaded models in the "models_class1" download.
 
     Parameters

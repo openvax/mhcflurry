@@ -10,7 +10,7 @@ base_hyperparameters = {
     ##########################################
     # ENSEMBLE SIZE
     ##########################################
-    "n_models": 1,
+    "n_models": 4,
 
     ##########################################
     # OPTIMIZATION
@@ -19,13 +19,13 @@ base_hyperparameters = {
     "patience": 20,
     "early_stopping": True,
     "validation_split": 0.1,
-    "minibatch_size": 128,
+    "minibatch_size": None,
     "loss": "custom:mse_with_inequalities",
 
     ##########################################
     # RANDOM NEGATIVE PEPTIDES
     ##########################################
-    "random_negative_rate": 0.2,
+    "random_negative_rate": 0.0,
     "random_negative_constant": 25,
     "random_negative_affinity_min": 20000.0,
     "random_negative_affinity_max": 50000.0,
@@ -52,28 +52,37 @@ base_hyperparameters = {
     "activation": "tanh",
     "output_activation": "sigmoid",
     "layer_sizes": [16],
-    "dense_layer_l1_regularization": 0.001,
+    "dense_layer_l1_regularization": None,
     "batch_normalization": False,
     "dropout_probability": 0.0,
+
+    ##########################################
+    # TRAINING Data
+    ##########################################
+    "train_data": {"subset": "all", "pretrain_min_points": 1000},
 }
 
 grid = []
-for dense_layer_size in [64, 32, 16]:
-    for l1 in [0.001, 0.01, 0.0]:
-        for num_lc in [0, 1, 2]:
-            for lc_kernel_size in [3, 5]:
-                new = deepcopy(base_hyperparameters)
-                new["layer_sizes"] = [dense_layer_size]
-                new["dense_layer_l1_regularization"] = l1
-                (lc_layer,) = new["locally_connected_layers"]
-                lc_layer['kernel_size'] = lc_kernel_size
-                if num_lc == 0:
-                    new["locally_connected_layers"] = []
-                elif num_lc == 1:
-                    new["locally_connected_layers"] = [lc_layer]
-                elif num_lc == 2:
-                    new["locally_connected_layers"] = [lc_layer, deepcopy(lc_layer)]
-                if not grid or new not in grid:
-                    grid.append(new)
+for train_subset in ["all", "quantitative"]:
+    for minibatch_size in [128]:
+        for dense_layer_size in [8, 16, 32, 64]:
+            for l1 in [0.0, 0.001]:
+                for num_lc in [0, 1, 2]:
+                    for lc_kernel_size in [3, 5]:
+                        new = deepcopy(base_hyperparameters)
+                        new["minibatch_size"] = minibatch_size
+                        new["train_data"]["subset"] = train_subset
+                        new["layer_sizes"] = [dense_layer_size]
+                        new["dense_layer_l1_regularization"] = l1
+                        (lc_layer,) = new["locally_connected_layers"]
+                        lc_layer['kernel_size'] = lc_kernel_size
+                        if num_lc == 0:
+                            new["locally_connected_layers"] = []
+                        elif num_lc == 1:
+                            new["locally_connected_layers"] = [lc_layer]
+                        elif num_lc == 2:
+                            new["locally_connected_layers"] = [lc_layer, deepcopy(lc_layer)]
+                        if not grid or new not in grid:
+                            grid.append(new)
 
 dump(grid, stdout)

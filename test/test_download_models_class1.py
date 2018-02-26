@@ -1,7 +1,9 @@
 import numpy
 numpy.random.seed(0)
 
-from mhcflurry import Class1AffinityPredictor
+from numpy.testing import assert_equal
+
+from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 
 
 DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
@@ -46,3 +48,11 @@ def test_a2_hiv_epitope_downloaded_models():
     #    The HIV-1 HLA-A2-SLYNTVATL Is a Help-Independent CTL Epitope
     predict_and_check("HLA-A*02:01", "SLYNTVATL")
 
+
+def test_caching():
+    Class1NeuralNetwork.KERAS_MODELS_CACHE.clear()
+    DOWNLOADED_PREDICTOR.predict(
+        peptides=["SIINFEKL"],
+        allele="HLA-A*02:01")
+    num_cached = len(Class1NeuralNetwork.KERAS_MODELS_CACHE)
+    assert num_cached > 0

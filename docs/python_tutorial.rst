@@ -99,7 +99,7 @@ some models.
 
 The `~mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors` method
 can be called any number of times on the same instance to build up ensembles
-of models across alleles. The `architecture_hyperparameters` we specified are
+of models across alleles. The architecture hyperparameters we specified are
 for demonstration purposes; to fit real models you would usually train for
 more epochs.
 

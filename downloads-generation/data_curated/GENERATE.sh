@@ -39,8 +39,6 @@ time python curate.py \
     --out-csv curated_training_data.no_mass_spec.csv
 
 # With mass-spec data
-# Note that we STILL drop mass-spec data from IEDB here, since this data seems
-# low-quality.
 time python curate.py \
     --data-iedb \
         "$(mhcflurry-downloads path data_iedb)/mhc_ligand_full.csv.bz2" \
@@ -50,6 +48,7 @@ time python curate.py \
         "$(mhcflurry-downloads path data_systemhcatlas)/data.csv.bz2" \
     --data-abelin-mass-spec \
         "$(mhcflurry-downloads path data_published)/abelin2017.hits.csv.bz2" \
+    --include-iedb-mass-spec \
     --out-csv curated_training_data.with_mass_spec.csv
 
 bzip2 curated_training_data.no_mass_spec.csv

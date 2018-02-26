@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Model select standard MHCflurry Class I models.
+# Model select standard MHCflurry Class I models, limiting to 1 model per allele.
 #
 set -e
 set -x
 
-DOWNLOAD_NAME=models_class1
+DOWNLOAD_NAME=models_class1_minimal
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
@@ -49,8 +49,8 @@ time mhcflurry-class1-select-allele-specific-models \
     --out-models-dir models \
     --scoring combined:mass-spec,mse,consensus \
     --consensus-num-peptides-per-length 10000 \
-    --combined-min-models 8 \
-    --combined-max-models 16 \
+    --combined-min-models 1 \
+    --combined-max-models 1 \
     --unselected-accuracy-scorer combined:mass-spec,mse \
     --unselected-accuracy-percentile-threshold 95 \
     --mass-spec-min-measurements 500 \
@@ -60,6 +60,9 @@ time mhcflurry-calibrate-percentile-ranks \
     --models-dir models \
     --num-peptides-per-length 100000 \
     --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
+
+# To save space in the final download
+rm test.csv
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt

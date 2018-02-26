@@ -41,7 +41,7 @@ class PercentRankTransform(object):
         indices = numpy.searchsorted(self.bin_edges, values)
         result = self.cdf[indices]
         assert len(result) == len(values)
-        return result
+        return numpy.minimum(result, 100.0)
 
     def to_series(self):
         """

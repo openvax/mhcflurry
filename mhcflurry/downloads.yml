@@ -8,7 +8,7 @@
 # by name, the downloads with "default=true" are downloaded.
 
 # This should usually be the latest release.
-current-release: 1.1.0
+current-release: 1.2.0
 
 # An integer indicating what models the current MHCflurry code base is compatible
 # with. Increment this integer when changes are made to MHCflurry that would break
@@ -17,6 +17,41 @@ current-compatibility-version: 2
 
 # Add new releases here as they are made.
 releases:
+    1.2.0:
+        compatibility-version: 2
+        downloads:
+            - name: models_class1
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1.20180225.tar.bz2
+              default: true
+
+            - name: models_class1_selected_no_mass_spec
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_selected_no_mass_spec.20180225.tar.bz2
+              default: true
+
+            - name: models_class1_unselected
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_unselected.20180221.tar.bz2
+              default: false
+
+            - name: models_class1_minimal
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_minimal.20180226.tar.bz2
+              default: false
+
+            - name: data_iedb
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.0/data_iedb.tar.bz2
+              default: false
+
+            - name: data_published
+              url: http://github.com/openvax/mhcflurry/releases/download/pre-1.1/data_published.tar.bz2
+              default: false
+
+            - name: data_systemhcatlas
+              url: http://github.com/openvax/mhcflurry/releases/download/pre-1.1/data_systemhcatlas.tar.bz2
+              default: false
+
+            - name: data_curated
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/data_curated.20180219.tar.bz2
+              default: true
+
     1.1.0:
         compatibility-version: 2
         downloads:

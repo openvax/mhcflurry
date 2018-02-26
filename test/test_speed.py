@@ -51,6 +51,12 @@ def test_speed(profile=False):
     DOWNLOADED_PREDICTOR.predict(peptides, allele="HLA-A*02:01")
     end("pred_already_encoded_%d" % NUM2)
 
+    NUM_REPEATS = 100
+    start("pred_already_encoded_%d_%d_times" % (NUM2, NUM_REPEATS))
+    for _ in range(NUM_REPEATS):
+        DOWNLOADED_PREDICTOR.predict(peptides, allele="HLA-A*02:01")
+    end("pred_already_encoded_%d_%d_times" % (NUM2, NUM_REPEATS))
+
     print("SPEED BENCHMARK")
     print("Results:\n%s" % str(pandas.Series(timings)))
 

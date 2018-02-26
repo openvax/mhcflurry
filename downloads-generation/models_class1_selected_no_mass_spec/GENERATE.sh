@@ -5,7 +5,7 @@
 set -e
 set -x
 
-DOWNLOAD_NAME=models_class1
+DOWNLOAD_NAME=models_class1_selected_no_mass_spec
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
@@ -24,6 +24,7 @@ pip freeze
 git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
+
 cp $SCRIPT_DIR/write_validation_data.py .
 
 mkdir models
@@ -34,8 +35,8 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
-python ./write_validation_data.py \
-    --include "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
+time python ./write_validation_data.py \
+    --include "$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2" \
     --exclude "$(mhcflurry-downloads path models_class1_unselected)/models/train_data.csv.bz2" \
     --only-alleles-present-in-exclude \
     --out-data test.csv \
@@ -47,14 +48,11 @@ time mhcflurry-class1-select-allele-specific-models \
     --data test.csv \
     --models-dir "$(mhcflurry-downloads path models_class1_unselected)/models" \
     --out-models-dir models \
-    --scoring combined:mass-spec,mse,consensus \
+    --scoring combined:mse,consensus \
     --consensus-num-peptides-per-length 10000 \
     --combined-min-models 8 \
     --combined-max-models 16 \
-    --unselected-accuracy-scorer combined:mass-spec,mse \
-    --unselected-accuracy-percentile-threshold 95 \
-    --mass-spec-min-measurements 500 \
-    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 1
+    --num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 5
 
 time mhcflurry-calibrate-percentile-ranks \
     --models-dir models \
