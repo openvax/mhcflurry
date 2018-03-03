@@ -215,7 +215,6 @@ class Class1NeuralNetwork(object):
             network.set_weights(network_weights)
             klass.KERAS_MODELS_CACHE[key] = (network, network_weights)
 
-
         # As an added safety check we overwrite the fit method on the returned
         # model to throw an error if it is called.
         def throw(*args, **kwargs):
