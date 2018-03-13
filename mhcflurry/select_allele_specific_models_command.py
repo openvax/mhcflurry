@@ -780,7 +780,7 @@ class MassSpecModelSelector(object):
                 # We additionally compute AUC score.
                 additional_metadata_out["score_mass_spec_AUC"] = roc_auc_score(
                     self.df[allele].values,
-                    (-1 * predictions).values)
+                    -1 * predictions)
             return ppv * multiplier
 
         summary = "mass-spec (%d hits / %d decoys)" % (total_hits, total_decoys)
