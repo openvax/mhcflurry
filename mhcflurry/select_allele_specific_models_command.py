@@ -442,13 +442,13 @@ def model_select(allele):
         unselected_score_function = (
             unselected_accuracy_scorer.score_function(allele))
 
-        unselected_score = unselected_score_function(predictor)
-        scrambled_predictor = ScrambledPredictor(predictor)
         additional_metadata = {}
+        unselected_score = unselected_score_function(
+            predictor, additional_metadata_out=additional_metadata)
+        scrambled_predictor = ScrambledPredictor(predictor)
         scrambled_scores = numpy.array([
             unselected_score_function(
-                scrambled_predictor,
-                additional_metadata_out=additional_metadata)
+                scrambled_predictor)
             for _ in range(unselected_accuracy_scorer_samples)
         ])
         unselected_score_scrambled_mean = scrambled_scores.mean()
@@ -779,8 +779,7 @@ class MassSpecModelSelector(object):
 
                 # We additionally compute AUC score.
                 additional_metadata_out["score_mass_spec_AUC"] = roc_auc_score(
-                    self.df[allele].values,
-                    -1 * predictions)
+                    self.df[allele].values, -1 * predictions)
             return ppv * multiplier
 
         summary = "mass-spec (%d hits / %d decoys)" % (total_hits, total_decoys)

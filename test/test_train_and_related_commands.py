@@ -105,7 +105,7 @@ def run_and_check_with_model_selection(n_jobs=1):
         deepcopy(HYPERPARAMETERS[0]),
         deepcopy(HYPERPARAMETERS[0]),
     ]
-    hyperparameters[-1]["max_epochs"] = 0
+    hyperparameters[-1]["max_epochs"] = 10
     with open(hyperparameters_filename, "w") as fd:
         json.dump(hyperparameters, fd)
 
@@ -153,9 +153,9 @@ def run_and_check_with_model_selection(n_jobs=1):
         result.allele_to_allele_specific_models["HLA-A*03:01"][
             0].hyperparameters["max_epochs"], 500)
 
-    #print("Deleting: %s" % models_dir1)
-    #print("Deleting: %s" % models_dir2)
-    #shutil.rmtree(models_dir1)
+    print("Deleting: %s" % models_dir1)
+    print("Deleting: %s" % models_dir2)
+    shutil.rmtree(models_dir1)
 
 
 if os.environ.get("KERAS_BACKEND") != "theano":
