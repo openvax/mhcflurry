@@ -97,6 +97,14 @@ parser.add_argument(
     metavar="N",
     help="Max number of models to select per allele when using combined selector")
 parser.add_argument(
+    "--combined-min-contribution-percent",
+    type=float,
+    default=1.0,
+    metavar="X",
+    help="Use only model selectors that can contribute at least X %% to the "
+    "total score. Default: %(default)s")
+
+parser.add_argument(
     "--mass-spec-min-measurements",
     type=int,
     metavar="N",
@@ -242,7 +250,9 @@ def run(argv=sys.argv[1:]):
     selectors = {}
     selector_to_model_selection_kwargs = {}
 
-    def make_selector(scoring):
+    def make_selector(
+            scoring,
+            combined_min_contribution_percent=args.combined_min_contribution_percent):
         if scoring in selectors:
             return (
                 selectors[scoring], selector_to_model_selection_kwargs[scoring])
@@ -258,7 +268,9 @@ def run(argv=sys.argv[1:]):
                 component_selectors.append(
                     make_selector(
                         component_selector)[0])
-            selector = CombinedModelSelector(component_selectors)
+            selector = CombinedModelSelector(
+                component_selectors,
+                min_contribution_percent=combined_min_contribution_percent)
         elif scoring == "mse":
             model_selection_kwargs = {
                 'min_models': args.mse_min_models,
@@ -301,7 +313,10 @@ def run(argv=sys.argv[1:]):
 
     unselected_accuracy_scorer = None
     if args.unselected_accuracy_scorer:
-        unselected_accuracy_scorer = make_selector(args.unselected_accuracy_scorer)[0]
+        # Force running all selectors by setting combined_min_contribution_percent=0.
+        unselected_accuracy_scorer = make_selector(
+            args.unselected_accuracy_scorer,
+            combined_min_contribution_percent=0.0)[0]
         print("Using unselected accuracy scorer: %s" % unselected_accuracy_scorer)
     GLOBAL_DATA["unselected_accuracy_scorer"] = unselected_accuracy_scorer
 
@@ -494,11 +509,12 @@ class CombinedModelSelector(object):
     """
     Model selector that computes a weighted average over other model selectors.
     """
-    def __init__(self, model_selectors, weights=None):
+    def __init__(self, model_selectors, weights=None, min_contribution_percent=1.0):
         if weights is None:
             weights = numpy.ones(shape=(len(model_selectors),))
         self.model_selectors = model_selectors
         self.selector_to_weight = dict(zip(self.model_selectors, weights))
+        self.min_contribution_percent = min_contribution_percent
 
     def usable_for_allele(self, allele):
         return any(
@@ -523,7 +539,9 @@ class CombinedModelSelector(object):
         selectors_to_use = [
             selector
             for selector in self.model_selectors
-            if selector_to_max_weighted_score[selector] > max_total_score / 100.
+            if (
+                selector_to_max_weighted_score[selector] >
+                max_total_score * self.min_contribution_percent / 100.0)
         ]
 
         summary = ", ".join([
@@ -660,7 +678,7 @@ class MSEModelSelector(object):
 
             score_mse = (1 - (deviations ** 2).mean())
             if additional_metadata_out is not None:
-                additional_metadata_out["score_MSE"] = score_mse
+                additional_metadata_out["score_MSE"] = 1 - score_mse
 
                 # We additionally include AUC scores on (=) measurements as
                 # a convenience
@@ -758,6 +776,11 @@ class MassSpecModelSelector(object):
             ppv = self.ppv(self.df[allele], predictions)
             if additional_metadata_out is not None:
                 additional_metadata_out["score_mass_spec_PPV"] = ppv
+
+                # We additionally compute AUC score.
+                additional_metadata_out["score_mass_spec_AUC"] = roc_auc_score(
+                    self.df[allele].values,
+                    (-1 * predictions).values)
             return ppv * multiplier
 
         summary = "mass-spec (%d hits / %d decoys)" % (total_hits, total_decoys)
