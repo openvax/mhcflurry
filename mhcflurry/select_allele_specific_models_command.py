@@ -12,7 +12,7 @@ from pprint import pprint
 
 import numpy
 import pandas
-from scipy.stats import kendalltau, percentileofscore
+from scipy.stats import kendalltau, percentileofscore, pearsonr
 from sklearn.metrics import roc_auc_score
 
 from mhcnames import normalize_allele_name
@@ -680,13 +680,18 @@ class MSEModelSelector(object):
             if additional_metadata_out is not None:
                 additional_metadata_out["score_MSE"] = 1 - score_mse
 
-                # We additionally include AUC scores on (=) measurements as
+                # We additionally include other scores on (=) measurements as
                 # a convenience
                 eq_df = sub_df
                 if 'measurement_inequality' in sub_df.columns:
                     eq_df = sub_df.loc[
                         sub_df.measurement_inequality == "="
                         ]
+                additional_metadata_out["score_pearsonr"] = (
+                    pearsonr(
+                        numpy.log(eq_df.measurement_value.values),
+                        numpy.log(predictions[eq_df.index.values]))[0])
+
                 for threshold in [500, 5000, 15000]:
                     if (eq_df.measurement_value < threshold).nunique() == 2:
                         additional_metadata_out["score_AUC@%d" % threshold] = (

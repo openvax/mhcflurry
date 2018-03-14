@@ -105,7 +105,7 @@ def run_and_check_with_model_selection(n_jobs=1):
         deepcopy(HYPERPARAMETERS[0]),
         deepcopy(HYPERPARAMETERS[0]),
     ]
-    hyperparameters[-1]["max_epochs"] = 10
+    hyperparameters[-1]["max_epochs"] = 0
     with open(hyperparameters_filename, "w") as fd:
         json.dump(hyperparameters, fd)
 
