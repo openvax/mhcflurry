@@ -134,7 +134,9 @@ def run_and_check_with_model_selection(n_jobs=1):
         "--out-models-dir", models_dir2,
         "--models-dir", models_dir1,
         "--num-jobs", str(n_jobs),
-        "--mse-max-models", "1"
+        "--mse-max-models", "1",
+        "--unselected-accuracy-scorer", "combined:mass-spec,mse",
+        "--unselected-accuracy-percentile-threshold", "95",
     ]
     print("Running with args: %s" % args)
     subprocess.check_call(args)

@@ -32,6 +32,14 @@ releases:
               url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_unselected.20180221.tar.bz2
               default: false
 
+            - name: models_class1_trained_with_mass_spec
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2.1/models_class1_trained_with_mass_spec.20180228.tar.bz2
+              default: false
+
+            - name: models_class1_unselected_with_mass_spec
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2.1/models_class1_unselected_with_mass_spec.20180227.tar.bz2
+              default: false
+
             - name: models_class1_minimal
               url: https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_minimal.20180226.tar.bz2
               default: false
