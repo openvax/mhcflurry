@@ -40,3 +40,28 @@ Wrote: /tmp/predictions.csv
 ```
 
 See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
+
+## MHCflurry model variants and mass spec 
+
+The default MHCflurry models are trained
+on affinity measurements. Mass spec datasets are incorporated only in
+the model selection step. We also release experimental predictors whose training data directly
+includes mass spec. To download these predictors, run:
+
+```
+$ mhcflurry-downloads fetch models_class1_trained_with_mass_spec
+```
+
+and then to make them used by default:
+
+```
+$ export MHCFLURRY_DEFAULT_CLASS1_MODELS="$(mhcflurry-downloads path models_class1_trained_with_mass_spec)/models"
+```
+
+We also release predictors that do not use mass spec datasets at all. To use
+these predictors, run:
+
+```
+$ mhcflurry-downloads fetch models_class1_selected_no_mass_spec
+export MHCFLURRY_DEFAULT_CLASS1_MODELS="$(mhcflurry-downloads path models_class1_selected_no_mass_spec)/models"
+```
