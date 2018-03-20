@@ -218,6 +218,14 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
     assert numpy.isnan(ic50_pred[2])
 
 
+def test_no_nans():
+    df = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+            alleles=["A02:01", "A02:02"],
+            peptides=["SIINFEKL", "SIINFEKLL"])
+    print(df)
+    assert not df.isnull().any().any()
+
+
 def test_predict_implementations_equivalent():
     for allele in ["HLA-A02:01", "A02:02"]:
         for centrality_measure in ["mean", "robust_mean"]:

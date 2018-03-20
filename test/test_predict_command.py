@@ -28,6 +28,7 @@ def test_csv():
         predict_command.run(full_args)
         result = pandas.read_csv(fd_out.name)
         print(result)
+        assert not result.isnull().any().any()
     finally:
         for delete in deletes:
             os.unlink(delete)

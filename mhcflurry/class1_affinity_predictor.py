@@ -1005,8 +1005,8 @@ class Class1AffinityPredictor(object):
         df["prediction"] = numpy.exp(log_centers)
 
         if include_confidence_intervals:
-            df["prediction_low"] = numpy.exp(numpy.percentile(logs, 5.0, axis=1))
-            df["prediction_high"] = numpy.exp(numpy.percentile(logs, 95.0, axis=1))
+            df["prediction_low"] = numpy.exp(numpy.nanpercentile(logs, 5.0, axis=1))
+            df["prediction_high"] = numpy.exp(numpy.nanpercentile(logs, 95.0, axis=1))
 
         if include_individual_model_predictions:
             for i in range(num_pan_models):
