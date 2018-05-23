@@ -702,7 +702,6 @@ class Class1AffinityPredictor(object):
                 progress_print_interval=progress_print_interval)
 
             model_name = self.model_name("pan-class1", i)
-            self.class1_pan_allele_models.append(model)
             row = pandas.Series(collections.OrderedDict([
                 ("model_name", model_name),
                 ("allele", "pan-class1"),
@@ -711,6 +710,7 @@ class Class1AffinityPredictor(object):
             ])).to_frame().T
             self._manifest_df = pandas.concat(
                 [self.manifest_df, row], ignore_index=True)
+            self.class1_pan_allele_models.append(model)
             if models_dir_for_save:
                 self.save(
                     models_dir_for_save, model_names_to_write=[model_name])
