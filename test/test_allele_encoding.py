@@ -55,4 +55,4 @@ def test_allele_encoding_raw_values():
             [0, 1, -1],
             [10, 11, 12],
             [0, 1, -1],
-        ], encoding1)
+        ], numpy.array(encoding1))
