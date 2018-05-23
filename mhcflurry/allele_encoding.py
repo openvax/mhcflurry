@@ -54,13 +54,9 @@ class AlleleEncoding(object):
 
         Returns
         -------
-        list of numpy arrays. Pass it to numpy.array to get an array with shape
+        numpy.array to get an array with shape
         (num sequences, sequence length, m) where m is
         vector_encoding_length(vector_encoding_name)
-
-        The reason to return a list instead of an array is that the list can
-        use much less memory in the common case where many of the rows are
-        the same.
         """
         cache_key = (
             "fixed_length_vector_encoding",
@@ -87,7 +83,7 @@ class AlleleEncoding(object):
             else:
                 # Raw values
                 vector_encoded = allele_to_fixed_length_sequence.values
-            result = [vector_encoded[i] for i in indices]
+            result = numpy.array([vector_encoded[i] for i in indices])
             self.encoding_cache[cache_key] = result
         return self.encoding_cache[cache_key]
 
