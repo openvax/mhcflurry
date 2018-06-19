@@ -37,22 +37,3 @@ def test_allele_encoding_speed():
     start = time.time()
     encoding1 = encoding.fixed_length_vector_encoded_sequences("BLOSUM62")
     print("Long encoding in %0.2f sec." % (time.time() - start))
-
-
-def test_allele_encoding_raw_values():
-    encoding = AlleleEncoding(
-        ["A*02:01", "A*02:03", "A*02:01"],
-        pandas.DataFrame(
-            [
-                [0, 1, -1],
-                [10, 11, 12],
-            ],
-            index=["A*02:01", "A*02:03"]))
-
-    encoding1 = encoding.fixed_length_vector_encoded_sequences("BLOSUM62")
-    assert_equal(
-        [
-            [0, 1, -1],
-            [10, 11, 12],
-            [0, 1, -1],
-        ], numpy.array(encoding1))

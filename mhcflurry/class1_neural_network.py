@@ -329,8 +329,8 @@ class Class1NeuralNetwork(object):
         
         Returns
         -------
-        list of numpy.array giving weights for each layer
-        or None if there is no network
+        list of numpy.array giving weights for each layer or None if there is no
+        network
         """
         self.update_network_description()
         self.load_weights()
@@ -420,7 +420,9 @@ class Class1NeuralNetwork(object):
         -------
         numpy.array
         """
-        return allele_encoding.fixed_length_vector_encoded_sequences("BLOSUM62")
+        return (
+            allele_encoding.indices,
+            allele_encoding.allele_representations("BLOSUM62"))
 
     def fit(
             self,
@@ -518,11 +520,10 @@ class Class1NeuralNetwork(object):
         x_dict_without_random_negatives = {
             'peptide': peptide_encoding,
         }
-        allele_encoding_dims = None
+        allele_representations = None
         if allele_encoding is not None:
-            allele_encoding_input = self.allele_encoding_to_network_input(
-                allele_encoding)
-            allele_encoding_dims = allele_encoding_input.shape[1:]
+            (allele_encoding_input, allele_representations) = (
+                self.allele_encoding_to_network_input(allele_encoding))
             x_dict_without_random_negatives['allele'] = allele_encoding_input
 
         # Shuffle y_values and the contents of x_dict_without_random_negatives
@@ -568,12 +569,16 @@ class Class1NeuralNetwork(object):
 
         if self.network() is None:
             self._network = self.make_network(
-                allele_encoding_dims=allele_encoding_dims,
+                allele_representations=allele_representations,
                 **self.network_hyperparameter_defaults.subselect(
                     self.hyperparameters))
-            self.network().compile(
-                loss=loss_name_or_function,
-                optimizer=self.hyperparameters['optimizer'])
+
+        if allele_representations is not None:
+            self.set_allele_representations(allele_representations)
+
+        self.network().compile(
+            loss=loss_name_or_function,
+            optimizer=self.hyperparameters['optimizer'])
 
         if self.hyperparameters['learning_rate'] is not None:
             from keras import backend as K
@@ -769,11 +774,15 @@ class Class1NeuralNetwork(object):
         x_dict = {
             'peptide': self.peptides_to_network_input(peptides)
         }
-        if allele_encoding is not None:
-            allele_input = self.allele_encoding_to_network_input(allele_encoding)
-            x_dict['allele'] = allele_input
 
-        network = self.network(borrow=True)
+        if allele_encoding is not None:
+            (allele_encoding_input, allele_representations) = (
+                self.allele_encoding_to_network_input(allele_encoding))
+            x_dict['allele'] = allele_encoding_input
+            self.set_allele_representations(allele_representations)
+            network = self.network()
+        else:
+            network = self.network(borrow=True)
         raw_predictions = network.predict(x_dict, batch_size=batch_size)
         predictions = numpy.array(raw_predictions, dtype = "float64")[:,0]
         result = to_ic50(predictions)
@@ -783,7 +792,7 @@ class Class1NeuralNetwork(object):
 
     @staticmethod
     def make_network(
-            allele_encoding_dims,
+            allele_representations,
             kmer_size,
             peptide_amino_acid_encoding,
             embedding_input_dim,
@@ -863,28 +872,36 @@ class Class1NeuralNetwork(object):
             current_layer = Dropout(dropout_probability, name="dropout_early")(
                 current_layer)
 
-        if allele_encoding_dims:
+        if allele_representations is not None:
             allele_input = Input(
-                shape=allele_encoding_dims,
+                shape=(1,),
                 dtype='float32',
                 name='allele')
             inputs.append(allele_input)
-            allele_embedding_layer = Flatten(name="allele_flat")(allele_input)
+
+            allele_representation = Embedding(
+                name="allele_representation",
+                input_dim=allele_representations.shape[0],
+                output_dim=allele_representations.shape[1],
+                input_length=1,
+                trainable=False)
+
+            allele_layer = Flatten(name="allele_flat")(allele_representation)
 
             for (i, layer_size) in enumerate(allele_dense_layer_sizes):
-                allele_embedding_layer = Dense(
+                allele_layer = Dense(
                     layer_size,
                     name="allele_dense_%d" % i,
                     kernel_regularizer=kernel_regularizer,
-                    activation=activation)(allele_embedding_layer)
+                    activation=activation)(allele_layer)
 
             if peptide_allele_merge_method == 'concatenate':
                 current_layer = keras.layers.concatenate([
-                    current_layer, allele_embedding_layer
+                    current_layer, allele_layer
                 ], name="allele_peptide_merged")
             elif peptide_allele_merge_method == 'multiply':
                 current_layer = keras.layers.multiply([
-                    current_layer, allele_embedding_layer
+                    current_layer, allele_layer
                 ], name="allele_peptide_merged")
             else:
                 raise ValueError(
@@ -921,4 +938,22 @@ class Class1NeuralNetwork(object):
             inputs=inputs,
             outputs=[output],
             name="predictor")
+
         return model
+
+    @staticmethod
+    def set_allele_representations(self, allele_representations):
+        """
+
+        Parameters
+        ----------
+        model
+        allele_representations
+
+        """
+        layer = self.network().get_layer("allele_representation")
+        (existing,) = layer.get_weights()
+        if existing.shape == allele_representations.shape:
+            layer.set_weights([allele_representations])
+        else:
+            raise NotImplementedError("Network surgery required")
