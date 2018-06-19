@@ -790,9 +790,11 @@ class Class1NeuralNetwork(object):
             self.prediction_cache[peptides] = result
         return result
 
-    @staticmethod
+    def make_allele_subnetwork(allele_sequence_layer):
+        return allele_sequence_layer
+
     def make_network(
-            allele_representations,
+            self,
             kmer_size,
             peptide_amino_acid_encoding,
             embedding_input_dim,
@@ -810,7 +812,8 @@ class Class1NeuralNetwork(object):
             dropout_probability,
             batch_normalization,
             embedding_init_method,
-            locally_connected_layers):
+            locally_connected_layers,
+            allele_representations=None):
         """
         Helper function to make a keras network for class1 affinity prediction.
         """
@@ -889,6 +892,9 @@ class Class1NeuralNetwork(object):
             allele_layer = Reshape(
                 target_shape=allele_representations.shape[1:],
                 name="allele_reshaped")(allele_representation)
+
+            allele_layer = self.make_allele_subnetwork(allele_layer)
+
             allele_layer = Flatten(name="allele_flat")(allele_layer)
 
             for (i, layer_size) in enumerate(allele_dense_layer_sizes):
