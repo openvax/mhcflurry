@@ -790,8 +790,9 @@ class Class1NeuralNetwork(object):
             self.prediction_cache[peptides] = result
         return result
 
-    def make_allele_subnetwork(allele_sequence_layer):
-        return allele_sequence_layer
+    def make_allele_subnetwork(self, allele_sequence_layer):
+        from keras.layers.core import Flatten
+        return Flatten(name="allele_flat")(allele_sequence_layer)
 
     def make_network(
             self,
@@ -894,8 +895,6 @@ class Class1NeuralNetwork(object):
                 name="allele_reshaped")(allele_representation)
 
             allele_layer = self.make_allele_subnetwork(allele_layer)
-
-            allele_layer = Flatten(name="allele_flat")(allele_layer)
 
             for (i, layer_size) in enumerate(allele_dense_layer_sizes):
                 allele_layer = Dense(
