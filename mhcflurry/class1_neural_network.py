@@ -950,12 +950,12 @@ class Class1NeuralNetwork(object):
         allele_representations
 
         """
+        reshaped = allele_representations.reshape((allele_representations.shape[0], -1))
         layer = self.network().get_layer("allele_representation")
         (existing,) = layer.get_weights()
-        if existing.shape == allele_representations.shape:
-            layer.set_weights([
-                allele_representations.reshape((allele_representations.shape[0], -1))])
+        if existing.shape == reshaped.shape:
+            layer.set_weights([reshaped])
         else:
             raise NotImplementedError(
                 "Network surgery required: %s != %s" % (
-                    str(existing.shape), str(allele_representations.shape)))
+                    str(existing.shape), str(reshaped.shape)))
