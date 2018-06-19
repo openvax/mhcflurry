@@ -884,7 +884,7 @@ class Class1NeuralNetwork(object):
                 input_dim=allele_representations.shape[0],
                 output_dim=allele_representations.shape[1],
                 input_length=1,
-                trainable=False)
+                trainable=False)(allele_input)
 
             allele_layer = Flatten(name="allele_flat")(allele_representation)
 
