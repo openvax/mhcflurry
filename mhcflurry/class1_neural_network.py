@@ -820,7 +820,7 @@ class Class1NeuralNetwork(object):
 
         from keras.layers import Input
         import keras.layers
-        from keras.layers.core import Dense, Flatten, Dropout
+        from keras.layers.core import Dense, Flatten, Reshape, Dropout
         from keras.layers.embeddings import Embedding
         from keras.layers.normalization import BatchNormalization
 
@@ -886,7 +886,10 @@ class Class1NeuralNetwork(object):
                 input_length=1,
                 trainable=False)(allele_input)
 
-            allele_layer = Flatten(name="allele_flat")(allele_representation)
+            allele_layer = Reshape(
+                target_shape=allele_representations.shape[1:],
+                name="allele_reshaped")(allele_representation)
+            allele_layer = Flatten(name="allele_flat")(allele_layer)
 
             for (i, layer_size) in enumerate(allele_dense_layer_sizes):
                 allele_layer = Dense(
