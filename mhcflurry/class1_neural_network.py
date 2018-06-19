@@ -955,4 +955,6 @@ class Class1NeuralNetwork(object):
         if existing.shape == allele_representations.shape:
             layer.set_weights([allele_representations])
         else:
-            raise NotImplementedError("Network surgery required")
+            raise NotImplementedError(
+                "Network surgery required: %s != %s" % (
+                    str(existing), str(allele_representations.shape)))
