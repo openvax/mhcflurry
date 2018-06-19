@@ -941,7 +941,6 @@ class Class1NeuralNetwork(object):
 
         return model
 
-    @staticmethod
     def set_allele_representations(self, allele_representations):
         """
 
