@@ -957,4 +957,4 @@ class Class1NeuralNetwork(object):
         else:
             raise NotImplementedError(
                 "Network surgery required: %s != %s" % (
-                    str(existing), str(allele_representations.shape)))
+                    str(existing.shape), str(allele_representations.shape)))
