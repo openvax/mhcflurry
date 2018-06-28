@@ -39,6 +39,7 @@ env:
   global:
     - PYTHONHASHSEED=0
     - MKL_THREADING_LAYER=GNU  # for theano
+    - CUDA_VISIBLE_DEVICES=""  # for tensorflow
   matrix:
     - KERAS_BACKEND=theano
     - KERAS_BACKEND=tensorflow
