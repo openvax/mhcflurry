@@ -12,7 +12,7 @@ and [Python library](http://openvax.github.io/mhcflurry/python_tutorial.html) in
 
 If you find MHCflurry useful in your research please cite:
 
-> O'Donnell, T. et al., 2017. MHCflurry: open-source class I MHC binding affinity prediction. bioRxiv. Available at: http://www.biorxiv.org/content/early/2017/08/09/174243.
+> T. J. O’Donnell, A. Rubinsteyn, M. Bonsack, A. B. Riemer, U. Laserson, and J. Hammerbacher, "MHCflurry: Open-Source Class I MHC Binding Affinity Prediction," *Cell Systems*, 2018. Available at: https://www.cell.com/cell-systems/fulltext/S2405-4712(18)30232-1.
 
 ## Installation (pip)
 
