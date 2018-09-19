@@ -25,6 +25,7 @@ from .regression_target import to_ic50
 from .version import __version__
 from .ensemble_centrality import CENTRALITY_MEASURES
 from .allele_encoding import AlleleEncoding
+from .allele_encoding_transforms import TRANSFORMS as ALLELE_ENCODING_TRANSFORMS
 
 
 # Default function for combining predictions across models in an ensemble.
@@ -46,6 +47,7 @@ class Class1AffinityPredictor(object):
             allele_to_allele_specific_models=None,
             class1_pan_allele_models=None,
             allele_to_sequence=None,
+            allele_encoding_transforms=None,
             manifest_df=None,
             allele_to_percent_rank_transform=None,
             metadata_dataframes=None):
@@ -80,8 +82,9 @@ class Class1AffinityPredictor(object):
         if class1_pan_allele_models is None:
             class1_pan_allele_models = []
 
-
         self.allele_to_sequence = allele_to_sequence
+        self.allele_encoding_transforms = (
+            allele_encoding_transforms if allele_encoding_transforms else {})
         self.master_allele_encoding = None
         if class1_pan_allele_models:
             assert self.allele_to_sequence
@@ -350,6 +353,7 @@ class Class1AffinityPredictor(object):
                     metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
                     df.to_csv(metadata_df_path, index=False, compression="bz2")
 
+        # Save allele sequences
         if self.allele_to_sequence is not None:
             allele_to_sequence_df = pandas.DataFrame(
                 list(self.allele_to_sequence.items()),
@@ -358,6 +362,18 @@ class Class1AffinityPredictor(object):
             allele_to_sequence_df.to_csv(
                 join(models_dir, "allele_sequences.csv"), index=False)
             logging.info("Wrote: %s" % join(models_dir, "allele_sequences.csv"))
+
+        # Save allele encoding transforms
+        for transform in self.allele_encoding_transforms.values():
+            if transform.is_fit():
+                fit_data = transform.get_fit()
+                assert set(fit_data) == set(transform.serialization_keys)
+                for (serialization_key, fit_df) in fit_data.items():
+                    csv_path = join(
+                        models_dir,
+                        "%s.%s.csv" % (transform.name, serialization_key))
+                    fit_df.to_csv(csv_path)
+                    logging.info("Wrote: %s" % csv_path)
 
         if self.allele_to_percent_rank_transform:
             percent_ranks_df = None
@@ -419,11 +435,36 @@ class Class1AffinityPredictor(object):
 
         manifest_df["model"] = all_models
 
+        # Load allele sequences
         allele_to_fixed_length_sequence = None
         if exists(join(models_dir, "allele_sequences.csv")):
             allele_to_fixed_length_sequence = pandas.read_csv(
                 join(models_dir, "allele_sequences.csv"),
                 index_col="allele").to_dict()
+
+        # Load allele encoding transforms
+        allele_encoding_transforms = {}
+        for transform_name in ALLELE_ENCODING_TRANSFORMS:
+            klass = ALLELE_ENCODING_TRANSFORMS[transform_name]
+            transform = klass()
+            restored_fit = {}
+            for serialization_key in klass.serialization_keys:
+                csv_path = join(
+                    models_dir,
+                    "%s.%s.csv" % (transform_name, serialization_key))
+                if exists(csv_path):
+                    restored_fit[serialization_key] = pandas.read_csv(
+                        csv_path, index_col=0)
+            if restored_fit:
+                if set(restored_fit) != set(klass.serialization_keys):
+                    logging.warning(
+                        "Missing some allele encoding transform serialization "
+                        "data from %s. Found: %s. Expected: %s." % (
+                            models_dir,
+                            str(set(restored_fit)),
+                            str(set(klass.serialization_keys))))
+                transform.restore_fit(restored_fit)
+            allele_encoding_transforms[transform_name] = transform
 
         allele_to_percent_rank_transform = {}
         percent_ranks_path = join(models_dir, "percent_ranks.csv")
@@ -494,7 +535,8 @@ class Class1AffinityPredictor(object):
                     self.master_allele_encoding.allele_to_sequence !=
                     self.allele_to_sequence):
             self.master_allele_encoding = AlleleEncoding(
-                allele_to_sequence=self.allele_to_sequence)
+                allele_to_sequence=self.allele_to_sequence,
+                transforms=self.allele_encoding_transforms)
         return self.master_allele_encoding
 
     def fit_allele_specific_predictors(
