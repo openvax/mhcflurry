@@ -30,6 +30,7 @@ class Class1NeuralNetwork(object):
     network_hyperparameter_defaults = HyperparameterDefaults(
         kmer_size=15,
         peptide_amino_acid_encoding="BLOSUM62",
+        allele_amino_acid_encoding="BLOSUM62",
         embedding_input_dim=21,
         embedding_output_dim=8,
         allele_dense_layer_sizes=[],
@@ -418,11 +419,12 @@ class Class1NeuralNetwork(object):
 
         Returns
         -------
-        numpy.array
+        (numpy.array, numpy.array)
         """
         return (
             allele_encoding.indices,
-            allele_encoding.allele_representations("BLOSUM62"))
+            allele_encoding.allele_representations(
+                self.hyperparameters['allele_amino_acid_encoding']))
 
     def fit(
             self,
@@ -790,13 +792,10 @@ class Class1NeuralNetwork(object):
             self.prediction_cache[peptides] = result
         return result
 
-    def make_allele_subnetwork(self, allele_sequence_layer):
-        from keras.layers.core import Flatten
-        return Flatten(name="allele_flat")(allele_sequence_layer)
-
     def make_network(
             self,
             kmer_size,
+            allele_amino_acid_encoding,
             peptide_amino_acid_encoding,
             embedding_input_dim,
             embedding_output_dim,
@@ -883,18 +882,12 @@ class Class1NeuralNetwork(object):
                 name='allele')
             inputs.append(allele_input)
 
-            allele_representation = Embedding(
+            allele_layer = Embedding(
                 name="allele_representation",
                 input_dim=allele_representations.shape[0],
-                output_dim=allele_representations.shape[1] * allele_representations.shape[2],
+                output_dim=numpy.product(allele_representations.shape[1:], dtype=int),
                 input_length=1,
                 trainable=False)(allele_input)
-
-            allele_layer = Reshape(
-                target_shape=allele_representations.shape[1:],
-                name="allele_reshaped")(allele_representation)
-
-            allele_layer = self.make_allele_subnetwork(allele_layer)
 
             for (i, layer_size) in enumerate(allele_dense_layer_sizes):
                 allele_layer = Dense(
