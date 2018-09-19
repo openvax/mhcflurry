@@ -31,7 +31,7 @@ install:
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
       numpy scipy nose pandas matplotlib mkl-service tensorflow theano
   - source activate test-environment
-  - pip install pypandoc pylint
+  - pip install pypandoc pylint tensorflow
   - pip install -r requirements.txt
   - pip install .
   - pip install coveralls
