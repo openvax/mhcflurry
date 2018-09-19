@@ -25,13 +25,13 @@ class AlleleEncodingTransform(object):
 
         Parameters
         ----------
-        fit : string to DataFrame
+        fit : string to array
         """
 
 
 class PCATransform(AlleleEncodingTransform):
     name = 'pca'
-    serialization_keys = ['data']
+    serialization_keys = ['mean', 'components']
 
     def __init__(self):
         self.model = None
@@ -51,19 +51,15 @@ class PCATransform(AlleleEncodingTransform):
         print("Fit complete in %0.3f sec." % (time.time() - start))
 
     def get_fit(self):
-        df = pandas.DataFrame(self.model.components_)
-        df.columns = ["pca_%s" % c for c in df.columns]
-        df["mean"] = self.model.mean_
         return {
-            'data': df
+            'mean': self.model.mean_,
+            'components': self.model.components_,
         }
 
     def restore_fit(self, fit):
-        assert list(fit) == ['data']
-        data = fit["data"]
         self.model = sklearn.decomposition.PCA()
-        self.model.mean_ = data["mean"].values
-        self.model.components_ = data.drop(columns="mean").values
+        self.model.mean_ = fit["mean"]
+        self.model.components_ = fit["components"]
 
     def transform(self, allele_representations):
         if not self.is_fit():
