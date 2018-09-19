@@ -368,12 +368,9 @@ class Class1AffinityPredictor(object):
             if transform.is_fit():
                 fit_data = transform.get_fit()
                 assert set(fit_data) == set(transform.serialization_keys)
-                for (serialization_key, fit_df) in fit_data.items():
-                    csv_path = join(
-                        models_dir,
-                        "%s.%s.csv" % (transform.name, serialization_key))
-                    fit_df.to_csv(csv_path)
-                    logging.info("Wrote: %s" % csv_path)
+                target_path = join(models_dir, "%s.npz" % transform.name)
+                numpy.savez(target_path, **fit_data)
+                logging.info("Wrote: %s" % target_path)
 
         if self.allele_to_percent_rank_transform:
             percent_ranks_df = None
@@ -447,15 +444,11 @@ class Class1AffinityPredictor(object):
         for transform_name in ALLELE_ENCODING_TRANSFORMS:
             klass = ALLELE_ENCODING_TRANSFORMS[transform_name]
             transform = klass()
-            restored_fit = {}
-            for serialization_key in klass.serialization_keys:
-                csv_path = join(
-                    models_dir,
-                    "%s.%s.csv" % (transform_name, serialization_key))
-                if exists(csv_path):
-                    restored_fit[serialization_key] = pandas.read_csv(
-                        csv_path, index_col=0)
-            if restored_fit:
+            target_path = join(models_dir, "%s.npz" % transform_name)
+            if exists(target_path):
+                with numpy.load(target_path) as loaded:
+                    restored_fit = dict(
+                        (key, loaded[key]) for key in loaded.keys())
                 if set(restored_fit) != set(klass.serialization_keys):
                     logging.warning(
                         "Missing some allele encoding transform serialization "
@@ -1116,12 +1109,11 @@ class Class1AffinityPredictor(object):
         ----------
         list of array
         """
-        loaded = numpy.load(filename)
-        weights = [
-            loaded["array_%d" % i]
-            for i in range(len(loaded.keys()))
-        ]
-        loaded.close()
+        with numpy.load(filename) as loaded:
+            weights = [
+                loaded["array_%d" % i]
+                for i in range(len(loaded.keys()))
+            ]
         return weights
 
     def calibrate_percentile_ranks(
