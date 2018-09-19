@@ -435,6 +435,7 @@ class Class1NeuralNetwork(object):
             sample_weights=None,
             shuffle_permutation=None,
             verbose=1,
+            progress_callback=None,
             progress_preamble="",
             progress_print_interval=5.0):
         """
@@ -739,6 +740,9 @@ class Class1NeuralNetwork(object):
                                     min_val_loss_iteration)).strip())
                         break
 
+            if progress_callback:
+                progress_callback()
+
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = len(peptides)
         self.fit_info.append(dict(fit_info))
@@ -823,7 +827,7 @@ class Class1NeuralNetwork(object):
 
         from keras.layers import Input
         import keras.layers
-        from keras.layers.core import Dense, Flatten, Reshape, Dropout
+        from keras.layers.core import Dense, Flatten, Dropout
         from keras.layers.embeddings import Embedding
         from keras.layers.normalization import BatchNormalization
 
