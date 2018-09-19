@@ -58,6 +58,7 @@ if __name__ == '__main__':
         'mhcnames',
         'pyyaml',
         'tqdm',
+        'np_utils',
     ]
     if PY2:
         # concurrent.futures is a standard library in Py3 but Py2

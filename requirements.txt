@@ -8,3 +8,4 @@ scikit-learn
 mhcnames
 pyyaml
 tqdm
+np_utils
