@@ -1,3 +1,5 @@
+from six import callable
+
 import pandas
 
 from . import amino_acid
@@ -72,7 +74,10 @@ class AlleleEncoding(object):
             "allele_representations",
             encoding_name)
         if cache_key not in self.encoding_cache:
-            if ":" in encoding_name:
+            if callable(encoding_name):
+                vector_encoded = encoding_name(self)
+                assert len(vector_encoded)== len(self.allele_to_sequence)
+            elif ":" in encoding_name:
                 # Apply transform
                 (transform_name, rest) = encoding_name.split(":", 2)
                 preliminary_encoded = self.allele_representations(rest)
