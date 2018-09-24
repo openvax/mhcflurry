@@ -816,7 +816,8 @@ class Class1AffinityPredictor(object):
             alleles=None,
             allele=None,
             throw=True,
-            centrality_measure=DEFAULT_CENTRALITY_MEASURE):
+            centrality_measure=DEFAULT_CENTRALITY_MEASURE,
+            model_kwargs={}):
         """
         Predict nM binding affinities.
         
@@ -840,6 +841,8 @@ class Class1AffinityPredictor(object):
         centrality_measure : string or callable
             Measure of central tendency to use to combine predictions in the
             ensemble. Options include: mean, median, robust_mean.
+        model_kwargs : dict
+            Additional keyword arguments to pass to Class1NeuralNetwork.predict
 
         Returns
         -------
@@ -853,6 +856,7 @@ class Class1AffinityPredictor(object):
             include_percentile_ranks=False,
             include_confidence_intervals=False,
             centrality_measure=centrality_measure,
+            model_kwargs=model_kwargs
         )
         return df.prediction.values
 
@@ -865,7 +869,8 @@ class Class1AffinityPredictor(object):
             include_individual_model_predictions=False,
             include_percentile_ranks=True,
             include_confidence_intervals=True,
-            centrality_measure=DEFAULT_CENTRALITY_MEASURE):
+            centrality_measure=DEFAULT_CENTRALITY_MEASURE,
+            model_kwargs={}):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
@@ -897,6 +902,8 @@ class Class1AffinityPredictor(object):
         centrality_measure : string or callable
             Measure of central tendency to use to combine predictions in the
             ensemble. Options include: mean, median, robust_mean.
+        model_kwargs : dict
+            Additional keyword arguments to pass to Class1NeuralNetwork.predict
 
         Returns
         -------
@@ -1002,7 +1009,8 @@ class Class1AffinityPredictor(object):
                 for (i, model) in enumerate(self.class1_pan_allele_models):
                     predictions_array[mask, i] = model.predict(
                         masked_peptides,
-                        allele_encoding=masked_allele_encoding)
+                        allele_encoding=masked_allele_encoding,
+                        **model_kwargs)
 
         if self.allele_to_allele_specific_models:
             unsupported_alleles = [
@@ -1031,7 +1039,7 @@ class Class1AffinityPredictor(object):
                     # Common case optimization
                     for (i, model) in enumerate(models):
                         predictions_array[:, num_pan_models + i] = (
-                            model.predict(peptides))
+                            model.predict(peptides, **model_kwargs))
                 elif mask.sum() > 0:
                     peptides_for_allele = EncodableSequences.create(
                         df.ix[mask].peptide.values)
@@ -1039,7 +1047,7 @@ class Class1AffinityPredictor(object):
                         predictions_array[
                             mask,
                             num_pan_models + i,
-                        ] = model.predict(peptides_for_allele)
+                        ] = model.predict(peptides_for_allele, **model_kwargs)
 
         if callable(centrality_measure):
             centrality_function = centrality_measure

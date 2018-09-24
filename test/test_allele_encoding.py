@@ -47,7 +47,8 @@ def test_pca():
             "A*02:03": "AE",
         }
     )
-    encoded1 = encoding.fixed_length_vector_encoded_sequences("pca:BLOSUM62")
+    encoded1 = encoding.fixed_length_vector_encoded_sequences(
+        "transform:pca:BLOSUM62")
 
     numpy.testing.assert_array_equal(encoded1[0], encoded1[2])
     assert not numpy.array_equal(encoded1[0], encoded1[1])
