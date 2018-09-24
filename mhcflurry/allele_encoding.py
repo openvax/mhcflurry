@@ -74,13 +74,16 @@ class AlleleEncoding(object):
             "allele_representations",
             encoding_name)
         if cache_key not in self.encoding_cache:
-            if callable(encoding_name):
-                vector_encoded = encoding_name(self)
-                assert len(vector_encoded)== len(self.allele_to_sequence)
-            elif ":" in encoding_name:
-                # Apply transform
-                (transform_name, rest) = encoding_name.split(":", 2)
-                preliminary_encoded = self.allele_representations(rest)
+            if ":" in encoding_name:
+                # Transform
+                pieces = encoding_name.split(":", 3)
+                if pieces[0] != "transform":
+                    raise RuntimeError(
+                        "Expected 'transform' but saw: %s" % pieces[0])
+                if len(pieces) == 1:
+                    raise RuntimeError("Expected: 'transform:<name>[:argument]")
+                transform_name = pieces[1]
+                argument = None if len(pieces) == 2 else pieces[2]
                 try:
                     transform = self.transforms[transform_name]
                 except KeyError:
@@ -88,8 +91,9 @@ class AlleleEncoding(object):
                         "Unsupported transform: %s. Supported transforms: %s" % (
                             transform_name,
                             " ".join(self.transforms) if self.transforms else "(none)"))
-
-                vector_encoded = transform.transform(preliminary_encoded)
+                vector_encoded = (
+                    transform.transform(self) if argument is None
+                    else transform.transform(self, argument))
             else:
                 # No transform.
                 index_encoded_matrix = amino_acid.index_encoding(

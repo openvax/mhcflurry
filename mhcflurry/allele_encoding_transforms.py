@@ -5,7 +5,7 @@ import sklearn.decomposition
 
 
 class AlleleEncodingTransform(object):
-    def transform(self, data):
+    def transform(self, allele_encoding, argument=None):
         raise NotImplementedError()
 
     def get_fit(self):
@@ -61,7 +61,9 @@ class PCATransform(AlleleEncodingTransform):
         self.model.mean_ = fit["mean"]
         self.model.components_ = fit["components"]
 
-    def transform(self, allele_representations):
+    def transform(self, allele_encoding, underlying_representation):
+        allele_representations = allele_encoding.allele_representations(
+            underlying_representation)
         if not self.is_fit():
             self.fit(allele_representations)
         flattened = allele_representations.reshape(
