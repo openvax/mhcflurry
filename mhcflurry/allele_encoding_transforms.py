@@ -27,6 +27,7 @@ class AlleleEncodingTransform(object):
         ----------
         fit : string to array
         """
+        pass
 
 
 class PCATransform(AlleleEncodingTransform):
