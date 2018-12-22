@@ -144,7 +144,7 @@ def run(argv=sys.argv[1:]):
     configure_logging(verbose=args.verbosity > 1)
 
     hyperparameters_lst = yaml.load(open(args.hyperparameters))
-    assert isinstance(hyperparameters_lst, list)
+    assert isinstance(hyperparameters_lst, list), hyperparameters_lst
     print("Loaded hyperparameters list: %s" % str(hyperparameters_lst))
 
     df = pandas.read_csv(args.data)
@@ -171,8 +171,8 @@ def run(argv=sys.argv[1:]):
         ].index)
 
     # Allele names in data are assumed to be already normalized.
+    print("Selected %d/%d alleles: %s" % (len(alleles), df.allele.nunique(), ' '.join(alleles)))
     df = df.loc[df.allele.isin(alleles)].dropna()
-    print("Selected %d alleles: %s" % (len(alleles), ' '.join(alleles)))
 
     if args.held_out_fraction_reciprocal:
         df = subselect_df_held_out(
@@ -227,6 +227,7 @@ def run(argv=sys.argv[1:]):
             allele_sequences = allele_sequences.loc[
                 allele_sequences.index.isin(df.allele.unique())
             ]
+            print("Allele sequences matching train data: %d" % len(allele_sequences))
             blosum_encoding = (
                 AlleleEncoding(
                     allele_sequences.index.values,
@@ -377,7 +378,6 @@ def train_model(
         alleles = []
         while not alleles or data_size_by_allele.loc[alleles].sum() < pretrain_min_points:
             alleles.append(similar_alleles.pop(0))
-        print(alleles)
         data = data.loc[data.allele.isin(alleles)]
         assert len(data) >= pretrain_min_points, (len(data), pretrain_min_points)
         train_rounds = (data.allele == allele).astype(int).values
