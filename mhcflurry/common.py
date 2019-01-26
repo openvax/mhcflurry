@@ -12,7 +12,7 @@ import pandas
 from . import amino_acid
 
 
-def set_keras_backend(backend=None, gpu_device_nums=None):
+def set_keras_backend(backend=None, gpu_device_nums=None, num_threads=None):
     """
     Configure Keras backend to use GPU or CPU. Only tensorflow is supported.
 
@@ -23,6 +23,9 @@ def set_keras_backend(backend=None, gpu_device_nums=None):
 
     gpu_device_nums : list of int, optional
         GPU devices to potentially use
+
+    num_threads : int, optional
+        Tensorflow threads to use
 
     """
     os.environ["KERAS_BACKEND"] = "tensorflow"
@@ -49,9 +52,11 @@ def set_keras_backend(backend=None, gpu_device_nums=None):
 
     import tensorflow
     from keras import backend as K
-    config = tensorflow.ConfigProto(
-        device_count=device_count)
-    config.gpu_options.allow_growth=True 
+    config = tensorflow.ConfigProto(device_count=device_count)
+    config.gpu_options.allow_growth = True
+    if num_threads:
+        config.inter_op_parallelism_threads = num_threads
+        config.intra_op_parallelism_threads = num_threads
     session = tensorflow.Session(config=config)
     K.set_session(session)
 
