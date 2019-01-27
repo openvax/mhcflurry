@@ -136,7 +136,7 @@ def make_worker_pool(
         issue we add a second 'backup queue'. This queue always contains the
         full set of initializer arguments: whenever a worker reads from it, it
         always pushes the pop'd args back to the end of the queue immediately.
-        If the primary arg queue is every empty, then workers will read
+        If the primary arg queue is ever empty, then workers will read
         from this backup queue.
 
     Parameters

@@ -33,6 +33,7 @@ import logging
 
 import pandas
 
+from .common import set_keras_backend
 from .downloads import get_default_class1_models_dir
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .version import __version__
@@ -68,7 +69,7 @@ helper_args.add_argument(
     version="mhcflurry %s" % __version__,
 )
 
-input_args = parser.add_argument_group(title="Required input arguments")
+input_args = parser.add_argument_group(title="Input (required)")
 input_args.add_argument(
     "input",
     metavar="INPUT.csv",
@@ -86,7 +87,7 @@ input_args.add_argument(
     help="Peptides to predict (exclusive with --input)")
 
 
-input_mod_args = parser.add_argument_group(title="Optional input modifiers")
+input_mod_args = parser.add_argument_group(title="Input options")
 input_mod_args.add_argument(
     "--allele-column",
     metavar="NAME",
@@ -104,7 +105,7 @@ input_mod_args.add_argument(
     help="Return NaNs for unsupported alleles or peptides instead of raising")
 
 
-output_args = parser.add_argument_group(title="Optional output modifiers")
+output_args = parser.add_argument_group(title="Output options")
 output_args.add_argument(
     "--out",
     metavar="OUTPUT.csv",
@@ -119,25 +120,38 @@ output_args.add_argument(
     metavar="CHAR",
     default=",",
     help="Delimiter character for results. Default: '%(default)s'")
-
-
-model_args = parser.add_argument_group(title="Optional model settings")
-model_args.add_argument(
-    "--models",
-    metavar="DIR",
-    default=None,
-    help="Directory containing models. "
-    "Default: %s" % get_default_class1_models_dir(test_exists=False))
-model_args.add_argument(
+output_args.add_argument(
     "--include-individual-model-predictions",
     action="store_true",
     default=False,
     help="Include predictions from each model in the ensemble"
 )
 
+model_args = parser.add_argument_group(title="Model options")
+model_args.add_argument(
+    "--models",
+    metavar="DIR",
+    default=None,
+    help="Directory containing models. "
+    "Default: %s" % get_default_class1_models_dir(test_exists=False))
+
+implementation_args = parser.add_argument_group(title="Implementation options")
+implementation_args.add_argument(
+    "--backend",
+    choices=("tensorflow-gpu", "tensorflow-cpu", "tensorflow-default"),
+    help="Keras backend. If not specified will use system default.")
+implementation_args.add_argument(
+    "--threads",
+    metavar="N",
+    type=int,
+    help="Num threads for tensorflow to use. If unspecified, tensorflow will "
+    "pick a value based on the number of cores.")
+
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
+
+    set_keras_backend(backend=args.backend, num_threads=args.threads)
 
     # It's hard to pass a tab in a shell, so we correct a common error:
     if args.output_delimiter == "\\t":
