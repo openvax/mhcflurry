@@ -3,8 +3,7 @@ import collections
 import logging
 import sys
 import os
-from struct import unpack
-from hashlib import sha256
+import warnings
 
 import numpy
 import pandas
@@ -52,13 +51,18 @@ def set_keras_backend(backend=None, gpu_device_nums=None, num_threads=None):
 
     import tensorflow
     from keras import backend as K
-    config = tensorflow.ConfigProto(device_count=device_count)
-    config.gpu_options.allow_growth = True
-    if num_threads:
-        config.inter_op_parallelism_threads = num_threads
-        config.intra_op_parallelism_threads = num_threads
-    session = tensorflow.Session(config=config)
-    K.set_session(session)
+    if K.backend() == 'tensorflow':
+        config = tensorflow.ConfigProto(device_count=device_count)
+        config.gpu_options.allow_growth = True
+        if num_threads:
+            config.inter_op_parallelism_threads = num_threads
+            config.intra_op_parallelism_threads = num_threads
+        session = tensorflow.Session(config=config)
+        K.set_session(session)
+    else:
+        warnings.warn(
+            "Only tensorflow backend can be customized. Ignoring customization."
+            "Backend: %s" % K.backend())
 
 
 def configure_logging(verbose=False):
