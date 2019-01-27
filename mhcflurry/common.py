@@ -29,6 +29,8 @@ def set_keras_backend(backend=None, gpu_device_nums=None, num_threads=None):
     """
     os.environ["KERAS_BACKEND"] = "tensorflow"
 
+    original_backend = backend
+
     if not backend:
         backend = "tensorflow-default"
 
@@ -60,9 +62,10 @@ def set_keras_backend(backend=None, gpu_device_nums=None, num_threads=None):
         session = tensorflow.Session(config=config)
         K.set_session(session)
     else:
-        warnings.warn(
-            "Only tensorflow backend can be customized. Ignoring customization."
-            "Backend: %s" % K.backend())
+        if original_backend or gpu_device_nums or num_threads:
+            warnings.warn(
+                "Only tensorflow backend can be customized. Ignoring "
+                " customization. Backend: %s" % K.backend())
 
 
 def configure_logging(verbose=False):
