@@ -45,7 +45,7 @@ AMINO_ACID_INDEX = dict(
 
 AMINO_ACIDS = list(COMMON_AMINO_ACIDS_WITH_UNKNOWN.keys())
 
-BLOSUM62_MATRIX = pandas.read_table(StringIO("""
+BLOSUM62_MATRIX = pandas.read_csv(StringIO("""
    A  R  N  D  C  Q  E  G  H  I  L  K  M  F  P  S  T  W  Y  V  X
 A  4 -1 -2 -2  0 -1 -1  0 -2 -1 -1 -1 -1 -2 -1  1  0 -3 -2  0  0
 R -1  5  0 -2 -3  1  0 -2  0 -3 -2  2 -1 -3 -2 -1 -1 -3 -2 -3  0
