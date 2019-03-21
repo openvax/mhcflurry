@@ -38,9 +38,9 @@ class AlleleEncoding(object):
         if self.borrow_from is None:
             assert allele_to_sequence is not None
             all_alleles = (
-                sorted(allele_to_sequence)
-                if alleles is None
-                else list(sorted(alleles.unique())))
+                sorted(allele_to_sequence))
+                #if alleles is None
+                #else list(sorted(alleles.unique())))
             self.allele_to_index = dict(
                 (allele, i)
                 for (i, allele) in enumerate(all_alleles))
@@ -58,7 +58,9 @@ class AlleleEncoding(object):
 
         if alleles is not None:
             assert all(
-                allele in self.allele_to_index for allele in alleles)
+                allele in self.allele_to_index for allele in alleles),\
+                "Missing alleles: " + " ".join([
+                    a for a in alleles if a not in self.allele_to_index])
             self.indices = alleles.map(self.allele_to_index)
             assert not self.indices.isnull().any()
         else:
