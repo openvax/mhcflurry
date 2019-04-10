@@ -50,7 +50,7 @@ def get_downloads_metadata():
     """
     global _METADATA
     if _METADATA is None:
-        _METADATA = yaml.load(resource_string(__name__, "downloads.yml"))
+        _METADATA = yaml.safe_load(resource_string(__name__, "downloads.yml"))
     return _METADATA
 
 

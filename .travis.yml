@@ -34,7 +34,6 @@ install:
   - pip install tensorflow pypandoc pylint
   - pip install -r requirements.txt
   - pip install .
-  - pip install coveralls
 env:
   global:
     - PYTHONHASHSEED=0
@@ -47,6 +46,5 @@ script:
   # download data and models, then run tests
   - mhcflurry-downloads fetch
   - mhcflurry-downloads info  # just to test this command works
-  - nosetests test -sv --with-coverage --cover-package=mhcflurry  && ./lint.sh
-after_success:
-  coveralls
+  - nosetests test -sv
+  - ./lint.sh
