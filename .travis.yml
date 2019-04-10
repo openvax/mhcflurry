@@ -29,12 +29,12 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib mkl-service theano
+      numpy scipy nose pandas matplotlib mkl-service 
   - source activate test-environment
-  - pip install tensorflow pypandoc pylint
+  - pip install tensorflow pypandoc pylint 'theano>=1.0.4'
   - pip install -r requirements.txt
   - pip install .
-  - pip install coveralls
+  - pip freeze
 env:
   global:
     - PYTHONHASHSEED=0
@@ -47,6 +47,5 @@ script:
   # download data and models, then run tests
   - mhcflurry-downloads fetch
   - mhcflurry-downloads info  # just to test this command works
-  - nosetests test -sv --with-coverage --cover-package=mhcflurry  && ./lint.sh
-after_success:
-  coveralls
+  - nosetests test -sv
+  - ./lint.sh
