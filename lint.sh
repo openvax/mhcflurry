@@ -10,6 +10,6 @@ set -o errexit
 find . -name '*.py' -not -path "./docs/*" \
   | xargs pylint \
   --errors-only \
-  --disable=unsubscriptable-object,not-an-iterable,no-member
+  --disable=unsubscriptable-object,not-an-iterable,no-member,assignment-from-no-return
 
 echo 'Passes pylint check'
