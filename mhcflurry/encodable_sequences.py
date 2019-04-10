@@ -132,7 +132,12 @@ class EncodableSequences(object):
 
     @classmethod
     def sequences_to_fixed_length_index_encoded_array(
-            klass, sequences, left_edge=4, right_edge=4, max_length=15):
+            klass,
+            sequences,
+            alignment_method="pad_middle",
+            left_edge=4,
+            right_edge=4,
+            max_length=15):
         """
         Transform a sequence of strings, where each string is of length at least
         left_edge + right_edge and at most max_length into strings of length
@@ -161,63 +166,69 @@ class EncodableSequences(object):
         -------
         numpy array of shape (len(sequences), max_length) and dtype int
         """
+        result = None
+        if alignment_method == 'pad_middle':
+            # Result array is int32, filled with X (null amino acid) value.
+            result = numpy.full(
+                fill_value=amino_acid.AMINO_ACID_INDEX['X'],
+                shape=(len(sequences), max_length),
+                dtype="int32")
 
-        # Result array is int32, filled with X (null amino acid) value.
-        result = numpy.full(
-            fill_value=amino_acid.AMINO_ACID_INDEX['X'],
-            shape=(len(sequences), max_length),
-            dtype="int32")
+            df = pandas.DataFrame({"peptide": sequences})
+            df["length"] = df.peptide.str.len()
 
-        df = pandas.DataFrame({"peptide": sequences})
-        df["length"] = df.peptide.str.len()
+            middle_length = max_length - left_edge - right_edge
 
-        middle_length = max_length - left_edge - right_edge
+            # For efficiency we handle each supported peptide length using bulk
+            # array operations.
+            for (length, sub_df) in df.groupby("length"):
+                if length < left_edge + right_edge:
+                    raise ValueError(
+                        "Sequence '%s' (length %d) unsupported: length must be at "
+                        "least %d. There are %d total peptides with this length." % (
+                            sub_df.iloc[0].peptide, length, left_edge + right_edge,
+                            len(sub_df)))
+                if length > max_length:
+                    raise ValueError(
+                        "Sequence '%s' (length %d) unsupported: length must be at "
+                        "most %d. There are %d total peptides with this length." % (
+                            sub_df.iloc[0].peptide, length, max_length,
+                            len(sub_df)))
 
-        # For efficiency we handle each supported peptide length using bulk
-        # array operations.
-        for (length, sub_df) in df.groupby("length"):
-            if length < left_edge + right_edge:
-                raise ValueError(
-                    "Sequence '%s' (length %d) unsupported: length must be at "
-                    "least %d. There are %d total peptides with this length." % (
-                        sub_df.iloc[0].peptide, length, left_edge + right_edge,
-                        len(sub_df)))
-            if length > max_length:
-                raise ValueError(
-                    "Sequence '%s' (length %d) unsupported: length must be at "
-                    "most %d. There are %d total peptides with this length." % (
-                        sub_df.iloc[0].peptide, length, max_length,
-                        len(sub_df)))
+                # Array of shape (num peptides, length) giving fixed-length amino
+                # acid encoding each peptide of the current length.
+                fixed_length_sequences = numpy.stack(
+                    sub_df.peptide.map(
+                        lambda s: numpy.array([
+                            amino_acid.AMINO_ACID_INDEX[char] for char in s
+                        ])).values)
 
-            # Array of shape (num peptides, length) giving fixed-length amino
-            # acid encoding each peptide of the current length.
-            fixed_length_sequences = numpy.stack(
-                sub_df.peptide.map(
-                    lambda s: numpy.array([
-                        amino_acid.AMINO_ACID_INDEX[char] for char in s
-                    ])).values)
+                num_null = max_length - length
+                num_null_left = int(math.ceil(num_null / 2))
+                num_middle_filled = middle_length - num_null
+                middle_start = left_edge + num_null_left
 
-            num_null = max_length - length
-            num_null_left = int(math.ceil(num_null / 2))
-            num_middle_filled = middle_length - num_null
-            middle_start = left_edge + num_null_left
+                # Set left edge
+                result[sub_df.index, :left_edge] = fixed_length_sequences[
+                    :, :left_edge
+                ]
 
-            # Set left edge
-            result[sub_df.index, :left_edge] = fixed_length_sequences[
-                :, :left_edge
-            ]
+                # Set middle.
+                result[
+                    sub_df.index,
+                    middle_start : middle_start + num_middle_filled
+                ] = fixed_length_sequences[
+                    :, left_edge : left_edge + num_middle_filled
+                ]
 
-            # Set middle.
-            result[
-                sub_df.index,
-                middle_start : middle_start + num_middle_filled
-            ] = fixed_length_sequences[
-                :, left_edge : left_edge + num_middle_filled
-            ]
-
-            # Set right edge.
-            result[
-                sub_df.index,
-                -right_edge:
-            ] = fixed_length_sequences[:, -right_edge:]
+                # Set right edge.
+                result[
+                    sub_df.index,
+                    -right_edge:
+                ] = fixed_length_sequences[:, -right_edge:]
+        elif alignment_method == "left_pad_right_pad":
+            raise NotImplementedError
+        else:
+            raise NotImplementedError(
+                "Unsupported alignment method: %s" % alignment_method)
         return result
