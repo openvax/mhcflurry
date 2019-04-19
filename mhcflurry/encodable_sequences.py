@@ -51,7 +51,11 @@ class EncodableSequences(object):
         return len(self.sequences)
 
     def variable_length_to_fixed_length_categorical(
-            self, left_edge=4, right_edge=4, max_length=15):
+            self,
+            alignment_method="pad_middle",
+            left_edge=4,
+            right_edge=4,
+            max_length=15):
         """
         Encode variable-length sequences using a fixed-length encoding designed
         for preserving the anchor positions of class I peptides.
@@ -80,6 +84,7 @@ class EncodableSequences(object):
             fixed_length_sequences = (
                 self.sequences_to_fixed_length_index_encoded_array(
                     self.sequences,
+                    alignment_method=alignment_method,
                     left_edge=left_edge,
                     right_edge=right_edge,
                     max_length=max_length))
@@ -87,7 +92,12 @@ class EncodableSequences(object):
         return self.encoding_cache[cache_key]
 
     def variable_length_to_fixed_length_vector_encoding(
-            self, vector_encoding_name, left_edge=4, right_edge=4, max_length=15):
+            self,
+            vector_encoding_name,
+            alignment_method="pad_middle",
+            left_edge=4,
+            right_edge=4,
+            max_length=15):
         """
         Encode variable-length sequences using a fixed-length encoding designed
         for preserving the anchor positions of class I peptides.
@@ -120,6 +130,7 @@ class EncodableSequences(object):
             fixed_length_sequences = (
                 self.sequences_to_fixed_length_index_encoded_array(
                     self.sequences,
+                    alignment_method=alignment_method,
                     left_edge=left_edge,
                     right_edge=right_edge,
                     max_length=max_length))
@@ -227,7 +238,27 @@ class EncodableSequences(object):
                     -right_edge:
                 ] = fixed_length_sequences[:, -right_edge:]
         elif alignment_method == "left_pad_right_pad":
-            raise NotImplementedError
+            # Result array is int32, filled with X (null amino acid) value.
+            result = numpy.full(fill_value=amino_acid.AMINO_ACID_INDEX['X'],
+                shape=(len(sequences), max_length * 2), dtype="int32")
+
+            df = pandas.DataFrame({"peptide": sequences})
+
+            # For efficiency we handle each supported peptide length using bulk
+            # array operations.
+            for (length, sub_df) in df.groupby(df.peptide.str.len()):
+                # Array of shape (num peptides, length) giving fixed-length amino
+                # acid encoding each peptide of the current length.
+                fixed_length_sequences = numpy.stack(sub_df.peptide.map(
+                    lambda s: numpy.array(
+                        [amino_acid.AMINO_ACID_INDEX[char] for char in
+                            s])).values)
+
+                # Set left edge
+                result[sub_df.index, :length] = fixed_length_sequences
+
+                # Set right edge.
+                result[sub_df.index, -length:] = fixed_length_sequences
         else:
             raise NotImplementedError(
                 "Unsupported alignment method: %s" % alignment_method)
