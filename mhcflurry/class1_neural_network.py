@@ -9,7 +9,7 @@ import pandas
 
 from .hyperparameters import HyperparameterDefaults
 
-from .encodable_sequences import EncodableSequences
+from .encodable_sequences import EncodableSequences, EncodingError
 from .amino_acid import available_vector_encodings, vector_encoding_length
 from .regression_target import to_ic50, from_ic50
 from .common import random_peptides, amino_acid_distribution
@@ -28,12 +28,15 @@ class Class1NeuralNetwork(object):
     """
 
     network_hyperparameter_defaults = HyperparameterDefaults(
-        kmer_size=15,
-        peptide_amino_acid_encoding="BLOSUM62",
         allele_amino_acid_encoding="BLOSUM62",
-        embedding_input_dim=21,
-        embedding_output_dim=8,
         allele_dense_layer_sizes=[],
+        peptide_encoding={
+            'vector_encoding_name': 'BLOSUM62',
+            'alignment_method': 'pad_middle',
+            'left_edge': 4,
+            'right_edge': 4,
+            'max_length': 15,
+        },
         peptide_dense_layer_sizes=[],
         peptide_allele_merge_method="multiply",
         peptide_allele_merge_activation="",
@@ -45,7 +48,6 @@ class Class1NeuralNetwork(object):
         output_activation="sigmoid",
         dropout_probability=0.0,
         batch_normalization=False,
-        embedding_init_method="glorot_uniform",
         locally_connected_layers=[
             {
                 "filters": 8,
@@ -67,15 +69,6 @@ class Class1NeuralNetwork(object):
     """
     Loss and optimizer hyperparameters. Any values supported by keras may be
     used.
-    """
-
-    input_encoding_hyperparameter_defaults = HyperparameterDefaults(
-        alignment_method="pad_middle",
-        left_edge=4,
-        right_edge=4)
-    """
-    Number of amino acid residues that are given fixed positions on the each
-    side in the variable length encoding.
     """
 
     fit_hyperparameter_defaults = HyperparameterDefaults(
@@ -110,7 +103,6 @@ class Class1NeuralNetwork(object):
 
     hyperparameter_defaults = network_hyperparameter_defaults.extend(
         compile_hyperparameter_defaults).extend(
-        input_encoding_hyperparameter_defaults).extend(
         fit_hyperparameter_defaults).extend(
         early_stopping_hyperparameter_defaults).extend(
         miscelaneous_hyperparameter_defaults
@@ -132,6 +124,13 @@ class Class1NeuralNetwork(object):
         "verbose": None,
         "mode": None,
         "take_best_epoch": None,
+        'kmer_size': None,
+        'peptide_amino_acid_encoding': None,
+        'embedding_input_dim': None,
+        'embedding_output_dim': None,
+        'embedding_init_method': None,
+        'left_edge': None,
+        'right_edge': None,
     }
 
     @classmethod
@@ -375,22 +374,8 @@ class Class1NeuralNetwork(object):
         numpy.array
         """
         encoder = EncodableSequences.create(peptides)
-        if (self.hyperparameters['peptide_amino_acid_encoding'] == "embedding"):
-            encoded = encoder.variable_length_to_fixed_length_categorical(
-                max_length=self.hyperparameters['kmer_size'],
-                **self.input_encoding_hyperparameter_defaults.subselect(
-                    self.hyperparameters))
-        elif (
-                self.hyperparameters['peptide_amino_acid_encoding'] in
-                    available_vector_encodings()):
-            encoded = encoder.variable_length_to_fixed_length_vector_encoding(
-                self.hyperparameters['peptide_amino_acid_encoding'],
-                max_length=self.hyperparameters['kmer_size'],
-                **self.input_encoding_hyperparameter_defaults.subselect(
-                    self.hyperparameters))
-        else:
-            raise ValueError("Unsupported peptide_amino_acid_encoding: %s" %
-                             self.hyperparameters['peptide_amino_acid_encoding'])
+        encoded = encoder.variable_length_to_fixed_length_vector_encoding(
+            **self.hyperparameters['peptide_encoding'])
         assert len(encoded) == len(peptides)
         return encoded
 
@@ -404,10 +389,16 @@ class Class1NeuralNetwork(object):
         (int, int) tuple
 
         """
-        return (
-            self.hyperparameters['left_edge'] +
-            self.hyperparameters['right_edge'],
-        self.hyperparameters['kmer_size'])
+        # We currently have an arbitrary hard floor of 5, even if the underlying
+        # peptide encoding supports smaller lengths.
+        #
+        # We empirically find the supported peptide lengths based on the
+        # lengths for which peptides_to_network_input throws ValueError.
+        try:
+            self.peptides_to_network_input([""])
+        except EncodingError as e:
+            return e.supported_peptide_lengths
+        raise RuntimeError("peptides_to_network_input did not raise")
 
     def allele_encoding_to_network_input(self, allele_encoding):
         """
@@ -799,11 +790,8 @@ class Class1NeuralNetwork(object):
 
     def make_network(
             self,
-            kmer_size,
+            peptide_encoding,
             allele_amino_acid_encoding,
-            peptide_amino_acid_encoding,
-            embedding_input_dim,
-            embedding_output_dim,
             allele_dense_layer_sizes,
             peptide_dense_layer_sizes,
             peptide_allele_merge_method,
@@ -816,7 +804,6 @@ class Class1NeuralNetwork(object):
             output_activation,
             dropout_probability,
             batch_normalization,
-            embedding_init_method,
             locally_connected_layers,
             allele_representations=None):
         """
@@ -832,23 +819,12 @@ class Class1NeuralNetwork(object):
         from keras.layers.embeddings import Embedding
         from keras.layers.normalization import BatchNormalization
 
-        if peptide_amino_acid_encoding == "embedding":
-            peptide_input = Input(
-                shape=(kmer_size,), dtype='int32', name='peptide')
-            current_layer = Embedding(
-                input_dim=embedding_input_dim,
-                output_dim=embedding_output_dim,
-                input_length=kmer_size,
-                embeddings_initializer=embedding_init_method,
-                name="peptide_embedding")(peptide_input)
-        else:
-            peptide_input = Input(
-                shape=(
-                    kmer_size,
-                    vector_encoding_length(peptide_amino_acid_encoding)),
-                dtype='float32',
-                name='peptide')
-            current_layer = peptide_input
+        peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
+        peptide_input = Input(
+            shape=peptide_encoding_shape,
+            dtype='float32',
+            name='peptide')
+        current_layer = peptide_input
 
         inputs = [peptide_input]
 
