@@ -70,6 +70,7 @@ class Class1NeuralNetwork(object):
     """
 
     input_encoding_hyperparameter_defaults = HyperparameterDefaults(
+        alignment_method="pad_middle",
         left_edge=4,
         right_edge=4)
     """
