@@ -76,6 +76,7 @@ class EncodableSequences(object):
 
         cache_key = (
             "fixed_length_categorical",
+            alignment_method,
             left_edge,
             right_edge,
             max_length)
@@ -123,6 +124,7 @@ class EncodableSequences(object):
         cache_key = (
             "fixed_length_vector_encoding",
             vector_encoding_name,
+            alignment_method,
             left_edge,
             right_edge,
             max_length)
