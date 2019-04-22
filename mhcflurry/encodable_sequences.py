@@ -13,6 +13,14 @@ import pandas
 from . import amino_acid
 
 
+class EncodingError(ValueError):
+    def __init__(self, message, supported_peptide_lengths):
+        self.supported_peptide_lengths = supported_peptide_lengths
+        ValueError.__init__(
+            self,
+            message + " Supported lengths: %s - %s." % supported_peptide_lengths)
+
+
 class EncodableSequences(object):
     """
     Sequences of amino acids.
@@ -36,7 +44,7 @@ class EncodableSequences(object):
         if not all(isinstance(obj, string_types) for obj in sequences):
             raise ValueError("Sequence of strings is required")
         self.sequences = numpy.array(sequences)
-        lengths = pandas.Series(self.sequences).str.len()
+        lengths = pandas.Series(self.sequences, dtype=numpy.object_).str.len()
 
         self.min_length = lengths.min()
         self.max_length = lengths.max()
@@ -187,26 +195,23 @@ class EncodableSequences(object):
                 shape=(len(sequences), max_length),
                 dtype="int32")
 
-            df = pandas.DataFrame({"peptide": sequences})
+            df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
             df["length"] = df.peptide.str.len()
 
             middle_length = max_length - left_edge - right_edge
+            min_length = left_edge + right_edge
 
             # For efficiency we handle each supported peptide length using bulk
             # array operations.
             for (length, sub_df) in df.groupby("length"):
-                if length < left_edge + right_edge:
-                    raise ValueError(
-                        "Sequence '%s' (length %d) unsupported: length must be at "
-                        "least %d. There are %d total peptides with this length." % (
-                            sub_df.iloc[0].peptide, length, left_edge + right_edge,
-                            len(sub_df)))
-                if length > max_length:
-                    raise ValueError(
-                        "Sequence '%s' (length %d) unsupported: length must be at "
-                        "most %d. There are %d total peptides with this length." % (
-                            sub_df.iloc[0].peptide, length, max_length,
-                            len(sub_df)))
+                if length < min_length or length > max_length:
+                    raise EncodingError(
+                        "Sequence '%s' (length %d) unsupported. There are %d "
+                        "total peptides with this length." % (
+                            sub_df.iloc[0].peptide,
+                            length,
+                            len(sub_df)), supported_peptide_lengths=(
+                                min_length, max_length))
 
                 # Array of shape (num peptides, length) giving fixed-length amino
                 # acid encoding each peptide of the current length.
@@ -240,17 +245,30 @@ class EncodableSequences(object):
                     -right_edge:
                 ] = fixed_length_sequences[:, -right_edge:]
         elif alignment_method == "left_pad_right_pad":
+            # We arbitrarily set a minimum length of 5, although this encoding
+            # could handle smaller peptides.
+            min_length = 5
+
             # Result array is int32, filled with X (null amino acid) value.
             result = numpy.full(fill_value=amino_acid.AMINO_ACID_INDEX['X'],
                 shape=(len(sequences), max_length * 2), dtype="int32")
 
-            df = pandas.DataFrame({"peptide": sequences})
+            df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
 
             # For efficiency we handle each supported peptide length using bulk
             # array operations.
             for (length, sub_df) in df.groupby(df.peptide.str.len()):
-                # Array of shape (num peptides, length) giving fixed-length amino
-                # acid encoding each peptide of the current length.
+                if length < min_length or length > max_length:
+                    raise EncodingError(
+                        "Sequence '%s' (length %d) unsupported. There are %d "
+                        "total peptides with this length." % (
+                            sub_df.iloc[0].peptide,
+                            length,
+                            len(sub_df)), supported_peptide_lengths=(
+                                min_length, max_length))
+
+                # Array of shape (num peptides, length) giving fixed-length
+                # amino acid encoding each peptide of the current length.
                 fixed_length_sequences = numpy.stack(sub_df.peptide.map(
                     lambda s: numpy.array(
                         [amino_acid.AMINO_ACID_INDEX[char] for char in
