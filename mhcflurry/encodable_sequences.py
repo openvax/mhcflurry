@@ -279,6 +279,50 @@ class EncodableSequences(object):
 
                 # Set right edge.
                 result[sub_df.index, -length:] = fixed_length_sequences
+        elif alignment_method == "left_pad_centered_right_pad":
+            # We arbitrarily set a minimum length of 5, although this encoding
+            # could handle smaller peptides.
+            min_length = 5
+
+            # Result array is int32, filled with X (null amino acid) value.
+            result = numpy.full(fill_value=amino_acid.AMINO_ACID_INDEX['X'],
+                shape=(len(sequences), max_length * 3), dtype="int32")
+
+            df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
+
+            # For efficiency we handle each supported peptide length using bulk
+            # array operations.
+            for (length, sub_df) in df.groupby(df.peptide.str.len()):
+                if length < min_length or length > max_length:
+                    raise EncodingError(
+                        "Sequence '%s' (length %d) unsupported. There are %d "
+                        "total peptides with this length." % (
+                            sub_df.iloc[0].peptide,
+                            length,
+                            len(sub_df)), supported_peptide_lengths=(
+                                min_length, max_length))
+
+                # Array of shape (num peptides, length) giving fixed-length
+                # amino acid encoding each peptide of the current length.
+                fixed_length_sequences = numpy.stack(sub_df.peptide.map(
+                    lambda s: numpy.array(
+                        [amino_acid.AMINO_ACID_INDEX[char] for char in
+                            s])).values)
+
+                # Set left edge
+                result[sub_df.index, :length] = fixed_length_sequences
+
+                # Set right edge.
+                result[sub_df.index, -length:] = fixed_length_sequences
+
+                # Set center.
+                center_left_padding = int(
+                    math.floor((max_length - length) / 2))
+                center_left_offset = max_length + center_left_padding
+                result[
+                    sub_df.index,
+                    center_left_offset : center_left_offset + length
+                ] = fixed_length_sequences
         else:
             raise NotImplementedError(
                 "Unsupported alignment method: %s" % alignment_method)
