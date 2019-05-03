@@ -146,32 +146,33 @@ def run():
         print(allele_sequences_to_differentiate.shape)
 
         additional_positions = []
-        for (pseudo, sub_df) in allele_sequences_to_differentiate.groupby("recapitulated"):
+        for (_, sub_df) in allele_sequences_to_differentiate.groupby("recapitulated"):
             if sub_df.aligned.nunique() > 1:
                 differing = pandas.DataFrame(
                     dict([(pos, chars) for (pos, chars) in
                     enumerate(zip(*sub_df.aligned.values)) if
                     any(c != chars[0] for c in chars) and "X" not in chars])).T
-                print(pseudo)
                 print(sub_df)
                 print(differing)
                 print()
                 additional_positions.extend(differing.index)
 
     additional_positions = sorted(set(additional_positions))
-    print("Selected additional positions: ", additional_positions)
+    print(
+        "Selected %d additional positions: " % len(additional_positions),
+        additional_positions)
 
     extended_selected_positions = sorted(
         set(selected_positions).union(set(additional_positions)))
-    print("Extended selected positions", *extended_selected_positions)
+    print(
+        "Extended selected positions (%d)" % len(extended_selected_positions),
+        *extended_selected_positions)
 
     allele_sequences["sequence"] = allele_sequences.aligned.map(
         lambda s: "".join(s[p] for p in extended_selected_positions))
 
     allele_sequences[["sequence"]].to_csv(args.out_csv, index=True)
     print("Wrote: %s" % args.out_csv)
-
-    import ipdb ; ipdb.set_trace()
 
 
 if __name__ == '__main__':
