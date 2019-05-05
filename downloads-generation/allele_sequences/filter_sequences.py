@@ -51,6 +51,7 @@ class_ii_names = {
     "DOB",
 }
 
+
 def run():
     args = parser.parse_args(sys.argv[1:])
     print(args)
@@ -64,7 +65,15 @@ def run():
             total += 1
             name = record.description.split()[1]
             normalized = normalize(name)
+            if not normalized and "," in record.description:
+                # Try parsing uniprot-style sequence description
+                name = (
+                    record.description.split()[1].replace("-", "") +
+                    "-" +
+                    record.description.split(",")[-1].split()[0].replace("-",""))
+                normalized = normalize(name)
             if not normalized:
+                print("Couldn't parse: ", name)
                 continue
             if normalized in seen:
                 continue
@@ -72,12 +81,13 @@ def run():
                 print("Dropping", name)
                 continue
             seen.add(normalized)
+            record.description = normalized + " " + record.description
             records.append(record)
 
     with open(args.out, "w") as fd:
         Bio.SeqIO.write(records, fd, "fasta")
 
-    print("Wrote %d / %d sequences" % (len(records), total))
+    print("Wrote %d / %d sequences: %s" % (len(records), total, args.out))
 
 
 if __name__ == '__main__':
