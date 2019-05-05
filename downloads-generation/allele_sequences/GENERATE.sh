@@ -42,15 +42,31 @@ TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.wi
 bzcat "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
     | cut -f 1 -d , | uniq | sort | uniq | grep -v allele > training_data.alleles.txt
 
+# Human
 wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/fasta/A_prot.fasta
 wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/fasta/B_prot.fasta
 wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/fasta/C_prot.fasta
 wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/fasta/E_prot.fasta
 wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/fasta/F_prot.fasta
 wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/fasta/G_prot.fasta
-wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/mhc/MHC_prot.fasta
 
-wget -q https://www.uniprot.org/uniprot/P01899.fasta  # H-2
+# Mouse
+wget -q https://www.uniprot.org/uniprot/P01899.fasta  # H-2 Db
+wget -q https://www.uniprot.org/uniprot/P01900.fasta  # H-2 Dd
+wget -q https://www.uniprot.org/uniprot/P14427.fasta  # H-2 Dp
+wget -q https://www.uniprot.org/uniprot/P14426.fasta  # H-2 Dk
+wget -q https://www.uniprot.org/uniprot/Q31145.fasta  # H-2 Dq
+
+wget -q https://www.uniprot.org/uniprot/P01901.fasta  # H-2 Kb
+wget -q https://www.uniprot.org/uniprot/P01902.fasta  # H-2 Kd
+wget -q https://www.uniprot.org/uniprot/P04223.fasta  # H-2 Kk
+wget -q https://www.uniprot.org/uniprot/P14428.fasta  # H-2 Kq
+
+wget -q https://www.uniprot.org/uniprot/P01897.fasta  # H-2 Ld
+wget -q https://www.uniprot.org/uniprot/Q31151.fasta  # H-2 Lq
+
+# Various
+wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/mhc/MHC_prot.fasta
 
 python filter_sequences.py *.fasta --out class1.fasta
 
