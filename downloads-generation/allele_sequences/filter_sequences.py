@@ -67,10 +67,14 @@ def run():
             normalized = normalize(name)
             if not normalized and "," in record.description:
                 # Try parsing uniprot-style sequence description
-                name = (
-                    record.description.split()[1].replace("-", "") +
-                    "-" +
-                    record.description.split(",")[-1].split()[0].replace("-",""))
+                if "MOUSE MHC class I L-q alpha-chain" in record.description:
+                    # Special case.
+                    name = "H2-Lq"
+                else: 
+                    name = (
+                        record.description.split()[1].replace("-", "") +
+                        "-" +
+                        record.description.split(",")[-1].split()[0].replace("-",""))
                 normalized = normalize(name)
             if not normalized:
                 print("Couldn't parse: ", name)

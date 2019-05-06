@@ -62,7 +62,8 @@ def run():
     allele_to_sequence = {}
     reader = Bio.SeqIO.parse(args.aligned_fasta, "fasta")
     for record in reader:
-        name = record.description.split()[0]
+        name = record.description.split()[1]
+        print(record.name, record.description)
         allele_to_sequence[name] = str(record.seq)
 
     print("Read %d aligned sequences" % len(allele_to_sequence))
