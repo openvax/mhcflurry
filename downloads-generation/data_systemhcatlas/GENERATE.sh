@@ -26,9 +26,22 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-wget --quiet https://github.com/openvax/mhcflurry/releases/download/pre-1.1/systemhc.20171121.combined.csv.bz2
+wget -q https://systemhcatlas.org/Builds_for_download/180409_master_final.tgz
+mkdir extracted
+tar -xvzf *.tgz -C extracted
+wc -l extracted/*/*.csv
 
-mv systemhc.20171121.combined.csv.bz2 data.csv.bz2
+# Write header line
+cat extracted/*/*.csv | head -n 1 > data.csv
+
+# Write concatenated data
+grep -v SysteMHC_ID extracted/*/*.csv >> data.csv
+
+# Cleanup
+rm -rf extracted *.tgz
+ls -lh data.csv
+wc -l data.csv
+bzip2 data.csv
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
