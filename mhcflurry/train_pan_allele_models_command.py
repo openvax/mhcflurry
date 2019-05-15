@@ -118,6 +118,11 @@ parser.add_argument(
     type=int,
     help="Keras verbosity. Default: %(default)s",
     default=0)
+parser.add_argument(
+    "--debug",
+    action="store_true",
+    default=False,
+    help="Launch python debugger on error")
 
 add_worker_pool_args(parser)
 
@@ -192,14 +197,27 @@ def pretrain_data_iterator(
 
         yield (allele_encoding, encodable_peptides, df.stack().values)
 
-def run(argv=sys.argv[1:]):
-    global GLOBAL_DATA
 
+def run(argv=sys.argv[1:]):
     # On sigusr1 print stack trace
     print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
     signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
 
     args = parser.parse_args(argv)
+
+    if args.debug:
+        try:
+            return main(args)
+        except Exception as e:
+            print(e)
+            import ipdb ; ipdb.set_trace()
+            raise
+    else:
+        return main(args)
+
+
+def main(args):
+    global GLOBAL_DATA
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
 
@@ -225,6 +243,15 @@ def run(argv=sys.argv[1:]):
 
     df = df.loc[df.allele.isin(allele_sequences.index)]
     print("Subselected to alleles with sequences: %s" % (str(df.shape)))
+
+    print("Data inequalities:")
+    print(df.measurement_inequality.value_counts())
+    df.measurement_inequality = df.measurement_inequality.map(lambda s: {
+        ">=": ">", "<=": "<"
+    }.get(s, s))
+
+    print("Data inequalities after adjustment:")
+    print(df.measurement_inequality.value_counts())
 
     if args.ignore_inequalities and "measurement_inequality" in df.columns:
         print("Dropping measurement_inequality column")
@@ -484,10 +511,5 @@ def train_model(
 
 
 if __name__ == '__main__':
-    try:
-        run()
-    except Exception as e:
-        print(e)
-        import ipdb ; ipdb.set_trace()
-        raise
+    run()
 
