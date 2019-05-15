@@ -567,6 +567,8 @@ class Class1NeuralNetwork(object):
                 allele_representations=allele_representations,
                 **self.network_hyperparameter_defaults.subselect(
                     self.hyperparameters))
+            if verbose > 0:
+                self.network().summary()
 
         if allele_representations is not None:
             self.set_allele_representations(allele_representations)
@@ -852,10 +854,6 @@ class Class1NeuralNetwork(object):
             current_layer = BatchNormalization(name="batch_norm_early")(
                 current_layer)
 
-        if dropout_probability:
-            current_layer = Dropout(dropout_probability, name="dropout_early")(
-                current_layer)
-
         if allele_representations is not None:
             allele_input = Input(
                 shape=(1,),
@@ -876,6 +874,8 @@ class Class1NeuralNetwork(object):
                     name="allele_dense_%d" % i,
                     kernel_regularizer=kernel_regularizer,
                     activation=activation)(allele_layer)
+
+            allele_layer = Flatten(name="allele_flat")(allele_layer)
 
             if peptide_allele_merge_method == 'concatenate':
                 current_layer = keras.layers.concatenate([
@@ -904,12 +904,13 @@ class Class1NeuralNetwork(object):
                 name="dense_%d" % i)(current_layer)
 
             if batch_normalization:
-                current_layer = BatchNormalization(name="batch_norm_%d" % i)\
-                    (current_layer)
+                current_layer = BatchNormalization(
+                    name="batch_norm_%d" % i)(current_layer)
 
             if dropout_probability > 0:
                 current_layer = Dropout(
-                    dropout_probability, name="dropout_%d" % i)(current_layer)
+                    rate=1 - dropout_probability,
+                    name="dropout_%d" % i)(current_layer)
 
         output = Dense(
             1,

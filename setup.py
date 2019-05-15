@@ -79,6 +79,8 @@ if __name__ == '__main__':
                 'mhcflurry-predict = mhcflurry.predict_command:run',
                 'mhcflurry-class1-train-allele-specific-models = '
                     'mhcflurry.train_allele_specific_models_command:run',
+                'mhcflurry-class1-train-pan-allele-models = '
+                    'mhcflurry.train_pan_allele_models_command:run',
                 'mhcflurry-class1-select-allele-specific-models = '
                     'mhcflurry.select_allele_specific_models_command:run',
                 'mhcflurry-calibrate-percentile-ranks = '

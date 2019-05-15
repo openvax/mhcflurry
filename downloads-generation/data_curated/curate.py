@@ -35,11 +35,6 @@ parser.add_argument(
     default=[],
     help="Path to systemhc-atlas-style mass-spec data")
 parser.add_argument(
-    "--data-abelin-mass-spec",
-    action="append",
-    default=[],
-    help="Path to Abelin Immunity 2017 mass-spec hits")
-parser.add_argument(
     "--include-iedb-mass-spec",
     action="store_true",
     default=False,
@@ -120,29 +115,6 @@ def load_data_systemhc_atlas(filename, min_probability=0.99):
     return df
 
 
-def load_data_abelin_mass_spec(filename):
-    df = pandas.read_csv(filename)
-    print("Loaded Abelin mass-spec data: %s" % str(df.shape))
-
-    df["measurement_source"] = "abelin-mass-spec"
-    df["measurement_value"] = QUALITATIVE_TO_AFFINITY["Positive"]
-    df["measurement_inequality"] = "<"
-    df["measurement_type"] = "qualitative"
-    df["original_allele"] = df.allele
-    df["allele"] = df.original_allele.map(normalize_allele_name)
-
-    print("Dropping un-parseable alleles: %s" % ", ".join(
-        str(x) for x in df.ix[df.allele == "UNKNOWN"]["allele"].unique()))
-    df = df.loc[df.allele != "UNKNOWN"]
-    print("Abelin mass-spec data now: %s" % str(df.shape))
-
-    print("Removing duplicates")
-    df = df.drop_duplicates(["allele", "peptide"])
-    print("Abelin mass-spec data now: %s" % str(df.shape))
-
-    return df
-
-
 def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
     iedb_df = pandas.read_csv(iedb_csv, skiprows=1, low_memory=False)
     print("Loaded iedb data: %s" % str(iedb_df.shape))
@@ -171,10 +143,12 @@ def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
 
     quantitative = iedb_df.ix[iedb_df["Units"] == "nM"].copy()
     quantitative["measurement_type"] = "quantitative"
-    quantitative["measurement_inequality"] = "="
+    quantitative["measurement_inequality"] = quantitative[
+        "Measurement Inequality"
+    ].fillna("=")
     print("Quantitative measurements: %d" % len(quantitative))
 
-    qualitative = iedb_df.ix[iedb_df["Units"] != "nM"].copy()
+    qualitative = iedb_df.ix[iedb_df["Units"].isnull()].copy()
     qualitative["measurement_type"] = "qualitative"
     print("Qualitative measurements: %d" % len(qualitative))
     if not include_mass_spec:
@@ -255,9 +229,6 @@ def run():
         dfs.append(df)
     for filename in args.data_systemhc_atlas:
         df = load_data_systemhc_atlas(filename)
-        dfs.append(df)
-    for filename in args.data_abelin_mass_spec:
-        df = load_data_abelin_mass_spec(filename)
         dfs.append(df)
 
     df = pandas.concat(dfs, ignore_index=True)
