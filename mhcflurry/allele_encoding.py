@@ -59,8 +59,8 @@ class AlleleEncoding(object):
         if alleles is not None:
             assert all(
                 allele in self.allele_to_index for allele in alleles),\
-                "Missing alleles: " + " ".join([
-                    a for a in alleles if a not in self.allele_to_index])
+                "Missing alleles: " + " ".join(set(
+                    a for a in alleles if a not in self.allele_to_index))
             self.indices = alleles.map(self.allele_to_index)
             assert not self.indices.isnull().any()
         else:

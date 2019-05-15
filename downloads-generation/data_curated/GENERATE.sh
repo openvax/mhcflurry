@@ -46,8 +46,6 @@ time python curate.py \
         "$(mhcflurry-downloads path data_published)/bdata.20130222.mhci.public.1.txt" \
     --data-systemhc-atlas \
         "$(mhcflurry-downloads path data_systemhcatlas)/data.csv.bz2" \
-    --data-abelin-mass-spec \
-        "$(mhcflurry-downloads path data_published)/abelin2017.hits.csv.bz2" \
     --include-iedb-mass-spec \
     --out-csv curated_training_data.with_mass_spec.csv
 

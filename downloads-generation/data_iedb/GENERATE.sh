@@ -22,10 +22,16 @@ date
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-wget --quiet http://www.iedb.org/doc/mhc_ligand_full.zip
+wget -q http://www.iedb.org/doc/mhc_ligand_full.zip
+wget -q http://www.iedb.org/downloader.php?file_name=doc/tcell_full_v3.zip -O tcell_full_v3.zip
+
 unzip mhc_ligand_full.zip
 rm mhc_ligand_full.zip
 bzip2 mhc_ligand_full.csv
+
+unzip tcell_full_v3.zip
+rm tcell_full_v3.zip
+bzip2 tcell_full_v3.csv
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
