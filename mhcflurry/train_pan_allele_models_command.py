@@ -219,6 +219,9 @@ def run(argv=sys.argv[1:]):
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
+    
+    df = df.loc[~df.measurement_value.isnull()]
+    print("Dropped NaNs: %s" % (str(df.shape)))
 
     df = df.loc[df.allele.isin(allele_sequences.index)]
     print("Subselected to alleles with sequences: %s" % (str(df.shape)))
@@ -362,7 +365,7 @@ def train_model(
         num_replicates,
         hyperparameters,
         pretrain_data_filename,
-        pretrain_patience=20,
+        pretrain_patience=1,
         verbose=None,
         progress_print_interval=None,
         predictor=None,
