@@ -8,6 +8,7 @@ import sys
 import time
 import traceback
 import random
+import pprint
 from functools import partial
 
 import numpy
@@ -206,7 +207,8 @@ def run(argv=sys.argv[1:]):
 
     hyperparameters_lst = yaml.load(open(args.hyperparameters))
     assert isinstance(hyperparameters_lst, list)
-    print("Loaded hyperparameters list: %s" % str(hyperparameters_lst))
+    print("Loaded hyperparameters list:")
+    pprint.pprint(hyperparameters_lst)
 
     allele_sequences = pandas.read_csv(
         args.allele_sequences, index_col=0).sequence
@@ -461,10 +463,10 @@ def train_model(
     model.fit(
         train_peptides,
         train_data.measurement_value,
+        allele_encoding=train_alleles,
         inequalities=(
             train_data.measurement_inequality.values
             if "measurement_inequality" in train_data.columns else None),
-        models_dir_for_save=save_to,
         progress_preamble=progress_preamble,
         progress_print_interval=progress_print_interval,
         verbose=verbose)
