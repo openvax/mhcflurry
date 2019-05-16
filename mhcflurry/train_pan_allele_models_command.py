@@ -291,6 +291,10 @@ def main(args):
         if args.max_epochs:
             hyperparameters['max_epochs'] = args.max_epochs
 
+        if hyperparameters.get("train_data", {}).get("pretrain", False):
+            if not args.pretrain_data:
+                raise ValueError("--pretrain-data is required")
+
         for fold in range(args.ensemble_size):
             for replicate in range(args.num_replicates):
                 work_dict = {
@@ -386,11 +390,10 @@ def train_model(
         num_replicates,
         hyperparameters,
         pretrain_data_filename,
-        pretrain_patience=1,
-        verbose=None,
-        progress_print_interval=None,
-        predictor=None,
-        save_to=None):
+        verbose,
+        progress_print_interval,
+        predictor,
+        save_to):
 
     if predictor is None:
         predictor = Class1AffinityPredictor()
@@ -424,7 +427,7 @@ def train_model(
             replicate_num + 1,
             num_replicates))
 
-    if pretrain_data_filename:
+    if hyperparameters.get("train_data", {}).get("pretrain", False):
         iterator = pretrain_data_iterator(pretrain_data_filename, allele_encoding)
         original_hyperparameters = dict(model.hyperparameters)
         model.hyperparameters['minibatch_size'] = int(len(next(iterator)[-1]) / 100)
@@ -432,6 +435,7 @@ def train_model(
         model.hyperparameters['validation_split'] = 0.0
         model.hyperparameters['random_negative_rate'] = 0.0
         model.hyperparameters['random_negative_constant'] = 0
+        pretrain_patience = hyperparameters["train_data"]["pretrain_patience"]
         scores = []
         best_score = float('inf')
         best_score_epoch = 0

@@ -39,7 +39,11 @@ base_hyperparameters = {
     'random_negative_distribution_smoothing': 0.0,
     'random_negative_match_distribution': True,
     'random_negative_rate': 0.2,
-    'train_data': {},
+    'train_data': {
+        'pretrain': True,
+        'pretrain_peptides_per_epoch': 1024,
+        'pretrain_patience': 10,
+    },
     'validation_split': 0.1,
 }
 
