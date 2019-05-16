@@ -246,12 +246,6 @@ def main(args):
 
     print("Data inequalities:")
     print(df.measurement_inequality.value_counts())
-    df.measurement_inequality = df.measurement_inequality.map(lambda s: {
-        ">=": ">", "<=": "<"
-    }.get(s, s))
-
-    print("Data inequalities after adjustment:")
-    print(df.measurement_inequality.value_counts())
 
     if args.ignore_inequalities and "measurement_inequality" in df.columns:
         print("Dropping measurement_inequality column")

@@ -145,7 +145,7 @@ def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
     quantitative["measurement_type"] = "quantitative"
     quantitative["measurement_inequality"] = quantitative[
         "Measurement Inequality"
-    ].fillna("=")
+    ].fillna("=").map(lambda s: {">=": ">", "<=": "<"}.get(s, s))
     print("Quantitative measurements: %d" % len(quantitative))
 
     qualitative = iedb_df.ix[iedb_df["Units"].isnull()].copy()
