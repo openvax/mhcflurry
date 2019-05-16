@@ -42,13 +42,15 @@ time mhcflurry-class1-train-pan-allele-models \
     --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
     --ensemble-size 4 \
     --hyperparameters hyperparameters.yaml \
-    --out-models-dir models \
+    --out-models-dir models-unselected \
 
 
     #--num-jobs $(expr $PROCESSORS \* 2) --gpus $GPUS --max-workers-per-gpu 2 --max-tasks-per-worker 50
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
-tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
+tar -cjf "../${DOWNLOAD_NAME}.with_unselected.tar.bz2" *
+echo "Created archive: $SCRATCH_DIR/${DOWNLOAD_NAME}.with_unselected.tar.bz2"
 
-echo "Created archive: $SCRATCH_DIR/$DOWNLOAD_NAME.tar.bz2"
+ls * | grep -v models-unselected | xargs -I {} tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" {}
+echo "Created archive: $SCRATCH_DIR/${DOWNLOAD_NAME}.tar.bz2"

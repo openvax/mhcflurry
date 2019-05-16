@@ -9,9 +9,10 @@ import tempfile
 import subprocess
 from copy import deepcopy
 
+from sklearn.metrics import roc_auc_score
 import pandas
 
-from numpy.testing import assert_array_less, assert_equal
+from numpy.testing import assert_, assert_equal
 
 from mhcflurry import Class1AffinityPredictor,Class1NeuralNetwork
 from mhcflurry.allele_encoding import AlleleEncoding
@@ -35,7 +36,7 @@ HYPERPARAMETERS = {
     'minibatch_size': 128,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
-    'patience': 20,
+    'patience': 10,
     'peptide_allele_merge_activation': '',
     'peptide_allele_merge_method': 'concatenate',
     'peptide_amino_acid_encoding': 'BLOSUM62',
@@ -71,6 +72,17 @@ TRAIN_DF = TRAIN_DF.loc[TRAIN_DF.peptide.str.len() >= 8]
 TRAIN_DF = TRAIN_DF.loc[TRAIN_DF.peptide.str.len() <= 15]
 
 
+MS_HITS_DF = pandas.read_csv(
+    get_path(
+        "data_curated", "curated_training_data.with_mass_spec.csv.bz2"))
+MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.allele.isin(ALLELE_TO_SEQUENCE)]
+MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.peptide.str.len() >= 8]
+MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.peptide.str.len() <= 15]
+MS_HITS_DF = MS_HITS_DF.loc[~MS_HITS_DF.peptide.isin(TRAIN_DF.peptide)]
+
+print("Loaded %d training and %d ms hits" % (
+    len(TRAIN_DF), len(MS_HITS_DF)))
+
 def test_train_simple():
     network = Class1NeuralNetwork(**HYPERPARAMETERS)
     allele_encoding = AlleleEncoding(
@@ -82,8 +94,24 @@ def test_train_simple():
         allele_encoding=allele_encoding,
         inequalities=TRAIN_DF.measurement_inequality.values)
 
+    validation_df = MS_HITS_DF.copy()
+    validation_df["hit"] = 1
+
+    decoys_df = MS_HITS_DF.copy()
+    decoys_df["hit"] = 0
+    decoys_df["allele"] = decoys_df.allele.sample(frac=1.0).values
+
+    validation_df = pandas.concat([validation_df, decoys_df], ignore_index=True)
+
     predictions = network.predict(
-        peptides=TRAIN_DF.peptide.values,
-        allele_encoding=allele_encoding)
+        peptides=validation_df.peptide.values,
+        allele_encoding=AlleleEncoding(
+            validation_df.allele.values, borrow_from=allele_encoding))
 
     print(pandas.Series(predictions).describe())
+
+    score = roc_auc_score(validation_df.hit, -1 * predictions)
+    print("AUC", score)
+
+    assert_(score > 0.6)
+
