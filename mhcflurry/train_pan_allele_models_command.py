@@ -269,7 +269,7 @@ def main(args):
         allele_sequences.index.isin(df.allele)
     ]
     print("Will use %d / %d allele sequences" % (
-        len(allele_sequences), len(allele_sequences_in_use)))
+        len(allele_sequences_in_use), len(allele_sequences)))
 
     allele_encoding = AlleleEncoding(
         alleles=allele_sequences_in_use.index.values,
