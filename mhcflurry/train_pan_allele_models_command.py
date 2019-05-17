@@ -265,9 +265,15 @@ def main(args):
         held_out_fraction=held_out_fraction,
         held_out_max=held_out_max)
 
+    allele_sequences_in_use = allele_sequences[
+        allele_sequences.index.isin(df.allele)
+    ]
+    print("Will use %d / %d allele sequences" % (
+        len(allele_sequences, len(allele_sequences_in_use))))
+
     allele_encoding = AlleleEncoding(
-        alleles=allele_sequences.index.values,
-        allele_to_sequence=allele_sequences.to_dict())
+        alleles=allele_sequences_in_use.index.values,
+        allele_to_sequence=allele_sequences_in_use.to_dict())
 
     GLOBAL_DATA["train_data"] = df
     GLOBAL_DATA["folds_df"] = folds_df
