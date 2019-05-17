@@ -319,7 +319,7 @@ class Class1AffinityPredictor(object):
         if not exists(models_dir):
             mkdir(models_dir)
 
-        sub_manifest_df = self.manifest_df.ix[
+        sub_manifest_df = self.manifest_df.loc[
             self.manifest_df.model_name.isin(model_names_to_write)
         ]
 
@@ -763,6 +763,22 @@ class Class1AffinityPredictor(object):
 
         self.clear_cache()
         return models
+
+    def add_pan_allele_model(self, model, models_dir_for_save=None):
+        model_name = self.model_name("pan-class1", 1)
+        row = pandas.Series(collections.OrderedDict([
+            ("model_name", model_name),
+            ("allele", "pan-class1"),
+            ("config_json", json.dumps(model.get_config())),
+            ("model", model),
+        ])).to_frame().T
+        self._manifest_df = pandas.concat(
+            [self.manifest_df, row], ignore_index=True)
+        self.class1_pan_allele_models.append(model)
+        if models_dir_for_save:
+            self.save(
+                models_dir_for_save, model_names_to_write=[model_name])
+
 
     def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
         """

@@ -219,6 +219,9 @@ def run(argv=sys.argv[1:]):
 def main(args):
     global GLOBAL_DATA
 
+    print("Arguments:")
+    print(args)
+
     args.out_models_dir = os.path.abspath(args.out_models_dir)
 
     configure_logging(verbose=args.verbosity > 1)
@@ -358,6 +361,7 @@ def main(args):
         # Run in serial. In this case, every worker is passed the same predictor,
         # which it adds models to, so no merging is required. It also saves
         # as it goes so no saving is required at the end.
+        print("Processing %d work items in serial." % len(work_items))
         for _ in tqdm.trange(len(work_items)):
             item = work_items.pop(0)  # want to keep freeing up memory
             work_predictor = train_model(**item)
@@ -499,11 +503,8 @@ def train_model(
         progress_print_interval=progress_print_interval,
         verbose=verbose)
 
-    predictor.class1_pan_allele_models.append(model)
+    predictor.add_pan_allele_model(model, models_dir_for_save=save_to)
     predictor.clear_cache()
-
-    if save_to:
-        predictor.save(save_to)
 
     return predictor
 
