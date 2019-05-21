@@ -1,0 +1,138 @@
+"""
+Tests for training and predicting using Class1 pan-allele models.
+"""
+
+import json
+import os
+import shutil
+import tempfile
+import subprocess
+from copy import deepcopy
+
+from sklearn.metrics import roc_auc_score
+import pandas
+
+from numpy.testing import assert_, assert_equal, assert_array_less
+
+from mhcflurry import Class1AffinityPredictor,Class1NeuralNetwork
+from mhcflurry.allele_encoding import AlleleEncoding
+from mhcflurry.downloads import get_path
+
+
+HYPERPARAMETERS_LIST = [
+{
+    'activation': 'tanh',
+    'allele_dense_layer_sizes': [],
+    'batch_normalization': False,
+    'dense_layer_l1_regularization': 0.0,
+    'dense_layer_l2_regularization': 0.0,
+    'dropout_probability': 0.5,
+    'early_stopping': True,
+    'init': 'glorot_uniform',
+    'layer_sizes': [64],
+    'learning_rate': None,
+    'locally_connected_layers': [],
+    'loss': 'custom:mse_with_inequalities',
+    'max_epochs': 5,
+    'minibatch_size': 128,
+    'optimizer': 'rmsprop',
+    'output_activation': 'sigmoid',
+    'patience': 10,
+    'peptide_allele_merge_activation': '',
+    'peptide_allele_merge_method': 'concatenate',
+    'peptide_amino_acid_encoding': 'BLOSUM62',
+    'peptide_dense_layer_sizes': [],
+    'peptide_encoding': {
+        'alignment_method': 'left_pad_centered_right_pad',
+        'max_length': 15,
+        'vector_encoding_name': 'BLOSUM62',
+    },
+    'random_negative_affinity_max': 50000.0,
+    'random_negative_affinity_min': 20000.0,
+    'random_negative_constant': 25,
+    'random_negative_distribution_smoothing': 0.0,
+    'random_negative_match_distribution': True,
+    'random_negative_rate': 0.2,
+    'train_data': {},
+    'validation_split': 0.1,
+},
+{
+    'activation': 'tanh',
+    'allele_dense_layer_sizes': [],
+    'batch_normalization': False,
+    'dense_layer_l1_regularization': 0.0,
+    'dense_layer_l2_regularization': 0.0,
+    'dropout_probability': 0.5,
+    'early_stopping': True,
+    'init': 'glorot_uniform',
+    'layer_sizes': [32],
+    'learning_rate': None,
+    'locally_connected_layers': [],
+    'loss': 'custom:mse_with_inequalities',
+    'max_epochs': 5,
+    'minibatch_size': 128,
+    'optimizer': 'rmsprop',
+    'output_activation': 'sigmoid',
+    'patience': 10,
+    'peptide_allele_merge_activation': '',
+    'peptide_allele_merge_method': 'concatenate',
+    'peptide_amino_acid_encoding': 'BLOSUM62',
+    'peptide_dense_layer_sizes': [],
+    'peptide_encoding': {
+        'alignment_method': 'left_pad_centered_right_pad',
+        'max_length': 15,
+        'vector_encoding_name': 'BLOSUM62',
+    },
+    'random_negative_affinity_max': 50000.0,
+    'random_negative_affinity_min': 20000.0,
+    'random_negative_constant': 25,
+    'random_negative_distribution_smoothing': 0.0,
+    'random_negative_match_distribution': True,
+    'random_negative_rate': 0.2,
+    'train_data': {},
+    'validation_split': 0.1,
+},
+]
+
+
+def run_and_check(n_jobs=0):
+    models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
+    hyperparameters_filename = os.path.join(
+        models_dir, "hyperparameters.yaml")
+    with open(hyperparameters_filename, "w") as fd:
+        json.dump(HYPERPARAMETERS_LIST, fd)
+
+    args = [
+        "mhcflurry-class1-train-pan-allele-models",
+        "--data", get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"),
+        "--allele-sequences", get_path("allele_sequences", "allele_sequences.csv"),
+        "--hyperparameters", hyperparameters_filename,
+        "--out-models-dir", models_dir,
+        "--num-jobs", str(n_jobs),
+        "--ensemble-size", "2",
+    ]
+    print("Running with args: %s" % args)
+    subprocess.check_call(args)
+
+    result = Class1AffinityPredictor.load(models_dir)
+    predictions = result.predict(
+        peptides=["SLYNTVATL"],
+        alleles=["HLA-A*02:01"])
+    assert_equal(predictions.shape, (1,))
+    assert_array_less(predictions, 1000)
+    df = result.predict_to_dataframe(
+            peptides=["SLYNTVATL"],
+            alleles=["HLA-A*02:01"])
+    print(df)
+
+    print("Deleting: %s" % models_dir)
+    shutil.rmtree(models_dir)
+
+
+if os.environ.get("KERAS_BACKEND") != "theano":
+    def test_run_parallel():
+        run_and_check(n_jobs=2)
+
+
+def test_run_serial():
+    run_and_check(n_jobs=1)

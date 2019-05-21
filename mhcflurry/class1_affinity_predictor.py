@@ -99,6 +99,9 @@ class Class1AffinityPredictor(object):
         self.metadata_dataframes = metadata_dataframes
         self._cache = {}
 
+        assert isinstance( self.allele_to_allele_specific_models, dict)
+        assert isinstance(self.class1_pan_allele_models, list)
+
     @property
     def manifest_df(self):
         if self._manifest_df is None:
@@ -207,22 +210,22 @@ class Class1AffinityPredictor(object):
         -------
         list of string : names of newly added models
         """
-
         new_model_names = []
+        original_manifest = self.manifest_df
+        new_manifest_rows = []
         for predictor in others:
             for model in predictor.class1_pan_allele_models:
                 model_name = self.model_name(
                     "pan-class1",
                     len(self.class1_pan_allele_models))
-                self.class1_pan_allele_models.append(model)
                 row = pandas.Series(collections.OrderedDict([
                     ("model_name", model_name),
                     ("allele", "pan-class1"),
                     ("config_json", json.dumps(model.get_config())),
                     ("model", model),
                 ])).to_frame().T
-                self._manifest_df = pandas.concat(
-                    [self.manifest_df, row], ignore_index=True)
+                new_manifest_rows.append(row)
+                self.class1_pan_allele_models.append(model)
                 new_model_names.append(model_name)
 
             for allele in predictor.allele_to_allele_specific_models:
@@ -237,12 +240,16 @@ class Class1AffinityPredictor(object):
                         ("config_json", json.dumps(model.get_config())),
                         ("model", model),
                     ])).to_frame().T
-                    self._manifest_df = pandas.concat(
-                        [self.manifest_df, row], ignore_index=True)
+                    new_manifest_rows.append(row)
                     current_models.append(model)
                     new_model_names.append(model_name)
 
+        self._manifest_df = pandas.concat(
+            [original_manifest] + new_manifest_rows,
+            ignore_index=True)
+
         self.clear_cache()
+        self.check_consistency()
         return new_model_names
 
     @property
@@ -282,6 +289,18 @@ class Class1AffinityPredictor(object):
             self._cache["supported_peptide_lengths"] = result
         return self._cache["supported_peptide_lengths"]
 
+    def check_consistency(self):
+        num_models = len(self.class1_pan_allele_models) + sum(
+            len(v) for v in self.allele_to_allele_specific_models.values())
+        assert len(self.manifest_df) == num_models, (
+            "Manifest seems out of sync with models: %d vs %d entries: "
+            "\n%s\npan-allele: %s\nallele-specific: %s"% (
+                len(self.manifest_df),
+                num_models,
+                str(self.manifest_df),
+                str(self.class1_pan_allele_models),
+                str(self.allele_to_allele_specific_models)))
+
     def save(self, models_dir, model_names_to_write=None, write_metadata=True):
         """
         Serialize the predictor to a directory on disk. If the directory does
@@ -306,11 +325,7 @@ class Class1AffinityPredictor(object):
         write_metadata : boolean, optional
             Whether to write optional metadata
         """
-        num_models = len(self.class1_pan_allele_models) + sum(
-            len(v) for v in self.allele_to_allele_specific_models.values())
-        assert len(self.manifest_df) == num_models, (
-            "Manifest seems out of sync with models: %d vs %d entries" % (
-                len(self.manifest_df), num_models))
+        self.check_consistency()
 
         if model_names_to_write is None:
             # Write all models
@@ -437,7 +452,7 @@ class Class1AffinityPredictor(object):
         if exists(join(models_dir, "allele_sequences.csv")):
             allele_to_fixed_length_sequence = pandas.read_csv(
                 join(models_dir, "allele_sequences.csv"),
-                index_col="allele").to_dict()
+                index_col="allele").sequence.to_dict()
 
         # Load allele encoding transforms
         allele_encoding_transforms = {}
@@ -775,6 +790,7 @@ class Class1AffinityPredictor(object):
         self._manifest_df = pandas.concat(
             [self.manifest_df, row], ignore_index=True)
         self.class1_pan_allele_models.append(model)
+        self.check_consistency()
         if models_dir_for_save:
             self.save(
                 models_dir_for_save, model_names_to_write=[model_name])
