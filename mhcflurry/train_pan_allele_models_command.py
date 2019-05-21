@@ -286,6 +286,7 @@ def main(args):
         print("Done.")
 
     predictor = Class1AffinityPredictor(
+        allele_to_sequence=allele_encoding.allele_to_sequence,
         metadata_dataframes={
             'train_data': df,
             'training_folds': folds_df,
@@ -405,13 +406,14 @@ def train_model(
         predictor,
         save_to):
 
-    if predictor is None:
-        predictor = Class1AffinityPredictor()
-
     df = GLOBAL_DATA["train_data"]
     folds_df = GLOBAL_DATA["folds_df"]
     allele_encoding = GLOBAL_DATA["allele_encoding"]
     args = GLOBAL_DATA["args"]
+
+    if predictor is None:
+        predictor = Class1AffinityPredictor(
+            allele_to_sequence=allele_encoding.allele_to_sequence)
 
     numpy.testing.assert_equal(len(df), len(folds_df))
 
@@ -497,7 +499,6 @@ def train_model(
         else:
             model.hyperparameters['learning_rate'] = 0.0001
 
-
     model.fit(
         peptides=train_peptides,
         affinities=train_data.measurement_value.values,
@@ -509,7 +510,11 @@ def train_model(
         progress_print_interval=progress_print_interval,
         verbose=verbose)
 
+    numpy.testing.assert_equal(
+        predictor.manifest_df.shape[0], len(predictor.class1_pan_allele_models))
     predictor.add_pan_allele_model(model, models_dir_for_save=save_to)
+    numpy.testing.assert_equal(
+        predictor.manifest_df.shape[0], len(predictor.class1_pan_allele_models))
     predictor.clear_cache()
 
     return predictor
