@@ -1,4 +1,4 @@
-FROM nvidia/cuda:cudnn-runtime
+FROM nvidia/cuda
 
 MAINTAINER Tim O'Donnell <timodonnell@gmail.com>
 
@@ -6,15 +6,16 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
     apt-get clean && \
     apt-get update && \
     apt-get install --yes \
+        locales \
         gfortran \
         git \
         libatlas-base-dev \
-        libatlas3gf-base \
+        libatlas3-base \
         libblas-dev \
         libfreetype6-dev \
-        libhdf5-serial-dev \
+        libhdf5-dev \
         liblapack-dev \
-        libpng12-dev \
+        libpng-dev \
         libxml2-dev \
         libxslt1-dev \
         libyaml-dev \
@@ -53,7 +54,7 @@ RUN virtualenv venv-py3 --python=python3 && \
         scikit-learn \
         seaborn
 
-ENV KERAS_BACKEND theano
+ENV KERAS_BACKEND tensorflow
 # RUN venv-py3/bin/pip install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.10.0-cp35-cp35m-linux_x86_64.whl
 
 # Install mhcflurry and latest kubeface and download data and models.
@@ -62,4 +63,4 @@ RUN venv-py3/bin/pip install --upgrade ./mhcflurry git+https://github.com/hammer
     && venv-py3/bin/mhcflurry-downloads fetch
  
 EXPOSE 8888
-CMD venv-py3/bin/jupyter notebook --no-browser
+ENTRYPOINT ["venv-py3/bin/jupyter", "notebook", "--ip=0.0.0.0", "--allow-root", "--no-browser"]
