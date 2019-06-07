@@ -434,7 +434,7 @@ def train_model(
     train_peptides = EncodableSequences(train_data.peptide.values)
     train_alleles = AlleleEncoding(
         train_data.allele.values, borrow_from=allele_encoding)
-    train_target = from_ic50(train_data.measurement_value)
+    train_target = from_ic50(train_data.measurement_value.values)
 
     model = Class1NeuralNetwork(**hyperparameters)
 
@@ -468,6 +468,7 @@ def train_model(
                 peptides=peptides,
                 affinities=affinities,
                 allele_encoding=alleles)
+
             fit_time = time.time() - start
             start = time.time()
             predictions = model.predict(
@@ -484,7 +485,7 @@ def train_model(
                 mask = train_data.measurement_inequality == inequality
                 predictions[mask.values] = func(
                     predictions[mask.values],
-                    train_data.loc[mask.values].measurement_value.values)
+                    train_data.loc[mask].measurement_value.values)
             score_mse = numpy.mean((from_ic50(predictions) - train_target)**2)
             score_time = time.time() - start
             print(
