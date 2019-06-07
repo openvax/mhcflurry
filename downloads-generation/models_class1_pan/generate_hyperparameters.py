@@ -48,7 +48,7 @@ base_hyperparameters = {
 }
 
 grid = []
-for layer_sizes in [[1024, 512], [512, 512], [1024, 1024]]:
+for layer_sizes in [[512, 256], [1024, 512], [1024, 1024]]:
     for l1 in [0.0, 0.0001, 0.001, 0.01]:
         new = deepcopy(base_hyperparameters)
         new["layer_sizes"] = layer_sizes
