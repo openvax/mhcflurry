@@ -139,16 +139,26 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
 
             held_out_count = int(
                 min(len(medians) * held_out_fraction, held_out_max))
-            held_out_low_count = min(
-                len(low_peptides),
-                int(held_out_count / 2))
-            held_out_high_count = min(
-                len(high_peptides),
-                held_out_count - held_out_low_count)
 
-            held_out_low = pandas.Series(low_peptides).sample(n=held_out_low_count)
-            held_out_high = pandas.Series(high_peptides).sample(n=held_out_high_count)
-            held_out_peptides = set(held_out_low).union(set(held_out_high))
+            held_out_peptides = set()
+            if held_out_count == 0:
+                pass
+            elif held_out_count < 2:
+                held_out_peptides = set(
+                    medians.index.to_series().sample(n=held_out_count))
+            else:
+                held_out_low_count = min(
+                    len(low_peptides),
+                    int(held_out_count / 2))
+                held_out_high_count = min(
+                    len(high_peptides),
+                    held_out_count - held_out_low_count)
+
+                held_out_low = pandas.Series(low_peptides).sample(
+                    n=held_out_low_count) if held_out_low_count else set()
+                held_out_high = pandas.Series(high_peptides).sample(
+                    n=held_out_high_count) if held_out_high_count else set()
+                held_out_peptides = set(held_out_low).union(set(held_out_high))
 
             result_df.loc[
                 sub_df.index[sub_df.peptide.isin(held_out_peptides)],
@@ -474,19 +484,19 @@ def train_model(
                 mask = train_data.measurement_inequality == inequality
                 predictions[mask.values] = func(
                     predictions[mask.values],
-                    train_data.loc[mask].measurement_value.values)
-            score = numpy.mean((from_ic50(predictions) - train_target)**2)
+                    train_data.loc[mask.values].measurement_value.values)
+            score_mse = numpy.mean((from_ic50(predictions) - train_target)**2)
             score_time = time.time() - start
             print(
                 progress_preamble,
                 "PRETRAIN epoch %d [%d values, %0.2f sec]. "
-                "Score [%0.2f sec.]: %10f" % (
-                    epoch, len(affinities), fit_time, score_time, score))
-            scores.append(score)
+                "MSE [%0.2f sec.]: %10f" % (
+                    epoch, len(affinities), fit_time, score_time, score_mse))
+            scores.append(score_mse)
 
-            if score < best_score:
-                print("New best score", score)
-                best_score = score
+            if score_mse < best_score:
+                print("New best score_mse", score_mse)
+                best_score = score_mse
                 best_score_epoch = epoch
 
             if epoch - best_score_epoch > pretrain_patience:
