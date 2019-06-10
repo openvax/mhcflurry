@@ -416,6 +416,9 @@ def train_model(
         predictor,
         save_to):
 
+    import keras.backend as K
+    K.clear_session()
+
     df = GLOBAL_DATA["train_data"]
     folds_df = GLOBAL_DATA["folds_df"]
     allele_encoding = GLOBAL_DATA["allele_encoding"]
