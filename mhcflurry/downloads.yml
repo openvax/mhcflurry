@@ -21,7 +21,7 @@ releases:
         compatibility-version: 2
         downloads:
             - name: data_iedb
-              url: https://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_iedb.20190506.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_iedb.20190610.tar.bz2
               default: false
 
             - name: data_systemhcatlas
