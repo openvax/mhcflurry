@@ -1032,8 +1032,20 @@ class Class1AffinityPredictor(object):
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
-            mask = df.supported_peptide_length
-            if mask.sum() > 0:
+            mask = df.supported_peptide_length & (
+                ~df.normalized_allele.isin(unsupported_alleles))
+            if mask is None or mask.all():
+                # Common case optimization
+                allele_encoding = AlleleEncoding(
+                    df.normalized_allele,
+                    borrow_from=master_allele_encoding)
+                for (i, model) in enumerate(self.class1_pan_allele_models):
+                    predictions_array[:, i] = (
+                        model.predict(
+                            peptides,
+                            allele_encoding=allele_encoding,
+                            **model_kwargs))
+            elif mask.sum() > 0:
                 masked_allele_encoding = AlleleEncoding(
                     df.loc[mask].normalized_allele,
                     borrow_from=master_allele_encoding)

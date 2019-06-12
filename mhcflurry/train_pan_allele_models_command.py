@@ -417,7 +417,7 @@ def train_model(
         save_to):
 
     import keras.backend as K
-    K.clear_session()
+    K.clear_session()  # release memory
 
     df = GLOBAL_DATA["train_data"]
     folds_df = GLOBAL_DATA["folds_df"]
