@@ -415,9 +415,7 @@ def train_model(
         progress_print_interval,
         predictor,
         save_to):
-
     import keras.backend as K
-    K.clear_session()  # release memory
 
     df = GLOBAL_DATA["train_data"]
     folds_df = GLOBAL_DATA["folds_df"]
@@ -530,6 +528,11 @@ def train_model(
     numpy.testing.assert_equal(
         predictor.manifest_df.shape[0], len(predictor.class1_pan_allele_models))
     predictor.clear_cache()
+
+    # Delete the network and release memory
+    model.update_network_description()  # save weights and config
+    model._network = None  # release tensorflow network
+    K.clear_session()  # release graph
 
     return predictor
 
