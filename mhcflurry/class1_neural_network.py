@@ -55,6 +55,7 @@ class Class1NeuralNetwork(object):
                 "kernel_size": 3
             }
         ],
+        num_outputs=1,
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -424,6 +425,7 @@ class Class1NeuralNetwork(object):
             affinities,
             allele_encoding=None,
             inequalities=None,
+            output_indices=None,
             sample_weights=None,
             shuffle_permutation=None,
             verbose=1,
@@ -536,7 +538,7 @@ class Class1NeuralNetwork(object):
             sample_weights = sample_weights[shuffle_permutation]
 
         if self.hyperparameters['loss'].startswith("custom:"):
-            # Using a custom loss that supports inequalities
+            # Using a custom loss
             try:
                 custom_loss = CUSTOM_LOSSES[
                     self.hyperparameters['loss'].replace("custom:", "")
@@ -550,17 +552,31 @@ class Class1NeuralNetwork(object):
                         ])))
             loss_name_or_function = custom_loss.loss
             loss_supports_inequalities = custom_loss.supports_inequalities
+            loss_supports_multiple_outputs = custom_loss.supports_multiple_outputs
             loss_encode_y_function = custom_loss.encode_y
         else:
-            # Using a regular keras loss. No inequalities supported.
+            # Using a regular keras loss.
             loss_name_or_function = self.hyperparameters['loss']
             loss_supports_inequalities = False
+            loss_supports_multiple_outputs = False
             loss_encode_y_function = None
 
         if not loss_supports_inequalities and (
                 any(inequality != "=" for inequality in adjusted_inequalities)):
             raise ValueError("Loss %s does not support inequalities" % (
                 loss_name_or_function))
+
+        if (
+                not loss_supports_multiple_outputs and
+                output_indices is not None and
+                (output_indices != 0).any()):
+            raise ValueError("Loss %s does not support multiple outputs" % (
+                output_indices))
+
+        if self.hyperparameters['num_outputs'] != 1:
+            if output_indices is None:
+                raise ValueError(
+                    "Must supply output_indices for multi-output predictor")
 
         if self.network() is None:
             self._network = self.make_network(
@@ -621,10 +637,26 @@ class Class1NeuralNetwork(object):
         else:
             sample_weights_with_random_negatives = None
 
+        if output_indices is not None:
+            output_indices_with_random_negatives = numpy.concatenate([
+                numpy.zeros(int(num_random_negative.sum()), dtype=int),
+                output_indices
+            ])
+        else:
+            output_indices_with_random_negatives = None
+
         if loss_encode_y_function is not None:
+            encode_y_kwargs = {}
+            if adjusted_inequalities_with_random_negatives is not None:
+                encode_y_kwargs["inequalities"] = (
+                    adjusted_inequalities_with_random_negatives)
+            if output_indices_with_random_negatives is not None:
+                encode_y_kwargs["output_indices"] = (
+                    output_indices_with_random_negatives)
+
             y_dict_with_random_negatives['output'] = loss_encode_y_function(
                 y_dict_with_random_negatives['output'],
-                adjusted_inequalities_with_random_negatives)
+                **encode_y_kwargs)
 
         val_losses = []
         min_val_loss_iteration = None
@@ -741,7 +773,12 @@ class Class1NeuralNetwork(object):
         fit_info["num_points"] = len(peptides)
         self.fit_info.append(dict(fit_info))
 
-    def predict(self, peptides, allele_encoding=None, batch_size=4096):
+    def predict(
+            self,
+            peptides,
+            allele_encoding=None,
+            batch_size=4096,
+            output_index=0):
         """
         Predict affinities.
 
@@ -784,7 +821,9 @@ class Class1NeuralNetwork(object):
         else:
             network = self.network(borrow=True)
         raw_predictions = network.predict(x_dict, batch_size=batch_size)
-        predictions = numpy.array(raw_predictions, dtype = "float64")[:,0]
+        predictions = numpy.array(raw_predictions, dtype = "float64")
+        if output_index is not None:
+            predictions = predictions[:,output_index]
         result = to_ic50(predictions)
         if use_cache:
             self.prediction_cache[peptides] = result
@@ -807,6 +846,7 @@ class Class1NeuralNetwork(object):
             dropout_probability,
             batch_normalization,
             locally_connected_layers,
+            num_outputs=1,
             allele_representations=None):
         """
         Helper function to make a keras network for class1 affinity prediction.
@@ -913,7 +953,7 @@ class Class1NeuralNetwork(object):
                     name="dropout_%d" % i)(current_layer)
 
         output = Dense(
-            1,
+            num_outputs,
             kernel_initializer=init,
             activation=output_activation,
             name="output")(current_layer)
