@@ -5,8 +5,9 @@ For losses supporting inequalities, each training data point is associated with
 one of (=), (<), or (>). For e.g. (>) inequalities, penalization is applied only
 if the prediction is less than the given value.
 """
-
+from __future__ import division
 import pandas
+import numpy
 from numpy import isnan, array
 
 CUSTOM_LOSSES = {}
@@ -39,6 +40,7 @@ class MSEWithInequalities(object):
     """
     name = "mse_with_inequalities"
     supports_inequalities = True
+    supports_multiple_outputs = False
 
     @staticmethod
     def encode_y(y, inequalities=None):
@@ -70,6 +72,8 @@ class MSEWithInequalities(object):
         # without tensorflow debug output, etc.
         from keras import backend as K
 
+        y_pred = K.flatten(y_pred)
+
         # Handle (=) inequalities
         diff1 = y_pred - y_true
         diff1 *= K.cast(y_true >= 0.0, "float32")
@@ -89,8 +93,69 @@ class MSEWithInequalities(object):
         return (
             K.sum(K.square(diff1), axis=-1) +
             K.sum(K.square(diff2), axis=-1) +
-            K.sum(K.square(diff3), axis=-1))
+            K.sum(K.square(diff3), axis=-1)) / K.cast(K.shape(y_true)[0], "float32")
+
+
+class MSEWithInequalitiesAndMultipleOutputs(object):
+    name = "mse_with_inequalities_and_multiple_outputs"
+    supports_inequalities = True
+    supports_multiple_outputs = True
+
+    @staticmethod
+    def encode_y(y, inequalities=None, output_indices=None):
+        y = array(y, dtype="float32")
+        if isnan(y).any():
+            raise ValueError("y contains NaN")
+        if (y > 1.0).any():
+            raise ValueError("y contains values > 1.0")
+        if (y < 0.0).any():
+            raise ValueError("y contains values < 0.0")
+
+        encoded = MSEWithInequalities.encode_y(
+            y, inequalities=inequalities)
+
+        if output_indices is not None:
+            output_indices = numpy.array(output_indices)
+            check_shape("output_indices", output_indices, (len(encoded),))
+            if (output_indices < 0).any():
+                raise ValueError("Invalid output indices: ", output_indices)
+
+            encoded += output_indices * 10
+
+        return encoded
+
+    @staticmethod
+    def loss(y_true, y_pred):
+        from keras import backend as K
+
+        output_indices = y_true // 10
+        updated_y_true = y_true - (10 * output_indices)
+
+        # We index into y_pred using flattened indices since Keras backend
+        # supports gather but has no equivalent of tf.gather_nd:
+        ordinals = K.arange(K.shape(y_true)[0])
+        flattened_indices = (
+            ordinals * y_pred.shape[1] + K.cast(output_indices, "int32"))
+        updated_y_pred = K.gather(K.flatten(y_pred), flattened_indices)
+
+        # Alternative implementation using tensorflow, which could be used if
+        # we drop support for other backends:
+        # import tensorflow as tf
+        # indexer = K.stack([
+        #     ordinals,
+        #     K.cast(output_indices, "int32")
+        # ], axis=-1)
+        #updated_y_pred = tf.gather_nd(y_pred, indexer)
+
+        return MSEWithInequalities.loss(updated_y_true, updated_y_pred)
+
+
+def check_shape(name, arr, expected_shape):
+    if arr.shape != expected_shape:
+        raise ValueError("Expected %s to have shape %s not %s" % (
+            name, str(expected_shape), str(arr.shape)))
+
 
 # Register custom losses.
-for cls in [MSEWithInequalities]:
+for cls in [MSEWithInequalities, MSEWithInequalitiesAndMultipleOutputs]:
     CUSTOM_LOSSES[cls.name] = cls()
