@@ -136,3 +136,10 @@ if os.environ.get("KERAS_BACKEND") != "theano":
 
 def test_run_serial():
     run_and_check(n_jobs=1)
+
+if __name__ == "__main__":
+    test_run_serial()
+    #for (name, value) in list(globals().items()):
+    #    if name.startswith("test_"):
+    #        print("Running test", name)
+    #        value()
