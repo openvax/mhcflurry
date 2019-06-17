@@ -88,7 +88,6 @@ def test_class1_neural_network_a0205_training_accuracy():
 def test_inequalities():
     # Memorize the dataset.
     hyperparameters = dict(
-        loss="custom:mse_with_inequalities",
         peptide_amino_acid_encoding="one-hot",
         activation="tanh",
         layer_sizes=[16],
@@ -105,7 +104,8 @@ def test_inequalities():
             }
         ],
         dense_layer_l1_regularization=0.0,
-        dropout_probability=0.0)
+        dropout_probability=0.0,
+        loss="custom:mse_with_inequalities_and_multiple_outputs")
 
     df = pandas.DataFrame()
     df["peptide"] = random_peptides(1000, length=9)

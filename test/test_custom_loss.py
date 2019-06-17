@@ -17,8 +17,10 @@ def evaluate_loss(loss, y_true, y_pred):
     y_pred = numpy.array(y_pred)
     if y_pred.ndim == 1:
         y_pred = y_pred.reshape((len(y_pred), 1))
+    if y_true.ndim == 1:
+        y_true = y_true.reshape((len(y_true), 1))
 
-    assert y_true.ndim == 1
+    assert y_true.ndim == 2
     assert y_pred.ndim == 2
 
     if K.backend() == "tensorflow":

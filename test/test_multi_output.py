@@ -10,12 +10,10 @@ import logging
 logging.getLogger('tensorflow').disabled = True
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
-from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
 
 def test_multi_output():
-    # Memorize the dataset.
     hyperparameters = dict(
         loss="custom:mse_with_inequalities_and_multiple_outputs",
         activation="tanh",
@@ -86,63 +84,4 @@ def test_multi_output():
     assert sub_correlation.iloc[0, 0] > 0.99, correlation
     assert sub_correlation.iloc[1, 1] > 0.99, correlation
     assert sub_correlation.iloc[2, 2] > 0.99, correlation
-
-    import ipdb ; ipdb.set_trace()
-
-
-
-    # Prediction2 has a (<) inequality on binders and an (=) on non-binders
-    predictor = Class1NeuralNetwork(**hyperparameters)
-    predictor.fit(
-        df.peptide.values,
-        df.value.values,
-        inequalities=df.inequality2.values,
-        **fit_kwargs)
-    df["prediction2"] = predictor.predict(df.peptide.values)
-
-    # Prediction3 has a (=) inequality on binders and an (>) on non-binders
-    predictor = Class1NeuralNetwork(**hyperparameters)
-    predictor.fit(
-        df.peptide.values,
-        df.value.values,
-        inequalities=df.inequality3.values,
-        **fit_kwargs)
-    df["prediction3"] = predictor.predict(df.peptide.values)
-
-    df_binders = df.loc[df.binder]
-    df_nonbinders = df.loc[~df.binder]
-
-    print("***** Binders: *****")
-    print(df_binders.head(5))
-
-    print("***** Non-binders: *****")
-    print(df_nonbinders.head(5))
-
-    # Binders should always be given tighter predicted affinity than non-binders
-    assert_less(df_binders.prediction1.mean(), df_nonbinders.prediction1.mean())
-    assert_less(df_binders.prediction2.mean(), df_nonbinders.prediction2.mean())
-    assert_less(df_binders.prediction3.mean(), df_nonbinders.prediction3.mean())
-
-    # prediction2 binders should be tighter on average than prediction1
-    # binders, since prediction2 has a (<) inequality for binders.
-    # Non-binders should be about the same between prediction2 and prediction1
-    assert_less(df_binders.prediction2.mean(), df_binders.prediction1.mean())
-    assert_almost_equal(
-        df_nonbinders.prediction2.mean(),
-        df_nonbinders.prediction1.mean(),
-        delta=3000)
-
-    # prediction3 non-binders should be weaker on average than prediction2 (or 1)
-    # non-binders, since prediction3 has a (>) inequality for these peptides.
-    # Binders should be about the same.
-    assert_greater(
-        df_nonbinders.prediction3.mean(),
-        df_nonbinders.prediction2.mean())
-    assert_greater(
-        df_nonbinders.prediction3.mean(),
-        df_nonbinders.prediction1.mean())
-    assert_almost_equal(
-        df_binders.prediction3.mean(),
-        df_binders.prediction1.mean(),
-        delta=3000)
 

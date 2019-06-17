@@ -72,8 +72,6 @@ class MSEWithInequalities(object):
         # without tensorflow debug output, etc.
         from keras import backend as K
 
-        y_pred = K.flatten(y_pred)
-
         # Handle (=) inequalities
         diff1 = y_pred - y_true
         diff1 *= K.cast(y_true >= 0.0, "float32")
@@ -93,7 +91,7 @@ class MSEWithInequalities(object):
         result = (
             K.sum(K.square(diff1)) +
             K.sum(K.square(diff2)) +
-            K.sum(K.square(diff3))) / K.cast(K.shape(y_true)[0], "float32")
+            K.sum(K.square(diff3))) / K.cast(K.shape(y_pred)[0], "float32")
 
         return result
 
