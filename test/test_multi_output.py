@@ -20,8 +20,8 @@ def test_multi_output():
         loss="custom:mse_with_inequalities_and_multiple_outputs",
         activation="tanh",
         layer_sizes=[16],
-        max_epochs=50,
-        minibatch_size=32,
+        max_epochs=500,
+        minibatch_size=250,
         random_negative_rate=0.0,
         random_negative_constant=0.0,
         early_stopping=False,
@@ -30,12 +30,14 @@ def test_multi_output():
         ],
         dense_layer_l1_regularization=0.0,
         dropout_probability=0.0,
-        num_outputs=2)
+        optimizer="adam",
+        num_outputs=3)
 
     df = pandas.DataFrame()
     df["peptide"] = random_peptides(10000, length=9)
-    df["output1"] = df.peptide.map(lambda s: s[4] == 'K').astype(int) * 10000 + 0.01
-    df["output2"] = df.peptide.map(lambda s: s[3] == 'Q').astype(int) * 10000 + 0.01
+    df["output1"] = df.peptide.map(lambda s: s[4] == 'K').astype(int) * 49000 + 1
+    df["output2"] = df.peptide.map(lambda s: s[3] == 'Q').astype(int) * 49000 + 1
+    df["output3"] = df.peptide.map(lambda s: s[4] == 'K' or s[3] == 'Q').astype(int) * 49000 + 1
 
     print("output1 mean", df.output1.mean())
     print("output2 mean", df.output2.mean())
@@ -45,6 +47,7 @@ def test_multi_output():
     stacked["output_index"] = stacked.output_name.map({
         "output1": 0,
         "output2": 1,
+        "output3": 2,
     })
     assert not stacked.output_index.isnull().any(), stacked
 
@@ -53,17 +56,36 @@ def test_multi_output():
     }
 
     predictor = Class1NeuralNetwork(**hyperparameters)
+    stacked_train = stacked
     predictor.fit(
-        stacked.peptide.values,
-        stacked.value.values,
-        output_indices=stacked.output_index.values,
+        stacked_train.peptide.values,
+        stacked_train.value.values,
+        output_indices=stacked_train.output_index.values,
         **fit_kwargs)
+
     result = predictor.predict(df.peptide.values, output_index=None)
     print(df.shape, result.shape)
     print(result)
 
     df["prediction1"] = result[:,0]
     df["prediction2"] = result[:,1]
+    df["prediction3"] = result[:,2]
+
+    df_by_peptide = df.set_index("peptide")
+
+    correlation = pandas.DataFrame(
+        numpy.corrcoef(df_by_peptide.T),
+        columns=df_by_peptide.columns,
+        index=df_by_peptide.columns)
+    print(correlation)
+
+    sub_correlation = correlation.loc[
+        ["output1", "output2", "output3"],
+        ["prediction1", "prediction2", "prediction3"],
+    ]
+    assert sub_correlation.iloc[0, 0] > 0.99, correlation
+    assert sub_correlation.iloc[1, 1] > 0.99, correlation
+    assert sub_correlation.iloc[2, 2] > 0.99, correlation
 
     import ipdb ; ipdb.set_trace()
 
