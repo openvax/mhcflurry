@@ -536,6 +536,8 @@ class Class1NeuralNetwork(object):
                 x_dict_without_random_negatives[key][shuffle_permutation])
         if sample_weights is not None:
             sample_weights = sample_weights[shuffle_permutation]
+        if output_indices is not None:
+            output_indices = output_indices[shuffle_permutation]
 
         if self.hyperparameters['loss'].startswith("custom:"):
             # Using a custom loss

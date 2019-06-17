@@ -90,10 +90,12 @@ class MSEWithInequalities(object):
         diff3 *= K.cast(y_true >= 4.0, "float32")
         diff3 *= K.cast(diff3 > 0.0, "float32")
 
-        return (
-            K.sum(K.square(diff1), axis=-1) +
-            K.sum(K.square(diff2), axis=-1) +
-            K.sum(K.square(diff3), axis=-1)) / K.cast(K.shape(y_true)[0], "float32")
+        result = (
+            K.sum(K.square(diff1)) +
+            K.sum(K.square(diff2)) +
+            K.sum(K.square(diff3))) / K.cast(K.shape(y_true)[0], "float32")
+
+        return result
 
 
 class MSEWithInequalitiesAndMultipleOutputs(object):
@@ -128,6 +130,11 @@ class MSEWithInequalitiesAndMultipleOutputs(object):
     def loss(y_true, y_pred):
         from keras import backend as K
 
+        #y_true = K.print_tensor(y_true, "y_true1")
+        #y_pred = K.print_tensor(y_pred, "y_pred1")
+
+        y_true = K.flatten(y_true)
+
         output_indices = y_true // 10
         updated_y_true = y_true - (10 * output_indices)
 
@@ -136,6 +143,8 @@ class MSEWithInequalitiesAndMultipleOutputs(object):
         ordinals = K.arange(K.shape(y_true)[0])
         flattened_indices = (
             ordinals * y_pred.shape[1] + K.cast(output_indices, "int32"))
+        import tensorflow
+        #flattened_indices = tensorflow.Print(flattened_indices, [flattened_indices], "flattened_indices", summarize=1000)
         updated_y_pred = K.gather(K.flatten(y_pred), flattened_indices)
 
         # Alternative implementation using tensorflow, which could be used if
