@@ -336,6 +336,7 @@ def main(args):
     start = time.time()
 
     worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+    print("Worker pool", worker_pool)
 
     if worker_pool:
         print("Processing %d work items in parallel." % len(work_items))
