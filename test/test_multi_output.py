@@ -20,7 +20,7 @@ def test_multi_output():
         loss="custom:mse_with_inequalities_and_multiple_outputs",
         activation="tanh",
         layer_sizes=[16],
-        max_epochs=500,
+        max_epochs=50,
         minibatch_size=250,
         random_negative_rate=0.0,
         random_negative_constant=0.0,
