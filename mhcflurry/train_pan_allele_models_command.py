@@ -32,8 +32,6 @@ from .allele_encoding import AlleleEncoding
 from .encodable_sequences import EncodableSequences
 from .regression_target import to_ic50, from_ic50
 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
-
 
 # To avoid pickling large matrices to send to child processes when running in
 # parallel, we use this global variable as a place to store data. Data that is
