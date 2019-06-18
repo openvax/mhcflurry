@@ -34,7 +34,7 @@ HYPERPARAMETERS_LIST = [
     'locally_connected_layers': [],
     'loss': 'custom:mse_with_inequalities',
     'max_epochs': 5,
-    'minibatch_size': 128,
+    'minibatch_size': 256,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
     'patience': 10,
@@ -70,7 +70,7 @@ HYPERPARAMETERS_LIST = [
     'locally_connected_layers': [],
     'loss': 'custom:mse_with_inequalities',
     'max_epochs': 5,
-    'minibatch_size': 128,
+    'minibatch_size': 256,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
     'patience': 10,
@@ -102,14 +102,21 @@ def run_and_check(n_jobs=0):
     with open(hyperparameters_filename, "w") as fd:
         json.dump(HYPERPARAMETERS_LIST, fd)
 
+    data_df = pandas.read_csv(
+        get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
+    selected_data_df = data_df.loc[data_df.allele.str.startswith("HLA-A")]
+    selected_data_df.to_csv(
+        os.path.join(models_dir, "train_data.csv"), index=False)
+
     args = [
         "mhcflurry-class1-train-pan-allele-models",
-        "--data", get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"),
+        "--data", os.path.join(models_dir, "train_data.csv"),
         "--allele-sequences", get_path("allele_sequences", "allele_sequences.csv"),
         "--hyperparameters", hyperparameters_filename,
         "--out-models-dir", models_dir,
         "--num-jobs", str(n_jobs),
         "--ensemble-size", "2",
+        "--verbosity", "1",
     ]
     print("Running with args: %s" % args)
     subprocess.check_call(args)

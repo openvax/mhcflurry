@@ -20,7 +20,7 @@ import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .common import configure_logging, set_keras_backend
+from .common import configure_logging
 from .parallelism import (
     add_worker_pool_args,
     worker_pool_with_gpu_assignments_from_args,

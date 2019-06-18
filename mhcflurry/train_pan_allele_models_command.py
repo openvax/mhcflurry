@@ -22,7 +22,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import Class1NeuralNetwork
-from .common import configure_logging, set_keras_backend
+from .common import configure_logging
 from .parallelism import (
     add_worker_pool_args,
     worker_pool_with_gpu_assignments_from_args,
@@ -451,6 +451,7 @@ def train_model(
             replicate_num + 1,
             num_replicates))
 
+    assert model.network() is None
     if hyperparameters.get("train_data", {}).get("pretrain", False):
         iterator = pretrain_data_iterator(pretrain_data_filename, allele_encoding)
         original_hyperparameters = dict(model.hyperparameters)
@@ -530,11 +531,9 @@ def train_model(
         predictor.manifest_df.shape[0], len(predictor.class1_pan_allele_models))
     predictor.clear_cache()
 
-    # Delete the network and release memory
+    # Delete the network to release memory
     model.update_network_description()  # save weights and config
     model._network = None  # release tensorflow network
-    K.clear_session()  # release graph
-
     return predictor
 
 
