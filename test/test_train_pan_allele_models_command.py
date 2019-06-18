@@ -55,7 +55,7 @@ HYPERPARAMETERS_LIST = [
     'random_negative_distribution_smoothing': 0.0,
     'random_negative_match_distribution': True,
     'random_negative_rate': 0.2,
-    'train_data': {},
+    'train_data': {"pretrain": False},
     'validation_split': 0.1,
 },
 {
@@ -91,10 +91,14 @@ HYPERPARAMETERS_LIST = [
     'random_negative_distribution_smoothing': 0.0,
     'random_negative_match_distribution': True,
     'random_negative_rate': 0.2,
-    'train_data': {},
+    'train_data': {
+        "pretrain": True,
+        'pretrain_peptides_per_epoch': 128,
+        'pretrain_max_epochs': 2,
+    },
     'validation_split': 0.1,
 },
-]
+][1:]
 
 
 def run_and_check(n_jobs=0):
@@ -119,6 +123,8 @@ def run_and_check(n_jobs=0):
         "--num-jobs", str(n_jobs),
         "--ensemble-size", "2",
         "--verbosity", "1",
+        "--pretrain-data", get_path(
+            "random_peptide_predictions", "predictions.csv.bz2"),
     ]
     print("Running with args: %s" % args)
     subprocess.check_call(args)
@@ -148,7 +154,3 @@ def test_run_serial():
 
 if __name__ == "__main__":
     test_run_serial()
-    #for (name, value) in list(globals().items()):
-    #    if name.startswith("test_"):
-    #        print("Running test", name)
-    #        value()

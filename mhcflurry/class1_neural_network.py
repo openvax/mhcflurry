@@ -13,7 +13,7 @@ from .encodable_sequences import EncodableSequences, EncodingError
 from .amino_acid import available_vector_encodings, vector_encoding_length
 from .regression_target import to_ic50, from_ic50
 from .common import random_peptides, amino_acid_distribution
-from .custom_loss import CUSTOM_LOSSES
+from .custom_loss import get_loss
 
 
 class Class1NeuralNetwork(object):
@@ -419,6 +419,116 @@ class Class1NeuralNetwork(object):
             allele_encoding.allele_representations(
                 self.hyperparameters['allele_amino_acid_encoding']))
 
+
+    def fit_generator(
+            self,
+            generator,
+            validation_peptide_encoding,
+            validation_affinities,
+            validation_allele_encoding=None,
+            validation_inequalities=None,
+            validation_output_indices=None,
+            steps_per_epoch=10,
+            epochs=1000,
+            patience=10,
+            verbose=1):
+        """
+        Fit using a generator. Does not support many of the features of fit(),
+        such as random negative peptides.
+
+        Parameters
+        ----------
+        generator : generator yielding (alleles, peptides, affinities) tuples
+            where alleles and peptides are lists of strings, and affinities
+            is list of floats.
+
+        validation_peptide_encoding
+        validation_affinities
+        validation_allele_encoding
+        validation_inequalities
+        validation_output_indices
+        steps_per_epoch
+        epochs
+        patience
+        verbose
+
+        Returns
+        -------
+
+        """
+        import keras
+
+        loss = get_loss(self.hyperparameters['loss'])
+
+        (validation_allele_input, allele_representations) = (
+            self.allele_encoding_to_network_input(validation_allele_encoding))
+
+        if self.network() is None:
+            self._network = self.make_network(
+                allele_representations=allele_representations,
+                **self.network_hyperparameter_defaults.subselect(
+                    self.hyperparameters))
+            if verbose > 0:
+                self.network().summary()
+        network = self.network()
+
+        network.compile(
+            loss=loss.loss, optimizer=self.hyperparameters['optimizer'])
+        network._make_predict_function()
+        self.set_allele_representations(allele_representations)
+
+        validation_x_dict = {
+            'peptide': self.peptides_to_network_input(
+                validation_peptide_encoding),
+            'allele': validation_allele_input,
+        }
+        encode_y_kwargs = {}
+        if validation_inequalities is not None:
+            encode_y_kwargs["inequalities"] = validation_inequalities
+        if validation_output_indices is not None:
+            encode_y_kwargs["output_indices"] = validation_output_indices
+
+        output = loss.encode_y(
+            from_ic50(validation_affinities), **encode_y_kwargs)
+
+        validation_y_dict = {
+            'output': output,
+        }
+
+        yielded_values_box = [0]
+
+        def wrapped_generator():
+            for (alleles, peptides, affinities) in generator:
+                (allele_encoding_input, _) = (
+                    self.allele_encoding_to_network_input(alleles))
+                x_dict = {
+                    'peptide': self.peptides_to_network_input(peptides),
+                    'allele': allele_encoding_input,
+                }
+                y_dict = {
+                    'output': from_ic50(affinities)
+                }
+                yield (x_dict, y_dict)
+                yielded_values_box[0] += len(affinities)
+
+        start = time.time()
+        result = network.fit_generator(
+            wrapped_generator(),
+            steps_per_epoch=steps_per_epoch,
+            epochs=epochs,
+            use_multiprocessing=False,
+            workers=1,
+            validation_data=(validation_x_dict, validation_y_dict),
+            callbacks=[keras.callbacks.EarlyStopping(
+                monitor="val_loss",
+                patience=patience,
+                verbose=1)]
+        )
+        if verbose > 0:
+            print("fit_generator completed in %0.2f sec (%d total points)" % (
+                time.time() - start, yielded_values_box[0]))
+
+
     def fit(
             self,
             peptides,
@@ -539,41 +649,15 @@ class Class1NeuralNetwork(object):
         if output_indices is not None:
             output_indices = output_indices[shuffle_permutation]
 
-        if self.hyperparameters['loss'].startswith("custom:"):
-            # Using a custom loss
-            try:
-                custom_loss = CUSTOM_LOSSES[
-                    self.hyperparameters['loss'].replace("custom:", "")
-                ]
-            except KeyError:
-                raise ValueError(
-                    "No such custom loss function: %s. Supported losses are: %s" % (
-                        self.hyperparameters['loss'],
-                        ", ".join([
-                            "custom:" + loss_name for loss_name in CUSTOM_LOSSES
-                        ])))
-            loss_name_or_function = custom_loss.loss
-            loss_supports_inequalities = custom_loss.supports_inequalities
-            loss_supports_multiple_outputs = custom_loss.supports_multiple_outputs
-            loss_encode_y_function = custom_loss.encode_y
-        else:
-            # Using a regular keras loss.
-            loss_name_or_function = self.hyperparameters['loss']
-            loss_supports_inequalities = False
-            loss_supports_multiple_outputs = False
-            loss_encode_y_function = None
+        loss = get_loss(self.hyperparameters['loss'])
 
-        if not loss_supports_inequalities and (
+        if not loss.supports_inequalities and (
                 any(inequality != "=" for inequality in adjusted_inequalities)):
-            raise ValueError("Loss %s does not support inequalities" % (
-                loss_name_or_function))
+            raise ValueError("Loss %s does not support inequalities" % loss)
 
-        if (
-                not loss_supports_multiple_outputs and
-                output_indices is not None and
-                (output_indices != 0).any()):
-            raise ValueError("Loss %s does not support multiple outputs" % (
-                output_indices))
+        if (not loss.supports_multiple_outputs and output_indices is not None
+                and (output_indices != 0).any()):
+            raise ValueError("Loss %s does not support multiple outputs" % loss)
 
         if self.hyperparameters['num_outputs'] != 1:
             if output_indices is None:
@@ -592,8 +676,7 @@ class Class1NeuralNetwork(object):
             self.set_allele_representations(allele_representations)
 
         self.network().compile(
-            loss=loss_name_or_function,
-            optimizer=self.hyperparameters['optimizer'])
+            loss=loss.loss, optimizer=self.hyperparameters['optimizer'])
 
         if self.hyperparameters['learning_rate'] is not None:
             from keras import backend as K
@@ -601,7 +684,7 @@ class Class1NeuralNetwork(object):
                 self.network().optimizer.lr,
                 self.hyperparameters['learning_rate'])
 
-        if loss_supports_inequalities:
+        if loss.supports_inequalities:
             # Do not sample negative affinities: just use an inequality.
             random_negative_ic50 = self.hyperparameters['random_negative_affinity_min']
             random_negative_target = from_ic50(random_negative_ic50)
@@ -647,18 +730,17 @@ class Class1NeuralNetwork(object):
         else:
             output_indices_with_random_negatives = None
 
-        if loss_encode_y_function is not None:
-            encode_y_kwargs = {}
-            if adjusted_inequalities_with_random_negatives is not None:
-                encode_y_kwargs["inequalities"] = (
-                    adjusted_inequalities_with_random_negatives)
-            if output_indices_with_random_negatives is not None:
-                encode_y_kwargs["output_indices"] = (
-                    output_indices_with_random_negatives)
+        encode_y_kwargs = {}
+        if adjusted_inequalities_with_random_negatives is not None:
+            encode_y_kwargs["inequalities"] = (
+                adjusted_inequalities_with_random_negatives)
+        if output_indices_with_random_negatives is not None:
+            encode_y_kwargs["output_indices"] = (
+                output_indices_with_random_negatives)
 
-            y_dict_with_random_negatives['output'] = loss_encode_y_function(
-                y_dict_with_random_negatives['output'],
-                **encode_y_kwargs)
+        y_dict_with_random_negatives['output'] = loss.encode_y(
+            y_dict_with_random_negatives['output'],
+            **encode_y_kwargs)
 
         val_losses = []
         min_val_loss_iteration = None

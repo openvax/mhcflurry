@@ -31,6 +31,7 @@ from .hyperparameters import HyperparameterDefaults
 from .allele_encoding import AlleleEncoding
 from .encodable_sequences import EncodableSequences
 from .regression_target import to_ic50, from_ic50
+from .import custom_loss
 
 
 # To avoid pickling large matrices to send to child processes when running in
@@ -417,6 +418,7 @@ def train_model(
         predictor,
         save_to):
     import keras.backend as K
+    import keras
 
     df = GLOBAL_DATA["train_data"]
     folds_df = GLOBAL_DATA["folds_df"]
@@ -436,7 +438,6 @@ def train_model(
     train_peptides = EncodableSequences(train_data.peptide.values)
     train_alleles = AlleleEncoding(
         train_data.allele.values, borrow_from=allele_encoding)
-    train_target = from_ic50(train_data.measurement_value.values)
 
     model = Class1NeuralNetwork(**hyperparameters)
 
@@ -453,61 +454,25 @@ def train_model(
 
     assert model.network() is None
     if hyperparameters.get("train_data", {}).get("pretrain", False):
-        iterator = pretrain_data_iterator(pretrain_data_filename, allele_encoding)
-        original_hyperparameters = dict(model.hyperparameters)
-        model.hyperparameters['minibatch_size'] = int(len(next(iterator)[-1]) / 100)
-        model.hyperparameters['max_epochs'] = 1
-        model.hyperparameters['validation_split'] = 0.0
-        model.hyperparameters['random_negative_rate'] = 0.0
-        model.hyperparameters['random_negative_constant'] = 0
-        pretrain_patience = hyperparameters["train_data"]["pretrain_patience"]
-        scores = []
-        best_score = float('inf')
-        best_score_epoch = 0
-        for (epoch, (alleles, peptides, affinities)) in enumerate(iterator):
-            # Fit one epoch.
-            start = time.time()
-            model.fit(
-                peptides=peptides,
-                affinities=affinities,
-                allele_encoding=alleles)
+        generator = pretrain_data_iterator(pretrain_data_filename, allele_encoding)
+        pretrain_patience = hyperparameters["train_data"].get(
+            "pretrain_patience", 10)
+        pretrain_steps_per_epoch = hyperparameters["train_data"].get(
+            "pretrain_steps_per_epoch", 10)
+        pretrain_max_epochs = hyperparameters["train_data"].get(
+            "pretrain_max_epochs", 1000)
 
-            fit_time = time.time() - start
-            start = time.time()
-            predictions = model.predict(
-                train_peptides,
-                allele_encoding=train_alleles)
-            assert len(predictions) == len(train_data)
-
-            print("Prediction histogram:")
-            print(
-                pandas.Series(
-                    dict([k, v] for (v, k) in zip(*numpy.histogram(predictions)))))
-
-            for (inequality, func) in [(">", numpy.minimum), ("<", numpy.maximum)]:
-                mask = train_data.measurement_inequality == inequality
-                predictions[mask.values] = func(
-                    predictions[mask.values],
-                    train_data.loc[mask].measurement_value.values)
-            score_mse = numpy.mean((from_ic50(predictions) - train_target)**2)
-            score_time = time.time() - start
-            print(
-                progress_preamble,
-                "PRETRAIN epoch %d [%d values, %0.2f sec]. "
-                "MSE [%0.2f sec.]: %10f" % (
-                    epoch, len(affinities), fit_time, score_time, score_mse))
-            scores.append(score_mse)
-
-            if score_mse < best_score:
-                print("New best score_mse", score_mse)
-                best_score = score_mse
-                best_score_epoch = epoch
-
-            if epoch - best_score_epoch > pretrain_patience:
-                print("Stopping pretraining")
-                break
-
-        model.hyperparameters = original_hyperparameters
+        model.fit_generator(
+            generator,
+            validation_peptide_encoding=train_peptides,
+            validation_affinities=train_data.measurement_value.values,
+            validation_allele_encoding=train_alleles,
+            validation_inequalities=train_data.measurement_inequality.values,
+            patience=pretrain_patience,
+            steps_per_epoch=pretrain_steps_per_epoch,
+            epochs=pretrain_max_epochs,
+            verbose=verbose,
+        )
         if model.hyperparameters['learning_rate']:
             model.hyperparameters['learning_rate'] /= 10
         else:

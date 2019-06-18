@@ -13,7 +13,43 @@ from numpy import isnan, array
 CUSTOM_LOSSES = {}
 
 
-class MSEWithInequalities(object):
+def get_loss(name):
+    if name.startswith("custom:"):
+        try:
+            custom_loss = CUSTOM_LOSSES[name.replace("custom:", "")]
+        except KeyError:
+            raise ValueError(
+                "No such custom loss: %s. Supported losses are: %s" % (
+                    name,
+                    ", ".join([
+                        "custom:" + loss_name for loss_name in CUSTOM_LOSSES
+                    ])))
+        return custom_loss
+    return StandardKerasLoss(name)
+
+
+class Loss(object):
+    def __init__(self, name=None):
+        self.name = name if name else self.name  # use name from class instance
+
+    def __str__(self):
+        return "<Loss: %s>" % self.name
+
+
+class StandardKerasLoss(Loss):
+    supports_inequalities = False
+    supports_multiple_outputs = False
+
+    def __init__(self, loss_name="mse"):
+        self.loss = loss_name
+        Loss.__init__(self, loss_name)
+
+    @staticmethod
+    def encode_y(y):
+        return y
+
+
+class MSEWithInequalities(Loss):
     """
     Supports training a regressor on data that includes inequalities
     (e.g. x < 100). Mean square error is used as the loss for elements with
@@ -96,7 +132,7 @@ class MSEWithInequalities(object):
         return result
 
 
-class MSEWithInequalitiesAndMultipleOutputs(object):
+class MSEWithInequalitiesAndMultipleOutputs(Loss):
     name = "mse_with_inequalities_and_multiple_outputs"
     supports_inequalities = True
     supports_multiple_outputs = True
