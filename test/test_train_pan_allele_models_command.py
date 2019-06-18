@@ -18,6 +18,8 @@ from mhcflurry import Class1AffinityPredictor,Class1NeuralNetwork
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
 
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 
 HYPERPARAMETERS_LIST = [
 {
