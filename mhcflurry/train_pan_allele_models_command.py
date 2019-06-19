@@ -339,12 +339,15 @@ def main(args):
     worker_pool = worker_pool_with_gpu_assignments_from_args(args)
     print("Worker pool", worker_pool)
 
+    # The estimated time to completion is more accurate if we randomize
+    # the order of the work.
+    random.shuffle(work_items)
+    for (work_item_num, item) in enumerate(work_items):
+        item['work_item_num'] = work_item_num
+        item['num_work_items'] = len(work_items)
+
     if worker_pool:
         print("Processing %d work items in parallel." % len(work_items))
-
-        # The estimated time to completion is more accurate if we randomize
-        # the order of the work.
-        random.shuffle(work_items)
 
         results_generator = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, train_model),
@@ -405,6 +408,8 @@ def main(args):
 
 
 def train_model(
+        work_item_num,
+        num_work_items,
         architecture_num,
         num_architectures,
         fold_num,
@@ -442,15 +447,21 @@ def train_model(
     model = Class1NeuralNetwork(**hyperparameters)
 
     progress_preamble = (
+        "[task %2d / %d2]: "
         "[%2d / %2d folds] "
         "[%2d / %2d architectures] "
         "[%4d / %4d replicates] " % (
+            work_item_num + 1,
+            num_work_items,
             fold_num + 1,
             num_folds,
             architecture_num + 1,
             num_architectures,
             replicate_num + 1,
             num_replicates))
+
+    print("%s [pid %d]. Hyperparameters:" % (progress_preamble, os.getpid()))
+    pprint.pprint(hyperparameters)
 
     assert model.network() is None
     if hyperparameters.get("train_data", {}).get("pretrain", False):
