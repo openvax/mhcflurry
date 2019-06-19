@@ -519,14 +519,16 @@ class Class1NeuralNetwork(object):
             use_multiprocessing=False,
             workers=1,
             validation_data=(validation_x_dict, validation_y_dict),
+            verbose=verbose,
             callbacks=[keras.callbacks.EarlyStopping(
                 monitor="val_loss",
                 patience=patience,
-                verbose=1)]
+                verbose=verbose)]
         )
         if verbose > 0:
             print("fit_generator completed in %0.2f sec (%d total points)" % (
                 time.time() - start, yielded_values_box[0]))
+        return result
 
 
     def fit(
