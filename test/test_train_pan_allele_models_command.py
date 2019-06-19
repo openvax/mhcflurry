@@ -146,11 +146,12 @@ def run_and_check(n_jobs=0):
 
 if os.environ.get("KERAS_BACKEND") != "theano":
     def test_run_parallel():
+        run_and_check(n_jobs=1)
         run_and_check(n_jobs=2)
 
 
 def test_run_serial():
-    run_and_check(n_jobs=1)
+    run_and_check(n_jobs=0)
 
 if __name__ == "__main__":
     test_run_serial()

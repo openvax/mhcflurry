@@ -21,7 +21,7 @@ def add_worker_pool_args(parser):
         type=int,
         metavar="N",
         help="Number of processes to parallelize training over. Experimental. "
-             "Set to 1 for serial run. Set to 0 to use number of cores. Default: %(default)s.")
+             "Set to 0 for serial run. Default: %(default)s.")
     group.add_argument(
         "--backend",
         choices=("tensorflow-gpu", "tensorflow-cpu", "tensorflow-default"),
@@ -67,7 +67,7 @@ def worker_pool_with_gpu_assignments(
 
     num_workers = num_jobs if num_jobs else cpu_count()
 
-    if num_workers == 1:
+    if num_workers == 0:
         if backend:
             set_keras_backend(backend)
         return None
@@ -136,7 +136,7 @@ def make_worker_pool(
         issue we add a second 'backup queue'. This queue always contains the
         full set of initializer arguments: whenever a worker reads from it, it
         always pushes the pop'd args back to the end of the queue immediately.
-        If the primary arg queue is every empty, then workers will read
+        If the primary arg queue is ever empty, then workers will read
         from this backup queue.
 
     Parameters
