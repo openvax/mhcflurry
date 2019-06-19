@@ -447,7 +447,7 @@ def train_model(
     model = Class1NeuralNetwork(**hyperparameters)
 
     progress_preamble = (
-        "[task %2d / %d2]: "
+        "[task %2d / %2d]: "
         "[%2d / %2d folds] "
         "[%2d / %2d architectures] "
         "[%4d / %4d replicates] " % (
