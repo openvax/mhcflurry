@@ -35,6 +35,9 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
+export PYTHONUNBUFFERED=1
+VERBOSITY=1
+
 mhcflurry-class1-train-pan-allele-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
     --allele-sequences "$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv" \
@@ -42,11 +45,26 @@ mhcflurry-class1-train-pan-allele-models \
     --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
     --ensemble-size 4 \
     --hyperparameters hyperparameters.yaml \
-    --out-models-dir models-unselected \
-    --num-jobs 4 --gpus $GPUS --max-workers-per-gpu 1 --max-tasks-per-worker 1
+    --out-models-dir models-unselected.with_mass_spec \
+    --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+    --verbosity $VERBOSITY \
+    --num-jobs $GPUS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
+
+mhcflurry-class1-train-pan-allele-models \
+    --data "$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2" \
+    --allele-sequences "$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv" \
+    --pretrain-data "$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2" \
+    --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
+    --ensemble-size 4 \
+    --hyperparameters hyperparameters.yaml \
+    --out-models-dir models-unselected.no_mass_spec \
+    --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+    --verbosity $VERBOSITY \
+    --num-jobs $GPUS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
+for i in $(ls LOG-worker.*.txt) ; do bzip2 $i ; done
 tar -cjf "../${DOWNLOAD_NAME}.with_unselected.tar.bz2" *
 echo "Created archive: $SCRATCH_DIR/${DOWNLOAD_NAME}.with_unselected.tar.bz2"
 
