@@ -718,6 +718,7 @@ class Class1NeuralNetwork(object):
                     y_values,
                 ]),
             }
+            adjusted_inequalities_with_random_negatives = None
         if sample_weights is not None:
             sample_weights_with_random_negatives = numpy.concatenate([
                 numpy.ones(int(num_random_negative.sum())),
