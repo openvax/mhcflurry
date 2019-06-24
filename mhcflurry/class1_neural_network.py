@@ -613,7 +613,7 @@ class Class1NeuralNetwork(object):
                 str(aa_distribution.to_dict())))
 
         y_values = from_ic50(affinities)
-        assert numpy.isnan(y_values).sum() == 0, numpy.isnan(y_values).sum()
+        assert numpy.isnan(y_values).sum() == 0, y_values
         if inequalities is not None:
             # Reverse inequalities because from_ic50() flips the direction
             # (i.e. lower affinity results in higher y values).
@@ -642,6 +642,7 @@ class Class1NeuralNetwork(object):
         if shuffle_permutation is None:
             shuffle_permutation = numpy.random.permutation(len(y_values))
         y_values = y_values[shuffle_permutation]
+        assert numpy.isnan(y_values).sum() == 0, y_values
         peptide_encoding = peptide_encoding[shuffle_permutation]
         adjusted_inequalities = adjusted_inequalities[shuffle_permutation]
         for key in x_dict_without_random_negatives:
