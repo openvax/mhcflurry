@@ -612,7 +612,7 @@ class Class1NeuralNetwork(object):
                 "Using amino acid distribution for random negative:\n%s" % (
                 str(aa_distribution.to_dict())))
 
-        y_values = from_ic50(affinities)
+        y_values = from_ic50(numpy.array(affinities, copy=False))
         assert numpy.isnan(y_values).sum() == 0, y_values
         if inequalities is not None:
             # Reverse inequalities because from_ic50() flips the direction
@@ -649,9 +649,13 @@ class Class1NeuralNetwork(object):
             x_dict_without_random_negatives[key] = (
                 x_dict_without_random_negatives[key][shuffle_permutation])
         if sample_weights is not None:
-            sample_weights = sample_weights[shuffle_permutation]
+            sample_weights = numpy.array(sample_weights, copy=False)[
+                shuffle_permutation
+            ]
         if output_indices is not None:
-            output_indices = output_indices[shuffle_permutation]
+            output_indices = numpy.array(output_indices, copy=False)[
+                shuffle_permutation
+            ]
 
         loss = get_loss(self.hyperparameters['loss'])
 
