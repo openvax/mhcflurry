@@ -719,6 +719,8 @@ class Class1NeuralNetwork(object):
                 ]),
             }
             adjusted_inequalities_with_random_negatives = None
+        assert numpy.isnan(y_dict_with_random_negatives['output']).sum() == 0, (
+            y_dict_with_random_negatives)
         if sample_weights is not None:
             sample_weights_with_random_negatives = numpy.concatenate([
                 numpy.ones(int(num_random_negative.sum())),

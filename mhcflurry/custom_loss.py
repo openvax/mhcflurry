@@ -82,11 +82,11 @@ class MSEWithInequalities(Loss):
     def encode_y(y, inequalities=None):
         y = array(y, dtype="float32")
         if isnan(y).any():
-            raise ValueError("y contains NaN: %s" % str(y))
+            raise ValueError("y contains NaN", y)
         if (y > 1.0).any():
-            raise ValueError("y contains values > 1.0")
+            raise ValueError("y contains values > 1.0", y)
         if (y < 0.0).any():
-            raise ValueError("y contains values < 0.0")
+            raise ValueError("y contains values < 0.0", y)
 
         if inequalities is None:
             encoded = y
@@ -141,11 +141,11 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
     def encode_y(y, inequalities=None, output_indices=None):
         y = array(y, dtype="float32")
         if isnan(y).any():
-            raise ValueError("y contains NaN: %s" % str(y))
+            raise ValueError("y contains NaN", y)
         if (y > 1.0).any():
-            raise ValueError("y contains values > 1.0")
+            raise ValueError("y contains values > 1.0", y)
         if (y < 0.0).any():
-            raise ValueError("y contains values < 0.0")
+            raise ValueError("y contains values < 0.0", y)
 
         encoded = MSEWithInequalities.encode_y(
             y, inequalities=inequalities)
