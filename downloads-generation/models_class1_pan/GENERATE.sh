@@ -27,7 +27,10 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 mkdir models
 
-python $SCRIPT_DIR/generate_hyperparameters.py > hyperparameters.yaml
+cp $SCRIPT_DIR/generate_hyperparameters.py .
+python generate_hyperparameters.py > hyperparameters.yaml
+
+cp $SCRIPT_DIR/write_validation_data.py .
 
 GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
 echo "Detected GPUS: $GPUS"

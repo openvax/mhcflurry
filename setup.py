@@ -83,6 +83,8 @@ if __name__ == '__main__':
                     'mhcflurry.train_pan_allele_models_command:run',
                 'mhcflurry-class1-select-allele-specific-models = '
                     'mhcflurry.select_allele_specific_models_command:run',
+                'mhcflurry-class1-select-pan-allele-models = '
+                    'mhcflurry.select_pan_allele_models_command:run',
                 'mhcflurry-calibrate-percentile-ranks = '
                     'mhcflurry.calibrate_percentile_ranks_command:run',
             ]
