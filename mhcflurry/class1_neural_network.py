@@ -458,6 +458,9 @@ class Class1NeuralNetwork(object):
 
         """
         import keras
+        from keras import backend as K
+
+        fit_info = collections.defaultdict(list)
 
         loss = get_loss(self.hyperparameters['loss'])
 
@@ -477,6 +480,13 @@ class Class1NeuralNetwork(object):
             loss=loss.loss, optimizer=self.hyperparameters['optimizer'])
         network._make_predict_function()
         self.set_allele_representations(allele_representations)
+
+        if self.hyperparameters['learning_rate'] is not None:
+            K.set_value(
+                self.network().optimizer.lr,
+                self.hyperparameters['learning_rate'])
+        fit_info["learning_rate"] = float(
+            K.get_value(self.network().optimizer.lr))
 
         validation_x_dict = {
             'peptide': self.peptides_to_network_input(
@@ -513,7 +523,8 @@ class Class1NeuralNetwork(object):
                 yielded_values_box[0] += len(affinities)
 
         start = time.time()
-        result = network.fit_generator(
+
+        fit_history = network.fit_generator(
             wrapped_generator(),
             steps_per_epoch=steps_per_epoch,
             epochs=epochs,
@@ -526,10 +537,12 @@ class Class1NeuralNetwork(object):
                 patience=patience,
                 verbose=verbose)]
         )
-        if verbose > 0:
-            print("fit_generator completed in %0.2f sec (%d total points)" % (
-                time.time() - start, yielded_values_box[0]))
-        return result
+        for (key, value) in fit_history.history.items():
+            fit_info[key].extend(value)
+
+        fit_info["time"] = time.time() - start
+        fit_info["num_points"] = yielded_values_box[0]
+        self.fit_info.append(dict(fit_info))
 
 
     def fit(
@@ -585,8 +598,10 @@ class Class1NeuralNetwork(object):
             How often (in seconds) to print progress update. Set to None to
             disable.
         """
+        from keras import backend as K
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
+        fit_info = collections.defaultdict(list)
 
         length_counts = (
             pandas.Series(encodable_peptides.sequences)
@@ -687,10 +702,11 @@ class Class1NeuralNetwork(object):
             loss=loss.loss, optimizer=self.hyperparameters['optimizer'])
 
         if self.hyperparameters['learning_rate'] is not None:
-            from keras import backend as K
             K.set_value(
                 self.network().optimizer.lr,
                 self.hyperparameters['learning_rate'])
+        fit_info["learning_rate"] = float(
+            K.get_value(self.network().optimizer.lr))
 
         if loss.supports_inequalities:
             # Do not sample negative affinities: just use an inequality.
@@ -762,7 +778,6 @@ class Class1NeuralNetwork(object):
         min_val_loss_iteration = None
         min_val_loss = None
 
-        fit_info = collections.defaultdict(list)
         start = time.time()
         last_progress_print = None
         x_dict_with_random_negatives = {}

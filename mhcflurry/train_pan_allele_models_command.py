@@ -9,6 +9,7 @@ import time
 import traceback
 import random
 import pprint
+import hashlib
 from functools import partial
 
 import numpy
@@ -130,6 +131,7 @@ add_worker_pool_args(parser)
 
 def assign_folds(df, num_folds, held_out_fraction, held_out_max):
     result_df = pandas.DataFrame(index=df.index)
+
     for fold in range(num_folds):
         result_df["fold_%d" % fold] = True
         for (allele, sub_df) in df.groupby("allele"):
@@ -171,6 +173,9 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
 
     print("Test points per fold")
     print((~result_df).sum())
+
+    result_df["allele"] = df["allele"]
+    result_df["peptide"] = df["peptide"]
 
     return result_df
 
@@ -422,8 +427,6 @@ def train_model(
         progress_print_interval,
         predictor,
         save_to):
-    import keras.backend as K
-    import keras
 
     df = GLOBAL_DATA["train_data"]
     folds_df = GLOBAL_DATA["folds_df"]
@@ -484,10 +487,10 @@ def train_model(
             epochs=pretrain_max_epochs,
             verbose=verbose,
         )
-        if model.hyperparameters['learning_rate']:
-            model.hyperparameters['learning_rate'] /= 10
-        else:
-            model.hyperparameters['learning_rate'] = 0.0001
+
+        # Use a smaller learning rate for training on real data
+        learning_rate = model.fit_info[-1]["learning_rate"]
+        model.hyperparameters['learning_rate'] = learning_rate / 10
 
     model.fit(
         peptides=train_peptides,
@@ -499,6 +502,20 @@ def train_model(
         progress_preamble=progress_preamble,
         progress_print_interval=progress_print_interval,
         verbose=verbose)
+
+    # Save model-specific training info
+    train_peptide_hash = hashlib.sha1()
+    for peptide in train_data.peptide.values:
+        train_peptide_hash.update(peptide.encode())
+    model.fit_info[-1]["training_info"] = {
+        "fold_num": fold_num,
+        "num_folds": num_folds,
+        "replicate_num": replicate_num,
+        "num_replicates": num_replicates,
+        "architecture_num": architecture_num,
+        "num_architectures": num_architectures,
+        "train_peptide_hash": train_peptide_hash.hexdigest(),
+    }
 
     numpy.testing.assert_equal(
         predictor.manifest_df.shape[0], len(predictor.class1_pan_allele_models))

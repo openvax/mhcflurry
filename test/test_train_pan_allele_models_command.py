@@ -101,7 +101,7 @@ HYPERPARAMETERS_LIST = [
 ][1:]
 
 
-def run_and_check(n_jobs=0):
+def run_and_check(n_jobs=0, delete=True):
     models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
     hyperparameters_filename = os.path.join(
         models_dir, "hyperparameters.yaml")
@@ -140,8 +140,9 @@ def run_and_check(n_jobs=0):
             alleles=["HLA-A*02:01"])
     print(df)
 
-    print("Deleting: %s" % models_dir)
-    shutil.rmtree(models_dir)
+    if delete:
+        print("Deleting: %s" % models_dir)
+        shutil.rmtree(models_dir)
 
 
 if os.environ.get("KERAS_BACKEND") != "theano":
@@ -153,5 +154,6 @@ if os.environ.get("KERAS_BACKEND") != "theano":
 def test_run_serial():
     run_and_check(n_jobs=0)
 
+
 if __name__ == "__main__":
-    test_run_serial()
+    run_and_check(n_jobs=0, delete=False)
