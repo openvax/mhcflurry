@@ -44,13 +44,6 @@ parser.add_argument(
         "Model selection data CSV. Expected columns: "
         "allele, peptide, measurement_value"))
 parser.add_argument(
-    "--exclude-data",
-    metavar="FILE.csv",
-    required=False,
-    help=(
-        "Data to EXCLUDE from model selection. Useful to specify the original "
-        "training data used"))
-parser.add_argument(
     "--models-dir",
     metavar="DIR",
     required=True,
@@ -60,24 +53,6 @@ parser.add_argument(
     metavar="DIR",
     required=True,
     help="Directory to write selected models")
-parser.add_argument(
-    "--out-unselected-predictions",
-    metavar="FILE.csv",
-    help="Write predictions for validation data using unselected predictor to "
-    "FILE.csv")
-parser.add_argument(
-    "--unselected-accuracy-scorer",
-    metavar="SCORER",
-    default="combined:mass-spec,mse")
-parser.add_argument(
-    "--unselected-accuracy-scorer-num-samples",
-    type=int,
-    default=1000)
-parser.add_argument(
-    "--unselected-accuracy-percentile-threshold",
-    type=float,
-    metavar="X",
-    default=95)
 parser.add_argument(
     "--min-models",
     type=int,
@@ -122,15 +97,14 @@ def run(argv=sys.argv[1:]):
     print("Loaded: %s" % input_predictor)
 
     alleles = input_predictor.supported_alleles
+    (min_peptide_length, max_peptide_length) = (
+        input_predictor.supported_peptide_lengths)
 
     metadata_dfs = {}
     df = pandas.read_csv(args.data)
     print("Loaded data: %s" % (str(df.shape)))
 
-    (min_peptide_length, max_peptide_length) = (
-        input_predictor.supported_peptide_lengths)
-
-    df = df.ix[
+    df = df.loc[
         (df.peptide.str.len() >= min_peptide_length) &
         (df.peptide.str.len() <= max_peptide_length)
     ]
@@ -141,26 +115,10 @@ def run(argv=sys.argv[1:]):
 
     # Allele names in data are assumed to be already normalized.
     df = df.loc[df.allele.isin(alleles)].dropna()
+    print("Subselected to supported alleles: %s" % str(df.shape))
+
+
     print("Selected %d alleles: %s" % (len(alleles), ' '.join(alleles)))
-
-    if args.exclude_data:
-        exclude_df = pandas.read_csv(args.exclude_data)
-        metadata_dfs["model_selection_exclude"] = exclude_df
-        print("Loaded exclude data: %s" % (str(df.shape)))
-
-        df["_key"] = df.allele + "__" + df.peptide
-        exclude_df["_key"] = exclude_df.allele + "__" + exclude_df.peptide
-        df["_excluded"] = df._key.isin(exclude_df._key.unique())
-        print("Excluding measurements per allele (counts): ")
-        print(df.groupby("allele")._excluded.sum())
-
-        print("Excluding measurements per allele (fractions): ")
-        print(df.groupby("allele")._excluded.mean())
-
-        df = df.loc[~df._excluded]
-        del df["_excluded"]
-        del df["_key"]
-        print("Reduced data to: %s" % (str(df.shape)))
 
     metadata_dfs["model_selection_data"] = df
 
@@ -168,101 +126,9 @@ def run(argv=sys.argv[1:]):
         args.mass_spec_regex)
 
 
-    if args.out_unselected_predictions:
-        df["unselected_prediction"] = input_predictor.predict(
-            alleles=df.allele.values,
-            peptides=df.peptide.values)
-        df.to_csv(args.out_unselected_predictions)
-        print("Wrote: %s" % args.out_unselected_predictions)
 
-    selectors = {}
-    selector_to_model_selection_kwargs = {}
 
-    def make_selector(
-            scoring,
-            combined_min_contribution_percent=args.combined_min_contribution_percent):
-        if scoring in selectors:
-            return (
-                selectors[scoring], selector_to_model_selection_kwargs[scoring])
 
-        start = time.time()
-        if scoring.startswith("combined:"):
-            model_selection_kwargs = {
-                'min_models': args.combined_min_models,
-                'max_models': args.combined_max_models,
-            }
-            component_selectors = []
-            for component_selector in scoring.split(":", 1)[1].split(","):
-                component_selectors.append(
-                    make_selector(
-                        component_selector)[0])
-            selector = CombinedModelSelector(
-                component_selectors,
-                min_contribution_percent=combined_min_contribution_percent)
-        elif scoring == "mse":
-            model_selection_kwargs = {
-                'min_models': args.mse_min_models,
-                'max_models': args.mse_max_models,
-            }
-            min_measurements = args.mse_min_measurements
-            selector = MSEModelSelector(
-                df=df.loc[~df.mass_spec],
-                predictor=input_predictor,
-                min_measurements=min_measurements)
-        elif scoring == "mass-spec":
-            mass_spec_df = df.loc[df.mass_spec]
-            model_selection_kwargs = {
-                'min_models': args.mass_spec_min_models,
-                'max_models': args.mass_spec_max_models,
-            }
-            min_measurements = args.mass_spec_min_measurements
-            selector = MassSpecModelSelector(
-                df=mass_spec_df,
-                predictor=input_predictor,
-                min_measurements=min_measurements)
-        elif scoring == "consensus":
-            model_selection_kwargs = {
-                'min_models': args.consensus_min_models,
-                'max_models': args.consensus_max_models,
-            }
-            selector = ConsensusModelSelector(
-                predictor=input_predictor,
-                num_peptides_per_length=args.consensus_num_peptides_per_length)
-        else:
-            raise ValueError("Unsupported scoring method: %s" % scoring)
-        print("Instantiated model selector %s in %0.2f sec." % (
-            scoring, time.time() - start))
-        return (selector, model_selection_kwargs)
-
-    for scoring in args.scoring:
-        (selector, model_selection_kwargs) = make_selector(scoring)
-        selectors[scoring] = selector
-        selector_to_model_selection_kwargs[scoring] = model_selection_kwargs
-
-    unselected_accuracy_scorer = None
-    if args.unselected_accuracy_scorer:
-        # Force running all selectors by setting combined_min_contribution_percent=0.
-        unselected_accuracy_scorer = make_selector(
-            args.unselected_accuracy_scorer,
-            combined_min_contribution_percent=0.0)[0]
-        print("Using unselected accuracy scorer: %s" % unselected_accuracy_scorer)
-    GLOBAL_DATA["unselected_accuracy_scorer"] = unselected_accuracy_scorer
-
-    print("Selectors for alleles:")
-    allele_to_selector = {}
-    allele_to_model_selection_kwargs = {}
-    for allele in alleles:
-        selector = None
-        for possible_selector in args.scoring:
-            if selectors[possible_selector].usable_for_allele(allele=allele):
-                selector = selectors[possible_selector]
-                print("%20s %s" % (allele, selector.plan_summary(allele)))
-                break
-        if selector is None:
-            raise ValueError("No selectors usable for allele: %s" % allele)
-        allele_to_selector[allele] = selector
-        allele_to_model_selection_kwargs[allele] = (
-            selector_to_model_selection_kwargs[possible_selector])
 
     GLOBAL_DATA["args"] = args
     GLOBAL_DATA["input_predictor"] = input_predictor
