@@ -7,13 +7,8 @@ import signal
 import sys
 import time
 import traceback
-import random
 from functools import partial
 
-import numpy
-import pandas
-import yaml
-from sklearn.metrics.pairwise import cosine_similarity
 from mhcnames import normalize_allele_name
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481

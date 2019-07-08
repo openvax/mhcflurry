@@ -72,14 +72,12 @@ def worker_pool_with_gpu_assignments(
         max_tasks_per_worker=None,
         worker_log_dir=None):
 
-    num_workers = num_jobs if num_jobs else cpu_count()
-
-    if num_workers == 0:
+    if num_jobs == 0:
         if backend:
             set_keras_backend(backend)
         return None
 
-    worker_init_kwargs = [{} for _ in range(num_workers)]
+    worker_init_kwargs = [{} for _ in range(num_jobs)]
     if num_gpus:
         print("Attempting to round-robin assign each worker a GPU.")
         if backend != "tensorflow-default":
@@ -115,7 +113,7 @@ def worker_pool_with_gpu_assignments(
             kwargs["worker_log_dir"] = worker_log_dir
 
     worker_pool = make_worker_pool(
-        processes=num_workers,
+        processes=num_jobs,
         initializer=worker_init,
         initializer_kwargs_per_process=worker_init_kwargs,
         max_tasks_per_worker=max_tasks_per_worker)
