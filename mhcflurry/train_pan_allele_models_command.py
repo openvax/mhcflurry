@@ -505,7 +505,7 @@ def train_model(
 
     # Save model-specific training info
     train_peptide_hash = hashlib.sha1()
-    for peptide in train_data.peptide.values:
+    for peptide in sorted(train_data.peptide.values):
         train_peptide_hash.update(peptide.encode())
     model.fit_info[-1]["training_info"] = {
         "fold_num": fold_num,
