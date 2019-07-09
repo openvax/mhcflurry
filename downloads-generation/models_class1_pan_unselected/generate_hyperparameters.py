@@ -42,6 +42,7 @@ base_hyperparameters = {
     'train_data': {
         'pretrain': True,
         'pretrain_peptides_per_epoch': 1024,
+        'pretrain_steps_per_epoch': 16,
         'pretrain_patience': 10,
     },
     'validation_split': 0.1,
