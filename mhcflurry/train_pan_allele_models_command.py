@@ -15,8 +15,6 @@ from functools import partial
 import numpy
 import pandas
 import yaml
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.model_selection import StratifiedKFold
 from mhcnames import normalize_allele_name
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
@@ -28,11 +26,8 @@ from .parallelism import (
     add_worker_pool_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
-from .hyperparameters import HyperparameterDefaults
 from .allele_encoding import AlleleEncoding
 from .encodable_sequences import EncodableSequences
-from .regression_target import to_ic50, from_ic50
-from .import custom_loss
 
 
 # To avoid pickling large matrices to send to child processes when running in
@@ -173,10 +168,6 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
 
     print("Test points per fold")
     print((~result_df).sum())
-
-    result_df["allele"] = df["allele"]
-    result_df["peptide"] = df["peptide"]
-
     return result_df
 
 
@@ -304,10 +295,13 @@ def main(args):
     predictor = Class1AffinityPredictor(
         allele_to_sequence=allele_encoding.allele_to_sequence,
         metadata_dataframes={
-            'train_data': df,
-            'training_folds': folds_df,
+            'train_data': pandas.merge(
+                df,
+                folds_df,
+                left_index=True,
+                right_index=True)
         })
-    serial_run = args.num_jobs == 1
+    serial_run = args.num_jobs == 0
 
     work_items = []
     for (h, hyperparameters) in enumerate(hyperparameters_lst):
@@ -353,6 +347,7 @@ def main(args):
 
     if worker_pool:
         print("Processing %d work items in parallel." % len(work_items))
+        assert not serial_run
 
         results_generator = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, train_model),
@@ -389,6 +384,7 @@ def main(args):
         # which it adds models to, so no merging is required. It also saves
         # as it goes so no saving is required at the end.
         print("Processing %d work items in serial." % len(work_items))
+        assert serial_run
         for _ in tqdm.trange(len(work_items)):
             item = work_items.pop(0)  # want to keep freeing up memory
             work_predictor = train_model(**item)
