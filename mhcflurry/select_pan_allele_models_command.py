@@ -232,18 +232,30 @@ def run(argv=sys.argv[1:]):
             chunksize=1)
 
     models_by_fold = {}
+    summary_dfs = []
     for result in tqdm.tqdm(results, total=len(work_items)):
         pprint(result)
         fold_num = result['fold_num']
+        (all_models_for_fold, _) = folds_to_predictors[fold_num]
         models = [
-            folds_to_predictors[fold_num][0][i]
+            all_models_for_fold[i]
             for i in result['selected_indices']
         ]
+        summary_df = result['summary'].copy()
+        summary_df.index = summary_df.index.map(
+            lambda idx: all_models_for_fold[idx])
+        summary_dfs.append(summary_df)
+
         print("Selected %d models for fold %d: %s" % (
             len(models), fold_num, result['selected_indices']))
         models_by_fold[fold_num] = models
         for model in models:
             result_predictor.add_pan_allele_model(model)
+
+    summary_df = pandas.concat(summary_dfs, ignore_index=False)
+    summary_df["model_config"] = summary_df.index.map(lambda m: m.get_config())
+    result_predictor.metadata_dataframes["model_selection_summary"] = (
+        summary_df.reset_index(drop=True))
 
     result_predictor.save(args.out_models_dir)
 
@@ -312,11 +324,16 @@ def model_select(fold_num, models, min_models, max_models):
             break
 
     assert selected
+
+    summary_df = pandas.Series(individual_model_scores)[
+        numpy.arange(len(models))
+    ].to_frame()
+    summary_df.columns = ['mse_score']
+
     return {
         'fold_num': fold_num,
         'selected_indices': selected,
-        'individual_model_scores': pandas.Series(
-            individual_model_scores)[numpy.arange(len(models))],
+        'summary': summary_df,  # indexed by model index
     }
 
 

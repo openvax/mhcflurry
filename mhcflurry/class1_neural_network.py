@@ -10,7 +10,6 @@ import pandas
 from .hyperparameters import HyperparameterDefaults
 
 from .encodable_sequences import EncodableSequences, EncodingError
-from .amino_acid import available_vector_encodings, vector_encoding_length
 from .regression_target import to_ic50, from_ic50
 from .common import random_peptides, amino_acid_distribution
 from .custom_loss import get_loss
@@ -155,7 +154,6 @@ class Class1NeuralNetwork(object):
                 if to_name:
                     hyperparameters[to_name] = value
         return hyperparameters
-
 
     def __init__(self, **hyperparameters):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
@@ -420,7 +418,6 @@ class Class1NeuralNetwork(object):
             allele_encoding.allele_representations(
                 self.hyperparameters['allele_amino_acid_encoding']))
 
-
     def fit_generator(
             self,
             generator,
@@ -543,7 +540,6 @@ class Class1NeuralNetwork(object):
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = yielded_values_box[0]
         self.fit_info.append(dict(fit_info))
-
 
     def fit(
             self,
