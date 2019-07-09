@@ -152,21 +152,21 @@ def run(argv=sys.argv[1:]):
     if num_folds <= 1:
         raise ValueError("Too few folds: ", num_folds)
 
-    #df = df.loc[
-    #    (df.peptide.str.len() >= min_peptide_length) &
-    #    (df.peptide.str.len() <= max_peptide_length)
-    #]
-    #print("Subselected to %d-%dmers: %s" % (
-    #    min_peptide_length, max_peptide_length, str(df.shape)))
+    df = df.loc[
+        (df.peptide.str.len() >= min_peptide_length) &
+        (df.peptide.str.len() <= max_peptide_length)
+    ]
+    print("Subselected to %d-%dmers: %s" % (
+        min_peptide_length, max_peptide_length, str(df.shape)))
 
     print("Num folds: ", num_folds, "fraction included:")
     print(df[fold_cols].mean())
 
     # Allele names in data are assumed to be already normalized.
-    #df = df.loc[df.allele.isin(alleles)].dropna()
-    #print("Subselected to supported alleles: %s" % str(df.shape))
+    df = df.loc[df.allele.isin(alleles)].dropna()
+    print("Subselected to supported alleles: %s" % str(df.shape))
 
-    #print("Selected %d alleles: %s" % (len(alleles), ' '.join(alleles)))
+    print("Selected %d alleles: %s" % (len(alleles), ' '.join(alleles)))
 
     metadata_dfs["model_selection_data"] = df
 
