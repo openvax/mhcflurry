@@ -13,8 +13,8 @@ import numpy
 from .common import set_keras_backend
 
 
-def add_worker_pool_args(parser):
-    group = parser.add_argument_group("Worker pool")
+def add_local_parallelism_args(parser):
+    group = parser.add_argument_group("Local parallelism")
 
     group.add_argument(
         "--num-jobs",

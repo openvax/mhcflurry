@@ -10,6 +10,8 @@ import traceback
 import random
 import pprint
 import hashlib
+import pickle
+import subprocess
 from functools import partial
 
 import numpy
@@ -22,10 +24,13 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import Class1NeuralNetwork
 from .common import configure_logging
-from .parallelism import (
-    add_worker_pool_args,
+from .local_parallelism import (
+    add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
+from .cluster_parallelism import (
+    add_cluster_parallelism_args,
+    cluster_results_from_args)
 from .allele_encoding import AlleleEncoding
 from .encodable_sequences import EncodableSequences
 
@@ -121,8 +126,8 @@ parser.add_argument(
     default=False,
     help="Launch python debugger on error")
 
-add_worker_pool_args(parser)
-
+add_local_parallelism_args(parser)
+add_cluster_parallelism_args(parser)
 
 def assign_folds(df, num_folds, held_out_fraction, held_out_max):
     result_df = pandas.DataFrame(index=df.index)
@@ -335,9 +340,6 @@ def main(args):
 
     start = time.time()
 
-    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
-    print("Worker pool", worker_pool)
-
     # The estimated time to completion is more accurate if we randomize
     # the order of the work.
     random.shuffle(work_items)
@@ -345,15 +347,41 @@ def main(args):
         item['work_item_num'] = work_item_num
         item['num_work_items'] = len(work_items)
 
-    if worker_pool:
-        print("Processing %d work items in parallel." % len(work_items))
-        assert not serial_run
+    if args.cluster_parallelism:
+        # Run using separate processes HPC cluster.
+        results_generator = cluster_results_from_args(
+            args,
+            work_function=train_model,
+            work_items=work_items,
+            constant_data=GLOBAL_DATA,
+            result_serialization_method="save_predictor")
+        worker_pool = None
+    else:
+        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        print("Worker pool", worker_pool)
 
-        results_generator = worker_pool.imap_unordered(
-            partial(call_wrapped_kwargs, train_model),
-            work_items,
-            chunksize=1)
+        if worker_pool:
+            print("Processing %d work items in parallel." % len(work_items))
+            assert not serial_run
 
+            results_generator = worker_pool.imap_unordered(
+                partial(call_wrapped_kwargs, train_model),
+                work_items,
+                chunksize=1)
+        else:
+            # Run in serial. In this case, every worker is passed the same predictor,
+            # which it adds models to, so no merging is required. It also saves
+            # as it goes so no saving is required at the end.
+            print("Processing %d work items in serial." % len(work_items))
+            assert serial_run
+            for _ in tqdm.trange(len(work_items)):
+                item = work_items.pop(0)  # want to keep freeing up memory
+                work_predictor = train_model(**item)
+                assert work_predictor is predictor
+            assert not work_items
+            results_generator = None
+
+    if results_generator:
         unsaved_predictors = []
         last_save_time = time.time()
         for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
@@ -378,18 +406,6 @@ def main(args):
                 last_save_time = time.time()
 
         predictor.merge_in_place(unsaved_predictors)
-
-    else:
-        # Run in serial. In this case, every worker is passed the same predictor,
-        # which it adds models to, so no merging is required. It also saves
-        # as it goes so no saving is required at the end.
-        print("Processing %d work items in serial." % len(work_items))
-        assert serial_run
-        for _ in tqdm.trange(len(work_items)):
-            item = work_items.pop(0)  # want to keep freeing up memory
-            work_predictor = train_model(**item)
-            assert work_predictor is predictor
-        assert not work_items
 
     print("Saving final predictor to: %s" % args.out_models_dir)
     predictor.save(args.out_models_dir)  # write all models just to be sure
@@ -422,12 +438,13 @@ def train_model(
         verbose,
         progress_print_interval,
         predictor,
-        save_to):
+        save_to,
+        constant_data=GLOBAL_DATA):
 
-    df = GLOBAL_DATA["train_data"]
-    folds_df = GLOBAL_DATA["folds_df"]
-    allele_encoding = GLOBAL_DATA["allele_encoding"]
-    args = GLOBAL_DATA["args"]
+    df = constant_data["train_data"]
+    folds_df = constant_data["folds_df"]
+    allele_encoding = constant_data["allele_encoding"]
+    args = constant_data["args"]
 
     if predictor is None:
         predictor = Class1AffinityPredictor(
