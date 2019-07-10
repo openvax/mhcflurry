@@ -10,6 +10,10 @@
 #BSUB -eo {work_dir}/%J.stderr # error log
 #BSUB -L /bin/bash # Initialize the execution environment
 
+export TMPDIR=/local/JOBS/haplocnv-{case}
+export PATH=$HOME/.conda/envs/py37/bin/:$PATH
+
 set -e
 free -m
 cd {work_dir}
+
