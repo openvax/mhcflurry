@@ -25,8 +25,6 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-mkdir models
-
 cp $SCRIPT_DIR/generate_hyperparameters.py .
 python generate_hyperparameters.py > hyperparameters.yaml
 
