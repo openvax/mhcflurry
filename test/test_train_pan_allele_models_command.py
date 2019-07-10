@@ -101,7 +101,7 @@ HYPERPARAMETERS_LIST = [
 ][1:]
 
 
-def run_and_check(n_jobs=0, delete=True):
+def run_and_check(n_jobs=0, delete=True, additional_args=[]):
     models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
     hyperparameters_filename = os.path.join(
         models_dir, "hyperparameters.yaml")
@@ -125,7 +125,7 @@ def run_and_check(n_jobs=0, delete=True):
         "--verbosity", "1",
         "--pretrain-data", get_path(
             "random_peptide_predictions", "predictions.csv.bz2"),
-    ]
+    ] + additional_args
     print("Running with args: %s" % args)
     subprocess.check_call(args)
 
@@ -144,7 +144,7 @@ def run_and_check(n_jobs=0, delete=True):
         print("Deleting: %s" % models_dir)
         shutil.rmtree(models_dir)
 
-
+"""
 if os.environ.get("KERAS_BACKEND") != "theano":
     def test_run_parallel():
         run_and_check(n_jobs=1)
@@ -153,6 +153,14 @@ if os.environ.get("KERAS_BACKEND") != "theano":
 
 def test_run_serial():
     run_and_check(n_jobs=0)
+"""
+
+
+def test_run_cluster_parallelism():
+    run_and_check(n_jobs=0, additional_args=[
+        '--cluster-parallelism',
+        '--cluster-results-workdir', '/tmp/'
+    ])
 
 
 if __name__ == "__main__":

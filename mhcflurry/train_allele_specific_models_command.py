@@ -21,8 +21,8 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import configure_logging
-from .parallelism import (
-    add_worker_pool_args,
+from .local_parallelism import (
+    add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from .hyperparameters import HyperparameterDefaults
@@ -122,7 +122,7 @@ parser.add_argument(
     help="Keras verbosity. Default: %(default)s",
     default=0)
 
-add_worker_pool_args(parser)
+add_local_parallelism_args(parser)
 
 TRAIN_DATA_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     subset="all",

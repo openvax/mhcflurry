@@ -22,7 +22,7 @@ from .class1_affinity_predictor import Class1AffinityPredictor
 from .encodable_sequences import EncodableSequences
 from .allele_encoding import AlleleEncoding
 from .common import configure_logging, random_peptides
-from .parallelism import worker_pool_with_gpu_assignments_from_args, add_worker_pool_args
+from .local_parallelism import worker_pool_with_gpu_assignments_from_args, add_local_parallelism_args
 from .regression_target import from_ic50
 
 
@@ -82,7 +82,7 @@ parser.add_argument(
     help="Keras verbosity. Default: %(default)s",
     default=0)
 
-add_worker_pool_args(parser)
+add_local_parallelism_args(parser)
 
 
 def mse(

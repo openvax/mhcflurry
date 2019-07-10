@@ -87,6 +87,8 @@ if __name__ == '__main__':
                     'mhcflurry.select_pan_allele_models_command:run',
                 'mhcflurry-calibrate-percentile-ranks = '
                     'mhcflurry.calibrate_percentile_ranks_command:run',
+                '_mhcflurry-cluster-worker-entry-point = '
+                    'mhcflurry.cluster_parallelism:worker_entry_point',
             ]
         },
         classifiers=[
