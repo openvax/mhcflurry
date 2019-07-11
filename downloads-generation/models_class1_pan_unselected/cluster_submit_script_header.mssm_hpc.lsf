@@ -10,10 +10,14 @@
 #BSUB -eo {work_dir}/%J.stderr # error log
 #BSUB -L /bin/bash # Initialize the execution environment
 
-export TMPDIR=/local/JOBS/haplocnv-{case}
-export PATH=$HOME/.conda/envs/py37/bin/:$PATH
+export TMPDIR=/local/JOBS/mhcflurry-{work_item_num}
+export PATH=$HOME/.conda/envs/py36b/bin/:$PATH
 
 set -e
 free -m
+
+module load cuda/10.1.105
+module load cudnn/7.1.1
+
 cd {work_dir}
 

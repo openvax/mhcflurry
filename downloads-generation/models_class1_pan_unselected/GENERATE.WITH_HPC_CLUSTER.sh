@@ -45,8 +45,8 @@ do
         --verbosity 1 \
         --cluster-parallelism \
         --cluster-submit-command bsub \
-        --cluster-results-workdir ~/mhcflurry-model-training \
-        --cluster-script-prefix-path ./cluster_submit_script_header.mssm_hpc.lsf
+        --cluster-results-workdir ~/mhcflurry-scratch \
+        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
