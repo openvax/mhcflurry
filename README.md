@@ -14,6 +14,8 @@ If you find MHCflurry useful in your research please cite:
 
 > T. J. O’Donnell, A. Rubinsteyn, M. Bonsack, A. B. Riemer, U. Laserson, and J. Hammerbacher, "MHCflurry: Open-Source Class I MHC Binding Affinity Prediction," *Cell Systems*, 2018. Available at: https://www.cell.com/cell-systems/fulltext/S2405-4712(18)30232-1.
 
+Have a bugfix or other contribution? We would love your help. See our [contributing guidelines](CONTRIBUTING.md) for more information.
+
 ## Installation (pip)
 
 Install the package:
