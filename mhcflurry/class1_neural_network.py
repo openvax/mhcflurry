@@ -89,6 +89,7 @@ class Class1NeuralNetwork(object):
 
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
         patience=20,
+        min_delta=0.0,
     )
     """
     Hyperparameters for early stopping.
@@ -429,6 +430,7 @@ class Class1NeuralNetwork(object):
             steps_per_epoch=10,
             epochs=1000,
             patience=10,
+            min_delta=0.0,
             verbose=1):
         """
         Fit using a generator. Does not support many of the features of fit(),
@@ -532,6 +534,7 @@ class Class1NeuralNetwork(object):
             callbacks=[keras.callbacks.EarlyStopping(
                 monitor="val_loss",
                 patience=patience,
+                min_delta=min_delta,
                 verbose=verbose)]
         )
         for (key, value) in fit_history.history.items():
@@ -831,7 +834,8 @@ class Class1NeuralNetwork(object):
                 shuffle=True,
                 batch_size=self.hyperparameters['minibatch_size'],
                 verbose=verbose,
-                epochs=1,
+                epochs=i + 1,
+                initial_epoch=i,
                 validation_split=self.hyperparameters['validation_split'],
                 sample_weight=sample_weights_with_random_negatives)
 
@@ -857,7 +861,8 @@ class Class1NeuralNetwork(object):
                 val_loss = fit_info['val_loss'][-1]
                 val_losses.append(val_loss)
 
-                if min_val_loss is None or val_loss <= min_val_loss:
+                if min_val_loss is None or (
+                        val_loss < min_val_loss - self.hyperparameters['min_delta']):
                     min_val_loss = val_loss
                     min_val_loss_iteration = i
 
