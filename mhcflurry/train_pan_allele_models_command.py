@@ -460,8 +460,6 @@ def train_model(
     train_alleles = AlleleEncoding(
         train_data.allele.values, borrow_from=allele_encoding)
 
-    model = Class1NeuralNetwork(**hyperparameters)
-
     progress_preamble = (
         "[task %2d / %2d]: "
         "[%2d / %2d folds] "
@@ -479,9 +477,7 @@ def train_model(
     print("%s [pid %d]. Hyperparameters:" % (progress_preamble, os.getpid()))
     pprint.pprint(hyperparameters)
 
-    assert model.network() is None
     if hyperparameters.get("train_data", {}).get("pretrain", False):
-        generator = pretrain_data_iterator(pretrain_data_filename, allele_encoding)
         pretrain_patience = hyperparameters["train_data"].get(
             "pretrain_patience", 10)
         pretrain_min_delta = hyperparameters["train_data"].get(
@@ -491,7 +487,7 @@ def train_model(
         pretrain_max_epochs = hyperparameters["train_data"].get(
             "pretrain_max_epochs", 1000)
 
-        max_val_loss =  hyperparameters["train_data"].get("pretrain_max_val_loss")
+        max_val_loss = hyperparameters["train_data"].get("pretrain_max_val_loss")
 
         attempt = 0
         while True:
@@ -500,6 +496,11 @@ def train_model(
             if attempt > 10:
                 print("Too many pre-training attempts! Stopping pretraining.")
                 break
+
+            model = Class1NeuralNetwork(**hyperparameters)
+            assert model.network() is None
+            generator = pretrain_data_iterator(
+                pretrain_data_filename, allele_encoding)
             model.fit_generator(
                 generator,
                 validation_peptide_encoding=train_peptides,
@@ -512,14 +513,17 @@ def train_model(
                 epochs=pretrain_max_epochs,
                 verbose=verbose,
             )
+            model.fit_info[-1].setdefault(
+                "training_info", {})["pretrain_attempt"] = attempt
             if not max_val_loss:
                 break
-            if model.fit_info[-1]["val_loss"] >= max_val_loss:
+            final_val_loss = model.fit_info[-1]["val_loss"][-1]
+            if final_val_loss >= max_val_loss:
                 print("Val loss %f >= max val loss %f. Pre-training again." % (
-                    model.fit_info[-1]["val_loss"], max_val_loss))
+                    final_val_loss, max_val_loss))
             else:
                 print("Val loss %f < max val loss %f. Done pre-training." % (
-                    model.fit_info[-1]["val_loss"], max_val_loss))
+                    final_val_loss, max_val_loss))
                 break
 
         # Use a smaller learning rate for training on real data
@@ -541,7 +545,8 @@ def train_model(
     train_peptide_hash = hashlib.sha1()
     for peptide in sorted(train_data.peptide.values):
         train_peptide_hash.update(peptide.encode())
-    model.fit_info[-1]["training_info"] = {
+
+    model.fit_info[-1].setdefault("training_info", {}).update({
         "fold_num": fold_num,
         "num_folds": num_folds,
         "replicate_num": replicate_num,
@@ -549,7 +554,7 @@ def train_model(
         "architecture_num": architecture_num,
         "num_architectures": num_architectures,
         "train_peptide_hash": train_peptide_hash.hexdigest(),
-    }
+    })
 
     numpy.testing.assert_equal(
         predictor.manifest_df.shape[0], len(predictor.class1_pan_allele_models))
