@@ -332,7 +332,7 @@ def main(args):
                     'hyperparameters': hyperparameters,
                     'pretrain_data_filename': args.pretrain_data,
                     'verbose': args.verbosity,
-                    'progress_print_interval': None if not serial_run else 5.0,
+                    'progress_print_interval': 60.0 if not serial_run else 5.0,
                     'predictor': predictor if serial_run else None,
                     'save_to': args.out_models_dir if serial_run else None,
                 }
@@ -484,22 +484,43 @@ def train_model(
         generator = pretrain_data_iterator(pretrain_data_filename, allele_encoding)
         pretrain_patience = hyperparameters["train_data"].get(
             "pretrain_patience", 10)
+        pretrain_min_delta = hyperparameters["train_data"].get(
+            "pretrain_min_delta", 0.0)
         pretrain_steps_per_epoch = hyperparameters["train_data"].get(
             "pretrain_steps_per_epoch", 10)
         pretrain_max_epochs = hyperparameters["train_data"].get(
             "pretrain_max_epochs", 1000)
 
-        model.fit_generator(
-            generator,
-            validation_peptide_encoding=train_peptides,
-            validation_affinities=train_data.measurement_value.values,
-            validation_allele_encoding=train_alleles,
-            validation_inequalities=train_data.measurement_inequality.values,
-            patience=pretrain_patience,
-            steps_per_epoch=pretrain_steps_per_epoch,
-            epochs=pretrain_max_epochs,
-            verbose=verbose,
-        )
+        max_val_loss =  hyperparameters["train_data"].get("pretrain_max_val_loss")
+
+        attempt = 0
+        while True:
+            attempt += 1
+            print("Pre-training attempt %d" % attempt)
+            if attempt > 10:
+                print("Too many pre-training attempts! Stopping pretraining.")
+                break
+            model.fit_generator(
+                generator,
+                validation_peptide_encoding=train_peptides,
+                validation_affinities=train_data.measurement_value.values,
+                validation_allele_encoding=train_alleles,
+                validation_inequalities=train_data.measurement_inequality.values,
+                patience=pretrain_patience,
+                min_delta=pretrain_min_delta,
+                steps_per_epoch=pretrain_steps_per_epoch,
+                epochs=pretrain_max_epochs,
+                verbose=verbose,
+            )
+            if not max_val_loss:
+                break
+            if model.fit_info[-1]["val_loss"] >= max_val_loss:
+                print("Val loss %f >= max val loss %f. Pre-training again." % (
+                    model.fit_info[-1]["val_loss"], max_val_loss))
+            else:
+                print("Val loss %f < max val loss %f. Done pre-training." % (
+                    model.fit_info[-1]["val_loss"], max_val_loss))
+                break
 
         # Use a smaller learning rate for training on real data
         learning_rate = model.fit_info[-1]["learning_rate"]

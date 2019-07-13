@@ -144,7 +144,6 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
         print("Deleting: %s" % models_dir)
         shutil.rmtree(models_dir)
 
-"""
 if os.environ.get("KERAS_BACKEND") != "theano":
     def test_run_parallel():
         run_and_check(n_jobs=1)
@@ -153,7 +152,6 @@ if os.environ.get("KERAS_BACKEND") != "theano":
 
 def test_run_serial():
     run_and_check(n_jobs=0)
-"""
 
 
 def test_run_cluster_parallelism():

@@ -24,6 +24,7 @@ base_hyperparameters = {
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
     "patience": 20,
+    "min_delta": 0.0,
     'peptide_encoding': {
         'vector_encoding_name': 'BLOSUM62',
         'alignment_method': 'left_pad_centered_right_pad',
@@ -44,6 +45,8 @@ base_hyperparameters = {
         'pretrain_peptides_per_epoch': 1024,
         'pretrain_steps_per_epoch': 16,
         'pretrain_patience': 10,
+        'pretrain_min_delta': 0.0001,
+        'pretrain_max_val_loss': 0.10,
     },
     'validation_split': 0.1,
 }
