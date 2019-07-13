@@ -5,7 +5,7 @@
 #BSUB -R span[hosts=1] # one node
 #BSUB -n 1 # number of compute cores
 #BSUB -W 36:00 # walltime in HH:MM
-#BSUB -R rusage[mem=60000] # mb memory requested
+#BSUB -R rusage[mem=30000] # mb memory requested
 #BSUB -o {work_dir}/%J.stdout # output log (%J : JobID)
 #BSUB -eo {work_dir}/%J.stderr # error log
 #BSUB -L /bin/bash # Initialize the execution environment
