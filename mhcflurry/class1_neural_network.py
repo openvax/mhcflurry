@@ -3,6 +3,7 @@ import collections
 import logging
 import json
 import weakref
+import itertools
 
 import numpy
 import pandas
@@ -13,6 +14,7 @@ from .encodable_sequences import EncodableSequences, EncodingError
 from .regression_target import to_ic50, from_ic50
 from .common import random_peptides, amino_acid_distribution
 from .custom_loss import get_loss
+from .data_dependent_weights_initialization import lsuv_init
 
 
 class Class1NeuralNetwork(object):
@@ -76,6 +78,7 @@ class Class1NeuralNetwork(object):
         validation_split=0.1,
         early_stopping=True,
         minibatch_size=128,
+        data_dependent_initialization_method=None,
         random_negative_rate=0.0,
         random_negative_constant=25,
         random_negative_affinity_min=20000.0,
@@ -419,6 +422,31 @@ class Class1NeuralNetwork(object):
             allele_encoding.allele_representations(
                 self.hyperparameters['allele_amino_acid_encoding']))
 
+    @staticmethod
+    def data_dependent_weights_initialization(
+            network,
+            x_dict=None,
+            method="lsuv",
+            verbose=1):
+        """
+        Data dependent weights initialization.
+
+        Parameters
+        ----------
+        method
+
+        Returns
+        -------
+
+        """
+        if verbose:
+            print("Performing data-dependent init: ", method)
+        if method == "lsuv":
+            assert x_dict is not None, "Data required for LSUV init"
+            lsuv_init(network, x_dict, verbose=verbose > 0)
+        else:
+            raise RuntimeError("Unsupported init method: ", method)
+
     def fit_generator(
             self,
             generator,
@@ -505,7 +533,9 @@ class Class1NeuralNetwork(object):
             'output': output,
         }
 
-        yielded_values_box = [0]
+        mutable_generator_state = {
+            'yielded_values': 0  # total number of data points yielded
+        }
 
         def wrapped_generator():
             for (alleles, peptides, affinities) in generator:
@@ -519,12 +549,28 @@ class Class1NeuralNetwork(object):
                     'output': from_ic50(affinities)
                 }
                 yield (x_dict, y_dict)
-                yielded_values_box[0] += len(affinities)
+                mutable_generator_state['yielded_values'] += len(affinities)
 
         start = time.time()
 
+        iterator = wrapped_generator()
+
+        # Initialization required if a data_dependent_initialization_method
+        # is set and this is our first time fitting (i.e. fit_info is empty).
+        data_dependent_init = self.hyperparameters[
+            'data_dependent_initialization_method'
+        ]
+        if data_dependent_init and not self.fit_info:
+            first_chunk = next(iterator)
+            self.data_dependent_weights_initialization(
+                network,
+                first_chunk[0],  # x_dict
+                method=data_dependent_init,
+                verbose=verbose)
+            iterator = itertools.chain([first_chunk], iterator)
+
         fit_history = network.fit_generator(
-            wrapped_generator(),
+            iterator,
             steps_per_epoch=steps_per_epoch,
             epochs=epochs,
             use_multiprocessing=False,
@@ -541,7 +587,7 @@ class Class1NeuralNetwork(object):
             fit_info[key].extend(value)
 
         fit_info["time"] = time.time() - start
-        fit_info["num_points"] = yielded_values_box[0]
+        fit_info["num_points"] = mutable_generator_state["yielded_values"]
         self.fit_info.append(dict(fit_info))
 
     def fit(
@@ -777,6 +823,12 @@ class Class1NeuralNetwork(object):
         min_val_loss_iteration = None
         min_val_loss = None
 
+        # Initialization required if a data_dependent_initialization_method
+        # is set and this is our first time fitting (i.e. fit_info is empty).
+        needs_initialization = self.hyperparameters[
+            'data_dependent_initialization_method'
+        ] is not None and not self.fit_info
+
         start = time.time()
         last_progress_print = None
         x_dict_with_random_negatives = {}
@@ -827,6 +879,15 @@ class Class1NeuralNetwork(object):
                                     size=len(random_negative_peptides))
                             ]
                         )
+
+            if needs_initialization:
+                self.data_dependent_weights_initialization(
+                    self.network(),
+                    x_dict_with_random_negatives,
+                    method=self.hyperparameters[
+                        'data_dependent_initialization_method'],
+                    verbose=verbose)
+                needs_initialization = False
 
             fit_history = self.network().fit(
                 x_dict_with_random_negatives,
