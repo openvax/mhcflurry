@@ -95,7 +95,7 @@ HYPERPARAMETERS_LIST = [
         "pretrain": True,
         'pretrain_peptides_per_epoch': 128,
         'pretrain_max_epochs': 2,
-        'pretrain_max_val_loss': 0.1,
+        'pretrain_max_val_loss': 0.2,
     },
     'validation_split': 0.1,
 },
