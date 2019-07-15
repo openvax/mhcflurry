@@ -35,7 +35,7 @@ import numpy
 
 
 def svd_orthonormal(shape):
-    # Orthonorm init code is from Lasagne
+    # Orthonormal init code is from Lasagne
     # https://github.com/Lasagne/Lasagne/blob/master/lasagne/init.py
     if len(shape) < 2:
         raise RuntimeError("Only shapes of length 2 or more are supported.")
