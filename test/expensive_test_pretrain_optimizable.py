@@ -38,7 +38,7 @@ HYPERPARAMTERS = {
     'early_stopping': True, 'init': 'glorot_uniform',
     'layer_sizes': [1024, 512], 'learning_rate': None,
     'locally_connected_layers': [], 'loss': 'custom:mse_with_inequalities',
-    'max_epochs': 1, 'min_delta': 0.0, 'minibatch_size': 128,
+    'max_epochs': 0, 'min_delta': 0.0, 'minibatch_size': 128,
     'optimizer': 'rmsprop', 'output_activation': 'sigmoid', 'patience': 20,
     'peptide_allele_merge_activation': '',
     'peptide_allele_merge_method': 'concatenate',
@@ -82,8 +82,9 @@ def test_optimizable():
         },
     )
     (network,) = predictor.neural_networks
-    pretrain_val_loss = network.fit_info[-1]['training_info']["val_loss"][-1]
-    print(predictor)
+    print(predictor, network)
+    print(network.fit_info)
+    pretrain_val_loss = network.fit_info[0]["val_loss"][-1]
     print(pretrain_val_loss)
     numpy.testing.assert_array_less(pretrain_val_loss, 0.1)
 
