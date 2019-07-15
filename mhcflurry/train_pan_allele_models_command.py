@@ -290,7 +290,6 @@ def main(args):
     GLOBAL_DATA["train_data"] = df
     GLOBAL_DATA["folds_df"] = folds_df
     GLOBAL_DATA["allele_encoding"] = allele_encoding
-    GLOBAL_DATA["args"] = args
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -444,7 +443,6 @@ def train_model(
     df = constant_data["train_data"]
     folds_df = constant_data["folds_df"]
     allele_encoding = constant_data["allele_encoding"]
-    args = constant_data["args"]
 
     if predictor is None:
         predictor = Class1AffinityPredictor(
