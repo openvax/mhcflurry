@@ -33,7 +33,7 @@ FOLDS_DF["fold_0"] = True
 HYPERPARAMTERS = {
     'activation': 'tanh', 'allele_dense_layer_sizes': [],
     'batch_normalization': False,
-    'dense_layer_l1_regularization': 9.999999999999999e-11,
+    'dense_layer_l1_regularization': 0.0,
     'dense_layer_l2_regularization': 0.0, 'dropout_probability': 0.5,
     'early_stopping': True, 'init': 'glorot_uniform',
     'layer_sizes': [1024, 512], 'learning_rate': None,
@@ -50,9 +50,10 @@ HYPERPARAMTERS = {
     'random_negative_distribution_smoothing': 0.0,
     'random_negative_match_distribution': True, 'random_negative_rate': 0.2,
     'train_data': {'pretrain': True,
-                   'pretrain_max_epochs': 3,
-                   'pretrain_peptides_per_epoch': 1024,
-                   'pretrain_steps_per_epoch': 16},
+                   'pretrain_max_epochs': 30,
+                   'pretrain_patience': 5,
+                   'pretrain_peptides_per_step': 32,
+                   'pretrain_steps_per_epoch': 256},
     'validation_split': 0.1,
     'data_dependent_initialization_method': "lsuv",
 }

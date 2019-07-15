@@ -569,6 +569,12 @@ class Class1NeuralNetwork(object):
                 verbose=verbose)
             iterator = itertools.chain([first_chunk], iterator)
 
+        def progress_update(epoch, logs):
+            if verbose:
+                print(
+                    "Cumulative training points:",
+                    mutable_generator_state['yielded_values'])
+
         fit_history = network.fit_generator(
             iterator,
             steps_per_epoch=steps_per_epoch,
@@ -577,11 +583,14 @@ class Class1NeuralNetwork(object):
             workers=1,
             validation_data=(validation_x_dict, validation_y_dict),
             verbose=verbose,
-            callbacks=[keras.callbacks.EarlyStopping(
-                monitor="val_loss",
-                patience=patience,
-                min_delta=min_delta,
-                verbose=verbose)]
+            callbacks=[
+                keras.callbacks.EarlyStopping(
+                    monitor="val_loss",
+                    patience=patience,
+                    min_delta=min_delta,
+                    verbose=verbose),
+                keras.callbacks.LambdaCallback(on_epoch_end=progress_update),
+            ]
         )
         for (key, value) in fit_history.history.items():
             fit_info[key].extend(value)

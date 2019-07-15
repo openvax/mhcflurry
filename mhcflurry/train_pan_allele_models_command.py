@@ -475,17 +475,32 @@ def train_model(
     print("%s [pid %d]. Hyperparameters:" % (progress_preamble, os.getpid()))
     pprint.pprint(hyperparameters)
 
-    if hyperparameters.get("train_data", {}).get("pretrain", False):
-        pretrain_patience = hyperparameters["train_data"].get(
-            "pretrain_patience", 10)
-        pretrain_min_delta = hyperparameters["train_data"].get(
-            "pretrain_min_delta", 0.0)
-        pretrain_steps_per_epoch = hyperparameters["train_data"].get(
-            "pretrain_steps_per_epoch", 10)
-        pretrain_max_epochs = hyperparameters["train_data"].get(
-            "pretrain_max_epochs", 1000)
+    train_params = dict(hyperparameters.get("train_data", {}))
 
-        max_val_loss = hyperparameters["train_data"].get("pretrain_max_val_loss")
+    def get_train_param(param, default):
+        if param in train_params:
+            result = train_params.pop(param)
+            if verbose:
+                print("Train param", param, "=", result)
+        else:
+            result = default
+            if verbose:
+                print("Train param", param, "=", result, "[default]")
+        return result
+
+    if get_train_param("pretrain", False):
+        pretrain_patience = get_train_param("pretrain_patience", 10)
+        pretrain_min_delta = get_train_param("pretrain_min_delta", 0.0)
+        pretrain_steps_per_epoch = get_train_param(
+            "pretrain_steps_per_epoch", 10)
+        pretrain_max_epochs = get_train_param(
+            "pretrain_max_epochs", 1000)
+        pretrain_peptides_per_step = get_train_param(
+            "pretrain_peptides_per_step", 1024)
+        max_val_loss = get_train_param("pretrain_max_val_loss", None)
+
+        if verbose:
+            print("Unused train params", train_params)
 
         attempt = 0
         while True:
@@ -498,7 +513,10 @@ def train_model(
             model = Class1NeuralNetwork(**hyperparameters)
             assert model.network() is None
             generator = pretrain_data_iterator(
-                pretrain_data_filename, allele_encoding)
+                pretrain_data_filename,
+                allele_encoding,
+                peptides_per_chunk=pretrain_peptides_per_step)
+
             model.fit_generator(
                 generator,
                 validation_peptide_encoding=train_peptides,
