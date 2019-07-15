@@ -42,9 +42,9 @@ base_hyperparameters = {
     'random_negative_rate': 0.2,
     'train_data': {
         'pretrain': True,
-        'pretrain_peptides_per_epoch': 1024,
-        'pretrain_steps_per_epoch': 16,
-        'pretrain_patience': 10,
+        'pretrain_peptides_per_epoch': 64,
+        'pretrain_steps_per_epoch': 256,
+        'pretrain_patience': 5,
         'pretrain_min_delta': 0.0001,
         'pretrain_max_val_loss': 0.10,
     },
