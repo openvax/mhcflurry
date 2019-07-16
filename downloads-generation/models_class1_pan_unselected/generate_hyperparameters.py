@@ -49,6 +49,7 @@ base_hyperparameters = {
         'pretrain_max_val_loss': 0.10,
     },
     'validation_split': 0.1,
+    'data_dependent_initialization_method': "lsuv",
 }
 
 grid = []
