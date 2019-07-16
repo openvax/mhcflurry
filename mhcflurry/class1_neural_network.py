@@ -457,9 +457,13 @@ class Class1NeuralNetwork(object):
             validation_output_indices=None,
             steps_per_epoch=10,
             epochs=1000,
+            min_epochs=0,
             patience=10,
             min_delta=0.0,
-            verbose=1):
+            verbose=1,
+            progress_callback=None,
+            progress_preamble="",
+            progress_print_interval=5.0):
         """
         Fit using a generator. Does not support many of the features of fit(),
         such as random negative peptides.
@@ -569,31 +573,63 @@ class Class1NeuralNetwork(object):
                 verbose=verbose)
             iterator = itertools.chain([first_chunk], iterator)
 
-        def progress_update(epoch, logs):
-            if verbose:
-                print(
-                    "Cumulative training points:",
-                    mutable_generator_state['yielded_values'])
+        min_val_loss_iteration = None
+        min_val_loss = None
+        last_progress_print = 0
+        epoch = 1
+        while True:
+            epoch_start_time = time.time()
+            fit_history = network.fit_generator(
+                iterator,
+                steps_per_epoch=steps_per_epoch,
+                initial_epoch=epoch - 1,
+                epochs=epoch,
+                use_multiprocessing=False,
+                workers=1,
+                validation_data=(validation_x_dict, validation_y_dict),
+                verbose=verbose,
+            )
+            epoch_time = time.time() - epoch_start_time
+            for (key, value) in fit_history.history.items():
+                fit_info[key].extend(value)
+            val_loss = fit_info['val_loss'][-1]
 
-        fit_history = network.fit_generator(
-            iterator,
-            steps_per_epoch=steps_per_epoch,
-            epochs=epochs,
-            use_multiprocessing=False,
-            workers=1,
-            validation_data=(validation_x_dict, validation_y_dict),
-            verbose=verbose,
-            callbacks=[
-                keras.callbacks.EarlyStopping(
-                    monitor="val_loss",
-                    patience=patience,
-                    min_delta=min_delta,
-                    verbose=verbose),
-                keras.callbacks.LambdaCallback(on_epoch_end=progress_update),
-            ]
-        )
-        for (key, value) in fit_history.history.items():
-            fit_info[key].extend(value)
+            if min_val_loss is None or val_loss < min_val_loss - min_delta:
+                min_val_loss = val_loss
+                min_val_loss_iteration = epoch
+
+            patience_epoch_threshold = min(
+                epochs, max(min_val_loss_iteration + patience, min_epochs))
+
+            progress_message = (
+                "epoch %3d / %3d [%0.2f sec.]: loss=%g val_loss=%g. Min val "
+                "loss (%g) at epoch %s. Cumulative training points: %d. "
+                "Earliest stop epoch: %d." % (
+                    epoch,
+                    epochs,
+                    epoch_time,
+                    fit_info['loss'][-1],
+                    val_loss,
+                    min_val_loss,
+                    min_val_loss_iteration,
+                    mutable_generator_state['yielded_values'],
+                    patience_epoch_threshold,
+                )).strip()
+
+            # Print progress no more often than once every few seconds.
+            if progress_print_interval is not None and (
+                    time.time() - last_progress_print > progress_print_interval):
+                print(progress_preamble, progress_message)
+                last_progress_print = time.time()
+
+            if progress_callback:
+                progress_callback()
+
+            if epoch >= patience_epoch_threshold:
+                if progress_print_interval is not None:
+                    print(progress_preamble, "STOPPING", progress_message)
+                    break
+            epoch += 1
 
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = mutable_generator_state["yielded_values"]
@@ -828,7 +864,6 @@ class Class1NeuralNetwork(object):
             y_dict_with_random_negatives['output'],
             **encode_y_kwargs)
 
-        val_losses = []
         min_val_loss_iteration = None
         min_val_loss = None
 
@@ -929,7 +964,6 @@ class Class1NeuralNetwork(object):
 
             if self.hyperparameters['validation_split']:
                 val_loss = fit_info['val_loss'][-1]
-                val_losses.append(val_loss)
 
                 if min_val_loss is None or (
                         val_loss < min_val_loss - self.hyperparameters['min_delta']):
@@ -944,11 +978,13 @@ class Class1NeuralNetwork(object):
                         if progress_print_interval is not None:
                             print((progress_preamble + " " +
                                 "Stopping at epoch %3d / %3d: loss=%g. "
-                                "Min val loss (%s) at epoch %s" % (
+                                "Min val loss (%g) at epoch %s" % (
                                     i,
                                     self.hyperparameters['max_epochs'],
                                     fit_info['loss'][-1],
-                                    str(min_val_loss),
+                                    (
+                                        min_val_loss if min_val_loss is not None
+                                        else numpy.nan),
                                     min_val_loss_iteration)).strip())
                         break
 

@@ -2,6 +2,7 @@
 #BSUB -J mhcf-{work_item_num} # Job name
 #BSUB -P acc_nkcancer # allocation account or Unix group
 #BSUB -q gpu # queue
+#BSUB -R rusage[ngpus_excl_p=1]  # 1 exclusive GPU
 #BSUB -R span[hosts=1] # one node
 #BSUB -n 1 # number of compute cores
 #BSUB -W 36:00 # walltime in HH:MM
