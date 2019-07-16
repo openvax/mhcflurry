@@ -42,7 +42,7 @@ do
         --hyperparameters hyperparameters.yaml \
         --out-models-dir models.${kind} \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
-        --verbosity 1 \
+        --verbosity 0 \
         --cluster-parallelism \
         --cluster-submit-command bsub \
         --cluster-results-workdir ~/mhcflurry-scratch \

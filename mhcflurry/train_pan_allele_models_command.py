@@ -195,19 +195,20 @@ def pretrain_data_iterator(
         numpy.tile(usable_alleles, peptides_per_chunk),
         borrow_from=master_allele_encoding)
 
-    synthetic_iter = pandas.read_csv(
-        filename, index_col=0, chunksize=peptides_per_chunk)
-    for (k, df) in enumerate(synthetic_iter):
-        if len(df) != peptides_per_chunk:
-            continue
+    while True:
+        synthetic_iter = pandas.read_csv(
+            filename, index_col=0, chunksize=peptides_per_chunk)
+        for (k, df) in enumerate(synthetic_iter):
+            if len(df) != peptides_per_chunk:
+                continue
 
-        df = df[usable_alleles]
-        encodable_peptides = EncodableSequences(
-            numpy.repeat(
-                df.index.values,
-                len(usable_alleles)))
+            df = df[usable_alleles]
+            encodable_peptides = EncodableSequences(
+                numpy.repeat(
+                    df.index.values,
+                    len(usable_alleles)))
 
-        yield (allele_encoding, encodable_peptides, df.stack().values)
+            yield (allele_encoding, encodable_peptides, df.stack().values)
 
 
 def run(argv=sys.argv[1:]):
@@ -493,8 +494,8 @@ def train_model(
         pretrain_min_delta = get_train_param("pretrain_min_delta", 0.0)
         pretrain_steps_per_epoch = get_train_param(
             "pretrain_steps_per_epoch", 10)
-        pretrain_max_epochs = get_train_param(
-            "pretrain_max_epochs", 1000)
+        pretrain_max_epochs = get_train_param("pretrain_max_epochs", 1000)
+        pretrain_min_epochs = get_train_param("pretrain_min_epochs", 0)
         pretrain_peptides_per_step = get_train_param(
             "pretrain_peptides_per_step", 1024)
         max_val_loss = get_train_param("pretrain_max_val_loss", None)
@@ -527,7 +528,10 @@ def train_model(
                 min_delta=pretrain_min_delta,
                 steps_per_epoch=pretrain_steps_per_epoch,
                 epochs=pretrain_max_epochs,
+                min_epochs=pretrain_min_epochs,
                 verbose=verbose,
+                progress_preamble=progress_preamble + "PRETRAIN",
+                progress_print_interval=progress_print_interval,
             )
             model.fit_info[-1].setdefault(
                 "training_info", {})["pretrain_attempt"] = attempt
