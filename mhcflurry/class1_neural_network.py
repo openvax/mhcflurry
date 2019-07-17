@@ -933,6 +933,7 @@ class Class1NeuralNetwork(object):
                     verbose=verbose)
                 needs_initialization = False
 
+            epoch_start = time.time()
             fit_history = self.network().fit(
                 x_dict_with_random_negatives,
                 y_dict_with_random_negatives,
@@ -943,6 +944,7 @@ class Class1NeuralNetwork(object):
                 initial_epoch=i,
                 validation_split=self.hyperparameters['validation_split'],
                 sample_weight=sample_weights_with_random_negatives)
+            epoch_time = time.time() - epoch_start
 
             for (key, value) in fit_history.history.items():
                 fit_info[key].extend(value)
@@ -953,10 +955,11 @@ class Class1NeuralNetwork(object):
                         time.time() - last_progress_print
                         > progress_print_interval)):
                 print((progress_preamble + " " +
-                       "Epoch %3d / %3d: loss=%g. "
+                       "Epoch %3d / %3d [%0.2f sec]: loss=%g. "
                        "Min val loss (%s) at epoch %s" % (
                            i,
                            self.hyperparameters['max_epochs'],
+                           epoch_time,
                            fit_info['loss'][-1],
                            str(min_val_loss),
                            min_val_loss_iteration)).strip())
