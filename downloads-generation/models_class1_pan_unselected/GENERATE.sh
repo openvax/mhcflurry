@@ -34,6 +34,8 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
+export PYTHONUNBUFFERED=1
+
 for kind in with_mass_spec no_mass_spec
 do
     mhcflurry-class1-train-pan-allele-models \
