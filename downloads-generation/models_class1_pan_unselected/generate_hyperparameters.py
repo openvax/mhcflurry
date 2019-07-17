@@ -16,7 +16,7 @@ base_hyperparameters = {
     'early_stopping': True,
     'init': 'glorot_uniform',
     'layer_sizes': [1024, 512],
-    'learning_rate': None,
+    'learning_rate': 0.001,
     'locally_connected_layers': [],
     'loss': 'custom:mse_with_inequalities',
     'max_epochs': 5000,
@@ -59,11 +59,13 @@ for layer_sizes in [[512, 256], [512, 512], [1024, 512], [1024, 1024]]:
     for pretrain in [True]:
         l1_base = 0.0000001
         for l1 in [l1_base, l1_base / 10, l1_base / 100, l1_base / 1000, 0.0]:
-            new = deepcopy(base_hyperparameters)
-            new["layer_sizes"] = layer_sizes
-            new["dense_layer_l1_regularization"] = l1
-            new["train_data"]["pretrain"] = pretrain
-            if not grid or new not in grid:
-                grid.append(new)
+            for lr in [0.001, 0.01]:
+                new = deepcopy(base_hyperparameters)
+                new["layer_sizes"] = layer_sizes
+                new["dense_layer_l1_regularization"] = l1
+                new["train_data"]["pretrain"] = pretrain
+                new["learning_rate"] = lr
+                if not grid or new not in grid:
+                    grid.append(new)
 
 dump(grid, stdout)

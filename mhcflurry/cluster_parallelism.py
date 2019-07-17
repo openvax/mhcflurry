@@ -139,16 +139,18 @@ def cluster_results(
     def result_generator():
         start = time.time()
         while result_items:
+            print("[%0.1f sec elapsed] waiting on %d / %d items." % (
+                time.time() - start, len(result_items), len(work_items)))
             while True:
                 result_item = None
                 for d in result_items:
-                    if os.path.exists(item['finished_path']):
+                    if os.path.exists(d['finished_path']):
                         result_item = d
                         break
                 if result_item is None:
                     os.sleep(60)
                 else:
-                    del result_items[result_item]
+                    result_items.remove(result_item)
                     break
 
             complete_dir = result_item['finished_path']

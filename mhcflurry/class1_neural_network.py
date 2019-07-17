@@ -602,9 +602,8 @@ class Class1NeuralNetwork(object):
                 epochs, max(min_val_loss_iteration + patience, min_epochs))
 
             progress_message = (
-                "epoch %3d / %3d [%0.2f sec.]: loss=%g val_loss=%g. Min val "
-                "loss (%g) at epoch %s. Cumulative training points: %d. "
-                "Earliest stop epoch: %d." % (
+                "epoch %3d/%3d [%0.2f sec.]: loss=%g val_loss=%g. Min val "
+                "loss %g at epoch %s. Cum. points: %d. Stop at epoch %d." % (
                     epoch,
                     epochs,
                     epoch_time,
