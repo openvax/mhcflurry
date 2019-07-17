@@ -6,6 +6,7 @@ import signal
 import argparse
 import pickle
 import subprocess
+import shutil
 
 from .local_parallelism import call_wrapped_kwargs
 from .class1_affinity_predictor import Class1AffinityPredictor
@@ -34,6 +35,7 @@ def add_cluster_parallelism_args(parser):
         '--cluster-script-prefix-path',
         help="",
     )
+    group.add_argument('--cluster-max-retries', help="", default=3)
 
 
 def cluster_results_from_args(
@@ -60,7 +62,8 @@ def cluster_results(
         submit_command="sh",
         results_workdir="./cluster-workdir",
         script_prefix_path=None,
-        result_serialization_method="pickle"):
+        result_serialization_method="pickle",
+        max_retries=3):
 
     constant_payload = {
         'constant_data': constant_data,
@@ -82,7 +85,7 @@ def cluster_results(
     else:
         script_prefix = "#!/bin/bash"
 
-    result_paths = []
+    result_items = []
 
     for (i, item) in enumerate(work_items):
         item_workdir = os.path.join(
@@ -124,23 +127,58 @@ def cluster_results(
         subprocess.check_call(launch_command, shell=True)
         print("Invoked", launch_command)
 
-        result_paths.append(
-            (item_finished_path, item_result_path, item_error_path))
+        result_items.append({
+            'work_dir': item_workdir,
+            'finished_path': item_finished_path,
+            'result_path': item_result_path,
+            'error_path': item_error_path,
+            'retry_num': 0,
+            'launch_command': launch_command,
+        })
 
     def result_generator():
         start = time.time()
-        for (complete_dir, result_path, error_path) in result_paths:
-            while not os.path.exists(complete_dir):
-                print("[%0.1f sec elapsed] waiting on" % (time.time() - start),
-                      complete_dir)
-                time.sleep(60)
-            print("Complete", complete_dir)
+        while result_items:
+            while True:
+                result_item = None
+                for d in result_items:
+                    if os.path.exists(item['finished_path']):
+                        result_item = d
+                        break
+                if result_item is None:
+                    os.sleep(60)
+                else:
+                    del result_items[result_item]
+                    break
+
+            complete_dir = result_item['finished_path']
+            result_path = result_item['result_path']
+            error_path = result_item['error_path']
+            retry_num = result_item['retry_num']
+            launch_command = result_item['launch_command']
+
+            print("[%0.1f sec elapsed] processing item %s" % (
+                time.time() - start, result_item))
 
             if os.path.exists(error_path):
                 print("Error path exists", error_path)
                 with open(error_path, "rb") as fd:
                     exception = pickle.load(fd)
-                    raise exception
+                    print(exception)
+                    if retry_num < max_retries:
+                        print("Relaunching", launch_command)
+                        attempt_dir = os.path.join(
+                            result_item['work_dir'], "attempt.%d" % retry_num)
+                        shutil.move(complete_dir, attempt_dir)
+                        shutil.move(error_path, attempt_dir)
+                        subprocess.check_call(launch_command, shell=True)
+                        print("Invoked", launch_command)
+                        result_item['retry_num'] += 1
+                        result_items.append(result_item)
+                        continue
+                    else:
+                        print("Max retries exceeded", max_retries)
+                        raise exception
 
             if os.path.exists(result_path):
                 print("Result path exists", error_path)
