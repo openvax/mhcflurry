@@ -1,8 +1,7 @@
 #!/bin/bash
 #BSUB -J mhcf-{work_item_num} # Job name
 #BSUB -P acc_nkcancer # allocation account or Unix group
-#BSUB -q gpu # queue
-#BSUB -R rusage[ngpus_excl_p=1]  # 1 exclusive GPU
+#BSUB -q normal # queue
 #BSUB -R span[hosts=1] # one node
 #BSUB -n 1 # number of compute cores
 #BSUB -W 36:00 # walltime in HH:MM
@@ -10,6 +9,8 @@
 #BSUB -o {work_dir}/%J.stdout # output log (%J : JobID)
 #BSUB -eo {work_dir}/%J.stderr # error log
 #BSUB -L /bin/bash # Initialize the execution environment
+#
+#IGNORE -R rusage[ngpus_excl_p=1]  # 1 exclusive GPU
 
 export TMPDIR=/local/JOBS/mhcflurry-{work_item_num}
 export PATH=$HOME/.conda/envs/py36b/bin/:$PATH
@@ -17,8 +18,8 @@ export PATH=$HOME/.conda/envs/py36b/bin/:$PATH
 set -e
 free -m
 
-module load cuda/10.1.105
-module load cudnn/7.1.1
+#module load cuda/10.1.105
+#module load cudnn/7.1.1
 
 cd {work_dir}
 

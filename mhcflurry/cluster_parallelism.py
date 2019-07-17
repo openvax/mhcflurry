@@ -148,7 +148,7 @@ def cluster_results(
                         result_item = d
                         break
                 if result_item is None:
-                    os.sleep(60)
+                    time.sleep(60)
                 else:
                     result_items.remove(result_item)
                     break
