@@ -13,13 +13,15 @@
 #IGNORE -R rusage[ngpus_excl_p=1]  # 1 exclusive GPU
 
 export TMPDIR=/local/JOBS/mhcflurry-{work_item_num}
-export PATH=$HOME/.conda/envs/py36b/bin/:$PATH
+export PATH=$HOME/.conda/envs/tf-cpu/bin/:$PATH
+export PYTHONUNBUFFERED=1
 
 set -e
 free -m
 
 #module load cuda/10.1.105
 #module load cudnn/7.1.1
+
 
 cd {work_dir}
 
