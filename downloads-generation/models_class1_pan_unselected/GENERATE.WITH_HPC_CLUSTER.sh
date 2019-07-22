@@ -28,6 +28,9 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
+export OMP_NUM_THREADS=1
+export PYTHONUNBUFFERED=1
+
 cp $SCRIPT_DIR/generate_hyperparameters.py .
 python generate_hyperparameters.py > hyperparameters.yaml
 
