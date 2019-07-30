@@ -1,11 +1,10 @@
 #!/bin/bash
-#
-# Train pan-allele MHCflurry Class I models.
+# Model select pan-allele MHCflurry Class I models and calibrate percentile ranks.
 #
 set -e
 set -x
 
-DOWNLOAD_NAME=models_class1_pan_unselected
+DOWNLOAD_NAME=models_class1_pan
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
@@ -25,8 +24,7 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-cp $SCRIPT_DIR/generate_hyperparameters.py .
-python generate_hyperparameters.py > hyperparameters.yaml
+cp $SCRIPT_ABSOLUTE_PATH .
 
 GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
 echo "Detected GPUS: $GPUS"
@@ -34,32 +32,36 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
-if [ "$GPUS" -eq "0" ]; then
-   NUM_JOBS=${NUM_JOBS-1}
-else
-    NUM_JOBS=${NUM_JOBS-$GPUS}
+NUM_JOBS=$GPUS
+if [ "$NUM_JOBS" -eq "0" ]; then
+   NUM_JOBS=1
 fi
 echo "Num jobs: $NUM_JOBS"
 
 export PYTHONUNBUFFERED=1
 
-for kind in with_mass_spec no_mass_spec
+UNSELECTED_PATH="$(mhcflurry-downloads path models_class1_pan_unselected)"
+
+for kind in with_mass_spec #no_mass_spec
 do
-    mhcflurry-class1-train-pan-allele-models \
-        --data "$(mhcflurry-downloads path data_curated)/curated_training_data.${kind}.csv.bz2" \
-        --allele-sequences "$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv" \
-        --pretrain-data "$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2" \
-        --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
-        --ensemble-size 4 \
-        --hyperparameters hyperparameters.yaml \
+    MODELS_DIR="$UNSELECTED_PATH/models.${kind}"
+    time mhcflurry-class1-select-pan-allele-models \
+        --data "$MODELS_DIR/train_data.csv.bz2" \
+        --models-dir "$MODELS_DIR" \
         --out-models-dir models.${kind} \
-        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
-        --verbosity 0 \
+        --min-models 8 \
+        --max-models 32 \
+        --num-jobs 0 \
+        --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
+
+    time mhcflurry-calibrate-percentile-ranks \
+        --models-dir models.${kind} \
+        --num-peptides-per-length 10000 \
         --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
 done
 
-cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
 for i in $(ls LOG-worker.*.txt) ; do bzip2 $i ; done
-tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
-echo "Created archive: $SCRATCH_DIR/${DOWNLOAD_NAME}.tar.bz2"
+RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
+tar -cjf "$RESULT" *
+echo "Created archive: $RESULT"

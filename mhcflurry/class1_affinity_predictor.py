@@ -80,7 +80,10 @@ class Class1AffinityPredictor(object):
         if class1_pan_allele_models is None:
             class1_pan_allele_models = []
 
-        self.allele_to_sequence = allele_to_sequence
+        self.allele_to_sequence = (
+            dict(allele_to_sequence)
+            if allele_to_sequence is not None else None)  # make a copy
+
         self.master_allele_encoding = None
         if class1_pan_allele_models:
             assert self.allele_to_sequence
@@ -112,8 +115,7 @@ class Class1AffinityPredictor(object):
                     json.dumps(model.get_config()),
                     model
                 ))
-            for (allele,
-                 models) in self.allele_to_allele_specific_models.items():
+            for (allele, models) in self.allele_to_allele_specific_models.items():
                 for (i, model) in enumerate(models):
                     rows.append((
                         self.model_name(allele, i),
@@ -125,6 +127,18 @@ class Class1AffinityPredictor(object):
                 rows,
                 columns=["model_name", "allele", "config_json", "model"])
         return self._manifest_df
+
+    def subselect_alleles(self, alleles):
+        if self.allele_to_sequence:
+            alleles = [
+                mhcnames.normalize_allele_name(allele)
+                for allele in set(alleles)
+            ]
+
+            allele_to_sequence = dict(
+                (a, self.allele_to_sequence[a]) for a in alleles)
+            self.allele_to_sequence = allele_to_sequence
+            self.clear_cache()
 
     def clear_cache(self):
         """
@@ -439,7 +453,7 @@ class Class1AffinityPredictor(object):
         if exists(join(models_dir, "allele_sequences.csv")):
             allele_to_fixed_length_sequence = pandas.read_csv(
                 join(models_dir, "allele_sequences.csv"),
-                index_col="allele").sequence.to_dict()
+                index_col=0).iloc[:,0].to_dict()
 
         allele_to_percent_rank_transform = {}
         percent_ranks_path = join(models_dir, "percent_ranks.csv")
