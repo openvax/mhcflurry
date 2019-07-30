@@ -183,7 +183,7 @@ def cluster_results(
                         raise exception
 
             if os.path.exists(result_path):
-                print("Result path exists", error_path)
+                print("Result path exists", result_path)
                 if result_serialization_method == "save_predictor":
                     result = Class1AffinityPredictor.load(result_path)
                 else:
