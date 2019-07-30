@@ -34,6 +34,12 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
+NUM_JOBS=$GPUS
+if [ "$NUM_JOBS" -eq "0" ]; then
+   NUM_JOBS=1
+fi
+echo "Num jobs: $NUM_JOBS"
+
 export PYTHONUNBUFFERED=1
 
 for kind in with_mass_spec no_mass_spec
@@ -48,7 +54,7 @@ do
         --out-models-dir models.${kind} \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
         --verbosity 0 \
-        --num-jobs $GPUS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
+        --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
