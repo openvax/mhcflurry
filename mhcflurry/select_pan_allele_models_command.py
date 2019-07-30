@@ -123,6 +123,9 @@ def run(argv=sys.argv[1:]):
 
     configure_logging(verbose=args.verbosity > 1)
 
+    df = pandas.read_csv(args.data)
+    print("Loaded data: %s" % (str(df.shape)))
+
     input_predictor = Class1AffinityPredictor.load(args.models_dir)
     print("Loaded: %s" % input_predictor)
 
@@ -131,8 +134,6 @@ def run(argv=sys.argv[1:]):
         input_predictor.supported_peptide_lengths)
 
     metadata_dfs = {}
-    df = pandas.read_csv(args.data)
-    print("Loaded data: %s" % (str(df.shape)))
 
     if args.folds:
         folds_df = pandas.read_csv(args.folds)
@@ -191,7 +192,7 @@ def run(argv=sys.argv[1:]):
         assert num_folds == training_info['num_folds']
         (lst, hash) = folds_to_predictors[fold_num]
         train_peptide_hash = training_info['train_peptide_hash']
-        #numpy.testing.assert_equal(hash, train_peptide_hash)  #enable later
+        numpy.testing.assert_equal(hash, train_peptide_hash)
         lst.append(model)
 
     work_items = []

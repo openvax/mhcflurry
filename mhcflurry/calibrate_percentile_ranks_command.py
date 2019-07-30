@@ -39,8 +39,8 @@ parser.add_argument(
     "--allele",
     default=None,
     nargs="+",
-    help="Alleles to train models for. If not specified, all alleles with "
-    "enough measurements will be used.")
+    help="Alleles to calibrate percentile ranks for. If not specified all "
+    "alleles are used")
 parser.add_argument(
     "--num-peptides-per-length",
     type=int,
@@ -55,6 +55,7 @@ parser.add_argument(
     default=0)
 
 add_local_parallelism_args(parser)
+
 
 def run(argv=sys.argv[1:]):
     global GLOBAL_DATA
@@ -78,7 +79,8 @@ def run(argv=sys.argv[1:]):
 
     start = time.time()
 
-    print("Performing percent rank calibration. Encoding peptides.")
+    print("Performing percent rank calibration for %d alleles: encoding peptides" % (
+        len(alleles)))
     encoded_peptides = predictor.calibrate_percentile_ranks(
         alleles=[],  # don't actually do any calibration, just return peptides
         num_peptides_per_length=args.num_peptides_per_length)

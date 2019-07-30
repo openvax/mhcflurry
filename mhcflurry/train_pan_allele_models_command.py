@@ -129,6 +129,7 @@ parser.add_argument(
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
 
+
 def assign_folds(df, num_folds, held_out_fraction, held_out_max):
     result_df = pandas.DataFrame(index=df.index)
 
@@ -284,6 +285,14 @@ def main(args):
     print("Will use %d / %d allele sequences" % (
         len(allele_sequences_in_use), len(allele_sequences)))
 
+    # All alleles, not just those with training data.
+    full_allele_encoding = AlleleEncoding(
+        alleles=allele_sequences.index.values,
+        allele_to_sequence=allele_sequences.to_dict()
+    )
+
+    # Only alleles with training data. For efficiency we perform model training
+    # using only these alleles in the neural network embedding layer.
     allele_encoding = AlleleEncoding(
         alleles=allele_sequences_in_use.index.values,
         allele_to_sequence=allele_sequences_in_use.to_dict())
@@ -366,9 +375,6 @@ def main(args):
 
             results_generator = worker_pool.imap_unordered(
                 partial(call_wrapped_kwargs, train_model),
-
-
-
                 work_items,
                 chunksize=1)
         else:
@@ -411,7 +417,11 @@ def main(args):
         predictor.merge_in_place(unsaved_predictors)
 
     print("Saving final predictor to: %s" % args.out_models_dir)
-    predictor.save(args.out_models_dir)  # write all models just to be sure
+    # We want the final predictor to support all alleles with sequences, not
+    # just those we actually used for model training.
+    predictor.allele_to_sequence = full_allele_encoding.allele_to_sequence
+    predictor.clear_cache()
+    predictor.save(args.out_models_dir)
     print("Done.")
 
     print("*" * 30)

@@ -1197,12 +1197,42 @@ class Class1NeuralNetwork(object):
         allele_representations
 
         """
-        reshaped = allele_representations.reshape((allele_representations.shape[0], -1))
-        layer = self.network().get_layer("allele_representation")
-        (existing,) = layer.get_weights()
-        if existing.shape == reshaped.shape:
-            layer.set_weights([reshaped])
-        else:
-            raise NotImplementedError(
-                "Network surgery required: %s != %s" % (
-                    str(existing.shape), str(reshaped.shape)))
+        from keras.models import model_from_json
+        reshaped = allele_representations.reshape(
+            (allele_representations.shape[0], -1))
+        original_model = self.network()
+        layer = original_model.get_layer("allele_representation")
+        (existing_weights,) = layer.get_weights()
+
+        # Only changes to the number of supported alleles (not the length of
+        # the allele sequences) are allowed.
+        assert existing_weights.shape[1:] == reshaped.shape[1:]
+
+        if existing_weights.shape != reshaped.shape:
+            # Network surgery required. Make a new network with this layer's
+            # dimensions changed. Kind of a hack.
+            layer.input_dim = reshaped.shape[0]
+            new_model = model_from_json(original_model.to_json())
+
+            # copy weights for other layers over
+            for layer in new_model.layers:
+                if layer.name != "allele_representation":
+                    layer.set_weights(
+                        original_model.get_layer(name=layer.name).get_weights())
+
+            self._network = new_model
+            self.update_network_description()
+
+            layer = new_model.get_layer("allele_representation")
+            (existing_weights,) = layer.get_weights()
+
+            # Disable the old model to catch bugs.
+            def throw(*args, **kwargs):
+                raise RuntimeError("Using a disabled model!")
+            original_model.predict = \
+                original_model.fit = \
+                original_model.fit_generator = throw
+
+        assert existing_weights.shape == reshaped.shape, (
+            existing_weights.shape, reshaped.shape)
+        layer.set_weights([reshaped])
