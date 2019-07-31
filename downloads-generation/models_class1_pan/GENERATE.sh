@@ -32,9 +32,10 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
-NUM_JOBS=$GPUS
-if [ "$NUM_JOBS" -eq "0" ]; then
-   NUM_JOBS=1
+if [ "$GPUS" -eq "0" ]; then
+   NUM_JOBS=${NUM_JOBS-1}
+else
+    NUM_JOBS=${NUM_JOBS-$GPUS}
 fi
 echo "Num jobs: $NUM_JOBS"
 
