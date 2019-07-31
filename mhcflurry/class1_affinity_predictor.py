@@ -17,7 +17,7 @@ from numpy.testing import assert_equal
 from six import string_types
 
 from .class1_neural_network import Class1NeuralNetwork
-from .common import random_peptides
+from .common import random_peptides, positional_frequency_matrix
 from .downloads import get_default_class1_models_dir
 from .encodable_sequences import EncodableSequences
 from .percent_rank_transform import PercentRankTransform
@@ -95,7 +95,8 @@ class Class1AffinityPredictor(object):
         if not allele_to_percent_rank_transform:
             allele_to_percent_rank_transform = {}
         self.allele_to_percent_rank_transform = allele_to_percent_rank_transform
-        self.metadata_dataframes = metadata_dataframes
+        self.metadata_dataframes = (
+            dict(metadata_dataframes) if metadata_dataframes else {})
         self._cache = {}
 
         assert isinstance( self.allele_to_allele_specific_models, dict)
@@ -1153,7 +1154,10 @@ class Class1AffinityPredictor(object):
             peptides=None,
             num_peptides_per_length=int(1e5),
             alleles=None,
-            bins=None):
+            bins=None,
+            motif_summary=False,
+            summary_top_peptide_fraction=0.001,
+            verbose=False):
         """
         Compute the cumulative distribution of ic50 values for a set of alleles
         over a large universe of random peptides, to enable computing quantiles in
@@ -1196,13 +1200,75 @@ class Class1AffinityPredictor(object):
 
         encoded_peptides = EncodableSequences.create(peptides)
 
+        if motif_summary:
+            frequency_matrices = []
+            length_distributions = []
+        else:
+            frequency_matrices = None
+            length_distributions = None
         for (i, allele) in enumerate(alleles):
+            start = time.time()
             predictions = self.predict(encoded_peptides, allele=allele)
+            if verbose:
+                elapsed = time.time() - start
+                print(
+                    "Generated %d predictions for allele %s in %0.2f sec: "
+                    "%0.2f predictions / sec" % (
+                        len(encoded_peptides.sequences),
+                        allele,
+                        elapsed,
+                        len(encoded_peptides.sequences) / elapsed))
             transform = PercentRankTransform()
             transform.fit(predictions, bins=bins)
             self.allele_to_percent_rank_transform[allele] = transform
 
-        return encoded_peptides
+            if frequency_matrices is not None:
+                predictions_df = pandas.DataFrame({
+                    'peptide': encoded_peptides.sequences,
+                    'prediction': predictions
+                }).drop_duplicates('peptide').set_index("peptide")
+                predictions_df["length"] = predictions_df.index.str.len()
+                for (length, sub_df) in predictions_df.groupby("length"):
+                    selected = sub_df.prediction.nsmallest(
+                        max(
+                            int(len(sub_df) * summary_top_peptide_fraction),
+                            1)).index.values
+                    matrix = positional_frequency_matrix(selected).reset_index()
+                    original_columns = list(matrix.columns)
+                    matrix["length"] = length
+                    matrix["allele"] = allele
+                    matrix = matrix[["allele", "length"] + original_columns]
+                    frequency_matrices.append(matrix)
+
+                # Length distribution
+                length_distribution = predictions_df.prediction.nsmallest(
+                    max(
+                        int(len(predictions_df) * summary_top_peptide_fraction),
+                        1)).index.str.len().value_counts()
+                length_distribution.index.name = "length"
+                length_distribution /= length_distribution.sum()
+                length_distribution = length_distribution.to_frame()
+                length_distribution.columns = ["fraction"]
+                length_distribution = length_distribution.reset_index()
+                length_distribution["allele"] = allele
+                length_distribution = length_distribution[
+                    ["allele", "length", "fraction"]
+                ].sort_values("length")
+                length_distributions.append(length_distribution)
+
+        if frequency_matrices is not None:
+            frequency_matrices = pandas.concat(
+                frequency_matrices, ignore_index=True)
+
+        if length_distributions is not None:
+            length_distributions = pandas.concat(
+                length_distributions, ignore_index=True)
+
+        if motif_summary:
+            return {
+                'frequency_matrices': frequency_matrices,
+                'length_distributions': length_distributions,
+            }
 
     def filter_networks(self, predicate):
         """

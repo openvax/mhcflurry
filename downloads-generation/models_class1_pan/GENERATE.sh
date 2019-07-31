@@ -56,7 +56,10 @@ do
 
     time mhcflurry-calibrate-percentile-ranks \
         --models-dir models.${kind} \
-        --num-peptides-per-length 10000 \
+        --match-amino-acid-distribution-data "$MODELS_DIR/train_data.csv.bz2" \
+        --motif-summary \
+        --num-peptides-per-length 100000 \
+        --verbosity 1 \
         --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
 done
 

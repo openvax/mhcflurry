@@ -18,7 +18,7 @@ def add_local_parallelism_args(parser):
 
     group.add_argument(
         "--num-jobs",
-        default=1,
+        default=0,
         type=int,
         metavar="N",
         help="Number of processes to parallelize training over. Experimental. "

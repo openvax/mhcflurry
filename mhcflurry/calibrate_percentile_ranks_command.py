@@ -7,14 +7,20 @@ import signal
 import sys
 import time
 import traceback
+import collections
 from functools import partial
+
+import pandas
+import numpy
 
 from mhcnames import normalize_allele_name
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .common import configure_logging
+from .encodable_sequences import EncodableSequences
+from .common import configure_logging, random_peptides, amino_acid_distribution
+from .amino_acid import BLOSUM62_MATRIX
 from .local_parallelism import (
     add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
@@ -42,12 +48,36 @@ parser.add_argument(
     help="Alleles to calibrate percentile ranks for. If not specified all "
     "alleles are used")
 parser.add_argument(
+    "--match-amino-acid-distribution-data",
+    help="Sample random peptides from the amino acid distribution of the "
+    "peptides listed in the supplied CSV file, which must have a 'peptide' "
+    "column. If not specified a uniform distribution is used.")
+parser.add_argument(
     "--num-peptides-per-length",
     type=int,
     metavar="N",
     default=int(1e5),
     help="Number of peptides per length to use to calibrate percent ranks. "
     "Default: %(default)s.")
+parser.add_argument(
+    "--motif-summary",
+    default=False,
+    action="store_true",
+    help="Calculate motifs and length preferences for each allele")
+parser.add_argument(
+    "--summary-top-peptide-fraction",
+    default=0.001,
+    type=float,
+    metavar="X",
+    help="The top X fraction of predictions (i.e. tightest binders) to use to "
+    "generate motifs and length preferences. Default: %(default)s")
+parser.add_argument(
+    "--length-range",
+    default=(8, 15),
+    type=int,
+    nargs=2,
+    help="Min and max peptide length to calibrate, inclusive. "
+    "Default: %(default)s")
 parser.add_argument(
     "--verbosity",
     type=int,
@@ -77,13 +107,26 @@ def run(argv=sys.argv[1:]):
     else:
         alleles = predictor.supported_alleles
 
+    distribution = None
+    if args.match_amino_acid_distribution_data:
+        distribution_peptides = pandas.read_csv(
+            args.match_amino_acid_distribution_data).peptide.unique()
+        distribution = amino_acid_distribution(distribution_peptides)
+        print("Using amino acid distribution:")
+        print(distribution)
+
     start = time.time()
 
-    print("Performing percent rank calibration for %d alleles: encoding peptides" % (
+    print("Percent rank calibration for %d alleles. Encoding peptides." % (
         len(alleles)))
-    encoded_peptides = predictor.calibrate_percentile_ranks(
-        alleles=[],  # don't actually do any calibration, just return peptides
-        num_peptides_per_length=args.num_peptides_per_length)
+
+    peptides = []
+    lengths = range(args.length_range[0], args.length_range[1] + 1)
+    for length in lengths:
+        peptides.extend(
+            random_peptides(
+                args.num_peptides_per_length, length, distribution=distribution))
+    encoded_peptides = EncodableSequences.create(peptides)
 
     # Now we encode the peptides for each neural network, so the encoding
     # becomes cached.
@@ -100,6 +143,12 @@ def run(argv=sys.argv[1:]):
 
     worker_pool = worker_pool_with_gpu_assignments_from_args(args)
 
+    constant_kwargs = {
+        'motif_summary': args.motif_summary,
+        'summary_top_peptide_fraction': args.summary_top_peptide_fraction,
+        'verbose': args.verbosity > 0,
+    }
+
     if worker_pool is None:
         # Serial run
         print("Running in serial.")
@@ -107,20 +156,34 @@ def run(argv=sys.argv[1:]):
             calibrate_percentile_ranks(
                 allele=allele,
                 predictor=predictor,
-                peptides=encoded_peptides)
+                peptides=encoded_peptides,
+                **constant_kwargs,
+            )
             for allele in alleles)
     else:
         # Parallel run
         results = worker_pool.imap_unordered(
             partial(
                 partial(call_wrapped, calibrate_percentile_ranks),
-                predictor=predictor),
+                predictor=predictor,
+                **constant_kwargs),
             alleles,
             chunksize=1)
 
-    for result in tqdm.tqdm(results, total=len(alleles)):
-        predictor.allele_to_percent_rank_transform.update(result)
-    print("Done calibrating %d additional alleles." % len(alleles))
+    summary_results_lists = collections.defaultdict(list)
+    for (transforms, summary_results) in tqdm.tqdm(results, total=len(alleles)):
+        predictor.allele_to_percent_rank_transform.update(transforms)
+        if summary_results is not None:
+            for (item, value) in summary_results.items():
+                summary_results_lists[item].append(value)
+    print("Done calibrating %d alleles." % len(alleles))
+    if summary_results_lists:
+        for (name, lst) in summary_results_lists.items():
+            df = pandas.concat(lst, ignore_index=True)
+            predictor.metadata_dataframes[name] = df
+            print("Including summary result: %s" % name)
+            print(df)
+
     predictor.save(args.models_dir, model_names_to_write=[])
 
     percent_rank_calibration_time = time.time() - start
@@ -134,19 +197,29 @@ def run(argv=sys.argv[1:]):
     print("Predictor written to: %s" % args.models_dir)
 
 
-def calibrate_percentile_ranks(allele, predictor, peptides=None):
+def calibrate_percentile_ranks(
+        allele,
+        predictor,
+        peptides=None,
+        motif_summary=False,
+        summary_top_peptide_fraction=0.001,
+        verbose=False):
     """
     Private helper function.
     """
     global GLOBAL_DATA
     if peptides is None:
         peptides = GLOBAL_DATA["calibration_peptides"]
-    predictor.calibrate_percentile_ranks(
+    summary_results = predictor.calibrate_percentile_ranks(
         peptides=peptides,
-        alleles=[allele])
-    return {
+        alleles=[allele],
+        motif_summary=motif_summary,
+        summary_top_peptide_fraction=summary_top_peptide_fraction,
+        verbose=verbose)
+    transforms = {
         allele: predictor.allele_to_percent_rank_transform[allele],
     }
+    return (transforms, summary_results)
 
 
 if __name__ == '__main__':
