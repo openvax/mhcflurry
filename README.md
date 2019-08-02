@@ -65,3 +65,35 @@ these predictors, run:
 $ mhcflurry-downloads fetch models_class1_selected_no_mass_spec
 export MHCFLURRY_DEFAULT_CLASS1_MODELS="$(mhcflurry-downloads path models_class1_selected_no_mass_spec)/models"
 ```
+
+## Experimental: pan-allele models
+
+We are testing new models that support prediction for any MHC I allele of known
+sequence (as opposed to the 112 alleles supported by the current version).
+
+Caveats:
+ * These models have not been carefully benchmarked and are likely to change
+ * We have concerns about the peptide length distributions for some alleles
+ * They are quite slow currently
+ * Percentile rank output is not available for these models, only predicted IC50.
+
+To try the pan-allele models, first download them:
+
+```
+$ mhcflurry-downloads fetch models_class1_pan
+```
+
+then set this environment variable to use them by default:
+
+```
+$ export MHCFLURRY_DEFAULT_CLASS1_MODELS="$(mhcflurry-downloads path models_class1_pan)/models.with_mass_spec"
+```
+
+You can now generate predictions for about 14,000 MHC I alleles. For example:
+
+```
+$ mhcflurry-predict --alleles HLA-A*02:04 --peptides SIINFEKL
+```
+
+If you use these models please let us know how it goes and if you encounter
+anything surprising.

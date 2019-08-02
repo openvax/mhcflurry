@@ -20,6 +20,10 @@ releases:
     2.0.0:
         compatibility-version: 2
         downloads:
+            - name: models_class1_pan
+              url: https://github.com/openvax/mhcflurry/releases/download/pan-dev1/models_class1_pan.20190802.tar.bz2
+              default: false
+
             - name: models_class1_pan_unselected
               url: https://github.com/openvax/mhcflurry/releases/download/pan-dev1/model_class1_pan_unselected.manual_build.20190731.tar.bz2
               default: false
