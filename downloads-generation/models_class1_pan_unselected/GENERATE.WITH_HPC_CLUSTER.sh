@@ -64,12 +64,10 @@ do
 
     # In case the above command fails, the job can may still be fixable manually.
     # So we wait for the COMPLETE file here.
-    if [ ! -f models.${kind}/COMPLETE ]
-    then
-        echo "Waiting for models.${kind}/COMPLETE"
-    fi
     while [ ! -f models.${kind}/COMPLETE ]
     do
+        echo "Waiting for $(pwd)/models.${kind}/COMPLETE"
+        echo "Processing script: $(pwd)/PROCESS.${kind}.sh"
         sleep 60
     done
 done
