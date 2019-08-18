@@ -1,7 +1,7 @@
 import traceback
 import sys
 import os
-import functools
+import time
 from multiprocessing import Pool, Queue, cpu_count
 from six.moves import queue
 from multiprocessing.util import Finalize
@@ -218,12 +218,9 @@ def worker_init_entry_point(
 
 def worker_init(keras_backend=None, gpu_device_nums=None, worker_log_dir=None):
     if worker_log_dir:
-        sys.stderr = sys.stdout = open(
-            os.path.join(worker_log_dir, "LOG-"
-                                         ""
-                                         ""
-                                         ""
-                                         "worker.%d.txt" % os.getpid()), "w")
+        sys.stderr = sys.stdout = open(os.path.join(
+            worker_log_dir,
+            "LOG-worker.%d.%d.txt" % (os.getpid(), int(time.time()))), "w")
 
     # Each worker needs distinct random numbers
     numpy.random.seed()

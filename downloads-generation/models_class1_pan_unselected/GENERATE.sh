@@ -11,8 +11,14 @@ SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 
 mkdir -p "$SCRATCH_DIR"
-rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
-mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
+if [ "$1" != "continue-incomplete" ]
+then
+    echo "Fresh run"
+    rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
+    mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
+else
+    echo "Continuing incomplete run"
+fi
 
 # Send stdout and stderr to a logfile included with the archive.
 exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
@@ -43,8 +49,21 @@ echo "Num jobs: $NUM_JOBS"
 
 export PYTHONUNBUFFERED=1
 
+if [ "$1" != "continue-incomplete" ]
+then
+    cp $SCRIPT_DIR/generate_hyperparameters.py .
+    python generate_hyperparameters.py > hyperparameters.yaml
+fi
+
 for kind in with_mass_spec no_mass_spec
 do
+    EXTRA_TRAIN_ARGS=""
+    if [ "$1" == "continue-incomplete" ] && [ -d "models.${kind}" ]
+    then
+        echo "Will continue existing run: $kind"
+        EXTRA_TRAIN_ARGS="--continue-incomplete"
+    fi
+
     mhcflurry-class1-train-pan-allele-models \
         --data "$(mhcflurry-downloads path data_curated)/curated_training_data.${kind}.csv.bz2" \
         --allele-sequences "$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv" \
@@ -55,7 +74,8 @@ do
         --out-models-dir models.${kind} \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
         --verbosity 0 \
-        --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
+        --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1 \
+        $EXTRA_TRAIN_ARGS
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
