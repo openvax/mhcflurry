@@ -312,6 +312,11 @@ class Class1AffinityPredictor(object):
                 str(self.class1_pan_allele_models),
                 str(self.allele_to_allele_specific_models)))
 
+    def save_metadata_df(self, models_dir, name):
+        df = self.metadata_dataframes[name]
+        metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
+        df.to_csv(metadata_df_path, index=False, compression="bz2")
+
     def save(self, models_dir, model_names_to_write=None, write_metadata=True):
         """
         Serialize the predictor to a directory on disk. If the directory does
@@ -375,9 +380,8 @@ class Class1AffinityPredictor(object):
                 info_path, sep="\t", header=False, index=False)
 
             if self.metadata_dataframes:
-                for (name, df) in self.metadata_dataframes.items():
-                    metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
-                    df.to_csv(metadata_df_path, index=False, compression="bz2")
+                for name in self.metadata_dataframes:
+                    self.save_metadata_df(models_dir, name)
 
         # Save allele sequences
         if self.allele_to_sequence is not None:
