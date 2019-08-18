@@ -36,20 +36,42 @@ python generate_hyperparameters.py > hyperparameters.yaml
 
 for kind in with_mass_spec no_mass_spec
 do
-    mhcflurry-class1-train-pan-allele-models \
+    echo mhcflurry-class1-train-pan-allele-models \
         --data "$(mhcflurry-downloads path data_curated)/curated_training_data.${kind}.csv.bz2" \
         --allele-sequences "$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv" \
         --pretrain-data "$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2" \
         --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
         --ensemble-size 4 \
         --hyperparameters hyperparameters.yaml \
-        --out-models-dir models.${kind} \
+        --out-models-dir $(pwd)/models.${kind} \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
         --verbosity 0 \
         --cluster-parallelism \
         --cluster-submit-command bsub \
         --cluster-results-workdir ~/mhcflurry-scratch \
-        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
+        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf \
+        \\ > INITIALIZE.${kind}.sh
+
+    cp INITIALIZE.${kind}.sh PROCESS.${kind}.sh
+    echo "--only-initialize" >> INITIALIZE.${kind}.sh
+    echo "--continue-incomplete" >> PROCESS.${kind}.sh
+
+    bash INITIALIZE.${kind}.sh
+    echo "Done initializing."
+
+    bash PROCESS.${kind}.sh && touch $(pwd)/models.${kind}/COMPLETE || true
+    echo "Processing terminated."
+
+    # In case the above command fails, the job can may still be fixable manually.
+    # So we wait for the COMPLETE file here.
+    if [ ! -f models.${kind}/COMPLETE ]
+    then
+        echo "Waiting for models.${kind}/COMPLETE"
+    fi
+    while [ ! -f models.${kind}/COMPLETE ]
+    do
+        sleep 60
+    done
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
