@@ -121,6 +121,12 @@ parser.add_argument(
     default=False,
     help="Continue training models from an incomplete training run. If this is "
     "specified then the only required argument is --out-models-dir")
+parser.add_argument(
+    "--only-initialize",
+    action="store_true",
+    default=False,
+    help="Do not actually train models. The initialized run can be continued "
+    "later with --continue-incomplete.")
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
@@ -235,7 +241,9 @@ def main(args):
 
     if not args.continue_incomplete:
         initialize_training(args)
-    train_models(args)
+
+    if not args.only_initialize:
+        train_models(args)
 
 
 def initialize_training(args):
