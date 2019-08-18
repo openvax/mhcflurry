@@ -36,7 +36,7 @@ base_hyperparameters = {
     'peptide_dense_layer_sizes': [],
     'random_negative_affinity_max': 50000.0,
     'random_negative_affinity_min': 20000.0,
-    'random_negative_constant': 25,
+    'random_negative_constant': 1500,
     'random_negative_distribution_smoothing': 0.0,
     'random_negative_match_distribution': True,
     'random_negative_rate': 0.2,

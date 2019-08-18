@@ -14,14 +14,21 @@ SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 
 mkdir -p "$SCRATCH_DIR"
-rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
-mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
+if [ "$1" != "continue-incomplete" ]
+then
+    echo "Fresh run"
+    rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
+    mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
+else
+    echo "Continuing incomplete run"
+fi
 
 # Send stdout and stderr to a logfile included with the archive.
 exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
 exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 
 # Log some environment info
+echo "Invocation: $0 $@"
 date
 pip freeze
 git status
@@ -31,12 +38,22 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
-cp $SCRIPT_DIR/generate_hyperparameters.py .
-python generate_hyperparameters.py > hyperparameters.yaml
+if [ "$1" != "continue-incomplete" ]
+then
+    cp $SCRIPT_DIR/generate_hyperparameters.py .
+    python generate_hyperparameters.py > hyperparameters.yaml
+fi
 
 for kind in with_mass_spec no_mass_spec
 do
-    echo mhcflurry-class1-train-pan-allele-models \
+    EXTRA_TRAIN_ARGS=""
+    if [ "$1" == "continue-incomplete" ] && [ -d "models.${kind}" ]
+    then
+        echo "Will continue existing run: $kind"
+        EXTRA_TRAIN_ARGS="--continue-incomplete"
+    fi
+
+    mhcflurry-class1-train-pan-allele-models \
         --data "$(mhcflurry-downloads path data_curated)/curated_training_data.${kind}.csv.bz2" \
         --allele-sequences "$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv" \
         --pretrain-data "$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2" \
@@ -50,26 +67,7 @@ do
         --cluster-submit-command bsub \
         --cluster-results-workdir ~/mhcflurry-scratch \
         --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf \
-        \\ > INITIALIZE.${kind}.sh
-
-    cp INITIALIZE.${kind}.sh PROCESS.${kind}.sh
-    echo "--only-initialize" >> INITIALIZE.${kind}.sh
-    echo "--continue-incomplete" >> PROCESS.${kind}.sh
-
-    bash INITIALIZE.${kind}.sh
-    echo "Done initializing."
-
-    bash PROCESS.${kind}.sh && touch $(pwd)/models.${kind}/COMPLETE || true
-    echo "Processing terminated."
-
-    # In case the above command fails, the job can may still be fixable manually.
-    # So we wait for the COMPLETE file here.
-    while [ ! -f models.${kind}/COMPLETE ]
-    do
-        echo "Waiting for $(pwd)/models.${kind}/COMPLETE"
-        echo "Processing script: $(pwd)/PROCESS.${kind}.sh"
-        sleep 60
-    done
+        $EXTRA_TRAIN_ARGS
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
