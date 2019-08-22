@@ -21,7 +21,7 @@ def add_local_parallelism_args(parser):
         default=0,
         type=int,
         metavar="N",
-        help="Number of processes to parallelize training over. Experimental. "
+        help="Number of local processes to parallelize training over. "
              "Set to 0 for serial run. Default: %(default)s.")
     group.add_argument(
         "--backend",
