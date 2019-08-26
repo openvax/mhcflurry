@@ -24,8 +24,9 @@ else
 fi
 
 # Send stdout and stderr to a logfile included with the archive.
-exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
-exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
+LOG="$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.$(date +%s).txt"
+exec >  >(tee -ia "$LOG")
+exec 2> >(tee -ia "$LOG" >&2)
 
 # Log some environment info
 echo "Invocation: $0 $@"
@@ -71,7 +72,21 @@ do
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
-bzip2 LOG.txt
-for i in $(ls LOG-worker.*.txt) ; do bzip2 $i ; done
-tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
-echo "Created archive: $SCRATCH_DIR/${DOWNLOAD_NAME}.tar.bz2"
+bzip2 -f "$LOG"
+for i in $(ls LOG-worker.*.txt) ; do bzip2 -f $i ; done
+RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
+tar -cjf "$RESULT" *
+echo "Created archive: $RESULT"
+
+# Split into <2GB chunks for GitHub
+PARTS="${RESULT}.part."
+# Check for pre-existing part files and rename them.
+for i in $(ls "${PARTS}"* )
+do
+    DEST="${i}.OLD.$(date +%s)"
+    echo "WARNING: already exists: $i . Moving to $DEST"
+    mv $i $DEST
+done
+split -b 2000M "$RESULT" "$PARTS"
+echo "Split into parts:"
+ls -lh "${PARTS}"*
