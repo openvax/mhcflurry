@@ -25,7 +25,9 @@ releases:
               default: false
 
             - name: models_class1_pan_unselected
-              url: https://github.com/openvax/mhcflurry/releases/download/pan-dev1/model_class1_pan_unselected.manual_build.20190731.tar.bz2
+              part_urls:
+                - https://github.com/openvax/mhcflurry/releases/download/pan-dev1/models_class1_pan_unselected.20190826.tar.bz2.part.aa
+                - https://github.com/openvax/mhcflurry/releases/download/pan-dev1/models_class1_pan_unselected.20190826.tar.bz2.part.ab
               default: false
 
             - name: data_iedb
