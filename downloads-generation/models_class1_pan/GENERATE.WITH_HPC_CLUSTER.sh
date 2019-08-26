@@ -14,6 +14,8 @@ SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 
 mkdir -p "$SCRATCH_DIR"
+rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
+mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
 
 # Send stdout and stderr to a logfile included with the archive.
 exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
