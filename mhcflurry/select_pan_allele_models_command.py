@@ -1,5 +1,5 @@
 """
-Model select class1 single allele models.
+Model select class1 pan allele models.
 """
 import argparse
 import os
@@ -7,13 +7,11 @@ import signal
 import sys
 import time
 import traceback
-import random
 import hashlib
 from pprint import pprint
 
 import numpy
 import pandas
-from scipy.stats import kendalltau, percentileofscore, pearsonr
 
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
@@ -22,7 +20,12 @@ from .class1_affinity_predictor import Class1AffinityPredictor
 from .encodable_sequences import EncodableSequences
 from .allele_encoding import AlleleEncoding
 from .common import configure_logging, random_peptides
-from .local_parallelism import worker_pool_with_gpu_assignments_from_args, add_local_parallelism_args
+from .local_parallelism import (
+    worker_pool_with_gpu_assignments_from_args,
+    add_local_parallelism_args)
+from .cluster_parallelism import (
+    add_cluster_parallelism_args,
+    cluster_results_from_args)
 from .regression_target import from_ic50
 
 
@@ -83,6 +86,7 @@ parser.add_argument(
     default=0)
 
 add_local_parallelism_args(parser)
+add_cluster_parallelism_args(parser)
 
 
 def mse(
@@ -216,21 +220,33 @@ def run(argv=sys.argv[1:]):
         allele_to_sequence=input_predictor.allele_to_sequence,
         metadata_dataframes=metadata_dfs)
 
-    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
-
+    serial_run = not args.cluster_parallelism and args.num_jobs == 0
+    worker_pool = None
     start = time.time()
-
-    if worker_pool is None:
+    if serial_run:
         # Serial run
         print("Running in serial.")
         results = (do_model_select_task(item) for item in work_items)
+    elif args.cluster_parallelism:
+        # Run using separate processes HPC cluster.
+        print("Running on cluster.")
+        results = cluster_results_from_args(
+            args,
+            work_function=do_model_select_task,
+            work_items=work_items,
+            constant_data=GLOBAL_DATA,
+            result_serialization_method="pickle")
     else:
+        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        print("Worker pool", worker_pool)
+        assert worker_pool is not None
+
+        print("Processing %d work items in parallel." % len(work_items))
+        assert not serial_run
+
         # Parallel run
-        random.shuffle(alleles)
         results = worker_pool.imap_unordered(
-            do_model_select_task,
-            work_items,
-            chunksize=1)
+            do_model_select_task, work_items, chunksize=1)
 
     models_by_fold = {}
     summary_dfs = []

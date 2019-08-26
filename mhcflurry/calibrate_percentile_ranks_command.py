@@ -11,7 +11,6 @@ import collections
 from functools import partial
 
 import pandas
-import numpy
 
 from mhcnames import normalize_allele_name
 import tqdm  # progress bar
@@ -20,11 +19,13 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .encodable_sequences import EncodableSequences
 from .common import configure_logging, random_peptides, amino_acid_distribution
-from .amino_acid import BLOSUM62_MATRIX
 from .local_parallelism import (
     add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped)
+from .cluster_parallelism import (
+    add_cluster_parallelism_args,
+    cluster_results_from_args)
 
 
 # To avoid pickling large matrices to send to child processes when running in
@@ -85,6 +86,7 @@ parser.add_argument(
     default=0)
 
 add_local_parallelism_args(parser)
+add_cluster_parallelism_args(parser)
 
 
 def run(argv=sys.argv[1:]):
@@ -140,33 +142,36 @@ def run(argv=sys.argv[1:]):
     # Store peptides in global variable so they are in shared memory
     # after fork, instead of needing to be pickled (when doing a parallel run).
     GLOBAL_DATA["calibration_peptides"] = encoded_peptides
-
-    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
-
-    constant_kwargs = {
+    GLOBAL_DATA["predictor"] = predictor
+    GLOBAL_DATA["args"] = {
         'motif_summary': args.motif_summary,
         'summary_top_peptide_fraction': args.summary_top_peptide_fraction,
-        'verbose': args.verbosity > 0,
+        'verbose': args.verbosity > 0
     }
 
-    if worker_pool is None:
+    serial_run = not args.cluster_parallelism and args.num_jobs == 0
+    worker_pool = None
+    start = time.time()
+    if serial_run:
         # Serial run
         print("Running in serial.")
         results = (
-            calibrate_percentile_ranks(
-                allele=allele,
-                predictor=predictor,
-                peptides=encoded_peptides,
-                **constant_kwargs,
-            )
-            for allele in alleles)
+            do_calibrate_percentile_ranks(allele) for allele in alleles)
+    elif args.cluster_parallelism:
+        # Run using separate processes HPC cluster.
+        print("Running on cluster.")
+        results = cluster_results_from_args(
+            args,
+            work_function=do_calibrate_percentile_ranks,
+            work_items=alleles,
+            constant_data=GLOBAL_DATA,
+            result_serialization_method="pickle")
     else:
-        # Parallel run
+        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        print("Worker pool", worker_pool)
+        assert worker_pool is not None
         results = worker_pool.imap_unordered(
-            partial(
-                partial(call_wrapped, calibrate_percentile_ranks),
-                predictor=predictor,
-                **constant_kwargs),
+            partial(call_wrapped, do_calibrate_percentile_ranks),
             alleles,
             chunksize=1)
 
@@ -195,6 +200,14 @@ def run(argv=sys.argv[1:]):
     print("Percent rank calibration time: %0.2f min." % (
        percent_rank_calibration_time / 60.0))
     print("Predictor written to: %s" % args.models_dir)
+
+
+def do_calibrate_percentile_ranks(allele):
+    return calibrate_percentile_ranks(
+        allele,
+        GLOBAL_DATA['predictor'],
+        peptides=GLOBAL_DATA['calibration_peptides'],
+        **GLOBAL_DATA["args"])
 
 
 def calibrate_percentile_ranks(
