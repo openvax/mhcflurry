@@ -43,7 +43,8 @@ def cluster_results_from_args(
         work_function,
         work_items,
         constant_data=None,
-        result_serialization_method="pickle"):
+        result_serialization_method="pickle",
+        clear_constant_data=False):
     return cluster_results(
         work_function=work_function,
         work_items=work_items,
@@ -51,7 +52,8 @@ def cluster_results_from_args(
         submit_command=args.cluster_submit_command,
         results_workdir=args.cluster_results_workdir,
         script_prefix_path=args.cluster_script_prefix_path,
-        result_serialization_method=result_serialization_method
+        result_serialization_method=result_serialization_method,
+        clear_constant_data=clear_constant_data
     )
 
 
@@ -63,7 +65,8 @@ def cluster_results(
         results_workdir="./cluster-workdir",
         script_prefix_path=None,
         result_serialization_method="pickle",
-        max_retries=3):
+        max_retries=3,
+        clear_constant_data=False):
 
     constant_payload = {
         'constant_data': constant_data,
@@ -78,6 +81,9 @@ def cluster_results(
     with open(constant_payload_path, "wb") as fd:
         pickle.dump(constant_payload, fd, protocol=pickle.HIGHEST_PROTOCOL)
     print("Wrote:", constant_payload_path)
+    if clear_constant_data:
+        constant_data.clear()
+        print("Cleared constant data to free up memory.")
 
     if script_prefix_path:
         with open(script_prefix_path) as fd:
