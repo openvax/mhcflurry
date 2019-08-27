@@ -81,6 +81,11 @@ parser.add_argument(
     help="Min and max peptide length to calibrate, inclusive. "
     "Default: %(default)s")
 parser.add_argument(
+    "--prediction-batch-size",
+    type=int,
+    default=4096,
+    help="Keras batch size for predictions")
+parser.add_argument(
     "--verbosity",
     type=int,
     help="Keras verbosity. Default: %(default)s",
@@ -149,7 +154,10 @@ def run(argv=sys.argv[1:]):
     GLOBAL_DATA["args"] = {
         'motif_summary': args.motif_summary,
         'summary_top_peptide_fractions': args.summary_top_peptide_fraction,
-        'verbose': args.verbosity > 0
+        'verbose': args.verbosity > 0,
+        'model_kwargs': {
+            'batch_size': args.prediction_batch_size,
+        }
     }
     del encoded_peptides
 
@@ -222,13 +230,20 @@ def calibrate_percentile_ranks(
         peptides=None,
         motif_summary=False,
         summary_top_peptide_fractions=[0.001],
-        verbose=False):
+        verbose=False,
+        model_kwargs={}):
+    if verbose:
+        print("Calibrating", allele)
+    start = time.time()
     summary_results = predictor.calibrate_percentile_ranks(
         peptides=peptides,
         alleles=[allele],
         motif_summary=motif_summary,
         summary_top_peptide_fractions=summary_top_peptide_fractions,
-        verbose=verbose)
+        verbose=verbose,
+        model_kwargs=model_kwargs)
+    if verbose:
+        print("Done calibrating", allele, "in", time.time() - start, "sec")
     transforms = {
         allele: predictor.allele_to_percent_rank_transform[allele],
     }

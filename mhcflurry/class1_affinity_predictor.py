@@ -1157,7 +1157,8 @@ class Class1AffinityPredictor(object):
             bins=None,
             motif_summary=False,
             summary_top_peptide_fractions=[0.001],
-            verbose=False):
+            verbose=False,
+            model_kwargs={}):
         """
         Compute the cumulative distribution of ic50 values for a set of alleles
         over a large universe of random peptides, to enable computing quantiles in
@@ -1208,7 +1209,8 @@ class Class1AffinityPredictor(object):
             length_distributions = None
         for (i, allele) in enumerate(alleles):
             start = time.time()
-            predictions = self.predict(encoded_peptides, allele=allele)
+            predictions = self.predict(
+                encoded_peptides, allele=allele, model_kwargs=model_kwargs)
             if verbose:
                 elapsed = time.time() - start
                 print(

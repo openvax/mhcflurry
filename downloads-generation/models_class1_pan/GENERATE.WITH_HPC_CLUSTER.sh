@@ -74,6 +74,7 @@ do
         --allele $(bzcat "$MODELS_DIR/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq) \
         --verbosity 1 \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+        --prediction-batch-size 524288 \
         --cluster-parallelism \
         --cluster-submit-command bsub \
         --cluster-results-workdir ~/mhcflurry-scratch \

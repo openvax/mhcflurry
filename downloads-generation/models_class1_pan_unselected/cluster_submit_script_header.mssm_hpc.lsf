@@ -18,6 +18,7 @@ export PYTHONUNBUFFERED=1
 export KMP_SETTINGS=1
 
 set -e
+set -x
 free -m
 
 module add cuda/10.0.130 cudnn/7.1.1
