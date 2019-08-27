@@ -73,6 +73,6 @@ def test_run_cluster_parallelism(delete=True):
 
 
 if __name__ == "__main__":
-    run_and_check(n_jobs=0, delete=False)
+    # run_and_check(n_jobs=0, delete=False)
     # run_and_check(n_jobs=2, delete=False)
-    # test_run_cluster_parallelism(delete=False)
+    test_run_cluster_parallelism(delete=False)

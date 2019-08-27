@@ -120,25 +120,27 @@ def run(argv=sys.argv[1:]):
 
     start = time.time()
 
-    print("Percent rank calibration for %d alleles. Encoding peptides." % (
+    print("Percent rank calibration for %d alleles. Generating peptides." % (
         len(alleles)))
-
     peptides = []
     lengths = range(args.length_range[0], args.length_range[1] + 1)
     for length in lengths:
         peptides.extend(
             random_peptides(
                 args.num_peptides_per_length, length, distribution=distribution))
+    print("Done generating peptides in %0.2f sec." % (time.time() - start))
+    print("Encoding %d peptides." % len(peptides))
+    start = time.time()
+
     encoded_peptides = EncodableSequences.create(peptides)
+    del peptides
 
     # Now we encode the peptides for each neural network, so the encoding
     # becomes cached.
     for network in predictor.neural_networks:
         network.peptides_to_network_input(encoded_peptides)
     assert encoded_peptides.encoding_cache  # must have cached the encoding
-    print("Finished encoding peptides for percent ranks in %0.2f sec." % (
-        time.time() - start))
-    print("Calibrating percent rank calibration for %d alleles." % len(alleles))
+    print("Finished encoding peptides in %0.2f sec." % (time.time() - start))
 
     # Store peptides in global variable so they are in shared memory
     # after fork, instead of needing to be pickled (when doing a parallel run).
@@ -149,6 +151,7 @@ def run(argv=sys.argv[1:]):
         'summary_top_peptide_fractions': args.summary_top_peptide_fraction,
         'verbose': args.verbosity > 0
     }
+    del encoded_peptides
 
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
     worker_pool = None
@@ -167,7 +170,8 @@ def run(argv=sys.argv[1:]):
             work_function=do_calibrate_percentile_ranks,
             work_items=work_items,
             constant_data=GLOBAL_DATA,
-            result_serialization_method="pickle")
+            result_serialization_method="pickle",
+            clear_constant_data=True)
     else:
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
