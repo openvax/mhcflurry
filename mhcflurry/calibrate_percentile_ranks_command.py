@@ -67,7 +67,8 @@ parser.add_argument(
     help="Calculate motifs and length preferences for each allele")
 parser.add_argument(
     "--summary-top-peptide-fraction",
-    default=0.001,
+    default=[0.0001, 0.001, 0.01, 0.1, 1.0],
+    nargs="+",
     type=float,
     metavar="X",
     help="The top X fraction of predictions (i.e. tightest binders) to use to "
@@ -145,7 +146,7 @@ def run(argv=sys.argv[1:]):
     GLOBAL_DATA["predictor"] = predictor
     GLOBAL_DATA["args"] = {
         'motif_summary': args.motif_summary,
-        'summary_top_peptide_fraction': args.summary_top_peptide_fraction,
+        'summary_top_peptide_fractions': args.summary_top_peptide_fraction,
         'verbose': args.verbosity > 0
     }
 
@@ -203,12 +204,12 @@ def run(argv=sys.argv[1:]):
     print("Predictor written to: %s" % args.models_dir)
 
 
-def do_calibrate_percentile_ranks(allele):
+def do_calibrate_percentile_ranks(allele, constant_data=GLOBAL_DATA):
     return calibrate_percentile_ranks(
         allele,
-        GLOBAL_DATA['predictor'],
-        peptides=GLOBAL_DATA['calibration_peptides'],
-        **GLOBAL_DATA["args"])
+        constant_data['predictor'],
+        peptides=constant_data['calibration_peptides'],
+        **constant_data["args"])
 
 
 def calibrate_percentile_ranks(
@@ -216,19 +217,13 @@ def calibrate_percentile_ranks(
         predictor,
         peptides=None,
         motif_summary=False,
-        summary_top_peptide_fraction=0.001,
+        summary_top_peptide_fractions=[0.001],
         verbose=False):
-    """
-    Private helper function.
-    """
-    global GLOBAL_DATA
-    if peptides is None:
-        peptides = GLOBAL_DATA["calibration_peptides"]
     summary_results = predictor.calibrate_percentile_ranks(
         peptides=peptides,
         alleles=[allele],
         motif_summary=motif_summary,
-        summary_top_peptide_fraction=summary_top_peptide_fraction,
+        summary_top_peptide_fractions=summary_top_peptide_fractions,
         verbose=verbose)
     transforms = {
         allele: predictor.allele_to_percent_rank_transform[allele],

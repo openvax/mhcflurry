@@ -246,7 +246,7 @@ def worker_entry_point(argv=sys.argv[1:]):
         if args.result_serialization_method == 'save_predictor':
             result.save(args.result_out)
         else:
-            with open(args.out, "wb") as fd:
+            with open(args.result_out, "wb") as fd:
                 pickle.dump(result, fd, pickle.HIGHEST_PROTOCOL)
         print("Wrote:", args.result_out)
     except Exception as e:

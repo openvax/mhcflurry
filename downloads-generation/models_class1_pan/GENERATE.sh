@@ -43,7 +43,7 @@ export PYTHONUNBUFFERED=1
 
 UNSELECTED_PATH="$(mhcflurry-downloads path models_class1_pan_unselected)"
 
-for kind in with_mass_spec #no_mass_spec
+for kind in with_mass_spec no_mass_spec
 do
     MODELS_DIR="$UNSELECTED_PATH/models.${kind}"
     time mhcflurry-class1-select-pan-allele-models \
@@ -62,7 +62,7 @@ do
         --models-dir models.${kind} \
         --match-amino-acid-distribution-data "$MODELS_DIR/train_data.csv.bz2" \
         --motif-summary \
-        --num-peptides-per-length 100000 \
+        --num-peptides-per-length 1000000 \
         --allele $(bzcat "$MODELS_DIR/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq) \
         --verbosity 1 \
         --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1

@@ -7,15 +7,12 @@ import os
 import shutil
 import tempfile
 import subprocess
-from copy import deepcopy
 
-from sklearn.metrics import roc_auc_score
 import pandas
 
-from numpy.testing import assert_, assert_equal, assert_array_less
+from numpy.testing import assert_equal, assert_array_less
 
 from mhcflurry import Class1AffinityPredictor,Class1NeuralNetwork
-from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -145,6 +142,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
         print("Deleting: %s" % models_dir)
         shutil.rmtree(models_dir)
 
+
 if os.environ.get("KERAS_BACKEND") != "theano":
     def test_run_parallel():
         run_and_check(n_jobs=1)
@@ -163,5 +161,5 @@ def test_run_cluster_parallelism():
 
 
 if __name__ == "__main__":
-    #run_and_check(n_jobs=0, delete=False)
+    # run_and_check(n_jobs=0, delete=False)
     test_run_cluster_parallelism()
