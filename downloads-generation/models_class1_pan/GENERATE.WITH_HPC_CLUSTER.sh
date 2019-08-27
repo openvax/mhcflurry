@@ -70,7 +70,7 @@ do
         --models-dir models.${kind} \
         --match-amino-acid-distribution-data "$MODELS_DIR/train_data.csv.bz2" \
         --motif-summary \
-        --num-peptides-per-length 100000 \
+        --num-peptides-per-length 1000000 \
         --allele $(bzcat "$MODELS_DIR/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq) \
         --verbosity 1 \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \

@@ -1156,7 +1156,7 @@ class Class1AffinityPredictor(object):
             alleles=None,
             bins=None,
             motif_summary=False,
-            summary_top_peptide_fraction=0.001,
+            summary_top_peptide_fractions=[0.001],
             verbose=False):
         """
         Compute the cumulative distribution of ic50 values for a set of alleles
@@ -1229,32 +1229,45 @@ class Class1AffinityPredictor(object):
                 }).drop_duplicates('peptide').set_index("peptide")
                 predictions_df["length"] = predictions_df.index.str.len()
                 for (length, sub_df) in predictions_df.groupby("length"):
-                    selected = sub_df.prediction.nsmallest(
-                        max(
-                            int(len(sub_df) * summary_top_peptide_fraction),
-                            1)).index.values
-                    matrix = positional_frequency_matrix(selected).reset_index()
-                    original_columns = list(matrix.columns)
-                    matrix["length"] = length
-                    matrix["allele"] = allele
-                    matrix = matrix[["allele", "length"] + original_columns]
-                    frequency_matrices.append(matrix)
+                    for cutoff_fraction in summary_top_peptide_fractions:
+                        selected = sub_df.prediction.nsmallest(
+                            max(
+                                int(len(sub_df) * cutoff_fraction),
+                                1)).index.values
+                        matrix = positional_frequency_matrix(selected).reset_index()
+                        original_columns = list(matrix.columns)
+                        matrix["allele"] = allele
+                        matrix["length"] = length
+                        matrix["cutoff_fraction"] = cutoff_fraction
+                        matrix["cutoff_count"] = len(selected)
+                        matrix = matrix[
+                            ["allele", "length", "cutoff_fraction", "cutoff_count"]
+                            + original_columns
+                        ]
+                        frequency_matrices.append(matrix)
 
                 # Length distribution
-                length_distribution = predictions_df.prediction.nsmallest(
-                    max(
-                        int(len(predictions_df) * summary_top_peptide_fraction),
-                        1)).index.str.len().value_counts()
-                length_distribution.index.name = "length"
-                length_distribution /= length_distribution.sum()
-                length_distribution = length_distribution.to_frame()
-                length_distribution.columns = ["fraction"]
-                length_distribution = length_distribution.reset_index()
-                length_distribution["allele"] = allele
-                length_distribution = length_distribution[
-                    ["allele", "length", "fraction"]
-                ].sort_values("length")
-                length_distributions.append(length_distribution)
+                for cutoff_fraction in summary_top_peptide_fractions:
+                    cutoff_count = max(
+                        int(len(predictions_df) * cutoff_fraction), 1)
+                    length_distribution = predictions_df.prediction.nsmallest(
+                        cutoff_count).index.str.len().value_counts()
+                    length_distribution.index.name = "length"
+                    length_distribution /= length_distribution.sum()
+                    length_distribution = length_distribution.to_frame()
+                    length_distribution.columns = ["fraction"]
+                    length_distribution = length_distribution.reset_index()
+                    length_distribution["allele"] = allele
+                    length_distribution["cutoff_fraction"] = cutoff_fraction
+                    length_distribution["cutoff_count"] = cutoff_count
+                    length_distribution = length_distribution[[
+                        "allele",
+                        "cutoff_fraction",
+                        "cutoff_count",
+                        "length",
+                        "fraction"
+                    ]].sort_values(["cutoff_fraction", "length"])
+                    length_distributions.append(length_distribution)
 
         if frequency_matrices is not None:
             frequency_matrices = pandas.concat(
