@@ -1218,6 +1218,17 @@ class Class1NeuralNetwork(object):
         # the allele sequences) are allowed.
         assert existing_weights.shape[1:] == reshaped.shape[1:]
 
+        if existing_weights.shape[0] > reshaped.shape[0]:
+            # Extend with NaNs so we can avoid having to reshape the weights
+            # matrix, which is expensive.
+            reshaped = numpy.append(
+                reshaped,
+                numpy.ones([
+                    existing_weights.shape[0] - reshaped.shape[0],
+                    reshaped.shape[1]
+                ]) * numpy.nan,
+                axis=0)
+
         if existing_weights.shape != reshaped.shape:
             # Network surgery required. Make a new network with this layer's
             # dimensions changed. Kind of a hack.
