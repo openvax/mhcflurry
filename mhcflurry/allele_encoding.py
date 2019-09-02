@@ -53,10 +53,19 @@ class AlleleEncoding(object):
                     a for a in alleles if a not in self.allele_to_index))
             self.indices = alleles.map(self.allele_to_index)
             assert not self.indices.isnull().any()
+            self.alleles = alleles
         else:
             self.indices = None
+            self.alleles = None
 
         self.encoding_cache = {}
+
+    def compact(self):
+        return AlleleEncoding(
+            alleles=self.alleles,
+            allele_to_sequence=dict(
+                (allele, self.allele_to_sequence[allele])
+                for allele in self.alleles.unique()))
 
     def allele_representations(self, encoding_name):
         if self.borrow_from is not None:

@@ -1020,6 +1020,15 @@ class Class1AffinityPredictor(object):
                 allele_encoding = AlleleEncoding(
                     df.normalized_allele,
                     borrow_from=master_allele_encoding)
+
+                # The following line is a performance optimization that may be
+                # revisited. It causes the neural network to set to include
+                # only the alleles actually being predicted for. This makes
+                # the network much smaller. However, subsequent calls to
+                # predict will need to reset these weights, so there is a
+                # tradeoff.
+                allele_encoding = allele_encoding.compact()
+
                 for (i, model) in enumerate(self.class1_pan_allele_models):
                     predictions_array[:, i] = (
                         model.predict(
@@ -1030,6 +1039,10 @@ class Class1AffinityPredictor(object):
                 masked_allele_encoding = AlleleEncoding(
                     df.loc[mask].normalized_allele,
                     borrow_from=master_allele_encoding)
+
+                # See above performance note.
+                masked_allele_encoding = masked_allele_encoding.compact()
+
                 masked_peptides = peptides.sequences[mask]
                 for (i, model) in enumerate(self.class1_pan_allele_models):
                     predictions_array[mask, i] = model.predict(
