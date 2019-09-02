@@ -20,9 +20,9 @@ from .data_dependent_weights_initialization import lsuv_init
 
 DEFAULT_PREDICT_BATCH_SIZE = 4096
 if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
-    DEFAULT_PREDICT_BATCH_SIZE = os.environ[
+    DEFAULT_PREDICT_BATCH_SIZE = int(os.environ[
         "MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"
-    ]
+    ])
     logging.info(
         "Configured default predict batch size: %d" % DEFAULT_PREDICT_BATCH_SIZE)
 
