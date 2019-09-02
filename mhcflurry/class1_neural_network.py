@@ -1,9 +1,10 @@
 import time
 import collections
-import logging
 import json
 import weakref
 import itertools
+import os
+import logging
 
 import numpy
 import pandas
@@ -15,6 +16,15 @@ from .regression_target import to_ic50, from_ic50
 from .common import random_peptides, amino_acid_distribution
 from .custom_loss import get_loss
 from .data_dependent_weights_initialization import lsuv_init
+
+
+DEFAULT_PREDICT_BATCH_SIZE = 4096
+if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
+    DEFAULT_PREDICT_BATCH_SIZE = os.environ[
+        "MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"
+    ]
+    logging.info(
+        "Configured default predict batch size: %d" % DEFAULT_PREDICT_BATCH_SIZE)
 
 
 class Class1NeuralNetwork(object):
@@ -1001,7 +1011,7 @@ class Class1NeuralNetwork(object):
             self,
             peptides,
             allele_encoding=None,
-            batch_size=4096,
+            batch_size=DEFAULT_PREDICT_BATCH_SIZE,
             output_index=0):
         """
         Predict affinities.
