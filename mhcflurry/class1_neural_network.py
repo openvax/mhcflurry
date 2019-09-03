@@ -5,6 +5,7 @@ import weakref
 import itertools
 import os
 import logging
+import pickle
 
 import numpy
 import pandas
@@ -1062,6 +1063,119 @@ class Class1NeuralNetwork(object):
         if use_cache:
             self.prediction_cache[peptides] = result
         return result
+
+    @classmethod
+    def merge(cls, models, merge_method="average"):
+        """
+        Merge multiple models at the tensorflow (or other backend) level.
+
+        Only certain neural network architectures support merging. Others will
+        throw NotImplementedError.
+
+        Parameters
+        ----------
+        models : list of Class1NeuralNetwork
+            instances to merge
+        merge_method : string, one of "average", "sum", or "concatenate"
+            How to merge the predictions of the different models
+
+        Returns
+        -------
+        Class1NeuralNetwork
+            The merged neural network
+
+        """
+        import keras
+        from keras.layers import Input
+        from keras.models import Model
+
+        if len(models) == 1:
+            return models[0]
+
+        # Copy models since we are going to mutate their underlying networks
+        models = [
+            pickle.loads(pickle.dumps(model, protocol=pickle.HIGHEST_PROTOCOL))
+            for model in models
+        ]
+        assert len(models) > 1
+
+        result = Class1NeuralNetwork(**dict(models[0].hyperparameters))
+
+        # Remove hyperparameters that are not shared by all models.
+        for model in models:
+            for (key, value) in model.hyperparameters.items():
+                if result.hyperparameters.get(key, value) != value:
+                    del result.hyperparameters[key]
+
+        assert result._network is None
+
+        networks = [
+            model.network() for model in models
+        ]
+
+        layer_names = [
+            [layer.name for layer in network.layers]
+            for network in networks
+        ]
+
+        pan_allele_layer_names1 = [
+            'allele', 'peptide', 'allele_representation', 'flattened_0',
+            'allele_flat', 'allele_peptide_merged', 'dense_0', 'dropout_0',
+            'dense_1', 'dropout_1', 'output',
+        ]
+
+        if all(names == pan_allele_layer_names1 for names in layer_names):
+            # Merging an ensemble of pan-allele architectures
+            network = networks[0]
+            peptide_input = Input(
+                shape=tuple(int(x) for x in network.inputs[0].shape[1:]),
+                dtype='float32',
+                name='peptide')
+            allele_input = Input(
+                shape=(1,),
+                dtype='float32',
+                name='allele')
+
+            allele_embedding = network.get_layer(
+                "allele_representation")(allele_input)
+            peptide_flat = network.get_layer("flattened_0")(peptide_input)
+            allele_flat = network.get_layer("allele_flat")(allele_embedding)
+            allele_peptide_merged = network.get_layer("allele_peptide_merged")(
+                [peptide_flat, allele_flat])
+
+            sub_networks = []
+            for (i, network) in enumerate(networks):
+                layers = network.layers[
+                    pan_allele_layer_names1.index("allele_peptide_merged") + 1:
+                ]
+                node = allele_peptide_merged
+                for layer in layers:
+                    layer.name += "_%d" % i
+                    node = layer(node)
+                sub_networks.append(node)
+
+            if merge_method == 'average':
+                output = keras.layers.average(sub_networks)
+            elif merge_method == 'sum':
+                output = keras.layers.add(sub_networks)
+            elif merge_method == 'concatenate':
+                output = keras.layers.concatenate(sub_networks)
+            else:
+                raise NotImplementedError(
+                    "Unsupported merge method", merge_method)
+
+            result._network = Model(
+                inputs=[peptide_input, allele_input],
+                outputs=[output],
+                name="merged_predictor"
+            )
+            result.update_network_description()
+        else:
+            raise NotImplementedError(
+                "Don't know merge_method to merge networks with layer names: ",
+                layer_names)
+        return result
+
 
     def make_network(
             self,

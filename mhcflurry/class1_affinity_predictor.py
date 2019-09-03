@@ -5,7 +5,7 @@ import logging
 import time
 import warnings
 from os.path import join, exists, abspath
-from os import mkdir
+from os import mkdir, environ
 from socket import gethostname
 from getpass import getuser
 from functools import partial
@@ -30,6 +30,9 @@ from .allele_encoding import AlleleEncoding
 # Default function for combining predictions across models in an ensemble.
 # See ensemble_centrality.py for other options.
 DEFAULT_CENTRALITY_MEASURE = "mean"
+
+# Any value > 0 will result in attempting to optimize models after loading.
+OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 0))
 
 
 class Class1AffinityPredictor(object):
@@ -98,6 +101,7 @@ class Class1AffinityPredictor(object):
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
         self._cache = {}
+        self.optimization_info = {}
 
         assert isinstance( self.allele_to_allele_specific_models, dict)
         assert isinstance(self.class1_pan_allele_models, list)
@@ -483,7 +487,47 @@ class Class1AffinityPredictor(object):
             manifest_df=manifest_df,
             allele_to_percent_rank_transform=allele_to_percent_rank_transform,
         )
+        if OPTIMIZATION_LEVEL >= 1:
+            logging.info("Optimizing models")
+            optimized = result.optimize()
+            logging.info(
+                "Optimization " + ("succeeded" if optimized else "failed"))
         return result
+
+    def optimize(self):
+        """
+        EXPERIMENTAL: Optimize the predictor for faster predictions.
+
+        Currently the only optimization implemented is to merge multiple pan-
+        allele predictors at the tensorflow level.
+
+        The optimization is performed in-place, mutating the instance.
+
+        Returns
+        ----------
+        bool
+            Whether optimization was performed
+
+        """
+        num_class1_pan_allele_models = len(self.class1_pan_allele_models)
+        if num_class1_pan_allele_models > 1:
+            try:
+                self.class1_pan_allele_models = [
+                    Class1NeuralNetwork.merge(
+                        self.class1_pan_allele_models,
+                        merge_method="concatenate")
+                ]
+            except NotImplementedError as e:
+                logging.warning("Optimization failed: %s" % str(e))
+                return False
+            self._manifest_df = None
+            self.clear_cache()
+            self.optimization_info["pan_models_merged"] = True
+            self.optimization_info["num_pan_models_merged"] = (
+                num_class1_pan_allele_models)
+        else:
+            return False
+        return True
 
     @staticmethod
     def model_name(allele, num):
@@ -987,7 +1031,10 @@ class Class1AffinityPredictor(object):
             df["supported_peptide_length"] = True
             all_peptide_lengths_supported = True
 
-        num_pan_models = len(self.class1_pan_allele_models)
+        num_pan_models = (
+            len(self.class1_pan_allele_models)
+            if not self.optimization_info.get("pan_models_merged", False)
+            else self.optimization_info["num_pan_models_merged"])
         max_single_allele_models = max(
             len(self.allele_to_allele_specific_models.get(allele, []))
             for allele in unique_alleles
@@ -1015,40 +1062,46 @@ class Class1AffinityPredictor(object):
                     raise ValueError(msg)
             mask = df.supported_peptide_length & (
                 ~df.normalized_allele.isin(unsupported_alleles))
+
+            row_slice = None
             if mask is None or mask.all():
-                # Common case optimization
-                allele_encoding = AlleleEncoding(
+                row_slice = slice(None, None, None)  # all rows
+                masked_allele_encoding = AlleleEncoding(
                     df.normalized_allele,
                     borrow_from=master_allele_encoding)
+                masked_peptides = peptides
+            elif mask.sum() > 0:
+                row_slice = mask
+                masked_allele_encoding = AlleleEncoding(
+                    df.loc[mask].normalized_allele,
+                    borrow_from=master_allele_encoding)
+                masked_peptides = peptides.sequences[mask]
 
+            if row_slice is not None:
                 # The following line is a performance optimization that may be
                 # revisited. It causes the neural network to set to include
                 # only the alleles actually being predicted for. This makes
                 # the network much smaller. However, subsequent calls to
                 # predict will need to reset these weights, so there is a
                 # tradeoff.
-                allele_encoding = allele_encoding.compact()
-
-                for (i, model) in enumerate(self.class1_pan_allele_models):
-                    predictions_array[:, i] = (
-                        model.predict(
-                            peptides,
-                            allele_encoding=allele_encoding,
-                            **model_kwargs))
-            elif mask.sum() > 0:
-                masked_allele_encoding = AlleleEncoding(
-                    df.loc[mask].normalized_allele,
-                    borrow_from=master_allele_encoding)
-
-                # See above performance note.
                 masked_allele_encoding = masked_allele_encoding.compact()
 
-                masked_peptides = peptides.sequences[mask]
-                for (i, model) in enumerate(self.class1_pan_allele_models):
-                    predictions_array[mask, i] = model.predict(
+                if self.optimization_info.get("pan_models_merged"):
+                    # Multiple pan-allele models have been merged into one
+                    # at the tensorflow level.
+                    assert len(self.class1_pan_allele_models) == 1
+                    predictions = self.class1_pan_allele_models[0].predict(
                         masked_peptides,
                         allele_encoding=masked_allele_encoding,
+                        output_index=None,
                         **model_kwargs)
+                    predictions_array[row_slice, :num_pan_models] = predictions
+                else:
+                    for (i, model) in enumerate(self.class1_pan_allele_models):
+                        predictions_array[row_slice, i] = model.predict(
+                            masked_peptides,
+                            allele_encoding=masked_allele_encoding,
+                            **model_kwargs)
 
         if self.allele_to_allele_specific_models:
             unsupported_alleles = [
