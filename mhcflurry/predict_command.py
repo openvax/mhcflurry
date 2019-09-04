@@ -137,6 +137,10 @@ model_args.add_argument(
 
 
 def run(argv=sys.argv[1:]):
+    if not argv:
+        parser.print_help()
+        parser.exit(1)
+
     args = parser.parse_args(argv)
 
     # It's hard to pass a tab in a shell, so we correct a common error:
