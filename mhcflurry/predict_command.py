@@ -149,6 +149,10 @@ implementation_args.add_argument(
 
 
 def run(argv=sys.argv[1:]):
+    if not argv:
+        parser.print_help()
+        parser.exit(1)
+
     args = parser.parse_args(argv)
 
     set_keras_backend(backend=args.backend, num_threads=args.threads)
