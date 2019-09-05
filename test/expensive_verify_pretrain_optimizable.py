@@ -1,4 +1,4 @@
-# Expensive test - not run by default.
+# Expensive test - not run by nose.
 
 from mhcflurry import train_pan_allele_models_command
 from mhcflurry.downloads import get_path
@@ -60,7 +60,7 @@ HYPERPARAMTERS = {
 }
 
 
-def test_optimizable():
+def verify_optimizable():
     predictor = train_pan_allele_models_command.train_model(
         work_item_name="work-item0",
         work_item_num=0,
@@ -94,4 +94,4 @@ def test_optimizable():
 
 
 if __name__ == "__main__":
-    test_optimizable()
+    verify_optimizable()

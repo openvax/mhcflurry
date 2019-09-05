@@ -14,6 +14,17 @@ CUSTOM_LOSSES = {}
 
 
 def get_loss(name):
+    """
+    Get a custom_loss.Loss instance by name.
+
+    Parameters
+    ----------
+    name : string
+
+    Returns
+    -------
+    custom_loss.Loss
+    """
     if name.startswith("custom:"):
         try:
             custom_loss = CUSTOM_LOSSES[name.replace("custom:", "")]
@@ -29,6 +40,17 @@ def get_loss(name):
 
 
 class Loss(object):
+    """
+    Thin wrapper to keep track of neural network loss functions, which could
+    be custom or baked into Keras.
+
+    Each subclass or instance should define these properties/methods:
+    - name : string
+    - loss : string or function
+        This is what gets passed to keras.fit()
+    - encode_y : numpy.ndarray -> numpy.ndarray
+        Transformation to apply to regression target before fitting
+    """
     def __init__(self, name=None):
         self.name = name if name else self.name  # use name from class instance
 
@@ -37,6 +59,9 @@ class Loss(object):
 
 
 class StandardKerasLoss(Loss):
+    """
+    A loss function supported by Keras, such as MSE.
+    """
     supports_inequalities = False
     supports_multiple_outputs = False
 
@@ -51,7 +76,7 @@ class StandardKerasLoss(Loss):
 
 class MSEWithInequalities(Loss):
     """
-    Supports training a regressor on data that includes inequalities
+    Supports training a regression model on data that includes inequalities
     (e.g. x < 100). Mean square error is used as the loss for elements with
     an (=) inequality. For elements with e.g. a (> 0.5) inequality, then the loss
     for that element is (y - 0.5)^2 (standard MSE) if y < 500 and 0 otherwise.
@@ -63,15 +88,15 @@ class MSEWithInequalities(Loss):
     y_true is interpreted as follows:
 
     between 0 - 1
-       Regular MSE loss is used. Penality (y_pred - y_true)**2 is applied if
+       Regular MSE loss is used. Penalty (y_pred - y_true)**2 is applied if
        y_pred is greater or less than y_true.
 
     between 2 - 3:
-       Treated as a "<" inequality. Penality (y_pred - (y_true - 2))**2 is
+       Treated as a "<" inequality. Penalty (y_pred - (y_true - 2))**2 is
        applied only if y_pred is greater than y_true - 2.
 
     between 4 - 5:
-       Treated as a ">" inequality. Penality (y_pred - (y_true - 4))**2 is
+       Treated as a ">" inequality. Penalty (y_pred - (y_true - 4))**2 is
        applied only if y_pred is less than y_true - 4.
     """
     name = "mse_with_inequalities"
@@ -104,8 +129,8 @@ class MSEWithInequalities(Loss):
 
     @staticmethod
     def loss(y_true, y_pred):
-        # We always delay import of Keras so that mhcflurry can be imported initially
-        # without tensorflow debug output, etc.
+        # We always delay import of Keras so that mhcflurry can be imported
+        # initially without tensorflow debug output, etc.
         from keras import backend as K
 
         # Handle (=) inequalities
@@ -133,6 +158,26 @@ class MSEWithInequalities(Loss):
 
 
 class MSEWithInequalitiesAndMultipleOutputs(Loss):
+    """
+    Loss supporting inequalities and multiple outputs.
+
+    This loss assumes that the normal range for y_true and y_pred is 0 - 1. As a
+    hack, the implementation uses other intervals for y_pred to encode the
+    inequality and output-index information.
+
+    Inequalities are encoded into the regression target as in
+    the MSEWithInequalities loss.
+
+    Multiple outputs are encoded by mapping each regression target x (after
+    transforming for inequalities) using the rule x -> x + i * 10 where i is
+    the output index.
+
+    The reason for explicitly encoding multiple outputs this way (rather than
+    just making the regression target a matrix instead of a vector) is that
+    in our use cases we frequently have missing data in the regression target.
+    This encoding gives a simple way to penalize only on (data point, output
+    index) pairs that have labels.
+    """
     name = "mse_with_inequalities_and_multiple_outputs"
     supports_inequalities = True
     supports_multiple_outputs = True
@@ -189,6 +234,16 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
 
 
 def check_shape(name, arr, expected_shape):
+    """
+    Raise ValueError if arr.shape != expected_shape.
+
+    Parameters
+    ----------
+    name : string
+        Included in error message to aid debugging
+    arr : numpy.ndarray
+    expected_shape : tuple of int
+    """
     if arr.shape != expected_shape:
         raise ValueError("Expected %s to have shape %s not %s" % (
             name, str(expected_shape), str(arr.shape)))

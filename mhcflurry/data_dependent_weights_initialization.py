@@ -1,3 +1,11 @@
+"""
+Layer-sequential unit-variance initialization for neural networks.
+
+See:
+    Mishkin and Matas, "All you need is a good init". 2016.
+    https://arxiv.org/abs/1511.06422
+"""
+#
 # LSUV initialization code in this file is adapted from:
 #   https://github.com/ducha-aiki/LSUV-keras/blob/master/lsuv_init.py
 # by Dmytro Mishkin
@@ -58,6 +66,29 @@ def get_activations(model, layer, X_batch):
 
 
 def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
+    """
+    Initialize neural network weights using layer-sequential unit-variance
+    initialization.
+
+    See:
+        Mishkin and Matas, "All you need is a good init". 2016.
+        https://arxiv.org/abs/1511.06422
+
+    Parameters
+    ----------
+    model : keras.Model
+    batch : dict
+        Training data, as would be passed keras.Model.fit()
+    verbose : boolean
+        Whether to print progress to stdout
+    margin : float
+    max_iter : int
+
+    Returns
+    -------
+    keras.Model
+        Same as what was passed in.
+    """
     from keras.layers import Dense, Convolution2D
     needed_variance = 1.0
     layers_inintialized = 0

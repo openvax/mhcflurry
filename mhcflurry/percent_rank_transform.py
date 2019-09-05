@@ -1,6 +1,7 @@
 import numpy
 import pandas
 
+
 class PercentRankTransform(object):
     """
     Transform arbitrary values into percent ranks.

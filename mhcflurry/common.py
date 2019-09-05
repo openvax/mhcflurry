@@ -150,6 +150,19 @@ def random_peptides(num, length=9, distribution=None):
 
 
 def positional_frequency_matrix(peptides):
+    """
+    Given a set of peptides, calculate a length x amino acids frequency matrix.
+
+    Parameters
+    ----------
+    peptides : list of string
+        All of same length
+
+    Returns
+    -------
+    pandas.DataFrame
+        Index is position, columns are amino acids
+    """
     length = len(peptides[0])
     assert all(len(peptide) == length for peptide in peptides)
     counts = pandas.DataFrame(

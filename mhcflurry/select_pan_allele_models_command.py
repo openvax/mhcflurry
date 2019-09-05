@@ -1,5 +1,10 @@
 """
-Model select class1 pan allele models.
+Model select class1 pan-allele models.
+
+APPROACH: For each training fold, we select at least min and at most max models
+(where min and max are set by the --{min/max}-models-per-fold argument) using a
+step-up (forward) selection procedure. The final ensemble is the union of all
+selected models across all folds.
 """
 import argparse
 import os
@@ -94,6 +99,22 @@ def mse(
         actual,
         inequalities=None,
         affinities_are_already_01_transformed=False):
+    """
+    Mean squared error of predictions vs. actual
+
+    Parameters
+    ----------
+    predictions : list of float
+    actual : list of float
+    inequalities : list of string (">", "<", or "=")
+    affinities_are_already_01_transformed : boolean
+        Predictions and actual are taken to be nanomolar affinities if
+        affinities_are_already_01_transformed is False, otherwise 0-1 values.
+
+    Returns
+    -------
+    float
+    """
     if not affinities_are_already_01_transformed:
         predictions = from_ic50(predictions)
         actual = from_ic50(actual)
@@ -286,14 +307,29 @@ def run(argv=sys.argv[1:]):
     print("Predictor written to: %s" % args.out_models_dir)
 
 
-def do_model_select_task(item):
-    return model_select(**item)
+def do_model_select_task(item, constant_data=GLOBAL_DATA):
+    return model_select(constant_data=constant_data, **item)
 
 
-def model_select(fold_num, models, min_models, max_models):
-    global GLOBAL_DATA
-    full_data = GLOBAL_DATA["data"]
-    input_predictor = GLOBAL_DATA["input_predictor"]
+def model_select(
+        fold_num, models, min_models, max_models, constant_data=GLOBAL_DATA):
+    """
+    Model select for a fold.
+
+    Parameters
+    ----------
+    fold_num : int
+    models : list of Class1NeuralNetwork
+    min_models : int
+    max_models : int
+    constant_data : dict
+
+    Returns
+    -------
+    dict with keys 'fold_num', 'selected_indices', 'summary'
+    """
+    full_data = constant_data["data"]
+    input_predictor = constant_data["input_predictor"]
     df = full_data.loc[
         full_data["fold_%d" % fold_num] == 0
     ]

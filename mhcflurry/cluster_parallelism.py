@@ -1,3 +1,8 @@
+"""
+Simple, relatively naive parallel map implementation for HPC clusters.
+
+Used for training MHCflurry models.
+"""
 import traceback
 import sys
 import os
@@ -18,6 +23,14 @@ except ImportError:
 
 
 def add_cluster_parallelism_args(parser):
+    """
+    Add commandline arguments controlling cluster parallelism to an argparse
+    ArgumentParser.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+    """
     group = parser.add_argument_group("Cluster parallelism")
     group.add_argument(
         "--cluster-parallelism",
@@ -45,6 +58,27 @@ def cluster_results_from_args(
         constant_data=None,
         result_serialization_method="pickle",
         clear_constant_data=False):
+    """
+    Parallel map configurable using commandline arguments. See the
+    cluster_results() function for docs.
+
+    The `args` parameter should be an argparse.Namespace from an argparse parser
+    generated using the add_cluster_parallelism_args() function.
+
+
+    Parameters
+    ----------
+    args
+    work_function
+    work_items
+    constant_data
+    result_serialization_method
+    clear_constant_data
+
+    Returns
+    -------
+    generator
+    """
     return cluster_results(
         work_function=work_function,
         work_items=work_items,
@@ -67,6 +101,49 @@ def cluster_results(
         result_serialization_method="pickle",
         max_retries=3,
         clear_constant_data=False):
+    """
+    Parallel map on an HPC cluster.
+
+    Returns [work_function(item) for item in work_items] where each invocation
+    of work_function is performed as a separate HPC cluster job. Order is
+    preserved.
+
+    Optionally, "constant data" can be specified, which will be passed to
+    each work_function() invocation as a keyword argument called constant_data.
+    This data is serialized once and all workers read it from the same source,
+    which is more efficient than serializing it separately for each worker.
+
+    Each worker's input is serialized to a shared NFS directory and the
+    submit_command is used to launch a job to process that input. The shared
+    filesystem is polled occasionally to watch for results, which are fed back
+    to the user.
+
+    Parameters
+    ----------
+    work_function : A -> B
+    work_items : list of A
+    constant_data : object
+    submit_command : string
+        For running on LSF, we use "bsub" here.
+    results_workdir : string
+        Path to NFS shared directory where inputs and results can be written
+    script_prefix_path : string
+        Path to script that will be invoked to run each worker. A line calling
+        the _mhcflurry-cluster-worker-entry-point command will be appended to
+        the contents of this file.
+    result_serialization_method : string, one of "pickle" or "save_predictor"
+        The "save_predictor" works only when the return type of work_function
+        is Class1AffinityPredictor
+    max_retries : int
+        How many times to attempt to re-launch a failed worker
+    clear_constant_data : bool
+        If True, the constant data dict is cleared on the launching host after
+        it is serialized to disk.
+
+    Returns
+    -------
+    generator of B
+    """
 
     constant_payload = {
         'constant_data': constant_data,
@@ -231,6 +308,13 @@ parser.add_argument(
 
 
 def worker_entry_point(argv=sys.argv[1:]):
+    """
+    Entry point for the worker command.
+
+    Parameters
+    ----------
+    argv : list of string
+    """
     # On sigusr1 print stack trace
     print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
     signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())

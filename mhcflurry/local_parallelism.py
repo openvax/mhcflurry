@@ -1,3 +1,8 @@
+"""
+Infrastructure for "local" parallelism, i.e. multiprocess parallelism on one
+compute node.
+"""
+
 import traceback
 import sys
 import os
@@ -14,6 +19,13 @@ from .common import set_keras_backend
 
 
 def add_local_parallelism_args(parser):
+    """
+    Add local parallelism arguments to the given argparse.ArgumentParser.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+    """
     group = parser.add_argument_group("Local parallelism")
 
     group.add_argument(
@@ -54,6 +66,20 @@ def add_local_parallelism_args(parser):
 
 
 def worker_pool_with_gpu_assignments_from_args(args):
+    """
+    Create a multiprocessing.Pool where each worker uses its own GPU.
+
+    Uses commandline arguments. See `worker_pool_with_gpu_assignments`.
+
+    Parameters
+    ----------
+    args : argparse.ArgumentParser
+
+    Returns
+    -------
+    multiprocessing.Pool
+    """
+
     return worker_pool_with_gpu_assignments(
         num_jobs=args.num_jobs,
         num_gpus=args.gpus,
@@ -71,6 +97,23 @@ def worker_pool_with_gpu_assignments(
         max_workers_per_gpu=1,
         max_tasks_per_worker=None,
         worker_log_dir=None):
+    """
+    Create a multiprocessing.Pool where each worker uses its own GPU.
+
+    Parameters
+    ----------
+    num_jobs : int
+        Number of worker processes.
+    num_gpus : int
+    backend : string
+    max_workers_per_gpu : int
+    max_tasks_per_worker : int
+    worker_log_dir : string
+
+    Returns
+    -------
+    multiprocessing.Pool
+    """
 
     if num_jobs == 0:
         if backend:
@@ -247,6 +290,20 @@ class WrapException(Exception):
 
 
 def call_wrapped(function, *args, **kwargs):
+    """
+    Run function on args and kwargs and return result, wrapping any exception
+    raised in a WrapException.
+
+    Parameters
+    ----------
+    function : arbitrary function
+
+    Any other arguments provided are passed to the function.
+
+    Returns
+    -------
+    object
+    """
     try:
         return function(*args, **kwargs)
     except:
@@ -254,4 +311,20 @@ def call_wrapped(function, *args, **kwargs):
 
 
 def call_wrapped_kwargs(function, kwargs):
+    """
+    Invoke function on given kwargs and return result, wrapping any exception
+    raised in a WrapException.
+
+    Parameters
+    ----------
+    function : arbitrary function
+    kwargs : dict
+
+    Returns
+    -------
+    object
+
+    result of calling function(**kwargs)
+
+    """
     return call_wrapped(function, **kwargs)
