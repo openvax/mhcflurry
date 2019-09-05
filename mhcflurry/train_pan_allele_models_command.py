@@ -133,6 +133,35 @@ add_cluster_parallelism_args(parser)
 
 
 def assign_folds(df, num_folds, held_out_fraction, held_out_max):
+    """
+    Split training data into multple test/train pairs, which we refer to as
+    folds. Note that a given data point may be assigned to multiple test or
+    train sets; these folds are NOT a non-overlapping partition as used in cross
+    validation.
+
+    A fold is defined by a boolean value for each data point, indicating whether
+    it is included in the training data for that fold. If it's not in the
+    training data, then it's in the test data.
+
+    Folds are balanced in terms of allele content.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        training data
+    num_folds : int
+    held_out_fraction : float
+        Fraction of data to hold out as test data in each fold
+    held_out_max
+        For a given allele, do not hold out more than held_out_max number of
+        data points in any fold.
+
+    Returns
+    -------
+    pandas.DataFrame
+        index is same as df.index, columns are "fold_0", ... "fold_N" giving
+        whether the data point is in the training data for the fold
+    """
     result_df = pandas.DataFrame(index=df.index)
 
     for fold in range(num_folds):
@@ -183,6 +212,21 @@ def pretrain_data_iterator(
         filename,
         master_allele_encoding,
         peptides_per_chunk=1024):
+    """
+    Step through a CSV file giving predictions for a large number of peptides
+    (rows) and alleles (columns).
+
+    Parameters
+    ----------
+    filename : string
+    master_allele_encoding : AlleleEncoding
+    peptides_per_chunk : int
+
+    Returns
+    -------
+    Generator of (AlleleEncoding, EncodableSequences, float affinities) tuples
+
+    """
     empty = pandas.read_csv(filename, index_col=0, nrows=0)
     usable_alleles = [
         c for c in empty.columns
