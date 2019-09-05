@@ -32,8 +32,7 @@ class Class1NeuralNetwork(object):
     """
     Low level class I predictor consisting of a single neural network.
     
-    Both single allele and pan-allele prediction are supported, but pan-allele
-    is in development and not yet well performing.
+    Both single allele and pan-allele prediction are supported.
     
     Users will generally use Class1AffinityPredictor, which gives a higher-level
     interface and supports ensembles.
@@ -269,12 +268,30 @@ class Class1NeuralNetwork(object):
         return self._network
 
     def update_network_description(self):
+        """
+        Update self.network_json and self.network_weights properties based on
+        this instances's neural network.
+        """
         if self._network is not None:
             self.network_json = self._network.to_json()
             self.network_weights = self._network.get_weights()
 
     @staticmethod
     def keras_network_cache_key(network_json):
+        """
+        Given a Keras JSON description of a neural network, return a key that
+        uniquely defines this network. Networks that share the same key should
+        have compatible weights matrices and give the same prediction outputs
+        when their weights are the same.
+
+        Parameters
+        ----------
+        network_json : string
+
+        Returns
+        -------
+        string
+        """
         # As an optimization, we remove anything about regularization as these
         # do not affect predictions.
         def drop_properties(d):
@@ -427,6 +444,9 @@ class Class1NeuralNetwork(object):
         Returns
         -------
         (numpy.array, numpy.array)
+
+        Indices and allele representations.
+
         """
         return (
             allele_encoding.indices,
@@ -444,11 +464,13 @@ class Class1NeuralNetwork(object):
 
         Parameters
         ----------
-        method
-
-        Returns
-        -------
-
+        network : keras.Model
+        x_dict : dict of string -> numpy.ndarray
+            Training data as would be passed keras.Model.fit().
+        method : string
+            Initialization method. Currently only "lsuv" is supported.
+        verbose : int
+            Status updates printed to stdout if verbose > 0
         """
         if verbose:
             print("Performing data-dependent init: ", method)
@@ -479,27 +501,32 @@ class Class1NeuralNetwork(object):
         Fit using a generator. Does not support many of the features of fit(),
         such as random negative peptides.
 
+        Fitting proceeds until early stopping is hit, using the peptides,
+        affinities, etc. given by the parameters starting with "validation_".
+
+        This is used for pre-training pan-allele models using data synthesized
+        by the allele-specific models.
+
         Parameters
         ----------
         generator : generator yielding (alleles, peptides, affinities) tuples
             where alleles and peptides are lists of strings, and affinities
             is list of floats.
-
-        validation_peptide_encoding
-        validation_affinities
-        validation_allele_encoding
-        validation_inequalities
-        validation_output_indices
-        steps_per_epoch
-        epochs
-        patience
-        verbose
-
-        Returns
-        -------
-
+        validation_peptide_encoding : EncodableSequences
+        validation_affinities : list of float
+        validation_allele_encoding : AlleleEncoding
+        validation_inequalities : list of string
+        validation_output_indices : list of int
+        steps_per_epoch : int
+        epochs : int
+        min_epochs : int
+        patience : int
+        min_delta : float
+        verbose : int
+        progress_callback : thunk
+        progress_preamble : string
+        progress_print_interval : float
         """
-        import keras
         from keras import backend as K
 
         fit_info = collections.defaultdict(list)
@@ -668,7 +695,7 @@ class Class1NeuralNetwork(object):
         affinities : list of float
             nM affinities. Must be same length of as peptides.
         
-        allele_encoding : AlleleEncoding, optional
+        allele_encoding : AlleleEncoding
             If not specified, the model will be a single-allele predictor.
 
         inequalities : list of string, each element one of ">", "<", or "=".
@@ -676,20 +703,26 @@ class Class1NeuralNetwork(object):
             Each element must be one of ">", "<", or "=". For example, a ">"
             will train on y_pred > y_true for that element in the training set.
             Requires using a custom losses that support inequalities (e.g.
-            mse_with_ineqalities).
-            If None all inequalities are taken to be "=".
-            
-        sample_weights : list of float, optional
+            mse_with_ineqalities). If None all inequalities are taken to be "=".
+
+        output_indices : list of int
+            For multi-output models only. Same length as affinities. Indicates
+            the index of the output (starting from 0) for each training example.
+
+        sample_weights : list of float
             If not specified, all samples (including random negatives added
             during training) will have equal weight. If specified, the random
             negatives will be assigned weight=1.0.
 
-        shuffle_permutation : list of int, optional
+        shuffle_permutation : list of int
             Permutation (integer list) of same length as peptides and affinities
             If None, then a random permutation will be generated.
 
         verbose : int
             Keras verbosity level
+
+        progress_callback : function
+            No-argument function to call after each epoch.
 
         progress_preamble : string
             Optional string of information to include in each progress update
@@ -752,8 +785,8 @@ class Class1NeuralNetwork(object):
             x_dict_without_random_negatives['allele'] = allele_encoding_input
 
         # Shuffle y_values and the contents of x_dict_without_random_negatives
-        # This ensures different data is used for the test set for early stopping
-        # when multiple models are trained.
+        # This ensures different data is used for the test set for early
+        # stopping when multiple models are trained.
         if shuffle_permutation is None:
             shuffle_permutation = numpy.random.permutation(len(y_values))
         y_values = y_values[shuffle_permutation]
@@ -810,7 +843,9 @@ class Class1NeuralNetwork(object):
 
         if loss.supports_inequalities:
             # Do not sample negative affinities: just use an inequality.
-            random_negative_ic50 = self.hyperparameters['random_negative_affinity_min']
+            random_negative_ic50 = self.hyperparameters[
+                'random_negative_affinity_min'
+            ]
             random_negative_target = from_ic50(random_negative_ic50)
 
             y_dict_with_random_negatives = {
@@ -1018,9 +1053,10 @@ class Class1NeuralNetwork(object):
         Predict affinities.
 
         If peptides are specified as EncodableSequences, then the predictions
-        will be cached for this predictor as long as the EncodableSequences object
-        remains in memory. The cache is keyed in the object identity of the
-        EncodableSequences, not the sequences themselves.
+        will be cached for this predictor as long as the EncodableSequences
+        object remains in memory. The cache is keyed in the object identity of
+        the EncodableSequences, not the sequences themselves. The cache is used
+        only for allele-specific models (i.e. when allele_encoding is None).
 
         Parameters
         ----------
@@ -1031,6 +1067,10 @@ class Class1NeuralNetwork(object):
 
         batch_size : int
             batch_size passed to Keras
+
+        output_index : int or None
+            For multi-output models. Gives the output index to return. If set to
+            None, then all outputs are returned as a samples x outputs matrix.
 
         Returns
         -------
@@ -1070,7 +1110,7 @@ class Class1NeuralNetwork(object):
         Merge multiple models at the tensorflow (or other backend) level.
 
         Only certain neural network architectures support merging. Others will
-        throw NotImplementedError.
+        result in a NotImplementedError.
 
         Parameters
         ----------
@@ -1091,12 +1131,6 @@ class Class1NeuralNetwork(object):
 
         if len(models) == 1:
             return models[0]
-
-        # Copy models since we are going to mutate their underlying networks
-        models = [
-            pickle.loads(pickle.dumps(model, protocol=pickle.HIGHEST_PROTOCOL))
-            for model in models
-        ]
         assert len(models) > 1
 
         result = Class1NeuralNetwork(**dict(models[0].hyperparameters))
@@ -1118,13 +1152,13 @@ class Class1NeuralNetwork(object):
             for network in networks
         ]
 
-        pan_allele_layer_names1 = [
+        pan_allele_layer_names = [
             'allele', 'peptide', 'allele_representation', 'flattened_0',
             'allele_flat', 'allele_peptide_merged', 'dense_0', 'dropout_0',
             'dense_1', 'dropout_1', 'output',
         ]
 
-        if all(names == pan_allele_layer_names1 for names in layer_names):
+        if all(names == pan_allele_layer_names for names in layer_names):
             # Merging an ensemble of pan-allele architectures
             network = networks[0]
             peptide_input = Input(
@@ -1146,7 +1180,7 @@ class Class1NeuralNetwork(object):
             sub_networks = []
             for (i, network) in enumerate(networks):
                 layers = network.layers[
-                    pan_allele_layer_names1.index("allele_peptide_merged") + 1:
+                    pan_allele_layer_names.index("allele_peptide_merged") + 1:
                 ]
                 node = allele_peptide_merged
                 for layer in layers:
@@ -1176,7 +1210,6 @@ class Class1NeuralNetwork(object):
                 layer_names)
         return result
 
-
     def make_network(
             self,
             peptide_encoding,
@@ -1197,7 +1230,7 @@ class Class1NeuralNetwork(object):
             num_outputs=1,
             allele_representations=None):
         """
-        Helper function to make a keras network for class1 affinity prediction.
+        Helper function to make a keras network for class 1 affinity prediction.
         """
 
         # We import keras here to avoid tensorflow debug output, etc. unless we
@@ -1314,12 +1347,24 @@ class Class1NeuralNetwork(object):
 
     def set_allele_representations(self, allele_representations):
         """
+        Set the allele representations in use by this model. This means mutating
+        the weights for the allele input embedding layer.
+
+        Rationale: instead of passing in the allele sequence for each data point
+        during model training or prediction (which is expensive in terms of
+        memory usage), we pass in an allele index between 0 and n-1 where n is
+        the number of alleles in some universe of possible alleles. This index
+        is used in the model to lookup the corresponding allele sequence. This
+        function sets the lookup table.
+
+        See also: AlleleEncoding.allele_representations()
 
         Parameters
         ----------
-        model
-        allele_representations
-
+        allele_representations : numpy.ndarray of shape (a, l, m)
+            where a is the total number of alleles,
+                  l is the allele sequence length,
+                  m is the length of the vectors used to represent amino acids
         """
         from keras.models import model_from_json
         reshaped = allele_representations.reshape(
