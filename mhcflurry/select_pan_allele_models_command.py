@@ -301,7 +301,7 @@ def model_select(fold_num, models, min_models, max_models):
     peptides = EncodableSequences.create(df.peptide.values)
     alleles = AlleleEncoding(
         df.allele.values,
-        borrow_from=input_predictor.get_master_allele_encoding())
+        borrow_from=input_predictor.master_allele_encoding)
 
     predictions_df = df.copy()
     for (i, model) in enumerate(models):
