@@ -50,7 +50,7 @@ env:
     - KERAS_BACKEND=tensorflow
 script:
   # download data and models, then run tests
-  - mhcflurry-downloads fetch data_curated models_class1 models_class1_pan
+  - mhcflurry-downloads fetch data_curated models_class1 models_class1_pan allele_sequences
   - mhcflurry-downloads info  # just to test this command works
   - nosetests test -sv
   - ./lint.sh
