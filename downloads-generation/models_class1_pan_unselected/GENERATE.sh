@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Train pan-allele MHCflurry Class I models.
+# Train pan-allele MHCflurry Class I models. Supports re-starting a failed run.
 #
 set -e
 set -x

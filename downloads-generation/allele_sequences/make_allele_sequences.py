@@ -132,7 +132,6 @@ def run():
     print("Overall agreement: %0.5f" % agreement)
     assert agreement > 0.9
 
-
     # Add additional positions
     if args.differentiate_alleles:
         differentiate_alleles = pandas.read_csv(

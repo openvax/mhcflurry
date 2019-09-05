@@ -62,6 +62,7 @@ HYPERPARAMTERS = {
 
 def test_optimizable():
     predictor = train_pan_allele_models_command.train_model(
+        work_item_name="work-item0",
         work_item_num=0,
         num_work_items=1,
         architecture_num=0,

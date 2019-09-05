@@ -38,16 +38,16 @@ def test_class1_neural_network_a0205_training_accuracy():
     df = pandas.read_csv(
         get_path(
             "data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
-    df = df.ix[
+    df = df.loc[
         df.allele == allele
     ]
-    df = df.ix[
+    df = df.loc[
         df.peptide.str.len() == 9
     ]
-    df = df.ix[
+    df = df.loc[
         df.measurement_type == "quantitative"
     ]
-    df = df.ix[
+    df = df.loc[
         df.measurement_source == "kim2014"
     ]
 

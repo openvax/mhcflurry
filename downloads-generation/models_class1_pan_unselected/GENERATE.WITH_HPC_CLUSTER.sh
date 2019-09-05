@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Train pan-allele MHCflurry Class I models.
+# Train pan-allele MHCflurry Class I models. Supports re-starting a failed run.
 #
 # Uses an HPC cluster (Mount Sinai chimera cluster, which uses lsf job
 # scheduler). This would need to be modified for other sites.

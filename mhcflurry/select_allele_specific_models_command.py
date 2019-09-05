@@ -205,7 +205,7 @@ def run(argv=sys.argv[1:]):
         df = pandas.read_csv(args.data)
         print("Loaded data: %s" % (str(df.shape)))
 
-        df = df.ix[
+        df = df.loc[
             (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
         ]
         print("Subselected to 8-15mers: %s" % (str(df.shape)))

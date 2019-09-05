@@ -42,7 +42,8 @@ class Class1AffinityPredictor(object):
     This class manages low-level `Class1NeuralNetwork` instances, each of which
     wraps a single Keras network. The purpose of `Class1AffinityPredictor` is to
     implement ensembles, handling of multiple alleles, and predictor loading and
-    saving.
+    saving. It also provides a place to keep track of metadata like prediction
+    histograms for percentile rank calibration.
     """
     def __init__(
             self,
@@ -62,7 +63,9 @@ class Class1AffinityPredictor(object):
             Ensemble of pan-allele models.
         
         allele_to_sequence : dict of string -> string
-            Required only if class1_pan_allele_models is specified.
+            MHC allele name to fixed-length amino acid sequence (sometimes
+            referred to as the pseudosequence). Required only if
+            class1_pan_allele_models is specified.
         
         manifest_df : `pandas.DataFrame`, optional
             Must have columns: model_name, allele, config_json, model.
@@ -108,10 +111,18 @@ class Class1AffinityPredictor(object):
 
     @property
     def manifest_df(self):
+        """
+        A pandas.DataFrame describing the models included in this predictor.
+
+        Based on:
+        - self.class1_pan_allele_models
+        - self.allele_to_allele_specific_models
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
         if self._manifest_df is None:
-            # Make a manifest based on
-            #  - self.class1_pan_allele_models
-            #  - self.allele_to_allele_specific_models
             rows = []
             for (i, model) in enumerate(self.class1_pan_allele_models):
                 rows.append((
@@ -132,18 +143,6 @@ class Class1AffinityPredictor(object):
                 rows,
                 columns=["model_name", "allele", "config_json", "model"])
         return self._manifest_df
-
-    def subselect_alleles(self, alleles):
-        if self.allele_to_sequence:
-            alleles = [
-                mhcnames.normalize_allele_name(allele)
-                for allele in set(alleles)
-            ]
-
-            allele_to_sequence = dict(
-                (a, self.allele_to_sequence[a]) for a in alleles)
-            self.allele_to_sequence = allele_to_sequence
-            self.clear_cache()
 
     def clear_cache(self):
         """
@@ -1022,7 +1021,7 @@ class Class1AffinityPredictor(object):
                         (~df.supported_peptide_length).sum(),
                         min_peptide_length,
                         max_peptide_length,
-                        str(df.ix[~df.supported_peptide_length].peptide.unique())))
+                        str(df.loc[~df.supported_peptide_length].peptide.unique())))
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
@@ -1133,7 +1132,7 @@ class Class1AffinityPredictor(object):
                             model.predict(peptides, **model_kwargs))
                 elif mask.sum() > 0:
                     peptides_for_allele = EncodableSequences.create(
-                        df.ix[mask].peptide.values)
+                        df.loc[mask].peptide.values)
                     for (i, model) in enumerate(models):
                         predictions_array[
                             mask,

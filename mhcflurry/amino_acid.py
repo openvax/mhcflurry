@@ -153,7 +153,7 @@ def fixed_vectors_encoding(index_encoded_sequences, letter_to_vector_df):
     target_shape = (
         num_sequences, sequence_length, letter_to_vector_df.shape[0])
     result = letter_to_vector_df.iloc[
-        index_encoded_sequences.reshape((-1,))
+        index_encoded_sequences.reshape((-1,))  # reshape() avoids copy
     ].values.reshape(target_shape)
     return result
 

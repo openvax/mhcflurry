@@ -150,7 +150,7 @@ def run(argv=sys.argv[1:]):
     df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
 
-    df = df.ix[
+    df = df.loc[
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
@@ -166,7 +166,7 @@ def run(argv=sys.argv[1:]):
     if args.allele:
         alleles = [normalize_allele_name(a) for a in args.allele]
     else:
-        alleles = list(allele_counts.ix[
+        alleles = list(allele_counts.loc[
             allele_counts > args.min_measurements_per_allele
         ].index)
 

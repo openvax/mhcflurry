@@ -1,6 +1,9 @@
 #!/bin/bash
 #
-# Create allele sequences.
+# Create allele sequences (sometimes referred to as pseudosequences) by
+# performing a global alignment across all MHC amino acid sequences we can get
+# our hands on.
+#
 # Requires: clustalo, wget
 #
 set -e

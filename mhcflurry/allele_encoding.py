@@ -4,13 +4,16 @@ from . import amino_acid
 
 
 class AlleleEncoding(object):
-    def __init__(
-            self,
-            alleles=None,
-            allele_to_sequence=None,
-            borrow_from=None):
+    def __init__(self, alleles=None, allele_to_sequence=None, borrow_from=None):
         """
-        A place to cache encodings for a (potentially large) sequence of alleles.
+        A place to cache encodings for a sequence of alleles.
+
+        We frequently work with alleles by integer indices, for example as
+        inputs to neural networks. This class is used to map allele names to
+        integer indices in a consistent way by keeping track of the universe
+        of alleles under use, i.e. a distinction is made between the universe
+        of supported alleles (what's in `allele_to_sequence`) and the actual
+        set of alleles used (what's in `alleles`).
 
         Parameters
         ----------
@@ -19,6 +22,12 @@ class AlleleEncoding(object):
 
         allele_to_sequence : dict of str -> str
             Allele name to amino acid sequence
+
+        borrow_from : AlleleEncoding, optional
+            If specified, do not specify allele_to_sequence. The sequences from
+            the provided instance are used. This guarantees that the mappings
+            from allele to index and from allele to sequence are the same
+            between the instances.
         """
 
         if alleles is not None:
@@ -30,8 +39,6 @@ class AlleleEncoding(object):
             assert allele_to_sequence is not None
             all_alleles = (
                 sorted(allele_to_sequence))
-                #if alleles is None
-                #else list(sorted(alleles.unique())))
             self.allele_to_index = dict(
                 (allele, i)
                 for (i, allele) in enumerate(all_alleles))
@@ -61,6 +68,14 @@ class AlleleEncoding(object):
         self.encoding_cache = {}
 
     def compact(self):
+        """
+        Return a new AlleleEncoding in which the universe of supported alleles
+        is only the alleles actually used.
+
+        Returns
+        -------
+        AlleleEncoding
+        """
         return AlleleEncoding(
             alleles=self.alleles,
             allele_to_sequence=dict(
@@ -68,6 +83,21 @@ class AlleleEncoding(object):
                 for allele in self.alleles.unique()))
 
     def allele_representations(self, encoding_name):
+        """
+        Encode the universe of supported allele sequences to a matrix.
+
+        Parameters
+        ----------
+        encoding_name : string
+            How to represent amino acids. Valid names are "BLOSUM62" or
+            "one-hot". See `amino_acid.ENCODING_DATA_FRAMES`.
+
+        Returns
+        -------
+        numpy.array of shape
+            (num alleles in universe, sequence length, vector size)
+        where vector size is usually 21 (20 amino acids + X character)
+        """
         if self.borrow_from is not None:
             return self.borrow_from.allele_representations(encoding_name)
 
@@ -86,18 +116,19 @@ class AlleleEncoding(object):
 
     def fixed_length_vector_encoded_sequences(self, encoding_name):
         """
-        Encode alleles.
+        Encode allele sequences (not the universe of alleles) to a matrix.
+
         Parameters
         ----------
         encoding_name : string
-            How to represent amino acids.
-            One of "BLOSUM62", "one-hot", etc. Full list of supported vector
-            encodings is given by available_vector_encodings() in amino_acid.
+            How to represent amino acids. Valid names are "BLOSUM62" or
+            "one-hot". See `amino_acid.ENCODING_DATA_FRAMES`.
 
         Returns
         -------
-        numpy.array with shape (num sequences, sequence length, m) where m is
-        vector_encoding_length(vector_encoding_name)
+        numpy.array with shape:
+            (num alleles, sequence length, vector size)
+        where vector size is usually 21 (20 amino acids + X character)
         """
         cache_key = (
             "fixed_length_vector_encoding",
