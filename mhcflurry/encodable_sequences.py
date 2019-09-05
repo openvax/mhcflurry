@@ -1,3 +1,6 @@
+"""
+Class for encoding variable-length peptides to fixed-size numerical matrices
+"""
 from __future__ import (
     print_function,
     division,
@@ -26,9 +29,12 @@ class EncodingError(ValueError):
 
 class EncodableSequences(object):
     """
-    Sequences of amino acids.
+    Class for encoding variable-length peptides to fixed-size numerical matrices
     
     This class caches various encodings of a list of sequences.
+
+    In practice this is used only for peptides. To encode MHC allele sequences,
+    see AlleleEncoding.
     """
     unknown_character = "X"
 
@@ -299,8 +305,10 @@ class EncodableSequences(object):
             min_length = 5
 
             # Result array is int32, filled with X (null amino acid) value.
-            result = numpy.full(fill_value=amino_acid.AMINO_ACID_INDEX['X'],
-                shape=(len(sequences), max_length * 2), dtype="int32")
+            result = numpy.full(
+                fill_value=amino_acid.AMINO_ACID_INDEX['X'],
+                shape=(len(sequences), max_length * 2),
+                dtype="int32")
 
             df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
 
@@ -319,9 +327,9 @@ class EncodableSequences(object):
                 # Array of shape (num peptides, length) giving fixed-length
                 # amino acid encoding each peptide of the current length.
                 fixed_length_sequences = numpy.stack(sub_df.peptide.map(
-                    lambda s: numpy.array(
-                        [amino_acid.AMINO_ACID_INDEX[char] for char in
-                            s])).values)
+                    lambda s: numpy.array([
+                        amino_acid.AMINO_ACID_INDEX[char] for char in s
+                    ])).values)
 
                 # Set left edge
                 result[sub_df.index, :length] = fixed_length_sequences
@@ -334,8 +342,10 @@ class EncodableSequences(object):
             min_length = 5
 
             # Result array is int32, filled with X (null amino acid) value.
-            result = numpy.full(fill_value=amino_acid.AMINO_ACID_INDEX['X'],
-                shape=(len(sequences), max_length * 3), dtype="int32")
+            result = numpy.full(
+                fill_value=amino_acid.AMINO_ACID_INDEX['X'],
+                shape=(len(sequences), max_length * 3),
+                dtype="int32")
 
             df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
 
@@ -354,9 +364,9 @@ class EncodableSequences(object):
                 # Array of shape (num peptides, length) giving fixed-length
                 # amino acid encoding each peptide of the current length.
                 fixed_length_sequences = numpy.stack(sub_df.peptide.map(
-                    lambda s: numpy.array(
-                        [amino_acid.AMINO_ACID_INDEX[char] for char in
-                            s])).values)
+                    lambda s: numpy.array([
+                        amino_acid.AMINO_ACID_INDEX[char] for char in s
+                    ])).values)
 
                 # Set left edge
                 result[sub_df.index, :length] = fixed_length_sequences

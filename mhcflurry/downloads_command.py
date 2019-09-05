@@ -168,8 +168,7 @@ def fetch_subcommand(args):
                 "\nThe requested download '%s' has already been downloaded. "
                 "To re-download this data, first run: \n\t%s\nin a shell "
                 "and then re-run this command.\n" +
-                "*" * 40)
-                % (name, 'rm -rf ' + quote(get_path(name))))
+                "*" * 40) % (name, 'rm -rf ' + quote(get_path(name))))
         if not info['downloaded'] and (name in args.download_name or default):
             items_to_fetch.add(name)
 

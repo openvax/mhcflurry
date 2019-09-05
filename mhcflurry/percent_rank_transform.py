@@ -1,3 +1,6 @@
+"""
+Class for transforming arbitrary values into percent ranks given a distribution.
+"""
 import numpy
 import pandas
 
@@ -77,8 +80,3 @@ class PercentRankTransform(object):
         result.cdf = series.values
         result.bin_edges = series.index.values[1:-1]
         return result
-
-
-
-
-

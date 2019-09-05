@@ -212,7 +212,7 @@ def run(argv=sys.argv[1:]):
         worker_pool.join()
 
     print("Percent rank calibration time: %0.2f min." % (
-       percent_rank_calibration_time / 60.0))
+        percent_rank_calibration_time / 60.0))
     print("Predictor written to: %s" % args.models_dir)
 
 

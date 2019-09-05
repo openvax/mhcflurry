@@ -219,7 +219,7 @@ def run(argv=sys.argv[1:]):
         })
         logging.info(
             "Predicting for %d alleles and %d peptides = %d predictions" % (
-            len(args.alleles), len(args.peptides), len(df)))
+                len(args.alleles), len(args.peptides), len(df)))
 
     predictions = predictor.predict_to_dataframe(
         peptides=df[args.peptide_column].values,

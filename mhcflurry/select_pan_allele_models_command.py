@@ -24,7 +24,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .encodable_sequences import EncodableSequences
 from .allele_encoding import AlleleEncoding
-from .common import configure_logging, random_peptides
+from .common import configure_logging
 from .local_parallelism import (
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)

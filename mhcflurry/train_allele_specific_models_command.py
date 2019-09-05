@@ -10,7 +10,6 @@ import traceback
 import random
 from functools import partial
 
-import numpy
 import pandas
 import yaml
 from sklearn.metrics.pairwise import cosine_similarity
@@ -337,7 +336,7 @@ def alleles_by_similarity(allele):
             allele_similarity.columns.to_series().sample(frac=1.0))
     return (
         allele_similarity[allele] + (
-        allele_similarity.index == allele)  # force that we return specified allele first
+            allele_similarity.index == allele)  # force specified allele first
     ).sort_values(ascending=False).index.tolist()
 
 

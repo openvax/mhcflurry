@@ -138,4 +138,3 @@ class AlleleEncoding(object):
             result = vector_encoded[self.indices]
             self.encoding_cache[cache_key] = result
         return self.encoding_cache[cache_key]
-

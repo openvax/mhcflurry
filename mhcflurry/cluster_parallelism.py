@@ -349,4 +349,3 @@ def worker_entry_point(argv=sys.argv[1:]):
         if args.complete_dir:
             os.mkdir(args.complete_dir)
             print("Created: ", args.complete_dir)
-

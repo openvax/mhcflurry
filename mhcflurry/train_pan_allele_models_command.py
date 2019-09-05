@@ -270,7 +270,8 @@ def run(argv=sys.argv[1:]):
             return main(args)
         except Exception as e:
             print(e)
-            import ipdb ; ipdb.set_trace()
+            import ipdb
+            ipdb.set_trace()
             raise
     else:
         return main(args)
@@ -697,4 +698,3 @@ def train_model(
 
 if __name__ == '__main__':
     run()
-
