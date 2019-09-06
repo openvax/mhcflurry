@@ -655,6 +655,8 @@ def train_model(
         # Use a smaller learning rate for training on real data
         learning_rate = model.fit_info[-1]["learning_rate"]
         model.hyperparameters['learning_rate'] = learning_rate / 10
+    else:
+        model = Class1NeuralNetwork(**hyperparameters)
 
     model.fit(
         peptides=train_peptides,

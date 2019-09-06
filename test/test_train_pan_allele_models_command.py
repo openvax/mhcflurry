@@ -89,7 +89,7 @@ HYPERPARAMETERS_LIST = [
     'random_negative_match_distribution': True,
     'random_negative_rate': 0.2,
     'train_data': {
-        "pretrain": True,
+        "pretrain": False,
         'pretrain_peptides_per_epoch': 128,
         'pretrain_max_epochs': 2,
         'pretrain_max_val_loss': 0.2,
@@ -121,8 +121,8 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
         "--num-jobs", str(n_jobs),
         "--ensemble-size", "2",
         "--verbosity", "1",
-        "--pretrain-data", get_path(
-            "random_peptide_predictions", "predictions.csv.bz2"),
+        # "--pretrain-data", get_path(
+        #      "random_peptide_predictions", "predictions.csv.bz2"),
     ] + additional_args
     print("Running with args: %s" % args)
     subprocess.check_call(args)
