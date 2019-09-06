@@ -39,8 +39,8 @@ env:
     - MKL_THREADING_LAYER=GNU  # for theano
     - CUDA_VISIBLE_DEVICES=""  # for tensorflow
   matrix:
-    - KERAS_BACKEND=theano
     - KERAS_BACKEND=tensorflow
+    #- KERAS_BACKEND=theano
 script:
   # download data and models, then run tests
   - mhcflurry-downloads fetch data_curated models_class1 models_class1_pan allele_sequences
