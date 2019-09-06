@@ -1372,24 +1372,24 @@ class Class1NeuralNetwork(object):
             (allele_representations.shape[0], -1))
         original_model = self.network()
         layer = original_model.get_layer("allele_representation")
-        (existing_weights,) = layer.get_weights()
+        existing_weights_shape = (layer.input_dim, layer.output_dim)
 
         # Only changes to the number of supported alleles (not the length of
         # the allele sequences) are allowed.
-        assert existing_weights.shape[1:] == reshaped.shape[1:]
+        assert existing_weights_shape[1:] == reshaped.shape[1:]
 
-        if existing_weights.shape[0] > reshaped.shape[0]:
+        if existing_weights_shape[0] > reshaped.shape[0]:
             # Extend with NaNs so we can avoid having to reshape the weights
             # matrix, which is expensive.
             reshaped = numpy.append(
                 reshaped,
                 numpy.ones([
-                    existing_weights.shape[0] - reshaped.shape[0],
+                    existing_weights_shape[0] - reshaped.shape[0],
                     reshaped.shape[1]
                 ]) * numpy.nan,
                 axis=0)
 
-        if existing_weights.shape != reshaped.shape:
+        if existing_weights_shape != reshaped.shape:
             # Network surgery required. Make a new network with this layer's
             # dimensions changed. Kind of a hack.
             layer.input_dim = reshaped.shape[0]
@@ -1405,7 +1405,6 @@ class Class1NeuralNetwork(object):
             self.update_network_description()
 
             layer = new_model.get_layer("allele_representation")
-            (existing_weights,) = layer.get_weights()
 
             # Disable the old model to catch bugs.
             def throw(*args, **kwargs):
@@ -1414,6 +1413,4 @@ class Class1NeuralNetwork(object):
                 original_model.fit = \
                 original_model.fit_generator = throw
 
-        assert existing_weights.shape == reshaped.shape, (
-            existing_weights.shape, reshaped.shape)
         layer.set_weights([reshaped])

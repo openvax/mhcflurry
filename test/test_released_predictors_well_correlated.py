@@ -1,6 +1,7 @@
 """
 Test that pan-allele and allele-specific predictors are highly correlated.
 """
+from __future__ import print_function
 import os
 import sys
 import argparse

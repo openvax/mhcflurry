@@ -60,10 +60,6 @@ if __name__ == '__main__':
         'tqdm',
         'np_utils',
     ]
-    if PY2:
-        # concurrent.futures is a standard library in Py3 but Py2
-        # requires this backport
-        required_packages.append('futures')
 
     setup(
         name='mhcflurry',
@@ -92,7 +88,7 @@ if __name__ == '__main__':
             ]
         },
         classifiers=[
-            'Development Status :: 4 - Beta',
+            'Development Status :: 5 - Production/Stable',
             'Environment :: Console',
             'Operating System :: OS Independent',
             'Intended Audience :: Science/Research',
