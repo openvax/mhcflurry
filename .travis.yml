@@ -26,24 +26,19 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib mkl-service tensorflow
-      pypandoc pylint
+      numpy scipy nose pandas matplotlib mkl-service tensorflow pypandoc
   - source activate test-environment
   - pip install -r requirements.txt
-  - pip install 'theano>=1.0.4'
   - pip install .
   - pip freeze
 env:
   global:
     - PYTHONHASHSEED=0
-    - MKL_THREADING_LAYER=GNU  # for theano
     - CUDA_VISIBLE_DEVICES=""  # for tensorflow
   matrix:
     - KERAS_BACKEND=tensorflow
-    #- KERAS_BACKEND=theano
 script:
   # download data and models, then run tests
   - mhcflurry-downloads fetch data_curated models_class1 models_class1_pan allele_sequences
   - mhcflurry-downloads info  # just to test this command works
   - nosetests test -sv
-  - ./lint.sh
