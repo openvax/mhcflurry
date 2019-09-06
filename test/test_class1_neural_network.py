@@ -91,7 +91,7 @@ def test_inequalities():
         peptide_amino_acid_encoding="one-hot",
         activation="tanh",
         layer_sizes=[16],
-        max_epochs=50,
+        max_epochs=200,
         minibatch_size=32,
         random_negative_rate=0.0,
         early_stopping=False,
