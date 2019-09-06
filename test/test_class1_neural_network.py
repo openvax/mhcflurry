@@ -90,7 +90,7 @@ def test_inequalities():
     hyperparameters = dict(
         peptide_amino_acid_encoding="one-hot",
         activation="tanh",
-        layer_sizes=[16],
+        layer_sizes=[64],
         max_epochs=200,
         minibatch_size=32,
         random_negative_rate=0.0,
@@ -108,7 +108,7 @@ def test_inequalities():
         loss="custom:mse_with_inequalities_and_multiple_outputs")
 
     df = pandas.DataFrame()
-    df["peptide"] = random_peptides(1000, length=9)
+    df["peptide"] = random_peptides(100, length=9)
 
     # First half are binders
     df["binder"] = df.index < len(df) / 2

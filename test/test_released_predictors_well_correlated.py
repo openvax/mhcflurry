@@ -23,7 +23,7 @@ PREDICTORS = {
         get_path("models_class1_pan", "models.with_mass_spec"))
 }
 
-PREDICTORS["pan-allele"].optimize()
+# PREDICTORS["pan-allele"].optimize()
 
 
 def test_correlation(
