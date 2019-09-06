@@ -1079,11 +1079,16 @@ class Class1AffinityPredictor(object):
                 if allele not in self.allele_to_sequence
             ]
             if unsupported_alleles:
+                truncate_at = 100
+                allele_string = " ".join(
+                    sorted(self.allele_to_sequence)[:truncate_at])
+                if len(self.allele_to_sequence) > truncate_at:
+                    allele_string += " + %d more alleles" % (
+                        len(self.allele_to_sequence) - truncate_at)
                 msg = (
                     "No sequences for allele(s): %s.\n"
                     "Supported alleles: %s" % (
-                        " ".join(unsupported_alleles),
-                        " ".join(sorted(self.allele_to_sequence))))
+                        " ".join(unsupported_alleles), allele_string))
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
