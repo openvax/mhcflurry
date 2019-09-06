@@ -101,16 +101,16 @@ anything surprising.
 
 ### Optimizations
 
-The pan-allele models are somewhat slow. You can set
-the environment variable `MHCFLURRY_OPTIMIZATION_LEVEL=1` to turn on one
-attempt to optimize these models for faster prediction speed. This will
-"stitch" the pan-allele models in the ensemble (currently 32) into one large
-tensorflow (or theano) graph. In our experiments it gives about a 30% speed
-improvement. It has no effect on allele-specific models.
+The pan-allele models are somewhat slow. You can set the environment variable
+`MHCFLURRY_OPTIMIZATION_LEVEL=1` to turn on one attempt to optimize these
+models for faster prediction speed. This will "stitch" the pan-allele models in
+the ensemble (currently 32) into one large tensorflow graph. In our experiments
+it gives about a 30% speed improvement. It has no effect on allele-specific
+models.
 
-For large prediction tasks, it can be helpful to increase the prediction
-batch size, which is set by the `MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE`
-environment variable. The default is 4096. This affects both allele-specific
-and pan-allele predictors. It can result in large performance increases if you
-have sufficient memory.
+For large prediction tasks, it can be helpful to increase the prediction batch
+size, which is set by the `MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE` environment
+variable. The default is 4096. This affects both allele-specific and pan-allele
+predictors. It can have large effects on performance. Alternatively, if you are
+running out of memory, you can try decreasing the batch size.
 
