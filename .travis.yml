@@ -26,11 +26,9 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib mkl-service 'theano>=1.0.4'
+      numpy scipy nose pandas matplotlib mkl-service theano tensorflow
+      pypandoc pylint
   - source activate test-environment
-  - pip install tensorflow pypandoc pylint
-  - pip install pypandoc pylint
-  - pip install --ignore-installed --upgrade $TF_PACKAGE
   - pip install -r requirements.txt
   - pip install .
   - pip freeze
