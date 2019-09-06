@@ -13,7 +13,7 @@ import pandas
 
 import mhcnames
 
-import Bio.SeqIO
+import Bio.SeqIO  # pylint: disable=import-error
 
 
 def normalize_simple(s):

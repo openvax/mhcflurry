@@ -8,7 +8,7 @@ import argparse
 
 import mhcnames
 
-import Bio.SeqIO
+import Bio.SeqIO  # pylint: disable=import-error
 
 
 def normalize(s, disallowed=["MIC", "HFE"]):

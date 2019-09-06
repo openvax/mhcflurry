@@ -270,7 +270,7 @@ def run(argv=sys.argv[1:]):
             return main(args)
         except Exception as e:
             print(e)
-            import ipdb
+            import ipdb  # pylint: disable=import-error
             ipdb.set_trace()
             raise
     else:

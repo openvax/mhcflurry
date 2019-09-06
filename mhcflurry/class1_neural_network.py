@@ -1126,6 +1126,7 @@ class Class1NeuralNetwork(object):
 
         """
         import keras
+        import keras.backend as K
         from keras.layers import Input
         from keras.models import Model
 
@@ -1162,7 +1163,7 @@ class Class1NeuralNetwork(object):
             # Merging an ensemble of pan-allele architectures
             network = networks[0]
             peptide_input = Input(
-                shape=tuple(int(x) for x in network.inputs[0].shape[1:]),
+                shape=tuple(int(x) for x in K.int_shape(network.inputs[0])[1:]),
                 dtype='float32',
                 name='peptide')
             allele_input = Input(
@@ -1366,7 +1367,7 @@ class Class1NeuralNetwork(object):
                   l is the allele sequence length,
                   m is the length of the vectors used to represent amino acids
         """
-        from keras.models import model_from_json
+        from keras.models import clone_model
         reshaped = allele_representations.reshape(
             (allele_representations.shape[0], -1))
         original_model = self.network()
@@ -1392,7 +1393,7 @@ class Class1NeuralNetwork(object):
             # Network surgery required. Make a new network with this layer's
             # dimensions changed. Kind of a hack.
             layer.input_dim = reshaped.shape[0]
-            new_model = model_from_json(original_model.to_json())
+            new_model = clone_model(original_model)
 
             # copy weights for other layers over
             for layer in new_model.layers:
