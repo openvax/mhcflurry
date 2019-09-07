@@ -2,13 +2,6 @@
 Tests for training and predicting using Class1 pan-allele models.
 """
 
-import json
-import os
-import shutil
-import tempfile
-import subprocess
-from copy import deepcopy
-
 from sklearn.metrics import roc_auc_score
 import pandas
 
@@ -33,10 +26,10 @@ HYPERPARAMETERS = {
     'locally_connected_layers': [],
     'loss': 'custom:mse_with_inequalities',
     'max_epochs': 5000,
-    'minibatch_size': 128,
+    'minibatch_size': 256,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
-    'patience': 10,
+    'patience': 5,
     'peptide_allele_merge_activation': '',
     'peptide_allele_merge_method': 'concatenate',
     'peptide_amino_acid_encoding': 'BLOSUM62',
@@ -71,17 +64,22 @@ TRAIN_DF = TRAIN_DF.loc[TRAIN_DF.allele.isin(ALLELE_TO_SEQUENCE)]
 TRAIN_DF = TRAIN_DF.loc[TRAIN_DF.peptide.str.len() >= 8]
 TRAIN_DF = TRAIN_DF.loc[TRAIN_DF.peptide.str.len() <= 15]
 
+TRAIN_DF = TRAIN_DF.loc[
+    TRAIN_DF.allele.isin(TRAIN_DF.allele.value_counts().iloc[:3].index)
+]
+
 
 MS_HITS_DF = pandas.read_csv(
     get_path(
         "data_curated", "curated_training_data.with_mass_spec.csv.bz2"))
-MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.allele.isin(ALLELE_TO_SEQUENCE)]
+MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.allele.isin(TRAIN_DF.allele.unique())]
 MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.peptide.str.len() >= 8]
 MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.peptide.str.len() <= 15]
 MS_HITS_DF = MS_HITS_DF.loc[~MS_HITS_DF.peptide.isin(TRAIN_DF.peptide)]
 
 print("Loaded %d training and %d ms hits" % (
     len(TRAIN_DF), len(MS_HITS_DF)))
+
 
 def test_train_simple():
     network = Class1NeuralNetwork(**HYPERPARAMETERS)

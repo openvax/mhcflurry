@@ -145,7 +145,6 @@ if __name__ == '__main__':
 
     if "pan-allele" in args.predictor:
         print("Running pan-allele test")
-        PAN_ALLELE_PREDICTOR.optimize()
         result = test_speed_pan_allele(
             profile=True, num=args.num_predictions)
         result[

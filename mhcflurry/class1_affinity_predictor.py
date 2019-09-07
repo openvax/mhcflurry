@@ -33,7 +33,7 @@ from .allele_encoding import AlleleEncoding
 DEFAULT_CENTRALITY_MEASURE = "mean"
 
 # Any value > 0 will result in attempting to optimize models after loading.
-OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 0))
+OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 1))
 
 
 class Class1AffinityPredictor(object):
