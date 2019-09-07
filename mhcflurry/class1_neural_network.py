@@ -1368,7 +1368,10 @@ class Class1NeuralNetwork(object):
                   m is the length of the vectors used to represent amino acids
         """
         from keras.models import clone_model
+        import tensorflow as tf
         import keras.backend as K
+        K.get_session().run(tf.global_variables_initializer())
+
         reshaped = allele_representations.reshape(
             (allele_representations.shape[0], -1))
         original_model = self.network()
