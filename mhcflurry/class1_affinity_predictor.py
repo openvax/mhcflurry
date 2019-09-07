@@ -418,7 +418,7 @@ class Class1AffinityPredictor(object):
             logging.info("Wrote: %s", percent_ranks_path)
 
     @staticmethod
-    def load(models_dir=None, max_models=None):
+    def load(models_dir=None, max_models=None, optimization_level=None):
         """
         Deserialize a predictor from a directory on disk.
         
@@ -431,12 +431,18 @@ class Class1AffinityPredictor(object):
         max_models : int, optional
             Maximum number of `Class1NeuralNetwork` instances to load
 
+        optimization_level : int
+            If >0, model optimization will be attempted. Defaults to value of
+            environment variable MHCFLURRY_OPTIMIZATION_LEVEL.
+
         Returns
         -------
         `Class1AffinityPredictor` instance
         """
         if models_dir is None:
             models_dir = get_default_class1_models_dir()
+        if optimization_level is None:
+            optimization_level = OPTIMIZATION_LEVEL
 
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
@@ -497,11 +503,11 @@ class Class1AffinityPredictor(object):
             manifest_df=manifest_df,
             allele_to_percent_rank_transform=allele_to_percent_rank_transform,
         )
-        if OPTIMIZATION_LEVEL >= 1:
-            logging.info("Optimizing models")
+        if optimization_level >= 1:
             optimized = result.optimize()
             logging.info(
-                "Optimization %s", ("succeeded" if optimized else "failed"))
+                "Model optimization %s",
+                "succeeded" if optimized else "not supported for these models")
         return result
 
     def optimize(self):

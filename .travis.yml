@@ -35,8 +35,6 @@ install:
 env:
   global:
     - PYTHONHASHSEED=0
-    - CUDA_VISIBLE_DEVICES=""  # for tensorflow
-  matrix:
     - KERAS_BACKEND=tensorflow
 script:
   # download data and models, then run tests

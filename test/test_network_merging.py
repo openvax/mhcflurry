@@ -14,13 +14,16 @@ from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
 ALLELE_SPECIFIC_PREDICTOR = Class1AffinityPredictor.load(
-    get_path("models_class1", "models"))
+    get_path("models_class1", "models"), optimization_level=0)
 
 PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
-    get_path("models_class1_pan", "models.with_mass_spec"))
+    get_path("models_class1_pan", "models.with_mass_spec"),
+    optimization_level=0)
 
 
 def test_merge():
+    assert len(PAN_ALLELE_PREDICTOR.class1_pan_allele_models) > 1
+
     peptides = random_peptides(100, length=9)
     peptides.extend(random_peptides(100, length=10))
     peptides = pandas.Series(peptides).sample(frac=1.0)
@@ -40,3 +43,4 @@ def test_merge():
     )
     predictions2 = merged_predictor.predict(peptides=peptides, alleles=alleles)
     numpy.testing.assert_allclose(predictions1, predictions2, atol=0.1)
+
