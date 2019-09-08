@@ -1368,9 +1368,8 @@ class Class1NeuralNetwork(object):
                   m is the length of the vectors used to represent amino acids
         """
         from keras.models import clone_model
-        import tensorflow as tf
         import keras.backend as K
-        K.get_session().run(tf.global_variables_initializer())
+        import tensorflow as tf
 
         reshaped = allele_representations.reshape(
             (allele_representations.shape[0], -1))
@@ -1417,4 +1416,10 @@ class Class1NeuralNetwork(object):
                 original_model.fit = \
                 original_model.fit_generator = throw
 
-        layer.set_weights([reshaped])
+        session = K.get_session()
+        (weights_variable,) = layer.non_trainable_weights
+        session.run(weights_variable.initializer)
+        session.run(tf.assign(weights_variable, reshaped))
+        #
+        # Previously had this but was getting sporadic not initialized errors
+        # layer.set_weights([reshaped])
