@@ -37,6 +37,9 @@ env:
   global:
     - PYTHONHASHSEED=0
     - KERAS_BACKEND=tensorflow
+    - KMP_SETTINGS=TRUE
+    - OMP_NUM_THREADS=1
+
 script:
   # download data and models, then run tests
   - mhcflurry-downloads fetch data_curated models_class1 models_class1_pan allele_sequences
