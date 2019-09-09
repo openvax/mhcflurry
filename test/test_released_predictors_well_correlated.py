@@ -15,7 +15,7 @@ from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
-from mhcflurry.testing_utils import module_cleanup
+from mhcflurry.testing_utils import cleanup
 
 PREDICTORS = None
 
@@ -33,7 +33,7 @@ def setup():
 def teardown():
     global PREDICTORS
     PREDICTORS = None
-    module_cleanup()
+    cleanup()
 
 
 def test_correlation(

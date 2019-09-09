@@ -11,8 +11,8 @@ import keras.backend as K
 
 from mhcflurry.custom_loss import CUSTOM_LOSSES
 
-from mhcflurry.testing_utils import module_cleanup
-teardown = module_cleanup
+from mhcflurry.testing_utils import cleanup
+teardown = cleanup
 
 
 def evaluate_loss(loss, y_true, y_pred):

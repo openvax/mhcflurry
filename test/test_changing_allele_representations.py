@@ -8,8 +8,8 @@ from mhcflurry.downloads import get_path
 
 from numpy.testing import assert_equal
 
-from mhcflurry.testing_utils import module_cleanup
-teardown = module_cleanup
+from mhcflurry.testing_utils import cleanup
+teardown = cleanup
 
 ALLELE_TO_SEQUENCE = pandas.read_csv(
     get_path(

@@ -1416,10 +1416,4 @@ class Class1NeuralNetwork(object):
                 original_model.fit = \
                 original_model.fit_generator = throw
 
-        session = K.get_session()
-        (weights_variable,) = layer.non_trainable_weights
-        session.run(weights_variable.initializer)
-        session.run(tf.assign(weights_variable, reshaped))
-        #
-        # Previously had this but was getting sporadic not initialized errors
-        # layer.set_weights([reshaped])
+        layer.set_weights([reshaped])

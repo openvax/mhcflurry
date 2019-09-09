@@ -5,7 +5,7 @@ from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
-from mhcflurry.testing_utils import module_cleanup
+from mhcflurry.testing_utils import cleanup
 
 logging.getLogger('tensorflow').disabled = True
 
@@ -23,7 +23,7 @@ def setup():
 def teardown():
     global PAN_ALLELE_PREDICTOR
     PAN_ALLELE_PREDICTOR = None
-    module_cleanup()
+    cleanup()
 
 
 def test_merge():

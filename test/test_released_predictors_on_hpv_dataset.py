@@ -13,7 +13,7 @@ from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 
-from mhcflurry.testing_utils import module_cleanup
+from mhcflurry.testing_utils import cleanup
 
 
 def data_path(name):
@@ -41,7 +41,7 @@ def setup():
 def teardown():
     global PREDICTORS
     PREDICTORS = None
-    module_cleanup()
+    cleanup()
 
 
 def test_on_hpv(df=DF):

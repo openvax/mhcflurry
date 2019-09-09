@@ -18,7 +18,7 @@ from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
-from mhcflurry.testing_utils import module_cleanup
+from mhcflurry.testing_utils import cleanup
 
 ALLELE_SPECIFIC_PREDICTOR = Class1AffinityPredictor.load(
     get_path("models_class1", "models"))
@@ -43,7 +43,7 @@ def setup():
 def teardown():
     global PREDICTORS
     PREDICTORS = None
-    module_cleanup()
+    cleanup()
 
 
 DEFAULT_NUM_PREDICTIONS = 10000

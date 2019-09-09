@@ -5,7 +5,7 @@ from numpy.testing import assert_equal
 
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 
-from mhcflurry.testing_utils import module_cleanup
+from mhcflurry.testing_utils import cleanup
 
 
 DOWNLOADED_PREDICTOR = None
@@ -19,7 +19,7 @@ def setup():
 def teardown():
     global DOWNLOADED_PREDICTOR
     DOWNLOADED_PREDICTOR = None
-    module_cleanup()
+    cleanup()
 
 
 def predict_and_check(

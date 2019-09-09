@@ -29,7 +29,7 @@ def setup():
 def teardown():
     global DOWNLOADED_PREDICTOR
     DOWNLOADED_PREDICTOR = None
-    mhcflurry.testing_utils.module_cleanup()
+    mhcflurry.testing_utils.cleanup()
 
 
 # To hunt down a weird warning we were seeing in pandas.

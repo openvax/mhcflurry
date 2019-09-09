@@ -14,8 +14,8 @@ from mhcflurry.downloads import get_path
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-from mhcflurry.testing_utils import module_cleanup
-teardown = module_cleanup
+from mhcflurry.testing_utils import cleanup
+teardown = cleanup
 
 
 def run_and_check(n_jobs=0, delete=True, additional_args=[]):

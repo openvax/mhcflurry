@@ -14,8 +14,8 @@ from numpy.testing import assert_array_less, assert_equal
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 
-from mhcflurry.testing_utils import module_cleanup
-teardown = module_cleanup
+from mhcflurry.testing_utils import cleanup
+teardown = cleanup
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
