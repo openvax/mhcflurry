@@ -5,6 +5,9 @@ from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
+from mhcflurry.testing_utils import module_cleanup
+teardown = module_cleanup
+
 logging.getLogger('tensorflow').disabled = True
 
 PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(

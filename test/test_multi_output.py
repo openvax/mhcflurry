@@ -12,6 +12,9 @@ logging.getLogger('tensorflow').disabled = True
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import random_peptides
 
+from mhcflurry.testing_utils import module_cleanup
+teardown = module_cleanup
+
 
 def test_multi_output():
     hyperparameters = dict(

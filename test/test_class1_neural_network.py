@@ -13,6 +13,9 @@ from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
+from mhcflurry.testing_utils import module_cleanup
+teardown = module_cleanup
+
 
 def test_class1_neural_network_a0205_training_accuracy():
     # Memorize the dataset.

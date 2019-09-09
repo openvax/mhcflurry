@@ -14,6 +14,9 @@ from mhcflurry.downloads import get_path
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
+from mhcflurry.testing_utils import module_cleanup
+teardown = module_cleanup
+
 
 def run_and_check(n_jobs=0, delete=True, additional_args=[]):
     source_models_dir = get_path("models_class1_pan", "models.with_mass_spec")

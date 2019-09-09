@@ -18,6 +18,9 @@ from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
+from mhcflurry.testing_utils import module_cleanup
+teardown = module_cleanup
+
 ALLELE_SPECIFIC_PREDICTOR = Class1AffinityPredictor.load(
     get_path("models_class1", "models"))
 

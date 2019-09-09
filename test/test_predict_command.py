@@ -6,6 +6,9 @@ from numpy.testing import assert_equal
 
 from mhcflurry import predict_command
 
+from mhcflurry.testing_utils import module_cleanup
+teardown = module_cleanup
+
 TEST_CSV = '''
 Allele,Peptide,Experiment
 HLA-A0201,SYNFEKKL,17

@@ -15,6 +15,9 @@ from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
+from mhcflurry.testing_utils import module_cleanup
+teardown = module_cleanup
+
 
 PREDICTORS = {
     'allele-specific': Class1AffinityPredictor.load(

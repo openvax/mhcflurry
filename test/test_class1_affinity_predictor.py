@@ -16,6 +16,10 @@ from numpy import testing
 
 from mhcflurry.downloads import get_path
 
+import mhcflurry.testing_utils
+teardown = mhcflurry.testing_utils.module_cleanup
+
+
 DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
 
 logging.basicConfig(level=logging.DEBUG)
@@ -252,3 +256,4 @@ def test_predict_implementations_equivalent():
                 peptides=peptides,
                 centrality_measure=centrality_measure).prediction.values
             testing.assert_almost_equal(pred1, pred2, decimal=2)
+

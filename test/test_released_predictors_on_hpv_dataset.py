@@ -13,6 +13,9 @@ from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 
+from mhcflurry.testing_utils import module_cleanup
+teardown = module_cleanup
+
 
 def data_path(name):
     '''

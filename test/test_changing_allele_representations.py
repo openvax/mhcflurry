@@ -8,6 +8,9 @@ from mhcflurry.downloads import get_path
 
 from numpy.testing import assert_equal
 
+from mhcflurry.testing_utils import module_cleanup
+teardown = module_cleanup
+
 ALLELE_TO_SEQUENCE = pandas.read_csv(
     get_path(
         "allele_sequences", "allele_sequences.csv"),
