@@ -19,13 +19,32 @@ from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import module_cleanup
-teardown = module_cleanup
 
 ALLELE_SPECIFIC_PREDICTOR = Class1AffinityPredictor.load(
     get_path("models_class1", "models"))
 
 PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
     get_path("models_class1_pan", "models.with_mass_spec"))
+
+
+PREDICTORS = None
+
+
+def setup():
+    global PREDICTORS
+    PREDICTORS = {
+        'allele-specific': Class1AffinityPredictor.load(
+            get_path("models_class1", "models")),
+        'pan-allele': Class1AffinityPredictor.load(
+            get_path("models_class1_pan", "models.with_mass_spec"))
+    }
+
+
+def teardown():
+    global PREDICTORS
+    PREDICTORS = None
+    module_cleanup()
+
 
 DEFAULT_NUM_PREDICTIONS = 10000
 
@@ -137,6 +156,7 @@ if __name__ == '__main__':
     # to explore results.
 
     args = parser.parse_args(sys.argv[1:])
+    setup()
 
     if "allele-specific" in args.predictor:
         print("Running allele-specific test")

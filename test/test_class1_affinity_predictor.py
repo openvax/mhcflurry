@@ -15,14 +15,21 @@ from nose.tools import eq_, assert_raises
 from numpy import testing
 
 from mhcflurry.downloads import get_path
-
 import mhcflurry.testing_utils
-teardown = mhcflurry.testing_utils.module_cleanup
-
 
 DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
 
-logging.basicConfig(level=logging.DEBUG)
+
+def setup():
+    global DOWNLOADED_PREDICTOR
+    DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+    logging.basicConfig(level=logging.DEBUG)
+
+
+def teardown():
+    global DOWNLOADED_PREDICTOR
+    DOWNLOADED_PREDICTOR = None
+    mhcflurry.testing_utils.module_cleanup()
 
 
 # To hunt down a weird warning we were seeing in pandas.

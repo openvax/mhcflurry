@@ -16,17 +16,24 @@ from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
 from mhcflurry.testing_utils import module_cleanup
-teardown = module_cleanup
+
+PREDICTORS = None
 
 
-PREDICTORS = {
-    'allele-specific': Class1AffinityPredictor.load(
-        get_path("models_class1", "models")),
-    'pan-allele': Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.with_mass_spec"))
-}
+def setup():
+    global PREDICTORS
+    PREDICTORS = {
+        'allele-specific': Class1AffinityPredictor.load(
+            get_path("models_class1", "models")),
+        'pan-allele': Class1AffinityPredictor.load(
+            get_path("models_class1_pan", "models.with_mass_spec"))
+    }
 
-# PREDICTORS["pan-allele"].optimize()
+
+def teardown():
+    global PREDICTORS
+    PREDICTORS = None
+    module_cleanup()
 
 
 def test_correlation(
@@ -83,6 +90,7 @@ parser.add_argument(
 
 if __name__ == '__main__':
     # If run directly from python, leave the user in a shell to explore results.
+    setup()
     args = parser.parse_args(sys.argv[1:])
     result = test_correlation(alleles=args.alleles, debug=True)
 

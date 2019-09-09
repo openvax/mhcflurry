@@ -6,14 +6,24 @@ from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import module_cleanup
-teardown = module_cleanup
 
 logging.getLogger('tensorflow').disabled = True
 
-PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
-    get_path("models_class1_pan", "models.with_mass_spec"),
-    max_models=4,
-    optimization_level=0,)
+PAN_ALLELE_PREDICTOR = None
+
+
+def setup():
+    global PAN_ALLELE_PREDICTOR
+    PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.with_mass_spec"),
+        max_models=4,
+        optimization_level=0,)
+
+
+def teardown():
+    global PAN_ALLELE_PREDICTOR
+    PAN_ALLELE_PREDICTOR = None
+    module_cleanup()
 
 
 def test_merge():

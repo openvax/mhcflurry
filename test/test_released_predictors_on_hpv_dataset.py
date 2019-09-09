@@ -14,7 +14,6 @@ from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import module_cleanup
-teardown = module_cleanup
 
 
 def data_path(name):
@@ -25,14 +24,24 @@ def data_path(name):
     return os.path.join(os.path.dirname(__file__), "data", name)
 
 
-PREDICTORS = {
-    'allele-specific': Class1AffinityPredictor.load(
-        get_path("models_class1", "models")),
-    'pan-allele': Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.with_mass_spec"))
+DF = pandas.read_csv(data_path("hpv_predictions.csv"))
+PREDICTORS = None
+
+
+def setup():
+    global PREDICTORS
+    PREDICTORS = {
+        'allele-specific': Class1AffinityPredictor.load(
+            get_path("models_class1", "models")),
+        'pan-allele': Class1AffinityPredictor.load(
+            get_path("models_class1_pan", "models.with_mass_spec"))
 }
 
-DF = pandas.read_csv(data_path("hpv_predictions.csv"))
+
+def teardown():
+    global PREDICTORS
+    PREDICTORS = None
+    module_cleanup()
 
 
 def test_on_hpv(df=DF):
@@ -63,6 +72,7 @@ def test_on_hpv(df=DF):
 
 if __name__ == '__main__':
     # If run directly from python, leave the user in a shell to explore results.
+    setup()
     result = test_on_hpv()
 
     # Leave in ipython
