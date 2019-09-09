@@ -3,5 +3,5 @@ from . import Class1NeuralNetwork
 
 def module_cleanup():
     import keras.backend as K
-    Class1NeuralNetwork.KERAS_MODELS_CACHE.clear()
+    Class1NeuralNetwork.clear_model_cache()
     K.clear_session()
