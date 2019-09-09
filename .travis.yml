@@ -45,4 +45,4 @@ script:
   - mhcflurry-downloads fetch data_curated models_class1 models_class1_pan allele_sequences
   - mhcflurry-downloads info  # just to test this command works
   #- travis_wait 30 nosetests --with-timer -sv
-  - for i in $(ls test/test_*.py) ; do echo "Invoking test: $i" ; nosetests -sv $i ; done
+  - bash -c 'for i in $(ls test/test_*.py) ; do echo "Invoking test: $i" ; nosetests -sv $i ; done'
