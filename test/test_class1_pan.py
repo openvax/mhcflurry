@@ -11,8 +11,9 @@ from mhcflurry import Class1AffinityPredictor,Class1NeuralNetwork
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
 
-from mhcflurry.testing_utils import cleanup
+from mhcflurry.testing_utils import cleanup, startup
 teardown = cleanup
+setup = startup
 
 
 HYPERPARAMETERS = {

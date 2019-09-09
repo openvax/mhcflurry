@@ -15,13 +15,14 @@ from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
-from mhcflurry.testing_utils import cleanup
+from mhcflurry.testing_utils import cleanup, startup
 
 PREDICTORS = None
 
 
 def setup():
     global PREDICTORS
+    startup()
     PREDICTORS = {
         'allele-specific': Class1AffinityPredictor.load(
             get_path("models_class1", "models")),
@@ -38,7 +39,7 @@ def teardown():
 
 def test_correlation(
         alleles=None,
-        num_peptides_per_length=500,
+        num_peptides_per_length=100,
         lengths=[8, 9, 10],
         debug=False):
     peptides = []

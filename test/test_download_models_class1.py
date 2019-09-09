@@ -5,14 +5,14 @@ from numpy.testing import assert_equal
 
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 
-from mhcflurry.testing_utils import cleanup
-
+from mhcflurry.testing_utils import cleanup, startup
 
 DOWNLOADED_PREDICTOR = None
 
 
 def setup():
     global DOWNLOADED_PREDICTOR
+    startup()
     DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
 
 

@@ -5,8 +5,7 @@ from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
-from mhcflurry.testing_utils import cleanup
-
+from mhcflurry.testing_utils import cleanup, startup
 logging.getLogger('tensorflow').disabled = True
 
 PAN_ALLELE_PREDICTOR = None
@@ -14,6 +13,7 @@ PAN_ALLELE_PREDICTOR = None
 
 def setup():
     global PAN_ALLELE_PREDICTOR
+    startup()
     PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
         get_path("models_class1_pan", "models.with_mass_spec"),
         max_models=4,

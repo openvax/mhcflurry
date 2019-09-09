@@ -6,8 +6,9 @@ from numpy.testing import assert_equal
 
 from mhcflurry import predict_command
 
-from mhcflurry.testing_utils import cleanup
+from mhcflurry.testing_utils import cleanup, startup
 teardown = cleanup
+setup = startup
 
 TEST_CSV = '''
 Allele,Peptide,Experiment

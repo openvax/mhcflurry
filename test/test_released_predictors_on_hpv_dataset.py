@@ -13,8 +13,7 @@ from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 
-from mhcflurry.testing_utils import cleanup
-
+from mhcflurry.testing_utils import cleanup, startup
 
 def data_path(name):
     '''
@@ -30,6 +29,7 @@ PREDICTORS = None
 
 def setup():
     global PREDICTORS
+    startup()
     PREDICTORS = {
         'allele-specific': Class1AffinityPredictor.load(
             get_path("models_class1", "models")),

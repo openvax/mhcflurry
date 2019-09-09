@@ -18,45 +18,40 @@ from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
-from mhcflurry.testing_utils import cleanup
-
-ALLELE_SPECIFIC_PREDICTOR = Class1AffinityPredictor.load(
-    get_path("models_class1", "models"))
-
-PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
-    get_path("models_class1_pan", "models.with_mass_spec"))
+from mhcflurry.testing_utils import cleanup, startup
 
 
-PREDICTORS = None
+ALLELE_SPECIFIC_PREDICTOR = None
+PAN_ALLELE_PREDICTOR = None
 
 
 def setup():
-    global PREDICTORS
-    PREDICTORS = {
-        'allele-specific': Class1AffinityPredictor.load(
-            get_path("models_class1", "models")),
-        'pan-allele': Class1AffinityPredictor.load(
-            get_path("models_class1_pan", "models.with_mass_spec"))
-    }
+    global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR
+    startup()
+    ALLELE_SPECIFIC_PREDICTOR = Class1AffinityPredictor.load(
+        get_path("models_class1", "models"))
+
+    PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.with_mass_spec"))
 
 
 def teardown():
-    global PREDICTORS
-    PREDICTORS = None
+    global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR
+    ALLELE_SPECIFIC_PREDICTOR = None
+    PAN_ALLELE_PREDICTOR = None
     cleanup()
 
 
 DEFAULT_NUM_PREDICTIONS = 10000
 
 
-def test_speed_allele_specific(
-        profile=False,
-        predictor=ALLELE_SPECIFIC_PREDICTOR,
-        num=DEFAULT_NUM_PREDICTIONS):
-
+def test_speed_allele_specific(profile=False, num=DEFAULT_NUM_PREDICTIONS):
+    global ALLELE_SPECIFIC_PREDICTOR
     starts = collections.OrderedDict()
     timings = collections.OrderedDict()
     profilers = collections.OrderedDict()
+
+    predictor = ALLELE_SPECIFIC_PREDICTOR
 
     def start(name):
         starts[name] = time.time()
@@ -101,14 +96,13 @@ def test_speed_allele_specific(
         (key, pstats.Stats(value)) for (key, value) in profilers.items())
 
 
-def test_speed_pan_allele(
-        profile=False,
-        predictor=PAN_ALLELE_PREDICTOR,
-        num=DEFAULT_NUM_PREDICTIONS):
-
+def test_speed_pan_allele(profile=False, num=DEFAULT_NUM_PREDICTIONS):
+    global PAN_ALLELE_PREDICTOR
     starts = collections.OrderedDict()
     timings = collections.OrderedDict()
     profilers = collections.OrderedDict()
+
+    predictor = PAN_ALLELE_PREDICTOR
 
     def start(name):
         starts[name] = time.time()

@@ -12,8 +12,9 @@ logging.getLogger('tensorflow').disabled = True
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import random_peptides
 
-from mhcflurry.testing_utils import cleanup
+from mhcflurry.testing_utils import cleanup, startup
 teardown = cleanup
+setup = startup
 
 
 def test_multi_output():
