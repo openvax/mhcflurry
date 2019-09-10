@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.select_allele_specific_models_command &mdash; MHCflurry 1.2.0 documentation</title>
+  <title>mhcflurry.select_allele_specific_models_command &mdash; MHCflurry 1.3.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.2.0 documentation" href="../../index.html"/>
+    <link rel="top" title="MHCflurry 1.3.0 documentation" href="../../index.html"/>
         <link rel="up" title="Module code" href="../index.html"/> 
 
   
@@ -63,7 +63,7 @@
             
             
               <div class="version">
-                1.2.0
+                1.3.0
               </div>
             
           
@@ -91,8 +91,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../models.html">Details on the released predictor</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
 </ul>
@@ -173,7 +171,8 @@
 
 <span class="kn">import</span> <span class="nn">numpy</span>
 <span class="kn">import</span> <span class="nn">pandas</span>
-<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="k">import</span> <span class="n">kendalltau</span><span class="p">,</span> <span class="n">percentileofscore</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="k">import</span> <span class="n">kendalltau</span><span class="p">,</span> <span class="n">percentileofscore</span><span class="p">,</span> <span class="n">pearsonr</span>
+<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="k">import</span> <span class="n">roc_auc_score</span>
 
 <span class="kn">from</span> <span class="nn">mhcnames</span> <span class="k">import</span> <span class="n">normalize_allele_name</span>
 <span class="kn">import</span> <span class="nn">tqdm</span>  <span class="c1"># progress bar</span>
@@ -182,7 +181,7 @@
 <span class="kn">from</span> <span class="nn">.class1_affinity_predictor</span> <span class="k">import</span> <span class="n">Class1AffinityPredictor</span>
 <span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span>
 <span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">configure_logging</span><span class="p">,</span> <span class="n">random_peptides</span>
-<span class="kn">from</span> <span class="nn">.parallelism</span> <span class="k">import</span> <span class="n">worker_pool_with_gpu_assignments_from_args</span><span class="p">,</span> <span class="n">add_worker_pool_args</span>
+<span class="kn">from</span> <span class="nn">.local_parallelism</span> <span class="k">import</span> <span class="n">worker_pool_with_gpu_assignments_from_args</span><span class="p">,</span> <span class="n">add_local_parallelism_args</span>
 <span class="kn">from</span> <span class="nn">.regression_target</span> <span class="k">import</span> <span class="n">from_ic50</span>
 
 
@@ -257,6 +256,14 @@
     <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Max number of models to select per allele when using combined selector&quot;</span><span class="p">)</span>
 <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--combined-min-contribution-percent&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;X&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Use only model selectors that can contribute at least X </span><span class="si">%%</span><span class="s2"> to the &quot;</span>
+    <span class="s2">&quot;total score. Default: </span><span class="si">%(default)s</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
     <span class="s2">&quot;--mass-spec-min-measurements&quot;</span><span class="p">,</span>
     <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
     <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
@@ -328,7 +335,7 @@
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Keras verbosity. Default: </span><span class="si">%(default)s</span><span class="s2">&quot;</span><span class="p">,</span>
     <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
-<span class="n">add_worker_pool_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+<span class="n">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="run"><a class="viewcode-back" href="../../api.html#mhcflurry.select_allele_specific_models_command.run">[docs]</a><span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
@@ -357,7 +364,7 @@
         <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Loaded data: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
 
-        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">ix</span><span class="p">[</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
             <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span> <span class="o">&gt;=</span> <span class="mi">8</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="mi">15</span><span class="p">)</span>
         <span class="p">]</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Subselected to 8-15mers: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
@@ -402,7 +409,9 @@
     <span class="n">selectors</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">selector_to_model_selection_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
 
-    <span class="k">def</span> <span class="nf">make_selector</span><span class="p">(</span><span class="n">scoring</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">make_selector</span><span class="p">(</span>
+            <span class="n">scoring</span><span class="p">,</span>
+            <span class="n">combined_min_contribution_percent</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">combined_min_contribution_percent</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">scoring</span> <span class="ow">in</span> <span class="n">selectors</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">(</span>
                 <span class="n">selectors</span><span class="p">[</span><span class="n">scoring</span><span class="p">],</span> <span class="n">selector_to_model_selection_kwargs</span><span class="p">[</span><span class="n">scoring</span><span class="p">])</span>
@@ -418,7 +427,9 @@
                 <span class="n">component_selectors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                     <span class="n">make_selector</span><span class="p">(</span>
                         <span class="n">component_selector</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
-            <span class="n">selector</span> <span class="o">=</span> <span class="n">CombinedModelSelector</span><span class="p">(</span><span class="n">component_selectors</span><span class="p">)</span>
+            <span class="n">selector</span> <span class="o">=</span> <span class="n">CombinedModelSelector</span><span class="p">(</span>
+                <span class="n">component_selectors</span><span class="p">,</span>
+                <span class="n">min_contribution_percent</span><span class="o">=</span><span class="n">combined_min_contribution_percent</span><span class="p">)</span>
         <span class="k">elif</span> <span class="n">scoring</span> <span class="o">==</span> <span class="s2">&quot;mse&quot;</span><span class="p">:</span>
             <span class="n">model_selection_kwargs</span> <span class="o">=</span> <span class="p">{</span>
                 <span class="s1">&#39;min_models&#39;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">mse_min_models</span><span class="p">,</span>
@@ -461,7 +472,10 @@
 
     <span class="n">unselected_accuracy_scorer</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">unselected_accuracy_scorer</span><span class="p">:</span>
-        <span class="n">unselected_accuracy_scorer</span> <span class="o">=</span> <span class="n">make_selector</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">unselected_accuracy_scorer</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># Force running all selectors by setting combined_min_contribution_percent=0.</span>
+        <span class="n">unselected_accuracy_scorer</span> <span class="o">=</span> <span class="n">make_selector</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">unselected_accuracy_scorer</span><span class="p">,</span>
+            <span class="n">combined_min_contribution_percent</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Using unselected accuracy scorer: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">unselected_accuracy_scorer</span><span class="p">)</span>
     <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;unselected_accuracy_scorer&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">unselected_accuracy_scorer</span>
 
@@ -587,10 +601,13 @@
         <span class="n">unselected_score_function</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">unselected_accuracy_scorer</span><span class="o">.</span><span class="n">score_function</span><span class="p">(</span><span class="n">allele</span><span class="p">))</span>
 
-        <span class="n">unselected_score</span> <span class="o">=</span> <span class="n">unselected_score_function</span><span class="p">(</span><span class="n">predictor</span><span class="p">)</span>
+        <span class="n">additional_metadata</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">unselected_score</span> <span class="o">=</span> <span class="n">unselected_score_function</span><span class="p">(</span>
+            <span class="n">predictor</span><span class="p">,</span> <span class="n">additional_metadata_out</span><span class="o">=</span><span class="n">additional_metadata</span><span class="p">)</span>
         <span class="n">scrambled_predictor</span> <span class="o">=</span> <span class="n">ScrambledPredictor</span><span class="p">(</span><span class="n">predictor</span><span class="p">)</span>
         <span class="n">scrambled_scores</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
-            <span class="n">unselected_score_function</span><span class="p">(</span><span class="n">scrambled_predictor</span><span class="p">)</span>
+            <span class="n">unselected_score_function</span><span class="p">(</span>
+                <span class="n">scrambled_predictor</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">unselected_accuracy_scorer_samples</span><span class="p">)</span>
         <span class="p">])</span>
         <span class="n">unselected_score_scrambled_mean</span> <span class="o">=</span> <span class="n">scrambled_scores</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
@@ -600,7 +617,12 @@
             <span class="s2">&quot;Unselected score and percentile&quot;</span><span class="p">,</span>
             <span class="n">allele</span><span class="p">,</span>
             <span class="n">unselected_score</span><span class="p">,</span>
-            <span class="n">unselected_score_percentile</span><span class="p">)</span>
+            <span class="n">unselected_score_percentile</span><span class="p">,</span>
+            <span class="n">additional_metadata</span><span class="p">)</span>
+        <span class="n">result_dict</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="nb">dict</span><span class="p">((</span><span class="s2">&quot;unselected_</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                 <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                 <span class="ow">in</span> <span class="n">additional_metadata</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span>
 
     <span class="n">selected</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">threshold</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">unselected_accuracy_percentile_threshold</span>
@@ -646,11 +668,12 @@
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Model selector that computes a weighted average over other model selectors.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_selectors</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_selectors</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">min_contribution_percent</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">weights</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">model_selectors</span><span class="p">),))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">model_selectors</span> <span class="o">=</span> <span class="n">model_selectors</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">selector_to_weight</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_selectors</span><span class="p">,</span> <span class="n">weights</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_contribution_percent</span> <span class="o">=</span> <span class="n">min_contribution_percent</span>
 
 <div class="viewcode-block" id="CombinedModelSelector.usable_for_allele"><a class="viewcode-back" href="../../api.html#mhcflurry.select_allele_specific_models_command.CombinedModelSelector.usable_for_allele">[docs]</a>    <span class="k">def</span> <span class="nf">usable_for_allele</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">any</span><span class="p">(</span>
@@ -675,7 +698,9 @@
         <span class="n">selectors_to_use</span> <span class="o">=</span> <span class="p">[</span>
             <span class="n">selector</span>
             <span class="k">for</span> <span class="n">selector</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_selectors</span>
-            <span class="k">if</span> <span class="n">selector_to_max_weighted_score</span><span class="p">[</span><span class="n">selector</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">max_total_score</span> <span class="o">/</span> <span class="mf">100.</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">selector_to_max_weighted_score</span><span class="p">[</span><span class="n">selector</span><span class="p">]</span> <span class="o">&gt;</span>
+                <span class="n">max_total_score</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_contribution_percent</span> <span class="o">/</span> <span class="mf">100.0</span><span class="p">)</span>
         <span class="p">]</span>
 
         <span class="n">summary</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
@@ -694,11 +719,17 @@
                 <span class="k">for</span> <span class="n">selector</span> <span class="ow">in</span> <span class="n">selectors_to_use</span>
             <span class="p">]</span>
 
-            <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">):</span>
+            <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">additional_metadata_out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
                 <span class="n">scores</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
-                    <span class="n">score_function</span><span class="p">(</span><span class="n">predictor</span><span class="p">)</span> <span class="o">*</span> <span class="n">weight</span>
+                    <span class="n">score_function</span><span class="p">(</span>
+                        <span class="n">predictor</span><span class="p">,</span>
+                        <span class="n">additional_metadata_out</span><span class="o">=</span><span class="n">additional_metadata_out</span><span class="p">)</span> <span class="o">*</span> <span class="n">weight</span>
                     <span class="k">for</span> <span class="p">(</span><span class="n">score_function</span><span class="p">,</span> <span class="n">weight</span><span class="p">)</span> <span class="ow">in</span> <span class="n">score_functions_and_weights</span>
                 <span class="p">])</span>
+                <span class="k">if</span> <span class="n">additional_metadata_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">&quot;combined_score_terms&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+                        <span class="nb">list</span><span class="p">(</span><span class="n">scores</span><span class="p">))</span>
+
                 <span class="k">return</span> <span class="n">scores</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">ScoreFunction</span><span class="p">(</span><span class="n">score</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="n">summary</span><span class="p">)</span></div></div>
 
@@ -739,14 +770,15 @@
             <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
             <span class="n">peptides</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">peptides</span><span class="p">)</span>
 
-        <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">additional_metadata_out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
             <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
                 <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
                 <span class="n">peptides</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">peptides</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="p">(</span>
-                <span class="n">kendalltau</span><span class="p">(</span><span class="n">predictions</span><span class="p">,</span> <span class="n">full_ensemble_predictions</span><span class="p">)</span><span class="o">.</span><span class="n">correlation</span> <span class="o">*</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_value</span><span class="p">)</span>
+            <span class="n">tau</span> <span class="o">=</span> <span class="n">kendalltau</span><span class="p">(</span><span class="n">predictions</span><span class="p">,</span> <span class="n">full_ensemble_predictions</span><span class="p">)</span><span class="o">.</span><span class="n">correlation</span>
+            <span class="k">if</span> <span class="n">additional_metadata_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">&quot;score_consensus_tau&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">tau</span>
+            <span class="k">return</span> <span class="n">tau</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_value</span>
 
         <span class="k">return</span> <span class="n">ScoreFunction</span><span class="p">(</span>
             <span class="n">score</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">plan_summary</span><span class="p">(</span><span class="n">allele</span><span class="p">))</span></div></div>
@@ -782,10 +814,10 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_function</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span><span class="o">.</span><span class="n">summary</span></div>
 
 <div class="viewcode-block" id="MSEModelSelector.score_function"><a class="viewcode-back" href="../../api.html#mhcflurry.select_allele_specific_models_command.MSEModelSelector.score_function">[docs]</a>    <span class="k">def</span> <span class="nf">score_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
-        <span class="n">sub_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="n">allele</span><span class="p">]</span>
+        <span class="n">sub_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="n">allele</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">sub_df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
 
-        <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">additional_metadata_out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
             <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
                 <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
                 <span class="n">peptides</span><span class="o">=</span><span class="n">peptides</span><span class="p">,</span>
@@ -803,7 +835,30 @@
                     <span class="p">((</span><span class="n">sub_df</span><span class="o">.</span><span class="n">measurement_inequality</span> <span class="o">==</span> <span class="s2">&quot;&gt;&quot;</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">deviations</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">))</span>
                     <span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
 
-            <span class="k">return</span>  <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="n">deviations</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span> <span class="o">*</span> <span class="p">(</span>
+            <span class="n">score_mse</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="n">deviations</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+            <span class="k">if</span> <span class="n">additional_metadata_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">&quot;score_MSE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">score_mse</span>
+
+                <span class="c1"># We additionally include other scores on (=) measurements as</span>
+                <span class="c1"># a convenience</span>
+                <span class="n">eq_df</span> <span class="o">=</span> <span class="n">sub_df</span>
+                <span class="k">if</span> <span class="s1">&#39;measurement_inequality&#39;</span> <span class="ow">in</span> <span class="n">sub_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                    <span class="n">eq_df</span> <span class="o">=</span> <span class="n">sub_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                        <span class="n">sub_df</span><span class="o">.</span><span class="n">measurement_inequality</span> <span class="o">==</span> <span class="s2">&quot;=&quot;</span>
+                        <span class="p">]</span>
+                <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">&quot;score_pearsonr&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">pearsonr</span><span class="p">(</span>
+                        <span class="n">numpy</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">eq_df</span><span class="o">.</span><span class="n">measurement_value</span><span class="o">.</span><span class="n">values</span><span class="p">),</span>
+                        <span class="n">numpy</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">predictions</span><span class="p">[</span><span class="n">eq_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">]))[</span><span class="mi">0</span><span class="p">])</span>
+
+                <span class="k">for</span> <span class="n">threshold</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">500</span><span class="p">,</span> <span class="mi">5000</span><span class="p">,</span> <span class="mi">15000</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">eq_df</span><span class="o">.</span><span class="n">measurement_value</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">&quot;score_AUC@</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">threshold</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                            <span class="n">roc_auc_score</span><span class="p">(</span>
+                                <span class="p">(</span><span class="n">eq_df</span><span class="o">.</span><span class="n">measurement_value</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+                                <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">predictions</span><span class="p">[</span><span class="n">eq_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">]))</span>
+
+            <span class="k">return</span> <span class="n">score_mse</span> <span class="o">*</span> <span class="p">(</span>
                 <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_data_size</span> <span class="k">else</span> <span class="mi">1</span><span class="p">)</span>
 
         <span class="n">summary</span> <span class="o">=</span> <span class="s2">&quot;mse (</span><span class="si">%d</span><span class="s2"> points)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">))</span>
@@ -877,12 +932,19 @@
         <span class="n">total_hits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
         <span class="n">total_decoys</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
         <span class="n">multiplier</span> <span class="o">=</span> <span class="n">total_hits</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_data_size</span> <span class="k">else</span> <span class="mi">1</span>
-        <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">additional_metadata_out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
             <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
                 <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
                 <span class="n">peptides</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">peptides</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ppv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">],</span> <span class="n">predictions</span><span class="p">)</span> <span class="o">*</span> <span class="n">multiplier</span>
+            <span class="n">ppv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ppv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">],</span> <span class="n">predictions</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">additional_metadata_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">&quot;score_mass_spec_PPV&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ppv</span>
+
+                <span class="c1"># We additionally compute AUC score.</span>
+                <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">&quot;score_mass_spec_AUC&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">roc_auc_score</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">predictions</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ppv</span> <span class="o">*</span> <span class="n">multiplier</span>
 
         <span class="n">summary</span> <span class="o">=</span> <span class="s2">&quot;mass-spec (</span><span class="si">%d</span><span class="s2"> hits / </span><span class="si">%d</span><span class="s2"> decoys)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">total_hits</span><span class="p">,</span> <span class="n">total_decoys</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">ScoreFunction</span><span class="p">(</span><span class="n">score</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="n">summary</span><span class="p">)</span></div></div>
@@ -904,8 +966,8 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Feb 26, 2018.
+        &copy; Copyright 2019, Timothy O&#39;Donnell.
+      Last updated on Sep 10, 2019.
 
     </p>
   </div>
@@ -927,7 +989,7 @@
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../../',
-            VERSION:'1.2.0',
+            VERSION:'1.3.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

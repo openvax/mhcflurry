@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.downloads &mdash; MHCflurry 1.2.0 documentation</title>
+  <title>mhcflurry.downloads &mdash; MHCflurry 1.3.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.2.0 documentation" href="../../index.html"/>
+    <link rel="top" title="MHCflurry 1.3.0 documentation" href="../../index.html"/>
         <link rel="up" title="Module code" href="../index.html"/> 
 
   
@@ -63,7 +63,7 @@
             
             
               <div class="version">
-                1.2.0
+                1.3.0
               </div>
             
           
@@ -91,8 +91,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../models.html">Details on the released predictor</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
 </ul>
@@ -170,9 +168,9 @@
 <span class="p">)</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">yaml</span>
-<span class="kn">from</span> <span class="nn">os.path</span> <span class="k">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">exists</span><span class="p">,</span> <span class="n">relpath</span>
-<span class="kn">from</span> <span class="nn">pipes</span> <span class="k">import</span> <span class="n">quote</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="k">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">exists</span>
 <span class="kn">from</span> <span class="nn">os</span> <span class="k">import</span> <span class="n">environ</span>
+<span class="kn">from</span> <span class="nn">pipes</span> <span class="k">import</span> <span class="n">quote</span>
 <span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">OrderedDict</span>
 <span class="kn">from</span> <span class="nn">appdirs</span> <span class="k">import</span> <span class="n">user_data_dir</span>
 <span class="kn">from</span> <span class="nn">pkg_resources</span> <span class="k">import</span> <span class="n">resource_string</span>
@@ -211,7 +209,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">global</span> <span class="n">_METADATA</span>
     <span class="k">if</span> <span class="n">_METADATA</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">_METADATA</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">resource_string</span><span class="p">(</span><span class="vm">__name__</span><span class="p">,</span> <span class="s2">&quot;downloads.yml&quot;</span><span class="p">))</span>
+        <span class="n">_METADATA</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">resource_string</span><span class="p">(</span><span class="vm">__name__</span><span class="p">,</span> <span class="s2">&quot;downloads.yml&quot;</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">_METADATA</span></div>
 
 
@@ -242,8 +240,7 @@
         <span class="k">if</span> <span class="n">test_exists</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="s2">&quot;No such directory: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">result</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">result</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">get_path</span><span class="p">(</span><span class="s2">&quot;models_class1&quot;</span><span class="p">,</span> <span class="s2">&quot;models&quot;</span><span class="p">,</span> <span class="n">test_exists</span><span class="o">=</span><span class="n">test_exists</span><span class="p">)</span></div>
+    <span class="k">return</span> <span class="n">get_path</span><span class="p">(</span><span class="s2">&quot;models_class1&quot;</span><span class="p">,</span> <span class="s2">&quot;models&quot;</span><span class="p">,</span> <span class="n">test_exists</span><span class="o">=</span><span class="n">test_exists</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="get_current_release_downloads"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads.get_current_release_downloads">[docs]</a><span class="k">def</span> <span class="nf">get_current_release_downloads</span><span class="p">():</span>
@@ -321,13 +318,13 @@
             <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;releases&quot;</span><span class="p">][</span><span class="n">_CURRENT_RELEASE</span><span class="p">][</span><span class="s2">&quot;compatibility-version&quot;</span><span class="p">])</span>
         <span class="n">current_compatability</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;current-compatibility-version&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">current_release_compatability</span> <span class="o">!=</span> <span class="n">current_compatability</span><span class="p">:</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                 <span class="s2">&quot;The specified downloads are not compatible with this version &quot;</span>
                 <span class="s2">&quot;of the MHCflurry codebase. Downloads: release </span><span class="si">%s</span><span class="s2">, &quot;</span>
-                <span class="s2">&quot;compatability version: </span><span class="si">%d</span><span class="s2">. Code compatability version: </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                    <span class="n">_CURRENT_RELEASE</span><span class="p">,</span>
-                    <span class="n">current_release_compatability</span><span class="p">,</span>
-                    <span class="n">current_compatability</span><span class="p">))</span>
+                <span class="s2">&quot;compatability version: </span><span class="si">%d</span><span class="s2">. Code compatability version: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">_CURRENT_RELEASE</span><span class="p">,</span>
+                <span class="n">current_release_compatability</span><span class="p">,</span>
+                <span class="n">current_compatability</span><span class="p">)</span>
 
         <span class="n">data_dir</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;MHCFLURRY_DATA_DIR&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">data_dir</span><span class="p">:</span>
@@ -337,7 +334,8 @@
             <span class="n">data_dir</span> <span class="o">=</span> <span class="n">user_data_dir</span><span class="p">(</span><span class="s2">&quot;mhcflurry&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;4&quot;</span><span class="p">)</span>
         <span class="n">_DOWNLOADS_DIR</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">_CURRENT_RELEASE</span><span class="p">)</span>
 
-    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Configured MHCFLURRY_DOWNLOADS_DIR: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">_DOWNLOADS_DIR</span><span class="p">)</span></div>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Configured MHCFLURRY_DOWNLOADS_DIR: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">_DOWNLOADS_DIR</span><span class="p">)</span></div>
+
 
 <span class="n">configure</span><span class="p">()</span>
 </pre></div>
@@ -354,8 +352,8 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Feb 26, 2018.
+        &copy; Copyright 2019, Timothy O&#39;Donnell.
+      Last updated on Sep 10, 2019.
 
     </p>
   </div>
@@ -377,7 +375,7 @@
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../../',
-            VERSION:'1.2.0',
+            VERSION:'1.3.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

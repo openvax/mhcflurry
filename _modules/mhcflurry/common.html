@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.common &mdash; MHCflurry 1.2.0 documentation</title>
+  <title>mhcflurry.common &mdash; MHCflurry 1.3.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.2.0 documentation" href="../../index.html"/>
+    <link rel="top" title="MHCflurry 1.3.0 documentation" href="../../index.html"/>
         <link rel="up" title="Module code" href="../index.html"/> 
 
   
@@ -63,7 +63,7 @@
             
             
               <div class="version">
-                1.2.0
+                1.3.0
               </div>
             
           
@@ -91,8 +91,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../models.html">Details on the released predictor</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
 </ul>
@@ -164,8 +162,7 @@
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">sys</span>
 <span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">from</span> <span class="nn">struct</span> <span class="k">import</span> <span class="n">unpack</span>
-<span class="kn">from</span> <span class="nn">hashlib</span> <span class="k">import</span> <span class="n">sha256</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span>
 <span class="kn">import</span> <span class="nn">pandas</span>
@@ -173,7 +170,7 @@
 <span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">amino_acid</span>
 
 
-<div class="viewcode-block" id="set_keras_backend"><a class="viewcode-back" href="../../api.html#mhcflurry.common.set_keras_backend">[docs]</a><span class="k">def</span> <span class="nf">set_keras_backend</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">gpu_device_nums</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="set_keras_backend"><a class="viewcode-back" href="../../api.html#mhcflurry.common.set_keras_backend">[docs]</a><span class="k">def</span> <span class="nf">set_keras_backend</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">gpu_device_nums</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Configure Keras backend to use GPU or CPU. Only tensorflow is supported.</span>
 
@@ -185,8 +182,13 @@
 <span class="sd">    gpu_device_nums : list of int, optional</span>
 <span class="sd">        GPU devices to potentially use</span>
 
+<span class="sd">    num_threads : int, optional</span>
+<span class="sd">        Tensorflow threads to use</span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;KERAS_BACKEND&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;tensorflow&quot;</span>
+
+    <span class="n">original_backend</span> <span class="o">=</span> <span class="n">backend</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">backend</span><span class="p">:</span>
         <span class="n">backend</span> <span class="o">=</span> <span class="s2">&quot;tensorflow-default&quot;</span>
@@ -195,7 +197,7 @@
         <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;CUDA_VISIBLE_DEVICES&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
             <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">gpu_device_nums</span><span class="p">])</span>
 
-    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">&quot;tensorflow-cpu&quot;</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">gpu_device_nums</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">&quot;tensorflow-cpu&quot;</span> <span class="ow">or</span> <span class="n">gpu_device_nums</span> <span class="o">==</span> <span class="p">[]:</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Forcing tensorflow/CPU backend.&quot;</span><span class="p">)</span>
         <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;CUDA_VISIBLE_DEVICES&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
         <span class="n">device_count</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;CPU&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;GPU&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
@@ -210,11 +212,19 @@
 
     <span class="kn">import</span> <span class="nn">tensorflow</span>
     <span class="kn">from</span> <span class="nn">keras</span> <span class="k">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
-    <span class="n">config</span> <span class="o">=</span> <span class="n">tensorflow</span><span class="o">.</span><span class="n">ConfigProto</span><span class="p">(</span>
-        <span class="n">device_count</span><span class="o">=</span><span class="n">device_count</span><span class="p">)</span>
-    <span class="n">config</span><span class="o">.</span><span class="n">gpu_options</span><span class="o">.</span><span class="n">allow_growth</span><span class="o">=</span><span class="kc">True</span> 
-    <span class="n">session</span> <span class="o">=</span> <span class="n">tensorflow</span><span class="o">.</span><span class="n">Session</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
-    <span class="n">K</span><span class="o">.</span><span class="n">set_session</span><span class="p">(</span><span class="n">session</span><span class="p">)</span></div>
+    <span class="k">if</span> <span class="n">K</span><span class="o">.</span><span class="n">backend</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;tensorflow&#39;</span><span class="p">:</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">tensorflow</span><span class="o">.</span><span class="n">ConfigProto</span><span class="p">(</span><span class="n">device_count</span><span class="o">=</span><span class="n">device_count</span><span class="p">)</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">gpu_options</span><span class="o">.</span><span class="n">allow_growth</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="n">num_threads</span><span class="p">:</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">inter_op_parallelism_threads</span> <span class="o">=</span> <span class="n">num_threads</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">intra_op_parallelism_threads</span> <span class="o">=</span> <span class="n">num_threads</span>
+        <span class="n">session</span> <span class="o">=</span> <span class="n">tensorflow</span><span class="o">.</span><span class="n">Session</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
+        <span class="n">K</span><span class="o">.</span><span class="n">set_session</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">original_backend</span> <span class="ow">or</span> <span class="n">gpu_device_nums</span> <span class="ow">or</span> <span class="n">num_threads</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;Only tensorflow backend can be customized. Ignoring &quot;</span>
+                <span class="s2">&quot; customization. Backend: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">K</span><span class="o">.</span><span class="n">backend</span><span class="p">())</span></div>
 
 
 <div class="viewcode-block" id="configure_logging"><a class="viewcode-back" href="../../api.html#mhcflurry.common.configure_logging">[docs]</a><span class="k">def</span> <span class="nf">configure_logging</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
@@ -296,6 +306,33 @@
             <span class="n">p</span><span class="o">=</span><span class="n">distribution</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
             <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">)))</span>
     <span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="positional_frequency_matrix"><a class="viewcode-back" href="../../api.html#mhcflurry.common.positional_frequency_matrix">[docs]</a><span class="k">def</span> <span class="nf">positional_frequency_matrix</span><span class="p">(</span><span class="n">peptides</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given a set of peptides, calculate a length x amino acids frequency matrix.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    peptides : list of string</span>
+<span class="sd">        All of same length</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pandas.DataFrame</span>
+<span class="sd">        Index is position, columns are amino acids</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">peptide</span><span class="p">)</span> <span class="o">==</span> <span class="n">length</span> <span class="k">for</span> <span class="n">peptide</span> <span class="ow">in</span> <span class="n">peptides</span><span class="p">)</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+        <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="n">a</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">BLOSUM62_MATRIX</span><span class="o">.</span><span class="n">index</span> <span class="k">if</span> <span class="n">a</span> <span class="o">!=</span> <span class="s1">&#39;X&#39;</span><span class="p">],</span>
+        <span class="n">columns</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">length</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">length</span><span class="p">):</span>
+        <span class="n">counts</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="n">p</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">peptides</span><span class="p">])</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">(</span><span class="n">counts</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">))</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;position&#39;</span>
+    <span class="k">return</span> <span class="n">result</span></div>
 </pre></div>
 
            </div>
@@ -310,8 +347,8 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Feb 26, 2018.
+        &copy; Copyright 2019, Timothy O&#39;Donnell.
+      Last updated on Sep 10, 2019.
 
     </p>
   </div>
@@ -333,7 +370,7 @@
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../../',
-            VERSION:'1.2.0',
+            VERSION:'1.3.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

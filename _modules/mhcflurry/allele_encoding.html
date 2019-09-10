@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.allele_encoding &mdash; MHCflurry 1.2.0 documentation</title>
+  <title>mhcflurry.allele_encoding &mdash; MHCflurry 1.3.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.2.0 documentation" href="../../index.html"/>
+    <link rel="top" title="MHCflurry 1.3.0 documentation" href="../../index.html"/>
         <link rel="up" title="Module code" href="../index.html"/> 
 
   
@@ -63,7 +63,7 @@
             
             
               <div class="version">
-                1.2.0
+                1.3.0
               </div>
             
           
@@ -91,8 +91,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../models.html">Details on the released predictor</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
 </ul>
@@ -159,76 +157,146 @@
            <div itemprop="articleBody">
             
   <h1>Source code for mhcflurry.allele_encoding</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">numpy</span>
-<span class="kn">import</span> <span class="nn">pandas</span>
+<span></span><span class="kn">import</span> <span class="nn">pandas</span>
 
-<span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span>
 <span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">amino_acid</span>
 
+
 <div class="viewcode-block" id="AlleleEncoding"><a class="viewcode-back" href="../../api.html#mhcflurry.allele_encoding.AlleleEncoding">[docs]</a><span class="k">class</span> <span class="nc">AlleleEncoding</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span>
-            <span class="n">alleles</span><span class="p">,</span>
-            <span class="n">allele_to_fixed_length_sequence</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">alleles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">allele_to_sequence</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">borrow_from</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        A place to cache encodings for a (potentially large) sequence of alleles.</span>
+<span class="sd">        A place to cache encodings for a sequence of alleles.</span>
+
+<span class="sd">        We frequently work with alleles by integer indices, for example as</span>
+<span class="sd">        inputs to neural networks. This class is used to map allele names to</span>
+<span class="sd">        integer indices in a consistent way by keeping track of the universe</span>
+<span class="sd">        of alleles under use, i.e. a distinction is made between the universe</span>
+<span class="sd">        of supported alleles (what&#39;s in `allele_to_sequence`) and the actual</span>
+<span class="sd">        set of alleles used (what&#39;s in `alleles`).</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        alleles : list of string</span>
 <span class="sd">            Allele names</span>
 
-<span class="sd">        allele_to_fixed_length_sequence : dict of str -&gt; str</span>
-<span class="sd">            Allele name to fixed lengths sequence (&quot;pseudosequence&quot;)</span>
+<span class="sd">        allele_to_sequence : dict of str -&gt; str</span>
+<span class="sd">            Allele name to amino acid sequence</span>
+
+<span class="sd">        borrow_from : AlleleEncoding, optional</span>
+<span class="sd">            If specified, do not specify allele_to_sequence. The sequences from</span>
+<span class="sd">            the provided instance are used. This guarantees that the mappings</span>
+<span class="sd">            from allele to index and from allele to sequence are the same</span>
+<span class="sd">            between the instances.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
-        <span class="n">alleles</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">alleles</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">alleles</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">alleles</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">borrow_from</span> <span class="o">=</span> <span class="n">borrow_from</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_sequence</span> <span class="o">=</span> <span class="n">allele_to_sequence</span>
 
-        <span class="n">all_alleles</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">alleles</span><span class="o">.</span><span class="n">unique</span><span class="p">()))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">borrow_from</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">allele_to_sequence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="n">all_alleles</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">sorted</span><span class="p">(</span><span class="n">allele_to_sequence</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_index</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">allele</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">all_alleles</span><span class="p">))</span>
+            <span class="n">unpadded</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">allele_to_sequence</span><span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">all_alleles</span><span class="p">],</span>
+                <span class="n">index</span><span class="o">=</span><span class="n">all_alleles</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span> <span class="o">=</span> <span class="n">unpadded</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span>
+                <span class="n">unpadded</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="n">fillchar</span><span class="o">=</span><span class="s2">&quot;X&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">allele_to_sequence</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_index</span> <span class="o">=</span> <span class="n">borrow_from</span><span class="o">.</span><span class="n">allele_to_index</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span> <span class="o">=</span> <span class="n">borrow_from</span><span class="o">.</span><span class="n">sequences</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_sequence</span> <span class="o">=</span> <span class="n">borrow_from</span><span class="o">.</span><span class="n">allele_to_sequence</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_index</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
-            <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
-            <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">allele</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">all_alleles</span><span class="p">))</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">indices</span> <span class="o">=</span> <span class="n">alleles</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_index</span><span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span>
-            <span class="p">[</span><span class="n">allele_to_fixed_length_sequence</span><span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">all_alleles</span><span class="p">],</span>
-            <span class="n">index</span><span class="o">=</span><span class="n">all_alleles</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span>
+                <span class="n">allele</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_index</span> <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">),</span>\
+                <span class="s2">&quot;Missing alleles: &quot;</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span>
+                    <span class="n">a</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">alleles</span> <span class="k">if</span> <span class="n">a</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_index</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">indices</span> <span class="o">=</span> <span class="n">alleles</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">allele_to_index</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">alleles</span> <span class="o">=</span> <span class="n">alleles</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">indices</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">alleles</span> <span class="o">=</span> <span class="kc">None</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span> <span class="o">=</span> <span class="p">{}</span>
 
-<div class="viewcode-block" id="AlleleEncoding.fixed_length_vector_encoded_sequences"><a class="viewcode-back" href="../../api.html#mhcflurry.allele_encoding.AlleleEncoding.fixed_length_vector_encoded_sequences">[docs]</a>    <span class="k">def</span> <span class="nf">fixed_length_vector_encoded_sequences</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vector_encoding_name</span><span class="p">):</span>
+<div class="viewcode-block" id="AlleleEncoding.compact"><a class="viewcode-back" href="../../api.html#mhcflurry.allele_encoding.AlleleEncoding.compact">[docs]</a>    <span class="k">def</span> <span class="nf">compact</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Encode alleles.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        vector_encoding_name : string</span>
-<span class="sd">            How to represent amino acids.</span>
-<span class="sd">            One of &quot;BLOSUM62&quot;, &quot;one-hot&quot;, etc. Full list of supported vector</span>
-<span class="sd">            encodings is given by available_vector_encodings() in amino_acid.</span>
+<span class="sd">        Return a new AlleleEncoding in which the universe of supported alleles</span>
+<span class="sd">        is only the alleles actually used.</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
-<span class="sd">        numpy.array with shape (num sequences, sequence length, m) where m is</span>
-<span class="sd">        vector_encoding_length(vector_encoding_name)</span>
+<span class="sd">        AlleleEncoding</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">AlleleEncoding</span><span class="p">(</span>
+            <span class="n">alleles</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">alleles</span><span class="p">,</span>
+            <span class="n">allele_to_sequence</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_sequence</span><span class="p">[</span><span class="n">allele</span><span class="p">])</span>
+                <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">alleles</span><span class="o">.</span><span class="n">unique</span><span class="p">()))</span></div>
+
+<div class="viewcode-block" id="AlleleEncoding.allele_representations"><a class="viewcode-back" href="../../api.html#mhcflurry.allele_encoding.AlleleEncoding.allele_representations">[docs]</a>    <span class="k">def</span> <span class="nf">allele_representations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoding_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Encode the universe of supported allele sequences to a matrix.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        encoding_name : string</span>
+<span class="sd">            How to represent amino acids. Valid names are &quot;BLOSUM62&quot; or</span>
+<span class="sd">            &quot;one-hot&quot;. See `amino_acid.ENCODING_DATA_FRAMES`.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array of shape</span>
+<span class="sd">            (num alleles in universe, sequence length, vector size)</span>
+<span class="sd">        where vector size is usually 21 (20 amino acids + X character)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">borrow_from</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">borrow_from</span><span class="o">.</span><span class="n">allele_representations</span><span class="p">(</span><span class="n">encoding_name</span><span class="p">)</span>
+
         <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="s2">&quot;fixed_length_vector_encoding&quot;</span><span class="p">,</span>
-            <span class="n">vector_encoding_name</span><span class="p">)</span>
+            <span class="s2">&quot;allele_representations&quot;</span><span class="p">,</span>
+            <span class="n">encoding_name</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">cache_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">:</span>
             <span class="n">index_encoded_matrix</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">index_encoding</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">fixed_length_sequences</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
                 <span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">)</span>
             <span class="n">vector_encoded</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">fixed_vectors_encoding</span><span class="p">(</span>
                 <span class="n">index_encoded_matrix</span><span class="p">,</span>
-                <span class="n">amino_acid</span><span class="o">.</span><span class="n">ENCODING_DATA_FRAMES</span><span class="p">[</span><span class="n">vector_encoding_name</span><span class="p">])</span>
+                <span class="n">amino_acid</span><span class="o">.</span><span class="n">ENCODING_DATA_FRAMES</span><span class="p">[</span><span class="n">encoding_name</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">vector_encoded</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="AlleleEncoding.fixed_length_vector_encoded_sequences"><a class="viewcode-back" href="../../api.html#mhcflurry.allele_encoding.AlleleEncoding.fixed_length_vector_encoded_sequences">[docs]</a>    <span class="k">def</span> <span class="nf">fixed_length_vector_encoded_sequences</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoding_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Encode allele sequences (not the universe of alleles) to a matrix.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        encoding_name : string</span>
+<span class="sd">            How to represent amino acids. Valid names are &quot;BLOSUM62&quot; or</span>
+<span class="sd">            &quot;one-hot&quot;. See `amino_acid.ENCODING_DATA_FRAMES`.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array with shape:</span>
+<span class="sd">            (num alleles, sequence length, vector size)</span>
+<span class="sd">        where vector size is usually 21 (20 amino acids + X character)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;fixed_length_vector_encoding&quot;</span><span class="p">,</span>
+            <span class="n">encoding_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cache_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">:</span>
+            <span class="n">vector_encoded</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_representations</span><span class="p">(</span><span class="n">encoding_name</span><span class="p">)</span>
             <span class="n">result</span> <span class="o">=</span> <span class="n">vector_encoded</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span></div></div>
-
-
 </pre></div>
 
            </div>
@@ -243,8 +311,8 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Feb 26, 2018.
+        &copy; Copyright 2019, Timothy O&#39;Donnell.
+      Last updated on Sep 10, 2019.
 
     </p>
   </div>
@@ -266,7 +334,7 @@
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../../',
-            VERSION:'1.2.0',
+            VERSION:'1.3.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,

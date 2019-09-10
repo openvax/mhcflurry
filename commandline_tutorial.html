@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Command-line tutorial &mdash; MHCflurry 1.2.0 documentation</title>
+  <title>Command-line tutorial &mdash; MHCflurry 1.3.0 documentation</title>
   
 
   
@@ -33,7 +33,7 @@
 
   
         <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="MHCflurry 1.2.0 documentation" href="index.html"/>
+    <link rel="top" title="MHCflurry 1.3.0 documentation" href="index.html"/>
         <link rel="next" title="Python library tutorial" href="python_tutorial.html"/>
         <link rel="prev" title="Introduction and setup" href="intro.html"/> 
 
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.2.0
+                1.3.0
               </div>
             
           
@@ -95,11 +95,10 @@
 <li class="toctree-l2"><a class="reference internal" href="#generating-predictions">Generating predictions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#fitting-your-own-models">Fitting your own models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#scanning-protein-sequences-for-predicted-epitopes">Scanning protein sequences for predicted epitopes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment variables</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
-<li class="toctree-l1"><a class="reference internal" href="models.html">Details on the released predictor</a></li>
 <li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
 </ul>
@@ -178,7 +177,7 @@ are distributed separately from the pip package and may be downloaded with the
 <p>Files downloaded with <a class="reference internal" href="commandline_tools.html#mhcflurry-downloads"><span class="std std-ref">mhcflurry-downloads</span></a> are stored in a platform-specific
 directory. To get the path to downloaded data, you can use:</p>
 <div class="highlight-text"><div class="highlight"><pre><span></span>$ mhcflurry-downloads path models_class1
-/Users/tim/Library/Application Support/mhcflurry/4/1.2.0/models_class1/
+/Users/tim/Library/Application Support/mhcflurry/4/1.3.0/models_class1/
 </pre></div>
 </div>
 <p>We also release a few other “downloads,” such as curated training data and some
@@ -191,18 +190,24 @@ Environment variables
   MHCFLURRY_DEFAULT_CLASS1_MODELS     [unset or empty]
 
 Configuration
-  current release                     = 1.2.0                
-  downloads dir                       = &#39;/Users/tim/Library/Application Support/mhcflurry/4/1.2.0&#39; [exists]
+  current release                     = 1.3.0                
+  downloads dir                       = &#39;/Users/tim/Library/Application Support/mhcflurry/4/1.3.0&#39; [exists]
 
 DOWNLOAD NAME                             DOWNLOADED?   URL                  
+models_class1_pan                         YES           https://github.com/openvax/mhcflurry/releases/download/pan-dev1/models_class1_pan.20190829.tar.bz2 
+models_class1_pan_unselected              NO            https://github.com/openvax/mhcflurry/releases/download/pan-dev1/models_class1_pan_unselected.20190826.tar.bz2.part.aa + 1 more parts 
+data_iedb                                 NO            https://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_iedb.20190610.tar.bz2 
+data_systemhcatlas                        NO            https://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_systemhcatlas.20190506.tar.bz2 
+allele_sequences                          YES           https://github.com/openvax/mhcflurry/releases/download/pan-dev1/allele_sequences.20190506.tar.bz2 
+random_peptide_predictions                NO            https://github.com/openvax/mhcflurry/releases/download/pan-dev1/random_peptide_predictions.20190506.tar.bz2 
+data_published                            NO            https://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_published.tar.bz2 
+data_curated                              YES           https://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_curated.20190516.tar.bz2 
 models_class1                             YES           https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1.20180225.tar.bz2 
-models_class1_selected_no_mass_spec       YES           https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_selected_no_mass_spec.20180225.tar.bz2 
+models_class1_selected_no_mass_spec       NO            https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_selected_no_mass_spec.20180225.tar.bz2 
 models_class1_unselected                  YES           https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_unselected.20180221.tar.bz2 
-models_class1_minimal                     YES           https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_minimal.20180226.tar.bz2 
-data_iedb                                 NO            https://github.com/openvax/mhcflurry/releases/download/pre-1.0/data_iedb.tar.bz2 
-data_published                            NO            http://github.com/openvax/mhcflurry/releases/download/pre-1.1/data_published.tar.bz2 
-data_systemhcatlas                        NO            http://github.com/openvax/mhcflurry/releases/download/pre-1.1/data_systemhcatlas.tar.bz2 
-data_curated                              YES           https://github.com/openvax/mhcflurry/releases/download/pre-1.2/data_curated.20180219.tar.bz2
+models_class1_trained_with_mass_spec      NO            https://github.com/openvax/mhcflurry/releases/download/pre-1.2.1/models_class1_trained_with_mass_spec.20180228.tar.bz2 
+models_class1_unselected_with_mass_spec   NO            https://github.com/openvax/mhcflurry/releases/download/pre-1.2.1/models_class1_unselected_with_mass_spec.20180227.tar.bz2 
+models_class1_minimal                     NO            https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_minimal.20180226.tar.bz2
 </pre></div>
 </div>
 <div class="admonition note">
@@ -221,25 +226,26 @@ models can be used by specifying the <code class="docutils literal"><span class=
     --alleles HLA-A0201 HLA-A0301
     --peptides SIINFEKL SIINFEKD SIINFEKQ
     --out /tmp/predictions.csv
+Forcing tensorflow backend.
 Wrote: /tmp/predictions.csv
 </pre></div>
 </div>
 <p>results in a file like this:</p>
 <div class="highlight-text"><div class="highlight"><pre><span></span>$ cat /tmp/predictions.csv
 allele,peptide,mhcflurry_prediction,mhcflurry_prediction_low,mhcflurry_prediction_high,mhcflurry_prediction_percentile
-HLA-A0201,SIINFEKL,4571.98373389,2093.54161999,11331.8276571,6.381625
-HLA-A0201,SIINFEKD,20649.7202275,14353.6110341,32423.3688234,55.223
-HLA-A0201,SIINFEKQ,18592.2279412,12515.6690892,29905.2586896,41.1675
-HLA-A0301,SIINFEKL,21589.9765427,17277.6791043,30373.8061378,41.669125
-HLA-A0301,SIINFEKD,23079.0795035,19624.4865948,32525.4297711,50.418875
-HLA-A0301,SIINFEKQ,18610.5233559,14780.1672773,27340.8378976,29.129875
+HLA-A0201,SIINFEKL,4571.9837338925745,2093.5416199928345,11331.82765707368,6.381625000000002
+HLA-A0201,SIINFEKD,20649.720227493523,14353.611034127305,32423.368823383964,55.223
+HLA-A0201,SIINFEKQ,18592.22794116855,12515.669089205081,29905.258689598362,41.16749999999999
+HLA-A0301,SIINFEKL,21589.976542675962,17277.679104286573,30373.806137826843,41.669124999999994
+HLA-A0301,SIINFEKD,23079.079503467212,19624.486594831662,32525.429771105642,50.41887499999998
+HLA-A0301,SIINFEKQ,18610.52335594213,14780.167277309405,27340.837897606812,29.12987499999999
 </pre></div>
 </div>
 <p>The predictions are given as affinities (KD) in nM in the <code class="docutils literal"><span class="pre">mhcflurry_prediction</span></code>
 column. The other fields give the 5-95 percentile predictions across
 the models in the ensemble and the quantile of the affinity prediction among
 a large number of random peptides tested on that allele.</p>
-<p>The predictions shown above were generated with MHCflurry 1.2.0. Different versions of
+<p>The predictions shown above were generated with MHCflurry 1.3.0. Different versions of
 MHCflurry can give considerably different results. Even
 on the same version, exact predictions may vary (up to about 1 nM) depending
 on the Keras backend and other details.</p>
@@ -319,20 +325,44 @@ sequences:</p>
     --mhc-peptide-lengths 8,9,10,11
     --extract-subsequences
     --output-csv /tmp/subsequence_predictions.csv
-2018-02-26 14:16:55,453 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles [&#39;HLA-A*02:01&#39;, &#39;HLA-A*03:01&#39;] and epitope lengths [8, 9, 10, 11]
-2018-02-26 14:17:00,837 - mhctools.cli.script - INFO - 
+2019-09-10 11:31:10,189 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles [&#39;HLA-A*02:01&#39;, &#39;HLA-A*03:01&#39;] and epitope lengths [8, 9, 10, 11]
+2019-09-10 11:31:16,268 - mhctools.mhcflurry - INFO - BindingPrediction(peptide=&#39;AARYSAFY&#39;, allele=&#39;HLA-A*03:01&#39;, affinity=3270.8757, percentile_rank=None, source_sequence_name=None, offset=0, prediction_method_name=&#39;mhcflurry&#39;)
 ...
+
 [1192 rows x 8 columns]
-Wrote: /tmp/subsequence_predictions.csv
 </pre></div>
 </div>
 <p>This will write a file giving predictions for all subsequences of the specified lengths:</p>
 <div class="highlight-text"><div class="highlight"><pre><span></span>$ head -n 3 /tmp/subsequence_predictions.csv
-source_sequence_name,offset,peptide,allele,affinity,percentile_rank,prediction_method_name,length
-protein2,42,AARYSAFY,HLA-A*03:01,3270.87565337,4.056625,mhcflurry,8
-protein2,42,AARYSAFYN,HLA-A*03:01,9140.1869546,10.101125,mhcflurry,9
+,source_sequence_name,offset,peptide,allele,affinity,percentile_rank,prediction_method_name,length
+0,protein2,42,AARYSAFY,HLA-A*03:01,3270.8756533692185,,mhcflurry,8
+1,protein2,42,AARYSAFYN,HLA-A*03:01,9140.186954603147,,mhcflurry,9
 </pre></div>
 </div>
+</div>
+<div class="section" id="environment-variables">
+<h2>Environment variables<a class="headerlink" href="#environment-variables" title="Permalink to this headline">¶</a></h2>
+<p>MHCflurry behavior can be modified using these environment variables:</p>
+<dl class="docutils">
+<dt><code class="docutils literal"><span class="pre">MHCFLURRY_DEFAULT_CLASS1_MODELS</span></code></dt>
+<dd>Path to models directory. If you call <code class="docutils literal"><span class="pre">Class1AffinityPredictor.load()</span></code>
+with no arguments, the models specified in this environment variable will be
+used. If this environment variable is undefined, the downloaded models for
+the current MHCflurry release are used.</dd>
+<dt><code class="docutils literal"><span class="pre">MHCFLURRY_OPTIMIZATION_LEVEL</span></code></dt>
+<dd>The pan-allele models can be somewhat slow. As an optimization, when this
+variable is greater than 0 (default is 1), we “stitch” the pan-allele models in
+the ensemble into one large tensorflow graph. In our experiments
+it gives about a 30% speed improvement. It has no effect on allele-specific
+models. Set this variable to 0 to disable this behavior. This may be helpful
+if you are running out of memory using the pan-allele models.</dd>
+<dt><code class="docutils literal"><span class="pre">MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE</span></code></dt>
+<dd>For large prediction tasks, it can be helpful to increase the prediction batch
+size, which is set by this environment variable (default is 4096). This
+affects both allele-specific and pan-allele predictors. It can have large
+effects on performance. Alternatively, if you are running out of memory,
+you can try decreasing the batch size.</dd>
+</dl>
 </div>
 </div>
 
@@ -358,8 +388,8 @@ protein2,42,AARYSAFYN,HLA-A*03:01,9140.1869546,10.101125,mhcflurry,9
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2017, Timothy O&#39;Donnell.
-      Last updated on Feb 26, 2018.
+        &copy; Copyright 2019, Timothy O&#39;Donnell.
+      Last updated on Sep 10, 2019.
 
     </p>
   </div>
@@ -381,7 +411,7 @@ protein2,42,AARYSAFYN,HLA-A*03:01,9140.1869546,10.101125,mhcflurry,9
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'./',
-            VERSION:'1.2.0',
+            VERSION:'1.3.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true,
