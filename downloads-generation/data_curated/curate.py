@@ -35,11 +35,6 @@ parser.add_argument(
     default=[],
     help="Path to systemhc-atlas-style mass-spec data")
 parser.add_argument(
-    "--data-abelin-mass-spec",
-    action="append",
-    default=[],
-    help="Path to Abelin Immunity 2017 mass-spec hits")
-parser.add_argument(
     "--include-iedb-mass-spec",
     action="store_true",
     default=False,
@@ -85,8 +80,8 @@ def load_data_kim2014(filename):
     df["peptide"] = df.sequence
     df["allele"] = df.mhc.map(normalize_allele_name)
     print("Dropping un-parseable alleles: %s" % ", ".join(
-        df.ix[df.allele == "UNKNOWN"]["mhc"].unique()))
-    df = df.ix[df.allele != "UNKNOWN"]
+        df.loc[df.allele == "UNKNOWN"]["mhc"].unique()))
+    df = df.loc[df.allele != "UNKNOWN"]
 
     print("Loaded kim2014 data: %s" % str(df.shape))
     return df
@@ -105,7 +100,7 @@ def load_data_systemhc_atlas(filename, min_probability=0.99):
     df["allele"] = df.top_allele.map(normalize_allele_name)
 
     print("Dropping un-parseable alleles: %s" % ", ".join(
-        str(x) for x in df.ix[df.allele == "UNKNOWN"]["top_allele"].unique()))
+        str(x) for x in df.loc[df.allele == "UNKNOWN"]["top_allele"].unique()))
     df = df.loc[df.allele != "UNKNOWN"]
     print("Systemhc atlas data now: %s" % str(df.shape))
 
@@ -120,65 +115,44 @@ def load_data_systemhc_atlas(filename, min_probability=0.99):
     return df
 
 
-def load_data_abelin_mass_spec(filename):
-    df = pandas.read_csv(filename)
-    print("Loaded Abelin mass-spec data: %s" % str(df.shape))
-
-    df["measurement_source"] = "abelin-mass-spec"
-    df["measurement_value"] = QUALITATIVE_TO_AFFINITY["Positive"]
-    df["measurement_inequality"] = "<"
-    df["measurement_type"] = "qualitative"
-    df["original_allele"] = df.allele
-    df["allele"] = df.original_allele.map(normalize_allele_name)
-
-    print("Dropping un-parseable alleles: %s" % ", ".join(
-        str(x) for x in df.ix[df.allele == "UNKNOWN"]["allele"].unique()))
-    df = df.loc[df.allele != "UNKNOWN"]
-    print("Abelin mass-spec data now: %s" % str(df.shape))
-
-    print("Removing duplicates")
-    df = df.drop_duplicates(["allele", "peptide"])
-    print("Abelin mass-spec data now: %s" % str(df.shape))
-
-    return df
-
-
 def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
     iedb_df = pandas.read_csv(iedb_csv, skiprows=1, low_memory=False)
     print("Loaded iedb data: %s" % str(iedb_df.shape))
 
     print("Selecting only class I")
-    iedb_df = iedb_df.ix[
+    iedb_df = iedb_df.loc[
         iedb_df["MHC allele class"].str.strip().str.upper() == "I"
     ]
     print("New shape: %s" % str(iedb_df.shape))
 
     print("Dropping known unusuable alleles")
-    iedb_df = iedb_df.ix[
+    iedb_df = iedb_df.loc[
         ~iedb_df["Allele Name"].isin(EXCLUDE_IEDB_ALLELES)
     ]
-    iedb_df = iedb_df.ix[
+    iedb_df = iedb_df.loc[
         (~iedb_df["Allele Name"].str.contains("mutant")) &
         (~iedb_df["Allele Name"].str.contains("CD1"))
     ]
 
     iedb_df["allele"] = iedb_df["Allele Name"].map(normalize_allele_name)
     print("Dropping un-parseable alleles: %s" % ", ".join(
-        iedb_df.ix[iedb_df.allele == "UNKNOWN"]["Allele Name"].unique()))
-    iedb_df = iedb_df.ix[iedb_df.allele != "UNKNOWN"]
+        iedb_df.loc[iedb_df.allele == "UNKNOWN"]["Allele Name"].unique()))
+    iedb_df = iedb_df.loc[iedb_df.allele != "UNKNOWN"]
 
     print("IEDB measurements per allele:\n%s" % iedb_df.allele.value_counts())
 
-    quantitative = iedb_df.ix[iedb_df["Units"] == "nM"].copy()
+    quantitative = iedb_df.loc[iedb_df["Units"] == "nM"].copy()
     quantitative["measurement_type"] = "quantitative"
-    quantitative["measurement_inequality"] = "="
+    quantitative["measurement_inequality"] = quantitative[
+        "Measurement Inequality"
+    ].fillna("=").map(lambda s: {">=": ">", "<=": "<"}.get(s, s))
     print("Quantitative measurements: %d" % len(quantitative))
 
-    qualitative = iedb_df.ix[iedb_df["Units"] != "nM"].copy()
+    qualitative = iedb_df.loc[iedb_df["Units"].isnull()].copy()
     qualitative["measurement_type"] = "qualitative"
     print("Qualitative measurements: %d" % len(qualitative))
     if not include_mass_spec:
-        qualitative = qualitative.ix[
+        qualitative = qualitative.loc[
             (~qualitative["Method/Technique"].str.contains("mass spec"))
         ].copy()
 
@@ -200,7 +174,7 @@ def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
 
     print("Subselecting to valid peptides. Starting with: %d" % len(iedb_df))
     iedb_df["Description"] = iedb_df.Description.str.strip()
-    iedb_df = iedb_df.ix[
+    iedb_df = iedb_df.loc[
         iedb_df.Description.str.match("^[ACDEFGHIKLMNPQRSTVWY]+$")
     ]
     print("Now: %d" % len(iedb_df))
@@ -248,16 +222,13 @@ def run():
             iedb_df = dfs[0]
             iedb_df["allele_peptide"] = iedb_df.allele + "_" + iedb_df.peptide
             print("Dropping kim2014 data present in IEDB.")
-            df = df.ix[
+            df = df.loc[
                 ~df.allele_peptide.isin(iedb_df.allele_peptide)
             ]
             print("Kim2014 data now: %s" % str(df.shape))
         dfs.append(df)
     for filename in args.data_systemhc_atlas:
         df = load_data_systemhc_atlas(filename)
-        dfs.append(df)
-    for filename in args.data_abelin_mass_spec:
-        df = load_data_abelin_mass_spec(filename)
         dfs.append(df)
 
     df = pandas.concat(dfs, ignore_index=True)

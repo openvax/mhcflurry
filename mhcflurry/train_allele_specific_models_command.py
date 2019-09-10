@@ -10,7 +10,6 @@ import traceback
 import random
 from functools import partial
 
-import numpy
 import pandas
 import yaml
 from sklearn.metrics.pairwise import cosine_similarity
@@ -20,9 +19,9 @@ import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .common import configure_logging, set_keras_backend
-from .parallelism import (
-    add_worker_pool_args,
+from .common import configure_logging
+from .local_parallelism import (
+    add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from .hyperparameters import HyperparameterDefaults
@@ -122,7 +121,7 @@ parser.add_argument(
     help="Keras verbosity. Default: %(default)s",
     default=0)
 
-add_worker_pool_args(parser)
+add_local_parallelism_args(parser)
 
 TRAIN_DATA_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     subset="all",
@@ -150,7 +149,7 @@ def run(argv=sys.argv[1:]):
     df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
 
-    df = df.ix[
+    df = df.loc[
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
@@ -166,7 +165,7 @@ def run(argv=sys.argv[1:]):
     if args.allele:
         alleles = [normalize_allele_name(a) for a in args.allele]
     else:
-        alleles = list(allele_counts.ix[
+        alleles = list(allele_counts.loc[
             allele_counts > args.min_measurements_per_allele
         ].index)
 
@@ -337,7 +336,7 @@ def alleles_by_similarity(allele):
             allele_similarity.columns.to_series().sample(frac=1.0))
     return (
         allele_similarity[allele] + (
-        allele_similarity.index == allele)  # force that we return specified allele first
+            allele_similarity.index == allele)  # force specified allele first
     ).sort_values(ascending=False).index.tolist()
 
 

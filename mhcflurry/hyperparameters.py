@@ -1,3 +1,6 @@
+"""
+Hyperparameter (neural network options) management
+"""
 from __future__ import (
     print_function,
     division,
@@ -70,8 +73,7 @@ class HyperparameterDefaults(object):
         if invalid_keys:
             raise ValueError(
                 "No such model parameters: %s. Valid parameters are: %s"
-                % (" ".join(invalid_keys),
-                    " ".join(self.defaults)))
+                % (" ".join(invalid_keys), " ".join(self.defaults)))
 
     def models_grid(self, **kwargs):
         '''

@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# Download some published MHC I ligand data
+# Download published non-IEDB MHC I ligand data. Most data has made its way into
+# IEDB but not all. Here we gather up the rest.
 #
 #
 set -e
@@ -9,6 +10,7 @@ set -x
 DOWNLOAD_NAME=data_published
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 
 mkdir -p "$SCRATCH_DIR"
 rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
@@ -26,13 +28,10 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-# Download kim2014 data
-wget --quiet https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.2009.mhci.public.1.txt
-wget --quiet https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.20130222.mhci.public.1.txt
-wget --quiet https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.2013.mhci.public.blind.1.txt
-
-# Download abelin et al 2017 data
-wget --quiet https://github.com/openvax/mhcflurry/releases/download/pre-1.1/abelin2017.hits.csv.bz2
+# Kim et al 2014 [PMID 25017736]
+wget -q https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.2009.mhci.public.1.txt
+wget -q https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.20130222.mhci.public.1.txt
+wget -q https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.2013.mhci.public.blind.1.txt
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt

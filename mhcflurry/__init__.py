@@ -1,3 +1,7 @@
+"""
+Class I MHC ligand prediction package
+"""
+
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import Class1NeuralNetwork
 from .version import __version__

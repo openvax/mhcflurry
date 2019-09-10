@@ -5,8 +5,21 @@ from numpy.testing import assert_equal
 
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 
+from mhcflurry.testing_utils import cleanup, startup
 
-DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+DOWNLOADED_PREDICTOR = None
+
+
+def setup():
+    global DOWNLOADED_PREDICTOR
+    startup()
+    DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+
+
+def teardown():
+    global DOWNLOADED_PREDICTOR
+    DOWNLOADED_PREDICTOR = None
+    cleanup()
 
 
 def predict_and_check(

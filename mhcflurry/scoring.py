@@ -1,3 +1,6 @@
+"""
+Measures of prediction accuracy
+"""
 from __future__ import (
     print_function,
     division,

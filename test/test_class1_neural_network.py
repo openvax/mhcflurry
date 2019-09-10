@@ -13,6 +13,10 @@ from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
+from mhcflurry.testing_utils import cleanup, startup
+teardown = cleanup
+setup = startup
+
 
 def test_class1_neural_network_a0205_training_accuracy():
     # Memorize the dataset.
@@ -38,16 +42,16 @@ def test_class1_neural_network_a0205_training_accuracy():
     df = pandas.read_csv(
         get_path(
             "data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
-    df = df.ix[
+    df = df.loc[
         df.allele == allele
     ]
-    df = df.ix[
+    df = df.loc[
         df.peptide.str.len() == 9
     ]
-    df = df.ix[
+    df = df.loc[
         df.measurement_type == "quantitative"
     ]
-    df = df.ix[
+    df = df.loc[
         df.measurement_source == "kim2014"
     ]
 
@@ -88,11 +92,10 @@ def test_class1_neural_network_a0205_training_accuracy():
 def test_inequalities():
     # Memorize the dataset.
     hyperparameters = dict(
-        loss="custom:mse_with_inequalities",
         peptide_amino_acid_encoding="one-hot",
         activation="tanh",
-        layer_sizes=[16],
-        max_epochs=50,
+        layer_sizes=[64],
+        max_epochs=200,
         minibatch_size=32,
         random_negative_rate=0.0,
         early_stopping=False,
@@ -105,10 +108,11 @@ def test_inequalities():
             }
         ],
         dense_layer_l1_regularization=0.0,
-        dropout_probability=0.0)
+        dropout_probability=0.0,
+        loss="custom:mse_with_inequalities_and_multiple_outputs")
 
     df = pandas.DataFrame()
-    df["peptide"] = random_peptides(1000, length=9)
+    df["peptide"] = random_peptides(100, length=9)
 
     # First half are binders
     df["binder"] = df.index < len(df) / 2

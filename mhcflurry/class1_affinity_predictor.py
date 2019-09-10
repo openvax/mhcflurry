@@ -5,19 +5,20 @@ import logging
 import time
 import warnings
 from os.path import join, exists, abspath
-from os import mkdir
+from os import mkdir, environ
 from socket import gethostname
 from getpass import getuser
 from functools import partial
-
-import mhcnames
-import numpy
-import pandas
-from numpy.testing import assert_equal
 from six import string_types
 
+import numpy
+from numpy.testing import assert_equal
+import pandas
+
+import mhcnames
+
 from .class1_neural_network import Class1NeuralNetwork
-from .common import random_peptides
+from .common import random_peptides, positional_frequency_matrix
 from .downloads import get_default_class1_models_dir
 from .encodable_sequences import EncodableSequences
 from .percent_rank_transform import PercentRankTransform
@@ -31,6 +32,9 @@ from .allele_encoding import AlleleEncoding
 # See ensemble_centrality.py for other options.
 DEFAULT_CENTRALITY_MEASURE = "mean"
 
+# Any value > 0 will result in attempting to optimize models after loading.
+OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 1))
+
 
 class Class1AffinityPredictor(object):
     """
@@ -39,13 +43,14 @@ class Class1AffinityPredictor(object):
     This class manages low-level `Class1NeuralNetwork` instances, each of which
     wraps a single Keras network. The purpose of `Class1AffinityPredictor` is to
     implement ensembles, handling of multiple alleles, and predictor loading and
-    saving.
+    saving. It also provides a place to keep track of metadata like prediction
+    histograms for percentile rank calibration.
     """
     def __init__(
             self,
             allele_to_allele_specific_models=None,
             class1_pan_allele_models=None,
-            allele_to_fixed_length_sequence=None,
+            allele_to_sequence=None,
             manifest_df=None,
             allele_to_percent_rank_transform=None,
             metadata_dataframes=None):
@@ -53,13 +58,15 @@ class Class1AffinityPredictor(object):
         Parameters
         ----------
         allele_to_allele_specific_models : dict of string -> list of `Class1NeuralNetwork`
-            Ensemble of single-allele models to use for each allele. 
-        
+            Ensemble of single-allele models to use for each allele.
+
         class1_pan_allele_models : list of `Class1NeuralNetwork`
             Ensemble of pan-allele models.
-        
-        allele_to_fixed_length_sequence : dict of string -> string
-            Required only if class1_pan_allele_models is specified.
+
+        allele_to_sequence : dict of string -> string
+            MHC allele name to fixed-length amino acid sequence (sometimes
+            referred to as the pseudosequence). Required only if
+            class1_pan_allele_models is specified.
         
         manifest_df : `pandas.DataFrame`, optional
             Must have columns: model_name, allele, config_json, model.
@@ -80,26 +87,43 @@ class Class1AffinityPredictor(object):
         if class1_pan_allele_models is None:
             class1_pan_allele_models = []
 
+        self.allele_to_sequence = (
+            dict(allele_to_sequence)
+            if allele_to_sequence is not None else None)  # make a copy
+
+        self._master_allele_encoding = None
         if class1_pan_allele_models:
-            assert allele_to_fixed_length_sequence, "Allele sequences required"
+            assert self.allele_to_sequence
 
         self.allele_to_allele_specific_models = allele_to_allele_specific_models
         self.class1_pan_allele_models = class1_pan_allele_models
-        self.allele_to_fixed_length_sequence = allele_to_fixed_length_sequence
         self._manifest_df = manifest_df
 
         if not allele_to_percent_rank_transform:
             allele_to_percent_rank_transform = {}
         self.allele_to_percent_rank_transform = allele_to_percent_rank_transform
-        self.metadata_dataframes = metadata_dataframes
+        self.metadata_dataframes = (
+            dict(metadata_dataframes) if metadata_dataframes else {})
         self._cache = {}
+        self.optimization_info = {}
+
+        assert isinstance(self.allele_to_allele_specific_models, dict)
+        assert isinstance(self.class1_pan_allele_models, list)
 
     @property
     def manifest_df(self):
+        """
+        A pandas.DataFrame describing the models included in this predictor.
+
+        Based on:
+        - self.class1_pan_allele_models
+        - self.allele_to_allele_specific_models
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
         if self._manifest_df is None:
-            # Make a manifest based on
-            #  - self.class1_pan_allele_models
-            #  - self.allele_to_allele_specific_models
             rows = []
             for (i, model) in enumerate(self.class1_pan_allele_models):
                 rows.append((
@@ -108,8 +132,7 @@ class Class1AffinityPredictor(object):
                     json.dumps(model.get_config()),
                     model
                 ))
-            for (allele,
-                 models) in self.allele_to_allele_specific_models.items():
+            for (allele, models) in self.allele_to_allele_specific_models.items():
                 for (i, model) in enumerate(models):
                     rows.append((
                         self.model_name(allele, i),
@@ -127,9 +150,9 @@ class Class1AffinityPredictor(object):
         Clear values cached based on the neural networks in this predictor.
 
         Users should call this after mutating any of the following:
-            - class1_pan_allele_models
-            - allele_to_allele_specific_models
-            - allele_to_fixed_length_sequence
+            - self.class1_pan_allele_models
+            - self.allele_to_allele_specific_models
+            - self.allele_to_sequence
 
         Methods that mutate these instance variables will call this method on
         their own if needed.
@@ -174,7 +197,7 @@ class Class1AffinityPredictor(object):
 
         allele_to_allele_specific_models = collections.defaultdict(list)
         class1_pan_allele_models = []
-        allele_to_fixed_length_sequence = predictors[0].allele_to_fixed_length_sequence
+        allele_to_sequence = predictors[0].allele_to_sequence
 
         for predictor in predictors:
             for (allele, networks) in (
@@ -186,7 +209,7 @@ class Class1AffinityPredictor(object):
         return Class1AffinityPredictor(
             allele_to_allele_specific_models=allele_to_allele_specific_models,
             class1_pan_allele_models=class1_pan_allele_models,
-            allele_to_fixed_length_sequence=allele_to_fixed_length_sequence
+            allele_to_sequence=allele_to_sequence
         )
 
     def merge_in_place(self, others):
@@ -202,22 +225,22 @@ class Class1AffinityPredictor(object):
         -------
         list of string : names of newly added models
         """
-
         new_model_names = []
+        original_manifest = self.manifest_df
+        new_manifest_rows = []
         for predictor in others:
             for model in predictor.class1_pan_allele_models:
                 model_name = self.model_name(
                     "pan-class1",
                     len(self.class1_pan_allele_models))
-                self.class1_pan_allele_models.append(model)
                 row = pandas.Series(collections.OrderedDict([
                     ("model_name", model_name),
                     ("allele", "pan-class1"),
                     ("config_json", json.dumps(model.get_config())),
                     ("model", model),
                 ])).to_frame().T
-                self._manifest_df = pandas.concat(
-                    [self.manifest_df, row], ignore_index=True)
+                new_manifest_rows.append(row)
+                self.class1_pan_allele_models.append(model)
                 new_model_names.append(model_name)
 
             for allele in predictor.allele_to_allele_specific_models:
@@ -232,12 +255,16 @@ class Class1AffinityPredictor(object):
                         ("config_json", json.dumps(model.get_config())),
                         ("model", model),
                     ])).to_frame().T
-                    self._manifest_df = pandas.concat(
-                        [self.manifest_df, row], ignore_index=True)
+                    new_manifest_rows.append(row)
                     current_models.append(model)
                     new_model_names.append(model_name)
 
+        self._manifest_df = pandas.concat(
+            [original_manifest] + new_manifest_rows,
+            ignore_index=True)
+
         self.clear_cache()
+        self.check_consistency()
         return new_model_names
 
     @property
@@ -251,8 +278,8 @@ class Class1AffinityPredictor(object):
         """
         if 'supported_alleles' not in self._cache:
             result = set(self.allele_to_allele_specific_models)
-            if self.allele_to_fixed_length_sequence:
-                result = result.union(self.allele_to_fixed_length_sequence)
+            if self.allele_to_sequence:
+                result = result.union(self.allele_to_sequence)
             self._cache["supported_alleles"] = sorted(result)
         return self._cache["supported_alleles"]
 
@@ -277,6 +304,27 @@ class Class1AffinityPredictor(object):
             self._cache["supported_peptide_lengths"] = result
         return self._cache["supported_peptide_lengths"]
 
+    def check_consistency(self):
+        """
+        Verify that self.manifest_df is consistent with:
+        - self.class1_pan_allele_models
+        - self.allele_to_allele_specific_models
+
+        Currently only checks for agreement on the total number of models.
+
+        Throws AssertionError if inconsistent.
+        """
+        num_models = len(self.class1_pan_allele_models) + sum(
+            len(v) for v in self.allele_to_allele_specific_models.values())
+        assert len(self.manifest_df) == num_models, (
+            "Manifest seems out of sync with models: %d vs %d entries: "
+            "\n%s\npan-allele: %s\nallele-specific: %s"% (
+                len(self.manifest_df),
+                num_models,
+                str(self.manifest_df),
+                str(self.class1_pan_allele_models),
+                str(self.allele_to_allele_specific_models)))
+
     def save(self, models_dir, model_names_to_write=None, write_metadata=True):
         """
         Serialize the predictor to a directory on disk. If the directory does
@@ -292,7 +340,7 @@ class Class1AffinityPredictor(object):
         Parameters
         ----------
         models_dir : string
-            Path to directory
+            Path to directory. It will be created if it doesn't exist.
             
         model_names_to_write : list of string, optional
             Only write the weights for the specified models. Useful for
@@ -301,11 +349,7 @@ class Class1AffinityPredictor(object):
         write_metadata : boolean, optional
             Whether to write optional metadata
         """
-        num_models = len(self.class1_pan_allele_models) + sum(
-            len(v) for v in self.allele_to_allele_specific_models.values())
-        assert len(self.manifest_df) == num_models, (
-            "Manifest seems out of sync with models: %d vs %d entries" % (
-                len(self.manifest_df), num_models))
+        self.check_consistency()
 
         if model_names_to_write is None:
             # Write all models
@@ -314,7 +358,7 @@ class Class1AffinityPredictor(object):
         if not exists(models_dir):
             mkdir(models_dir)
 
-        sub_manifest_df = self.manifest_df.ix[
+        sub_manifest_df = self.manifest_df.loc[
             self.manifest_df.model_name.isin(model_names_to_write)
         ]
 
@@ -322,14 +366,14 @@ class Class1AffinityPredictor(object):
             weights_path = self.weights_path(models_dir, row.model_name)
             Class1AffinityPredictor.save_weights(
                 row.model.get_weights(), weights_path)
-            logging.info("Wrote: %s" % weights_path)
+            logging.info("Wrote: %s", weights_path)
 
         write_manifest_df = self.manifest_df[[
             c for c in self.manifest_df.columns if c != "model"
         ]]
         manifest_path = join(models_dir, "manifest.csv")
         write_manifest_df.to_csv(manifest_path, index=False)
-        logging.info("Wrote: %s" % manifest_path)
+        logging.info("Wrote: %s", manifest_path)
 
         if write_metadata:
             # Write "info.txt"
@@ -348,14 +392,15 @@ class Class1AffinityPredictor(object):
                     metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
                     df.to_csv(metadata_df_path, index=False, compression="bz2")
 
-        if self.allele_to_fixed_length_sequence is not None:
+        # Save allele sequences
+        if self.allele_to_sequence is not None:
             allele_to_sequence_df = pandas.DataFrame(
-                list(self.allele_to_fixed_length_sequence.items()),
+                list(self.allele_to_sequence.items()),
                 columns=['allele', 'sequence']
             )
             allele_to_sequence_df.to_csv(
                 join(models_dir, "allele_sequences.csv"), index=False)
-            logging.info("Wrote: %s" % join(models_dir, "allele_sequences.csv"))
+            logging.info("Wrote: %s", join(models_dir, "allele_sequences.csv"))
 
         if self.allele_to_percent_rank_transform:
             percent_ranks_df = None
@@ -370,20 +415,25 @@ class Class1AffinityPredictor(object):
                 percent_ranks_path,
                 index=True,
                 index_label="bin")
-            logging.info("Wrote: %s" % percent_ranks_path)
+            logging.info("Wrote: %s", percent_ranks_path)
 
     @staticmethod
-    def load(models_dir=None, max_models=None):
+    def load(models_dir=None, max_models=None, optimization_level=None):
         """
         Deserialize a predictor from a directory on disk.
         
         Parameters
         ----------
         models_dir : string
-            Path to directory
+            Path to directory. If unspecified the default downloaded models are
+            used.
             
         max_models : int, optional
             Maximum number of `Class1NeuralNetwork` instances to load
+
+        optimization_level : int
+            If >0, model optimization will be attempted. Defaults to value of
+            environment variable MHCFLURRY_OPTIMIZATION_LEVEL.
 
         Returns
         -------
@@ -391,6 +441,8 @@ class Class1AffinityPredictor(object):
         """
         if models_dir is None:
             models_dir = get_default_class1_models_dir()
+        if optimization_level is None:
+            optimization_level = OPTIMIZATION_LEVEL
 
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
@@ -417,11 +469,12 @@ class Class1AffinityPredictor(object):
 
         manifest_df["model"] = all_models
 
-        allele_to_fixed_length_sequence = None
+        # Load allele sequences
+        allele_to_sequence = None
         if exists(join(models_dir, "allele_sequences.csv")):
-            allele_to_fixed_length_sequence = pandas.read_csv(
+            allele_to_sequence = pandas.read_csv(
                 join(models_dir, "allele_sequences.csv"),
-                index_col="allele").to_dict()
+                index_col=0).iloc[:, 0].to_dict()
 
         allele_to_percent_rank_transform = {}
         percent_ranks_path = join(models_dir, "percent_ranks.csv")
@@ -433,24 +486,64 @@ class Class1AffinityPredictor(object):
 
         logging.info(
             "Loaded %d class1 pan allele predictors, %d allele sequences, "
-            "%d percent rank distributions, and %d allele specific models: %s" % (
-                len(class1_pan_allele_models),
-                len(allele_to_fixed_length_sequence) if allele_to_fixed_length_sequence else 0,
-                len(allele_to_percent_rank_transform),
-                sum(len(v) for v in allele_to_allele_specific_models.values()),
-                ", ".join(
-                    "%s (%d)" % (allele, len(v))
-                    for (allele, v)
-                    in sorted(allele_to_allele_specific_models.items()))))
+            "%d percent rank distributions, and %d allele specific models: %s",
+            len(class1_pan_allele_models),
+            len(allele_to_sequence) if allele_to_sequence else 0,
+            len(allele_to_percent_rank_transform),
+            sum(len(v) for v in allele_to_allele_specific_models.values()),
+            ", ".join(
+                "%s (%d)" % (allele, len(v))
+                for (allele, v)
+                in sorted(allele_to_allele_specific_models.items())))
 
         result = Class1AffinityPredictor(
             allele_to_allele_specific_models=allele_to_allele_specific_models,
             class1_pan_allele_models=class1_pan_allele_models,
-            allele_to_fixed_length_sequence=allele_to_fixed_length_sequence,
+            allele_to_sequence=allele_to_sequence,
             manifest_df=manifest_df,
             allele_to_percent_rank_transform=allele_to_percent_rank_transform,
         )
+        if optimization_level >= 1:
+            optimized = result.optimize()
+            logging.info(
+                "Model optimization %s",
+                "succeeded" if optimized else "not supported for these models")
         return result
+
+    def optimize(self):
+        """
+        EXPERIMENTAL: Optimize the predictor for faster predictions.
+
+        Currently the only optimization implemented is to merge multiple pan-
+        allele predictors at the tensorflow level.
+
+        The optimization is performed in-place, mutating the instance.
+
+        Returns
+        ----------
+        bool
+            Whether optimization was performed
+
+        """
+        num_class1_pan_allele_models = len(self.class1_pan_allele_models)
+        if num_class1_pan_allele_models > 1:
+            try:
+                self.class1_pan_allele_models = [
+                    Class1NeuralNetwork.merge(
+                        self.class1_pan_allele_models,
+                        merge_method="concatenate")
+                ]
+            except NotImplementedError as e:
+                logging.warning("Optimization failed: %s", str(e))
+                return False
+            self._manifest_df = None
+            self.clear_cache()
+            self.optimization_info["pan_models_merged"] = True
+            self.optimization_info["num_pan_models_merged"] = (
+                num_class1_pan_allele_models)
+        else:
+            return False
+        return True
 
     @staticmethod
     def model_name(allele, num):
@@ -486,6 +579,23 @@ class Class1AffinityPredictor(object):
         string
         """
         return join(models_dir, "weights_%s.npz" % model_name)
+
+    @property
+    def master_allele_encoding(self):
+        """
+        An AlleleEncoding containing the universe of alleles specified by
+        self.allele_to_sequence.
+
+        Returns
+        -------
+        AlleleEncoding
+        """
+        if (self._master_allele_encoding is None or
+                self._master_allele_encoding.allele_to_sequence !=
+                self.allele_to_sequence):
+            self._master_allele_encoding = AlleleEncoding(
+                allele_to_sequence=self.allele_to_sequence)
+        return self._master_allele_encoding
 
     def fit_allele_specific_predictors(
             self,
@@ -523,7 +633,7 @@ class Class1AffinityPredictor(object):
             nM affinities
 
         inequalities : list of string, each element one of ">", "<", or "="
-            See Class1NeuralNetwork.fit for details.
+            See `Class1NeuralNetwork.fit` for details.
 
         train_rounds : sequence of int
             Each training point i will be used on training rounds r for which
@@ -685,12 +795,12 @@ class Class1AffinityPredictor(object):
         alleles = pandas.Series(alleles).map(mhcnames.normalize_allele_name)
         allele_encoding = AlleleEncoding(
             alleles,
-            allele_to_fixed_length_sequence=self.allele_to_fixed_length_sequence)
+            borrow_from=self.master_allele_encoding)
 
         encodable_peptides = EncodableSequences.create(peptides)
         models = []
         for i in range(n_models):
-            logging.info("Training model %d / %d" % (i + 1, n_models))
+            logging.info("Training model %d / %d", i + 1, n_models)
             model = Class1NeuralNetwork(**architecture_hyperparameters)
             model.fit(
                 encodable_peptides,
@@ -702,7 +812,6 @@ class Class1AffinityPredictor(object):
                 progress_print_interval=progress_print_interval)
 
             model_name = self.model_name("pan-class1", i)
-            self.class1_pan_allele_models.append(model)
             row = pandas.Series(collections.OrderedDict([
                 ("model_name", model_name),
                 ("allele", "pan-class1"),
@@ -711,6 +820,7 @@ class Class1AffinityPredictor(object):
             ])).to_frame().T
             self._manifest_df = pandas.concat(
                 [self.manifest_df, row], ignore_index=True)
+            self.class1_pan_allele_models.append(model)
             if models_dir_for_save:
                 self.save(
                     models_dir_for_save, model_names_to_write=[model_name])
@@ -718,6 +828,33 @@ class Class1AffinityPredictor(object):
 
         self.clear_cache()
         return models
+
+    def add_pan_allele_model(self, model, models_dir_for_save=None):
+        """
+        Add a pan-allele model to the ensemble and optionally do an incremental
+        save.
+
+        Parameters
+        ----------
+        model : Class1NeuralNetwork
+        models_dir_for_save : string
+            Directory to save resulting ensemble to
+        """
+        model_name = self.model_name("pan-class1", 1)
+        row = pandas.Series(collections.OrderedDict([
+            ("model_name", model_name),
+            ("allele", "pan-class1"),
+            ("config_json", json.dumps(model.get_config())),
+            ("model", model),
+        ])).to_frame().T
+        self._manifest_df = pandas.concat(
+            [self.manifest_df, row], ignore_index=True)
+        self.class1_pan_allele_models.append(model)
+        self.clear_cache()
+        self.check_consistency()
+        if models_dir_for_save:
+            self.save(
+                models_dir_for_save, model_names_to_write=[model_name])
 
     def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
         """
@@ -749,10 +886,8 @@ class Class1AffinityPredictor(object):
                 msg = "Allele %s has no percentile rank information" % allele
                 if throw:
                     raise ValueError(msg)
-                else:
-                    warnings.warn(msg)
-                    # Return NaNs
-                    return numpy.ones(len(affinities)) * numpy.nan
+                warnings.warn(msg)
+                return numpy.ones(len(affinities)) * numpy.nan  # Return NaNs
 
         if alleles is None:
             raise ValueError("Specify allele or alleles")
@@ -771,12 +906,13 @@ class Class1AffinityPredictor(object):
             alleles=None,
             allele=None,
             throw=True,
-            centrality_measure=DEFAULT_CENTRALITY_MEASURE):
+            centrality_measure=DEFAULT_CENTRALITY_MEASURE,
+            model_kwargs={}):
         """
         Predict nM binding affinities.
         
         If multiple predictors are available for an allele, the predictions are
-        the geometric means of the individual model predictions.
+        the geometric means of the individual model (nM) predictions.
         
         One of 'allele' or 'alleles' must be specified. If 'allele' is specified
         all predictions will be for the given allele. If 'alleles' is specified
@@ -795,6 +931,8 @@ class Class1AffinityPredictor(object):
         centrality_measure : string or callable
             Measure of central tendency to use to combine predictions in the
             ensemble. Options include: mean, median, robust_mean.
+        model_kwargs : dict
+            Additional keyword arguments to pass to Class1NeuralNetwork.predict
 
         Returns
         -------
@@ -808,6 +946,7 @@ class Class1AffinityPredictor(object):
             include_percentile_ranks=False,
             include_confidence_intervals=False,
             centrality_measure=centrality_measure,
+            model_kwargs=model_kwargs
         )
         return df.prediction.values
 
@@ -820,7 +959,8 @@ class Class1AffinityPredictor(object):
             include_individual_model_predictions=False,
             include_percentile_ranks=True,
             include_confidence_intervals=True,
-            centrality_measure=DEFAULT_CENTRALITY_MEASURE):
+            centrality_measure=DEFAULT_CENTRALITY_MEASURE,
+            model_kwargs={}):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
@@ -844,14 +984,16 @@ class Class1AffinityPredictor(object):
             the predictions for the unsupported alleles or peptides will be NaN.
         include_individual_model_predictions : boolean
             If True, the predictions of each individual model are included as
-            columns in the result dataframe.
+            columns in the result DataFrame.
         include_percentile_ranks : boolean, default True
-            If True, a "prediction_percentile" column will be included giving the
-            percentile ranks. If no percentile rank information is available,
+            If True, a "prediction_percentile" column will be included giving
+            the percentile ranks. If no percentile rank info is available,
             this will be ignored with a warning.
         centrality_measure : string or callable
             Measure of central tendency to use to combine predictions in the
             ensemble. Options include: mean, median, robust_mean.
+        model_kwargs : dict
+            Additional keyword arguments to pass to Class1NeuralNetwork.predict
 
         Returns
         -------
@@ -913,7 +1055,7 @@ class Class1AffinityPredictor(object):
                         (~df.supported_peptide_length).sum(),
                         min_peptide_length,
                         max_peptide_length,
-                        str(df.ix[~df.supported_peptide_length].peptide.unique())))
+                        str(df.loc[~df.supported_peptide_length].peptide.unique())))
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
@@ -922,7 +1064,10 @@ class Class1AffinityPredictor(object):
             df["supported_peptide_length"] = True
             all_peptide_lengths_supported = True
 
-        num_pan_models = len(self.class1_pan_allele_models)
+        num_pan_models = (
+            len(self.class1_pan_allele_models)
+            if not self.optimization_info.get("pan_models_merged", False)
+            else self.optimization_info["num_pan_models_merged"])
         max_single_allele_models = max(
             len(self.allele_to_allele_specific_models.get(allele, []))
             for allele in unique_alleles
@@ -933,30 +1078,70 @@ class Class1AffinityPredictor(object):
         predictions_array[:] = numpy.nan
 
         if self.class1_pan_allele_models:
+            master_allele_encoding = self.master_allele_encoding
             unsupported_alleles = [
                 allele for allele in
                 df.normalized_allele.unique()
-                if allele not in self.allele_to_fixed_length_sequence
+                if allele not in self.allele_to_sequence
             ]
             if unsupported_alleles:
+                truncate_at = 100
+                allele_string = " ".join(
+                    sorted(self.allele_to_sequence)[:truncate_at])
+                if len(self.allele_to_sequence) > truncate_at:
+                    allele_string += " + %d more alleles" % (
+                        len(self.allele_to_sequence) - truncate_at)
                 msg = (
                     "No sequences for allele(s): %s.\n"
                     "Supported alleles: %s" % (
-                        " ".join(unsupported_alleles),
-                        " ".join(sorted(self.allele_to_fixed_length_sequence))))
+                        " ".join(unsupported_alleles), allele_string))
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
-            mask = df.supported_peptide_length
-            if mask.sum() > 0:
+            mask = df.supported_peptide_length & (
+                ~df.normalized_allele.isin(unsupported_alleles))
+
+            row_slice = None
+            if mask is None or mask.all():
+                row_slice = slice(None, None, None)  # all rows
+                masked_allele_encoding = AlleleEncoding(
+                    df.normalized_allele,
+                    borrow_from=master_allele_encoding)
+                masked_peptides = peptides
+            elif mask.sum() > 0:
+                row_slice = mask
                 masked_allele_encoding = AlleleEncoding(
                     df.loc[mask].normalized_allele,
-                    allele_to_fixed_length_sequence=self.allele_to_fixed_length_sequence)
+                    borrow_from=master_allele_encoding)
                 masked_peptides = peptides.sequences[mask]
-                for (i, model) in enumerate(self.class1_pan_allele_models):
-                    predictions_array[mask, i] = model.predict(
+
+            masked_peptides = EncodableSequences.create(masked_peptides)
+
+            if row_slice is not None:
+                # The following line is a performance optimization that may be
+                # revisited. It causes the neural network to set to include
+                # only the alleles actually being predicted for. This makes
+                # the network much smaller. However, subsequent calls to
+                # predict will need to reset these weights, so there is a
+                # tradeoff.
+                masked_allele_encoding = masked_allele_encoding.compact()
+
+                if self.optimization_info.get("pan_models_merged"):
+                    # Multiple pan-allele models have been merged into one
+                    # at the tensorflow level.
+                    assert len(self.class1_pan_allele_models) == 1
+                    predictions = self.class1_pan_allele_models[0].predict(
                         masked_peptides,
-                        allele_encoding=masked_allele_encoding)
+                        allele_encoding=masked_allele_encoding,
+                        output_index=None,
+                        **model_kwargs)
+                    predictions_array[row_slice, :num_pan_models] = predictions
+                else:
+                    for (i, model) in enumerate(self.class1_pan_allele_models):
+                        predictions_array[row_slice, i] = model.predict(
+                            masked_peptides,
+                            allele_encoding=masked_allele_encoding,
+                            **model_kwargs)
 
         if self.allele_to_allele_specific_models:
             unsupported_alleles = [
@@ -981,19 +1166,22 @@ class Class1AffinityPredictor(object):
                     mask = (
                         (df.normalized_allele == allele) &
                         df.supported_peptide_length).values
+
+                row_slice = None
                 if mask is None or mask.all():
-                    # Common case optimization
-                    for (i, model) in enumerate(models):
-                        predictions_array[:, num_pan_models + i] = (
-                            model.predict(peptides))
+                    peptides_for_allele = peptides
+                    row_slice = slice(None, None, None)
                 elif mask.sum() > 0:
                     peptides_for_allele = EncodableSequences.create(
-                        df.ix[mask].peptide.values)
+                        df.loc[mask].peptide.values)
+                    row_slice = mask
+
+                if row_slice is not None:
                     for (i, model) in enumerate(models):
                         predictions_array[
-                            mask,
+                            row_slice,
                             num_pan_models + i,
-                        ] = model.predict(peptides_for_allele)
+                        ] = model.predict(peptides_for_allele, **model_kwargs)
 
         if callable(centrality_measure):
             centrality_function = centrality_measure
@@ -1005,8 +1193,10 @@ class Class1AffinityPredictor(object):
         df["prediction"] = numpy.exp(log_centers)
 
         if include_confidence_intervals:
-            df["prediction_low"] = numpy.exp(numpy.nanpercentile(logs, 5.0, axis=1))
-            df["prediction_high"] = numpy.exp(numpy.nanpercentile(logs, 95.0, axis=1))
+            df["prediction_low"] = numpy.exp(
+                numpy.nanpercentile(logs, 5.0, axis=1))
+            df["prediction_high"] = numpy.exp(
+                numpy.nanpercentile(logs, 95.0, axis=1))
 
         if include_individual_model_predictions:
             for i in range(num_pan_models):
@@ -1063,12 +1253,11 @@ class Class1AffinityPredictor(object):
         ----------
         list of array
         """
-        loaded = numpy.load(filename)
-        weights = [
-            loaded["array_%d" % i]
-            for i in range(len(loaded.keys()))
-        ]
-        loaded.close()
+        with numpy.load(filename) as loaded:
+            weights = [
+                loaded["array_%d" % i]
+                for i in range(len(loaded.keys()))
+            ]
         return weights
 
     def calibrate_percentile_ranks(
@@ -1076,11 +1265,15 @@ class Class1AffinityPredictor(object):
             peptides=None,
             num_peptides_per_length=int(1e5),
             alleles=None,
-            bins=None):
+            bins=None,
+            motif_summary=False,
+            summary_top_peptide_fractions=[0.001],
+            verbose=False,
+            model_kwargs={}):
         """
         Compute the cumulative distribution of ic50 values for a set of alleles
-        over a large universe of random peptides, to enable computing quantiles in
-        this distribution later.
+        over a large universe of random peptides, to enable taking quantiles
+        of this distribution later.
 
         Parameters
         ----------
@@ -1097,10 +1290,25 @@ class Class1AffinityPredictor(object):
             Anything that can be passed to numpy.histogram's "bins" argument
             can be used here, i.e. either an integer or a sequence giving bin
             edges. This is in ic50 space.
+        motif_summary : bool
+            If True, the length distribution and per-position amino acid
+            frequencies are also calculated for the top x fraction of tightest-
+            binding peptides, where each value of x is given in the
+            summary_top_peptide_fractions list.
+        summary_top_peptide_fractions : list of float
+            Only used if motif_summary is True
+        verbose : boolean
+            Whether to print status updates to stdout
+        model_kwargs : dict
+            Additional low-level Class1NeuralNetwork.predict() kwargs.
 
         Returns
         ----------
-        EncodableSequences : peptides used for calibration
+        dict of string -> pandas.DataFrame
+
+        If motif_summary is True, this will have keys  "frequency_matrices" and
+        "length_distributions". Otherwise it will be empty.
+
         """
         if bins is None:
             bins = to_ic50(numpy.linspace(1, 0, 1000))
@@ -1119,42 +1327,90 @@ class Class1AffinityPredictor(object):
 
         encoded_peptides = EncodableSequences.create(peptides)
 
-        for (i, allele) in enumerate(alleles):
-            predictions = self.predict(encoded_peptides, allele=allele)
+        if motif_summary:
+            frequency_matrices = []
+            length_distributions = []
+        else:
+            frequency_matrices = None
+            length_distributions = None
+        for allele in alleles:
+            start = time.time()
+            predictions = self.predict(
+                encoded_peptides, allele=allele, model_kwargs=model_kwargs)
+            if verbose:
+                elapsed = time.time() - start
+                print(
+                    "Generated %d predictions for allele %s in %0.2f sec: "
+                    "%0.2f predictions / sec" % (
+                        len(encoded_peptides.sequences),
+                        allele,
+                        elapsed,
+                        len(encoded_peptides.sequences) / elapsed))
             transform = PercentRankTransform()
             transform.fit(predictions, bins=bins)
             self.allele_to_percent_rank_transform[allele] = transform
 
-        return encoded_peptides
+            if frequency_matrices is not None:
+                predictions_df = pandas.DataFrame({
+                    'peptide': encoded_peptides.sequences,
+                    'prediction': predictions
+                }).drop_duplicates('peptide').set_index("peptide")
+                predictions_df["length"] = predictions_df.index.str.len()
+                for (length, sub_df) in predictions_df.groupby("length"):
+                    for cutoff_fraction in summary_top_peptide_fractions:
+                        selected = sub_df.prediction.nsmallest(
+                            max(
+                                int(len(sub_df) * cutoff_fraction),
+                                1)).index.values
+                        matrix = positional_frequency_matrix(selected).reset_index()
+                        original_columns = list(matrix.columns)
+                        matrix["allele"] = allele
+                        matrix["length"] = length
+                        matrix["cutoff_fraction"] = cutoff_fraction
+                        matrix["cutoff_count"] = len(selected)
+                        matrix = matrix[
+                            ["allele", "length", "cutoff_fraction", "cutoff_count"]
+                            + original_columns
+                        ]
+                        frequency_matrices.append(matrix)
 
-    def filter_networks(self, predicate):
-        """
-        Return a new Class1AffinityPredictor containing a subset of this
-        predictor's neural networks.
+                # Length distribution
+                for cutoff_fraction in summary_top_peptide_fractions:
+                    cutoff_count = max(
+                        int(len(predictions_df) * cutoff_fraction), 1)
+                    length_distribution = predictions_df.prediction.nsmallest(
+                        cutoff_count).index.str.len().value_counts()
+                    length_distribution.index.name = "length"
+                    length_distribution /= length_distribution.sum()
+                    length_distribution = length_distribution.to_frame()
+                    length_distribution.columns = ["fraction"]
+                    length_distribution = length_distribution.reset_index()
+                    length_distribution["allele"] = allele
+                    length_distribution["cutoff_fraction"] = cutoff_fraction
+                    length_distribution["cutoff_count"] = cutoff_count
+                    length_distribution = length_distribution[[
+                        "allele",
+                        "cutoff_fraction",
+                        "cutoff_count",
+                        "length",
+                        "fraction"
+                    ]].sort_values(["cutoff_fraction", "length"])
+                    length_distributions.append(length_distribution)
 
-        Parameters
-        ----------
-        predicate : Class1NeuralNetwork -> boolean
-            Function specifying which neural networks to include
+        if frequency_matrices is not None:
+            frequency_matrices = pandas.concat(
+                frequency_matrices, ignore_index=True)
 
-        Returns
-        -------
-        Class1AffinityPredictor
-        """
-        allele_to_allele_specific_models = {}
-        for (allele, models) in self.allele_to_allele_specific_models.items():
-            allele_to_allele_specific_models[allele] = [
-                m for m in models if predicate(m)
-            ]
-        class1_pan_allele_models = [
-            m for m in self.class1_pan_allele_models if predicate(m)
-        ]
+        if length_distributions is not None:
+            length_distributions = pandas.concat(
+                length_distributions, ignore_index=True)
 
-        return Class1AffinityPredictor(
-            allele_to_allele_specific_models=allele_to_allele_specific_models,
-            class1_pan_allele_models=class1_pan_allele_models,
-            allele_to_fixed_length_sequence=self.allele_to_fixed_length_sequence,
-        )
+        if motif_summary:
+            return {
+                'frequency_matrices': frequency_matrices,
+                'length_distributions': length_distributions,
+            }
+        return {}
 
     def model_select(
             self,
@@ -1164,6 +1420,8 @@ class Class1AffinityPredictor(object):
             max_models=10000):
         """
         Perform model selection using a user-specified scoring function.
+
+        This works only with allele-specific models, not pan-allele models.
 
         Model selection is done using a "step up" variable selection procedure,
         in which models are repeatedly added to an ensemble until the score
@@ -1243,4 +1501,3 @@ class Class1AffinityPredictor(object):
                 "model_selection": df,
             })
         return new_predictor
-

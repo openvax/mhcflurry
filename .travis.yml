@@ -4,9 +4,6 @@ python:
   - "2.7"
   - "3.6"
 before_install:
-  # Commands below copied from: http://conda.pydata.org/docs/travis.html
-  # We do this conditionally because it saves us some downloading if the
-  # version is the same.
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
       wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
     else
@@ -20,6 +17,7 @@ before_install:
   - conda update -q conda
   # Useful for debugging any issues with conda
   - conda info -a
+  - free -m
 addons:
   apt:
     packages:
@@ -29,23 +27,21 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib mkl-service 
+      numpy scipy nose pandas matplotlib mkl-service tensorflow pypandoc
   - source activate test-environment
-  - pip install tensorflow pypandoc pylint 'theano>=1.0.4'
+  - pip install nose-timer
   - pip install -r requirements.txt
   - pip install .
   - pip freeze
 env:
   global:
     - PYTHONHASHSEED=0
-    - MKL_THREADING_LAYER=GNU  # for theano
-    - CUDA_VISIBLE_DEVICES=""  # for tensorflow
-  matrix:
-    - KERAS_BACKEND=theano
     - KERAS_BACKEND=tensorflow
+    - KMP_SETTINGS=TRUE
+    - OMP_NUM_THREADS=1
+
 script:
   # download data and models, then run tests
-  - mhcflurry-downloads fetch
+  - mhcflurry-downloads fetch data_curated models_class1 models_class1_pan allele_sequences
   - mhcflurry-downloads info  # just to test this command works
-  - nosetests test -sv
-  - ./lint.sh
+  - nosetests --with-timer -sv test

@@ -9,9 +9,9 @@ from __future__ import (
 )
 import logging
 import yaml
-from os.path import join, exists, relpath
-from pipes import quote
+from os.path import join, exists
 from os import environ
+from pipes import quote
 from collections import OrderedDict
 from appdirs import user_data_dir
 from pkg_resources import resource_string
@@ -81,8 +81,7 @@ def get_default_class1_models_dir(test_exists=True):
         if test_exists and not exists(result):
             raise IOError("No such directory: %s" % result)
         return result
-    else:
-        return get_path("models_class1", "models", test_exists=test_exists)
+    return get_path("models_class1", "models", test_exists=test_exists)
 
 
 def get_current_release_downloads():
@@ -160,13 +159,13 @@ def configure():
             metadata["releases"][_CURRENT_RELEASE]["compatibility-version"])
         current_compatability = metadata["current-compatibility-version"]
         if current_release_compatability != current_compatability:
-            logging.warn(
+            logging.warning(
                 "The specified downloads are not compatible with this version "
                 "of the MHCflurry codebase. Downloads: release %s, "
-                "compatability version: %d. Code compatability version: %d" % (
-                    _CURRENT_RELEASE,
-                    current_release_compatability,
-                    current_compatability))
+                "compatability version: %d. Code compatability version: %d",
+                _CURRENT_RELEASE,
+                current_release_compatability,
+                current_compatability)
 
         data_dir = environ.get("MHCFLURRY_DATA_DIR")
         if not data_dir:
@@ -176,6 +175,7 @@ def configure():
             data_dir = user_data_dir("mhcflurry", version="4")
         _DOWNLOADS_DIR = join(data_dir, _CURRENT_RELEASE)
 
-    logging.debug("Configured MHCFLURRY_DOWNLOADS_DIR: %s" % _DOWNLOADS_DIR)
+    logging.debug("Configured MHCFLURRY_DOWNLOADS_DIR: %s", _DOWNLOADS_DIR)
+
 
 configure()

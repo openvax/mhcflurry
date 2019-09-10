@@ -27,7 +27,8 @@ import os
 from pipes import quote
 import errno
 import tarfile
-from tempfile import mkstemp
+from shutil import copyfileobj
+from tempfile import NamedTemporaryFile
 from tqdm import tqdm
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -167,8 +168,7 @@ def fetch_subcommand(args):
                 "\nThe requested download '%s' has already been downloaded. "
                 "To re-download this data, first run: \n\t%s\nin a shell "
                 "and then re-run this command.\n" +
-                "*" * 40)
-                % (name, 'rm -rf ' + quote(get_path(name))))
+                "*" * 40) % (name, 'rm -rf ' + quote(get_path(name))))
         if not info['downloaded'] and (name in args.download_name or default):
             items_to_fetch.add(name)
 
@@ -181,27 +181,46 @@ def fetch_subcommand(args):
         "DOWNLOAD NAME", "ALREADY DOWNLOADED?", "WILL DOWNLOAD NOW?", "URL"))
 
     for (item, info) in downloads.items():
+        urls = (
+            [info['metadata']["url"]]
+            if "url" in info['metadata']
+            else info['metadata']["part_urls"])
+        url_description = urls[0]
+        if len(urls) > 1:
+            url_description += " + %d more parts" % (len(urls) - 1)
+
         qprint(format_string % (
             item,
             yes_no(info['downloaded']),
             yes_no(item in items_to_fetch),
-            info['metadata']["url"]))
+            url_description))
 
     # TODO: may want to extract into somewhere temporary and then rename to
     # avoid making an incomplete extract if the process is killed.
     for item in items_to_fetch:
         metadata = downloads[item]['metadata']
-        (temp_fd, target_path) = mkstemp()
+        urls = (
+            [metadata["url"]] if "url" in metadata else metadata["part_urls"])
+        temp = NamedTemporaryFile(delete=False, suffix=".tar.bz2")
         try:
-            qprint("Downloading: %s" % metadata['url'])
-            urlretrieve(
-                metadata['url'],
-                target_path,
-                reporthook=TqdmUpTo(
-                    unit='B', unit_scale=True, miniters=1).update_to)
-            qprint("Downloaded to: %s" % quote(target_path))
+            for (url_num, url) in enumerate(urls):
+                qprint("Downloading [part %d/%d]: %s" % (
+                    url_num + 1, len(urls), url))
+                (downloaded_path, _) = urlretrieve(
+                    url,
+                    temp.name if len(urls) == 1 else None,
+                    reporthook=TqdmUpTo(
+                        unit='B', unit_scale=True, miniters=1).update_to)
+                qprint("Downloaded to: %s" % quote(downloaded_path))
 
-            tar = tarfile.open(target_path, 'r:bz2')
+                if downloaded_path != temp.name:
+                    qprint("Appending to: %s" % temp.name)
+                    with open(downloaded_path, "rb") as fd:
+                        copyfileobj(fd, temp, length=64*1024*1024)
+                    os.remove(downloaded_path)
+
+            temp.close()
+            tar = tarfile.open(temp.name, 'r:bz2')
             names = tar.getnames()
             logging.debug("Extracting: %s" % names)
             bad_names = [
@@ -221,7 +240,7 @@ def fetch_subcommand(args):
                 len(names), quote(result_dir)))
         finally:
             if not args.keep:
-                os.remove(target_path)
+                os.remove(temp.name)
 
 
 def info_subcommand(args):
@@ -257,10 +276,18 @@ def info_subcommand(args):
     print(format_string % ("DOWNLOAD NAME", "DOWNLOADED?", "URL"))
 
     for (item, info) in downloads.items():
+        urls = (
+            [info['metadata']["url"]]
+            if "url" in info['metadata']
+            else info['metadata']["part_urls"])
+        url_description = urls[0]
+        if len(urls) > 1:
+            url_description += " + %d more parts" % (len(urls) - 1)
+
         print(format_string % (
             item,
             yes_no(info['downloaded']),
-            info['metadata']["url"]))
+            url_description))
 
 
 def path_subcommand(args):

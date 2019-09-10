@@ -5,10 +5,14 @@
 prediction package with competitive accuracy and a fast and 
 [documented](http://openvax.github.io/mhcflurry/) implementation.
 
-MHCflurry supports Class I peptide/MHC binding affinity prediction using
-ensembles of allele-specific models. It runs on Python 2.7 and 3.4+ using
-the [keras](https://keras.io) neural network library. It exposes [command-line](http://openvax.github.io/mhcflurry/commandline_tutorial.html)
-and [Python library](http://openvax.github.io/mhcflurry/python_tutorial.html) interfaces.
+MHCflurry implements class I peptide/MHC binding affinity prediction. By default
+it supports 112 MHC alleles using ensembles of allele-specific models.
+Pan-allele predictors supporting virtually any MHC allele of known sequence
+are available for testing (see below). MHCflurry runs on Python 2.7 and 3.4+ using the
+[keras](https://keras.io) neural network library.
+It exposes [command-line](http://openvax.github.io/mhcflurry/commandline_tutorial.html)
+and [Python library](http://openvax.github.io/mhcflurry/python_tutorial.html)
+interfaces.
 
 If you find MHCflurry useful in your research please cite:
 
@@ -43,12 +47,41 @@ Wrote: /tmp/predictions.csv
 
 See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
 
-## MHCflurry model variants and mass spec 
+### Pan-allele models (experimental)
 
-The default MHCflurry models are trained
-on affinity measurements. Mass spec datasets are incorporated only in
-the model selection step. We also release experimental predictors whose training data directly
-includes mass spec. To download these predictors, run:
+We are testing new models that support prediction for any MHC I allele of known
+sequence (as opposed to the 112 alleles supported by the allele-specific
+predictors). These models are trained on both affinity measurements and mass spec.
+
+To try the pan-allele models, first download them:
+
+```
+$ mhcflurry-downloads fetch models_class1_pan
+```
+
+then set this environment variable to use them by default:
+
+```
+$ export MHCFLURRY_DEFAULT_CLASS1_MODELS="$(mhcflurry-downloads path models_class1_pan)/models.with_mass_spec"
+```
+
+You can now generate predictions for about 14,000 MHC I alleles. For example:
+
+```
+$ mhcflurry-predict --alleles HLA-A*02:04 --peptides SIINFEKL
+```
+
+If you use these models please let us know how it goes.
+
+
+## Other allele-specific models
+
+The default MHCflurry models are trained on affinity measurements, one allele
+per model (i.e. allele-specific). Mass spec datasets are incorporated in the
+model selection step.
+
+We also release experimental allele-specific predictors whose training data
+directly includes mass spec. To download these predictors, run:
 
 ```
 $ mhcflurry-downloads fetch models_class1_trained_with_mass_spec

@@ -68,7 +68,7 @@ W -3 -3 -4 -4 -2 -2 -3 -2 -2 -3 -2 -3 -1  1 -4 -3 -2 11  2 -3  0
 Y -2 -2 -2 -3 -2 -1 -2 -3  2 -1 -1 -2 -1  3 -3 -2 -2  2  7 -1  0
 V  0 -3 -3 -3 -1 -2 -2 -3 -3  3  1 -2  1 -1 -2 -2  0 -3 -1  4  0
 X  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  1
-"""), sep='\s+').loc[AMINO_ACIDS, AMINO_ACIDS]
+"""), sep='\s+').loc[AMINO_ACIDS, AMINO_ACIDS].astype("int8")
 assert (BLOSUM62_MATRIX == BLOSUM62_MATRIX.T).all().all()
 
 ENCODING_DATA_FRAMES = {
@@ -153,7 +153,7 @@ def fixed_vectors_encoding(index_encoded_sequences, letter_to_vector_df):
     target_shape = (
         num_sequences, sequence_length, letter_to_vector_df.shape[0])
     result = letter_to_vector_df.iloc[
-        index_encoded_sequences.flatten()
+        index_encoded_sequences.reshape((-1,))  # reshape() avoids copy
     ].values.reshape(target_shape)
     return result
 

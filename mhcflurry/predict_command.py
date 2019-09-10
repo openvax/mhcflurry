@@ -149,6 +149,10 @@ implementation_args.add_argument(
 
 
 def run(argv=sys.argv[1:]):
+    if not argv:
+        parser.print_help()
+        parser.exit(1)
+
     args = parser.parse_args(argv)
 
     set_keras_backend(backend=args.backend, num_threads=args.threads)
@@ -159,9 +163,9 @@ def run(argv=sys.argv[1:]):
 
     models_dir = args.models
     if models_dir is None:
-        # The reason we set the default here instead of in the argument parser is that
-        # we want to test_exists at this point, so the user gets a message instructing
-        # them to download the models if needed.
+        # The reason we set the default here instead of in the argument parser
+        # is that we want to test_exists at this point, so the user gets a
+        # message instructing them to download the models if needed.
         models_dir = get_default_class1_models_dir(test_exists=True)
     predictor = Class1AffinityPredictor.load(models_dir)
 
@@ -215,12 +219,13 @@ def run(argv=sys.argv[1:]):
         })
         logging.info(
             "Predicting for %d alleles and %d peptides = %d predictions" % (
-            len(args.alleles), len(args.peptides), len(df)))
+                len(args.alleles), len(args.peptides), len(df)))
 
     predictions = predictor.predict_to_dataframe(
         peptides=df[args.peptide_column].values,
         alleles=df[args.allele_column].values,
-        include_individual_model_predictions=args.include_individual_model_predictions,
+        include_individual_model_predictions=(
+            args.include_individual_model_predictions),
         throw=not args.no_throw)
 
     for col in predictions.columns:

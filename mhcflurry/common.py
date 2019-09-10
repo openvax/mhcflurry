@@ -147,3 +147,30 @@ def random_peptides(num, length=9, distribution=None):
             p=distribution.values,
             size=(int(num), int(length)))
     ]
+
+
+def positional_frequency_matrix(peptides):
+    """
+    Given a set of peptides, calculate a length x amino acids frequency matrix.
+
+    Parameters
+    ----------
+    peptides : list of string
+        All of same length
+
+    Returns
+    -------
+    pandas.DataFrame
+        Index is position, columns are amino acids
+    """
+    length = len(peptides[0])
+    assert all(len(peptide) == length for peptide in peptides)
+    counts = pandas.DataFrame(
+        index=[a for a in amino_acid.BLOSUM62_MATRIX.index if a != 'X'],
+        columns=numpy.arange(1, length + 1),
+    )
+    for i in range(length):
+        counts[i + 1] = pandas.Series([p[i] for p in peptides]).value_counts()
+    result = (counts / len(peptides)).fillna(0.0).T
+    result.index.name = 'position'
+    return result

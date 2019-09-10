@@ -15,10 +15,22 @@ from nose.tools import eq_, assert_raises
 from numpy import testing
 
 from mhcflurry.downloads import get_path
+from mhcflurry.testing_utils import cleanup, startup
 
 DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
 
-logging.basicConfig(level=logging.DEBUG)
+
+def setup():
+    global DOWNLOADED_PREDICTOR
+    startup()
+    DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+    logging.basicConfig(level=logging.DEBUG)
+
+
+def teardown():
+    global DOWNLOADED_PREDICTOR
+    DOWNLOADED_PREDICTOR = None
+    cleanup()
 
 
 # To hunt down a weird warning we were seeing in pandas.
@@ -52,7 +64,7 @@ def test_a1_known_epitopes_in_newly_trained_model():
     df = pandas.read_csv(
         get_path(
             "data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
-    df = df.ix[
+    df = df.loc[
         (df.allele == allele) &
         (df.peptide.str.len() >= 8) &
         (df.peptide.str.len() <= 15)
@@ -138,16 +150,16 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
     df = pandas.read_csv(
         get_path(
             "data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
-    df = df.ix[
+    df = df.loc[
         df.allele == allele
     ]
-    df = df.ix[
+    df = df.loc[
         df.peptide.str.len() == 9
     ]
-    df = df.ix[
+    df = df.loc[
         df.measurement_type == "quantitative"
     ]
-    df = df.ix[
+    df = df.loc[
         df.measurement_source == "kim2014"
     ]
 
@@ -252,3 +264,4 @@ def test_predict_implementations_equivalent():
                 peptides=peptides,
                 centrality_measure=centrality_measure).prediction.values
             testing.assert_almost_equal(pred1, pred2, decimal=2)
+
