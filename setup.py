@@ -51,7 +51,7 @@ if __name__ == '__main__':
         'six',
         'numpy>=1.11',
         'pandas>=0.20.3',
-        'Keras>=2.0.9',
+        'Keras>=2.2.5',
         'appdirs',
         'tensorflow>=1.1.0',
         'scikit-learn',
