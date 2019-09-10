@@ -76,7 +76,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'MHCflurry'
-copyright = '2017, Timothy O\'Donnell'
+copyright = '2019, Timothy O\'Donnell'
 author = 'Timothy O\'Donnell'
 
 # The version info for the project you're documenting, acts as replacement for
