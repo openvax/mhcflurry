@@ -23,6 +23,7 @@ addons:
     # install pandoc for use with pypandoc for converting the README
     # from markdown to RST
     - pandoc
+    - libssl1.0.0
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
