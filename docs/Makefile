@@ -53,12 +53,8 @@ help:
 .PHONY: generate
 generate:
 	sphinx-apidoc -M -f -o _build/ ../mhcflurry
-	mhcflurry-downloads fetch models_class1 models_class1_unselected
-	python generate.py \
-	    --out-alleles-info-rst _build/_alleles_info.rst \
-	    --out-models-info-rst _build/_models_info.rst \
-	    --out-models-supported-alleles-rst _build/_models_supported_alleles.rst
-
+	mhcflurry-downloads fetch models_class1_pan
+	python generate_class1_pan.py --out-dir model-info
 
 # Added by Tim:
 .PHONY: readme
@@ -76,6 +72,7 @@ clean:
 	mv $(BUILDDIR)/html /tmp/html-bk
 	rm -rf $(BUILDDIR)/*
 	mv /tmp/html-bk $(BUILDDIR)/html
+	rm -rf model-info
 
 .PHONY: html
 html:
