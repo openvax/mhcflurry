@@ -39,6 +39,16 @@ env:
 
 script:
   # download data and models, then run tests
-  - mhcflurry-downloads fetch data_curated models_class1 models_class1_pan allele_sequences
+  - mkdir -p /tmp/downloads
+  -
+    wget
+      $(mhcflurry-downloads url models_class1)
+      $(mhcflurry-downloads url models_class1_pan)
+      $(mhcflurry-downloads url allele_sequences)
+      -P /tmp/downloads
+  -
+    mhcflurry-downloads fetch
+    data_curated models_class1 models_class1_pan
+    --already-downloaded-dir /tmp/downloads
   - mhcflurry-downloads info  # just to test this command works
   - nosetests --with-timer -sv test
