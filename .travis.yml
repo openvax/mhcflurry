@@ -1,3 +1,4 @@
+dist: bionic
 language: python
 python:
   - "2.7"
@@ -21,7 +22,6 @@ addons:
   apt:
     packages:
       - pandoc
-      - libssl1.0.0
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
