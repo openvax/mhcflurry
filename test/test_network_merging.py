@@ -30,7 +30,6 @@ def teardown():
 
 def test_merge():
     assert len(PAN_ALLELE_PREDICTOR.class1_pan_allele_models) > 1
-
     peptides = random_peptides(100, length=9)
     peptides.extend(random_peptides(100, length=10))
     peptides = pandas.Series(peptides).sample(frac=1.0)
