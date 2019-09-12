@@ -54,6 +54,7 @@ script:
     data_curated
     models_class1
     models_class1_pan
+    allele_sequences
     --already-downloaded-dir /tmp/downloads
   - mhcflurry-downloads info  # just to test this command works
   - nosetests --with-timer -sv test
