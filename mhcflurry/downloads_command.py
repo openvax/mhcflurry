@@ -7,10 +7,13 @@ Fetch the default downloads:
     $ mhcflurry-downloads fetch
 
 Fetch a specific download:
-    $ mhcflurry-downloads fetch data_kim2014
+    $ mhcflurry-downloads fetch models_class1_pan
 
 Get the path to a download:
-    $ mhcflurry-downloads path data_kim2014
+    $ mhcflurry-downloads path models_class1_pan
+
+Get the URL of a download:
+    $ mhcflurry-downloads url models_class1_pan
 
 Summarize available and fetched downloads:
     $ mhcflurry-downloads info
@@ -32,10 +35,14 @@ from tempfile import NamedTemporaryFile
 from tqdm import tqdm
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
+import posixpath
+
 try:
     from urllib.request import urlretrieve
+    from urllib.parse import urlsplit
 except ImportError:
     from urllib import urlretrieve
+    from urlparse import urlsplit
 
 from .downloads import (
     get_current_release,
@@ -78,11 +85,21 @@ parser_fetch.add_argument(
     "--release",
     default=get_current_release(),
     help="Release to download. Default: %(default)s")
+parser_fetch.add_argument(
+    "--already-downloaded-dir",
+    metavar="DIR",
+    help="Don't download files, get them from DIR")
 
 parser_info = subparsers.add_parser('info')
 
 parser_path = subparsers.add_parser('path')
 parser_path.add_argument(
+    "download_name",
+    nargs="?",
+    default='')
+
+parser_url = subparsers.add_parser('url')
+parser_url.add_argument(
     "download_name",
     nargs="?",
     default='')
@@ -99,6 +116,7 @@ def run(argv=sys.argv[1:]):
         "fetch": fetch_subcommand,
         "info": info_subcommand,
         "path": path_subcommand,
+        "url": url_subcommand,
         None: lambda args: parser.print_help(),
     }
     command_functions[args.subparser_name](args)
@@ -204,20 +222,28 @@ def fetch_subcommand(args):
         temp = NamedTemporaryFile(delete=False, suffix=".tar.bz2")
         try:
             for (url_num, url) in enumerate(urls):
-                qprint("Downloading [part %d/%d]: %s" % (
-                    url_num + 1, len(urls), url))
-                (downloaded_path, _) = urlretrieve(
-                    url,
-                    temp.name if len(urls) == 1 else None,
-                    reporthook=TqdmUpTo(
-                        unit='B', unit_scale=True, miniters=1).update_to)
-                qprint("Downloaded to: %s" % quote(downloaded_path))
+                delete_downloaded = True
+                if args.already_downloaded_dir:
+                    filename = posixpath.basename(urlsplit(url).path)
+                    downloaded_path = os.path.join(
+                        args.already_downloaded_dir, filename)
+                    delete_downloaded = False
+                else:
+                    qprint("Downloading [part %d/%d]: %s" % (
+                        url_num + 1, len(urls), url))
+                    (downloaded_path, _) = urlretrieve(
+                        url,
+                        temp.name if len(urls) == 1 else None,
+                        reporthook=TqdmUpTo(
+                            unit='B', unit_scale=True, miniters=1).update_to)
+                    qprint("Downloaded to: %s" % quote(downloaded_path))
 
                 if downloaded_path != temp.name:
-                    qprint("Appending to: %s" % temp.name)
+                    qprint("Copying to: %s" % temp.name)
                     with open(downloaded_path, "rb") as fd:
                         copyfileobj(fd, temp, length=64*1024*1024)
-                    os.remove(downloaded_path)
+                    if delete_downloaded:
+                        os.remove(downloaded_path)
 
             temp.close()
             tar = tarfile.open(temp.name, 'r:bz2')
@@ -291,4 +317,21 @@ def info_subcommand(args):
 
 
 def path_subcommand(args):
+    """
+    Print the local path to a download
+    """
     print(get_path(args.download_name))
+
+
+def url_subcommand(args):
+    """
+    Print the URL(s) for a download
+    """
+    downloads = get_current_release_downloads()
+    download = downloads[args.download_name]["metadata"]
+    urls = []
+    if download.get("url"):
+        urls.append(download["url"])
+    if download.get("part_urls"):
+        urls.extend(download["part_urls"])
+    print("\n".join(urls))

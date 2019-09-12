@@ -21,7 +21,6 @@ addons:
   apt:
     packages:
       - pandoc
-      - libssl1.0.0
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
@@ -40,6 +39,22 @@ env:
 
 script:
   # download data and models, then run tests
-  - mhcflurry-downloads fetch data_curated models_class1 models_class1_pan allele_sequences
+  - mkdir -p /tmp/downloads
+  # We download using wget to avoid sporadic SSL error on travis from Python.
+  -
+    wget
+      $(mhcflurry-downloads url data_curated)
+      $(mhcflurry-downloads url models_class1)
+      $(mhcflurry-downloads url models_class1_pan)
+      $(mhcflurry-downloads url allele_sequences)
+      -P /tmp/downloads
+  - ls -lh /tmp/downloads
+  -
+    mhcflurry-downloads fetch
+    data_curated
+    models_class1
+    models_class1_pan
+    allele_sequences
+    --already-downloaded-dir /tmp/downloads
   - mhcflurry-downloads info  # just to test this command works
   - nosetests --with-timer -sv test
