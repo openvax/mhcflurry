@@ -7,10 +7,13 @@ Fetch the default downloads:
     $ mhcflurry-downloads fetch
 
 Fetch a specific download:
-    $ mhcflurry-downloads fetch data_kim2014
+    $ mhcflurry-downloads fetch models_class1_pan
 
 Get the path to a download:
-    $ mhcflurry-downloads path data_kim2014
+    $ mhcflurry-downloads path models_class1_pan
+
+Get the URL of a download:
+    $ mhcflurry-downloads url models_class1_pan
 
 Summarize available and fetched downloads:
     $ mhcflurry-downloads info
@@ -314,10 +317,16 @@ def info_subcommand(args):
 
 
 def path_subcommand(args):
+    """
+    Print the local path to a download
+    """
     print(get_path(args.download_name))
 
 
 def url_subcommand(args):
+    """
+    Print the URL(s) for a download
+    """
     downloads = get_current_release_downloads()
     download = downloads[args.download_name]["metadata"]
     urls = []
