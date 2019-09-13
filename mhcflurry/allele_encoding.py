@@ -1,4 +1,7 @@
+import numpy
 import pandas
+
+from copy import copy
 
 from . import amino_acid
 
@@ -18,7 +21,8 @@ class AlleleEncoding(object):
         Parameters
         ----------
         alleles : list of string
-            Allele names
+            Allele names. If any allele is None instead of string, it will be
+            mapped to the special index value -1.
 
         allele_to_sequence : dict of str -> str
             Allele name to amino acid sequence
@@ -42,6 +46,7 @@ class AlleleEncoding(object):
             self.allele_to_index = dict(
                 (allele, i)
                 for (i, allele) in enumerate(all_alleles))
+            self.allele_to_index[None] = -1  # special mask value
             unpadded = pandas.Series(
                 [allele_to_sequence[a] for a in all_alleles],
                 index=all_alleles)
@@ -138,3 +143,52 @@ class AlleleEncoding(object):
             result = vector_encoded[self.indices]
             self.encoding_cache[cache_key] = result
         return self.encoding_cache[cache_key]
+
+
+class MultipleAlleleEncoding(object):
+    def __init__(
+            self,
+            experiment_names,
+            experiment_to_allele_list,
+            max_alleles_per_experiment=6,
+            allele_to_sequence=None,
+            borrow_from=None):
+
+        padded_experiment_to_allele_list = {}
+        for (name, alleles) in experiment_to_allele_list.items():
+            assert len(alleles) > 0
+            assert len(alleles) <= max_alleles_per_experiment
+            alleles_with_mask = alleles + [None] * (
+                    max_alleles_per_experiment - len(alleles))
+            padded_experiment_to_allele_list[name] = alleles_with_mask
+
+        flattened_allele_list = []
+        for name in experiment_names:
+            flattened_allele_list.extend(padded_experiment_to_allele_list[name])
+
+        self.allele_encoding = AlleleEncoding(
+            alleles=flattened_allele_list,
+            allele_to_sequence=allele_to_sequence,
+            borrow_from=borrow_from
+        )
+        self.max_alleles_per_experiment = max_alleles_per_experiment
+
+    @property
+    def indices(self):
+        return self.allele_encoding.indices.values.reshape(
+            (-1, self.max_alleles_per_experiment))
+
+    def compact(self):
+        result = copy(self)
+        result.allele_encoding = self.allele_encoding.compact()
+        return result
+
+    def allele_representations(self, encoding_name):
+        return self.allele_encoding.allele_representations(encoding_name)
+
+    @property
+    def allele_to_sequence(self):
+        return self.allele_encoding.allele_to_sequence
+
+    def fixed_length_vector_encoded_sequences(self, encoding_name):
+        raise NotImplementedError()
