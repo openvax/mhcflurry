@@ -66,6 +66,7 @@ class Class1NeuralNetwork(object):
                 "kernel_size": 3
             }
         ],
+        topology="feedforward",
         num_outputs=1,
     )
     """
@@ -1228,6 +1229,7 @@ class Class1NeuralNetwork(object):
             dropout_probability,
             batch_normalization,
             locally_connected_layers,
+            topology,
             num_outputs=1,
             allele_representations=None):
         """
@@ -1317,8 +1319,16 @@ class Class1NeuralNetwork(object):
                     peptide_allele_merge_activation,
                     name="alelle_peptide_merged_%s" %
                          peptide_allele_merge_activation)(current_layer)
-            
-        for (i, layer_size) in enumerate(layer_sizes):
+
+        densenet_layers = [] if topology == "densenet" else None
+        for (i, layer_size) in enumerate(layer_size):
+            if densenet_layers is not None:
+                densenet_layers.append(current_layer)
+                if len(densenet_layers) > 1:
+                    current_layer = keras.layers.concatenate(densenet_layers)
+                else:
+                    (current_layer,) = densenet_layers
+
             current_layer = Dense(
                 layer_size,
                 activation=activation,
@@ -1334,6 +1344,10 @@ class Class1NeuralNetwork(object):
                     rate=1 - dropout_probability,
                     name="dropout_%d" % i)(current_layer)
 
+        # Note that when using densenet topology, we intentionally do not have
+        # any skip connections to the final output node. This empirically seems
+        # to work better.
+
         output = Dense(
             num_outputs,
             kernel_initializer=init,
@@ -1348,11 +1362,8 @@ class Class1NeuralNetwork(object):
 
     def clear_allele_representations(self):
         """
-        Set allele representations to NaN.
-
-        This reduces the size of saved models since the NaNs will compress
-        easily. It doesn't actually shrink the size of the model in memory,
-        though.
+        Set allele representations to an empty array. Useful before saving to
+        save a smaller version of the model.
         """
         original_model = self.network()
         layer = original_model.get_layer("allele_representation")
@@ -1361,7 +1372,7 @@ class Class1NeuralNetwork(object):
             numpy.zeros(shape=(0,) + existing_weights_shape.shape[1:]))
 
 
-    def set_allele_representations(self, allele_representations):
+    def set_allele_representations(self, allele_representations, force_surgery=False):
         """
         Set the allele representations in use by this model. This means mutating
         the weights for the allele input embedding layer.
@@ -1396,7 +1407,7 @@ class Class1NeuralNetwork(object):
         # the allele sequences) are allowed.
         assert existing_weights_shape[1:] == reshaped.shape[1:]
 
-        if existing_weights_shape[0] > reshaped.shape[0]:
+        if existing_weights_shape[0] > reshaped.shape[0] and not force_surgery:
             # Extend with NaNs so we can avoid having to reshape the weights
             # matrix, which is expensive.
             reshaped = numpy.append(
