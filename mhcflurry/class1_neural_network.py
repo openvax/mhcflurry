@@ -1321,7 +1321,7 @@ class Class1NeuralNetwork(object):
                          peptide_allele_merge_activation)(current_layer)
 
         densenet_layers = [] if topology == "densenet" else None
-        for (i, layer_size) in enumerate(layer_size):
+        for (i, layer_size) in enumerate(layer_sizes):
             if densenet_layers is not None:
                 densenet_layers.append(current_layer)
                 if len(densenet_layers) > 1:
