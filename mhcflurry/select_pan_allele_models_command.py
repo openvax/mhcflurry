@@ -288,6 +288,7 @@ def run(argv=sys.argv[1:]):
             len(models), fold_num, result['selected_indices']))
         models_by_fold[fold_num] = models
         for model in models:
+            model.clear_allele_representations()
             result_predictor.add_pan_allele_model(model)
 
     summary_df = pandas.concat(summary_dfs, ignore_index=False)

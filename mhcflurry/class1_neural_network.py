@@ -1346,6 +1346,21 @@ class Class1NeuralNetwork(object):
 
         return model
 
+    def clear_allele_representations(self):
+        """
+        Set allele representations to NaN.
+
+        This reduces the size of saved models since the NaNs will compress
+        easily. It doesn't actually shrink the size of the model in memory,
+        though.
+        """
+        original_model = self.network()
+        layer = original_model.get_layer("allele_representation")
+        existing_weights_shape = (layer.input_dim, layer.output_dim)
+        self.set_allele_representations(
+            numpy.zeros(shape=(0,) + existing_weights_shape.shape[1:]))
+
+
     def set_allele_representations(self, allele_representations):
         """
         Set the allele representations in use by this model. This means mutating

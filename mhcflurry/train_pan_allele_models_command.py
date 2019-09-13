@@ -693,6 +693,7 @@ def train_model(
     predictor.clear_cache()
 
     # Delete the network to release memory
+    model.clear_allele_representations()
     model.update_network_description()  # save weights and config
     model._network = None  # release tensorflow network
     return predictor
