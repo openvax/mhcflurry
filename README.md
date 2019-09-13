@@ -47,7 +47,7 @@ Wrote: /tmp/predictions.csv
 
 See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
 
-### Pan-allele models (experimental)
+## Pan-allele models (experimental)
 
 We are testing new models that support prediction for any MHC I allele of known
 sequence (as opposed to the 112 alleles supported by the allele-specific
@@ -100,3 +100,49 @@ these predictors, run:
 $ mhcflurry-downloads fetch models_class1_selected_no_mass_spec
 export MHCFLURRY_DEFAULT_CLASS1_MODELS="$(mhcflurry-downloads path models_class1_selected_no_mass_spec)/models"
 ```
+
+## Common issues and fixes
+
+### Problems downloading data and models
+Some users have reported HTTP connection issues when using `mhcflurry-downloads fetch`. As a workaround, you can download the data manually (e.g. using `wget`) and then use `mhcflurry-downloads` just to copy the data to the right place.
+
+To do this, first get the URL(s) of the downloads you need using `mhcflurry-downloads url`:
+
+```
+$ mhcflurry-downloads url models_class1
+http://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1.20180225.tar.bz2
+```
+
+Then make a directory and download the needed files to this directory:
+
+```
+$ mkdir downloads
+$ wget  --directory-prefix downloads http://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1.20180225.tar.bz2 
+HTTP request sent, awaiting response... 200 OK
+Length: 72616448 (69M) [application/octet-stream]
+Saving to: 'downloads/models_class1.20180225.tar.bz2'
+```
+
+Now call `mhcflurry-downloads fetch` with the `--already-downloaded-dir` option to indicate that the downloads should be retrived from the specified directory:
+
+```
+$ mhcflurry-downloads fetch models_class1 --already-downloaded-dir downloads
+```
+
+### Problems deserializing models
+If you encounter errors loading the MHCflurry models, such as:
+
+```
+...
+  File "/usr/local/lib/python3.6/site-packages/keras/engine/topology.py", line 293, in __init__
+    raise TypeError('Keyword argument not understood:', kwarg)
+TypeError: ('Keyword argument not understood:', 'data_format')
+```
+
+You may need to upgrade Keras:
+
+```
+pip install --upgrade Keras
+```
+
+
