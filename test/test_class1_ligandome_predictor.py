@@ -19,14 +19,17 @@ import pandas
 import argparse
 import sys
 
-from numpy.testing import assert_, assert_equal
+from numpy.testing import assert_, assert_equal, assert_allclose
 import numpy
 from random import shuffle
 
+from sklearn.metrics import roc_auc_score
+
 from mhcflurry import Class1AffinityPredictor,Class1NeuralNetwork
-from mhcflurry.allele_encoding import AlleleEncoding
+from mhcflurry.allele_encoding import MultipleAlleleEncoding
 from mhcflurry.class1_ligandome_predictor import Class1LigandomePredictor
 from mhcflurry.downloads import get_path
+from mhcflurry.regression_target import from_ic50
 
 from mhcflurry.testing_utils import cleanup, startup
 from mhcflurry.amino_acid import COMMON_AMINO_ACIDS
@@ -44,7 +47,10 @@ def setup():
     global PAN_ALLELE_MOTIFS_NO_MASS_SPEC_DF
     startup()
     PAN_ALLELE_PREDICTOR_NO_MASS_SPEC = Class1AffinityPredictor.load(
-            get_path("models_class1_pan", "models.no_mass_spec"))
+        get_path("models_class1_pan", "models.no_mass_spec"),
+        optimization_level=0,
+        max_models=1)
+
     PAN_ALLELE_MOTIFS_WITH_MASS_SPEC_DF = pandas.read_csv(
         get_path(
             "models_class1_pan",
@@ -142,25 +148,65 @@ def test_synthetic_allele_refinement():
 
     train_df = pandas.concat([hits_df, decoys_df], ignore_index=True)
 
-    predictor = Class1LigandomePredictor(PAN_ALLELE_PREDICTOR_NO_MASS_SPEC)
+    predictor = Class1LigandomePredictor(
+        PAN_ALLELE_PREDICTOR_NO_MASS_SPEC,
+        max_ensemble_size=1,
+        max_epochs=100,
+        patience=5)
+
+    allele_encoding = MultipleAlleleEncoding(
+        experiment_names=["experiment1"] * len(train_df),
+        experiment_to_allele_list={
+            "experiment1": alleles,
+        },
+        max_alleles_per_experiment=6,
+        allele_to_sequence=PAN_ALLELE_PREDICTOR_NO_MASS_SPEC.allele_to_sequence,
+    ).compact()
+
+    pre_predictions = predictor.predict(
+        peptides=train_df.peptide.values,
+        allele_encoding=allele_encoding)
+
+    (model,) = PAN_ALLELE_PREDICTOR_NO_MASS_SPEC.class1_pan_allele_models
+    expected_pre_predictions = from_ic50(
+        model.predict(
+            peptides=numpy.repeat(train_df.peptide.values, len(alleles)),
+            allele_encoding=allele_encoding.allele_encoding,
+    )).reshape((-1, len(alleles)))
+
+    train_df["pre_max_prediction"] = pre_predictions.max(1)
+    pre_auc = roc_auc_score(train_df.hit.values, train_df.pre_max_prediction.values)
+    print("PRE_AUC", pre_auc)
+
+    #import ipdb ; ipdb.set_trace()
+
+    assert_allclose(pre_predictions, expected_pre_predictions)
+
     predictor.fit(
         peptides=train_df.peptide.values,
         labels=train_df.hit.values,
-        experiment_names=["experiment1"] * len(train_df),
-        experiment_name_to_alleles={
-            "experiment1": alleles,
-        }
+        allele_encoding=allele_encoding
     )
 
     predictions = predictor.predict(
         peptides=train_df.peptide.values,
-        alleles=alleles,
-        output_format="concatenate"
+        allele_encoding=allele_encoding,
     )
+
+    train_df["max_prediction"] = predictions.max(1)
+    train_df["predicted_allele"] = pandas.Series(alleles).loc[
+        predictions.argmax(1).flatten()
+    ].values
 
     print(predictions)
 
+    auc = roc_auc_score(train_df.hit.values, train_df.max_prediction.values)
+    print("AUC", auc)
+
     import ipdb ; ipdb.set_trace()
+
+    return predictions
+
 
 
 """
