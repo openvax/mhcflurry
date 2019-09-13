@@ -562,7 +562,10 @@ class Class1AffinityPredictor(object):
         """
         random_string = hashlib.sha1(
             str(time.time()).encode()).hexdigest()[:16]
-        return "%s-%d-%s" % (allele.upper(), num, random_string)
+        return "%s-%d-%s" % (
+            allele.upper().replace("*", "_").replace(":", "_"),
+            num,
+            random_string)
 
     @staticmethod
     def weights_path(models_dir, model_name):
