@@ -1369,7 +1369,8 @@ class Class1NeuralNetwork(object):
         layer = original_model.get_layer("allele_representation")
         existing_weights_shape = (layer.input_dim, layer.output_dim)
         self.set_allele_representations(
-            numpy.zeros(shape=(0,) + existing_weights_shape.shape[1:]))
+            numpy.zeros(shape=(0,) + existing_weights_shape[1:]),
+            force_surgery=True)
 
 
     def set_allele_representations(self, allele_representations, force_surgery=False):
@@ -1397,15 +1398,18 @@ class Class1NeuralNetwork(object):
         import keras.backend as K
         import tensorflow as tf
 
-        reshaped = allele_representations.reshape(
-            (allele_representations.shape[0], -1))
+        reshaped = allele_representations.reshape((
+            allele_representations.shape[0],
+            numpy.product(allele_representations.shape[1:])
+        ))
         original_model = self.network()
         layer = original_model.get_layer("allele_representation")
         existing_weights_shape = (layer.input_dim, layer.output_dim)
 
         # Only changes to the number of supported alleles (not the length of
         # the allele sequences) are allowed.
-        assert existing_weights_shape[1:] == reshaped.shape[1:]
+        assert existing_weights_shape[1:] == reshaped.shape[1:], (
+            existing_weights_shape, reshaped.shape)
 
         if existing_weights_shape[0] > reshaped.shape[0] and not force_surgery:
             # Extend with NaNs so we can avoid having to reshape the weights
@@ -1439,6 +1443,8 @@ class Class1NeuralNetwork(object):
             def throw(*args, **kwargs):
                 raise RuntimeError("Using a disabled model!")
             original_model.predict = \
+                original_model.to_json = \
+                original_model.get_weights = \
                 original_model.fit = \
                 original_model.fit_generator = throw
 
