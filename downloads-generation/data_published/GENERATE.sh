@@ -28,11 +28,60 @@ git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
+############################################
+# BINDING AFFINITIES
+############################################
+#
 # Kim et al 2014 [PMID 25017736]
 wget -q https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.2009.mhci.public.1.txt
 wget -q https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.20130222.mhci.public.1.txt
 wget -q https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.2013.mhci.public.blind.1.txt
 
+mkdir raw
+
+############################################
+# MS: Multiallelic
+############################################
+# Bassani-Sternberg, ..., Gfeller PLOS Comp. Bio. 2017 [PMID 28832583]
+# The first dataset is from this work. The second dataset is originally from:
+#   Pearson, ..., Perreault JCI 2016 [PMID 27841757]
+# but was reanalyzed in this work, and we download the reanalyzed version here.
+PMID=28832583
+mkdir -p raw/$PMID
+wget -q https://doi.org/10.1371/journal.pcbi.1005725.s002 -P raw/$PMID # data generated in this work
+wget -q https://doi.org/10.1371/journal.pcbi.1005725.s003 -P raw/$PMID # data reanalyzed in this work
+
+# Bassani-Sternberg, ..., Mann Mol Cell Proteomics 2015 [PMID 25576301]
+PMID=25576301
+mkdir -p raw/$PMID
+wget -q https://www.mcponline.org/highwire/filestream/35026/field_highwire_adjunct_files/7/mcp.M114.042812-4.xlsx -P raw/$PMID
+
+# Mommen, ..., Heck PNAS 2014 [PMID 24616531]
+PMID=24616531
+mkdir -p raw/$PMID
+wget -q https://www.pnas.org/highwire/filestream/615485/field_highwire_adjunct_files/1/sd01.xlsx -P raw/$PMID
+
+# Gloger, ..., Neri Cancer Immunol Immunother 2016 [PMID 27600516]
+# Data extracted from supplemental PDF table.
+PMID=27600516
+mkdir -p raw/$PMID
+wget -q https://github.com/openvax/mhcflurry/releases/download/pan-dev1/Gloger_Neri_CII_2016_27600516_extracted_from_pdf.csv -P raw/$PMID
+
+# Ritz, ..., Fugmann Proteomics 2016 [PMID 26992070]
+# Supplemental zip downloaded from publication
+PMID=26992070
+mkdir -p raw/$PMID
+wget -q https://github.com/openvax/mhcflurry/releases/download/pan-dev1/pmic12297-sup-0001-supinfo.zip -P raw/$PMID
+unzip raw/$PMID/pmic12297-sup-0001-supinfo.zip
+
+# Shraibman, ..., Admon Mol Cell Proteomics	2016 [PMID 27412690]
+PMID=27412690
+mkdir -p raw/$PMID
+wget -q https://www.mcponline.org/lookup/suppl/doi:10.1074/mcp.M116.060350/-/DC1/mcp.M116.060350-2.xlsx -P raw/$PMID
+
+# Pearson, ..., Perreault 2016 J Clin Invest [PMID 27841757]
+# Note: we do not use the original data from this publicaton, we use 28832583's reanalysis of it.
+#
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
 RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
