@@ -20,11 +20,7 @@ mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
 exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
 exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 
-# Log some environment info
 date
-pip freeze
-# git rev-parse HEAD
-git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
@@ -65,23 +61,33 @@ wget -q https://www.pnas.org/highwire/filestream/615485/field_highwire_adjunct_f
 # Data extracted from supplemental PDF table.
 PMID=27600516
 mkdir -p raw/$PMID
-wget -q https://github.com/openvax/mhcflurry/releases/download/pan-dev1/Gloger_Neri_CII_2016_27600516_extracted_from_pdf.csv -P raw/$PMID
+wget -q https://github.com/openvax/mhcflurry/releases/download/pan-dev1/27600516.peptides.csv -P raw/$PMID
 
 # Ritz, ..., Fugmann Proteomics 2016 [PMID 26992070]
 # Supplemental zip downloaded from publication
 PMID=26992070
 mkdir -p raw/$PMID
 wget -q https://github.com/openvax/mhcflurry/releases/download/pan-dev1/pmic12297-sup-0001-supinfo.zip -P raw/$PMID
-unzip raw/$PMID/pmic12297-sup-0001-supinfo.zip
+cd raw/$PMID
+unzip pmic12297-sup-0001-supinfo.zip
+cd ../..
 
 # Shraibman, ..., Admon Mol Cell Proteomics	2016 [PMID 27412690]
 PMID=27412690
 mkdir -p raw/$PMID
 wget -q https://www.mcponline.org/lookup/suppl/doi:10.1074/mcp.M116.060350/-/DC1/mcp.M116.060350-2.xlsx -P raw/$PMID
 
-# Pearson, ..., Perreault 2016 J Clin Invest [PMID 27841757]
+# Pearson, ..., Perreault J Clin Invest 2016 [PMID 27841757]
 # Note: we do not use the original data from this publicaton, we use 28832583's reanalysis of it.
 #
+
+# Hassan, ..., van Veelen Mol Cell Proteomics 2015 [PMID 23481700]
+PMID=23481700
+mkdir -p raw/$PMID
+wget -q https://www.mcponline.org/highwire/filestream/34681/field_highwire_adjunct_files/1/mcp.M112.024810-2.xls  -P raw/$PMID
+
+
+
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
 RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
