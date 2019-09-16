@@ -55,6 +55,8 @@ do
         --num-jobs 0 \
         --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
 
+    cp "$MODELS_DIR/train_data.csv.bz2" "models.${kind}/"
+
     # For now we calibrate percentile ranks only for alleles for which there
     # is training data. Calibrating all alleles would be too slow.
     # This could be improved though.

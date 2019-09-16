@@ -62,6 +62,8 @@ do
         --max-models 32 \
         --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
 
+    cp "$MODELS_DIR/train_data.csv.bz2" "models.${kind}/"
+
     # Percentile rank calibration is run on the cluster.
     # For now we calibrate percentile ranks only for alleles for which there
     # is training data. Calibrating all alleles would be too slow.
