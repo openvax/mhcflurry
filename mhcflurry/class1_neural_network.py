@@ -773,7 +773,7 @@ class Class1NeuralNetwork(object):
                 random_negative_alleles = []
                 for _ in random_negative_lengths:
                     for (allele, num) in allele_to_num_per_length.items():
-                        random_negative_alleles.append([allele] * num)
+                        random_negative_alleles.extend([allele] * num)
 
             numpy.testing.assert_equal(
                 len(random_negative_alleles),
@@ -1422,12 +1422,18 @@ class Class1NeuralNetwork(object):
                     name="alelle_peptide_merged_%s" %
                          peptide_allele_merge_activation)(current_layer)
 
-        densenet_layers = [] if topology == "densenet" else None
+        if topology == "feedforward":
+            densenet_layers = None
+        elif topology == "with-skip-connections":
+            densenet_layers = []
+        else:
+            raise NotImplementedError(topology)
         for (i, layer_size) in enumerate(layer_sizes):
             if densenet_layers is not None:
                 densenet_layers.append(current_layer)
                 if len(densenet_layers) > 1:
-                    current_layer = keras.layers.concatenate(densenet_layers)
+                    current_layer = keras.layers.concatenate(
+                        densenet_layers[-2:])
                 else:
                     (current_layer,) = densenet_layers
 
