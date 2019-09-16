@@ -14,6 +14,7 @@ import pandas
 from .hyperparameters import HyperparameterDefaults
 
 from .encodable_sequences import EncodableSequences, EncodingError
+from .allele_encoding import AlleleEncoding
 from .regression_target import to_ic50, from_ic50
 from .common import random_peptides, amino_acid_distribution
 from .custom_loss import get_loss
@@ -97,7 +98,10 @@ class Class1NeuralNetwork(object):
         random_negative_affinity_max=50000.0,
         random_negative_match_distribution=True,
         random_negative_distribution_smoothing=0.0,
-        random_negative_output_indices=None)
+        random_negative_output_indices=None,
+        random_negative_method="by_length",
+        random_negative_binder_threshold=None,
+        random_negative_lengths=[8,9,10,11,12,13,14,15])
     """
     Hyperparameters for neural network training.
     """
@@ -674,6 +678,132 @@ class Class1NeuralNetwork(object):
         fit_info["num_points"] = mutable_generator_state["yielded_values"]
         self.fit_info.append(dict(fit_info))
 
+    def random_negatives_generator(
+            self,
+            encodable_peptides,
+            affinities,
+            allele_encoding,
+            inequalities):
+
+        random_negative_lengths = self.hyperparameters['random_negative_lengths']
+
+        df = pandas.DataFrame({
+            "peptide": encodable_peptides.sequences,
+            "affinity": affinities,
+        })
+        if allele_encoding is not None:
+            df["allele"] = allele_encoding.alleles
+        df["length"] = df.peptide.str.len()
+        if inequalities is None:
+            df["inequality"] = "="
+        else:
+            df["inequality"] = inequalities
+        if self.hyperparameters['random_negative_binder_threshold']:
+            df = df.loc[
+                (df.inequality != ">") &
+                (df.affinity < self.hyperparameters[
+                    'random_negative_binder_threshold'
+                ])
+            ]
+
+        aa_distribution = None
+        if self.hyperparameters['random_negative_match_distribution']:
+            aa_distribution = amino_acid_distribution(
+                encodable_peptides.sequences,
+                smoothing=self.hyperparameters[
+                    'random_negative_distribution_smoothing'
+                ])
+            logging.info(
+                "Using amino acid distribution for random negative:\n%s" % (
+                    str(aa_distribution.to_dict())))
+
+        random_negative_alleles = None
+        if self.hyperparameters["random_negative_method"] == "by_length":
+            # Different numbers of random negatives per length. Alleles are
+            # sampled proportionally to the number of times they are used in
+            # the training data.
+            length_to_num_random_negative = {}
+            random_negative_lengths = self.hyperparameters[
+                'random_negative_lengths'
+            ]
+
+            length_counts = df.length.value_counts().to_dict()
+            for length in random_negative_lengths:
+                length_to_num_random_negative[length] = int(
+                    length_counts.get(length, 0) *
+                    self.hyperparameters['random_negative_rate'] +
+                    self.hyperparameters['random_negative_constant'])
+            length_to_num_random_negative = pandas.Series(
+                length_to_num_random_negative)
+            total_random_negatives = length_to_num_random_negative.sum()
+            logging.info("Random negative counts per length:\n%s" % (
+                str(length_to_num_random_negative.to_dict())))
+
+            if allele_encoding is not None:
+                random_negative_alleles = df.allele.sample(
+                    n=total_random_negatives, replace=True).values
+
+            def sample_peptides():
+                peptides = []
+                for (length, count) in length_to_num_random_negative.items():
+                    peptides.extend(
+                        random_peptides(
+                            count,
+                            length=length,
+                            distribution=aa_distribution))
+                random.shuffle(peptides) # important
+                return EncodableSequences.create(peptides)
+        elif self.hyperparameters["random_negative_method"] == "by_allele":
+            # For each allele, a particular number of random negatives are used
+            # for all lengths. Across alleles, the number of random negatives
+            # varies; within an allele, the number of random negatives for each
+            # length is a constant
+            allele_to_num_per_length = {}
+            total_random_peptides_per_length = 0
+            for (allele, sub_df) in df.groupby("allele"):
+                num_for_allele = len(sub_df) * (
+                    self.hyperparameters['random_negative_rate']
+                ) + self.hyperparameters['random_negative_constant']
+                num_per_length = int(
+                    num_for_allele / len(random_negative_lengths))
+                total_random_peptides_per_length += num_per_length
+                allele_to_num_per_length[allele] = num_per_length
+
+            for _ in random_negative_lengths:
+                for (allele, num) in allele_to_num_per_length.items():
+                    random_negative_alleles.append([allele] * num)
+
+            numpy.testing.assert_equal(
+                len(random_negative_alleles),
+                total_random_peptides_per_length * len(random_negative_lengths))
+
+            logging.info(
+                "Random negative counts for each length by allele:\n%s" % (
+                    str(allele_to_num_per_length)))
+
+            def sample_peptides():
+                peptides = []
+                for length in random_negative_lengths:
+                    peptides.extend(
+                        random_peptides(
+                            total_random_peptides_per_length,
+                            length=length,
+                            distribution=aa_distribution))
+                # important NOT to shuffle peptides.
+                return EncodableSequences.create(peptides)
+        else:
+            raise NotImplementedError(
+                self.hyperparameters["random_negative_method"])
+
+        random_negative_allele_encoding = None
+        if random_negative_alleles:
+            random_negative_allele_encoding = AlleleEncoding(
+                random_negative_alleles, borrow_from=allele_encoding)
+
+        yield random_negative_allele_encoding
+        while True:
+            yield sample_peptides()
+
     def fit(
             self,
             peptides,
@@ -738,29 +868,14 @@ class Class1NeuralNetwork(object):
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
         fit_info = collections.defaultdict(list)
 
-        length_counts = (
-            pandas.Series(encodable_peptides.sequences)
-            .str.len().value_counts().to_dict())
-
-        num_random_negative = {}
-        for length in range(8, 16):
-            num_random_negative[length] = int(
-                length_counts.get(length, 0) *
-                self.hyperparameters['random_negative_rate'] +
-                self.hyperparameters['random_negative_constant'])
-        num_random_negative = pandas.Series(num_random_negative)
-        logging.info("Random negative counts per length:\n%s" % (
-            str(num_random_negative.to_dict())))
-
-        aa_distribution = None
-        if self.hyperparameters['random_negative_match_distribution']:
-            aa_distribution = amino_acid_distribution(
-                encodable_peptides.sequences,
-                smoothing=self.hyperparameters[
-                    'random_negative_distribution_smoothing'])
-            logging.info(
-                "Using amino acid distribution for random negative:\n%s" % (
-                str(aa_distribution.to_dict())))
+        random_negatives_generator = self.random_negatives_generator(
+            encodable_peptides=encodable_peptides,
+            affinities=affinities,
+            allele_encoding=allele_encoding,
+            inequalities=inequalities)
+        random_negatives_allele_encoding = next(random_negatives_generator)
+        num_random_negatives = len(
+            next(random_negatives_generator).sequences)
 
         y_values = from_ic50(numpy.array(affinities, copy=False))
         assert numpy.isnan(y_values).sum() == 0, y_values
@@ -853,15 +968,14 @@ class Class1NeuralNetwork(object):
             y_dict_with_random_negatives = {
                 "output": numpy.concatenate([
                     numpy.tile(
-                        random_negative_target, int(num_random_negative.sum())),
+                        random_negative_target, num_random_negatives),
                     y_values,
                 ]),
             }
             # Note: we are using "<" here not ">" because the inequalities are
             # now in target-space (0-1) not affinity-space.
             adjusted_inequalities_with_random_negatives = (
-                ["<"] * int(num_random_negative.sum()) +
-                list(adjusted_inequalities))
+                ["<"] * num_random_negatives + list(adjusted_inequalities))
         else:
             # Randomly sample random negative affinities
             y_dict_with_random_negatives = {
@@ -872,7 +986,7 @@ class Class1NeuralNetwork(object):
                                 'random_negative_affinity_min'],
                             self.hyperparameters[
                                 'random_negative_affinity_max'],
-                            int(num_random_negative.sum()))),
+                            num_random_negatives)),
                     y_values,
                 ]),
             }
@@ -881,7 +995,7 @@ class Class1NeuralNetwork(object):
             y_dict_with_random_negatives)
         if sample_weights is not None:
             sample_weights_with_random_negatives = numpy.concatenate([
-                numpy.ones(int(num_random_negative.sum())),
+                numpy.ones(num_random_negatives),
                 sample_weights])
         else:
             sample_weights_with_random_negatives = None
@@ -893,7 +1007,7 @@ class Class1NeuralNetwork(object):
                 else list(range(0, self.hyperparameters['num_outputs'])))
             output_indices_with_random_negatives = numpy.concatenate([
                 pandas.Series(random_negative_output_indices, dtype=int).sample(
-                    n=int(num_random_negative.sum()), replace=True).values,
+                    n=num_random_negatives, replace=True).values,
                 output_indices
             ])
         else:
@@ -924,32 +1038,24 @@ class Class1NeuralNetwork(object):
         last_progress_print = None
         x_dict_with_random_negatives = {}
         for i in range(self.hyperparameters['max_epochs']):
-            random_negative_peptides_list = []
-            for (length, count) in num_random_negative.iteritems():
-                random_negative_peptides_list.extend(
-                    random_peptides(
-                        count,
-                        length=length,
-                        distribution=aa_distribution))
-            random.shuffle(random_negative_peptides_list)
-            random_negative_peptides = EncodableSequences.create(
-                random_negative_peptides_list)
+            random_negative_peptides = next(random_negatives_generator)
             random_negative_peptides_encoding = (
                 self.peptides_to_network_input(random_negative_peptides))
 
             if not x_dict_with_random_negatives:
                 if len(random_negative_peptides) > 0:
-                    x_dict_with_random_negatives["peptide"] = numpy.concatenate([
+                    x_dict_with_random_negatives[
+                        "peptide"
+                    ] = numpy.concatenate([
                         random_negative_peptides_encoding,
-                        peptide_encoding,
+                        x_dict_without_random_negatives['peptide'],
                     ])
                     if 'allele' in x_dict_without_random_negatives:
-                        x_dict_with_random_negatives['allele'] = numpy.concatenate([
-                            x_dict_without_random_negatives['allele'][
-                                numpy.random.choice(
-                                    x_dict_without_random_negatives[
-                                        'allele'].shape[0],
-                                    size=len(random_negative_peptides_list))],
+                        x_dict_with_random_negatives[
+                            'allele'
+                        ] = numpy.concatenate([
+                            self.allele_encoding_to_network_input(
+                                random_negatives_allele_encoding)[0],
                             x_dict_without_random_negatives['allele']
                         ])
                 else:
@@ -959,18 +1065,9 @@ class Class1NeuralNetwork(object):
                 # Update x_dict_with_random_negatives in place.
                 # This is more memory efficient than recreating it as above.
                 if len(random_negative_peptides) > 0:
-                    x_dict_with_random_negatives["peptide"][:len(random_negative_peptides)] = (
-                        random_negative_peptides_encoding
-                    )
-                    if 'allele' in x_dict_with_random_negatives:
-                        x_dict_with_random_negatives['allele'][:len(random_negative_peptides)] = (
-                            x_dict_with_random_negatives['allele'][
-                                len(random_negative_peptides) + numpy.random.choice(
-                                    x_dict_with_random_negatives['allele'].shape[0] -
-                                    len(random_negative_peptides),
-                                    size=len(random_negative_peptides))
-                            ]
-                        )
+                    x_dict_with_random_negatives[
+                        "peptide"
+                    ][:num_random_negatives] = random_negative_peptides_encoding
 
             if needs_initialization:
                 self.data_dependent_weights_initialization(
