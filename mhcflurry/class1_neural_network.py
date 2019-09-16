@@ -701,7 +701,7 @@ class Class1NeuralNetwork(object):
         if self.hyperparameters['random_negative_binder_threshold']:
             df = df.loc[
                 (df.inequality != ">") &
-                (df.affinity < self.hyperparameters[
+                (df.affinity <= self.hyperparameters[
                     'random_negative_binder_threshold'
                 ])
             ]
