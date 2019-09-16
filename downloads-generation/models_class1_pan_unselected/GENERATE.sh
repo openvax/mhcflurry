@@ -31,6 +31,8 @@ date
 pip freeze
 git status
 
+mhcflurry-downloads fetch data_curated allele_sequences random_peptide_predictions
+
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 cp $SCRIPT_DIR/generate_hyperparameters.py .

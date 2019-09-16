@@ -34,6 +34,8 @@ date
 pip freeze
 git status
 
+mhcflurry-downloads fetch data_curated allele_sequences random_peptide_predictions
+
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 export OMP_NUM_THREADS=1
