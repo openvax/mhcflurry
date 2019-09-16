@@ -796,7 +796,7 @@ class Class1NeuralNetwork(object):
                 self.hyperparameters["random_negative_method"])
 
         random_negative_allele_encoding = None
-        if random_negative_alleles:
+        if random_negative_alleles is not None:
             random_negative_allele_encoding = AlleleEncoding(
                 random_negative_alleles, borrow_from=allele_encoding)
 
