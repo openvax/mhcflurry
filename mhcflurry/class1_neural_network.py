@@ -769,9 +769,11 @@ class Class1NeuralNetwork(object):
                 total_random_peptides_per_length += num_per_length
                 allele_to_num_per_length[allele] = num_per_length
 
-            for _ in random_negative_lengths:
-                for (allele, num) in allele_to_num_per_length.items():
-                    random_negative_alleles.append([allele] * num)
+            if allele_encoding is not None:
+                random_negative_alleles = []
+                for _ in random_negative_lengths:
+                    for (allele, num) in allele_to_num_per_length.items():
+                        random_negative_alleles.append([allele] * num)
 
             numpy.testing.assert_equal(
                 len(random_negative_alleles),
@@ -789,7 +791,8 @@ class Class1NeuralNetwork(object):
                             total_random_peptides_per_length,
                             length=length,
                             distribution=aa_distribution))
-                # important NOT to shuffle peptides.
+                # important NOT to shuffle peptides, since they correspond with
+                # specific alleles.
                 return EncodableSequences.create(peptides)
         else:
             raise NotImplementedError(

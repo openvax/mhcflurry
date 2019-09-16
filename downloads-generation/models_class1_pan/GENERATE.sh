@@ -50,8 +50,8 @@ do
         --data "$MODELS_DIR/train_data.csv.bz2" \
         --models-dir "$MODELS_DIR" \
         --out-models-dir models.${kind} \
-        --min-models 8 \
-        --max-models 32 \
+        --min-models 2 \
+        --max-models 8 \
         --num-jobs 0 \
         --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
 
