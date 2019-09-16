@@ -8,7 +8,7 @@
 # by name, the downloads with "default=true" are downloaded.
 
 # This should usually be the latest release.
-current-release: 1.3.0
+current-release: 1.4.0
 
 # An integer indicating what models the current MHCflurry code base is compatible
 # with. Increment this integer when changes are made to MHCflurry that would break
@@ -17,6 +17,69 @@ current-compatibility-version: 2
 
 # Add new releases here as they are made.
 releases:
+    1.4.0:
+        compatibility-version: 2
+        downloads:
+            - name: models_class1_pan
+              url: http://github.com/openvax/mhcflurry/releases/download/pan-dev1/models_class1_pan.20190829.tar.bz2
+              default: false
+
+            - name: models_class1_pan_unselected
+              part_urls:
+                - http://github.com/openvax/mhcflurry/releases/download/pan-dev1/models_class1_pan_unselected.20190826.tar.bz2.part.aa
+                - http://github.com/openvax/mhcflurry/releases/download/pan-dev1/models_class1_pan_unselected.20190826.tar.bz2.part.ab
+              default: false
+
+            - name: data_iedb
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/data_iedb.20190916.tar.bz2
+              default: false
+
+            - name: data_systemhcatlas
+              url: http://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_systemhcatlas.20190506.tar.bz2
+              default: false
+
+            - name: allele_sequences
+              url: http://github.com/openvax/mhcflurry/releases/download/pan-dev1/allele_sequences.20190506.tar.bz2
+              default: false
+
+            - name: random_peptide_predictions
+              url: http://github.com/openvax/mhcflurry/releases/download/pan-dev1/random_peptide_predictions.20190506.tar.bz2
+              default: false
+
+            - name: data_published
+              url: http://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_published.tar.bz2
+              default: false
+
+            - name: data_curated
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/data_curated.20190916.tar.bz2
+              default: true
+
+            # Older downloads
+            - name: models_class1
+              url: http://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1.20180225.tar.bz2
+              default: true
+
+            - name: models_class1_selected_no_mass_spec
+              url: http://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_selected_no_mass_spec.20180225.tar.bz2
+              default: false
+
+            - name: models_class1_unselected
+              url: http://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_unselected.20180221.tar.bz2
+              default: false
+
+            - name: models_class1_trained_with_mass_spec
+              url: http://github.com/openvax/mhcflurry/releases/download/pre-1.2.1/models_class1_trained_with_mass_spec.20180228.tar.bz2
+              default: false
+
+            - name: models_class1_unselected_with_mass_spec
+              url: http://github.com/openvax/mhcflurry/releases/download/pre-1.2.1/models_class1_unselected_with_mass_spec.20180227.tar.bz2
+              default: false
+
+            - name: models_class1_minimal
+              url: http://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_minimal.20180226.tar.bz2
+              default: false
+
+
     1.3.0:
         compatibility-version: 2
         downloads:

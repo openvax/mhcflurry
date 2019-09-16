@@ -54,6 +54,6 @@ bzip2 curated_training_data.with_mass_spec.csv
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
-tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
-
-echo "Created archive: $SCRATCH_DIR/$DOWNLOAD_NAME.tar.bz2"
+RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
+tar -cjf "$RESULT" *
+echo "Created archive: $RESULT"
