@@ -8,17 +8,21 @@
 #BSUB -W 46:00 # walltime in HH:MM
 #BSUB -R rusage[mem=30000] # mb memory requested
 #BSUB -o {work_dir}/%J.stdout # output log (%J : JobID)
-#BSUB -eo {work_dir}/%J.stderr # error log
+#BSUB -eo {work_dir}/STDERR # error log
 #BSUB -L /bin/bash # Initialize the execution environment
 #
+
+set -e
+set -x
+
+echo "Subsequent stderr output redirected to stdout" >&2
+exec 2>&1
 
 export TMPDIR=/local/JOBS/mhcflurry-{work_item_num}
 export PATH=$HOME/.conda/envs/py36b/bin/:$PATH
 export PYTHONUNBUFFERED=1
 export KMP_SETTINGS=1
 
-set -e
-set -x
 free -m
 
 module add cuda/10.0.130 cudnn/7.1.1
