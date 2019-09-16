@@ -5,6 +5,7 @@ import weakref
 import itertools
 import os
 import logging
+import random
 import pickle
 
 import numpy
@@ -930,6 +931,7 @@ class Class1NeuralNetwork(object):
                         count,
                         length=length,
                         distribution=aa_distribution))
+            random.shuffle(random_negative_peptides_list)
             random_negative_peptides = EncodableSequences.create(
                 random_negative_peptides_list)
             random_negative_peptides_encoding = (
