@@ -134,6 +134,18 @@ def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
         (~iedb_df["Allele Name"].str.contains("CD1"))
     ]
 
+    # Drop insufficiently specific allele names like "HLA-A03":
+    insuffient_mask = (
+        (~iedb_df["Allele Name"].str.upper().str.startswith("H2-")) &
+        (~iedb_df["Allele Name"].str.upper().str.startswith("H-2-")) &
+        (~iedb_df["Allele Name"].str.upper().str.startswith("MAMU")) &
+        (iedb_df["Allele Name"].str.findall("[0-9]").str.len() < 4)
+    )
+    print("Dropping %d records with insufficiently-specific allele names:" %
+        insuffient_mask.sum())
+    print(iedb_df.loc[insuffient_mask]["Allele Name"].value_counts())
+    iedb_df = iedb_df.loc[~insuffient_mask]
+
     iedb_df["allele"] = iedb_df["Allele Name"].map(normalize_allele_name)
     print("Dropping un-parseable alleles: %s" % ", ".join(
         iedb_df.loc[iedb_df.allele == "UNKNOWN"]["Allele Name"].unique()))
