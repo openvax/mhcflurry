@@ -2,6 +2,11 @@
 Tests for training and predicting using Class1 pan-allele models.
 """
 
+import logging
+logging.getLogger('tensorflow').disabled = True
+logging.getLogger('matplotlib').disabled = True
+
+
 import json
 import os
 import shutil
@@ -36,7 +41,7 @@ HYPERPARAMETERS_LIST = [
     'learning_rate': None,
     'locally_connected_layers': [],
     'loss': 'custom:mse_with_inequalities',
-    'max_epochs': 5,
+    'max_epochs': 0,  # never selected
     'minibatch_size': 256,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
@@ -100,7 +105,7 @@ HYPERPARAMETERS_LIST = [
     },
     'validation_split': 0.1,
 },
-][1:]
+]
 
 
 def run_and_check(n_jobs=0, delete=True, additional_args=[]):
@@ -114,37 +119,47 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
         get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
     selected_data_df = data_df.loc[data_df.allele.str.startswith("HLA-A")]
     selected_data_df.to_csv(
-        os.path.join(models_dir, "train_data.csv"), index=False)
+        os.path.join(models_dir, "_train_data.csv"), index=False)
 
     args = [
         "mhcflurry-class1-train-pan-allele-models",
-        "--data", os.path.join(models_dir, "train_data.csv"),
+        "--data", os.path.join(models_dir, "_train_data.csv"),
         "--allele-sequences", get_path("allele_sequences", "allele_sequences.csv"),
         "--hyperparameters", hyperparameters_filename,
         "--out-models-dir", models_dir,
         "--num-jobs", str(n_jobs),
-        "--ensemble-size", "2",
+        "--num-folds", "2",
         "--verbosity", "1",
-        # "--pretrain-data", get_path(
-        #      "random_peptide_predictions", "predictions.csv.bz2"),
     ] + additional_args
     print("Running with args: %s" % args)
     subprocess.check_call(args)
 
-    result = Class1AffinityPredictor.load(models_dir)
-    predictions = result.predict(
-        peptides=["SLYNTVATL"],
+    # Run model selection
+    models_dir_selected = tempfile.mkdtemp(
+        prefix="mhcflurry-test-models-selected")
+    args = [
+        "mhcflurry-class1-select-pan-allele-models",
+        "--data", os.path.join(models_dir, "train_data.csv.bz2"),
+        "--models-dir", models_dir,
+        "--out-models-dir", models_dir_selected,
+        "--max-models", "1",
+        "--num-jobs", str(n_jobs),
+    ] + additional_args
+    print("Running with args: %s" % args)
+    subprocess.check_call(args)
+
+    result = Class1AffinityPredictor.load(
+        models_dir_selected, optimization_level=0)
+    assert_equal(len(result.neural_networks), 2)
+    predictions = result.predict(peptides=["SLYNTVATL"],
         alleles=["HLA-A*02:01"])
     assert_equal(predictions.shape, (1,))
     assert_array_less(predictions, 1000)
-    df = result.predict_to_dataframe(
-            peptides=["SLYNTVATL"],
-            alleles=["HLA-A*02:01"])
-    print(df)
 
     if delete:
         print("Deleting: %s" % models_dir)
         shutil.rmtree(models_dir)
+        shutil.rmtree(models_dir_selected)
 
 
 if os.environ.get("KERAS_BACKEND") != "theano":

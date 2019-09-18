@@ -73,7 +73,7 @@ do
         --allele-sequences "$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv" \
         --pretrain-data "$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2" \
         --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
-        --ensemble-size 4 \
+        --num-folds 4 \
         --hyperparameters hyperparameters.yaml \
         --out-models-dir models.${kind} \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
