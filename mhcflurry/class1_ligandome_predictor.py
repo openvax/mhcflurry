@@ -146,7 +146,52 @@ class Class1LigandomePredictor(object):
         return network
 
     @staticmethod
-    def loss(y_true, y_pred):
+    def loss(y_true, y_pred, lmbda=0.001):
+        import keras.backend as K
+        import tensorflow as tf
+
+        y_pred = tf.squeeze(y_pred, axis=-1)
+
+        #y_pred = tf.Print(y_pred, [y_pred, tf.shape(y_pred)], "y_pred", summarize=20)
+        #y_true = tf.Print(y_true, [y_true, tf.shape(y_true)], "y_true", summarize=20)
+
+        y_true = tf.reshape(tf.cast(y_true, tf.bool), (-1,))
+
+        pos = tf.boolean_mask(y_pred, y_true)
+        pos_max = tf.reduce_max(pos, axis=1)
+        #pos_max = tf.reduce_logsumexp(tf.boolean_mask(y_pred, y_true), axis=1)
+        neg = tf.boolean_mask(y_pred, tf.logical_not(y_true))
+
+        result = tf.reduce_sum(
+            tf.maximum(0.0, tf.reshape(neg, (-1, 1)) - pos_max)**2)
+
+        term2 = tf.reduce_sum(
+            tf.minimum(0.0, tf.reshape(neg, (-1, 1)) - pos_max))
+        result = result + lmbda * term2
+
+        #differences = tf.reshape(neg, (-1, 1)) - pos
+
+        #result = tf.reduce_sum(tf.sign(differences) * differences**2)
+        #result = tf.Print(result, [result], "result", summarize=20)
+
+        #term2 = lmbda * tf.reduce_mean((1 - pos)**2)
+        #result = result + term2
+        return result
+
+        """
+        pos = tf.boolean_mask(y_pred, y_true)
+
+        pos = y_pred[y_true.astype(bool)].max(1)
+        neg = y_pred[~y_true.astype(bool)]
+        expected2 = (numpy.maximum(0,
+            neg.flatten().reshape((-1, 1)) - pos) ** 2).sum()
+        """
+
+
+
+
+    @staticmethod
+    def loss_old(y_true, y_pred):
         """Binary cross entropy after taking logsumexp over predictions"""
         import keras.backend as K
         import tensorflow as tf
@@ -230,6 +275,11 @@ class Class1LigandomePredictor(object):
 
         import keras.backend as K
 
+        #for layer in self.network._layers[:8]:
+        #    print("Setting non trainable", layer)
+        #    layer.trainable = False
+        #    import ipdb ; ipdb.set_trace()
+
         peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(peptides)
 
@@ -273,6 +323,9 @@ class Class1LigandomePredictor(object):
         start = time.time()
         for i in range(self.hyperparameters['max_epochs']):
             epoch_start = time.time()
+
+            # TODO: need to use fit_generator to keep each minibatch corresponding
+            # to a single experiment
             fit_history = self.network.fit(
                 x_dict,
                 labels,
@@ -281,7 +334,8 @@ class Class1LigandomePredictor(object):
                 verbose=verbose,
                 epochs=i + 1,
                 initial_epoch=i,
-                validation_split=self.hyperparameters['validation_split'])
+                validation_split=self.hyperparameters['validation_split'],
+            )
             epoch_time = time.time() - epoch_start
 
             for (key, value) in fit_history.history.items():
