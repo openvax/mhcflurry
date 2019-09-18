@@ -14,7 +14,10 @@ Idea:
 
 """
 
-from sklearn.metrics import roc_auc_score
+import logging
+logging.getLogger('tensorflow').disabled = True
+logging.getLogger('matplotlib').disabled = True
+
 import pandas
 import argparse
 import sys
@@ -25,12 +28,13 @@ from random import shuffle
 
 from sklearn.metrics import roc_auc_score
 
-from mhcflurry import Class1AffinityPredictor,Class1NeuralNetwork
+from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 from mhcflurry.allele_encoding import MultipleAlleleEncoding
 from mhcflurry.class1_ligandome_predictor import Class1LigandomePredictor
+from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.downloads import get_path
 from mhcflurry.regression_target import from_ic50
-
+from mhcflurry.common import random_peptides, positional_frequency_matrix
 from mhcflurry.testing_utils import cleanup, startup
 from mhcflurry.amino_acid import COMMON_AMINO_ACIDS
 
@@ -72,27 +76,138 @@ def teardown():
     cleanup()
 
 
-def sample_peptides_from_pssm(pssm, count):
-    result = pandas.DataFrame(
-        index=numpy.arange(count),
-        columns=pssm.index,
-        dtype=object,
-    )
-
-    for (position, vector) in pssm.iterrows():
-        result.loc[:, position] = numpy.random.choice(
-            pssm.columns,
-            size=count,
-            replace=True,
-            p=vector.values)
-
-    return result.apply("".join, axis=1)
-
-
 def scramble_peptide(peptide):
     lst = list(peptide)
     shuffle(lst)
     return "".join(lst)
+
+
+def evaluate_loss(loss, y_true, y_pred):
+    import keras.backend as K
+
+    y_true = numpy.array(y_true)
+    y_pred = numpy.array(y_pred)
+    if y_pred.ndim == 1:
+        y_pred = y_pred.reshape((len(y_pred), 1))
+    if y_true.ndim == 1:
+        y_true = y_true.reshape((len(y_true), 1))
+
+    if K.backend() == "tensorflow":
+        session = K.get_session()
+        y_true_var = K.constant(y_true, name="y_true")
+        y_pred_var = K.constant(y_pred, name="y_pred")
+        result = loss(y_true_var, y_pred_var)
+        return result.eval(session=session)
+    elif K.backend() == "theano":
+        y_true_var = K.constant(y_true, name="y_true")
+        y_pred_var = K.constant(y_pred, name="y_pred")
+        result = loss(y_true_var, y_pred_var)
+        return result.eval()
+    else:
+        raise ValueError("Unsupported backend: %s" % K.backend())
+
+
+def Xtest_loss():
+    # Hit labels
+    y_true = [
+        1.0,
+        0.0,
+        1.0,
+        1.0,
+        0.0
+    ]
+    y_true = numpy.array(y_true)
+    y_pred = [
+        [0.3, 0.7, 0.5],
+        [0.2, 0.4, 0.6],
+        [0.1, 0.5, 0.3],
+        [0.1, 0.7, 0.1],
+        [0.8, 0.2, 0.4],
+    ]
+    y_pred = numpy.array(y_pred)
+
+    # reference implementation 1
+    contributions = []
+    for i in range(len(y_true)):
+        if y_true[i] == 1.0:
+            for j in range(len(y_true)):
+                if y_true[j] == 0.0:
+                    tightest_i = max(y_pred[i])
+                    contribution = sum(
+                        max(0, y_pred[j, k] - tightest_i)**2
+                        for k in range(y_pred.shape[1])
+                    )
+                    contributions.append(contribution)
+    contributions = numpy.array(contributions)
+    expected1 = contributions.sum()
+
+    # reference implementation 2: numpy
+    pos = y_pred[y_true.astype(bool)].max(1)
+    neg = y_pred[~y_true.astype(bool)]
+    expected2 = (
+            numpy.maximum(0, neg.reshape((-1, 1)) - pos)**2).sum()
+
+    numpy.testing.assert_almost_equal(expected1, expected2)
+
+    computed = evaluate_loss(
+        Class1LigandomePredictor.loss,
+        y_true,
+        y_pred.reshape(y_pred.shape + (1,)))
+    numpy.testing.assert_almost_equal(computed, expected1)
+
+
+AA_DIST = pandas.Series(
+    dict((line.split()[0], float(line.split()[1])) for line in """
+A    0.071732
+E    0.060102
+N    0.034679
+D    0.039601
+T    0.055313
+L    0.115337
+V    0.070498
+S    0.071882
+Q    0.040436
+F    0.050178
+G    0.053176
+C    0.005429
+H    0.025487
+I    0.056312
+W    0.013593
+K    0.057832
+M    0.021079
+Y    0.043372
+R    0.060330
+P    0.053632
+""".strip().split("\n")))
+print(AA_DIST)
+
+
+def make_random_peptides(num_peptides_per_length=10000, lengths=[9]):
+    peptides = []
+    for length in lengths:
+        peptides.extend(
+            random_peptides
+                (num_peptides_per_length, length=length, distribution=AA_DIST))
+    return EncodableSequences.create(peptides)
+
+
+def make_motif(allele, peptides, frac=0.01):
+    peptides = EncodableSequences.create(peptides)
+    predictions = PAN_ALLELE_PREDICTOR_NO_MASS_SPEC.predict(
+        peptides=peptides,
+        allele=allele,
+    )
+
+    random_predictions_df = pandas.DataFrame({"peptide": peptides.sequences})
+    random_predictions_df["prediction"] = predictions
+    random_predictions_df = random_predictions_df.sort_values(
+        "prediction", ascending=True)
+    #print("Random peptide predictions", allele)
+    #print(random_predictions_df)
+    top = random_predictions_df.iloc[:int(len(random_predictions_df) * frac)]
+    matrix = positional_frequency_matrix(top.peptide.values)
+    #print("Matrix")
+    return matrix
 
 
 def test_synthetic_allele_refinement():
@@ -151,8 +266,10 @@ def test_synthetic_allele_refinement():
     predictor = Class1LigandomePredictor(
         PAN_ALLELE_PREDICTOR_NO_MASS_SPEC,
         max_ensemble_size=1,
-        max_epochs=100,
-        patience=5)
+        max_epochs=10,
+        learning_rate=0.00001,
+        patience=5,
+        min_delta=0.0)
 
     allele_encoding = MultipleAlleleEncoding(
         experiment_names=["experiment1"] * len(train_df),
@@ -182,85 +299,115 @@ def test_synthetic_allele_refinement():
 
     assert_allclose(pre_predictions, expected_pre_predictions)
 
+    motifs_history = []
+    random_peptides_encodable = make_random_peptides(10000, [9])
+
+
+    def update_motifs():
+        for allele in alleles:
+            motif = make_motif(allele, random_peptides_encodable)
+            motifs_history.append((allele, motif))
+
+    metric_rows = []
+
+    def progress():
+        predictions = predictor.predict(peptides=train_df.peptide.values,
+            allele_encoding=allele_encoding, )
+
+        train_df["max_prediction"] = predictions.max(1)
+        train_df["predicted_allele"] = pandas.Series(alleles).loc[
+            predictions.argmax(1).flatten()].values
+
+        print(predictions)
+
+        mean_predictions_for_hit = train_df.loc[
+            train_df.hit == 1.0
+        ].max_prediction.mean()
+        mean_predictions_for_decoy = train_df.loc[
+            train_df.hit == 0.0
+        ].max_prediction.mean()
+        correct_allele_fraction = (
+                train_df.loc[train_df.hit == 1.0].predicted_allele ==
+                train_df.loc[train_df.hit == 1.0].true_allele
+        ).mean()
+        auc = roc_auc_score(train_df.hit.values, train_df.max_prediction.values)
+
+        print("Mean prediction for hit", mean_predictions_for_hit)
+        print("Mean prediction for decoy", mean_predictions_for_decoy)
+        print("Correct predicted allele fraction", correct_allele_fraction)
+        print("AUC", auc)
+
+        metric_rows.append((
+            mean_predictions_for_hit,
+            mean_predictions_for_decoy,
+            correct_allele_fraction,
+            auc,
+        ))
+
+        update_motifs()
+
+        return (predictions, auc)
+
+    print("Pre fitting:")
+    progress()
+    update_motifs()
+    print("Fitting...")
+
     predictor.fit(
         peptides=train_df.peptide.values,
         labels=train_df.hit.values,
-        allele_encoding=allele_encoding
-    )
-
-    predictions = predictor.predict(
-        peptides=train_df.peptide.values,
         allele_encoding=allele_encoding,
+        progress_callback=progress,
     )
 
-    train_df["max_prediction"] = predictions.max(1)
-    train_df["predicted_allele"] = pandas.Series(alleles).loc[
-        predictions.argmax(1).flatten()
-    ].values
+    (predictions, final_auc) = progress()
+    print("Final AUC", final_auc)
 
-    print(predictions)
+    update_motifs()
 
-    auc = roc_auc_score(train_df.hit.values, train_df.max_prediction.values)
-    print("AUC", auc)
-
-    import ipdb ; ipdb.set_trace()
-
-    return predictions
-
-
-
-"""
-def test_simple_synethetic(
-        num_peptide_per_allele_and_length=100, lengths=[8,9,10,11]):
-    alleles = [
-        "HLA-A*02:01", "HLA-B*52:01", "HLA-C*07:01",
-        "HLA-A*03:01", "HLA-B*57:02", "HLA-C*03:01",
-    ]
-    cutoff = PAN_ALLELE_MOTIFS_DF.cutoff_fraction.min()
-    peptides_and_alleles = []
-    for allele in alleles:
-        sub_df = PAN_ALLELE_MOTIFS_DF.loc[
-            (PAN_ALLELE_MOTIFS_DF.allele == allele) &
-            (PAN_ALLELE_MOTIFS_DF.cutoff_fraction == cutoff)
+    motifs = pandas.DataFrame(
+        motifs_history,
+        columns=[
+            "allele",
+            "motif",
         ]
-        assert len(sub_df) > 0, allele
-        for length in lengths:
-            pssm = sub_df.loc[
-                sub_df.length == length
-            ].set_index("position")[COMMON_AMINO_ACIDS]
-            peptides = sample_peptides_from_pssm(pssm, num_peptide_per_allele_and_length)
-            for peptide in peptides:
-                peptides_and_alleles.append((peptide, allele))
-
-    hits_df = pandas.DataFrame(
-        peptides_and_alleles,
-        columns=["peptide", "allele"]
     )
-    hits_df["hit"] = 1
 
-    decoys = hits_df.copy()
-    decoys["peptide"] = decoys.peptide.map(scramble_peptide)
-    decoys["hit"] = 0.0
+    metrics = pandas.DataFrame(
+        metric_rows,
+        columns=[
+            "mean_predictions_for_hit",
+            "mean_predictions_for_decoy",
+            "correct_allele_fraction",
+            "auc"
+        ])
 
-    train_df = pandas.concat([hits_df, decoys], ignore_index=True)
+    #import ipdb ; ipdb.set_trace()
 
-    return train_df
-    return
-    pass
-"""
+    return (predictor, predictions, metrics, motifs)
+
 
 parser = argparse.ArgumentParser(usage=__doc__)
 parser.add_argument(
-    "--alleles",
-    nargs="+",
+    "--out-metrics-csv",
     default=None,
-    help="Which alleles to test")
+    help="Metrics output")
+parser.add_argument(
+    "--out-motifs-pickle",
+    default=None,
+    help="Metrics output")
+
 
 if __name__ == '__main__':
     # If run directly from python, leave the user in a shell to explore results.
     setup()
     args = parser.parse_args(sys.argv[1:])
-    result = test_synthetic_allele_refinement()
+    (predictor, predictions, metrics, motifs) = test_synthetic_allele_refinement()
+
+    if args.out_metrics_csv:
+        metrics.to_csv(args.out_metrics_csv)
+    if args.out_motifs_pickle:
+        motifs.to_pickle(args.out_motifs_pickle)
 
     # Leave in ipython
     import ipdb  # pylint: disable=import-error
