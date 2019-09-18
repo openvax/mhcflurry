@@ -151,7 +151,8 @@ def run(argv=sys.argv[1:]):
     df = pandas.read_csv(args.data)
     print("Loaded data: %s" % (str(df.shape)))
 
-    input_predictor = Class1AffinityPredictor.load(args.models_dir)
+    input_predictor = Class1AffinityPredictor.load(
+        args.models_dir, optimization_level=0)
     print("Loaded: %s" % input_predictor)
 
     alleles = input_predictor.supported_alleles
