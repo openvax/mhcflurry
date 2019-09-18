@@ -52,7 +52,10 @@ def add_cluster_parallelism_args(parser):
         '--cluster-script-prefix-path',
         help="",
     )
-    group.add_argument('--cluster-max-retries', help="", default=3)
+    group.add_argument(
+        '--cluster-max-retries',
+        help="How many times to rerun failing jobs. Default: %(default)s",
+        default=3)
 
 
 def cluster_results_from_args(
@@ -92,6 +95,7 @@ def cluster_results_from_args(
         additional_complete_file=args.additional_complete_file,
         script_prefix_path=args.cluster_script_prefix_path,
         result_serialization_method=result_serialization_method,
+        max_retries=args.cluster_max_retries,
         clear_constant_data=clear_constant_data
     )
 
