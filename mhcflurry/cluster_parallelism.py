@@ -278,10 +278,10 @@ def cluster_results(
                     print("Relaunching", launch_command)
                     attempt_dir = os.path.join(
                         result_item['work_dir'], "attempt.%d" % retry_num)
+                    if os.path.exists(complete_dir):
+                        shutil.move(complete_dir, attempt_dir)  # directory
                     if os.path.exists(additional_complete_file_path):
                         shutil.move(additional_complete_file_path, attempt_dir)
-                    if os.path.exists(complete_dir):
-                        shutil.move(complete_dir, attempt_dir)
                     if os.path.exists(error_path):
                         shutil.move(error_path, attempt_dir)
                     subprocess.check_call(launch_command, shell=True)
