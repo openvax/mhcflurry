@@ -51,8 +51,9 @@ UNSELECTED_PATH="$(mhcflurry-downloads path models_class1_pan_unselected)"
 
 for kind in with_mass_spec no_mass_spec
 do
-    # Model selection is always done locally. It's fast enough that it
-    # doesn't make sense to put it on the cluster.
+    # Model selection is run on the cluster, although for any reasonable
+    # machine it could be run locally. We run on the cluster because our
+    # cluster login nodes are often overloaded.
     MODELS_DIR="$UNSELECTED_PATH/models.${kind}"
     time mhcflurry-class1-select-pan-allele-models \
         --data "$MODELS_DIR/train_data.csv.bz2" \
@@ -60,8 +61,14 @@ do
         --out-models-dir models.${kind} \
         --min-models 2 \
         --max-models 8 \
-        --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
-
+        --verbosity 1 \
+        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+        --cluster-parallelism \
+        --cluster-max-retries 15 \
+        --cluster-submit-command bsub \
+        --cluster-results-workdir ~/mhcflurry-scratch \
+        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
+        
     cp "$MODELS_DIR/train_data.csv.bz2" "models.${kind}/"
 
     # Percentile rank calibration is run on the cluster.
@@ -72,12 +79,13 @@ do
         --models-dir models.${kind} \
         --match-amino-acid-distribution-data "$MODELS_DIR/train_data.csv.bz2" \
         --motif-summary \
-        --num-peptides-per-length 1000000 \
+        --num-peptides-per-length 100000 \
         --allele $(bzcat "$MODELS_DIR/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq) \
         --verbosity 1 \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
         --prediction-batch-size 524288 \
         --cluster-parallelism \
+        --cluster-max-retries 15 \
         --cluster-submit-command bsub \
         --cluster-results-workdir ~/mhcflurry-scratch \
         --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf

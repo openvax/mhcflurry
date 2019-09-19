@@ -54,6 +54,7 @@ def add_cluster_parallelism_args(parser):
     )
     group.add_argument(
         '--cluster-max-retries',
+        type=int,
         help="How many times to rerun failing jobs. Default: %(default)s",
         default=3)
 
