@@ -156,8 +156,8 @@ class Class1LigandomePredictor(object):
         y_true = tf.reshape(tf.cast(y_true, tf.bool), (-1,))
 
         pos = tf.boolean_mask(y_pred, y_true)
-        #pos_max = tf.reduce_max(pos, axis=1)
-        
+        pos_max = tf.reduce_max(pos, axis=1)
+
         neg = tf.boolean_mask(y_pred, tf.logical_not(y_true))
         result = tf.reduce_sum(
             tf.maximum(0.0, tf.reshape(neg, (-1, 1)) - pos_max + delta) ** 2)
