@@ -21,6 +21,7 @@ logging.getLogger('matplotlib').disabled = True
 import pandas
 import argparse
 import sys
+from functools import partial
 
 from numpy.testing import assert_, assert_equal, assert_allclose
 import numpy
@@ -107,7 +108,9 @@ def evaluate_loss(loss, y_true, y_pred):
         raise ValueError("Unsupported backend: %s" % K.backend())
 
 
-def Xtest_loss():
+def test_loss():
+    delta = 0.4
+
     # Hit labels
     y_true = [
         1.0,
@@ -134,7 +137,7 @@ def Xtest_loss():
                 if y_true[j] == 0.0:
                     tightest_i = max(y_pred[i])
                     contribution = sum(
-                        max(0, y_pred[j, k] - tightest_i)**2
+                        max(0, y_pred[j, k] - tightest_i + delta)**2
                         for k in range(y_pred.shape[1])
                     )
                     contributions.append(contribution)
@@ -145,12 +148,12 @@ def Xtest_loss():
     pos = y_pred[y_true.astype(bool)].max(1)
     neg = y_pred[~y_true.astype(bool)]
     expected2 = (
-            numpy.maximum(0, neg.reshape((-1, 1)) - pos)**2).sum()
+            numpy.maximum(0, neg.reshape((-1, 1)) - pos + delta)**2).sum()
 
     numpy.testing.assert_almost_equal(expected1, expected2)
 
     computed = evaluate_loss(
-        Class1LigandomePredictor.loss,
+        partial(Class1LigandomePredictor.loss, delta=delta),
         y_true,
         y_pred.reshape(y_pred.shape + (1,)))
     numpy.testing.assert_almost_equal(computed, expected1)
@@ -197,20 +200,16 @@ def make_motif(allele, peptides, frac=0.01):
         peptides=peptides,
         allele=allele,
     )
-
     random_predictions_df = pandas.DataFrame({"peptide": peptides.sequences})
     random_predictions_df["prediction"] = predictions
     random_predictions_df = random_predictions_df.sort_values(
         "prediction", ascending=True)
-    #print("Random peptide predictions", allele)
-    #print(random_predictions_df)
     top = random_predictions_df.iloc[:int(len(random_predictions_df) * frac)]
     matrix = positional_frequency_matrix(top.peptide.values)
-    #print("Matrix")
     return matrix
 
 
-def test_synthetic_allele_refinement():
+def test_synthetic_allele_refinement(max_epochs=10):
     refine_allele = "HLA-C*01:02"
     alleles = [
         "HLA-A*02:01", "HLA-B*27:01", "HLA-C*07:01",
@@ -266,8 +265,8 @@ def test_synthetic_allele_refinement():
     predictor = Class1LigandomePredictor(
         PAN_ALLELE_PREDICTOR_NO_MASS_SPEC,
         max_ensemble_size=1,
-        max_epochs=10,
-        learning_rate=0.00001,
+        max_epochs=max_epochs,
+        learning_rate=0.0001,
         patience=5,
         min_delta=0.0)
 
@@ -294,8 +293,6 @@ def test_synthetic_allele_refinement():
     train_df["pre_max_prediction"] = pre_predictions.max(1)
     pre_auc = roc_auc_score(train_df.hit.values, train_df.pre_max_prediction.values)
     print("PRE_AUC", pre_auc)
-
-    #import ipdb ; ipdb.set_trace()
 
     assert_allclose(pre_predictions, expected_pre_predictions)
 
@@ -396,13 +393,19 @@ parser.add_argument(
     "--out-motifs-pickle",
     default=None,
     help="Metrics output")
+parser.add_argument(
+    "--max-epochs",
+    default=100,
+    type=int,
+    help="Max epochs")
 
 
 if __name__ == '__main__':
     # If run directly from python, leave the user in a shell to explore results.
     setup()
     args = parser.parse_args(sys.argv[1:])
-    (predictor, predictions, metrics, motifs) = test_synthetic_allele_refinement()
+    (predictor, predictions, metrics, motifs) = (
+        test_synthetic_allele_refinement(max_epochs=args.max_epochs))
 
     if args.out_metrics_csv:
         metrics.to_csv(args.out_metrics_csv)
