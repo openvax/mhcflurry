@@ -140,87 +140,28 @@ class Class1LigandomePredictor(object):
             name="ligandome",
         )
         #print('trainable', network.get_layer("td_dense_0").trainable)
-        network.get_layer("td_dense_0").trainable = False
+        #network.get_layer("td_dense_0").trainable = False
         #print('trainable', network.get_layer("td_dense_0").trainable)
 
         return network
 
     @staticmethod
-    def loss(y_true, y_pred, lmbda=0.001):
-        import keras.backend as K
+    def loss(y_true, y_pred, delta=0.2):
+        """
+        Loss function for ligandome prediction.
+        """
         import tensorflow as tf
 
         y_pred = tf.squeeze(y_pred, axis=-1)
-
-        #y_pred = tf.Print(y_pred, [y_pred, tf.shape(y_pred)], "y_pred", summarize=20)
-        #y_true = tf.Print(y_true, [y_true, tf.shape(y_true)], "y_true", summarize=20)
-
         y_true = tf.reshape(tf.cast(y_true, tf.bool), (-1,))
 
         pos = tf.boolean_mask(y_pred, y_true)
-        pos_max = tf.reduce_max(pos, axis=1)
-        #pos_max = tf.reduce_logsumexp(tf.boolean_mask(y_pred, y_true), axis=1)
+        #pos_max = tf.reduce_max(pos, axis=1)
+        
         neg = tf.boolean_mask(y_pred, tf.logical_not(y_true))
-
         result = tf.reduce_sum(
-            tf.maximum(0.0, tf.reshape(neg, (-1, 1)) - pos_max)**2)
-
-        term2 = tf.reduce_sum(
-            tf.minimum(0.0, tf.reshape(neg, (-1, 1)) - pos_max))
-        result = result + lmbda * term2
-
-        #differences = tf.reshape(neg, (-1, 1)) - pos
-
-        #result = tf.reduce_sum(tf.sign(differences) * differences**2)
-        #result = tf.Print(result, [result], "result", summarize=20)
-
-        #term2 = lmbda * tf.reduce_mean((1 - pos)**2)
-        #result = result + term2
+            tf.maximum(0.0, tf.reshape(neg, (-1, 1)) - pos_max + delta) ** 2)
         return result
-
-        """
-        pos = tf.boolean_mask(y_pred, y_true)
-
-        pos = y_pred[y_true.astype(bool)].max(1)
-        neg = y_pred[~y_true.astype(bool)]
-        expected2 = (numpy.maximum(0,
-            neg.flatten().reshape((-1, 1)) - pos) ** 2).sum()
-        """
-
-
-
-
-    @staticmethod
-    def loss_old(y_true, y_pred):
-        """Binary cross entropy after taking logsumexp over predictions"""
-        import keras.backend as K
-        import tensorflow as tf
-        #y_pred_aggregated = K.logsumexp(y_pred, axis=1, keepdims=True)
-        #y_pred_aggregated = K.sigmoid(y_pred_aggregated)
-        #y_pred = tf.Print(y_pred, [y_pred], "y_pred", summarize=20)
-        #y_true = tf.Print(y_true, [y_true], "y_true", summarize=20)
-
-        y_pred_aggregated = K.max(y_pred, axis=1, keepdims=False)
-        #y_pred_aggregated = tf.Print(y_pred_aggregated, [y_pred_aggregated], "y_pred_aggregated",
-        #    summarize=20)
-
-        y_true = K.squeeze(K.cast(y_true, y_pred_aggregated.dtype), axis=-1)
-        #print("SHAPES", y_pred, K.int_shape(y_pred), y_pred_aggregated, K.int_shape(y_pred_aggregated), y_true, K.int_shape(y_true))
-        #K.print_tensor(y_pred_aggregated, "y_pred_aggregated")
-        #K.print_tensor(y_true, "y_true")
-
-        #y_pred_aggregated = K.print_tensor(y_pred_aggregated, "y_pred_aggregated")
-
-
-        #y_true = K.print_tensor(y_true, "y_true")
-
-        #return K.mean(
-        #    K.binary_crossentropy(y_true, y_pred_aggregated),
-        #    axis=-1)
-        return K.mean(
-            (y_true - y_pred_aggregated)**2,
-            axis=-1
-        )
 
     def peptides_to_network_input(self, peptides):
         """
