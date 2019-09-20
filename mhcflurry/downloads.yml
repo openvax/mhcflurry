@@ -109,7 +109,7 @@ releases:
               default: false
 
             - name: data_published
-              url: http://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_published.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/data_published.20190920.tar.bz2
               default: false
 
             - name: data_curated
