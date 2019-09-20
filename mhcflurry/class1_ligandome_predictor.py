@@ -150,7 +150,7 @@ class Class1LigandomePredictor(object):
         return network
 
     @staticmethod
-    def loss(y_true, y_pred, delta=0.2, alpha=None):
+    def loss(y_true, y_pred, sample_weight=None, delta=0.2, alpha=None):
         """
         Loss function for ligandome prediction.
         """

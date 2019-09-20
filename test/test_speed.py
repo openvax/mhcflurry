@@ -22,11 +22,11 @@ from mhcflurry.testing_utils import cleanup, startup
 
 
 ALLELE_SPECIFIC_PREDICTOR = None
-PAN_ALLELE_PREDICTOR_NO_MASS_SPEC = None
+PAN_ALLELE_PREDICTOR = None
 
 
 def setup():
-    global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
+    global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR
     startup()
     ALLELE_SPECIFIC_PREDICTOR = Class1AffinityPredictor.load(
         get_path("models_class1", "models"))
@@ -36,7 +36,7 @@ def setup():
 
 
 def teardown():
-    global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
+    global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR
     ALLELE_SPECIFIC_PREDICTOR = None
     PAN_ALLELE_PREDICTOR = None
     cleanup()
@@ -97,7 +97,7 @@ def test_speed_allele_specific(profile=False, num=DEFAULT_NUM_PREDICTIONS):
 
 
 def test_speed_pan_allele(profile=False, num=DEFAULT_NUM_PREDICTIONS):
-    global PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
+    global PAN_ALLELE_PREDICTOR
     starts = collections.OrderedDict()
     timings = collections.OrderedDict()
     profilers = collections.OrderedDict()
