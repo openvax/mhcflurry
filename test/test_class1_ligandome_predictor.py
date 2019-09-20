@@ -109,54 +109,74 @@ def evaluate_loss(loss, y_true, y_pred):
 
 
 def test_loss():
-    delta = 0.4
+    for delta in [0.0, 0.3]:
+        for alpha in [None, 1.0, 20.0]:
+            print("delta", delta)
+            print("alpha", alpha)
+            # Hit labels
+            y_true = [
+                1.0,
+                0.0,
+                1.0,
+                1.0,
+                0.0
+            ]
+            y_true = numpy.array(y_true)
+            y_pred = [
+                [0.3, 0.7, 0.5],
+                [0.2, 0.4, 0.6],
+                [0.1, 0.5, 0.3],
+                [0.1, 0.7, 0.1],
+                [0.8, 0.2, 0.4],
+            ]
+            y_pred = numpy.array(y_pred)
 
-    # Hit labels
-    y_true = [
-        1.0,
-        0.0,
-        1.0,
-        1.0,
-        0.0
-    ]
-    y_true = numpy.array(y_true)
-    y_pred = [
-        [0.3, 0.7, 0.5],
-        [0.2, 0.4, 0.6],
-        [0.1, 0.5, 0.3],
-        [0.1, 0.7, 0.1],
-        [0.8, 0.2, 0.4],
-    ]
-    y_pred = numpy.array(y_pred)
+            # reference implementation 1
 
-    # reference implementation 1
-    contributions = []
-    for i in range(len(y_true)):
-        if y_true[i] == 1.0:
-            for j in range(len(y_true)):
-                if y_true[j] == 0.0:
-                    tightest_i = max(y_pred[i])
-                    contribution = sum(
-                        max(0, y_pred[j, k] - tightest_i + delta)**2
-                        for k in range(y_pred.shape[1])
-                    )
-                    contributions.append(contribution)
-    contributions = numpy.array(contributions)
-    expected1 = contributions.sum()
+            def smooth_max(x, alpha):
+                x = numpy.array(x)
+                alpha = numpy.array([alpha])
+                return (x * numpy.exp(x * alpha)).sum() / (
+                    numpy.exp(x * alpha)).sum()
 
-    # reference implementation 2: numpy
-    pos = y_pred[y_true.astype(bool)].max(1)
-    neg = y_pred[~y_true.astype(bool)]
-    expected2 = (
-            numpy.maximum(0, neg.reshape((-1, 1)) - pos + delta)**2).sum()
+            if alpha is None:
+                max_func = max
+            else:
+                max_func = partial(smooth_max, alpha=alpha)
 
-    numpy.testing.assert_almost_equal(expected1, expected2)
+            contributions = []
+            for i in range(len(y_true)):
+                if y_true[i] == 1.0:
+                    for j in range(len(y_true)):
+                        if y_true[j] == 0.0:
+                            tightest_i = max_func(y_pred[i])
+                            contribution = sum(
+                                max(0, y_pred[j, k] - tightest_i + delta)**2
+                                for k in range(y_pred.shape[1])
+                            )
+                            contributions.append(contribution)
+            contributions = numpy.array(contributions)
+            expected1 = contributions.sum()
 
-    computed = evaluate_loss(
-        partial(Class1LigandomePredictor.loss, delta=delta),
-        y_true,
-        y_pred.reshape(y_pred.shape + (1,)))
-    numpy.testing.assert_almost_equal(computed, expected1)
+            # reference implementation 2: numpy
+            pos = numpy.array([
+                max_func(y_pred[i])
+                for i in range(len(y_pred))
+                if y_true[i] == 1.0
+            ])
+
+            neg = y_pred[~y_true.astype(bool)]
+            expected2 = (
+                    numpy.maximum(0, neg.reshape((-1, 1)) - pos + delta)**2).sum()
+
+            yield numpy.testing.assert_almost_equal, expected1, expected2, 4
+
+            computed = evaluate_loss(
+                partial(Class1LigandomePredictor.loss, delta=delta, alpha=alpha),
+                y_true,
+                y_pred.reshape(y_pred.shape + (1,)))
+
+            yield numpy.testing.assert_almost_equal, computed, expected1, 4
 
 
 AA_DIST = pandas.Series(
