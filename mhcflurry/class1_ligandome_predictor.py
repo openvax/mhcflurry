@@ -1,5 +1,8 @@
+from __future__ import print_function
+
 import time
 import collections
+from functools import partial
 
 import numpy
 
@@ -43,7 +46,8 @@ class Class1LigandomePredictor(object):
     """
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
-        loss="custom:mse_with_inequalities",
+        loss_delta=0.2,
+        loss_alpha=None,
         optimizer="rmsprop",
         learning_rate=None,
     )
@@ -146,18 +150,26 @@ class Class1LigandomePredictor(object):
         return network
 
     @staticmethod
-    def loss(y_true, y_pred, delta=0.2):
+    def loss(y_true, y_pred, delta=0.2, alpha=None):
         """
         Loss function for ligandome prediction.
         """
         import tensorflow as tf
+        import keras.backend as K
 
         y_pred = tf.squeeze(y_pred, axis=-1)
         y_true = tf.reshape(tf.cast(y_true, tf.bool), (-1,))
 
         pos = tf.boolean_mask(y_pred, y_true)
-        pos_max = tf.reduce_max(pos, axis=1)
 
+        if alpha is None:
+            pos_max = tf.reduce_max(pos, axis=1)
+        else:
+            # Smooth maximum
+            exp_alpha_x = tf.exp(alpha * pos)
+            numerator = tf.reduce_sum(tf.multiply(pos, exp_alpha_x), axis=1)
+            denominator = tf.reduce_sum(exp_alpha_x, axis=1)
+            pos_max = numerator / denominator
         neg = tf.boolean_mask(y_pred, tf.logical_not(y_true))
         result = tf.reduce_sum(
             tf.maximum(0.0, tf.reshape(neg, (-1, 1)) - pos_max + delta) ** 2)
@@ -246,7 +258,10 @@ class Class1LigandomePredictor(object):
 
         self.set_allele_representations(allele_representations)
         self.network.compile(
-            loss=self.loss,
+            loss=partial(
+                self.loss,
+                delta=self.hyperparameters['loss_delta'],
+                alpha=self.hyperparameters['loss_alpha']),
             optimizer=self.hyperparameters['optimizer'])
         if self.hyperparameters['learning_rate'] is not None:
             K.set_value(
