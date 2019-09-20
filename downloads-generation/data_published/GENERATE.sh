@@ -25,7 +25,7 @@ date
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 ############################################
-# BINDING AFFINITIES
+# BINDING AFFINITIES: class I
 ############################################
 #
 # Kim et al 2014 [PMID 25017736]
@@ -36,7 +36,7 @@ wget -q https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.201
 mkdir raw
 
 ############################################
-# MS: Multiallelic
+# MS: Multiallelic class I
 ############################################
 # Bassani-Sternberg, ..., Gfeller PLOS Comp. Bio. 2017 [PMID 28832583]
 # The first dataset is from this work. The second dataset is originally from:
@@ -84,8 +84,15 @@ wget -q https://www.mcponline.org/lookup/suppl/doi:10.1074/mcp.M116.060350/-/DC1
 # Hassan, ..., van Veelen Mol Cell Proteomics 2015 [PMID 23481700]
 PMID=23481700
 mkdir -p raw/$PMID
-wget -q https://www.mcponline.org/highwire/filestream/34681/field_highwire_adjunct_files/1/mcp.M112.024810-2.xls  -P raw/$PMID
+wget -q https://www.mcponline.org/highwire/filestream/34681/field_highwire_adjunct_files/1/mcp.M112.024810-2.xls -P raw/$PMID
 
+############################################
+# MS: Monoallelic class II
+############################################
+# Abelin, ..., Rooney Immunity 2019 [PMID 31495665]
+PMID=31495665
+mkdir -p raw/$PMID
+wget -q https://ars.els-cdn.com/content/image/1-s2.0-S1074761319303632-mmc2.xlsx -P raw/$PMID
 
 
 cp $SCRIPT_ABSOLUTE_PATH .
