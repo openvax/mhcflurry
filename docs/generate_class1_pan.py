@@ -5,6 +5,7 @@ from __future__ import print_function
 import sys
 import argparse
 from collections import OrderedDict, defaultdict
+import os
 from os.path import join, exists
 from os import mkdir
 
@@ -35,7 +36,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--logo-cutoff",
-    default=0.01,
+    default=0.001,
     type=float,
     help="Fraction of top to use for motifs",
 )
@@ -46,10 +47,18 @@ parser.add_argument(
     help="Fraction of top to use for length distribution",
 )
 parser.add_argument(
-    "--lengths",
+    "--length-distribution-lengths",
+    nargs="+",
+    default=[8, 9, 10, 11, 12, 13, 14, 15],
+    type=int,
+    help="Peptide lengths for length distribution plots",
+)
+parser.add_argument(
+    "--motif-lengths",
+    nargs="+",
     default=[8, 9, 10, 11],
     type=int,
-    help="Peptide lengths",
+    help="Peptide lengths for motif plots",
 )
 parser.add_argument(
     "--out-dir",
@@ -59,6 +68,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--max-alleles",
+    default=None,
     type=int,
     metavar="N",
     help="Only use N alleles (for testing)",
@@ -70,6 +80,8 @@ def model_info(models_dir):
         join(models_dir, "length_distributions.csv.bz2"))
     frequency_matrices_df = pandas.read_csv(
         join(models_dir, "frequency_matrices.csv.bz2"))
+    train_data_df = pandas.read_csv(
+        join(models_dir, "train_data.csv.bz2"))
 
     distribution = frequency_matrices_df.loc[
         (frequency_matrices_df.cutoff_fraction == 1.0), AMINO_ACIDS
@@ -79,9 +91,13 @@ def model_info(models_dir):
     normalized_frequency_matrices.loc[:, AMINO_ACIDS] = (
             normalized_frequency_matrices[AMINO_ACIDS] / distribution)
 
+    observations_per_allele = (
+        train_data_df.groupby("allele").peptide.nunique().to_dict())
+
     return {
         'length_distributions': length_distributions_df,
         'normalized_frequency_matrices': normalized_frequency_matrices,
+        'observations_per_allele': observations_per_allele,
     }
 
 
@@ -114,9 +130,11 @@ def write_logo(
     )
     pyplot.title("%s %d-mer (%s)" % (allele, length, models_label))
     pyplot.xticks(matrix.index.values)
-    name = "%s_%dmer.%s.png" % (allele, length, models_label)
-    pyplot.savefig(join(out_dir, name))
-    print("Wrote: ", name)
+    name = "%s-%dmer.%s.png" % (
+        allele.replace("*", "-").replace(":", "-"), length, models_label)
+    filename = os.path.abspath(join(out_dir, name))
+    pyplot.savefig(filename)
+    print("Wrote: ", filename)
     fig.clear()
     pyplot.close(fig)
     return name
@@ -140,9 +158,12 @@ def write_length_distribution(
     pyplot.xlabel("")
     pyplot.xticks(rotation=0)
     pyplot.gca().get_legend().remove()
-    name = "%s.lengths.%s.png" % (allele, models_label)
-    pyplot.savefig(join(out_dir, name))
-    print("Wrote: ", name)
+    name = "%s.lengths.%s.png" % (
+        allele.replace("*", "-").replace(":", "-"), models_label)
+
+    filename = os.path.abspath(join(out_dir, name))
+    pyplot.savefig(filename)
+    print("Wrote: ", filename)
     fig.clear()
     pyplot.close(fig)
     return name
@@ -208,7 +229,7 @@ def go(argv):
             length_distribution_image_path = write_length_distribution(
                 length_distributions_df=length_distribution,
                 allele=allele,
-                lengths=args.lengths,
+                lengths=args.length_distribution_lengths,
                 cutoff=args.length_cutoff,
                 out_dir=args.out_dir,
                 models_label=label)
@@ -219,9 +240,12 @@ def go(argv):
                 "*" + (
                     "With mass-spec" if label == "with_mass_spec" else "Affinities only")
                 + "*\n")
+            w("Training observations (unique peptides): %d" % (
+                info['observations_per_allele'].get(allele, 0)))
+            w("\n")
             w(image(length_distribution_image_path))
 
-            for length in args.lengths:
+            for length in args.motif_lengths:
                 w(image(write_logo(
                     normalized_frequency_matrices=normalized_frequency_matrices,
                     allele=allele,
