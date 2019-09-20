@@ -18,8 +18,8 @@ rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
 mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
 
 # Send stdout and stderr to a logfile included with the archive.
-exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
-exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
+#exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
+#exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 
 # Log some environment info
 date
@@ -29,6 +29,22 @@ git status
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 cp $SCRIPT_DIR/curate.py .
+cp $SCRIPT_DIR/curate_by_pmid.py .
+
+RAW_DIR="$(mhcflurry-downloads path data_published)/raw"
+cp -r "$RAW_DIR" .
+
+CURATE_BY_PMID_ARGS=""
+for pmid in $(ls raw)
+do
+    CURATE_BY_PMID_ARGS+=$(echo --item $pmid raw/$pmid/* ' ')
+done
+
+time python curate_by_pmid.py $CURATE_BY_PMID_ARGS --out curated.by_pmid.csv --debug
+
+exit 1
+
+
 
 # No mass-spec data
 time python curate.py \
