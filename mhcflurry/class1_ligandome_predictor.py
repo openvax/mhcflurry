@@ -155,7 +155,6 @@ class Class1LigandomePredictor(object):
         Loss function for ligandome prediction.
         """
         import tensorflow as tf
-        import keras.backend as K
 
         y_pred = tf.squeeze(y_pred, axis=-1)
         y_true = tf.reshape(tf.cast(y_true, tf.bool), (-1,))
