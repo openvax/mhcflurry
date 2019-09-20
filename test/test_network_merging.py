@@ -10,7 +10,6 @@ from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import cleanup, startup
 
-
 PAN_ALLELE_PREDICTOR = None
 
 
