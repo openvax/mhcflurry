@@ -119,7 +119,7 @@ def handle_pmid_24616531(filename):
 
 def handle_pmid_25576301(filename):
     df = pandas.read_excel(filename, sheetname="Peptides")
-    peptides = df.Sequence.values
+    peptides = df.Sequence.values   
     assert peptides[0] == "AAAAAAAQSVY"
     assert peptides[-1] == "YYYNGKAVY"
 
