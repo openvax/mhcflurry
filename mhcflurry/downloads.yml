@@ -21,12 +21,12 @@ releases:
         compatibility-version: 2
         downloads:
             - name: models_class1_pan
-              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/models_class1_pan.20190918.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/models_class1_pan.20190923.tar.bz2
               default: false
 
             - name: models_class1_pan_unselected
               part_urls:
-                - https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/models_class1_pan_unselected.20190917.tar.bz2.part.aa
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/models_class1_pan_unselected.20190923.tar.bz2.part.aa
               default: false
 
             - name: data_iedb
