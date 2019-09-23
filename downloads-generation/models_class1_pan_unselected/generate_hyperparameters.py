@@ -40,7 +40,7 @@ base_hyperparameters = {
     'random_negative_constant': 1,
     'random_negative_distribution_smoothing': 0.0,
     'random_negative_match_distribution': True,
-    'random_negative_rate': 7.0,
+    'random_negative_rate': 1.0,
     'random_negative_method': 'by_allele',
     'train_data': {
         'pretrain': True,
