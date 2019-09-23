@@ -61,6 +61,9 @@ def test_on_hpv(df=DF):
     scores_df = scores_df.pivot(
         index="metric", columns="predictor", values="score")
 
+    print("Predictions")
+    print(df)
+
     print("Scores")
     print(scores_df)
 
