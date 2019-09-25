@@ -6,13 +6,11 @@ import itertools
 import os
 import logging
 import random
-import pickle
 
 import numpy
 import pandas
 
 from .hyperparameters import HyperparameterDefaults
-
 from .encodable_sequences import EncodableSequences, EncodingError
 from .allele_encoding import AlleleEncoding
 from .regression_target import to_ic50, from_ic50
