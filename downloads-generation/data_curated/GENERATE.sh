@@ -42,6 +42,8 @@ done
 
 time python curate_by_pmid.py $CURATE_BY_PMID_ARGS --out curated.by_pmid.csv --debug
 
+rm -rf raw
+
 # No mass-spec data
 time python curate.py \
     --data-iedb \
