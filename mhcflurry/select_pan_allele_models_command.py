@@ -288,7 +288,9 @@ def run(argv=sys.argv[1:]):
         worker_pool.join()
 
     print("Model selection time %0.2f min." % (model_selection_time / 60.0))
-    print("Predictor written to: %s" % args.out_models_dir)
+    print("Predictor [%d models] written to: %s" % (
+        len(result_predictor.neural_networks),
+        args.out_models_dir))
 
 
 def do_model_select_task(item, constant_data=GLOBAL_DATA):

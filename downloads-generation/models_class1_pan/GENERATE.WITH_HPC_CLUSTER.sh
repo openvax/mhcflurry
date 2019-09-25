@@ -33,6 +33,7 @@ export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
 cp $SCRIPT_ABSOLUTE_PATH .
+cp $SCRIPT_DIR/additional_alleles.txt .
 
 GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
 echo "Detected GPUS: $GPUS"
@@ -48,6 +49,12 @@ fi
 echo "Num local jobs for model selection: $NUM_JOBS"
 
 UNSELECTED_PATH="$(mhcflurry-downloads path models_class1_pan_unselected)"
+
+# For now we calibrate percentile ranks only for alleles for which there
+# is training data. Calibrating all alleles would be too slow.
+# This could be improved though.
+ALLELE_LIST=$(bzcat "$UNSELECTED_PATH/models.with_mass_spec/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
+ALLELE_LIST+=$(echo " " $(cat additional_alleles.txt | grep -v '#') )
 
 for kind in with_mass_spec no_mass_spec
 do
@@ -72,15 +79,13 @@ do
     cp "$MODELS_DIR/train_data.csv.bz2" "models.${kind}/"
 
     # Percentile rank calibration is run on the cluster.
-    # For now we calibrate percentile ranks only for alleles for which there
-    # is training data. Calibrating all alleles would be too slow.
-    # This could be improved though.
+
     time mhcflurry-calibrate-percentile-ranks \
         --models-dir models.${kind} \
         --match-amino-acid-distribution-data "$MODELS_DIR/train_data.csv.bz2" \
         --motif-summary \
         --num-peptides-per-length 100000 \
-        --allele $(bzcat "$MODELS_DIR/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq) \
+        --allele $ALLELE_LIST \
         --verbosity 1 \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
         --prediction-batch-size 524288 \

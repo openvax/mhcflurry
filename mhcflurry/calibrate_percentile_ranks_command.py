@@ -115,6 +115,8 @@ def run(argv=sys.argv[1:]):
     else:
         alleles = predictor.supported_alleles
 
+    alleles = sorted(set(alleles))
+
     distribution = None
     if args.match_amino_acid_distribution_data:
         distribution_peptides = pandas.read_csv(
