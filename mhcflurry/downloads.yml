@@ -46,7 +46,7 @@ releases:
               default: false
 
             - name: data_published
-              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/data_published.20190920.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/data_published.20190924.tar.bz2
               default: false
 
             - name: data_curated
