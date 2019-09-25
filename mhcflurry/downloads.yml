@@ -21,7 +21,7 @@ releases:
         compatibility-version: 2
         downloads:
             - name: models_class1_pan
-              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/models_class1_pan.20190924.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/models_class1_pan.20190925.tar.bz2
               default: false
 
             - name: models_class1_pan_unselected
