@@ -41,7 +41,7 @@ base_hyperparameters = {
     'random_negative_distribution_smoothing': 0.0,
     'random_negative_match_distribution': True,
     'random_negative_rate': 1.0,
-    'random_negative_method': 'by_allele',
+    'random_negative_method': 'by_allele_equalize_nonbinders',
     'train_data': {
         'pretrain': True,
         'pretrain_peptides_per_epoch': 64,

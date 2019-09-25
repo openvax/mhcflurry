@@ -6,6 +6,7 @@ import itertools
 import os
 import logging
 import random
+import math
 
 import numpy
 import pandas
@@ -696,7 +697,14 @@ class Class1NeuralNetwork(object):
             df["inequality"] = "="
         else:
             df["inequality"] = inequalities
+        df_nonbinders = None
         if self.hyperparameters['random_negative_binder_threshold']:
+            df_nonbinders = df.loc[
+                (df.inequality != "<") &
+                (df.affinity > self.hyperparameters[
+                    'random_negative_binder_threshold'
+                ])
+            ]
             df = df.loc[
                 (df.inequality != ">") &
                 (df.affinity <= self.hyperparameters[
@@ -762,8 +770,8 @@ class Class1NeuralNetwork(object):
                 num_for_allele = len(sub_df) * (
                     self.hyperparameters['random_negative_rate']
                 ) + self.hyperparameters['random_negative_constant']
-                num_per_length = int(
-                    num_for_allele / len(random_negative_lengths))
+                num_per_length = int(math.ceil(
+                    num_for_allele / len(random_negative_lengths)))
                 total_random_peptides_per_length += num_per_length
                 allele_to_num_per_length[allele] = num_per_length
 
@@ -788,6 +796,66 @@ class Class1NeuralNetwork(object):
                         random_peptides(
                             total_random_peptides_per_length,
                             length=length,
+                            distribution=aa_distribution))
+                # important NOT to shuffle peptides, since they correspond with
+                # specific alleles.
+                return EncodableSequences.create(peptides)
+        elif self.hyperparameters["random_negative_method"] == "by_allele_equalize_nonbinders":
+            assert df_nonbinders is not None
+
+            allele_and_length_to_num_random_negative = {}
+
+            # First pass
+            allele_to_num_per_length_first_pass = {}
+            for (allele, sub_df) in df.groupby("allele"):
+                num_for_allele = len(sub_df) * (
+                    self.hyperparameters['random_negative_rate']
+                ) + self.hyperparameters['random_negative_constant']
+                num_per_length = int(math.ceil(
+                    num_for_allele / len(random_negative_lengths)))
+                allele_to_num_per_length_first_pass[allele] = num_per_length
+
+            # Second pass
+            for (allele, sub_df) in df_nonbinders.groupby("allele"):
+                nonbinders_by_length = sub_df.peptide.str.len().value_counts()
+                nonbinders_by_length = nonbinders_by_length.reindex(
+                    random_negative_lengths
+                ).fillna(0)
+
+                total_nonbinders_by_length = (
+                    nonbinders_by_length +
+                    allele_to_num_per_length_first_pass[allele])
+                max_total_nonbinders_by_length = total_nonbinders_by_length.max()
+                for (length, total) in total_nonbinders_by_length.items():
+                    allele_and_length_to_num_random_negative[
+                        (allele, length)
+                    ] = math.ceil(
+                        allele_to_num_per_length_first_pass[allele] +
+                        max_total_nonbinders_by_length -
+                        total)
+
+            plan_df = []
+            for (
+                    (allele, length), num_random_negative) in (
+                    allele_and_length_to_num_random_negative.items()):
+                plan_df.append((allele, length, num_random_negative))
+            plan_df = pandas.DataFrame(
+                plan_df, columns=["allele", "length", "num"])
+
+            logging.info("Random negative plan:\n%s", plan_df)
+
+            if allele_encoding is not None:
+                random_negative_alleles = []
+                for _, row in plan_df.iterrows():
+                    random_negative_alleles.extend([row.allele] * int(row.num))
+
+            def sample_peptides():
+                peptides = []
+                for _, row in plan_df.iterrows():
+                    peptides.extend(
+                        random_peptides(
+                            row.num,
+                            length=row.length,
                             distribution=aa_distribution))
                 # important NOT to shuffle peptides, since they correspond with
                 # specific alleles.
