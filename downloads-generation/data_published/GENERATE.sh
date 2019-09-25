@@ -46,6 +46,15 @@ PMID=28832583
 mkdir -p raw/$PMID
 wget -q https://doi.org/10.1371/journal.pcbi.1005725.s002 -P raw/$PMID # data generated in this work
 wget -q https://doi.org/10.1371/journal.pcbi.1005725.s003 -P raw/$PMID # data reanalyzed in this work
+cd raw/$PMID
+unzip *.s002
+unzip *.s003
+mkdir saved
+mv Dataset*/Dataset*.txt saved
+rm -rf Dataset* *.s002 *.s003 _*
+mv saved/* .
+rmdir saved
+cd ../..
 
 # Bassani-Sternberg, ..., Mann Mol Cell Proteomics 2015 [PMID 25576301]
 PMID=25576301
