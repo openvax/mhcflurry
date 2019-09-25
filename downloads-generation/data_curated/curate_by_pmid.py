@@ -229,7 +229,7 @@ def handle_pmid_26992070(*filenames):
         for num in ["1", "2"]:
             allele_info[
                 "HLA-%s %s" % (gene, num)
-            ] = "HLA-" + gene + allele_info["HLA-%s %s" % (gene, num)]
+            ] = "HLA-" + gene + "*" + allele_info["HLA-%s %s" % (gene, num)]
     cell_line_to_allele = allele_info.apply(" ".join, axis=1)
 
     sheets = {}
@@ -585,7 +585,7 @@ def handle_pmid_31495665(filename):
         "MAPTAC_DRB3*01:01_dm-": "mixed",
     }
 
-    df = pandas.read_excel(filename, sheetname="DataS1B")
+    df = pandas.read_excel(filename, sheet_name="DataS1B")
     results = []
     for sample_id in df.columns:
         if hla_type[sample_id] is None:
