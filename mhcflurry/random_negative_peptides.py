@@ -14,7 +14,7 @@ class RandomNegativePeptides(object):
         random_negative_constant=25,
         random_negative_match_distribution=True,
         random_negative_distribution_smoothing=0.0,
-        random_negative_method="by_length",
+        random_negative_method="recommended",
         random_negative_binder_threshold=None,
         random_negative_lengths=[8,9,10,11,12,13,14,15])
 
@@ -63,6 +63,13 @@ class RandomNegativePeptides(object):
             ]
 
         method = self.hyperparameters['random_negative_method']
+        if method == 'recommended':
+            # by_length for allele-specific prediction and by_allele for pan.
+            method = (
+                "by_length"
+                if alleles is None else
+                "by_allele")
+
         function = {
             'by_length': self.plan_by_length,
             'by_allele': self.plan_by_allele,
