@@ -7,6 +7,7 @@ import pandas
 from .hyperparameters import HyperparameterDefaults
 from .common import amino_acid_distribution, random_peptides
 
+
 class RandomNegativePeptides(object):
     hyperparameter_defaults = HyperparameterDefaults(
         random_negative_rate=0.0,

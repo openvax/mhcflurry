@@ -18,6 +18,7 @@ from mhcflurry.testing_utils import cleanup, startup
 teardown = cleanup
 setup = startup
 
+
 def run_and_check(n_jobs=0, delete=True, additional_args=[]):
     source_models_dir = get_path("models_class1_pan", "models.with_mass_spec")
     dest_models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
