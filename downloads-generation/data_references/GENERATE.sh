@@ -34,11 +34,14 @@ wget -q ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebas
 wget -q ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000005640_9606_DNA.fasta.gz
 wget -q ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000005640_9606_DNA.miss.gz
 wget -q ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000005640_9606_additional.fasta.gz
-
+wget -q ftp://ftp.ensembl.org/pub/release-98/gtf/homo_sapiens/Homo_sapiens.GRCh38.98.gtf.gz
 
 python process.py \
     UP000005640_9606.fasta.gz UP000005640_9606_additional.fasta.gz \
-    --out-csv uniprot_proteins.csv --out-index uniprot_proteins.fm
+    --id-mapping UP000005640_9606.idmapping.gz \
+    --ensembl-gtf Homo_sapiens.GRCh38.98.gtf.gz \
+    --out-csv uniprot_proteins.csv \
+    --out-index uniprot_proteins.fm
 
 ls -lh uniprot_proteins.csv uniprot_proteins.fm
 
