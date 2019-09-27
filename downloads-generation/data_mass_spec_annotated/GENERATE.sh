@@ -15,8 +15,8 @@ rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
 mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
 
 # Send stdout and stderr to a logfile included with the archive.
-#exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
-#exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
+exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
+exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 
 # Log some environment info
 date
@@ -27,11 +27,14 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 cp $SCRIPT_DIR/annotate.py .
 
-INPUT=$(mhcflurry-downloads path data_curated)/nontraining_curated.by_pmid.csv.bz2
+PEPTIDES=$(mhcflurry-downloads path data_curated)/nontraining_curated.by_pmid.csv.bz2
+REFERENCES_DIR=$(mhcflurry-downloads path data_references)
 
-python annotate.py "$INPUT" --out annotated_ms.csv
-
-exit 1
+python annotate.py \
+    "$PEPTIDES" \
+    "${REFERENCES_DIR}/uniprot_proteins.csv.bz2" \
+    "${REFERENCES_DIR}/uniprot_proteins.fm" \
+    --out annotated_ms.csv
 
 bzip2 annotated_ms.csv
 
