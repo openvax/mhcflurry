@@ -126,6 +126,12 @@ def handle_pmid_23481700(filename):
         results.append(result_df)
 
     result_df = pandas.concat(results, ignore_index=True)
+
+    # Rename samples to avoid a collision with the JY sample in PMID 25576301.
+    result_df.sample_id = result_df.sample_id.map({
+        "JY": "JY.2015",
+        "HHC": "HHC.2015",
+    })
     return result_df
 
 
@@ -665,6 +671,10 @@ def run():
         print(null_df)
     else:
         print("No nulls.")
+
+    # Each sample should be coming from only one experiment.
+    assert df.groupby("sample_id").pmid.nunique().max() == 1, (
+        df.groupby("sample_id").pmid.nunique().sort_values())
 
     df.to_csv(args.out, index=False)
     print("Wrote: %s" % os.path.abspath(args.out))

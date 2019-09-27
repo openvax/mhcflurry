@@ -40,7 +40,10 @@ do
     CURATE_BY_PMID_ARGS+=$(echo --item $pmid raw/$pmid/* ' ')
 done
 
-time python curate_by_pmid.py $CURATE_BY_PMID_ARGS --out curated.by_pmid.csv --debug
+time python curate_by_pmid.py $CURATE_BY_PMID_ARGS \
+    --out nontraining_curated.by_pmid.csv
+
+bzip2 nontraining_curated.by_pmid.csv
 
 rm -rf raw
 
