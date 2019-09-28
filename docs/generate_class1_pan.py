@@ -36,13 +36,13 @@ parser.add_argument(
 )
 parser.add_argument(
     "--logo-cutoff",
-    default=0.001,
+    default=0.01,
     type=float,
     help="Fraction of top to use for motifs",
 )
 parser.add_argument(
     "--length-cutoff",
-    default=0.001,
+    default=0.01,
     type=float,
     help="Fraction of top to use for length distribution",
 )
