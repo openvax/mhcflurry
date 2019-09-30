@@ -29,19 +29,6 @@ cp $SCRIPT_DIR/write_proteome_peptides.py .
 cp $SCRIPT_DIR/run_mhcflurry.py .
 cp $SCRIPT_DIR/write_allele_list.py .
 
-GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
-echo "Detected GPUS: $GPUS"
-
-PROCESSORS=$(getconf _NPROCESSORS_ONLN)
-echo "Detected processors: $PROCESSORS"
-
-if [ "$GPUS" -eq "0" ]; then
-   NUM_JOBS=${NUM_JOBS-1}
-else
-    NUM_JOBS=${NUM_JOBS-$GPUS}
-fi
-echo "Num jobs: $NUM_JOBS"
-
 
 PEPTIDES=$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2
 REFERENCES_DIR=$(mhcflurry-downloads path data_references)
@@ -65,7 +52,13 @@ do
         --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
         --allele $(cat alleles.txt) \
         --out "predictions/mhcflurry.$kind" \
-        --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
+        --verbosity 1 \
+        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+        --cluster-parallelism \
+        --cluster-max-retries 15 \
+        --cluster-submit-command bsub \
+        --cluster-results-workdir ~/mhcflurry-scratch \
+        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
