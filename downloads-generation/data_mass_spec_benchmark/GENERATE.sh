@@ -27,7 +27,7 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 cp $SCRIPT_DIR/write_proteome_peptides.py .
 
-PEPTIDES=$(mhcflurry-downloads path data_mass_spec_annotated)/all_sequences.csv.bz2
+PEPTIDES=$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2
 REFERENCES_DIR=$(mhcflurry-downloads path data_references)
 
 python write_proteome_peptides.py \
