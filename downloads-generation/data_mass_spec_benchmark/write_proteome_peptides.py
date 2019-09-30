@@ -33,7 +33,7 @@ parser.add_argument(
     "--debug-max-rows",
     metavar="N",
     type=int,
-    default=10,
+    default=None,
     help="Max rows to process. Useful for debugging. If specified an ipdb "
     "debugging session is also opened at the end of the script")
 parser.add_argument(
