@@ -7,6 +7,7 @@ import sys
 import time
 import traceback
 import collections
+import math
 from functools import partial
 
 import numpy
@@ -100,7 +101,8 @@ def run(argv=sys.argv[1:]):
     # using local parallelism.
     predictor = Class1AffinityPredictor.load(
         args.models_dir,
-        optimization_level=None if serial_run or args.cluster_parallelism else 0,
+        #optimization_level=None if serial_run or args.cluster_parallelism else 0,
+        optimization_level=0,
     )
 
     alleles = [normalize_allele_name(a) for a in args.allele]
@@ -133,7 +135,7 @@ def run(argv=sys.argv[1:]):
     }).to_csv(out_alleles, index=False)
     print("Wrote: ", out_alleles)
 
-    num_chunks = int(len(peptides) / args.chunk_size)
+    num_chunks = int(math.ceil(len(peptides) / args.chunk_size))
     print("Split peptides into %d chunks" % num_chunks)
     peptide_chunks = numpy.array_split(peptides, num_chunks)
 
