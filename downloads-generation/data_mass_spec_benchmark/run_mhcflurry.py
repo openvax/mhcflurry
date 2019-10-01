@@ -177,7 +177,7 @@ def run(argv=sys.argv[1:]):
             work_function=do_predictions,
             work_items=work_items,
             constant_data=GLOBAL_DATA,
-            result_serialization_method="pickle",
+            result_serialization_method="dill",
             clear_constant_data=True)
     else:
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
