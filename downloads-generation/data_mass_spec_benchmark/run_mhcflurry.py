@@ -108,7 +108,7 @@ def run(argv=sys.argv[1:]):
 
     peptides = pandas.read_csv(args.input_peptides).peptide.drop_duplicates()
     print("Filtering to valid peptides. Starting at: ", len(peptides))
-    peptides = peptides[peptides.str.match("[ACDEFGHIKLMNPQRSTVWY]+")]
+    peptides = peptides[peptides.str.match("^[ACDEFGHIKLMNPQRSTVWY]+$")]
     print("Filtered to: ", len(peptides))
     peptides = peptides.unique()
     num_peptides = len(peptides)
