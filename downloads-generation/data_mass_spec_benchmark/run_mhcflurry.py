@@ -137,7 +137,10 @@ def run(argv=sys.argv[1:]):
 
     num_chunks = int(math.ceil(len(peptides) / args.chunk_size))
     print("Split peptides into %d chunks" % num_chunks)
-    peptide_chunks = numpy.array_split(peptides, num_chunks)
+    peptide_chunks = [
+        EncodableSequences.create(chunk)
+        for chunk in numpy.array_split(peptides, num_chunks)
+    ]
 
     GLOBAL_DATA["predictor"] = predictor
     GLOBAL_DATA["args"] = {
