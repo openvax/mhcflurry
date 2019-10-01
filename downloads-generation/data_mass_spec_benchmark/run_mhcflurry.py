@@ -233,6 +233,7 @@ def do_predictions(chunk_index, peptides, alleles, constant_data=None):
     # This may run on the cluster in a way that misses all top level imports,
     # so we have to re-import everything here.
     import time
+    from mhcflurry.encodable_sequences import EncodableSequences
 
     if constant_data is None:
         constant_data = GLOBAL_DATA
