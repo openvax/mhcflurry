@@ -47,6 +47,8 @@ for kind in with_mass_spec no_mass_spec
 do
     python run_mhcflurry.py \
         proteome_peptides.csv.bz2 \
+        --chunk-size 1000000 \
+        --batch-size 65536 \
         --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
         --allele $(cat alleles.txt) \
         --out "predictions/mhcflurry.$kind" \
