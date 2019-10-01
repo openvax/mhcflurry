@@ -62,8 +62,9 @@ for kind in with_mass_spec no_mass_spec
 do
     python run_mhcflurry.py \
         proteome_peptides.csv.bz2 \
-        --chunk-size 10000000 \
+        --chunk-size 100000 \
         --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
+        --batch-size 65536 \
         --allele $(cat alleles.txt) \
         --out "predictions/mhcflurry.$kind" \
         --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
