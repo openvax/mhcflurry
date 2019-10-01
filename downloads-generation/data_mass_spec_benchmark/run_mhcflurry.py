@@ -55,7 +55,7 @@ parser.add_argument(
 parser.add_argument(
     "--chunk-size",
     type=int,
-    default=1000000,
+    default=100000000,
     help="Num peptides per job. Default: %(default)s")
 parser.add_argument(
     "--batch-size",

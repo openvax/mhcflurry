@@ -12,8 +12,6 @@ import pandas
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
-import shellinford
-
 
 parser = argparse.ArgumentParser(usage=__doc__)
 

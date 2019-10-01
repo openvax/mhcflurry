@@ -15,8 +15,8 @@ rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
 mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
 
 # Send stdout and stderr to a logfile included with the archive.
-#exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
-#exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
+exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
+exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 
 # Log some environment info
 date
@@ -29,17 +29,15 @@ cp $SCRIPT_DIR/write_proteome_peptides.py .
 cp $SCRIPT_DIR/run_mhcflurry.py .
 cp $SCRIPT_DIR/write_allele_list.py .
 
-
 PEPTIDES=$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2
 REFERENCES_DIR=$(mhcflurry-downloads path data_references)
 
-#python write_proteome_peptides.py \
-#    "$PEPTIDES" \
-#    "${REFERENCES_DIR}/uniprot_proteins.csv.bz2" \
-#    --out proteome_peptides.csv
-#ls -lh proteome_peptides.csv
-#bzip2 proteome_peptides.csv
-ln -s ~/Dropbox/sinai/projects/201808-mhcflurry-pan/20190622-models/proteome_peptides.csv.bz2 proteome_peptides.csv.bz2
+python write_proteome_peptides.py \
+    "$PEPTIDES" \
+    "${REFERENCES_DIR}/uniprot_proteins.csv.bz2" \
+    --out proteome_peptides.csv
+ls -lh proteome_peptides.csv
+bzip2 proteome_peptides.csv
 
 python write_allele_list.py "$PEPTIDES" --out alleles.txt
 
