@@ -28,6 +28,11 @@ parser.add_argument(
     metavar="OUT.csv",
     help="Out file path")
 parser.add_argument(
+    "--chromosome",
+    metavar="CHR",
+    nargs="+",
+    help="Use only proteins from the specified chromosome(s)")
+parser.add_argument(
     "--debug-max-rows",
     metavar="N",
     type=int,
@@ -61,6 +66,12 @@ def run():
     print("Subselecting to gene-associated hits. Before: ", len(df))
     df = df.loc[~df.protein_ensembl_primary.isnull()]
     print("After: ", len(df))
+
+    if args.chromosome:
+        print("Subselecting to chromosome(s): ", *args.chromosome)
+        print("Before: ", len(df))
+        df = df.loc[df.protein_primary_ensembl_contig.isin(args.chromosome)]
+        print("After: ", len(df))
 
     (flanking_length,) = list(
         set(df.n_flank.str.len().unique()).union(
