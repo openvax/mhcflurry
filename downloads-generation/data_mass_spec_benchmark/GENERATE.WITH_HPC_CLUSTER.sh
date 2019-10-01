@@ -35,9 +35,8 @@ REFERENCES_DIR=$(mhcflurry-downloads path data_references)
 python write_proteome_peptides.py \
     "$PEPTIDES" \
     "${REFERENCES_DIR}/uniprot_proteins.csv.bz2" \
-    --out proteome_peptides.csv
-ls -lh proteome_peptides.csv
-bzip2 proteome_peptides.csv
+    --chromosome 1 \
+    --out proteome_peptides.chr1.csv
 
 python write_allele_list.py "$PEPTIDES" --out alleles.txt
 
@@ -46,12 +45,12 @@ mkdir predictions
 for kind in with_mass_spec no_mass_spec
 do
     python run_mhcflurry.py \
-        proteome_peptides.csv.bz2 \
-        --chunk-size 1000000 \
+        proteome_peptides.chr1.csv \
+        --chunk-size 100000 \
         --batch-size 65536 \
         --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
         --allele $(cat alleles.txt) \
-        --out "predictions/mhcflurry.$kind" \
+        --out "predictions/chr1.mhcflurry.$kind" \
         --verbosity 1 \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
         --cluster-parallelism \
@@ -60,6 +59,8 @@ do
         --cluster-results-workdir ~/mhcflurry-scratch \
         --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
 done
+
+bzip2 proteome_peptides.chr1.csv
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
