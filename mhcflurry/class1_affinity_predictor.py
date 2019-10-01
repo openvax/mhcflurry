@@ -521,7 +521,7 @@ class Class1AffinityPredictor(object):
                 "succeeded" if optimized else "not supported for these models")
         return result
 
-    def optimize(self):
+    def optimize(self, warn=True):
         """
         EXPERIMENTAL: Optimize the predictor for faster predictions.
 
@@ -545,7 +545,8 @@ class Class1AffinityPredictor(object):
                         merge_method="concatenate")
                 ]
             except NotImplementedError as e:
-                logging.warning("Optimization failed: %s", str(e))
+                if warn:
+                    logging.warning("Optimization failed: %s", str(e))
                 return False
             self._manifest_df = None
             self.clear_cache()
