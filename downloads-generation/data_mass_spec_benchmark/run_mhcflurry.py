@@ -106,7 +106,11 @@ def run(argv=sys.argv[1:]):
     alleles = [normalize_allele_name(a) for a in args.allele]
     alleles = sorted(set(alleles))
 
-    peptides = pandas.read_csv(args.input_peptides).peptide.unique()
+    peptides = pandas.read_csv(args.input_peptides).peptide.drop_duplicates()
+    print("Filtering to valid peptides. Starting at: ", len(peptides))
+    peptides = peptides[peptides.str.match("[ACDEFGHIKLMNPQRSTVWY]+")]
+    print("Filtered to: ", len(peptides))
+    peptides = peptides.unique()
     num_peptides = len(peptides)
 
     print("Predictions for %d alleles x %d peptides." % (
@@ -137,7 +141,7 @@ def run(argv=sys.argv[1:]):
     GLOBAL_DATA["args"] = {
         'verbose': args.verbosity > 0,
         'model_kwargs': {
-            'batch_size': args.prediction_batch_size,
+            'batch_size': args.batch_size,
         }
     }
 
@@ -239,7 +243,6 @@ def predict_for_allele(
     predictions = predictor.predict(
         peptides=chunk_peptides,
         allele=allele,
-        verbose=verbose,
         throw=False,
         model_kwargs=model_kwargs).astype('float32')
     if verbose:
