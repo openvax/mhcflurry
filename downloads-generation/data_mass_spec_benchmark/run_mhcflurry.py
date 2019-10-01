@@ -246,14 +246,15 @@ def do_predictions(chunk_index, peptides, alleles, constant_data=None):
     start = time.time()
     results = {}
     peptides = EncodableSequences.create(peptides)
-    for allele in alleles:
+    for (i, allele) in enumerate(alleles):
+        print("Processing allele %d / %d: %0.2f sec elapsed" % (
+            i + 1, len(alleles), time.time() - start))
         results[allele] = predictor.predict(
             peptides=peptides,
             allele=allele,
             throw=False,
             model_kwargs=model_kwargs).astype('float32')
-    if verbose:
-        print("Done predicting in", time.time() - start, "sec")
+    print("Done predicting in", time.time() - start, "sec")
     return (chunk_index, results)
 
 
