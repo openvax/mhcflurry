@@ -41,10 +41,9 @@ parser.add_argument(
     metavar="CSV",
     help="CSV file with 'peptide' column")
 parser.add_argument(
-    "--models-dir",
-    metavar="DIR",
+    "--predictor",
     required=True,
-    help="Directory to read MHCflurry models")
+    choices=("netmhcpan4", "netmhcpan4-el"))
 parser.add_argument(
     "--allele",
     default=None,
@@ -57,28 +56,42 @@ parser.add_argument(
     default=100000,
     help="Num peptides per job. Default: %(default)s")
 parser.add_argument(
-    "--batch-size",
-    type=int,
-    default=4096,
-    help="Keras batch size for predictions. Default: %(default)s")
-parser.add_argument(
     "--out",
     metavar="DIR",
     help="Write results to DIR")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Keras verbosity. Default: %(default)s",
-    default=0)
 parser.add_argument(
     "--max-peptides",
     type=int,
     help="Max peptides to process. For debugging.",
     default=None)
-
+parser.add_argument(
+    "--reuse-predictions",
+    metavar="DIR",
+    help="Take predictions from indicated DIR instead of re-running them")
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
+
+
+def load_results(dirname, result_df=None, col_names=None):
+    peptides = pandas.read_csv(
+        os.path.join(dirname, "peptides.csv")).peptide.values
+    manifest_df = pandas.read_csv(os.path.join(dirname, "alleles.csv"))
+    if col_names:
+        manifest_df = manifest_df.loc[manifest_df.col.isin(col_names)]
+
+    if result_df is None:
+        result_df = pandas.DataFrame(
+            index=peptides, columns=manifest_df.col.values, dtype="float32")
+        result_df[:] = numpy.nan
+
+    for _, row in manifest_df.iterrows():
+        with open(os.path.join(dirname, row.path), "rb") as fd:
+            result_df.loc[
+                peptides, row.col
+            ] = numpy.load(fd)['arr_0']
+
+    return result_df
 
 
 def run(argv=sys.argv[1:]):
@@ -90,18 +103,9 @@ def run(argv=sys.argv[1:]):
 
     args = parser.parse_args(argv)
 
-    args.models_dir = os.path.abspath(args.models_dir)
-
-    configure_logging(verbose=args.verbosity > 1)
+    configure_logging()
 
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
-
-    # It's important that we don't trigger a Keras import here since that breaks
-    # local parallelism (tensorflow backend). So we set optimization_level=0.
-    predictor = Class1AffinityPredictor.load(
-        args.models_dir,
-        optimization_level=0,
-    )
 
     alleles = [normalize_allele_name(a) for a in args.allele]
     alleles = sorted(set(alleles))
@@ -121,40 +125,53 @@ def run(argv=sys.argv[1:]):
         print("Creating", args.out)
         os.mkdir(args.out)
 
+
+    GLOBAL_DATA["predictor"] = args.predictor
+
     # Write peptide and allele lists to out dir.
     out_peptides = os.path.abspath(os.path.join(args.out, "peptides.csv"))
     pandas.DataFrame({"peptide": peptides}).to_csv(out_peptides, index=False)
     print("Wrote: ", out_peptides)
-    allele_to_file_path = dict(
-        (allele, "%s.npz" % (allele.replace("*", ""))) for allele in alleles)
-    out_alleles = os.path.abspath(os.path.join(args.out, "alleles.csv"))
-    pandas.DataFrame({
-        'allele': alleles,
-        'path': [allele_to_file_path[allele] for allele in alleles],
-    }).to_csv(out_alleles, index=False)
-    print("Wrote: ", out_alleles)
 
-    num_chunks = int(math.ceil(len(peptides) / args.chunk_size))
-    print("Splitting peptides into %d chunks" % num_chunks)
-    peptide_chunks = numpy.array_split(peptides, num_chunks)
+    manifest_df = []
+    for allele in alleles:
+        for col in ["affinity", "percentile_rank", "elution_score"]:
+            manifest_df.append((allele, col))
+    manifest_df = pandas.DataFrame(
+        manifest_df, columns=["allele", "kind"])
+    manifest_df["col"] = (
+            manifest_df.allele + " " + manifest_df.kind)
+    manifest_df["path"] = manifest_df.col.map(
+        lambda s: s.replace("*", "").replace(" ", ".")) + ".npz"
+    out_manifest = os.path.abspath(os.path.join(args.out, "alleles.csv"))
+    manifest_df.to_csv(out_manifest, index=False)
+    col_to_filename = manifest_df.set_index("col").path.map(
+        lambda s: os.path.abspath(os.path.join(args.out, s)))
+    print("Wrote: ", out_manifest)
 
-    GLOBAL_DATA["predictor"] = predictor
-    GLOBAL_DATA["args"] = {
-        'verbose': args.verbosity > 0,
-        'model_kwargs': {
-            'batch_size': args.batch_size,
-        }
-    }
+    result_df = pandas.DataFrame(
+        index=peptides, columns=manifest_df.columns.values, dtype="float32")
+    result_df[:] = numpy.nan
 
-    work_items = []
-    for (chunk_index, chunk_peptides) in enumerate(peptide_chunks):
-        work_item = {
-            'alleles': alleles,
-            'chunk_index': chunk_index,
-            'peptides': chunk_peptides,
-        }
-        work_items.append(work_item)
+    if args.reuse_predictions:
+        raise NotImplementedError()
+    else:
+        # Same number of chunks for all alleles
+        num_chunks = int(math.ceil(len(peptides) / args.chunk_size))
+        print("Splitting peptides into %d chunks" % num_chunks)
+        peptide_chunks = numpy.array_split(peptides, num_chunks)
+
+        work_items = []
+        for (chunk_index, chunk_peptides) in enumerate(peptide_chunks):
+            work_item = {
+                'alleles': alleles,
+                'peptides': chunk_peptides,
+            }
+            work_items.append(work_item)
     print("Work items: ", len(work_items))
+
+    for (i, work_item) in enumerate(work_items):
+        work_item["work_item_num"] = i
 
     worker_pool = None
     start = time.time()
@@ -187,33 +204,23 @@ def run(argv=sys.argv[1:]):
     for allele in alleles:
         allele_to_chunk_index_to_predictions[allele] = {}
 
-    for (chunk_index, allele_to_predictions) in tqdm.tqdm(
+    for (work_item_num, col_to_predictions) in tqdm.tqdm(
             results, total=len(work_items)):
-        for (allele, predictions) in allele_to_predictions.items():
-            chunk_index_to_predictions = allele_to_chunk_index_to_predictions[
-                allele
-            ]
-            assert chunk_index not in chunk_index_to_predictions
-            chunk_index_to_predictions[chunk_index] = predictions
+        for (col, predictions) in col_to_predictions.items():
+            result_df.loc[
+                work_items[work_item_num]['peptides'],
+                col
+            ] = predictions
+            out_path = os.path.join(
+                args.out, col_to_filename[col])
+            numpy.savez(out_path, result_df[col].values)
+            print(
+                "Wrote [%f%% null]:" % (
+                    result_df[col].isnull().mean() * 100.0),
+                out_path)
 
-            if len(allele_to_chunk_index_to_predictions[allele]) == num_chunks:
-                chunk_predictions = sorted(chunk_index_to_predictions.items())
-                assert [i for (i, _) in chunk_predictions] == list(
-                    range(num_chunks))
-                predictions = numpy.concatenate([
-                    predictions for (_, predictions) in chunk_predictions
-                ])
-                assert len(predictions) == num_peptides
-                out_path = os.path.join(
-                    args.out, allele.replace("*", "")) + ".npz"
-                out_path = os.path.abspath(out_path)
-                numpy.savez(out_path, predictions)
-                print("Wrote:", out_path)
-
-                del allele_to_chunk_index_to_predictions[allele]
-
-    assert not allele_to_chunk_index_to_predictions, (
-        "Not all results written: ", allele_to_chunk_index_to_predictions)
+    print("Overall null rate (should be 0): %f" % (
+        100.0 * result_df.isnull().values.flatten().mean()))
 
     if worker_pool:
         worker_pool.close()
@@ -224,33 +231,35 @@ def run(argv=sys.argv[1:]):
         prediction_time / 60.0))
 
 
-def do_predictions(chunk_index, peptides, alleles, constant_data=None):
+def do_predictions(work_item_num, peptides, alleles, constant_data=None):
     # This may run on the cluster in a way that misses all top level imports,
     # so we have to re-import everything here.
     import time
-    from mhcflurry.encodable_sequences import EncodableSequences
+    import numpy
+    import numpy.testing
+    import mhctools
 
     if constant_data is None:
         constant_data = GLOBAL_DATA
 
-    predictor = constant_data['predictor']
-    verbose = constant_data['args'].get("verbose", False)
-    model_kwargs = constant_data['args'].get("model_kwargs", {})
+    predictor_name = constant_data['predictor']
+    if predictor_name == "netmhcpan4":
+        predictor = mhctools.NetMHCpan4(
+            alleles=alleles, program_name="netMHCpan-4.0")
+    else:
+        raise ValueError("Unsupported", predictor_name)
 
-    predictor.optimize(warn=False)  # since we loaded with optimization_level=0
     start = time.time()
+    df = predictor.predict_peptides_dataframe(peptides)
+    print("Generated predictions for %d peptides x %d alleles in %0.2f sec." % (
+        len(peptides), len(alleles), (time.time() - start)))
+
     results = {}
-    peptides = EncodableSequences.create(peptides)
-    for (i, allele) in enumerate(alleles):
-        print("Processing allele %d / %d: %0.2f sec elapsed" % (
-            i + 1, len(alleles), time.time() - start))
-        results[allele] = predictor.predict(
-            peptides=peptides,
-            allele=allele,
-            throw=False,
-            model_kwargs=model_kwargs).astype('float32')
-    print("Done predicting in", time.time() - start, "sec")
-    return (chunk_index, results)
+    for (allele, sub_df) in df.groupby("allele"):
+        for col in ["affinity", "percentile_rank", "elution_score"]:
+            results["%s %s" % (allele, col)] = sub_df[col].values.astype(
+                'float32')
+    return (work_item_num, results)
 
 
 if __name__ == '__main__':
