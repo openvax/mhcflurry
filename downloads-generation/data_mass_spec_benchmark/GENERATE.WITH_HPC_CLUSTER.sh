@@ -42,23 +42,36 @@ python write_proteome_peptides.py \
     --chromosome 1 \
     --out proteome_peptides.chr1.csv
 
-for kind in with_mass_spec no_mass_spec
-do
-    python run_mhcflurry.py \
-        proteome_peptides.chr1.csv \
-        --chunk-size 100000 \
-        --batch-size 65536 \
-        --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
-        --allele $(cat alleles.txt) \
-        --out "predictions/chr1.mhcflurry.$kind" \
-        --verbosity 1 \
-        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
-        --cluster-parallelism \
-        --cluster-max-retries 15 \
-        --cluster-submit-command bsub \
-        --cluster-results-workdir ~/mhcflurry-scratch \
-        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
-done
+#for kind in with_mass_spec no_mass_spec
+#do
+#    python run_mhcflurry.py \
+#        proteome_peptides.chr1.csv \
+#        --chunk-size 100000 \
+#        --batch-size 65536 \
+#        --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
+#        --allele $(cat alleles.txt) \
+#        --out "predictions/chr1.mhcflurry.$kind" \
+#        --verbosity 1 \
+#        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+#        --cluster-parallelism \
+#        --cluster-max-retries 15 \
+#        --cluster-submit-command bsub \
+#        --cluster-results-workdir ~/mhcflurry-scratch \
+#        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
+#done
+
+python run_thirdparty_predictors.py \
+    proteome_peptides.chr1.csv \
+    --predictor netmhcpan4 \
+    --chunk-size 100000 \
+    --allele $(cat alleles.txt) \
+    --out "predictions/chr1.netmhcpan4" \
+    --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+    --cluster-parallelism \
+    --cluster-max-retries 15 \
+    --cluster-submit-command bsub \
+    --cluster-results-workdir ~/mhcflurry-scratch \
+    --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
 
 # Now all peptides
 python write_proteome_peptides.py \
@@ -66,23 +79,38 @@ python write_proteome_peptides.py \
     "${REFERENCES_DIR}/uniprot_proteins.csv.bz2" \
     --out proteome_peptides.all.csv
 
-for kind in with_mass_spec no_mass_spec
-do
-    python run_mhcflurry.py \
-        proteome_peptides.all.csv \
-        --chunk-size 500000 \
-        --batch-size 65536 \
-        --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
-        --allele $(cat alleles.txt) \
-        --out "predictions/all.mhcflurry.$kind" \
-        --verbosity 1 \
-        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
-        --cluster-parallelism \
-        --cluster-max-retries 15 \
-        --cluster-submit-command bsub \
-        --cluster-results-workdir ~/mhcflurry-scratch \
-        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
-done
+#for kind in with_mass_spec no_mass_spec
+#do
+#    python run_mhcflurry.py \
+#        proteome_peptides.all.csv \
+#        --chunk-size 500000 \
+#        --batch-size 65536 \
+#        --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
+#        --allele $(cat alleles.txt) \
+#        --out "predictions/all.mhcflurry.$kind" \
+#        --verbosity 1 \
+#        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+#        --cluster-parallelism \
+#        --cluster-max-retries 15 \
+#        --cluster-submit-command bsub \
+#        --cluster-results-workdir ~/mhcflurry-scratch \
+#        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
+#done
+
+python run_thirdparty_predictors.py \
+    proteome_peptides.all.csv \
+    --predictor netmhcpan4 \
+    --chunk-size 100000 \
+    --allele $(cat alleles.txt) \
+    --out "predictions/all.netmhcpan4" \
+    --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+    --cluster-parallelism \
+    --cluster-max-retries 15 \
+    --cluster-submit-command bsub \
+    --cluster-results-workdir ~/mhcflurry-scratch \
+    --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
+
+
 
 
 bzip2 proteome_peptides.chr1.csv
