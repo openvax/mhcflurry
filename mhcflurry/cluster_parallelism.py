@@ -170,6 +170,9 @@ def cluster_results(
         'constant_data': constant_data,
         'function': work_function,
     }
+    if not os.path.exists(results_workdir):
+        os.mkdir(results_workdir)
+
     work_dir = os.path.join(
         os.path.abspath(results_workdir),
         str(int(time.time())))
