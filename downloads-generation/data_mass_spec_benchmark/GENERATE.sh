@@ -119,7 +119,7 @@ do
             --allele $(cat alleles.txt) \
             --out "$OUT_DIR" \
             --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
-            --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf \
+            --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.gpu.lsf \
             $REUSE_ARG $EXTRA_ARGS
     done
 
