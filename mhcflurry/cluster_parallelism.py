@@ -252,6 +252,7 @@ def cluster_results(
         })
 
     def result_generator():
+        additional_complete_file_path = None
         start = time.time()
         while result_items:
             print("[%0.1f sec elapsed] waiting on %d / %d items." % (
@@ -303,7 +304,8 @@ def cluster_results(
                         result_item['work_dir'], "attempt.%d" % retry_num)
                     if os.path.exists(complete_dir):
                         shutil.move(complete_dir, attempt_dir)  # directory
-                    if os.path.exists(additional_complete_file_path):
+                    if additional_complete_file and os.path.exists(
+                            additional_complete_file_path):
                         shutil.move(additional_complete_file_path, attempt_dir)
                     if os.path.exists(error_path):
                         shutil.move(error_path, attempt_dir)
