@@ -75,6 +75,7 @@ parser.add_argument(
 parser.add_argument(
     "--reuse-predictions",
     metavar="DIR",
+    nargs="+",
     help="Take predictions from indicated DIR instead of re-running them")
 
 add_local_parallelism_args(parser)
@@ -214,10 +215,11 @@ def run(argv=sys.argv[1:]):
     result_df[:] = numpy.nan
 
     if args.reuse_predictions:
-        print("Loading predictions", args.reuse_predictions)
-        result_df = load_results(args.reuse_predictions, result_df)
-        print("Existing data filled %f%% entries" % (
-            result_df.notnull().values.mean()))
+        for dirname in args.reuse_predictions:
+            print("Loading predictions", dirname)
+            result_df = load_results(dirname, result_df)
+            print("Existing data filled %f%% entries" % (
+                result_df.notnull().values.mean()))
 
         # We rerun any alleles have nulls for any kind of values
         # (affinity, percentile rank, elution score).
