@@ -75,7 +75,7 @@ parser.add_argument(
 parser.add_argument(
     "--reuse-predictions",
     metavar="DIR",
-    action="append",
+    nargs="*",
     help="Take predictions from indicated DIR instead of re-running them")
 
 add_local_parallelism_args(parser)
@@ -99,21 +99,31 @@ def load_results(dirname, result_df=None):
         len(manifest_df),
         "columns")
 
+    # Make adjustments for old style data. Can be removed later.
+    if "kind" not in manifest_df.columns:
+        manifest_df["kind"] = "affinity"
+    if "col" not in manifest_df.columns:
+        manifest_df["col"] = manifest_df.allele + " " + manifest_df.kind
+
     if result_df is None:
         result_df = pandas.DataFrame(
             index=peptides, columns=manifest_df.col.values, dtype="float32")
         result_df[:] = numpy.nan
+        peptides_to_assign = peptides
+        mask = None
     else:
         manifest_df = manifest_df.loc[manifest_df.col.isin(result_df.columns)]
-        peptides = peptides[peptides.isin(result_df.index)]
+        mask = (peptides.isin(result_df.index)).values
+        peptides_to_assign = peptides[mask]
 
     print("Will load", len(peptides), "peptides and", len(manifest_df), "cols")
 
-    for _, row in manifest_df.iterrows():
+    for _, row in tqdm.tqdm(manifest_df.iterrows(), total=len(manifest_df)):
         with open(os.path.join(dirname, row.path), "rb") as fd:
-            result_df.loc[
-                peptides.values, row.col
-            ] = numpy.load(fd)['arr_0']
+            value = numpy.load(fd)['arr_0']
+            if mask is not None:
+                value = value[mask]
+            result_df.loc[peptides_to_assign, row.col] = value
 
     return result_df
 
@@ -222,10 +232,15 @@ def run(argv=sys.argv[1:]):
 
     if args.reuse_predictions:
         for dirname in args.reuse_predictions:
-            print("Loading predictions", dirname)
-            result_df = load_results(dirname, result_df)
-            print("Existing data filled %f%% entries" % (
-                result_df.notnull().values.mean()))
+            if not dirname:
+                continue  # ignore empty strings
+            if os.path.exists(dirname):
+                print("Loading predictions", dirname)
+                result_df = load_results(dirname, result_df)
+                print("Existing data filled %f%% entries" % (
+                    result_df.notnull().values.mean()))
+            else:
+                print("WARNING: skipping because does not exist", dirname)
 
         # We rerun any alleles have nulls for any kind of values
         # (e.g. affinity, percentile rank, elution score).
@@ -306,6 +321,17 @@ def run(argv=sys.argv[1:]):
     for allele in alleles:
         allele_to_chunk_index_to_predictions[allele] = {}
 
+    last_write_time_per_column = dict((col, 0.0) for col in result_df.columns)
+
+    def write_col(col):
+        out_path = os.path.join(
+            args.out, col_to_filename[col])
+        numpy.savez(out_path, result_df[col].values)
+        print(
+            "Wrote [%f%% null]:" % (
+                result_df[col].isnull().mean() * 100.0),
+            out_path)
+
     for (work_item_num, col_to_predictions) in tqdm.tqdm(
             results, total=len(work_items)):
         for (col, predictions) in col_to_predictions.items():
@@ -313,13 +339,13 @@ def run(argv=sys.argv[1:]):
                 work_items[work_item_num]['peptides'],
                 col
             ] = predictions
-            out_path = os.path.join(
-                args.out, col_to_filename[col])
-            numpy.savez(out_path, result_df[col].values)
-            print(
-                "Wrote [%f%% null]:" % (
-                    result_df[col].isnull().mean() * 100.0),
-                out_path)
+            if time.time() - last_write_time_per_column[col] > 180:
+                write_col(col)
+                last_write_time_per_column[col] = time.time()
+
+    print("Done processing. Final write for each column.")
+    for col in result_df.columns:
+        write_col(col)
 
     print("Overall null rate (should be 0): %f" % (
         100.0 * result_df.isnull().values.flatten().mean()))
