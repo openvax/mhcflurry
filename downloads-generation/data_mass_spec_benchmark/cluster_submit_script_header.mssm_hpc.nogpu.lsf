@@ -1,11 +1,11 @@
 #!/bin/bash
 #BSUB -J MHCf-{work_item_num} # Job name
 #BSUB -P acc_nkcancer # allocation account or Unix group
-#BSUB -q express # queue
+#BSUB -q premium # queue
 #BSUB -R span[hosts=1] # one node
 #BSUB -n 1 # number of compute cores
 #BSUB -W 12:00 # walltime in HH:MM
-#BSUB -R rusage[mem=20000] # mb memory requested
+#BSUB -R rusage[mem=4000] # mb memory requested
 #BSUB -o {work_dir}/%J.stdout # output log (%J : JobID)
 #BSUB -eo {work_dir}/STDERR # error log
 #BSUB -L /bin/bash # Initialize the execution environment
