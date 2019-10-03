@@ -76,8 +76,8 @@ REFERENCES_DIR=$(mhcflurry-downloads path data_references)
 
 if [ "${2:-reuse-none}" != "reuse-none" ]
 then
-    EXISTING_DATA=$(mhcflurry-downloads path $DOWNLOAD_NAME)
-    echo "Will reuse data from $REFERENCES_DIR"
+    EXISTING_DATA="$(mhcflurry-downloads path $DOWNLOAD_NAME)"
+    echo "Will reuse data from $EXISTING_DATA"
 else
     EXISTING_DATA=""
     echo "Will NOT reuse any data"
@@ -121,14 +121,15 @@ do
     for kind in with_mass_spec no_mass_spec
     do
         OUT_DIR=predictions/${subset}.mhcflurry.${kind}
-        REUSE_ARG=""
+        REUSE1=""
+        REUSE2=""
         if [ "$subset" == "all" ]
         then
-            REUSE_ARG="--reuse-predictions predictions/chr1.mhcflurry.${kind}"
+            REUSE1="predictions/chr1.mhcflurry.${kind}"
         fi
         if [ "${2:-reuse-none}" != "reuse-none" ] && [ "${2:-reuse-none}" != "reuse-predictions-except-mhcflurry" ]
         then
-            REUSE_ARG+="--reuse-predictions" "$EXISTING_DATA/$OUT_DIR"
+            REUSE2="$EXISTING_DATA"/$OUT_DIR
         fi
 
         python run_predictors.py \
@@ -141,19 +142,20 @@ do
             --out "$OUT_DIR" \
             --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
             --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.gpu.lsf \
-            $REUSE_ARG $EXTRA_ARGS
+            --reuse-predictions "$REUSE1" "$REUSE2" $EXTRA_ARGS
     done
 
     # Run netmhcpan4
     OUT_DIR=predictions/${subset}.netmhcpan4
-    REUSE_ARG=""
+    REUSE1=""
+    REUSE2=""
     if [ "$subset" == "all" ]
     then
-        REUSE_ARG="--reuse-predictions predictions/chr1.netmhcpan4"
+        REUSE1="predictions/chr1.netmhcpan4"
     fi
     if [ "${2:-reuse-none}" != "reuse-none" ]
     then
-        REUSE_ARG+="--reuse-predictions" "$EXISTING_DATA/$OUT_DIR"
+        REUSE2="$EXISTING_DATA"/$OUT_DIR
     fi
 
     python run_predictors.py \
@@ -164,7 +166,7 @@ do
         --out "$OUT_DIR" \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
         --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf \
-        $REUSE_ARG $EXTRA_ARGS
+        --reuse-predictions "$REUSE1" "$REUSE2" $EXTRA_ARGS
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
@@ -182,6 +184,6 @@ do
     echo "WARNING: already exists: $i . Moving to $DEST"
     mv $i $DEST
 done
-split -b 2000M "$RESULT" "$PARTS"
+split -b 2000m "$RESULT" "$PARTS"
 echo "Split into parts:"
 ls -lh "${PARTS}"*
