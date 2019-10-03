@@ -81,6 +81,11 @@ parser.add_argument(
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
 
+PREDICTOR_TO_COLS = {
+    "mhcflurry": ["affinity"],
+    "netmhcpan4": ["affinity", "percentile_rank", "elution_score"],
+}
+
 
 def load_results(dirname, result_df=None):
     peptides = pandas.read_csv(
@@ -188,6 +193,7 @@ def run(argv=sys.argv[1:]):
 
     GLOBAL_DATA["predictor"] = args.predictor
     GLOBAL_DATA["args"] = args
+    GLOBAL_DATA["cols"] = PREDICTOR_TO_COLS[args.predictor]
 
     # Write peptide and allele lists to out dir.
     out_peptides = os.path.abspath(os.path.join(args.out, "peptides.csv"))
@@ -196,7 +202,7 @@ def run(argv=sys.argv[1:]):
 
     manifest_df = []
     for allele in alleles:
-        for col in ["affinity", "percentile_rank", "elution_score"]:
+        for col in PREDICTOR_TO_COLS[args.predictor]:
             manifest_df.append((allele, col))
     manifest_df = pandas.DataFrame(
         manifest_df, columns=["allele", "kind"])
@@ -222,7 +228,7 @@ def run(argv=sys.argv[1:]):
                 result_df.notnull().values.mean()))
 
         # We rerun any alleles have nulls for any kind of values
-        # (affinity, percentile rank, elution score).
+        # (e.g. affinity, percentile rank, elution score).
         print("Computing blocks.")
         start = time.time()
         blocks = blocks_of_ones(result_df.isnull().values)
@@ -327,7 +333,8 @@ def run(argv=sys.argv[1:]):
         prediction_time / 60.0))
 
 
-def do_predictions_mhctools(work_item_num, peptides, alleles, constant_data=None):
+def do_predictions_mhctools(
+        work_item_num, peptides, alleles, constant_data=None):
     # This may run on the cluster in a way that misses all top level imports,
     # so we have to re-import everything here.
     import time
@@ -345,6 +352,8 @@ def do_predictions_mhctools(work_item_num, peptides, alleles, constant_data=None
     else:
         raise ValueError("Unsupported", predictor_name)
 
+    cols = constant_data['cols']
+
     start = time.time()
     df = predictor.predict_peptides_dataframe(peptides)
     print("Generated predictions for %d peptides x %d alleles in %0.2f sec." % (
@@ -352,9 +361,8 @@ def do_predictions_mhctools(work_item_num, peptides, alleles, constant_data=None
 
     results = {}
     for (allele, sub_df) in df.groupby("allele"):
-        for col in ["affinity", "percentile_rank", "elution_score"]:
-            results["%s %s" % (allele, col)] = sub_df[col].values.astype(
-                'float32')
+        for col in cols:
+            results["%s %s" % (allele, col)] = sub_df[col].values.astype('float32')
     return (work_item_num, results)
 
 
@@ -371,6 +379,7 @@ def do_predictions_mhcflurry(work_item_num, peptides, alleles, constant_data=Non
     args = constant_data['args']
 
     assert args.predictor == "mhcflurry"
+    assert constant_data['cols'] == ["affinity"]
 
     predictor = Class1AffinityPredictor.load(args.mhcflurry_models_dir)
 
