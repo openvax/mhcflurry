@@ -27,6 +27,7 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 cp $SCRIPT_DIR/write_proteome_peptides.py .
 cp $SCRIPT_DIR/run_mhcflurry.py .
+cp $SCRIPT_DIR/run_thirdparty_predictors.py .
 cp $SCRIPT_DIR/write_allele_list.py .
 
 PEPTIDES=$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2
@@ -100,7 +101,7 @@ python write_proteome_peptides.py \
 python run_thirdparty_predictors.py \
     proteome_peptides.all.csv \
     --predictor netmhcpan4 \
-    --chunk-size 100000 \
+    --chunk-size 10000 \
     --allele $(cat alleles.txt) \
     --out "predictions/all.netmhcpan4" \
     --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
@@ -108,9 +109,7 @@ python run_thirdparty_predictors.py \
     --cluster-max-retries 15 \
     --cluster-submit-command bsub \
     --cluster-results-workdir ~/mhcflurry-scratch \
-    --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
-
-
+    --cluster-script-prefix-path cluster_submit_script_header.mssm_hpc.nogpu.lsf
 
 
 bzip2 proteome_peptides.chr1.csv
