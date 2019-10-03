@@ -72,7 +72,7 @@ python run_thirdparty_predictors.py \
     --cluster-max-retries 15 \
     --cluster-submit-command bsub \
     --cluster-results-workdir ~/mhcflurry-scratch \
-    --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf
+    --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf
 
 # Now all peptides
 python write_proteome_peptides.py \
