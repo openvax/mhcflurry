@@ -29,6 +29,10 @@ releases:
                 - https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/models_class1_pan_unselected.20190924.tar.bz2.part.aa
               default: false
 
+            - name: data_mass_spec_benchmark
+              url: https://www.dropbox.com/s/0oh8vljyt4zeo7o/data_mass_spec_benchmark.20191001.tar.bz2?dl=1
+              default: false
+
             - name: data_mass_spec_annotated
               url: https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/data_mass_spec_annotated.20190930.tar.bz2
               default: false
