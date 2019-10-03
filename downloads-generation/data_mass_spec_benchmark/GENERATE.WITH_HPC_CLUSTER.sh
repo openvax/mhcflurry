@@ -64,12 +64,12 @@ python write_proteome_peptides.py \
 python run_thirdparty_predictors.py \
     proteome_peptides.chr1.csv \
     --predictor netmhcpan4 \
-    --chunk-size 100000 \
+    --chunk-size 10000 \
     --allele $(cat alleles.txt) \
     --out "predictions/chr1.netmhcpan4" \
     --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
     --cluster-parallelism \
-    --cluster-max-retries 15 \
+    --cluster-max-retries 3 \
     --cluster-submit-command bsub \
     --cluster-results-workdir ~/mhcflurry-scratch \
     --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf
@@ -106,7 +106,7 @@ python run_thirdparty_predictors.py \
     --out "predictions/all.netmhcpan4" \
     --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
     --cluster-parallelism \
-    --cluster-max-retries 15 \
+    --cluster-max-retries 3 \
     --cluster-submit-command bsub \
     --cluster-results-workdir ~/mhcflurry-scratch \
     --cluster-script-prefix-path cluster_submit_script_header.mssm_hpc.nogpu.lsf
