@@ -1,6 +1,27 @@
 #!/bin/bash
 #
-# GENERATE.sh <local|cluster> <reuse-all|reuse-none|reuse-predictions>
+# This download includes predictions for MHCflurry and NetMHCpan 4.0 over a
+# large number of peptides encompassing almost the full proteome.
+#
+# Usage:
+# GENERATE.sh <local|cluster> <reuse-all|reuse-none|reuse-predictions|reuse-predictions-except-mhcflurry>
+#
+# The first choice listed above for each argument is the default.
+#
+# Meanings for these arguments:
+#
+# FIRST ARGUMENT: where to run
+# local             - run locally using NUM_JOBS cores.
+# cluster           - run on cluster.
+#
+# SECOND ARGUMENT: whether to reuse predictions from existing downloaded data
+# reuse-all         - reuse predictions and peptide / allele lists from existing
+#                     downloaded data_mass_spec_benchmark.
+# reuse-none        - fully self-contained run; do not reuse anything.
+# reuse-predictions - reuse predictions but not peptide or allele lists. Any
+#                     new peptides not already included will be run.
+# reuse-predictions-except-mhcflurry
+#                   - Reuse predictions except for mhcflurry.
 #
 set -e
 set -x
@@ -105,7 +126,7 @@ do
         then
             REUSE_ARG="--reuse-predictions predictions/chr1.mhcflurry.${kind}"
         fi
-        if [ "${2:-reuse-none}" != "reuse-none" ]
+        if [ "${2:-reuse-none}" != "reuse-none" ] && [ "${2:-reuse-none}" != "reuse-predictions-except-mhcflurry" ]
         then
             REUSE_ARG+="--reuse-predictions" "$EXISTING_DATA/$OUT_DIR"
         fi
