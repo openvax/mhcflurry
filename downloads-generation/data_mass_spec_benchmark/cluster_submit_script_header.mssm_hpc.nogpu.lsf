@@ -4,8 +4,8 @@
 #BSUB -q express # queue
 #BSUB -R span[hosts=1] # one node
 #BSUB -n 1 # number of compute cores
-#BSUB -W 46:00 # walltime in HH:MM
-#BSUB -R rusage[mem=30000] # mb memory requested
+#BSUB -W 12:00 # walltime in HH:MM
+#BSUB -R rusage[mem=20000] # mb memory requested
 #BSUB -o {work_dir}/%J.stdout # output log (%J : JobID)
 #BSUB -eo {work_dir}/STDERR # error log
 #BSUB -L /bin/bash # Initialize the execution environment
@@ -25,8 +25,19 @@ export NETMHC_BUNDLE_HOME=$HOME/sinai/git/netmhc-bundle
 export NETMHC_BUNDLE_TMPDIR=/local/JOBS/netmhctmp-{work_item_num}
 export PATH=$NETMHC_BUNDLE_HOME/bin:$PATH
 
+cd {work_dir}
+
+mkdir -p "$NETMHC_BUNDLE_TMPDIR"
+mkdir -p "$TMPDIR"
+
+chmod 777 "$NETMHC_BUNDLE_TMPDIR"
+chmod 777 "$TMPDIR"
+
+ls "$NETMHC_BUNDLE_TMPDIR"
+ls "$TMPDIR"
+
+netMHCpan-4.0 -listMHC
 free -m
 env
 
-cd {work_dir}
 
