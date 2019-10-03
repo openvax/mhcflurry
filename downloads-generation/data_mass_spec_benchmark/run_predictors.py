@@ -75,7 +75,7 @@ parser.add_argument(
 parser.add_argument(
     "--reuse-predictions",
     metavar="DIR",
-    nargs="+",
+    action="append",
     help="Take predictions from indicated DIR instead of re-running them")
 
 add_local_parallelism_args(parser)
@@ -385,7 +385,9 @@ def do_predictions_mhcflurry(work_item_num, peptides, alleles, constant_data=Non
                 peptides=peptides,
                 allele=allele,
                 throw=False,
-                model_kwargs={'batch_size': args.batch_size}).astype('float32')
+                model_kwargs={
+                    'batch_size': args.mhcflurry_batch_size,
+                }).astype('float32')
     print("Done predicting in", time.time() - start, "sec")
     return (work_item_num, results)
 

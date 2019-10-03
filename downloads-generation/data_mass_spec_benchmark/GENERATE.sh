@@ -1,5 +1,6 @@
 #!/bin/bash
 #
+# GENERATE.sh <local|cluster> <reuse-all|reuse-none|reuse-predictions>
 #
 set -e
 set -x
@@ -15,8 +16,8 @@ rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
 mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
 
 # Send stdout and stderr to a logfile included with the archive.
-#exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
-#exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
+exec >  >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt")
+exec 2> >(tee -ia "$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.txt" >&2)
 
 # Log some environment info
 date
@@ -26,48 +27,123 @@ git status
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 cp $SCRIPT_DIR/write_proteome_peptides.py .
-cp $SCRIPT_DIR/run_mhcflurry.py .
 cp $SCRIPT_DIR/write_allele_list.py .
+cp $SCRIPT_DIR/run_predictors.py .
 
-GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
-echo "Detected GPUS: $GPUS"
+if [ "$1" != "cluster" ]
+then
 
-PROCESSORS=$(getconf _NPROCESSORS_ONLN)
-echo "Detected processors: $PROCESSORS"
+    GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
+    echo "Detected GPUS: $GPUS"
 
-if [ "$GPUS" -eq "0" ]; then
-   NUM_JOBS=${NUM_JOBS-1}
+    PROCESSORS=$(getconf _NPROCESSORS_ONLN)
+    echo "Detected processors: $PROCESSORS"
+
+    if [ "$GPUS" -eq "0" ]; then
+       NUM_JOBS=${NUM_JOBS-1}
+    else
+        NUM_JOBS=${NUM_JOBS-$GPUS}
+    fi
+    echo "Num jobs: $NUM_JOBS"
+    EXTRA_ARGS+=" --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1"
 else
-    NUM_JOBS=${NUM_JOBS-$GPUS}
+    EXTRA_ARGS+=" --cluster-parallelism --cluster-max-retries 3 --cluster-submit-command bsub --cluster-results-workdir ~/mhcflurry-scratch"
 fi
-echo "Num jobs: $NUM_JOBS"
-
 
 PEPTIDES=$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2
 REFERENCES_DIR=$(mhcflurry-downloads path data_references)
 
-#python write_proteome_peptides.py \
-#    "$PEPTIDES" \
-#    "${REFERENCES_DIR}/uniprot_proteins.csv.bz2" \
-#    --out proteome_peptides.csv
-#ls -lh proteome_peptides.csv
-#bzip2 proteome_peptides.csv
-ln -s ~/Dropbox/sinai/projects/201808-mhcflurry-pan/20190622-models/proteome_peptides.csv.bz2 proteome_peptides.csv.bz2
-
-python write_allele_list.py "$PEPTIDES" --out alleles.txt
+if [ "${2:-reuse-none}" != "reuse-none" ]
+then
+    EXISTING_DATA=$(mhcflurry-downloads path $DOWNLOAD_NAME)
+    echo "Will reuse data from $REFERENCES_DIR"
+else
+    EXISTING_DATA=""
+    echo "Will NOT reuse any data"
+fi
 
 mkdir predictions
 
-for kind in with_mass_spec no_mass_spec
+# Write out alleles
+if [ "$2" == "reuse-all" ]
+then
+    echo "Reusing allele list"
+    cp "$EXISTING_DATA/alleles.txt" .
+else
+    echo "Generating allele list"
+    python write_allele_list.py "$PEPTIDES" --out alleles.txt
+fi
+
+# Write out and process peptides.
+# First just chr1 peptides, then all peptides.
+for subset in chr1 all
 do
-    python run_mhcflurry.py \
-        proteome_peptides.csv.bz2 \
-        --chunk-size 100000 \
-        --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
-        --batch-size 65536 \
+    if [ "$2" == "reuse-all" ]
+    then
+        echo "Reusing peptide list"
+        cp "$EXISTING_DATA/proteome_peptides.$subset.csv.bz2" .
+    else
+        echo "Generating peptide list"
+        SUBSET_ARG=""
+        if [ "$subset" == "chr1" ]
+        then
+            SUBSET_ARG="--chromosome 1"
+        fi
+        python write_proteome_peptides.py \
+            "$PEPTIDES" \
+            "${REFERENCES_DIR}/uniprot_proteins.csv.bz2" \
+            --out proteome_peptides.$subset.csv $SUBSET_ARG
+        bzip2 proteome_peptides.$subset.csv
+    fi
+
+    # Run MHCflurry
+    for kind in with_mass_spec no_mass_spec
+    do
+        OUT_DIR=predictions/${subset}.mhcflurry.${kind}
+        REUSE_ARG=""
+        if [ "$subset" == "all" ]
+        then
+            REUSE_ARG="--reuse-predictions predictions/chr1.mhcflurry.${kind}"
+        fi
+        if [ "${2:-reuse-none}" != "reuse-none" ]
+        then
+            REUSE_ARG+="--reuse-predictions" "$EXISTING_DATA/$OUT_DIR"
+        fi
+
+        python run_predictors.py \
+            proteome_peptides.${subset}.csv.bz2 \
+            --predictor mhcflurry \
+            --chunk-size 500000 \
+            --mhcflurry-batch-size 65536 \
+            --mhcflurry-models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
+            --allele $(cat alleles.txt) \
+            --out "$OUT_DIR" \
+            --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+            --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf \
+            $REUSE_ARG $EXTRA_ARGS
+    done
+
+    # Run netmhcpan4
+    OUT_DIR=predictions/${subset}.netmhcpan4
+    REUSE_ARG=""
+    if [ "$subset" == "all" ]
+    then
+        REUSE_ARG="--reuse-predictions predictions/chr1.netmhcpan4"
+    fi
+    if [ "${2:-reuse-none}" != "reuse-none" ]
+    then
+        REUSE_ARG+="--reuse-predictions" "$EXISTING_DATA/$OUT_DIR"
+    fi
+
+    python run_predictors.py \
+        proteome_peptides.$subset.csv.bz2 \
+        --predictor netmhcpan4 \
+        --chunk-size 10000 \
         --allele $(cat alleles.txt) \
-        --out "predictions/mhcflurry.$kind" \
-        --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
+        --out "$OUT_DIR" \
+        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf \
+        $REUSE_ARG $EXTRA_ARGS
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
@@ -75,3 +151,16 @@ bzip2 LOG.txt
 RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
 tar -cjf "$RESULT" *
 echo "Created archive: $RESULT"
+
+# Split into <2GB chunks for GitHub
+PARTS="${RESULT}.part."
+# Check for pre-existing part files and rename them.
+for i in $(ls "${PARTS}"* )
+do
+    DEST="${i}.OLD.$(date +%s)"
+    echo "WARNING: already exists: $i . Moving to $DEST"
+    mv $i $DEST
+done
+split -b 2000M "$RESULT" "$PARTS"
+echo "Split into parts:"
+ls -lh "${PARTS}"*
