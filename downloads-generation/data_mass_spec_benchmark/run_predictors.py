@@ -237,8 +237,6 @@ def run(argv=sys.argv[1:]):
             if os.path.exists(dirname):
                 print("Loading predictions", dirname)
                 result_df = load_results(dirname, result_df)
-                print("Existing data filled %f%% entries" % (
-                    result_df.notnull().values.mean()))
             else:
                 print("WARNING: skipping because does not exist", dirname)
 
