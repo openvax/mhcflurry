@@ -7,6 +7,7 @@ import sys
 import time
 import traceback
 import math
+import collections
 from functools import partial
 
 import numpy
@@ -134,48 +135,6 @@ def load_results(dirname, result_df=None, dtype="float32"):
     return result_df
 
 
-def blocks_of_ones(arr):
-    """
-    Given a binary matrix, return indices of rectangular blocks of 1s.
-
-    Parameters
-    ----------
-    arr : binary matrix
-
-    Returns
-    -------
-    List of (x1, y1, x2, y2) where all indices are INCLUSIVE. Each block spans
-    from (x1, y1) on its upper left corner to (x2, y2) on its lower right corner.
-
-    """
-    arr = arr.copy()
-    blocks = []
-    while arr.sum() > 0:
-        (x1, y1) = numpy.unravel_index(arr.argmax(), arr.shape)
-        block = [x1, y1, x1, y1]
-
-        # Extend in first dimension as far as possible
-        down_stop = numpy.argmax(arr[x1:, y1] == 0) - 1
-        if down_stop == -1:
-            block[2] = arr.shape[0] - 1
-        else:
-            assert down_stop >= 0
-            block[2] = x1 + down_stop
-
-        # Extend in second dimension as far as possible
-        for i in range(y1, arr.shape[1]):
-            if (arr[block[0] : block[2] + 1, i] == 1).all():
-                block[3] = i
-
-        # Zero out block:
-        assert (
-            arr[block[0]: block[2] + 1, block[1] : block[3] + 1] == 1).all(), (arr, block)
-        arr[block[0] : block[2] + 1, block[1] : block[3] + 1] = 0
-
-        blocks.append(block)
-    return blocks
-
-
 def run(argv=sys.argv[1:]):
     global GLOBAL_DATA
 
@@ -190,7 +149,7 @@ def run(argv=sys.argv[1:]):
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
 
     alleles = [normalize_allele_name(a) for a in args.allele]
-    alleles = sorted(set(alleles))
+    alleles = numpy.array(sorted(set(alleles)))
 
     peptides = pandas.read_csv(
         args.input_peptides, nrows=args.max_peptides).peptide.drop_duplicates()
@@ -251,35 +210,32 @@ def run(argv=sys.argv[1:]):
             else:
                 print("WARNING: skipping because does not exist", dirname)
 
-        # We rerun any alleles have nulls for any kind of values
+        # We rerun any alleles that have nulls for any kind of values
         # (e.g. affinity, percentile rank, elution score).
         for (i, allele) in enumerate(alleles):
             sub_df = manifest_df.loc[manifest_df.allele == allele]
             is_null_matrix[:, i] = result_df[sub_df.col.values].isnull().any(1)
         print("Fraction null", is_null_matrix.mean())
 
-        print("Computing blocks.")
-        start = time.time()
-        blocks = blocks_of_ones(is_null_matrix)
-        print("Found %d blocks in %f sec." % (
-            len(blocks), (time.time() - start)))
+        print("Grouping peptides by alleles")
+        allele_indices_to_peptides = collections.defaultdict(list)
+        for (i, peptide) in tqdm.tqdm(enumerate(peptides), total=len(peptides)):
+            (allele_indices,) = numpy.where(is_null_matrix[i])
+            if len(allele_indices) > 0:
+                allele_indices_to_peptides[tuple(allele_indices)].append(peptide)
+
+        del is_null_matrix
 
         work_items = []
-        for (row_index1, col_index1, row_index2, col_index2) in blocks:
-            block_alleles = alleles[col_index1 : col_index2 + 1]
-            block_peptides = result_df.index[row_index1 : row_index2 + 1]
-
-            print("Block: ", row_index1, col_index1, row_index2, col_index2)
+        print("Assigning peptides to work items.")
+        for (indices, block_peptides) in allele_indices_to_peptides.items():
             num_chunks = int(math.ceil(len(block_peptides) / args.chunk_size))
-            print("Splitting peptides into %d chunks" % num_chunks)
             peptide_chunks = numpy.array_split(peptides, num_chunks)
-
             for chunk_peptides in peptide_chunks:
-                work_item = {
-                    'alleles': block_alleles,
+                work_items.append({
+                    'alleles': alleles[list(allele_indices_to_peptides)],
                     'peptides': chunk_peptides,
-                }
-                work_items.append(work_item)
+                })
     else:
         # Same number of chunks for all alleles
         num_chunks = int(math.ceil(len(peptides) / args.chunk_size))
