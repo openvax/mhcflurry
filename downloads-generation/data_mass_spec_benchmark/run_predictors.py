@@ -238,10 +238,8 @@ def run(argv=sys.argv[1:]):
 
     if args.reuse_predictions:
         # Allocating this here to hit any memory errors as early as possible.
-        is_null_matrix = pandas.DataFrame(
-            columns=alleles,
-            index=result_df.index,
-            dtype="int8")
+        is_null_matrix = numpy.ones(
+            shape=(result_df.shape[0], len(alleles)), dtype="int8")
 
         for dirname in args.reuse_predictions:
             if not dirname:
@@ -255,19 +253,20 @@ def run(argv=sys.argv[1:]):
 
         # We rerun any alleles have nulls for any kind of values
         # (e.g. affinity, percentile rank, elution score).
-        for (allele, sub_df) in manifest_df.groupby("allele"):
-            is_null_matrix[allele] = result_df[sub_df.col.values].isnull().any(1)
-        print("Fraction null", is_null_matrix.values.mean())
+        for (i, allele) in enumerate(alleles):
+            sub_df = manifest_df.loc[manifest_df.allele == allele]
+            is_null_matrix[:, i] = result_df[sub_df.col.values].isnull().any(1)
+        print("Fraction null", is_null_matrix.mean())
 
         print("Computing blocks.")
         start = time.time()
-        blocks = blocks_of_ones(is_null_matrix.values)
+        blocks = blocks_of_ones(is_null_matrix)
         print("Found %d blocks in %f sec." % (
             len(blocks), (time.time() - start)))
 
         work_items = []
         for (row_index1, col_index1, row_index2, col_index2) in blocks:
-            block_alleles = is_null_matrix.columns[col_index1 : col_index2 + 1]
+            block_alleles = alleles[col_index1 : col_index2 + 1]
             block_peptides = result_df.index[row_index1 : row_index2 + 1]
 
             print("Block: ", row_index1, col_index1, row_index2, col_index2)
