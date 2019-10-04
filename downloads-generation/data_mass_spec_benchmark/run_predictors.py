@@ -77,6 +77,10 @@ parser.add_argument(
     metavar="DIR",
     nargs="*",
     help="Take predictions from indicated DIR instead of re-running them")
+parser.add_argument(
+    "--result-dtype",
+    default="float32",
+    help="Numpy dtype of result. Default: %(default)s.")
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
@@ -87,7 +91,7 @@ PREDICTOR_TO_COLS = {
 }
 
 
-def load_results(dirname, result_df=None):
+def load_results(dirname, result_df=None, dtype="float32"):
     peptides = pandas.read_csv(
         os.path.join(dirname, "peptides.csv")).peptide
     manifest_df = pandas.read_csv(os.path.join(dirname, "alleles.csv"))
@@ -107,7 +111,9 @@ def load_results(dirname, result_df=None):
 
     if result_df is None:
         result_df = pandas.DataFrame(
-            index=peptides, columns=manifest_df.col.values, dtype="float32")
+            index=peptides,
+            columns=manifest_df.col.values,
+            dtype=dtype)
         result_df[:] = numpy.nan
         peptides_to_assign = peptides
         mask = None
@@ -227,23 +233,28 @@ def run(argv=sys.argv[1:]):
     print("Wrote: ", out_manifest)
 
     result_df = pandas.DataFrame(
-        index=peptides, columns=manifest_df.col.values, dtype="float32")
+        index=peptides, columns=manifest_df.col.values, dtype=args.result_dtype)
     result_df[:] = numpy.nan
 
     if args.reuse_predictions:
+        # Allocating this here to hit any memory errors as early as possible.
+        is_null_matrix = pandas.DataFrame(
+            columns=alleles,
+            index=result_df.index,
+            dtype="int8")
+
         for dirname in args.reuse_predictions:
             if not dirname:
                 continue  # ignore empty strings
             if os.path.exists(dirname):
                 print("Loading predictions", dirname)
-                result_df = load_results(dirname, result_df)
+                result_df = load_results(
+                    dirname, result_df, dtype=args.result_dtype)
             else:
                 print("WARNING: skipping because does not exist", dirname)
 
         # We rerun any alleles have nulls for any kind of values
         # (e.g. affinity, percentile rank, elution score).
-        is_null_matrix = pandas.DataFrame(
-            columns=alleles, index=result_df.index, dtype="int8")
         for (allele, sub_df) in manifest_df.groupby("allele"):
             is_null_matrix[allele] = result_df[sub_df.col.values].isnull().any(1)
         print("Fraction null", is_null_matrix.values.mean())
@@ -424,7 +435,8 @@ def do_predictions_mhctools(work_item_dicts, constant_data=None):
         for (allele, sub_df) in df.groupby("allele"):
             for col in cols:
                 result["%s %s" % (allele, col)] = (
-                    sub_df[col].values.astype('float32'))
+                    sub_df[col].values.astype(
+                        constant_data['args'].result_dtype))
     return results
 
 
@@ -471,7 +483,7 @@ def do_predictions_mhcflurry(work_item_dicts, constant_data=None):
                     throw=False,
                     model_kwargs={
                         'batch_size': args.mhcflurry_batch_size,
-                    }).astype('float32')
+                    }).astype(constant_data['args'].result_dtype)
         print("Done predicting in", time.time() - start, "sec")
     return results
 
