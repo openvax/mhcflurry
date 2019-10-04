@@ -370,9 +370,6 @@ def run(argv=sys.argv[1:]):
     for col in result_df.columns:
         write_col(col)
 
-    print("Overall null rate (should be 0): %f" % (
-        100.0 * result_df.isnull().values.flatten().mean()))
-
     if worker_pool:
         worker_pool.close()
         worker_pool.join()
