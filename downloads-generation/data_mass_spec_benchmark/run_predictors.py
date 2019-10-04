@@ -244,7 +244,8 @@ def run(argv=sys.argv[1:]):
 
         # We rerun any alleles have nulls for any kind of values
         # (e.g. affinity, percentile rank, elution score).
-        is_null_matrix = pandas.DataFrame(columns=alleles, dtype="int8")
+        is_null_matrix = pandas.DataFrame(
+            columns=alleles, index=result_df.index, dtype="int8")
         for (allele, sub_df) in manifest_df.groupby("allele"):
             is_null_matrix[allele] = result_df[sub_df.col.values].isnull().any(1)
         print("Fraction null", is_null_matrix.values.mean())

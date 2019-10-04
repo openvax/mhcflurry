@@ -117,6 +117,29 @@ do
         bzip2 proteome_peptides.$subset.csv
     fi
 
+    # Run netmhcpan4
+    OUT_DIR=predictions/${subset}.netmhcpan4
+    REUSE1=""
+    REUSE2=""
+    if [ "$subset" == "all" ]
+    then
+        REUSE1="predictions/chr1.netmhcpan4"
+    fi
+    if [ "${2:-reuse-none}" != "reuse-none" ]
+    then
+        REUSE2="$EXISTING_DATA"/$OUT_DIR
+    fi
+
+    python run_predictors.py \
+        proteome_peptides.$subset.csv.bz2 \
+        --predictor netmhcpan4 \
+        --chunk-size 10000 \
+        --allele $(cat alleles.txt) \
+        --out "$OUT_DIR" \
+        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf \
+        --reuse-predictions "$REUSE1" "$REUSE2" $EXTRA_ARGS
+
     # Run MHCflurry
     for kind in with_mass_spec no_mass_spec
     do
@@ -144,29 +167,6 @@ do
             --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.gpu.lsf \
             --reuse-predictions "$REUSE1" "$REUSE2" $EXTRA_ARGS
     done
-
-    # Run netmhcpan4
-    OUT_DIR=predictions/${subset}.netmhcpan4
-    REUSE1=""
-    REUSE2=""
-    if [ "$subset" == "all" ]
-    then
-        REUSE1="predictions/chr1.netmhcpan4"
-    fi
-    if [ "${2:-reuse-none}" != "reuse-none" ]
-    then
-        REUSE2="$EXISTING_DATA"/$OUT_DIR
-    fi
-
-    python run_predictors.py \
-        proteome_peptides.$subset.csv.bz2 \
-        --predictor netmhcpan4 \
-        --chunk-size 10000 \
-        --allele $(cat alleles.txt) \
-        --out "$OUT_DIR" \
-        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
-        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf \
-        --reuse-predictions "$REUSE1" "$REUSE2" $EXTRA_ARGS
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
