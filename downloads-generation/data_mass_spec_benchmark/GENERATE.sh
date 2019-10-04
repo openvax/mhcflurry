@@ -97,7 +97,9 @@ fi
 
 # Write out and process peptides.
 # First just chr1 peptides, then all peptides.
-for subset in chr1 all
+# TODO: switch this back
+#for subset in chr1 all
+for subset in all chr1
 do
     if [ "$2" == "reuse-all" ]
     then
@@ -123,7 +125,9 @@ do
     REUSE2=""
     if [ "$subset" == "all" ]
     then
-        REUSE1="predictions/chr1.netmhcpan4"
+        #REUSE1="predictions/chr1.netmhcpan4"
+        # TODO: switch this back
+        REUSE1="$EXISTING_DATA"/predictions/chr1.netmhcpan4
     fi
     if [ "${2:-reuse-none}" != "reuse-none" ]
     then
@@ -132,6 +136,7 @@ do
 
     python run_predictors.py \
         proteome_peptides.$subset.csv.bz2 \
+        --result-dtype "float16" \
         --predictor netmhcpan4 \
         --chunk-size 10000 \
         --allele $(cat alleles.txt) \
@@ -148,7 +153,9 @@ do
         REUSE2=""
         if [ "$subset" == "all" ]
         then
-            REUSE1="predictions/chr1.mhcflurry.${kind}"
+            #REUSE1="predictions/chr1.mhcflurry.${kind}"
+            # TODO: switch this back
+            REUSE1="$EXISTING_DATA"/predictions/chr1.mhcflurry.${kind}
         fi
         if [ "${2:-reuse-none}" != "reuse-none" ] && [ "${2:-reuse-none}" != "reuse-predictions-except-mhcflurry" ]
         then
@@ -157,6 +164,7 @@ do
 
         python run_predictors.py \
             proteome_peptides.${subset}.csv.bz2 \
+            --result-dtype "float16" \
             --predictor mhcflurry \
             --chunk-size 500000 \
             --mhcflurry-batch-size 65536 \
