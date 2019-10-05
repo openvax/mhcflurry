@@ -1129,13 +1129,25 @@ class Class1NeuralNetwork(object):
             for network in networks
         ]
 
-        pan_allele_layer_names = [
+        pan_allele_layer_initial_names = [
             'allele', 'peptide', 'allele_representation', 'flattened_0',
             'allele_flat', 'allele_peptide_merged', 'dense_0', 'dropout_0',
-            'dense_1', 'dropout_1', 'output',
+            #'dense_1', 'dropout_1', 'output',
+        ]
+        pan_allele_layer_final_names = [
+            'output'
         ]
 
-        if all(names == pan_allele_layer_names for names in layer_names):
+        def startswith(lst, prefix):
+            return lst[:len(prefix)] == prefix
+
+        def endswith(lst, suffix):
+            return lst[-len(suffix):] == suffix
+
+        if all(startswith(names, pan_allele_layer_initial_names) and
+                endswith(names, pan_allele_layer_final_names)
+                for names in layer_names):
+
             # Merging an ensemble of pan-allele architectures
             network = networks[0]
             peptide_input = Input(
@@ -1154,15 +1166,35 @@ class Class1NeuralNetwork(object):
             allele_peptide_merged = network.get_layer("allele_peptide_merged")(
                 [peptide_flat, allele_flat])
 
+
             sub_networks = []
             for (i, network) in enumerate(networks):
                 layers = network.layers[
-                    pan_allele_layer_names.index("allele_peptide_merged") + 1:
+                    pan_allele_layer_initial_names.index(
+                        "allele_peptide_merged") + 1:
                 ]
-                node = allele_peptide_merged
                 for layer in layers:
                     layer.name += "_%d" % i
-                    node = layer(node)
+
+                node = allele_peptide_merged
+                layer_name_to_new_node = {
+                    "allele_peptide_merged": allele_peptide_merged,
+                }
+                for layer in layers:
+                    assert layer.name not in layer_name_to_new_node
+                    input_layer_names = []
+                    for inbound_node in layer._inbound_nodes:
+                        for inbound_layer in inbound_node.inbound_layers:
+                            input_layer_names.append(inbound_layer.name)
+                    input_nodes = [
+                        layer_name_to_new_node[name]
+                        for name in input_layer_names
+                    ]
+                    if len(input_nodes) == 1:
+                        node = layer(input_nodes[0])
+                    else:
+                        node = layer(input_nodes)
+                    layer_name_to_new_node[layer.name] = node
                 sub_networks.append(node)
 
             if merge_method == 'average':

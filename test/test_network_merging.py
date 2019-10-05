@@ -1,4 +1,7 @@
 import logging
+logging.getLogger('tensorflow').disabled = True
+logging.getLogger('matplotlib').disabled = True
+
 import numpy
 import pandas
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
@@ -6,7 +9,7 @@ from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import cleanup, startup
-logging.getLogger('tensorflow').disabled = True
+
 
 PAN_ALLELE_PREDICTOR = None
 
@@ -16,7 +19,6 @@ def setup():
     startup()
     PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
         get_path("models_class1_pan", "models.with_mass_spec"),
-        max_models=4,
         optimization_level=0,)
 
 
@@ -27,7 +29,7 @@ def teardown():
 
 
 def test_merge():
-    assert len(PAN_ALLELE_PREDICTOR.class1_pan_allele_models) == 4
+    assert len(PAN_ALLELE_PREDICTOR.class1_pan_allele_models) > 1
 
     peptides = random_peptides(100, length=9)
     peptides.extend(random_peptides(100, length=10))
