@@ -18,6 +18,7 @@ base_hyperparameters = {
     'layer_sizes': [1024, 512],
     'learning_rate': 0.001,
     'locally_connected_layers': [],
+    'topology': 'feedfoward',
     'loss': 'custom:mse_with_inequalities',
     'max_epochs': 5000,
     'minibatch_size': 128,
@@ -36,10 +37,12 @@ base_hyperparameters = {
     'peptide_dense_layer_sizes': [],
     'random_negative_affinity_max': 50000.0,
     'random_negative_affinity_min': 20000.0,
-    'random_negative_constant': 1500,
+    'random_negative_constant': 1,
     'random_negative_distribution_smoothing': 0.0,
     'random_negative_match_distribution': True,
-    'random_negative_rate': 0.2,
+    'random_negative_rate': 1.0,
+    'random_negative_method': 'by_allele_equalize_nonbinders',
+    'random_negative_binder_threshold': 500.0,
     'train_data': {
         'pretrain': True,
         'pretrain_peptides_per_epoch': 64,
@@ -56,16 +59,23 @@ base_hyperparameters = {
 
 grid = []
 for layer_sizes in [[512, 256], [512, 512], [1024, 512], [1024, 1024]]:
-    for pretrain in [True]:
-        l1_base = 0.0000001
-        for l1 in [l1_base, l1_base / 10, l1_base / 100, l1_base / 1000, 0.0]:
-            for lr in [0.001, 0.01]:
-                new = deepcopy(base_hyperparameters)
-                new["layer_sizes"] = layer_sizes
-                new["dense_layer_l1_regularization"] = l1
-                new["train_data"]["pretrain"] = pretrain
-                new["learning_rate"] = lr
-                if not grid or new not in grid:
-                    grid.append(new)
+    l1_base = 0.0000001
+    for l1 in [l1_base, l1_base / 10, l1_base / 100, l1_base / 1000, 0.0]:
+        new = deepcopy(base_hyperparameters)
+        new["topology"] = 'feedforward'
+        new["layer_sizes"] = layer_sizes
+        new["dense_layer_l1_regularization"] = l1
+        if not grid or new not in grid:
+            grid.append(new)
+
+for layer_sizes in [[256, 512], [256, 256, 512], [256, 512, 512]]:
+    l1_base = 0.0000001
+    for l1 in [l1_base, l1_base / 10, l1_base / 100, l1_base / 1000, 0.0]:
+        new = deepcopy(base_hyperparameters)
+        new["topology"] = 'with-skip-connections'
+        new["layer_sizes"] = layer_sizes
+        new["dense_layer_l1_regularization"] = l1
+        if not grid or new not in grid:
+            grid.append(new)
 
 dump(grid, stdout)

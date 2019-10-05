@@ -360,13 +360,24 @@ class Class1AffinityPredictor(object):
 
         sub_manifest_df = self.manifest_df.loc[
             self.manifest_df.model_name.isin(model_names_to_write)
-        ]
+        ].copy()
 
+        # Network JSON configs may have changed since the models were added,
+        # for example due to changes to the allele representation layer.
+        # So we update the JSON configs here also.
+        updated_network_config_jsons = []
         for (_, row) in sub_manifest_df.iterrows():
+            updated_network_config_jsons.append(
+                json.dumps(row.model.get_config()))
             weights_path = self.weights_path(models_dir, row.model_name)
             Class1AffinityPredictor.save_weights(
                 row.model.get_weights(), weights_path)
             logging.info("Wrote: %s", weights_path)
+        sub_manifest_df["config_json"] = updated_network_config_jsons
+        self.manifest_df.loc[
+            sub_manifest_df.index,
+            "config_json"
+        ] = updated_network_config_jsons
 
         write_manifest_df = self.manifest_df[[
             c for c in self.manifest_df.columns if c != "model"
@@ -562,7 +573,10 @@ class Class1AffinityPredictor(object):
         """
         random_string = hashlib.sha1(
             str(time.time()).encode()).hexdigest()[:16]
-        return "%s-%d-%s" % (allele.upper(), num, random_string)
+        return "%s-%d-%s" % (
+            allele.upper().replace("*", "_").replace(":", "_"),
+            num,
+            random_string)
 
     @staticmethod
     def weights_path(models_dir, model_name):

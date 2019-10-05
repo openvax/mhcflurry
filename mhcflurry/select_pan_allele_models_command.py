@@ -52,11 +52,6 @@ parser.add_argument(
         "Model selection data CSV. Expected columns: "
         "allele, peptide, measurement_value"))
 parser.add_argument(
-    "--folds",
-    metavar="FILE.csv",
-    required=False,
-    help=(""))
-parser.add_argument(
     "--models-dir",
     metavar="DIR",
     required=True,
@@ -151,7 +146,8 @@ def run(argv=sys.argv[1:]):
     df = pandas.read_csv(args.data)
     print("Loaded data: %s" % (str(df.shape)))
 
-    input_predictor = Class1AffinityPredictor.load(args.models_dir)
+    input_predictor = Class1AffinityPredictor.load(
+        args.models_dir, optimization_level=0)
     print("Loaded: %s" % input_predictor)
 
     alleles = input_predictor.supported_alleles
@@ -159,19 +155,6 @@ def run(argv=sys.argv[1:]):
         input_predictor.supported_peptide_lengths)
 
     metadata_dfs = {}
-
-    if args.folds:
-        folds_df = pandas.read_csv(args.folds)
-        matches = all([
-            len(folds_df) == len(df),
-            (folds_df.peptide == df.peptide).all(),
-            (folds_df.allele == df.allele).all(),
-        ])
-        if not matches:
-            raise ValueError("Training data and fold data do not match")
-        fold_cols = [c for c in folds_df if c.startswith("fold_")]
-        for col in fold_cols:
-            df[col] = folds_df[col]
 
     fold_cols = [c for c in df if c.startswith("fold_")]
     num_folds = len(fold_cols)
@@ -191,8 +174,6 @@ def run(argv=sys.argv[1:]):
     # Allele names in data are assumed to be already normalized.
     df = df.loc[df.allele.isin(alleles)].dropna()
     print("Subselected to supported alleles: %s" % str(df.shape))
-
-    print("Selected %d alleles: %s" % (len(alleles), ' '.join(alleles)))
 
     metadata_dfs["model_selection_data"] = df
 
@@ -247,13 +228,13 @@ def run(argv=sys.argv[1:]):
     if serial_run:
         # Serial run
         print("Running in serial.")
-        results = (do_model_select_task(item) for item in work_items)
+        results = (model_select(**item) for item in work_items)
     elif args.cluster_parallelism:
         # Run using separate processes HPC cluster.
         print("Running on cluster.")
         results = cluster_results_from_args(
             args,
-            work_function=do_model_select_task,
+            work_function=model_select,
             work_items=work_items,
             constant_data=GLOBAL_DATA,
             result_serialization_method="pickle")
@@ -267,7 +248,9 @@ def run(argv=sys.argv[1:]):
 
         # Parallel run
         results = worker_pool.imap_unordered(
-            do_model_select_task, work_items, chunksize=1)
+            do_model_select_task,
+            work_items,
+            chunksize=1)
 
     models_by_fold = {}
     summary_dfs = []
@@ -288,6 +271,7 @@ def run(argv=sys.argv[1:]):
             len(models), fold_num, result['selected_indices']))
         models_by_fold[fold_num] = models
         for model in models:
+            model.clear_allele_representations()
             result_predictor.add_pan_allele_model(model)
 
     summary_df = pandas.concat(summary_dfs, ignore_index=False)
@@ -304,7 +288,9 @@ def run(argv=sys.argv[1:]):
         worker_pool.join()
 
     print("Model selection time %0.2f min." % (model_selection_time / 60.0))
-    print("Predictor written to: %s" % args.out_models_dir)
+    print("Predictor [%d models] written to: %s" % (
+        len(result_predictor.neural_networks),
+        args.out_models_dir))
 
 
 def do_model_select_task(item, constant_data=GLOBAL_DATA):

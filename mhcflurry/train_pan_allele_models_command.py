@@ -84,11 +84,11 @@ parser.add_argument(
     default=False,
     help="Do not use affinity value inequalities even when present in data")
 parser.add_argument(
-    "--ensemble-size",
+    "--num-folds",
     type=int,
+    default=4,
     metavar="N",
-    help="Ensemble size, i.e. how many models to retain the final predictor. "
-    "In the current implementation, this is also the number of training folds.")
+    help="Number of training folds.")
 parser.add_argument(
     "--num-replicates",
     type=int,
@@ -296,7 +296,7 @@ def initialize_training(args):
         "data",
         "out_models_dir",
         "hyperparameters",
-        "ensemble_size",
+        "num_folds",
     ]
     for arg in required_arguments:
         if getattr(args, arg) is None:
@@ -338,7 +338,7 @@ def initialize_training(args):
 
     folds_df = assign_folds(
         df=df,
-        num_folds=args.ensemble_size,
+        num_folds=args.num_folds,
         held_out_fraction=held_out_fraction,
         held_out_max=held_out_max)
 
@@ -387,14 +387,14 @@ def initialize_training(args):
             if not args.pretrain_data:
                 raise ValueError("--pretrain-data is required")
 
-        for fold in range(args.ensemble_size):
+        for fold in range(args.num_folds):
             for replicate in range(args.num_replicates):
                 work_dict = {
                     'work_item_name': str(uuid.uuid4()),
                     'architecture_num': h,
                     'num_architectures': len(hyperparameters_lst),
                     'fold_num': fold,
-                    'num_folds': args.ensemble_size,
+                    'num_folds': args.num_folds,
                     'replicate_num': replicate,
                     'num_replicates': args.num_replicates,
                     'hyperparameters': hyperparameters,
@@ -693,6 +693,7 @@ def train_model(
     predictor.clear_cache()
 
     # Delete the network to release memory
+    model.clear_allele_representations()
     model.update_network_description()  # save weights and config
     model._network = None  # release tensorflow network
     return predictor

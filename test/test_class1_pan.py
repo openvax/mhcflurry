@@ -49,6 +49,7 @@ HYPERPARAMETERS = {
     'random_negative_distribution_smoothing': 0.0,
     'random_negative_match_distribution': True,
     'random_negative_rate': 0.2,
+    'random_negative_method': 'by_allele',
     'train_data': {},
     'validation_split': 0.1,
 }

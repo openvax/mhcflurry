@@ -108,12 +108,19 @@ def run(argv=sys.argv[1:]):
 
     configure_logging(verbose=args.verbosity > 1)
 
-    predictor = Class1AffinityPredictor.load(args.models_dir)
+    # It's important that we don't trigger a Keras import here since that breaks
+    # local parallelism (tensorflow backend). So we set optimization_level=0.
+    predictor = Class1AffinityPredictor.load(
+        args.models_dir,
+        optimization_level=0,
+    )
 
     if args.allele:
         alleles = [normalize_allele_name(a) for a in args.allele]
     else:
         alleles = predictor.supported_alleles
+
+    alleles = sorted(set(alleles))
 
     distribution = None
     if args.match_amino_acid_distribution_data:
@@ -234,6 +241,7 @@ def calibrate_percentile_ranks(
         model_kwargs={}):
     if verbose:
         print("Calibrating", allele)
+    predictor.optimize()  # since we loaded with optimization_level=0
     start = time.time()
     summary_results = predictor.calibrate_percentile_ranks(
         peptides=peptides,

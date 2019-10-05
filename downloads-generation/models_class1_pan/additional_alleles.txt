@@ -1,0 +1,3 @@
+# Additional alleles besides those in the training data to include in percentile rank calibration
+HLA-C*02:10
+HLA-A*02:20

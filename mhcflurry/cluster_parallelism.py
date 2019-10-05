@@ -45,10 +45,18 @@ def add_cluster_parallelism_args(parser):
         default='./cluster-workdir',
         help="Default: %(default)s")
     group.add_argument(
+        "--additional-complete-file",
+        default='STDERR',
+        help="Additional file to monitor for job completion. Default: %(default)s")
+    group.add_argument(
         '--cluster-script-prefix-path',
         help="",
     )
-    group.add_argument('--cluster-max-retries', help="", default=3)
+    group.add_argument(
+        '--cluster-max-retries',
+        type=int,
+        help="How many times to rerun failing jobs. Default: %(default)s",
+        default=3)
 
 
 def cluster_results_from_args(
@@ -85,8 +93,10 @@ def cluster_results_from_args(
         constant_data=constant_data,
         submit_command=args.cluster_submit_command,
         results_workdir=args.cluster_results_workdir,
+        additional_complete_file=args.additional_complete_file,
         script_prefix_path=args.cluster_script_prefix_path,
         result_serialization_method=result_serialization_method,
+        max_retries=args.cluster_max_retries,
         clear_constant_data=clear_constant_data
     )
 
@@ -97,6 +107,7 @@ def cluster_results(
         constant_data=None,
         submit_command="sh",
         results_workdir="./cluster-workdir",
+        additional_complete_file=None,
         script_prefix_path=None,
         result_serialization_method="pickle",
         max_retries=3,
@@ -230,6 +241,15 @@ def cluster_results(
                     if os.path.exists(d['finished_path']):
                         result_item = d
                         break
+                    if additional_complete_file:
+                        additional_complete_file_path = os.path.join(
+                            d['work_dir'],
+                            additional_complete_file)
+                        if os.path.exists(additional_complete_file_path):
+                            result_item = d
+                            print("Exists", additional_complete_file_path)
+                            break
+
                 if result_item is None:
                     time.sleep(60)
                 else:
@@ -245,25 +265,33 @@ def cluster_results(
             print("[%0.1f sec elapsed] processing item %s" % (
                 time.time() - start, result_item))
 
-            if os.path.exists(error_path):
-                print("Error path exists", error_path)
-                with open(error_path, "rb") as fd:
-                    exception = pickle.load(fd)
-                    print(exception)
-                    if retry_num < max_retries:
-                        print("Relaunching", launch_command)
-                        attempt_dir = os.path.join(
-                            result_item['work_dir'], "attempt.%d" % retry_num)
-                        shutil.move(complete_dir, attempt_dir)
+            if os.path.exists(error_path) or not os.path.exists(result_path):
+                if os.path.exists(error_path):
+                    print("Error path exists", error_path)
+                    with open(error_path, "rb") as fd:
+                        exception = pickle.load(fd)
+                        print(exception)
+                if not os.path.exists(result_path):
+                    print("Result path does NOT exist", result_path)
+
+                if retry_num < max_retries:
+                    print("Relaunching", launch_command)
+                    attempt_dir = os.path.join(
+                        result_item['work_dir'], "attempt.%d" % retry_num)
+                    if os.path.exists(complete_dir):
+                        shutil.move(complete_dir, attempt_dir)  # directory
+                    if os.path.exists(additional_complete_file_path):
+                        shutil.move(additional_complete_file_path, attempt_dir)
+                    if os.path.exists(error_path):
                         shutil.move(error_path, attempt_dir)
-                        subprocess.check_call(launch_command, shell=True)
-                        print("Invoked", launch_command)
-                        result_item['retry_num'] += 1
-                        result_items.append(result_item)
-                        continue
-                    else:
-                        print("Max retries exceeded", max_retries)
-                        raise exception
+                    subprocess.check_call(launch_command, shell=True)
+                    print("Invoked", launch_command)
+                    result_item['retry_num'] += 1
+                    result_items.append(result_item)
+                    continue
+                else:
+                    print("Max retries exceeded", max_retries)
+                    raise exception
 
             if os.path.exists(result_path):
                 print("Result path exists", result_path)
