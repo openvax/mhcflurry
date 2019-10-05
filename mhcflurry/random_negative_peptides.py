@@ -190,7 +190,8 @@ class RandomNegativePeptides(object):
     def plan_by_allele_equalize_nonbinders(
             self, df_all, df_binders, df_nonbinders):
         """
-        Generate a random negative plan using the "by_allele" policy.
+        Generate a random negative plan using the
+        "by_allele_equalize_nonbinders" policy.
 
         Parameters are as in the `plan` method. No return value.
 

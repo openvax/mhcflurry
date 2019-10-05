@@ -101,6 +101,7 @@ def test_inequalities():
         max_epochs=200,
         minibatch_size=32,
         random_negative_rate=0.0,
+        random_negative_constant=0,
         early_stopping=False,
         validation_split=0.0,
         locally_connected_layers=[
@@ -127,7 +128,7 @@ def test_inequalities():
     # Strong binders - same peptides as above but more measurement values
     df = pandas.DataFrame()
     df["peptide"] = dfs[-1].peptide.values
-    df["value"] = 10
+    df["value"] = 1
     df["inequality1"] = "="
     df["inequality2"] = "="
     dfs.append(df)
@@ -160,7 +161,6 @@ def test_inequalities():
         **fit_kwargs)
     df["prediction2"] = predictor.predict(df.peptide.values)
 
-
     # Binders should be stronger
     for pred in ["prediction1", "prediction2"]:
         assert_less(df.loc[df.value < 1000, pred].mean(), 500)
@@ -170,8 +170,10 @@ def test_inequalities():
     # inequality1 should make the prediction weaker, whereas for inequality2
     # this measurement is a "<" so it should allow the strong-binder measurement
     # to dominate.
-    assert_less(
-        df.loc[df.value == 10].prediction2.mean() + 10,  # add some buffer
-        df.loc[df.value == 10].prediction1.mean(),
-    )
+    numpy.testing.assert_allclose(
+        df.loc[df.value == 1].prediction2.values,
+        1.0,
+        atol=0.5)
+    numpy.testing.assert_array_less(
+        5.0, df.loc[df.value == 1].prediction1.values)
     print(df.groupby("value")[["prediction1", "prediction2"]].mean())
