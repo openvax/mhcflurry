@@ -43,7 +43,7 @@ parser.add_argument(
 parser.add_argument(
     "--predictor",
     required=True,
-    choices=("mhcflurry", "netmhcpan4"))
+    choices=("mhcflurry", "netmhcpan4-ba", "netmhcpan4-el"))
 parser.add_argument(
     "--mhcflurry-models-dir",
     metavar="DIR",
@@ -88,7 +88,8 @@ add_cluster_parallelism_args(parser)
 
 PREDICTOR_TO_COLS = {
     "mhcflurry": ["affinity"],
-    "netmhcpan4": ["affinity", "percentile_rank", "elution_score"],
+    "netmhcpan4-ba": ["affinity", "percentile_rank"],
+    "netmhcpan4-el": ["elution_score"],
 }
 
 
@@ -376,9 +377,16 @@ def do_predictions_mhctools(work_item_dicts, constant_data=None):
         result = {}
         results.append((work_item_num, result))
 
-        if predictor_name == "netmhcpan4":
+        if predictor_name == "netmhcpan4-ba":
             predictor = mhctools.NetMHCpan4(
-                alleles=alleles, program_name="netMHCpan-4.0")
+                alleles=alleles,
+                program_name="netMHCpan-4.0",
+                mode="binding_affinity")
+        elif predictor_name == "netmhcpan4-el":
+            predictor = mhctools.NetMHCpan4(
+                alleles=alleles,
+                program_name="netMHCpan-4.0",
+                mode="elution_score")
         else:
             raise ValueError("Unsupported", predictor_name)
 
