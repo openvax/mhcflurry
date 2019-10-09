@@ -26,8 +26,9 @@ with open(args.production_hyperparameters) as fd:
 def transform_to_single_hidden(hyperparameters):
     result = []
     for size in [64, 128, 256, 1024]:
-        hyperparameters['layer_sizes'] = [size]
-        result.append(deepcopy(hyperparameters))
+        new_hyperparameters = deepcopy(hyperparameters)
+        new_hyperparameters['layer_sizes'] = [size]
+        result.append(new_hyperparameters)
     return result
 
 
@@ -46,8 +47,9 @@ transform = TRANSFORMS[args.kind]
 
 result_list = []
 for item in production_hyperparameters_list:
-    for result_item in transform(item):
+    results = transform(item)
+    for result_item in results:
         if result_item not in result_list:
-            result_list.append(item)
+            result_list.append(result_item)
 
 dump(result_list, stdout)
