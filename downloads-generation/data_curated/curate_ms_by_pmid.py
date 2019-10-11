@@ -23,24 +23,35 @@ def normalize_allele_name(s):
 parser = argparse.ArgumentParser(usage=__doc__)
 
 parser.add_argument(
-    "--item",
+    "--ms-item",
     nargs="+",
     action="append",
     metavar="PMID FILE, ... FILE",
     default=[],
-    help="Item to curate: PMID and list of files")
+    help="Mass spec item to curate: PMID and list of files")
 parser.add_argument(
-    "--out",
+    "--expression-item",
+    nargs="+",
+    action="append",
+    metavar="LABEL FILE, ... FILE",
+    default=[],
+    help="Expression data to curate: dataset label and list of files")
+parser.add_argument(
+    "--ms-out",
     metavar="OUT.csv",
-    help="Out file path")
+    help="Out file path (MS data)")
+parser.add_argument(
+    "--expression-out",
+    metavar="OUT.csv",
+    help="Out file path (RNA-seq expression)")
 parser.add_argument(
     "--debug",
     action="store_true",
     default=False,
     help="Leave user in pdb if PMID is unsupported")
 
-HANDLERS = {}
-
+PMID_HANDLERS = {}
+EXPRESSION_HANDLERS = {}
 
 def load(filenames, **kwargs):
     result = {}
@@ -146,7 +157,7 @@ def handle_pmid_24616531(filename):
         "peptide": peptides,
     })
     result_df["sample_id"] = "24616531"
-    result_df["sample_type"] = "B-lymphoblastoid"
+    result_df["sample_type"] = "B-LCL"
     result_df["cell_line"] = "GR"
     result_df["pulldown_antibody"] = "W6/32"
 
@@ -181,7 +192,6 @@ def handle_pmid_25576301(filename):
             rows.append((row.Sequence, sample))
 
     result_df = pandas.DataFrame(rows, columns=["peptide", "sample_id"])
-    result_df["cell_line"] = ""
     result_df["pulldown_antibody"] = "W6/32"
     result_df["mhc_class"] = "I"
     result_df["format"] = "multiallelic"
@@ -209,11 +219,21 @@ def handle_pmid_25576301(filename):
         'HCC1143': "basal like breast cancer",
         'JY': "B-cell",
     }
+    cell_line = {
+        'Fib': None,
+        'HCC1937': "HCC1937",
+        'SupB15WT': None,
+        'SupB15RT': None,
+        'HCT116': "HCT116",
+        'HCC1143': "HCC1143",
+        'JY': "JY",
+    }
     result_df["hla"] = result_df.sample_id.map(allele_map)
     print("Entries before dropping samples with unknown alleles", len(result_df))
     result_df = result_df.loc[~result_df.hla.isnull()]
     print("Entries after dropping samples with unknown alleles", len(result_df))
     result_df["sample_type"] = result_df.sample_id.map(sample_type)
+    result_df["cell_line"] = result_df.sample_id.map(cell_line)
     print(result_df.head(3))
     return result_df
 
@@ -266,7 +286,7 @@ def handle_pmid_26992070(*filenames):
         "HEK293": "hek",
         "HL-60": "neutrophil",
         "RPMI8226": "b-cell",
-        "MAVER-1": "b-lymphoblast",
+        "MAVER-1": "b-LCL",
         "THP-1": "monocyte",
     })
     result_df["mhc_class"] = "I"
@@ -343,30 +363,30 @@ def handle_pmid_28832583(*filenames):
     CM467	B-cell	28832583	HLA-A*01:01	HLA-A*24:02	HLA-B*13:02	HLA-B*39:06	HLA-C*06:02	HLA-C*12:03
     GD149	B-cell	28832583	HLA-A*01:01	HLA-A*24:02	HLA-B*38:01	HLA-B*44:03	HLA-C*06:02	HLA-C*12:03
     MD155	B-cell	28832583	HLA-A*02:01	HLA-A*24:02	HLA-B*15:01	HLA-B*18:01	HLA-C*03:03	HLA-C*07:01
-    PD42	B cell	28832583	HLA-A*02:06	HLA-A*24:02	HLA-B*07:02	HLA-B*55:01	HLA-C*01:02	HLA-C*07:02
-    RA957	B cell	28832583	HLA-A*02:20	HLA-A*68:01	HLA-B*35:03	HLA-B*39:01	HLA-C*04:01	HLA-C*07:02
+    PD42	B-cell	28832583	HLA-A*02:06	HLA-A*24:02	HLA-B*07:02	HLA-B*55:01	HLA-C*01:02	HLA-C*07:02
+    RA957	B-cell	28832583	HLA-A*02:20	HLA-A*68:01	HLA-B*35:03	HLA-B*39:01	HLA-C*04:01	HLA-C*07:02
     TIL1	TIL	28832583	HLA-A*02:01	HLA-A*02:01	HLA-B*18:01	HLA-B*38:01	HLA-C*05:01	
     TIL3	TIL	28832583	HLA-A*01:01	HLA-A*23:01	HLA-B*07:02	HLA-B*15:01	HLA-C*12:03	HLA-C*14:02
     Apher1	Leukapheresis	28832583	HLA-A*03:01	HLA-A*29:02	HLA-B*44:02	HLA-B*44:03	HLA-C*12:03	HLA-C*16:01
     Apher6	Leukapheresis	28832583	HLA-A*02:01	HLA-A*03:01	HLA-B*07:02		HLA-C*07:02	
-    pat_AC2	B lymphoblast	27841757	HLA-A*03:01	HLA-A*32:01	HLA-B*27:05	HLA-B*45:01		
-    pat_C	B lymphoblast	27841757	HLA-A*02:01	HLA-A*03:01	HLA-B*07:02		HLA-C*07:02	
-    pat_CELG	B lymphoblast	27841757	HLA-A*02:01	HLA-A*24:02	HLA-B*15:01	HLA-B*73:01	HLA-C*03:03	HLA-C*15:05
-    pat_CP2	B lymphoblast	27841757	HLA-A*11:01		HLA-B*14:02	HLA-B*44:02		
-    pat_FL	B lymphoblast	27841757	HLA-A*03:01	HLA-A*11:01	HLA-B*44:03	HLA-B*50:01		
-    pat_J	B lymphoblast	27841757	HLA-A*02:01	HLA-A*03:01	HLA-B*07:02		HLA-C*07:02	
-    pat_JPB3	B lymphoblast	27841757	HLA-A*02:01	HLA-A*11:01	HLA-B*27:05	HLA-B*56:01		
-    pat_JT2	B lymphoblast	27841757	HLA-A*11:01		HLA-B*18:03	HLA-B*35:01		
-    pat_M	B lymphoblast	27841757	HLA-A*03:01	HLA-A*29:02	HLA-B*08:01	HLA-B*44:03	HLA-C*07:01	HLA-C*16:01
-    pat_MA	B lymphoblast	27841757	HLA-A*02:01	HLA-A*29:02	HLA-B*44:03	HLA-B*57:01	HLA-C*07:01	HLA-C*16:01
-    pat_ML	B lymphoblast	27841757	HLA-A*02:01	HLA-A*11:01	HLA-B*40:01	HLA-B*44:03		
-    pat_NS2	B lymphoblast	27841757	HLA-A*02:01		HLA-B*13:02	HLA-B*41:01		
-    pat_NT	B lymphoblast	27841757	HLA-A*01:01	HLA-A*32:01	HLA-B*08:01			
-    pat_PF1	B lymphoblast	27841757	HLA-A*01:01	HLA-A*02:01	HLA-B*07:02	HLA-B*44:03	HLA-C*07:02	HLA-C*16:01
-    pat_R	B lymphoblast	27841757	HLA-A*03:01	HLA-A*29:02	HLA-B*08:01	HLA-B*44:03	HLA-C*07:01	HLA-C*16:01
-    pat_RT	B lymphoblast	27841757	HLA-A*01:01	HLA-A*02:01	HLA-B*18:01	HLA-B*39:24	HLA-C*05:01	HLA-C*07:01
-    pat_SR	B lymphoblast	27841757	HLA-A*02:01	HLA-A*23:01	HLA-B*18:01	HLA-B*44:03		
-    pat_ST	B lymphoblast	27841757	HLA-A*03:01	HLA-A*24:02	HLA-B*07:02	HLA-B*27:05
+    pat_AC2	B-LCL	27841757	HLA-A*03:01	HLA-A*32:01	HLA-B*27:05	HLA-B*45:01		
+    pat_C	B-LCL	27841757	HLA-A*02:01	HLA-A*03:01	HLA-B*07:02		HLA-C*07:02	
+    pat_CELG	B-LCL	27841757	HLA-A*02:01	HLA-A*24:02	HLA-B*15:01	HLA-B*73:01	HLA-C*03:03	HLA-C*15:05
+    pat_CP2	B-LCL	27841757	HLA-A*11:01		HLA-B*14:02	HLA-B*44:02		
+    pat_FL	B-LCL	27841757	HLA-A*03:01	HLA-A*11:01	HLA-B*44:03	HLA-B*50:01		
+    pat_J	B-LCL	27841757	HLA-A*02:01	HLA-A*03:01	HLA-B*07:02		HLA-C*07:02	
+    pat_JPB3	B-LCL	27841757	HLA-A*02:01	HLA-A*11:01	HLA-B*27:05	HLA-B*56:01		
+    pat_JT2	B-LCL	27841757	HLA-A*11:01		HLA-B*18:03	HLA-B*35:01		
+    pat_M	B-LCL	27841757	HLA-A*03:01	HLA-A*29:02	HLA-B*08:01	HLA-B*44:03	HLA-C*07:01	HLA-C*16:01
+    pat_MA	B-LCL	27841757	HLA-A*02:01	HLA-A*29:02	HLA-B*44:03	HLA-B*57:01	HLA-C*07:01	HLA-C*16:01
+    pat_ML	B-LCL	27841757	HLA-A*02:01	HLA-A*11:01	HLA-B*40:01	HLA-B*44:03		
+    pat_NS2	B-LCL	27841757	HLA-A*02:01		HLA-B*13:02	HLA-B*41:01		
+    pat_NT	B-LCL	27841757	HLA-A*01:01	HLA-A*32:01	HLA-B*08:01			
+    pat_PF1	B-LCL	27841757	HLA-A*01:01	HLA-A*02:01	HLA-B*07:02	HLA-B*44:03	HLA-C*07:02	HLA-C*16:01
+    pat_R	B-LCL	27841757	HLA-A*03:01	HLA-A*29:02	HLA-B*08:01	HLA-B*44:03	HLA-C*07:01	HLA-C*16:01
+    pat_RT	B-LCL	27841757	HLA-A*01:01	HLA-A*02:01	HLA-B*18:01	HLA-B*39:24	HLA-C*05:01	HLA-C*07:01
+    pat_SR	B-LCL	27841757	HLA-A*02:01	HLA-A*23:01	HLA-B*18:01	HLA-B*44:03		
+    pat_ST	B-LCL	27841757	HLA-A*03:01	HLA-A*24:02	HLA-B*07:02	HLA-B*27:05
     """
     info_df = pandas.read_csv(StringIO(info_text), sep="\t", index_col=0)
     info_df.index = info_df.index.str.strip()
@@ -613,59 +633,383 @@ def handle_pmid_31495665(filename):
     return result_df
 
 
-# Add all functions with names like handle_pmid_XXXX to HANDLERS dict.
+def handle_pmid_27869121(filename):
+    """Bassani-Sternberg, ..., Krackhardt Nature Comm. 2016 [PMID 27869121]"""
+    # Although this dataset has class II data also, we are only extracting
+    # class I for now.
+    df = pandas.read_excel(filename, skiprows=1)
+
+    # Taking these from:
+    # Supplementary Table 2: Information of patients selected for neoepitope
+    # identification
+    # For the Mel5 sample, only two-digit alleles are shown (A*01, A*25,
+    # B*08, B*18) so we are skipping that sample for now.
+    hla_df = pandas.DataFrame([
+        ("Mel-8", "HLA-A*01:01 HLA-A*03:01 HLA-B*07:02 HLA-B*08:01 HLA-C*07:01 HLA-C*07:02"),
+        ("Mel-12", "HLA-A*01:01 HLA-B*08:01 HLA-C*07:01"),
+        ("Mel-15", "HLA-A*03:01 HLA-A*68:01 HLA-B*27:05 HLA-B*35:03 HLA-C*02:02 HLA-C*04:01"),
+        ("Mel-16", "HLA-A*01:01 HLA-A*24:02 HLA-B*07:02 HLA-B*08:01 HLA-C*07:01 HLA-C*07:02"),
+    ], columns=["sample_id", "hla"]).set_index("sample_id")
+
+    # We assert below that none of the class I hit peptides were found in any
+    # of the class II pull downs.
+    class_ii_cols = [
+        c for c in df.columns if c.endswith("HLA-II (arbitrary units)")
+    ]
+    class_ii_hits = set(df.loc[
+        (df[class_ii_cols].fillna(0.0).sum(1) > 0)
+    ].Sequence.unique())
+
+    results = []
+    for (sample_id, hla) in hla_df.hla.items():
+        intensity_col = "Intensity %s_HLA-I (arbitrary units)" % sample_id
+        sub_df = df.loc[
+            (df[intensity_col].fillna(0.0) > 0)
+        ]
+        filtered_sub_df = sub_df.loc[
+            (~sub_df.Sequence.isin(class_ii_hits))
+        ]
+        peptides = filtered_sub_df.Sequence.unique()
+        assert not any(p in class_ii_hits for p in peptides)
+
+        result_df = pandas.DataFrame({
+            "peptide": peptides,
+        })
+        result_df["sample_id"] = sample_id
+        result_df["hla"] = hla_df.loc[sample_id, "hla"]
+        result_df["pulldown_antibody"] = "W6/32"
+        result_df["format"] = "multiallelic"
+        result_df["mhc_class"] = "I"
+        result_df["sample_type"] = "melanoma_met"
+        result_df["cell_line"] = None
+        results.append(result_df)
+
+    result_df = pandas.concat(results, ignore_index=True)
+    return result_df
+
+
+def handle_pmid_31154438(*filenames):
+    """Shraibman, ..., Admon Mol Cell Proteomics 2019"""
+    # Note: this publication also includes analyses of the secreted HLA
+    # peptidedome (sHLA) but we are using only the data from membrane-bound
+    # HLA.
+    (xls, txt) = sorted(filenames, key=lambda s: not s.endswith(".xlsx"))
+
+    info = pandas.read_excel(xls, skiprows=1)
+    df = pandas.read_csv(txt, sep="\t", skiprows=1)
+
+    hla_df = info.loc[
+        ~info["mHLA tissue sample"].isnull()
+    ].set_index("mHLA tissue sample")[["HLA typing"]]
+
+    def fix_hla(string):
+        result = []
+        alleles = string.split(";")
+        for a in alleles:
+            a = a.strip()
+            if "/" in a:
+                (a1, a2) = a.split("/")
+                a2 = a1[:2] + a2
+                lst = [a1, a2]
+            else:
+                lst = [a]
+            for a in lst:
+                normalized = normalize_allele_name(a)
+                # Ignore class II
+                if normalized[4] in ("A", "B", "C"):
+                    result.append(normalized)
+        return " ".join(result)
+
+    hla_df["hla"] = hla_df["HLA typing"].map(fix_hla)
+
+    results = []
+    for (sample_id, hla) in hla_df.hla.items():
+        intensity_col = "Intensity %s" % sample_id
+        sub_df = df.loc[
+            (df[intensity_col].fillna(0.0) > 0)
+        ]
+        peptides = sub_df.Sequence.unique()
+
+        result_df = pandas.DataFrame({
+            "peptide": peptides,
+        })
+        result_df["sample_id"] = sample_id
+        result_df["hla"] = hla_df.loc[sample_id, "hla"]
+        result_df["pulldown_antibody"] = "W6/32"
+        result_df["format"] = "multiallelic"
+        result_df["mhc_class"] = "I"
+        result_df["sample_type"] = "glioblastoma_tissue"
+        result_df["cell_line"] = None
+        results.append(result_df)
+
+    result_df = pandas.concat(results, ignore_index=True)
+    return result_df
+
+
+def expression_groups(dataset_identifier, df, groups):
+    result_df = pandas.DataFrame(index=df.index)
+    for (label, columns) in groups.items():
+        result_df[label] = df[columns].mean(1)
+    return result_df
+
+
+def handle_expression_GSE113126(*filenames):
+    """
+    Barry, ..., Krummel Nature Medicine 2018 [PMID 29942093]
+
+    This is the melanoma met RNA-seq dataset.
+
+    """
+
+    df = pandas.read_csv(filenames[0], sep="\t", index_col=0)
+    df = df[[]]  # no columns
+
+    for filename in filenames:
+        df[os.path.basename(filename)] = pandas.read_csv(
+            filename, sep="\t", index_col=0)["TPM"]
+
+    assert len(df.columns) == len(filenames)
+
+    groups = {
+        "sample_type:MELANOMA_MET": df.columns.tolist(),
+    }
+    return expression_groups("GSE113126", df, groups)
+
+
+def handle_expression_expression_atlas_22460905(filename):
+    df = pandas.read_csv(filename, sep="\t", skiprows=4, index_col=0)
+    del df["Gene Name"]
+    df.columns = df.columns.str.lower()
+    df = df.fillna(0.0)
+
+    def matches(*strings):
+        return [c for c in df.columns if all(s in c for s in strings)]
+
+    import ipdb ; ipdb.set_trace()
+
+    groups = {
+        "sample_type:B-LCL": (
+            matches("b-cell", "lymphoblast") + matches("b acute lymphoblastic")),
+        "sample_type:B-CELL": matches("b-cell"),
+        "sample_type:MELANOMA_CELL_LINE": matches("melanoma"),
+
+        # For GBM tissue we are just using a mixture of cell lines.
+        "sample_type:GLIOBLASTOMA_TISSUE": matches("glioblastoma"),
+
+        "cell_line:THP-1": ["childhood acute monocytic leukemia, thp-1"],
+        "cell_line:HL-60": ["adult acute myeloid leukemia, hl-60"],
+        "cell_line:U-87": ['glioblastoma, u-87 mg'],
+        "cell_line:LNT-229": ['glioblastoma, ln-229'],
+        "cell_line:T98G": ['glioblastoma, t98g'],
+        "cell_line:SK-MEL-5": ['cutaneous melanoma, sk-mel-5'],
+        'cell_line:MEWO': ['melanoma, mewo'],
+        "cell_line:HCC1937": ['breast ductal adenocarcinoma, hcc1937'],
+        "cell_line:HCT116": ['colon carcinoma, hct 116'],
+        "cell_line:HCC1143": ['breast ductal adenocarcinoma, hcc1143'],
+    }
+    return expression_groups("expression_atlas_22460905", df, groups)
+
+
+
+def handle_expression_human_protein_atlas(*filenames):
+    (cell_line_filename,) = [f for f in filenames if "celline" in f]
+    (blood_filename,) = [f for f in filenames if "blood" in f]
+    (gtex_filename,) = [f for f in filenames if "gtex" in f]
+
+    cell_line_df = pandas.read_csv(cell_line_filename, sep="\t")
+    blood_df = pandas.read_csv(blood_filename, sep="\t", index_col=0)
+    gtex_df = pandas.read_csv(gtex_filename, sep="\t")
+
+    cell_line_df = cell_line_df.pivot(
+        index="Gene", columns="Cell line", values="TPM")
+
+    gtex_df = gtex_df.pivot(
+        index="Gene", columns="Tissue", values="TPM")
+
+    result_df = pandas.DataFrame(index=cell_line_df.index)
+
+    result_df["sample_type:pbmc"] = blood_df[
+        [c for c in blood_df.columns if "total PBMC" in c]
+    ].mean(1)
+
+    result_df["cell_line:HEK293"] = cell_line_df['HEK 293']
+    result_df["cell_line:RPMI8226"] = cell_line_df['RPMI-8226']
+
+    # EXPI293 is based off HEK293
+    result_df["cell_line:EXPI293"] = cell_line_df['HEK 293']
+
+    # For leukapheresis we use pbmc sample
+    result_df["sample_type:leukapheresis"] = result_df["sample_type:pbmc"]
+
+    for tissue in ["lung", "spleen"]:
+        result_df["sample_type:%s" % tissue.upper()] = gtex_df[tissue]
+    return result_df
+
+
+
+
+
+# Add all functions with names like handle_pmid_XXXX to PMID_HANDLERS dict.
 for (key, value) in list(locals().items()):
     if key.startswith("handle_pmid_"):
-        HANDLERS[key.replace("handle_pmid_", "")] = value
+        PMID_HANDLERS[key.replace("handle_pmid_", "")] = value
+    elif key.startswith("handle_expression_"):
+        EXPRESSION_HANDLERS[key.replace("handle_expression_", "")] = value
 
 
 def run():
     args = parser.parse_args(sys.argv[1:])
 
-    dfs = []
-    for (i, item_tpl) in enumerate(args.item):
-        (pmid, filenames) = (item_tpl[0], item_tpl[1:])
+    expression_dfs = []
+    for (i, item_tpl) in enumerate(args.expression_item):
+        (label, filenames) = (item_tpl[0], item_tpl[1:])
+        label = label.replace("-", "_")
         print(
-            "Processing item %d / %d" % (i + 1, len(args.item)),
-            pmid,
+            "Processing expression item %d of %d" % (i + 1, len(args.expression_item)),
+            label,
             *[os.path.abspath(f) for f in filenames])
 
-        df = None
+        expression_df = None
         handler = None
-        if pmid in HANDLERS:
-            handler = HANDLERS[pmid]
-            df = handler(*filenames)
+        if label in EXPRESSION_HANDLERS:
+            handler = EXPRESSION_HANDLERS[label]
+            expression_df = handler(*filenames)
         elif args.debug:
             debug(*filenames)
         else:
-            raise NotImplementedError(args.pmid)
+            raise NotImplementedError(label)
 
-        if df is not None:
-            df["pmid"] = pmid
-            if "original_pmid" not in df.columns:
-                df["original_pmid"] = pmid
-            df = df.applymap(str).applymap(str.upper)
-            print("*** PMID %s: %d peptides ***" % (pmid, len(df)))
+        if expression_df is not None:
+            print(
+                "Processed expression data",
+                label,
+                "with shape",
+                expression_df.shape)
+            print(*expression_df.columns)
+            expression_dfs.append(expression_df)
+
+    expression_df = expression_dfs[0]
+    for other in expression_dfs[1:]:
+        expression_df = pandas.merge(
+            expression_df, other, how='outer', left_index=True, right_index=True)
+    expression_df = expression_df.fillna(0)
+
+    print(
+        "Genes in each expression dataframe: ",
+        *[len(e) for e in expression_dfs])
+    print("Genes in merged expression dataframe", len(expression_df))
+
+    ms_dfs = []
+    for (i, item_tpl) in enumerate(args.ms_item):
+        (pmid, filenames) = (item_tpl[0], item_tpl[1:])
+        print(
+            "Processing MS item %d of %d" % (i + 1, len(args.ms_item)),
+            pmid,
+            *[os.path.abspath(f) for f in filenames])
+
+        ms_df = None
+        handler = None
+        if pmid in PMID_HANDLERS:
+            handler = PMID_HANDLERS[pmid]
+            ms_df = handler(*filenames)
+        elif args.debug:
+            debug(*filenames)
+        else:
+            raise NotImplementedError(pmid)
+
+        if ms_df is not None:
+            ms_df["pmid"] = pmid
+            if "original_pmid" not in ms_df.columns:
+                ms_df["original_pmid"] = pmid
+            if "expression_dataset" not in ms_df.columns:
+                ms_df["expression_dataset"] = ""
+            ms_df = ms_df.applymap(str).applymap(str.upper)
+            ms_df["sample_id"] = ms_df.sample_id.str.replace(" ", "")
+            print("*** PMID %s: %d peptides ***" % (pmid, len(ms_df)))
             if handler is not None:
                 print(handler.__doc__)
             print("Counts by sample id:")
-            print(df.groupby("sample_id").peptide.nunique())
+            print(ms_df.groupby("sample_id").peptide.nunique())
             print("")
             print("Counts by sample type:")
-            print(df.groupby("sample_type").peptide.nunique())
+            print(ms_df.groupby("sample_type").peptide.nunique())
             print("****************************")
 
-            dfs.append(df)
+            for value in ms_df.expression_dataset.unique():
+                if value and value not in expression_df.columns:
+                    raise ValueError("No such expression dataset", value)
 
-    df = pandas.concat(dfs, ignore_index=True, sort=False)
+            ms_dfs.append(ms_df)
 
-    df["cell_line"] = df["cell_line"].fillna("")
+    ms_df = pandas.concat(ms_dfs, ignore_index=True, sort=False)
+    ms_df["cell_line"] = ms_df["cell_line"].fillna("")
 
-    cols = ["pmid", "sample_id", "peptide", "format", "mhc_class", "hla", ]
-    cols += [c for c in sorted(df.columns) if c not in cols]
-    df = df[cols]
+    sample_table = ms_df[
+        ["sample_id", "pmid", "expression_dataset", "cell_line", "sample_type"]
+    ].drop_duplicates().set_index("sample_id")
 
-    null_df = df.loc[df.isnull().any(1)]
+    sample_id_to_expression_dataset = sample_table.expression_dataset.to_dict()
+    for (sample_id, value) in sorted(sample_id_to_expression_dataset.items()):
+        if value:
+            print("Expression dataset for sample", sample_id, "already assigned")
+            continue
+        cell_line_col = "cell_line:" + sample_table.loc[sample_id, "cell_line"]
+        sample_type_col = "sample_type:" + (
+            sample_table.loc[sample_id, "sample_type"])
+
+        expression_dataset = None
+        for col in [cell_line_col, sample_type_col]:
+            if col in expression_df.columns:
+                expression_dataset = col
+                break
+
+        if not expression_dataset:
+            print("*" * 20)
+            print("No expression dataset for sample ", sample_id)
+            print("Sample info:")
+            print(sample_table.loc[sample_id])
+            print("*" * 20)
+
+        sample_id_to_expression_dataset[sample_id] = expression_dataset
+        print(
+            "Sample", sample_id, "assigned exp. dataset", expression_dataset)
+
+    print("Expression dataset usage:")
+    print(pandas.Series(sample_id_to_expression_dataset).value_counts())
+
+    missing = [
+        key for (key, value) in
+        sample_id_to_expression_dataset.items()
+        if value is None
+    ]
+    if missing:
+        print("Missing expression data for samples", *missing)
+        print(
+            "Missing cell lines: ",
+            *sample_table.loc[missing, "cell_line"].dropna().drop_duplicates().tolist())
+        print("Missing sample types: ", *sample_table.loc[
+            missing, "sample_type"].dropna().drop_duplicates().tolist())
+        if args.debug:
+            import ipdb; ipdb.set_trace()
+        else:
+            raise ValueError("Missing expression data for samples: ", missing)
+
+    ms_df["expression_dataset"] = ms_df.sample_id.map(
+        sample_id_to_expression_dataset)
+
+    cols = [
+        "pmid",
+        "sample_id",
+        "peptide",
+        "format",
+        "mhc_class",
+        "hla",
+        "expression_dataset",
+    ]
+    cols += [c for c in sorted(ms_df.columns) if c not in cols]
+    ms_df = ms_df[cols]
+
+    null_df = ms_df.loc[ms_df.isnull().any(1)]
     if len(null_df) > 0:
         print("Nulls:")
         print(null_df)
@@ -673,11 +1017,14 @@ def run():
         print("No nulls.")
 
     # Each sample should be coming from only one experiment.
-    assert df.groupby("sample_id").pmid.nunique().max() == 1, (
-        df.groupby("sample_id").pmid.nunique().sort_values())
+    assert ms_df.groupby("sample_id").pmid.nunique().max() == 1, (
+        ms_df.groupby("sample_id").pmid.nunique().sort_values())
 
-    df.to_csv(args.out, index=False)
-    print("Wrote: %s" % os.path.abspath(args.out))
+    expression_df.to_csv(args.expression_out, index=True)
+    print("Wrote: %s" % os.path.abspath(args.expression_out))
+
+    ms_df.to_csv(args.ms_out, index=False)
+    print("Wrote: %s" % os.path.abspath(args.ms_out))
 
 if __name__ == '__main__':
     run()
