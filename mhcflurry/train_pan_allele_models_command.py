@@ -309,7 +309,7 @@ def initialize_training(args):
     pprint.pprint(hyperparameters_lst)
 
     allele_sequences = pandas.read_csv(
-        args.allele_sequences, index_col=0).sequence
+        args.allele_sequences, index_col=0).iloc[:,0]
 
     df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
