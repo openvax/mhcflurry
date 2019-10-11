@@ -428,8 +428,7 @@ def train_models(args):
 
     with open(join(args.out_models_dir, "training_init_info.pkl"), "rb") as fd:
         GLOBAL_DATA.update(pickle.load(fd))
-    print("Loaded training init info:")
-    print(GLOBAL_DATA)
+    print("Loaded training init info.")
 
     all_work_items = GLOBAL_DATA["work_items"]
     complete_work_item_names = [
