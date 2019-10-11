@@ -5,6 +5,7 @@ optionally including eluted peptides identified by mass-spec.
 import sys
 import argparse
 import os
+import json
 import collections
 from six.moves import StringIO
 
@@ -44,6 +45,10 @@ parser.add_argument(
     "--expression-out",
     metavar="OUT.csv",
     help="Out file path (RNA-seq expression)")
+parser.add_argument(
+    "--expression-metadata-out",
+    metavar="OUT.csv",
+    help="Out file path for expression metadata, i.e. which samples used")
 parser.add_argument(
     "--debug",
     action="store_true",
@@ -421,6 +426,42 @@ def handle_pmid_28832583(*filenames):
     return result_df
 
 
+PMID_31495665_SAMPLE_TYPES = {
+        "HLA-DR_Lung": "lung",
+        "HLA-DR_PBMC_HDSC": "pbmc",
+        "HLA-DR_PBMC_RG1095": "pbmc",
+        "HLA-DR_PBMC_RG1104": "pbmc",
+        "HLA-DR_PBMC_RG1248": "pbmc",
+        "HLA-DR_Spleen": "spleen",
+        "MAPTAC_A*02:01": "mix:a375,expi293,hek293,hela",
+        "MAPTAC_A*11:01": "mix:expi293,hela",
+        "MAPTAC_A*32:01": "mix:a375,expi293,hela",
+        "MAPTAC_B*07:02": "mix:a375,expi293,hela",
+        "MAPTAC_B*45:01": "expi293",
+        "MAPTAC_B*52:01": "mix:a375,expi293",
+        "MAPTAC_C*03:03": "expi293",
+        "MAPTAC_C*06:02": "mix:a375,expi293",
+        "MAPTAC_DPB1*06:01/DPA1*01:03_dm+": "expi293",
+        "MAPTAC_DPB1*06:01/DPA1*01:03_dm-": "expi293",
+        "MAPTAC_DQB1*06:04/DQA1*01:02_dm+": "expi293",
+        "MAPTAC_DQB1*06:04/DQA1*01:02_dm-": "expi293",
+        "MAPTAC_DRB1*01:01": "mix:a375,b721,expi293,kg1,k562",
+        "MAPTAC_DRB1*03:01": "expi293",
+        "MAPTAC_DRB1*04:01": "expi293",
+        "MAPTAC_DRB1*07:01": "mix:expi293,hek293",
+        "MAPTAC_DRB1*11:01": "mix:expi293,k562,kg1",
+        "MAPTAC_DRB1*12:01_dm+": "expi293",
+        "MAPTAC_DRB1*12:01_dm-": "expi293",
+        "MAPTAC_DRB1*15:01": "expi293",
+        "MAPTAC_DRB3*01:01_dm+": "expi293",
+        "MAPTAC_DRB3*01:01_dm-": "expi293",
+}
+CELL_LINE_MIXTURES = sorted(
+    set(
+        x for x in PMID_31495665_SAMPLE_TYPES.values()
+        if x.startswith("mix:")))
+
+
 def handle_pmid_31495665(filename):
     """Abelin, ..., Rooney Immunity 2019 [PMID 31495665]"""
     hla_type = {
@@ -561,55 +602,26 @@ def handle_pmid_31495665(filename):
         "MAPTAC_A*11:01": "",
         "MAPTAC_A*32:01": "",
         "MAPTAC_B*07:02": "",
-        "MAPTAC_B*45:01": "",
+        "MAPTAC_B*45:01": "expi293",
         "MAPTAC_B*52:01": "",
-        "MAPTAC_C*03:03": "",
+        "MAPTAC_C*03:03": "expi293",
         "MAPTAC_C*06:02": "",
         "MAPTAC_DPB1*06:01/DPA1*01:03_dm+": "expi293",
         "MAPTAC_DPB1*06:01/DPA1*01:03_dm-": "expi293",
         "MAPTAC_DQB1*06:04/DQA1*01:02_dm+": "expi293",  # don't actually see this in DataS1A!
         "MAPTAC_DQB1*06:04/DQA1*01:02_dm-": "expi293",
         "MAPTAC_DRB1*01:01": "",
-        "MAPTAC_DRB1*03:01": "",
-        "MAPTAC_DRB1*04:01": "",
+        "MAPTAC_DRB1*03:01": "expi293",
+        "MAPTAC_DRB1*04:01": "expi293",
         "MAPTAC_DRB1*07:01": "",
         "MAPTAC_DRB1*11:01": "",
-        "MAPTAC_DRB1*12:01_dm+": "",
-        "MAPTAC_DRB1*12:01_dm-": "",
-        "MAPTAC_DRB1*15:01": "",
-        "MAPTAC_DRB3*01:01_dm+": "",
-        "MAPTAC_DRB3*01:01_dm-": "",
+        "MAPTAC_DRB1*12:01_dm+": "expi293",
+        "MAPTAC_DRB1*12:01_dm-": "expi293",
+        "MAPTAC_DRB1*15:01": "expi293",
+        "MAPTAC_DRB3*01:01_dm+": "expi293",
+        "MAPTAC_DRB3*01:01_dm-": "expi293",
     }
-    sample_type = {
-        "HLA-DR_Lung": "lung",
-        "HLA-DR_PBMC_HDSC": "lung",
-        "HLA-DR_PBMC_RG1095": "lung",
-        "HLA-DR_PBMC_RG1104": "lung",
-        "HLA-DR_PBMC_RG1248": "lung",
-        "HLA-DR_Spleen": "spleen",
-        "MAPTAC_A*02:01": "mixed",
-        "MAPTAC_A*11:01": "mixed",
-        "MAPTAC_A*32:01": "mixed",
-        "MAPTAC_B*07:02": "mixed",
-        "MAPTAC_B*45:01": "mixed",
-        "MAPTAC_B*52:01": "mixed",
-        "MAPTAC_C*03:03": "mixed",
-        "MAPTAC_C*06:02": "mixed",
-        "MAPTAC_DPB1*06:01/DPA1*01:03_dm+": "mixed",
-        "MAPTAC_DPB1*06:01/DPA1*01:03_dm-": "mixed",
-        "MAPTAC_DQB1*06:04/DQA1*01:02_dm+": "mixed",
-        "MAPTAC_DQB1*06:04/DQA1*01:02_dm-": "mixed",
-        "MAPTAC_DRB1*01:01": "mixed",
-        "MAPTAC_DRB1*03:01": "mixed",
-        "MAPTAC_DRB1*04:01": "mixed",
-        "MAPTAC_DRB1*07:01": "mixed",
-        "MAPTAC_DRB1*11:01": "mixed",
-        "MAPTAC_DRB1*12:01_dm+": "mixed",
-        "MAPTAC_DRB1*12:01_dm-": "mixed",
-        "MAPTAC_DRB1*15:01": "mixed",
-        "MAPTAC_DRB3*01:01_dm+": "mixed",
-        "MAPTAC_DRB3*01:01_dm-": "mixed",
-    }
+
 
     df = pandas.read_excel(filename, sheet_name="DataS1B")
     results = []
@@ -626,7 +638,7 @@ def handle_pmid_31495665(filename):
         result_df["pulldown_antibody"] = pulldown_antibody[sample_id]
         result_df["format"] = format[sample_id]
         result_df["mhc_class"] = mhc_class[sample_id]
-        result_df["sample_type"] = sample_type[sample_id]
+        result_df["sample_type"] = PMID_31495665_SAMPLE_TYPES[sample_id]
         result_df["cell_line"] = cell_line[sample_id]
         results.append(result_df)
     result_df = pandas.concat(results, ignore_index=True)
@@ -745,11 +757,18 @@ def handle_pmid_31154438(*filenames):
     result_df = pandas.concat(results, ignore_index=True)
     return result_df
 
+EXPRESSION_GROUPS_ROWS = []
 
-def expression_groups(dataset_identifier, df, groups):
+
+def make_expression_groups(dataset_identifier, df, groups):
     result_df = pandas.DataFrame(index=df.index)
     for (label, columns) in groups.items():
+        for col in columns:
+            if col not in df.columns:
+                raise ValueError(
+                    "Missing: %s. Available: %s" % (col, df.columns.tolist()))
         result_df[label] = df[columns].mean(1)
+        EXPRESSION_GROUPS_ROWS.append((dataset_identifier, label, columns))
     return result_df
 
 
@@ -773,7 +792,7 @@ def handle_expression_GSE113126(*filenames):
     groups = {
         "sample_type:MELANOMA_MET": df.columns.tolist(),
     }
-    return expression_groups("GSE113126", df, groups)
+    return [make_expression_groups("GSE113126", df, groups)]
 
 
 def handle_expression_expression_atlas_22460905(filename):
@@ -785,13 +804,17 @@ def handle_expression_expression_atlas_22460905(filename):
     def matches(*strings):
         return [c for c in df.columns if all(s in c for s in strings)]
 
-    import ipdb ; ipdb.set_trace()
-
     groups = {
         "sample_type:B-LCL": (
             matches("b-cell", "lymphoblast") + matches("b acute lymphoblastic")),
         "sample_type:B-CELL": matches("b-cell"),
+        "sample_type:B721-LIKE": matches("b-cell"),
         "sample_type:MELANOMA_CELL_LINE": matches("melanoma"),
+        "sample_type:A375-LIKE": matches("melanoma"),
+        "sample_type:KG1-LIKE": matches("myeloid leukemia"),
+
+        # Using a fibrosarcoma cell line for our fibroblast sample.
+        "sample_type:FIBROBLAST": ['fibrosarcoma, ht-1080'],
 
         # For GBM tissue we are just using a mixture of cell lines.
         "sample_type:GLIOBLASTOMA_TISSUE": matches("glioblastoma"),
@@ -807,8 +830,7 @@ def handle_expression_expression_atlas_22460905(filename):
         "cell_line:HCT116": ['colon carcinoma, hct 116'],
         "cell_line:HCC1143": ['breast ductal adenocarcinoma, hcc1143'],
     }
-    return expression_groups("expression_atlas_22460905", df, groups)
-
+    return [make_expression_groups("expression_atlas_22460905", df, groups)]
 
 
 def handle_expression_human_protein_atlas(*filenames):
@@ -826,27 +848,67 @@ def handle_expression_human_protein_atlas(*filenames):
     gtex_df = gtex_df.pivot(
         index="Gene", columns="Tissue", values="TPM")
 
-    result_df = pandas.DataFrame(index=cell_line_df.index)
+    return [
+        make_expression_groups(
+            "human_protein_atlas:%s" % os.path.basename(blood_filename),
+            blood_df,
+            groups={
+                "sample_type:PBMC": [
+                    c for c in blood_df.columns if "total PBMC" in c
+                ],
 
-    result_df["sample_type:pbmc"] = blood_df[
-        [c for c in blood_df.columns if "total PBMC" in c]
-    ].mean(1)
+                # for samples labeled leukapheresis we also use PBMC
+                "sample_type:LEUKAPHERESIS": [
+                    c for c in blood_df.columns if "total PBMC" in c
+                ],
 
-    result_df["cell_line:HEK293"] = cell_line_df['HEK 293']
-    result_df["cell_line:RPMI8226"] = cell_line_df['RPMI-8226']
+                # for samples labeled TIL we are also using PBMC
+                "sample_type:TIL": [
+                    c for c in blood_df.columns if "total PBMC" in c
+                ],
+            }),
+        make_expression_groups(
+            "human_protein_atlas:%s" % os.path.basename(cell_line_filename),
+            cell_line_df,
+            groups={
+                "cell_line:HELA": ['HeLa'],
+                "cell_line:K562": ["K-562"],
+                "cell_line:HEK293": ['HEK 293'],
+                "cell_line:RPMI8226": ['RPMI-8226'],
+                "cell_line:EXPI293": ['HEK 293'],  # EXPI293 derived from HEK293
+            }),
+        make_expression_groups(
+            "human_protein_atlas:%s" % os.path.basename(gtex_filename),
+            gtex_df,
+            groups={
+                "sample_type:LUNG": ["lung"],
+                "sample_type:SPLEEN": ["spleen"],
+            }),
+    ]
 
-    # EXPI293 is based off HEK293
-    result_df["cell_line:EXPI293"] = cell_line_df['HEK 293']
 
-    # For leukapheresis we use pbmc sample
-    result_df["sample_type:leukapheresis"] = result_df["sample_type:pbmc"]
-
-    for tissue in ["lung", "spleen"]:
-        result_df["sample_type:%s" % tissue.upper()] = gtex_df[tissue]
-    return result_df
-
-
-
+def make_expression_mixtures(expression_df):
+    global CELL_LINE_MIXTURES
+    groups = {}
+    for mix in CELL_LINE_MIXTURES:
+        components = []
+        for item in mix.replace("mix:", "").upper().split(","):
+            if "cell_line:%s" % item in expression_df.columns:
+                components.append("cell_line:%s" % item)
+            else:
+                print("No cell line, falling back on similar: ", item)
+                components.append("sample_type:%s-LIKE" % item)
+        groups["sample_type:" + mix.upper()] = components
+    missing = set()
+    for some in groups.values():
+        for item in some:
+            if item not in expression_df.columns:
+                missing.add(item)
+    if missing:
+        raise ValueError(
+            "Missing [%d]: %s. Available: %s" % (
+                len(missing), missing, expression_df.columns.tolist()))
+    return make_expression_groups("mixtures", expression_df, groups)
 
 
 # Add all functions with names like handle_pmid_XXXX to PMID_HANDLERS dict.
@@ -869,35 +931,43 @@ def run():
             label,
             *[os.path.abspath(f) for f in filenames])
 
-        expression_df = None
+        expression_dfs_for_item = []
         handler = None
         if label in EXPRESSION_HANDLERS:
             handler = EXPRESSION_HANDLERS[label]
-            expression_df = handler(*filenames)
+            expression_dfs_for_item = handler(*filenames)
         elif args.debug:
             debug(*filenames)
         else:
             raise NotImplementedError(label)
 
-        if expression_df is not None:
+        if expression_dfs_for_item:
             print(
                 "Processed expression data",
                 label,
-                "with shape",
-                expression_df.shape)
-            print(*expression_df.columns)
-            expression_dfs.append(expression_df)
+                "result dataframes",
+                len(expression_dfs_for_item))
+            print(*[e.columns for e in expression_dfs_for_item])
+            expression_dfs.extend(expression_dfs_for_item)
 
     expression_df = expression_dfs[0]
     for other in expression_dfs[1:]:
         expression_df = pandas.merge(
             expression_df, other, how='outer', left_index=True, right_index=True)
-    expression_df = expression_df.fillna(0)
 
-    print(
-        "Genes in each expression dataframe: ",
+    print("Genes in each expression dataframe: ",
         *[len(e) for e in expression_dfs])
     print("Genes in merged expression dataframe", len(expression_df))
+
+    if CELL_LINE_MIXTURES:
+        print("Generating cell line mixtures.")
+        expression_mixture_df = make_expression_mixtures(expression_df)
+        expression_df = pandas.merge(
+            expression_df,
+            expression_mixture_df,
+            how='outer',
+            left_index=True,
+            right_index=True)
 
     ms_dfs = []
     for (i, item_tpl) in enumerate(args.ms_item):
@@ -1025,6 +1095,16 @@ def run():
 
     ms_df.to_csv(args.ms_out, index=False)
     print("Wrote: %s" % os.path.abspath(args.ms_out))
+
+    if args.expression_metadata_out is not None:
+        expression_metadata_df = pandas.DataFrame(
+            EXPRESSION_GROUPS_ROWS,
+            columns=["expression_dataset", "label", "samples"])
+        expression_metadata_df["samples"] = expression_metadata_df[
+            "samples"
+        ].map(json.dumps)
+        expression_metadata_df.to_csv(args.expression_metadata_out, index=False)
+        print("Wrote: %s" % os.path.abspath(args.expression_metadata_out))
 
 if __name__ == '__main__':
     run()
