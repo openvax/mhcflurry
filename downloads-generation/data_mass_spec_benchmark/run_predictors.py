@@ -234,7 +234,7 @@ def run(argv=sys.argv[1:]):
             peptide_chunks = numpy.array_split(peptides, num_chunks)
             for chunk_peptides in peptide_chunks:
                 work_items.append({
-                    'alleles': alleles[list(allele_indices_to_peptides)],
+                    'alleles': alleles[list(indices)],
                     'peptides': chunk_peptides,
                 })
     else:
