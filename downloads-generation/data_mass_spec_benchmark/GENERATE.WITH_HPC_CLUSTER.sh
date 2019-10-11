@@ -1,1 +1,1 @@
-bash GENERATE.sh cluster reuse-all
+bash GENERATE.sh cluster reuse-predictions
