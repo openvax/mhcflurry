@@ -423,7 +423,8 @@ def train_models(args):
     global GLOBAL_DATA
 
     print("Beginning training.")
-    predictor = Class1AffinityPredictor.load(args.out_models_dir)
+    predictor = Class1AffinityPredictor.load(
+        args.out_models_dir, optimization_level=0)
     print("Loaded predictor with %d networks" % len(predictor.neural_networks))
 
     with open(join(args.out_models_dir, "training_init_info.pkl"), "rb") as fd:
