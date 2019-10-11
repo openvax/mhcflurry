@@ -62,15 +62,15 @@ if [ "$2" != "continue-incomplete" ]
 then
     cp $SCRIPT_DIR/generate_hyperparameters.production.py .
     cp $SCRIPT_DIR/generate_hyperparameters.py .
-    python generate_hyperparameters.production.py > hyperparameters.production.json
-    python generate_hyperparameters.py hyperparameters.production.json no_pretrain > hyperparameters.no_pretrain.yaml
+    python generate_hyperparameters.production.py > hyperparameters.production.yaml
+    python generate_hyperparameters.py hyperparameters.production.yaml no_pretrain > hyperparameters.no_pretrain.yaml
     python generate_hyperparameters.py hyperparameters.no_pretrain.yaml single_hidden > hyperparameters.single_hidden_no_pretrain.yaml
 fi
 
 for kind in single_hidden_no_pretrain no_pretrain 34mer_sequence
 do
     CONTINUE_INCOMPLETE_ARGS=""
-    if [ "$2" == "continue-incomplete" ] && [ -d "models.${kind}" ]
+    if [ "$2" == "continue-incomplete" ] && [ -d "models.unselected.${kind}" ]
     then
         echo "Will continue existing run: $kind"
         CONTINUE_INCOMPLETE_ARGS="--continue-incomplete"
