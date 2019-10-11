@@ -29,23 +29,33 @@ git status
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 cp $SCRIPT_DIR/curate.py .
-cp $SCRIPT_DIR/curate_by_pmid.py .
+cp $SCRIPT_DIR/curate_ms_by_pmid.py .
 
-RAW_DIR="$(mhcflurry-downloads path data_published)/raw"
-cp -r "$RAW_DIR" .
+MS_DIR="$(mhcflurry-downloads path data_published)/ms"
+cp -r "$MS_DIR" .
+
+EXPRESSION_DIR="$(mhcflurry-downloads path data_published)/expression"
+cp -r "$EXPRESSION_DIR" .
 
 CURATE_BY_PMID_ARGS=""
-for pmid in $(ls raw)
+for pmid in $(ls ms)
 do
-    CURATE_BY_PMID_ARGS+=$(echo --item $pmid raw/$pmid/* ' ')
+    CURATE_BY_PMID_ARGS+=$(echo --ms-item $pmid ms/$pmid/* ' ')
+done
+for item in $(ls expression)
+do
+    CURATE_BY_PMID_ARGS+=$(echo --expression-item $item expression/$item/* ' ')
 done
 
-time python curate_by_pmid.py $CURATE_BY_PMID_ARGS \
-    --out nontraining_curated.by_pmid.csv
+time python curate_ms_by_pmid.py $CURATE_BY_PMID_ARGS \
+    --ms-out ms.nontraining_curated.by_pmid.csv \
+    --expression-out rna_expression.csv
 
-bzip2 nontraining_curated.by_pmid.csv
+bzip2 ms.nontraining_curated.by_pmid.csv
+bzip2 rna_expression.csv
 
-rm -rf raw
+
+rm -rf ms
 
 # No mass-spec data
 time python curate.py \
