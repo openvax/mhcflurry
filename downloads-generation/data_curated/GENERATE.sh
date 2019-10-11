@@ -49,7 +49,8 @@ done
 
 time python curate_ms_by_pmid.py $CURATE_BY_PMID_ARGS \
     --ms-out ms.nontraining_curated.by_pmid.csv \
-    --expression-out rna_expression.csv
+    --expression-out rna_expression.csv \
+    --expression-metadata-out rna_expression.metadata.csv
 
 bzip2 ms.nontraining_curated.by_pmid.csv
 bzip2 rna_expression.csv
