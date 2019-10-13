@@ -311,8 +311,6 @@ def run(argv=sys.argv[1:]):
     for allele in alleles:
         allele_to_chunk_index_to_predictions[allele] = {}
 
-    last_write_time_per_column = dict((col, 0.0) for col in result_df.columns)
-
     def write_col(col):
         out_path = os.path.join(
             args.out, col_to_filename[col])
@@ -321,6 +319,13 @@ def run(argv=sys.argv[1:]):
             "Wrote [%f%% null]:" % (
                 result_df[col].isnull().mean() * 100.0),
             out_path)
+
+    print("Writing all columns.")
+    last_write_time_per_column = {}
+    for col in result_df.columns:
+        write_col(col)
+        last_write_time_per_column[col] = time.time()
+    print("Done writing all columns. Reading results.")
 
     for worker_results in tqdm.tqdm(results, total=len(work_items)):
         for (work_item_num, col_to_predictions) in worker_results:
