@@ -701,7 +701,7 @@ def handle_pmid_27869121(filename):
 
 
 def handle_pmid_31154438(*filenames):
-    """Shraibman, ..., Admon Mol Cell Proteomics 2019"""
+    """Shraibman, ..., Admon Mol Cell Proteomics 2019 [PMID 31154438]"""
     # Note: this publication also includes analyses of the secreted HLA
     # peptidedome (sHLA) but we are using only the data from membrane-bound
     # HLA.
