@@ -46,7 +46,7 @@ wc -l test.csv
 
 time mhcflurry-class1-select-allele-specific-models \
     --data test.csv \
-    --models-dir "$(mhcflurry-downloads path models_class1_unselected)/models" \
+    --models-dir "$(mhcflurry-downloads path models_class1_unselected_with_mass_spec)/models" \
     --out-models-dir models \
     --scoring combined:mass-spec,mse,consensus \
     --consensus-num-peptides-per-length 10000 \
