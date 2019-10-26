@@ -44,7 +44,7 @@ dependencies:
   - progressbar33==2.4
   - pydot==1.2.3
   - pyensembl==1.1.0
-  - pygments==2.2.0
+  - pygments==2.4.2
   - pypandoc==1.4
   - pyparsing==2.2.0
   - python-dateutil==2.6.1
