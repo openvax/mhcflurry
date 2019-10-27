@@ -137,7 +137,7 @@ do
             proteome_peptides.$subset.csv.bz2 \
             --result-dtype "float16" \
             --predictor netmhcpan4-$kind \
-            --chunk-size 5000 \
+            --chunk-size 1000 \
             --allele $(cat alleles.txt) \
             --out "$OUT_DIR" \
             --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
