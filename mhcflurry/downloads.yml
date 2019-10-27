@@ -34,7 +34,7 @@ releases:
               default: false
 
             - name: data_mass_spec_benchmark
-              url: https://www.dropbox.com/s/0oh8vljyt4zeo7o/data_mass_spec_benchmark.20191006.tar.bz2?dl=1
+              url: https://www.dropbox.com/s/4wzotlnl58i1w32/data_mass_spec_benchmark.20191027.tar.bz2?dl=0
               default: false
 
             - name: data_mass_spec_annotated
