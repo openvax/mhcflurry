@@ -53,7 +53,7 @@ if __name__ == '__main__':
         'pandas>=0.20.3',
         'Keras>=2.2.5',
         'appdirs',
-        'tensorflow>=1.1.0',
+        'tensorflow>=1.1.0,<2.0.0',
         'scikit-learn',
         'mhcnames',
         'pyyaml',
