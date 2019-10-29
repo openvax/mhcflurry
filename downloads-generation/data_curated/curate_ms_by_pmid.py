@@ -244,7 +244,7 @@ def handle_pmid_25576301(filename):
 
 
 def handle_pmid_26992070(*filenames):
-    """Ritz, ..., Fugmann Proteomics 2016 [PMID 26992070]"""
+    """Ritz, ..., Fugmann Proteomics 2016 [PMID 26992070]"""  # WRONG PMID!!!
     allele_text = """
         Cell line	HLA-A 1	HLA-A 2	HLA-B 1	HLA-B 2	HLA-C 1	HLA-C 2
         HEK293	03:01	03:01	07:02	07:02	07:02	07:02
