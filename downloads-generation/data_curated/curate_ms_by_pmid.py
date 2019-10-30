@@ -244,10 +244,15 @@ def handle_pmid_25576301(filename):
 
 
 def handle_pmid_26992070(*filenames):
-    """Ritz, ..., Fugmann Proteomics 2016 [PMID 26992070]"""  # WRONG PMID!!!
+    """Ritz, ..., Fugmann Proteomics 2016 [PMID 26992070]"""
+    # Although this publication seems to suggest that HEK293 are C*07:02
+    # (figure 3B), in a subsequent publication [PMID 28834231] this group
+    # gives the HEK293 HLA type as HLA‐A*03:01, HLA‐B*07:02, and HLA‐C*07:01.
+    # We are therefore using the HLA‐C*07:01 (i.e. the latter) typing results
+    # here.
     allele_text = """
         Cell line	HLA-A 1	HLA-A 2	HLA-B 1	HLA-B 2	HLA-C 1	HLA-C 2
-        HEK293	03:01	03:01	07:02	07:02	07:02	07:02
+        HEK293	03:01	03:01	07:02	07:02	07:01	07:01
         HL-60	01:01	01:01	57:01	57:01	06:02	06:02
         RPMI8226	30:01	68:02	15:03	15:10	02:10	03:04
         MAVER-1	24:02	26:01	38:01	44:02	05:01	12:03
