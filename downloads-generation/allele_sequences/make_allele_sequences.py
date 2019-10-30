@@ -133,6 +133,7 @@ def run():
     assert agreement > 0.9
 
     # Add additional positions
+    additional_positions = []
     if args.differentiate_alleles:
         differentiate_alleles = pandas.read_csv(
             args.differentiate_alleles).iloc[:,0].values
