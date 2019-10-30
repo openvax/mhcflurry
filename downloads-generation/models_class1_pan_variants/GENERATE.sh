@@ -69,7 +69,7 @@ then
     python normalize_allele_names.py "$(mhcflurry-downloads path allele_sequences)/class1_pseudosequences.csv"  --out allele_sequences.34mer.csv
 fi
 
-for kind in single_hidden_no_pretrain no_pretrain 34mer_sequence
+for kind in 34mer_sequence single_hidden_no_pretrain no_pretrain 
 do
     CONTINUE_INCOMPLETE_ARGS=""
     if [ "$2" == "continue-incomplete" ] && [ -d "models.unselected.${kind}" ]
