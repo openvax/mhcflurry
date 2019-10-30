@@ -81,6 +81,11 @@ time python make_allele_sequences.py \
     --differentiate-alleles training_data.alleles.txt \
     --out-csv allele_sequences.csv
 
+time python make_allele_sequences.py \
+    class1.aligned.fasta \
+    --recapitulate-sequences class1_pseudosequences.csv \
+    --out-csv allele_sequences.no_differentiation.csv
+
 # Cleanup
 gzip -f class1.fasta
 gzip -f class1.aligned.fasta
@@ -88,6 +93,6 @@ rm *.fasta
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
-tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
-
-echo "Created archive: $SCRATCH_DIR/$DOWNLOAD_NAME.tar.bz2"
+RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
+tar -cjf "$RESULT" *
+echo "Created archive: $RESULT"

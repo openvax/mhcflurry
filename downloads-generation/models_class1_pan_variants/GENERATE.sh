@@ -62,9 +62,11 @@ if [ "$2" != "continue-incomplete" ]
 then
     cp $SCRIPT_DIR/generate_hyperparameters.production.py .
     cp $SCRIPT_DIR/generate_hyperparameters.py .
+    cp $SCRIPT_DIR/normalize_allele_names.py .
     python generate_hyperparameters.production.py > hyperparameters.production.yaml
     python generate_hyperparameters.py hyperparameters.production.yaml no_pretrain > hyperparameters.no_pretrain.yaml
     python generate_hyperparameters.py hyperparameters.no_pretrain.yaml single_hidden > hyperparameters.single_hidden_no_pretrain.yaml
+    python normalize_allele_names.py "$(mhcflurry-downloads path allele_sequences)/class1_pseudosequences.csv"  --out allele_sequences.34mer.csv
 fi
 
 for kind in single_hidden_no_pretrain no_pretrain 34mer_sequence
@@ -80,7 +82,7 @@ do
     HYPERPARAMETERS=hyperparameters.$kind.yaml
     if [ "$kind" == "34mer_sequence" ]
     then
-        ALLELE_SEQUENCES="$(mhcflurry-downloads path allele_sequences)/class1_pseudosequences.csv"
+        ALLELE_SEQUENCES=allele_sequences.34mer.csv
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
 
