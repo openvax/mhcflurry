@@ -193,7 +193,7 @@ def run(argv=sys.argv[1:]):
         metadata_dataframes={
             'train_data': df,
         })
-    serial_run = args.num_jobs == 1
+    serial_run = args.num_jobs == 0
 
     work_items = []
     for (h, hyperparameters) in enumerate(hyperparameters_lst):

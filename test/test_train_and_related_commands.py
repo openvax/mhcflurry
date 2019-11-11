@@ -164,12 +164,11 @@ def run_and_check_with_model_selection(n_jobs=1):
     shutil.rmtree(models_dir1)
 
 
-if os.environ.get("KERAS_BACKEND") != "theano":
-    def test_run_parallel():
-        run_and_check(n_jobs=2)
-        run_and_check_with_model_selection(n_jobs=2)
+def test_run_parallel():
+    run_and_check(n_jobs=2)
+    run_and_check_with_model_selection(n_jobs=2)
 
 
 def test_run_serial():
-    run_and_check(n_jobs=1)
-    run_and_check_with_model_selection(n_jobs=1)
+    run_and_check(n_jobs=0)
+    run_and_check_with_model_selection(n_jobs=0)
