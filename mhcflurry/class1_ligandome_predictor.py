@@ -105,14 +105,6 @@ class Class1LigandomePredictor(object):
             dtype='float32',
             name='peptide')
 
-        #peptides_broadcasted = Lambda(
-        #    lambda x:
-        #        K.reshape(
-        #            K.repeat(
-        #                K.reshape(x, (-1, numpy.product(peptide_shape))), 6),
-        #         (-1, 6) + peptide_shape)
-        #)(input_peptides)
-
         peptides_flattened = Flatten()(input_peptides)
         peptides_repeated = RepeatVector(6)(peptides_flattened)
 
@@ -123,9 +115,10 @@ class Class1LigandomePredictor(object):
             input_length=6,
             trainable=False)(input_alleles)
 
-        allele_flat = Reshape((6, -1))(allele_representation)
+        allele_flat = Reshape((6, -1), name="allele_flat")(allele_representation)
 
-        allele_peptide_merged = concatenate([peptides_repeated, allele_flat])
+        allele_peptide_merged = concatenate(
+            [peptides_repeated, allele_flat], name="allele_peptide_merged")
 
         layer_names = [
             layer.name for layer in merged_ensemble.layers
@@ -163,35 +156,19 @@ class Class1LigandomePredictor(object):
 
             if len(input_nodes) == 1:
                 lifted = TimeDistributed(layer)
-                result = lifted(input_nodes[0])
+                node = lifted(input_nodes[0])
             else:
-                print(layer, layer.name, node, lifted)
-                result = layer(input_nodes)
+                node = layer(input_nodes)
+            print(layer, layer.name, node, lifted)
 
-            layer_name_to_new_node[layer.name] = result
-
-        """
-        dense_0 = merged_ensemble.get_layer("dense_0")
-        td_dense0 = TimeDistributed(dense_0, name="td_dense_0")(allele_peptide_merged)
-        td_dense0 = Dropout(0.5)(td_dense0)
-
-        dense_1 = merged_ensemble.get_layer("dense_1")
-        td_dense1 = TimeDistributed(dense_1, name="td_dense_1")(td_dense0)
-        td_dense1 = Dropout(0.5)(td_dense1)
-
-        output = merged_ensemble.get_layer("output")
-        td_output = TimeDistributed(output)(td_dense1)
-        """
+            layer_name_to_new_node[layer.name] = node
 
         network = Model(
             inputs=[input_peptides, input_alleles],
             outputs=node,
             name="ligandome",
         )
-        #print('trainable', network.get_layer("td_dense_0").trainable)
-        #network.get_layer("td_dense_0").trainable = False
-        #print('trainable', network.get_layer("td_dense_0").trainable)
-
+        network.summary()
         return network
 
     @staticmethod

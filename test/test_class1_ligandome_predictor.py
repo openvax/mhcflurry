@@ -399,8 +399,6 @@ def test_synthetic_allele_refinement(max_epochs=10):
             "auc"
         ])
 
-    #import ipdb ; ipdb.set_trace()
-
     return (predictor, predictions, metrics, motifs)
 
 
