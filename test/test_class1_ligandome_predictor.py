@@ -38,6 +38,7 @@ from mhcflurry.regression_target import from_ic50
 from mhcflurry.common import random_peptides, positional_frequency_matrix
 from mhcflurry.testing_utils import cleanup, startup
 from mhcflurry.amino_acid import COMMON_AMINO_ACIDS
+from mhcflurry.custom_loss import MultiallelicMassSpecLoss
 
 COMMON_AMINO_ACIDS = sorted(COMMON_AMINO_ACIDS)
 
@@ -110,73 +111,66 @@ def evaluate_loss(loss, y_true, y_pred):
 
 def test_loss():
     for delta in [0.0, 0.3]:
-        for alpha in [None, 1.0, 20.0]:
-            print("delta", delta)
-            print("alpha", alpha)
-            # Hit labels
-            y_true = [
-                1.0,
-                0.0,
-                1.0,
-                1.0,
-                0.0
-            ]
-            y_true = numpy.array(y_true)
-            y_pred = [
-                [0.3, 0.7, 0.5],
-                [0.2, 0.4, 0.6],
-                [0.1, 0.5, 0.3],
-                [0.1, 0.7, 0.1],
-                [0.8, 0.2, 0.4],
-            ]
-            y_pred = numpy.array(y_pred)
+        print("delta", delta)
+        # Hit labels
+        y_true = [
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0
+        ]
+        y_true = numpy.array(y_true)
+        y_pred = [
+            [0.3, 0.7, 0.5],
+            [0.2, 0.4, 0.6],
+            [0.1, 0.5, 0.3],
+            [0.1, 0.7, 0.1],
+            [0.8, 0.2, 0.4],
+        ]
+        y_pred = numpy.array(y_pred)
 
-            # reference implementation 1
+        # reference implementation 1
 
-            def smooth_max(x, alpha):
-                x = numpy.array(x)
-                alpha = numpy.array([alpha])
-                return (x * numpy.exp(x * alpha)).sum() / (
-                    numpy.exp(x * alpha)).sum()
+        def smooth_max(x, alpha):
+            x = numpy.array(x)
+            alpha = numpy.array([alpha])
+            return (x * numpy.exp(x * alpha)).sum() / (
+                numpy.exp(x * alpha)).sum()
 
-            if alpha is None:
-                max_func = max
-            else:
-                max_func = partial(smooth_max, alpha=alpha)
+        contributions = []
+        for i in range(len(y_true)):
+            if y_true[i] == 1.0:
+                for j in range(len(y_true)):
+                    if y_true[j] == 0.0:
+                        tightest_i = max(y_pred[i])
+                        contribution = sum(
+                            max(0, y_pred[j, k] - tightest_i + delta)**2
+                            for k in range(y_pred.shape[1])
+                        )
+                        contributions.append(contribution)
+        contributions = numpy.array(contributions)
+        expected1 = contributions.sum()
 
-            contributions = []
-            for i in range(len(y_true)):
-                if y_true[i] == 1.0:
-                    for j in range(len(y_true)):
-                        if y_true[j] == 0.0:
-                            tightest_i = max_func(y_pred[i])
-                            contribution = sum(
-                                max(0, y_pred[j, k] - tightest_i + delta)**2
-                                for k in range(y_pred.shape[1])
-                            )
-                            contributions.append(contribution)
-            contributions = numpy.array(contributions)
-            expected1 = contributions.sum()
+        # reference implementation 2: numpy
+        pos = numpy.array([
+            max(y_pred[i])
+            for i in range(len(y_pred))
+            if y_true[i] == 1.0
+        ])
 
-            # reference implementation 2: numpy
-            pos = numpy.array([
-                max_func(y_pred[i])
-                for i in range(len(y_pred))
-                if y_true[i] == 1.0
-            ])
+        neg = y_pred[~y_true.astype(bool)]
+        expected2 = (
+                numpy.maximum(0, neg.reshape((-1, 1)) - pos + delta)**2).sum()
 
-            neg = y_pred[~y_true.astype(bool)]
-            expected2 = (
-                    numpy.maximum(0, neg.reshape((-1, 1)) - pos + delta)**2).sum()
+        yield numpy.testing.assert_almost_equal, expected1, expected2, 4
 
-            yield numpy.testing.assert_almost_equal, expected1, expected2, 4
+        computed = evaluate_loss(
+            MultiallelicMassSpecLoss(delta=delta).loss,
+            y_true,
+            y_pred.reshape(y_pred.shape + (1,)))
 
-            computed = evaluate_loss(
-                partial(Class1LigandomePredictor.loss, delta=delta, alpha=alpha),
-                y_true,
-                y_pred.reshape(y_pred.shape + (1,)))
-
-            yield numpy.testing.assert_almost_equal, computed, expected1, 4
+        yield numpy.testing.assert_almost_equal, computed, expected1, 4
 
 
 AA_DIST = pandas.Series(
@@ -284,6 +278,7 @@ def test_synthetic_allele_refinement(max_epochs=10):
 
     predictor = Class1LigandomePredictor(
         PAN_ALLELE_PREDICTOR_NO_MASS_SPEC,
+        additional_dense_layers=[8, 1],
         max_ensemble_size=1,
         max_epochs=max_epochs,
         learning_rate=0.0001,
@@ -299,9 +294,11 @@ def test_synthetic_allele_refinement(max_epochs=10):
         allele_to_sequence=PAN_ALLELE_PREDICTOR_NO_MASS_SPEC.allele_to_sequence,
     ).compact()
 
-    pre_predictions = predictor.predict(
-        peptides=train_df.peptide.values,
-        allele_encoding=allele_encoding)
+    pre_predictions = from_ic50(
+        predictor.predict(
+            output="affinities",
+            peptides=train_df.peptide.values,
+            allele_encoding=allele_encoding))
 
     (model,) = PAN_ALLELE_PREDICTOR_NO_MASS_SPEC.class1_pan_allele_models
     expected_pre_predictions = from_ic50(
@@ -310,11 +307,13 @@ def test_synthetic_allele_refinement(max_epochs=10):
             allele_encoding=allele_encoding.allele_encoding,
     )).reshape((-1, len(alleles)))
 
+    #import ipdb ; ipdb.set_trace()
+
     train_df["pre_max_prediction"] = pre_predictions.max(1)
     pre_auc = roc_auc_score(train_df.hit.values, train_df.pre_max_prediction.values)
     print("PRE_AUC", pre_auc)
 
-    assert_allclose(pre_predictions, expected_pre_predictions)
+    assert_allclose(pre_predictions, expected_pre_predictions, rtol=1e-4)
 
     motifs_history = []
     random_peptides_encodable = make_random_peptides(10000, [9])
@@ -328,8 +327,11 @@ def test_synthetic_allele_refinement(max_epochs=10):
     metric_rows = []
 
     def progress():
-        predictions = predictor.predict(peptides=train_df.peptide.values,
-            allele_encoding=allele_encoding, )
+        predictions = from_ic50(
+            predictor.predict(
+                output="affinities",
+                peptides=train_df.peptide.values,
+                allele_encoding=allele_encoding))
 
         train_df["max_prediction"] = predictions.max(1)
         train_df["predicted_allele"] = pandas.Series(alleles).loc[

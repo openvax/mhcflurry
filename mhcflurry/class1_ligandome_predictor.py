@@ -5,11 +5,17 @@ import collections
 from functools import partial
 
 import numpy
+import pandas
 
 from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import Class1NeuralNetwork, DEFAULT_PREDICT_BATCH_SIZE
 from .encodable_sequences import EncodableSequences
-
+from .regression_target import from_ic50, to_ic50
+from .random_negative_peptides import RandomNegativePeptides
+from .custom_loss import (
+    MSEWithInequalities,
+    MSEWithInequalitiesAndMultipleOutputs,
+    MultiallelicMassSpecLoss)
 
 class Class1LigandomePredictor(object):
     network_hyperparameter_defaults = HyperparameterDefaults(
@@ -19,6 +25,8 @@ class Class1LigandomePredictor(object):
             'alignment_method': 'left_pad_centered_right_pad',
             'max_length': 15,
         },
+        additional_dense_layers=[],
+        additional_dense_activation="sigmoid",
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -29,9 +37,8 @@ class Class1LigandomePredictor(object):
         max_epochs=500,
         validation_split=0.1,
         early_stopping=True,
-        minibatch_size=128,
-        random_negative_rate=0.0,
-        random_negative_constant=0,
+        minibatch_size=128,).extend(
+        RandomNegativePeptides.hyperparameter_defaults
     )
     """
     Hyperparameters for neural network training.
@@ -47,7 +54,6 @@ class Class1LigandomePredictor(object):
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
         loss_delta=0.2,
-        loss_alpha=None,
         optimizer="rmsprop",
         learning_rate=None,
     )
@@ -56,10 +62,18 @@ class Class1LigandomePredictor(object):
     used.
     """
 
+    allele_features_hyperparameter_defaults = HyperparameterDefaults(
+        allele_features_include_gene=True,
+    )
+    """
+    Allele feature hyperparameters.
+    """
+
     hyperparameter_defaults = network_hyperparameter_defaults.extend(
         fit_hyperparameter_defaults).extend(
         early_stopping_hyperparameter_defaults).extend(
-        compile_hyperparameter_defaults)
+        compile_hyperparameter_defaults).extend(
+        allele_features_hyperparameter_defaults)
 
     def __init__(
             self,
@@ -87,8 +101,15 @@ class Class1LigandomePredictor(object):
     @staticmethod
     def make_network(pan_allele_class1_neural_networks, hyperparameters):
         import keras.backend as K
-        from keras.layers import Input, TimeDistributed, Lambda, Flatten, RepeatVector, concatenate, Dropout, Reshape, Embedding
-        from keras.activations import sigmoid
+        from keras.layers import (
+            Input,
+            TimeDistributed,
+            Dense,
+            Flatten,
+            RepeatVector,
+            concatenate,
+            Reshape,
+            Embedding)
         from keras.models import Model
 
         networks = [model.network() for model in pan_allele_class1_neural_networks]
@@ -163,38 +184,27 @@ class Class1LigandomePredictor(object):
 
             layer_name_to_new_node[layer.name] = node
 
+        affinity_predictor_output = node
+
+        for (i, layer_size) in enumerate(
+                hyperparameters['additional_dense_layers']):
+            layer = Dense(
+                layer_size,
+                activation=hyperparameters['additional_dense_activation'])
+            lifted = TimeDistributed(layer)
+            node = lifted(node)
+
+        layer = Dense(1, activation="sigmoid")
+        lifted = TimeDistributed(layer)
+        ligandome_output = lifted(node)
+
         network = Model(
             inputs=[input_peptides, input_alleles],
-            outputs=node,
+            outputs=[affinity_predictor_output, ligandome_output],
             name="ligandome",
         )
         network.summary()
         return network
-
-    @staticmethod
-    def loss(y_true, y_pred, sample_weight=None, delta=0.2, alpha=None):
-        """
-        Loss function for ligandome prediction.
-        """
-        import tensorflow as tf
-
-        y_pred = tf.squeeze(y_pred, axis=-1)
-        y_true = tf.reshape(tf.cast(y_true, tf.bool), (-1,))
-
-        pos = tf.boolean_mask(y_pred, y_true)
-
-        if alpha is None:
-            pos_max = tf.reduce_max(pos, axis=1)
-        else:
-            # Smooth maximum
-            exp_alpha_x = tf.exp(alpha * pos)
-            numerator = tf.reduce_sum(tf.multiply(pos, exp_alpha_x), axis=1)
-            denominator = tf.reduce_sum(exp_alpha_x, axis=1)
-            pos_max = numerator / denominator
-        neg = tf.boolean_mask(y_pred, tf.logical_not(y_true))
-        result = tf.reduce_sum(
-            tf.maximum(0.0, tf.reshape(neg, (-1, 1)) - pos_max + delta) ** 2)
-        return result
 
     def peptides_to_network_input(self, peptides):
         """
@@ -241,6 +251,8 @@ class Class1LigandomePredictor(object):
             peptides,
             labels,
             allele_encoding,
+            affinities_mask=None,  # True when a peptide/label is actually a peptide and an affinity
+            inequalities=None,  # interpreted only for elements where affinities_mask is True, otherwise ignored
             shuffle_permutation=None,
             verbose=1,
             progress_callback=None,
@@ -275,14 +287,25 @@ class Class1LigandomePredictor(object):
             'allele': allele_encoding_input,
         }
 
+        loss = MSEWithInequalitiesAndMultipleOutputs(losses=[
+            MSEWithInequalities(),
+            MultiallelicMassSpecLoss(
+                delta=self.hyperparameters['loss_delta']),
+        ])
+
+        y_values_pre_encoding = labels.copy()
+        if affinities_mask is not None:
+            y_values_pre_encoding[affinities_mask] = from_ic50(labels)
+        y_values = loss.encode_y(
+            y_values_pre_encoding,
+            inequalities=inequalities[affinities_mask] if inequalities is not None else None,
+            output_indices=(~affinities_mask).astype(int) if affinities_mask is not None else numpy.ones(len(y_values_pre_encoding), dtype=int))
+
         fit_info = collections.defaultdict(list)
 
         self.set_allele_representations(allele_representations)
         self.network.compile(
-            loss=partial(
-                self.loss,
-                delta=self.hyperparameters['loss_delta'],
-                alpha=self.hyperparameters['loss_alpha']),
+            loss=loss.loss,
             optimizer=self.hyperparameters['optimizer'])
         if self.hyperparameters['learning_rate'] is not None:
             K.set_value(
@@ -371,6 +394,7 @@ class Class1LigandomePredictor(object):
             self,
             peptides,
             allele_encoding,
+            output="affinities",
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
         (allele_encoding_input, allele_representations) = (
                 self.allele_encoding_to_network_input(allele_encoding.compact()))
@@ -380,11 +404,15 @@ class Class1LigandomePredictor(object):
             'allele': allele_encoding_input,
         }
         predictions = self.network.predict(x_dict, batch_size=batch_size)
+        if output == "affinities":
+            predictions = to_ic50(predictions[0])
+        elif output == "ligandome_presentation":
+            predictions = predictions[1]
+        elif output == "both":
+            pass
+        else:
+            raise NotImplementedError("Unknown output", output)
         return numpy.squeeze(predictions)
-
-    #def predict(self):
-
-
 
     def set_allele_representations(self, allele_representations):
         """
@@ -440,3 +468,13 @@ class Class1LigandomePredictor(object):
                 original_model.fit_generator = throw
 
         layer.set_weights([reshaped])
+
+    @staticmethod
+    def allele_features(allele_names, hyperparameters):
+        df = pandas.DataFrame({"allele_name": allele_names})
+        if hyperparameters['allele_features_include_gene']:
+            # TODO: support other organisms.
+            for gene in ["A", "B", "C"]:
+                df[gene] = df.allele_name.str.startswith(
+                    "HLA-%s" % gene).astype(float)
+        return gene

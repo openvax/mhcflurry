@@ -182,8 +182,10 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
     supports_inequalities = True
     supports_multiple_outputs = True
 
-    @staticmethod
-    def encode_y(y, inequalities=None, output_indices=None):
+    def __init__(self, losses=MSEWithInequalities):
+        self.losses = losses
+
+    def encode_y(self, y, inequalities=None, output_indices=None):
         y = array(y, dtype="float32")
         if isnan(y).any():
             raise ValueError("y contains NaN", y)
@@ -192,8 +194,25 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
         if (y < 0.0).any():
             raise ValueError("y contains values < 0.0", y)
 
-        encoded = MSEWithInequalities.encode_y(
-            y, inequalities=inequalities)
+        if isinstance(self.losses, Loss):
+            # Single loss applied to all outputs
+            encoded = MSEWithInequalities.encode_y(y, inequalities=inequalities)
+        else:
+            assert output_indices is not None
+            df = pandas.DataFrame({
+                "y": y,
+                "inequality": inequalities,
+                "output_index": output_indices,
+            })
+            encoded = y.copy()
+            encoded[:] = numpy.nan
+            for (output_index, sub_df) in df.groupby("output_index"):
+                loss = self.losses[output_index]
+                loss_kwargs = {}
+                if not sub_df.inequality.isnull().all():
+                    loss_kwargs['inequalities'] = sub_df.inequality.values
+                encoded[sub_df.index.values] = loss.encode_y(
+                    sub_df.y.values, **loss_kwargs)
 
         if output_indices is not None:
             output_indices = numpy.array(output_indices)
@@ -205,8 +224,7 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
 
         return encoded
 
-    @staticmethod
-    def loss(y_true, y_pred):
+    def loss(self, y_true, y_pred):
         from keras import backend as K
 
         y_true = K.flatten(y_true)
@@ -230,7 +248,49 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
         # ], axis=-1)
         #updated_y_pred = tf.gather_nd(y_pred, indexer)
 
-        return MSEWithInequalities.loss(updated_y_true, updated_y_pred)
+        if isinstance(self.losses, Loss):
+            # Single loss for all outputs.
+            return self.losses.loss(updated_y_true, updated_y_pred)
+        else:
+            # TODO: make this more efficient?
+            result = None
+            for (i, loss) in enumerate(self.losses):
+                values = (
+                    loss.loss(updated_y_true, updated_y_pred) *
+                    K.cast(K.equal(output_indices, i), "float32"))
+                if result is None:
+                    result = values
+                else:
+                    result += values
+            return result
+
+
+class MultiallelicMassSpecLoss(Loss):
+    """
+    """
+    name = "multiallelic_mass_spec_loss"
+    supports_inequalities = True
+    supports_multiple_outputs = False
+
+    def __init__(self, delta=0.2):
+        self.delta = delta
+
+    def encode_y(self, y):
+        return y
+
+    def loss(self, y_true, y_pred):
+        import tensorflow as tf
+
+        #y_pred = tf.squeeze(y_pred, axis=-1)
+        y_true = tf.reshape(tf.cast(y_true, tf.bool), (-1,))
+
+        pos = tf.boolean_mask(y_pred, y_true)
+        pos_max = tf.reduce_max(pos, axis=1)
+        neg = tf.boolean_mask(y_pred, tf.logical_not(y_true))
+        result = tf.reduce_sum(
+            tf.maximum(
+                0.0, tf.reshape(neg, (-1, 1)) - pos_max + self.delta) ** 2)
+        return result
 
 
 def check_shape(name, arr, expected_shape):
@@ -250,5 +310,5 @@ def check_shape(name, arr, expected_shape):
 
 
 # Register custom losses.
-for cls in [MSEWithInequalities, MSEWithInequalitiesAndMultipleOutputs]:
+for cls in [MSEWithInequalities, MSEWithInequalitiesAndMultipleOutputs, MultiallelicMassSpecLoss]:
     CUSTOM_LOSSES[cls.name] = cls()
