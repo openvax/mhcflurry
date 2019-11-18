@@ -109,6 +109,7 @@ class Class1LigandomePredictor(object):
             RepeatVector,
             concatenate,
             Reshape,
+            Lambda,
             Embedding)
         from keras.models import Model
 
@@ -134,9 +135,11 @@ class Class1LigandomePredictor(object):
             input_dim=64,  # arbitrary, how many alleles to have room for
             output_dim=1029,
             input_length=6,
-            trainable=False)(input_alleles)
+            trainable=False,
+            mask_zero=True)(input_alleles)
 
-        allele_flat = Reshape((6, -1), name="allele_flat")(allele_representation)
+        #allele_flat = Reshape((6, -1), name="allele_flat")(allele_representation)
+        allele_flat = allele_representation
 
         allele_peptide_merged = concatenate(
             [peptides_repeated, allele_flat], name="allele_peptide_merged")
@@ -184,7 +187,7 @@ class Class1LigandomePredictor(object):
 
             layer_name_to_new_node[layer.name] = node
 
-        affinity_predictor_output = node
+        affinity_predictor_output = Lambda(lambda x: x[:, 0])(node)
 
         for (i, layer_size) in enumerate(
                 hyperparameters['additional_dense_layers']):
@@ -197,6 +200,10 @@ class Class1LigandomePredictor(object):
         layer = Dense(1, activation="sigmoid")
         lifted = TimeDistributed(layer)
         ligandome_output = lifted(node)
+
+        #output_node = concatenate([
+        #    affinity_predictor_output, ligandome_output
+        #], name="combined_output")
 
         network = Model(
             inputs=[input_peptides, input_alleles],
@@ -281,31 +288,47 @@ class Class1LigandomePredictor(object):
         peptide_encoding = peptide_encoding[shuffle_permutation]
         allele_encoding_input = allele_encoding_input[shuffle_permutation]
         labels = labels[shuffle_permutation]
+        inequalities = inequalities[shuffle_permutation]
+        affinities_mask = affinities_mask[shuffle_permutation]
 
         x_dict = {
             'peptide': peptide_encoding,
             'allele': allele_encoding_input,
         }
 
-        loss = MSEWithInequalitiesAndMultipleOutputs(losses=[
-            MSEWithInequalities(),
-            MultiallelicMassSpecLoss(
-                delta=self.hyperparameters['loss_delta']),
-        ])
-
-        y_values_pre_encoding = labels.copy()
+        y1 = numpy.zeros(shape=len(labels))
         if affinities_mask is not None:
-            y_values_pre_encoding[affinities_mask] = from_ic50(labels)
-        y_values = loss.encode_y(
-            y_values_pre_encoding,
-            inequalities=inequalities[affinities_mask] if inequalities is not None else None,
-            output_indices=(~affinities_mask).astype(int) if affinities_mask is not None else numpy.ones(len(y_values_pre_encoding), dtype=int))
+            y1[affinities_mask] = from_ic50(labels[affinities_mask])
+
+        if inequalities is not None:
+            # Reverse inequalities because from_ic50() flips the direction
+            # (i.e. lower affinity results in higher y values).
+            adjusted_inequalities = pandas.Series(inequalities).map({
+                "=": "=",
+                ">": "<",
+                "<": ">",
+            }).values
+        else:
+            adjusted_inequalities = numpy.tile("=", len(y1))
+
+        adjusted_inequalities[~affinities_mask] = ">"
+
+        affinities_loss = MSEWithInequalities()
+        encoded_y1 = affinities_loss.encode_y(
+            y1, inequalities=adjusted_inequalities)
+
+        mms_loss = MultiallelicMassSpecLoss(
+            delta=self.hyperparameters['loss_delta'])
+
+        y2 = labels.copy()
+        y2[affinities_mask] = -1
+        encoded_y2 = mms_loss.encode_y(y2)
 
         fit_info = collections.defaultdict(list)
 
         self.set_allele_representations(allele_representations)
         self.network.compile(
-            loss=loss.loss,
+            loss=[affinities_loss.loss, mms_loss.loss],
             optimizer=self.hyperparameters['optimizer'])
         if self.hyperparameters['learning_rate'] is not None:
             K.set_value(
@@ -328,7 +351,7 @@ class Class1LigandomePredictor(object):
             # to a single experiment
             fit_history = self.network.fit(
                 x_dict,
-                labels,
+                [encoded_y1, encoded_y2],
                 shuffle=True,
                 batch_size=self.hyperparameters['minibatch_size'],
                 verbose=verbose,

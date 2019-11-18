@@ -117,6 +117,7 @@ def test_loss():
             1.0,
             0.0,
             1.0,
+            -1.0,  # ignored
             1.0,
             0.0
         ]
@@ -125,8 +126,10 @@ def test_loss():
             [0.3, 0.7, 0.5],
             [0.2, 0.4, 0.6],
             [0.1, 0.5, 0.3],
+            [0.9, 0.1, 0.2],
             [0.1, 0.7, 0.1],
             [0.8, 0.2, 0.4],
+
         ]
         y_pred = numpy.array(y_pred)
 
@@ -159,7 +162,7 @@ def test_loss():
             if y_true[i] == 1.0
         ])
 
-        neg = y_pred[~y_true.astype(bool)]
+        neg = y_pred[(y_true == 0.0).astype(bool)]
         expected2 = (
                 numpy.maximum(0, neg.reshape((-1, 1)) - pos + delta)**2).sum()
 
@@ -223,7 +226,112 @@ def make_motif(allele, peptides, frac=0.01):
     return matrix
 
 
-def test_synthetic_allele_refinement(max_epochs=10):
+def test_real_data_multiallelic_refinement(max_epochs=10):
+    ms_df = pandas.read_csv(
+        get_path("data_mass_spec_annotated", "annotated_ms.csv.bz2"))
+    ms_df = ms_df.loc[
+        (ms_df.mhc_class == "I") & (~ms_df.protein_ensembl.isnull())].copy()
+
+    sample_table = ms_df.drop_duplicates(
+        "sample_id").set_index("sample_id").loc[ms_df.sample_id.unique()]
+    grouped = ms_df.groupby("sample_id").nunique()
+    for col in sample_table.columns:
+        if (grouped[col] > 1).any():
+            del sample_table[col]
+    sample_table["alleles"] = sample_table.hla.str.split()
+
+    multi_train_df = ms_df.loc[
+        ms_df.sample_id  == "RA957"
+    ].drop_duplicates("peptide")[["peptide", "sample_id"]].reset_index(drop=True)
+    multi_train_df["label"] = 1.0
+    multi_train_df["is_affinity"] = False
+
+    multi_train_alleles = set()
+    for alleles in sample_table.loc[multi_train_df.sample_id.unique()].alleles:
+        multi_train_alleles.update(alleles)
+    multi_train_alleles = sorted(multi_train_alleles)
+
+    pan_train_df = pandas.read_csv(
+        get_path(
+            "models_class1_pan", "models.with_mass_spec/train_data.csv.bz2"))
+
+    pan_sub_train_df = pan_train_df.loc[
+        pan_train_df.allele.isin(multi_train_alleles),
+        ["peptide", "allele", "measurement_inequality", "measurement_value"]
+    ]
+    pan_sub_train_df["label"] = pan_sub_train_df["measurement_value"]
+    del pan_sub_train_df["measurement_value"]
+    pan_sub_train_df["is_affinity"] = True
+
+    pan_predictor = Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.with_mass_spec"),
+        optimization_level=0,
+        max_models=1)
+
+    allele_encoding = MultipleAlleleEncoding(
+        experiment_names=multi_train_df.sample_id.values,
+        experiment_to_allele_list=sample_table.alleles.to_dict(),
+        max_alleles_per_experiment=sample_table.alleles.str.len().max(),
+        allele_to_sequence=pan_predictor.allele_to_sequence,
+    )
+    allele_encoding.append_alleles(pan_sub_train_df.allele.values)
+    allele_encoding =  allele_encoding.compact()
+
+    combined_train_df = pandas.concat([multi_train_df, pan_sub_train_df])
+
+    ligandome_predictor = Class1LigandomePredictor(
+        pan_predictor,
+        max_ensemble_size=1,
+        max_epochs=500,
+        learning_rate=0.0001,
+        patience=5,
+        min_delta=0.0)
+
+    pre_predictions = from_ic50(
+        ligandome_predictor.predict(
+            output="affinities",
+            peptides=combined_train_df.peptide.values,
+            allele_encoding=allele_encoding))
+
+    (model,) = pan_predictor.class1_pan_allele_models
+    expected_pre_predictions = from_ic50(
+        model.predict(
+            peptides=numpy.repeat(combined_train_df.peptide.values, len(alleles)),
+            allele_encoding=allele_encoding.allele_encoding,
+    )).reshape((-1, len(alleles)))[:,0]
+
+    assert_allclose(pre_predictions, expected_pre_predictions, rtol=1e-4)
+
+    motifs_history = []
+    random_peptides_encodable = make_random_peptides(10000, [9])
+
+
+    def update_motifs():
+        for allele in multi_train_alleles:
+            motif = make_motif(allele, random_peptides_encodable)
+            motifs_history.append((allele, motif))
+
+    print("Pre fitting:")
+    update_motifs()
+    print("Fitting...")
+
+    ligandome_predictor.fit(
+        peptides=combined_train_df.peptide.values,
+        labels=combined_train_df.label.values,
+        allele_encoding=allele_encoding,
+        affinities_mask=combined_train_df.is_affinity.values,
+        inequalities=combined_train_df.measurement_inequality.values,
+        progress_callback=update_motifs,
+    )
+
+    #import ipdb ; ipdb.set_trace()
+
+
+
+
+
+
+def Xtest_synthetic_allele_refinement(max_epochs=10):
     refine_allele = "HLA-C*01:02"
     alleles = [
         "HLA-A*02:01", "HLA-B*27:01", "HLA-C*07:01",
