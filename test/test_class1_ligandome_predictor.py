@@ -282,10 +282,11 @@ def test_real_data_multiallelic_refinement(max_epochs=10):
     ligandome_predictor = Class1LigandomePredictor(
         pan_predictor,
         max_ensemble_size=1,
-        max_epochs=500,
+        max_epochs=50,
         learning_rate=0.0001,
         patience=5,
-        min_delta=0.0)
+        min_delta=0.0,
+        random_negative_rate=1.0)
 
     pre_predictions = from_ic50(
         ligandome_predictor.predict(

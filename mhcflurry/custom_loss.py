@@ -235,12 +235,6 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
 
 class MultiallelicMassSpecLoss(Loss):
     """
-    Affiniities are mapped according to MSEWithInequalities, then by:
-        x -> x + 10.
-
-    Mass spec hit vs. decoy are kept at [0, 1].
-
-
     """
     name = "multiallelic_mass_spec_loss"
     supports_inequalities = True
@@ -251,20 +245,12 @@ class MultiallelicMassSpecLoss(Loss):
 
     @staticmethod
     def encode_y(y, affinities_mask=None, inequalities=None):
-        y = array(y, dtype="float32")
-        if isnan(y).any():
-            raise ValueError("y contains NaN", y)
-        if (y > 1.0).any():
-            raise ValueError("y contains values > 1.0", y)
-        if (y < 0.0).any():
-            raise ValueError("y contains values < 0.0", y)
-
-        encoded = y.copy()
-        if affinities_mask is not None:
-            encoded[affinities_mask] = MSEWithInequalities.encode_y(
-                encoded[affinities_mask], inequalities=inequalities) + 10.0
-
-        return encoded
+        encoded = pandas.Series(y, dtype="float32", copy=True)
+        assert all(item in (-1.0, 1.0, 0.0) for item in encoded), set(y)
+        print(
+            "MultiallelicMassSpecLoss: y-value counts:\n",
+            encoded.value_counts())
+        return encoded.values
 
     def loss(self, y_true, y_pred):
         import tensorflow as tf

@@ -208,3 +208,17 @@ class MultipleAlleleEncoding(object):
 
     def fixed_length_vector_encoded_sequences(self, encoding_name):
         raise NotImplementedError()
+
+    def shuffle_in_place(self, shuffle_permutation=None):
+        flattened_alleles = self.allele_encoding.alleles.values
+        reshaped_alleles = numpy.reshape(
+            flattened_alleles, (-1, self.max_alleles_per_experiment))
+
+        if shuffle_permutation is None:
+            shuffle_permutation = numpy.random.permutation(
+                len(reshaped_alleles))
+
+        self.allele_encoding = AlleleEncoding(
+            alleles=reshaped_alleles[shuffle_permutation].flatten(),
+            borrow_from=self.allele_encoding
+        )

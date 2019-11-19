@@ -70,6 +70,12 @@ class RandomNegativePeptides(object):
         pandas.DataFrame indicating number of random negatives for each length
         and allele.
         """
+        numpy.testing.assert_equal(len(peptides), len(affinities))
+        if alleles is not None:
+            numpy.testing.assert_equal(len(peptides), len(alleles))
+        if inequalities is not None:
+            numpy.testing.assert_equal(len(peptides), len(inequalities))
+
         peptides = pandas.Series(peptides, copy=False)
         peptide_lengths = peptides.str.len()
 

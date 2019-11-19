@@ -12,10 +12,11 @@ from .class1_neural_network import Class1NeuralNetwork, DEFAULT_PREDICT_BATCH_SI
 from .encodable_sequences import EncodableSequences
 from .regression_target import from_ic50, to_ic50
 from .random_negative_peptides import RandomNegativePeptides
+from .allele_encoding import MultipleAlleleEncoding
 from .custom_loss import (
     MSEWithInequalities,
-    MSEWithInequalitiesAndMultipleOutputs,
     MultiallelicMassSpecLoss)
+
 
 class Class1LigandomePredictor(object):
     network_hyperparameter_defaults = HyperparameterDefaults(
@@ -37,7 +38,8 @@ class Class1LigandomePredictor(object):
         max_epochs=500,
         validation_split=0.1,
         early_stopping=True,
-        minibatch_size=128,).extend(
+        minibatch_size=128,
+        random_negative_affinity_min=20000.0,).extend(
         RandomNegativePeptides.hyperparameter_defaults
     )
     """
@@ -273,32 +275,65 @@ class Class1LigandomePredictor(object):
         #    layer.trainable = False
         #    import ipdb ; ipdb.set_trace()
 
-        peptides = EncodableSequences.create(peptides)
-        peptide_encoding = self.peptides_to_network_input(peptides)
+        encodable_peptides = EncodableSequences.create(peptides)
+        if labels is not None:
+            labels = numpy.array(labels, copy=False)
+        if affinities_mask is not None:
+            affinities_mask = numpy.array(affinities_mask, copy=False)
+        if inequalities is not None:
+            inequalities = numpy.array(inequalities, copy=False)
 
-        # Optional optimization
-        allele_encoding = allele_encoding.compact()
+        random_negatives_planner = RandomNegativePeptides(
+            **RandomNegativePeptides.hyperparameter_defaults.subselect(
+                self.hyperparameters))
+        random_negatives_planner.plan(
+            peptides=encodable_peptides.sequences[affinities_mask],
+            affinities=(labels[affinities_mask]),
+            alleles=numpy.reshape(
+                allele_encoding.allele_encoding.alleles.values,
+                (-1, allele_encoding.max_alleles_per_experiment))[
+                    affinities_mask, 0
+            ].flatten(),
+            inequalities=inequalities[affinities_mask])
 
-        (allele_encoding_input, allele_representations) = (
-            self.allele_encoding_to_network_input(allele_encoding))
+        peptide_input = self.peptides_to_network_input(encodable_peptides)
 
         # Shuffle
         if shuffle_permutation is None:
             shuffle_permutation = numpy.random.permutation(len(labels))
-        peptide_encoding = peptide_encoding[shuffle_permutation]
-        allele_encoding_input = allele_encoding_input[shuffle_permutation]
+        peptide_input = peptide_input[shuffle_permutation]
+        allele_encoding.shuffle_in_place(shuffle_permutation)
         labels = labels[shuffle_permutation]
         inequalities = inequalities[shuffle_permutation]
         affinities_mask = affinities_mask[shuffle_permutation]
+        del peptides
+        del encodable_peptides
 
-        x_dict = {
-            'peptide': peptide_encoding,
+        # Optional optimization
+        allele_encoding = allele_encoding.compact()
+        (allele_encoding_input, allele_representations) = (
+            self.allele_encoding_to_network_input(allele_encoding))
+
+        x_dict_without_random_negatives = {
+            'peptide': peptide_input,
             'allele': allele_encoding_input,
         }
 
         y1 = numpy.zeros(shape=len(labels))
         if affinities_mask is not None:
             y1[affinities_mask] = from_ic50(labels[affinities_mask])
+
+        random_negatives_allele_encoding = None
+        if allele_encoding is not None:
+            random_negative_alleles = random_negatives_planner.get_alleles()
+            random_negatives_allele_encoding = MultipleAlleleEncoding(
+                experiment_names=random_negative_alleles,
+                experiment_to_allele_list=dict(
+                    (a, [a]) for a in random_negative_alleles),
+                max_alleles_per_experiment=(
+                    allele_encoding.max_alleles_per_experiment),
+                borrow_from=allele_encoding.allele_encoding)
+        num_random_negatives = random_negatives_planner.get_total_count()
 
         if inequalities is not None:
             # Reverse inequalities because from_ic50() flips the direction
@@ -313,16 +348,35 @@ class Class1LigandomePredictor(object):
 
         adjusted_inequalities[~affinities_mask] = ">"
 
+        # Note: we are using "<" here not ">" because the inequalities are
+        # now in target-space (0-1) not affinity-space.
+        adjusted_inequalities_with_random_negative = numpy.concatenate([
+            numpy.tile("<", num_random_negatives),
+            adjusted_inequalities
+        ])
+        random_negative_ic50 = self.hyperparameters[
+            'random_negative_affinity_min'
+        ]
+        y1_with_random_negatives = numpy.concatenate([
+            numpy.tile(
+                from_ic50(random_negative_ic50), num_random_negatives),
+            y1,
+        ])
+
         affinities_loss = MSEWithInequalities()
         encoded_y1 = affinities_loss.encode_y(
-            y1, inequalities=adjusted_inequalities)
+            y1_with_random_negatives,
+            inequalities=adjusted_inequalities_with_random_negative)
 
         mms_loss = MultiallelicMassSpecLoss(
             delta=self.hyperparameters['loss_delta'])
-
         y2 = labels.copy()
         y2[affinities_mask] = -1
-        encoded_y2 = mms_loss.encode_y(y2)
+        y2_with_random_negatives = numpy.concatenate([
+            numpy.tile(0.0, num_random_negatives),
+            y2,
+        ])
+        encoded_y2 = mms_loss.encode_y(y2_with_random_negatives)
 
         fit_info = collections.defaultdict(list)
 
@@ -344,13 +398,45 @@ class Class1LigandomePredictor(object):
         min_val_loss = None
         last_progress_print = 0
         start = time.time()
+        x_dict_with_random_negatives = {}
         for i in range(self.hyperparameters['max_epochs']):
             epoch_start = time.time()
+
+            random_negative_peptides = EncodableSequences.create(
+                random_negatives_planner.get_peptides())
+            random_negative_peptides_encoding = (
+                self.peptides_to_network_input(random_negative_peptides))
+
+            if not x_dict_with_random_negatives:
+                if len(random_negative_peptides) > 0:
+                    x_dict_with_random_negatives[
+                        "peptide"
+                    ] = numpy.concatenate([
+                        random_negative_peptides_encoding,
+                        x_dict_without_random_negatives['peptide'],
+                    ])
+                    x_dict_with_random_negatives[
+                        'allele'
+                    ] = numpy.concatenate([
+                        self.allele_encoding_to_network_input(
+                            random_negatives_allele_encoding)[0],
+                        x_dict_without_random_negatives['allele']
+                    ])
+                else:
+                    x_dict_with_random_negatives = (
+                        x_dict_without_random_negatives)
+            else:
+                # Update x_dict_with_random_negatives in place.
+                # This is more memory efficient than recreating it as above.
+                if len(random_negative_peptides) > 0:
+                    x_dict_with_random_negatives[
+                        "peptide"
+                    ][:num_random_negatives] = random_negative_peptides_encoding
 
             # TODO: need to use fit_generator to keep each minibatch corresponding
             # to a single experiment
             fit_history = self.network.fit(
-                x_dict,
+                x_dict_with_random_negatives,
                 [encoded_y1, encoded_y2],
                 shuffle=True,
                 batch_size=self.hyperparameters['minibatch_size'],
@@ -410,7 +496,7 @@ class Class1LigandomePredictor(object):
                 progress_callback()
 
         fit_info["time"] = time.time() - start
-        fit_info["num_points"] = len(peptides)
+        fit_info["num_points"] = len(encodable_peptides)
         self.fit_info.append(dict(fit_info))
 
     def predict(
