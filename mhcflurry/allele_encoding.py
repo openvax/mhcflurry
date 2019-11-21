@@ -150,8 +150,8 @@ class AlleleEncoding(object):
 class MultipleAlleleEncoding(object):
     def __init__(
             self,
-            experiment_names,
-            experiment_to_allele_list,
+            experiment_names=[],
+            experiment_to_allele_list={},
             max_alleles_per_experiment=6,
             allele_to_sequence=None,
             borrow_from=None):
@@ -192,6 +192,12 @@ class MultipleAlleleEncoding(object):
     @property
     def indices(self):
         return self.allele_encoding.indices.values.reshape(
+            (-1, self.max_alleles_per_experiment))
+
+    @property
+    def alleles(self):
+        return numpy.reshape(
+            self.allele_encoding.alleles.values,
             (-1, self.max_alleles_per_experiment))
 
     def compact(self):

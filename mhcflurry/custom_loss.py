@@ -92,12 +92,12 @@ class MSEWithInequalities(Loss):
        y_pred is greater or less than y_true.
 
     between 2 - 3:
-       Treated as a "<" inequality. Penalty (y_pred - (y_true - 2))**2 is
-       applied only if y_pred is greater than y_true - 2.
+       Treated as a ">" inequality. Penalty (y_pred - (y_true - 2))**2 is
+       applied only if y_pred is less than y_true - 2.
 
     between 4 - 5:
-       Treated as a ">" inequality. Penalty (y_pred - (y_true - 4))**2 is
-       applied only if y_pred is less than y_true - 4.
+       Treated as a "<" inequality. Penalty (y_pred - (y_true - 4))**2 is
+       applied only if y_pred is greater than y_true - 4.
     """
     name = "mse_with_inequalities"
     supports_inequalities = True
@@ -240,11 +240,12 @@ class MultiallelicMassSpecLoss(Loss):
     supports_inequalities = True
     supports_multiple_outputs = False
 
-    def __init__(self, delta=0.2):
+    def __init__(self, delta=0.2, multiplier=1.0):
         self.delta = delta
+        self.multiplier = multiplier
 
     @staticmethod
-    def encode_y(y, affinities_mask=None, inequalities=None):
+    def encode_y(y):
         encoded = pandas.Series(y, dtype="float32", copy=True)
         assert all(item in (-1.0, 1.0, 0.0) for item in encoded), set(y)
         print(
@@ -262,9 +263,25 @@ class MultiallelicMassSpecLoss(Loss):
         pos_max = tf.reduce_max(pos, axis=1)
         neg = tf.boolean_mask(y_pred, tf.math.equal(y_true, 0.0))
         term = tf.reshape(neg, (-1, 1)) - pos_max + self.delta
-        result = tf.reduce_sum(tf.maximum(0.0, term) ** 2)
-        return result
+        result = tf.reduce_sum(tf.maximum(0.0, term) ** 2) / tf.cast(
+            tf.shape(term)[0], tf.float32) * self.multiplier
+        return tf.where(tf.is_nan(result), 0.0, result)
 
+
+class ZeroLoss(Loss):
+    """
+    """
+    name = "zero_loss"
+    supports_inequalities = False
+    supports_multiple_outputs = False
+
+    @staticmethod
+    def encode_y(y):
+        return y
+
+    @staticmethod
+    def loss(y_true, y_pred):
+        return 0.0
 
 
 def check_shape(name, arr, expected_shape):
@@ -284,5 +301,7 @@ def check_shape(name, arr, expected_shape):
 
 
 # Register custom losses.
-for cls in [MSEWithInequalities, MSEWithInequalitiesAndMultipleOutputs]:
+for cls in [MSEWithInequalities, MSEWithInequalitiesAndMultipleOutputs, MultiallelicMassSpecLoss, ZeroLoss]:
     CUSTOM_LOSSES[cls.name] = cls()
+
+
