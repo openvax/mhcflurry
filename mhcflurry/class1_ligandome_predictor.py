@@ -230,6 +230,10 @@ class Class1LigandomePredictor(object):
                 [node, auxiliary_input], name="affinities_with_auxiliary")
 
         #layer = Dense(1, activation="linear", kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=1e-5), use_bias=False)
+        layer = Dense(8, activation="tanh")
+        lifted = TimeDistributed(layer, name="ligandome_hidden1")
+        node = lifted(node)
+
         layer = Dense(1, activation="tanh")
         lifted = TimeDistributed(layer, name="ligandome_output")
         ligandome_adjustment = lifted(node)
