@@ -174,6 +174,7 @@ class MultipleAlleleEncoding(object):
             borrow_from=borrow_from
         )
         self.max_alleles_per_experiment = max_alleles_per_experiment
+        self.experiment_names = numpy.array(experiment_names)
 
     def append_alleles(self, alleles):
         extended_alleles = list(self.allele_encoding.alleles)
@@ -188,6 +189,11 @@ class MultipleAlleleEncoding(object):
         self.allele_encoding = AlleleEncoding(
             alleles=extended_alleles,
             borrow_from=self.allele_encoding)
+
+        self.experiment_names = numpy.concatenate([
+            self.experiment_names,
+            numpy.tile(None, len(alleles))
+        ])
 
     @property
     def indices(self):
@@ -216,15 +222,11 @@ class MultipleAlleleEncoding(object):
         raise NotImplementedError()
 
     def shuffle_in_place(self, shuffle_permutation=None):
-        flattened_alleles = self.allele_encoding.alleles.values
-        reshaped_alleles = numpy.reshape(
-            flattened_alleles, (-1, self.max_alleles_per_experiment))
-
+        alleles_matrix = self.alleles
         if shuffle_permutation is None:
-            shuffle_permutation = numpy.random.permutation(
-                len(reshaped_alleles))
-
+            shuffle_permutation = numpy.random.permutation(len(alleles_matrix))
         self.allele_encoding = AlleleEncoding(
-            alleles=reshaped_alleles[shuffle_permutation].flatten(),
+            alleles=alleles_matrix[shuffle_permutation].flatten(),
             borrow_from=self.allele_encoding
         )
+        self.experiment_names = self.experiment_names[shuffle_permutation]
