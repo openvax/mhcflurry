@@ -1,7 +1,7 @@
 import pandas
 import numpy
 
-from mhcflurry.multiallelic_mass_spec_batch_generator import (
+from mhcflurry.batch_generator import (
     MultiallelicMassSpecBatchGenerator)
 
 from numpy.testing import assert_equal
@@ -56,7 +56,6 @@ def test_basic():
 
     for ((kind, batch_num), batch_df) in df.groupby(["kind", "batch"]):
         if not batch_df.affinities_mask.all():
-            print(batch_df)
             # Test each batch has at most one multiallelic ms experiment.
             assert_equal(
                 batch_df.loc[

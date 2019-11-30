@@ -8,7 +8,16 @@ from .hyperparameters import HyperparameterDefaults
 
 
 class BatchPlan(object):
-    def __init__(self, equivalence_classes, batch_compositions):
+    def __init__(self, equivalence_classes, batch_compositions, equivalence_class_labels=None):
+        """
+
+        Parameters
+        ----------
+        equivalence_classes
+        batch_compositions
+        equivalence_class_labels : list of string, optional
+            Used only for summary().
+        """
         # batch_compositions is (num batches_generator, batch size)
 
         self.equivalence_classes = equivalence_classes # indices into points
@@ -23,6 +32,9 @@ class BatchPlan(object):
             indices_into_equivalence_classes.append(
                 numpy.array(indices, dtype=int))
         self.indices_into_equivalence_classes = indices_into_equivalence_classes
+        self.equivalence_class_labels = (
+            numpy.array(equivalence_class_labels)
+            if equivalence_class_labels is not None else None)
 
     def batch_indices_generator(self, epochs=1):
         batch_nums = numpy.arange(len(self.batch_compositions))
@@ -54,21 +66,35 @@ class BatchPlan(object):
 
     def summary(self, indent=0):
         lines = []
-        lines.append("Equivalence class sizes: ")
-        lines.append(pandas.Series(
-            [len(c) for c in self.equivalence_classes]))
-        lines.append("Batch compositions: ")
-        lines.append(self.batch_compositions)
+        equivalence_class_labels = self.equivalence_class_labels
+        if equivalence_class_labels is None:
+            equivalence_class_labels = (
+                "class-" + numpy.arange(self.equivalence_classes).astype("str"))
+
+        i = 0
+        while i < len(self.batch_compositions):
+            composition = self.batch_compositions[i]
+            label_counts = pandas.Series(
+                equivalence_class_labels[composition]).value_counts()
+            lines.append(
+                ("Batch %5d: " % i) + ", ".join(
+                    "{key}[{value}]".format(key=key, value=value)
+                    for (key, value) in label_counts.iteritems()))
+            if i == 5:
+                lines.append("...")
+                i = len(self.batch_compositions) - 4
+            i += 1
+
         indent_spaces = "    " * indent
         return "\n".join([indent_spaces + str(line) for line in lines])
 
     @property
     def num_batches(self):
-        return self.batch_compositions.shape[0]
+        return len(self.batch_compositions)
 
     @property
     def batch_size(self):
-        return self.batch_compositions.shape[1]
+        return max(len(b) for b in self.batch_compositions)
 
 
 class MultiallelicMassSpecBatchGenerator(object):
@@ -100,6 +126,15 @@ class MultiallelicMassSpecBatchGenerator(object):
         df["first_allele"] = df.alleles.str.get(0)
         df["unused"] = True
         df["idx"] = df.index
+        equivalence_class_to_label = dict(
+            (idx, (
+                "{first_allele} {binder}" if row.is_affinity else
+                "{experiment_name} {binder}"
+                ).format(
+                    binder="binder" if row.is_binder else "nonbinder",
+                    **row.to_dict()))
+            for (idx, row) in df.drop_duplicates(
+                "equivalence_class").set_index("equivalence_class").iterrows())
         df = df.sample(frac=1.0)
         #df["key"] = df.is_binder ^ (numpy.arange(len(df)) % 2).astype(bool)
         #df = df.sort_values("key")
@@ -171,14 +206,19 @@ class MultiallelicMassSpecBatchGenerator(object):
         ]
         return BatchPlan(
             equivalence_classes=equivalence_classes,
-            batch_compositions=batch_compositions)
+            batch_compositions=batch_compositions,
+            equivalence_class_labels=[
+                equivalence_class_to_label[i] for i in
+                range(len(class_to_indices))
+            ])
 
     def plan(
             self,
             affinities_mask,
             experiment_names,
             alleles_matrix,
-            is_binder):
+            is_binder,
+            potential_validation_mask=None):
         affinities_mask = numpy.array(affinities_mask, copy=False, dtype=bool)
         experiment_names = numpy.array(experiment_names, copy=False)
         alleles_matrix = numpy.array(alleles_matrix, copy=False)
@@ -190,10 +230,13 @@ class MultiallelicMassSpecBatchGenerator(object):
         numpy.testing.assert_equal(len(is_binder), n)
         numpy.testing.assert_equal(
             affinities_mask, pandas.isnull(experiment_names))
+        if potential_validation_mask is not None:
+            numpy.testing.assert_equal(len(potential_validation_mask), n)
 
         validation_items = numpy.random.choice(
-            n, int(
-                self.hyperparameters['batch_generator_validation_split'] * n))
+            n if potential_validation_mask is None
+                else numpy.where(potential_validation_mask)[0],
+            int(self.hyperparameters['batch_generator_validation_split'] * n))
         validation_mask = numpy.zeros(n, dtype=bool)
         validation_mask[validation_items] = True
 
@@ -216,7 +259,7 @@ class MultiallelicMassSpecBatchGenerator(object):
 
     def summary(self):
         return (
-            "Train: " + self.train_batch_plan.summary(indent=1) +
+            "Train:\n" + self.train_batch_plan.summary(indent=1) +
             "\n***\nTest: " + self.test_batch_plan.summary(indent=1))
 
     def get_train_and_test_generators(self, x_dict, y_list, epochs=1):
@@ -225,3 +268,11 @@ class MultiallelicMassSpecBatchGenerator(object):
         test_generator = self.test_batch_plan.batches_generator(
             x_dict, y_list, epochs=epochs)
         return (train_generator, test_generator)
+
+    @property
+    def num_train_batches(self):
+        return self.train_batch_plan.num_batches
+
+    @property
+    def num_test_batches(self):
+        return self.test_batch_plan.num_batches
