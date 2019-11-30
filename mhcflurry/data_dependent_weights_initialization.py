@@ -96,7 +96,7 @@ def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
         if not isinstance(layer, (Dense, Convolution2D)):
             continue
         # avoid small layers where activation variance close to zero, esp.
-        # for small batches
+        # for small batches_generator
         if numpy.prod(layer.get_output_shape_at(0)[1:]) < 32:
             if verbose:
                 print('LSUV initialization skipping', layer.name)

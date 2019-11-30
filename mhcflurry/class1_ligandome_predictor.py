@@ -672,7 +672,7 @@ class Class1LigandomePredictor(object):
         print("affinity count", affinities_per_batch)
         print("mass_spec count", mass_spec_per_batch,hits_per_mass_spec_batch, decoys_per_mass_spec_batch )
 
-        # Mixed mass spec / affinity batches
+        # Mixed mass spec / affinity batches_generator
         experiments = df.experiment.unique()
         batch_indices = []
         batch_descriptions = []
@@ -695,7 +695,7 @@ class Class1LigandomePredictor(object):
                     affinities_for_this_batch = (
                             batch_size - mass_spec_for_this_batch)
                     if affinities_for_this_batch < len(affinities_df):
-                        # For mass spec, we only do whole batches, since it's
+                        # For mass spec, we only do whole batches_generator, since it's
                         # unclear how our pairwise loss would interact with
                         # a smaller batch.
                         break
@@ -732,7 +732,7 @@ class Class1LigandomePredictor(object):
                 batch_indices.append(to_use_indices)
                 batch_descriptions.append("multiallelic-mass-spec")
 
-        # Affinities-only batches
+        # Affinities-only batches_generator
         affinities_df = df.loc[df.unused & df.experiment.isnull()]
         while len(affinities_df) > 0:
             if len(affinities_df) <= batch_size:
@@ -745,7 +745,7 @@ class Class1LigandomePredictor(object):
             batch_descriptions.append("affinities-only")
 
         numpy.random.shuffle(batch_indices)
-        print("Planning %d batches took" % len(batch_indices), time.time() - start, "sec")
+        print("Planning %d batches_generator took" % len(batch_indices), time.time() - start, "sec")
         print("remaining unused: ")
         print(df.loc[df.unused].experiment.fillna("[affinity]").value_counts())
         print("batch descriptions")
