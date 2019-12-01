@@ -725,7 +725,8 @@ class Class1LigandomePredictor(object):
                 axis=0)
 
         if existing_weights_shape != reshaped.shape:
-            print("Performing network surgery", existing_weights_shape, reshaped.shape)
+            print(
+                "Performing network surgery", existing_weights_shape, reshaped.shape)
             # Network surgery required. Make a new network with this layer's
             # dimensions changed. Kind of a hack.
             layer.input_dim = reshaped.shape[0]

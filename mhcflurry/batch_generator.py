@@ -116,13 +116,12 @@ class MultiallelicMassSpecBatchGenerator(object):
     def plan_from_dataframe(df, hyperparameters):
         affinity_fraction = hyperparameters["batch_generator_affinity_fraction"]
         batch_size = hyperparameters["batch_generator_batch_size"]
-        classes = {}
-        df["equivalence_class"] = [
-            classes.setdefault(
-                tuple(row[["is_affinity", "is_binder", "experiment_name"]]),
-                len(classes))
-            for _, row in df.iterrows()
-        ]
+        equivalence_columns = ["is_affinity", "is_binder", "experiment_name"]
+        df["equivalence_key"] = df[equivalence_columns].astype(str).sum(1)
+        equivalence_map = dict(
+            (v, i)
+            for (i, v) in zip(*df.equivalence_key.factorize()))
+        df["equivalence_class"] = df.equivalence_key.map(equivalence_map)
         df["first_allele"] = df.alleles.str.get(0)
         df["unused"] = True
         df["idx"] = df.index
