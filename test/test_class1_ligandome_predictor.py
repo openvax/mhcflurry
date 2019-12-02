@@ -753,7 +753,7 @@ def Xtest_synthetic_allele_refinement(max_epochs=10):
     return (predictor, predictions, metrics, motifs)
 
 
-def test_refinemeent_large(sample_rate=0.1):
+def test_batch_generator(sample_rate=0.1):
     multi_train_df = pandas.read_csv(
         data_path("multiallelic_ms.benchmark1.csv.bz2"))
     multi_train_df["label"] = multi_train_df.hit

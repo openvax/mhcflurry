@@ -117,82 +117,63 @@ class MultiallelicMassSpecBatchGenerator(object):
         affinity_fraction = hyperparameters["batch_generator_affinity_fraction"]
         batch_size = hyperparameters["batch_generator_batch_size"]
         df["first_allele"] = df.alleles.str.get(0)
-        equivalence_columns = [
-            "is_affinity",
-            "is_binder",
-            "experiment_name",
-            "first_allele",
-        ]
         df["equivalence_key"] = numpy.where(
             df.is_affinity,
             df.first_allele,
             df.experiment_name,
         ) + " " + df.is_binder.map({True: "binder", False: "nonbinder"})
-
         (df["equivalence_class"], equivalence_class_labels) = (
             df.equivalence_key.factorize())
-        df["unused"] = True
         df["idx"] = df.index
         df = df.sample(frac=1.0)
 
         affinities_per_batch = int(affinity_fraction * batch_size)
 
+        remaining_affinities_df = df.loc[df.is_affinity].copy()
+
         # First do mixed affinity / multiallelic ms batches_generator.
         batch_compositions = []
-        for experiment in df.loc[~df.is_affinity].experiment_name.unique():
-            if experiment is None:
-                continue
-            while True:
-                experiment_df = df.loc[
-                    df.unused & (df.experiment_name == experiment)]
-                if len(experiment_df) == 0:
-                    break
-                (experiment_alleles,) = experiment_df.alleles.unique()
-                affinities_df = df.loc[df.unused & df.is_affinity].copy()
-                affinities_df["matches_allele"] = (
-                    affinities_df.first_allele.isin(experiment_alleles))
-
-                # Whenever possible we try to use affinities with the same
-                # alleles as the mass spec experiment
-                affinities_df = affinities_df.sort_values(
-                    "matches_allele", ascending=False)
-
+        for (experiment, experiment_df) in df.loc[~df.is_affinity].groupby(
+                "experiment_name"):
+            (experiment_alleles,) = experiment_df.alleles.unique()
+            remaining_affinities_df["matches_allele"] = (
+                remaining_affinities_df.first_allele.isin(experiment_alleles))
+            # Whenever possible we try to use affinities with the same
+            # alleles as the mass spec experiment
+            remaining_affinities_df = remaining_affinities_df.sort_values(
+                "matches_allele", ascending=False)
+            while len(experiment_df) > 0:
                 affinities_for_this_batch = min(
-                    affinities_per_batch, len(affinities_df))
+                    affinities_per_batch, len(remaining_affinities_df))
                 mass_spec_for_this_batch = (
                     batch_size - affinities_for_this_batch)
                 if len(experiment_df) < mass_spec_for_this_batch:
                     mass_spec_for_this_batch = len(experiment_df)
                     affinities_for_this_batch = (
                             batch_size - mass_spec_for_this_batch)
-                    if affinities_for_this_batch < len(affinities_df):
-                        # For mass spec, we only do whole batches_generator, since it's
-                        # unclear how our pairwise loss would interact with
-                        # a smaller batch.
-                        break
 
-                to_use_list = []
+                batch_composition = []
 
-                # sample mass spec
-                to_use = experiment_df.head(mass_spec_for_this_batch)
-                to_use_list.append(to_use.index.values)
+                # take mass spec
+                to_use = experiment_df.iloc[:mass_spec_for_this_batch]
+                experiment_df = experiment_df.iloc[mass_spec_for_this_batch:]
+                batch_composition.extend(to_use.equivalence_class.values)
 
-                # sample affinities
-                to_use = affinities_df.head(affinities_for_this_batch)
-                to_use_list.append(to_use.index.values)
-
-                to_use_indices = numpy.concatenate(to_use_list)
-                df.loc[to_use_indices, "unused"] = False
-                batch_compositions.append(
-                    df.loc[to_use_indices].equivalence_class.values)
+                # take affinities
+                to_use = remaining_affinities_df.iloc[
+                    :affinities_for_this_batch
+                ]
+                remaining_affinities_df = remaining_affinities_df.iloc[
+                    affinities_for_this_batch:
+                ]
+                batch_composition.extend(to_use.equivalence_class.values)
+                batch_compositions.append(batch_composition)
 
         # Affinities-only batches
-        affinities_df = df.loc[df.unused & df.is_affinity]
-        while len(affinities_df) > 0:
-            to_use = affinities_df.head(batch_size)
-            df.loc[to_use.index, "unused"] = False
+        while len(remaining_affinities_df) > 0:
+            to_use = remaining_affinities_df.iloc[:batch_size]
+            remaining_affinities_df = remaining_affinities_df.iloc[batch_size:]
             batch_compositions.append(to_use.equivalence_class.values)
-            affinities_df = df.loc[df.unused & df.is_affinity]
 
         class_to_indices = df.groupby("equivalence_class").idx.unique()
         equivalence_classes = [
@@ -228,7 +209,8 @@ class MultiallelicMassSpecBatchGenerator(object):
         validation_items = numpy.random.choice(
             n if potential_validation_mask is None
                 else numpy.where(potential_validation_mask)[0],
-            int(self.hyperparameters['batch_generator_validation_split'] * n))
+            int(self.hyperparameters['batch_generator_validation_split'] * n),
+            replace=False)
         validation_mask = numpy.zeros(n, dtype=bool)
         validation_mask[validation_items] = True
 

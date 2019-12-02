@@ -19,6 +19,7 @@ from mhcflurry.regression_target import to_ic50
 from mhcflurry import Class1AffinityPredictor
 
 from numpy.testing import assert_equal
+from nose.tools import assert_greater, assert_less
 
 
 def data_path(name):
@@ -29,20 +30,27 @@ def data_path(name):
     return os.path.join(os.path.dirname(__file__), "data", name)
 
 
+def test_basic_repeat():
+    for _ in range(100):
+        test_basic()
+
+
 def test_basic():
+    batch_size = 7
+    validation_split = 0.2
     planner = MultiallelicMassSpecBatchGenerator(
         hyperparameters=dict(
-            batch_generator_validation_split=0.2,
-            batch_generator_batch_size=10,
+            batch_generator_validation_split=validation_split,
+            batch_generator_batch_size=batch_size,
             batch_generator_affinity_fraction=0.5))
 
     exp1_alleles = ["HLA-A*03:01", "HLA-B*07:02", "HLA-C*02:01"]
     exp2_alleles = ["HLA-A*02:01", "HLA-B*27:01", "HLA-C*02:01"]
 
     df = pandas.DataFrame(dict(
-        affinities_mask=([True] * 4) + ([False] * 6),
-        experiment_names=([None] * 4) + (["exp1"] * 2) + (["exp2"] * 4),
-        alleles_matrix=[
+        affinities_mask=([True] * 14) + ([False] * 6),
+        experiment_names=([None] * 14) + (["exp1"] * 2) + (["exp2"] * 4),
+        alleles_matrix=[["HLA-C*07:01", None, None]] * 10 + [
             ["HLA-A*02:01", None, None],
             ["HLA-A*02:01", None, None],
             ["HLA-A*03:01", None, None],
@@ -54,11 +62,20 @@ def test_basic():
             exp2_alleles,
             exp2_alleles,
         ],
-        is_binder=[
+        is_binder=[False, True] * 5 + [
             True, True, False, False, True, False, True, False, True, False,
         ]))
+    df = pandas.concat([df, df], ignore_index=True)
+    df = pandas.concat([df, df], ignore_index=True)
+
     planner.plan(**df.to_dict("list"))
-    print(planner.summary())
+
+    assert_equal(
+        planner.num_train_batches,
+        numpy.ceil(len(df) * (1 - validation_split) / batch_size))
+    assert_equal(
+        planner.num_test_batches,
+        numpy.ceil(len(df) * validation_split / batch_size))
 
     (train_iter, test_iter) = planner.get_train_and_test_generators(
         x_dict={
@@ -74,20 +91,36 @@ def test_basic():
             df.loc[idx, "batch"] = i
     df["idx"] = df.idx.astype(int)
     df["batch"] = df.batch.astype(int)
-    print(df)
 
+    assert_equal(df.kind.value_counts()["test"], len(df) * validation_split)
+    assert_equal(df.kind.value_counts()["train"], len(df) * (1 - validation_split))
+
+    experiment_allele_colocations = collections.defaultdict(int)
     for ((kind, batch_num), batch_df) in df.groupby(["kind", "batch"]):
         if not batch_df.affinities_mask.all():
             # Test each batch has at most one multiallelic ms experiment.
-            assert_equal(
-                batch_df.loc[
-                    ~batch_df.affinities_mask
-                ].experiment_names.nunique(), 1)
+            names = batch_df.loc[
+                ~batch_df.affinities_mask
+            ].experiment_names.unique()
+            assert_equal(len(names), 1)
+            (experiment,) = names
+            if batch_df.affinities_mask.any():
+                # Test experiments are matched to the correct affinity alleles.
+                affinity_alleles = batch_df.loc[
+                    batch_df.affinities_mask
+                ].alleles_matrix.str.get(0).values
+                for allele in affinity_alleles:
+                    experiment_allele_colocations[(experiment, allele)] += 1
 
-    #import ipdb;ipdb.set_trace()
+    assert_greater(
+        experiment_allele_colocations[('exp1', 'HLA-A*03:01')],
+        experiment_allele_colocations[('exp1', 'HLA-A*02:01')])
+    assert_less(
+        experiment_allele_colocations[('exp2', 'HLA-A*03:01')],
+        experiment_allele_colocations[('exp2', 'HLA-A*02:01')])
 
 
-def test_large(sample_rate=0.01):
+def test_large(sample_rate=1.0):
     multi_train_df = pandas.read_csv(
         data_path("multiallelic_ms.benchmark1.csv.bz2"))
     multi_train_df["label"] = multi_train_df.hit
@@ -151,6 +184,7 @@ def test_large(sample_rate=0.01):
             combined_train_df.is_affinity.values,
             combined_train_df.label.values,
             to_ic50(combined_train_df.label.values)) < 1000.0)
+    profiler.disable()
     stats = pstats.Stats(profiler)
     stats.sort_stats("cumtime").reverse_order().print_stats()
     print(planner.summary())
@@ -162,20 +196,25 @@ def test_large(sample_rate=0.01):
         },
         y_list=[])
 
+    train_batch_sizes = []
+    indices_total = numpy.zeros(len(combined_train_df))
     for (kind, it) in [("train", train_iter), ("test", test_iter)]:
         for (i, (x_item, y_item)) in enumerate(it):
             idx = x_item["idx"]
-            combined_train_df.loc[idx, "kind"] = kind
-            combined_train_df.loc[idx, "idx"] = idx
-            combined_train_df.loc[idx, "batch"] = i
-    import ipdb ; ipdb.set_trace()
-    combined_train_df["idx"] = combined_train_df.idx.astype(int)
-    combined_train_df["batch"] = combined_train_df.batch.astype(int)
+            indices_total[idx] += 1
+            batch_df = combined_train_df.iloc[idx]
+            if not batch_df.is_affinity.all():
+                # Test each batch has at most one multiallelic ms experiment.
+                assert_equal(
+                    batch_df.loc[~batch_df.is_affinity].sample_id.nunique(), 1)
+            if kind == "train":
+                train_batch_sizes.append(len(batch_df))
 
-    for ((kind, batch_num), batch_df) in combined_train_df.groupby(["kind", "batch"]):
-        if not batch_df.is_affinity.all():
-            # Test each batch has at most one multiallelic ms experiment.
-            assert_equal(
-                batch_df.loc[
-                    ~batch_df.is_affinity
-                ].sample_id.nunique(), 1)
+    # At most one short batch.
+    assert_less(sum(b != 128 for b in train_batch_sizes), 2)
+    assert_greater(
+        sum(b == 128 for b in train_batch_sizes), len(train_batch_sizes) - 2)
+
+    # Each point used exactly once.
+    assert_equal(
+        indices_total, numpy.ones(len(combined_train_df)))
