@@ -1,0 +1,7 @@
+-
+  #########################
+  # Batch generation
+  #########################
+  batch_generator_validation_split: 0.1,
+  batch_generator_batch_size: 1024,
+  batch_generator_affinity_fraction: 0.5
