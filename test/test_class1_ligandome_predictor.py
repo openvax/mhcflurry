@@ -237,7 +237,7 @@ def make_motif(allele, peptides, frac=0.01):
     return matrix
 
 
-def Xtest_real_data_multiallelic_refinement(max_epochs=10):
+def test_real_data_multiallelic_refinement(max_epochs=10):
     ms_df = pandas.read_csv(
         get_path("data_mass_spec_annotated", "annotated_ms.csv.bz2"))
     ms_df = ms_df.loc[
@@ -304,7 +304,7 @@ def Xtest_real_data_multiallelic_refinement(max_epochs=10):
         pan_predictor,
         auxiliary_input_features=[],
         max_ensemble_size=1,
-        max_epochs=50,
+        max_epochs=max_epochs,
         learning_rate=0.0001,
         patience=5,
         min_delta=0.0,
@@ -350,7 +350,7 @@ def Xtest_real_data_multiallelic_refinement(max_epochs=10):
     import ipdb ; ipdb.set_trace()
 
 
-def Xtest_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
+def test_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
     refine_allele = "HLA-C*01:02"
     alleles = [
         "HLA-A*02:01", "HLA-B*27:01", "HLA-C*07:01",
@@ -563,7 +563,7 @@ def Xtest_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
 
 
 
-def Xtest_synthetic_allele_refinement(max_epochs=10):
+def test_synthetic_allele_refinement(max_epochs=10):
     refine_allele = "HLA-C*01:02"
     alleles = [
         "HLA-A*02:01", "HLA-B*27:01", "HLA-C*07:01",
