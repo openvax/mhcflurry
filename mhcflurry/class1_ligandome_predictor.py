@@ -625,6 +625,13 @@ class Class1LigandomePredictor(object):
         fit_info["num_points"] = len(labels)
         self.fit_info.append(dict(fit_info))
 
+        return {
+            'batch_generator': batch_generator,
+            'last_x': x_dict_with_random_negatives,
+            'last_y': [encoded_y1, encoded_y2, encoded_y2],
+            'fit_info': fit_info,
+        }
+
     def predict(
             self,
             peptides,
