@@ -116,28 +116,24 @@ class MultiallelicMassSpecBatchGenerator(object):
     def plan_from_dataframe(df, hyperparameters):
         affinity_fraction = hyperparameters["batch_generator_affinity_fraction"]
         batch_size = hyperparameters["batch_generator_batch_size"]
-        equivalence_columns = ["is_affinity", "is_binder", "experiment_name"]
-        df["equivalence_key"] = df[equivalence_columns].astype(str).sum(1)
-        equivalence_map = dict(
-            (v, i)
-            for (i, v) in zip(*df.equivalence_key.factorize()))
-        df["equivalence_class"] = df.equivalence_key.map(equivalence_map)
         df["first_allele"] = df.alleles.str.get(0)
+        equivalence_columns = [
+            "is_affinity",
+            "is_binder",
+            "experiment_name",
+            "first_allele",
+        ]
+        df["equivalence_key"] = numpy.where(
+            df.is_affinity,
+            df.first_allele,
+            df.experiment_name,
+        ) + " " + df.is_binder.map({True: "binder", False: "nonbinder"})
+
+        (df["equivalence_class"], equivalence_class_labels) = (
+            df.equivalence_key.factorize())
         df["unused"] = True
         df["idx"] = df.index
-        equivalence_class_to_label = dict(
-            (idx, (
-                "{first_allele} {binder}" if row.is_affinity else
-                "{experiment_name} {binder}"
-                ).format(
-                    binder="binder" if row.is_binder else "nonbinder",
-                    **row.to_dict()))
-            for (idx, row) in df.drop_duplicates(
-                "equivalence_class").set_index("equivalence_class").iterrows())
         df = df.sample(frac=1.0)
-        #df["key"] = df.is_binder ^ (numpy.arange(len(df)) % 2).astype(bool)
-        #df = df.sort_values("key")
-        #del df["key"]
 
         affinities_per_batch = int(affinity_fraction * batch_size)
 
@@ -206,10 +202,7 @@ class MultiallelicMassSpecBatchGenerator(object):
         return BatchPlan(
             equivalence_classes=equivalence_classes,
             batch_compositions=batch_compositions,
-            equivalence_class_labels=[
-                equivalence_class_to_label[i] for i in
-                range(len(class_to_indices))
-            ])
+            equivalence_class_labels=equivalence_class_labels)
 
     def plan(
             self,

@@ -137,7 +137,7 @@ def test_large(sample_rate=0.01):
     planner = MultiallelicMassSpecBatchGenerator(
         hyperparameters=dict(
             batch_generator_validation_split=0.2,
-            batch_generator_batch_size=1024,
+            batch_generator_batch_size=128,
             batch_generator_affinity_fraction=0.5))
 
     s = time.time()
@@ -168,6 +168,7 @@ def test_large(sample_rate=0.01):
             combined_train_df.loc[idx, "kind"] = kind
             combined_train_df.loc[idx, "idx"] = idx
             combined_train_df.loc[idx, "batch"] = i
+    import ipdb ; ipdb.set_trace()
     combined_train_df["idx"] = combined_train_df.idx.astype(int)
     combined_train_df["batch"] = combined_train_df.batch.astype(int)
 
