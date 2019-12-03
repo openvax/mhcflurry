@@ -33,7 +33,7 @@ from sklearn.metrics import roc_auc_score
 
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 from mhcflurry.allele_encoding import MultipleAlleleEncoding
-from mhcflurry.class1_ligandome_predictor import Class1LigandomePredictor
+from mhcflurry.class1_ligandome_neural_network import Class1LigandomeNeuralNetwork
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.downloads import get_path
 from mhcflurry.regression_target import from_ic50
@@ -300,7 +300,7 @@ def test_real_data_multiallelic_refinement(max_epochs=10):
 
     combined_train_df = pandas.concat([multi_train_df, pan_sub_train_df])
 
-    ligandome_predictor = Class1LigandomePredictor(
+    ligandome_predictor = Class1LigandomeNeuralNetwork(
         pan_predictor,
         auxiliary_input_features=[],
         max_ensemble_size=1,
@@ -416,7 +416,7 @@ def test_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
     del affinity_train_df["measurement_value"]
     affinity_train_df["is_affinity"] = True
 
-    predictor = Class1LigandomePredictor(
+    predictor = Class1LigandomeNeuralNetwork(
         PAN_ALLELE_PREDICTOR_NO_MASS_SPEC,
         auxiliary_input_features=["gene"],
         max_ensemble_size=1,
@@ -616,7 +616,7 @@ def test_synthetic_allele_refinement(max_epochs=10):
 
     train_df = pandas.concat([hits_df, decoys_df], ignore_index=True)
 
-    predictor = Class1LigandomePredictor(
+    predictor = Class1LigandomeNeuralNetwork(
         PAN_ALLELE_PREDICTOR_NO_MASS_SPEC,
         max_ensemble_size=1,
         max_epochs=max_epochs,
@@ -798,7 +798,7 @@ def test_batch_generator(sample_rate=0.1):
     combined_train_df = pandas.concat(
         [multi_train_df, pan_sub_train_df], ignore_index=True, sort=True)
 
-    ligandome_predictor = Class1LigandomePredictor(
+    ligandome_predictor = Class1LigandomeNeuralNetwork(
         pan_predictor,
         auxiliary_input_features=[],
         max_ensemble_size=1,
