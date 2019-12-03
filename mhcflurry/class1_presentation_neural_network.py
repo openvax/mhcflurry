@@ -23,7 +23,7 @@ from .custom_loss import (
     ZeroLoss)
 
 
-class Class1LigandomeNeuralNetwork(object):
+class Class1PresentationNeuralNetwork(object):
     network_hyperparameter_defaults = HyperparameterDefaults(
         allele_amino_acid_encoding="BLOSUM62",
         peptide_encoding={

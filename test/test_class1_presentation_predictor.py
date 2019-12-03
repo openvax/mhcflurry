@@ -6,7 +6,7 @@ Idea:
     possiblility is DLA-88*501:01 but human would be better
 - generate synethetic multi-allele MS by combining single-allele MS for differnet
    alleles, including the selected allele
-- train ligandome predictor based on the no-ms pan-allele models on theis
+- train presentation predictor based on the no-ms pan-allele models on theis
   synthetic dataset
 - see if the pan-allele predictor learns the "correct" motif for the selected
   allele, i.e. updates to become more similar to the with-ms pan allele predictor.
@@ -33,7 +33,7 @@ from sklearn.metrics import roc_auc_score
 
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 from mhcflurry.allele_encoding import MultipleAlleleEncoding
-from mhcflurry.class1_ligandome_neural_network import Class1LigandomeNeuralNetwork
+from mhcflurry.class1_presentation_neural_network import Class1PresentationNeuralNetwork
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.downloads import get_path
 from mhcflurry.regression_target import from_ic50
@@ -300,7 +300,7 @@ def test_real_data_multiallelic_refinement(max_epochs=10):
 
     combined_train_df = pandas.concat([multi_train_df, pan_sub_train_df])
 
-    ligandome_predictor = Class1LigandomeNeuralNetwork(
+    presentation_predictor = Class1PresentationNeuralNetwork(
         pan_predictor,
         auxiliary_input_features=[],
         max_ensemble_size=1,
@@ -311,7 +311,7 @@ def test_real_data_multiallelic_refinement(max_epochs=10):
         random_negative_rate=1.0)
 
     pre_predictions = from_ic50(
-        ligandome_predictor.predict(
+        presentation_predictor.predict(
             output="affinities",
             peptides=combined_train_df.peptide.values,
             alleles=allele_encoding))
@@ -338,7 +338,7 @@ def test_real_data_multiallelic_refinement(max_epochs=10):
     update_motifs()
     print("Fitting...")
 
-    ligandome_predictor.fit(
+    presentation_predictor.fit(
         peptides=combined_train_df.peptide.values,
         labels=combined_train_df.label.values,
         allele_encoding=allele_encoding,
@@ -416,7 +416,7 @@ def test_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
     del affinity_train_df["measurement_value"]
     affinity_train_df["is_affinity"] = True
 
-    predictor = Class1LigandomeNeuralNetwork(
+    predictor = Class1PresentationNeuralNetwork(
         PAN_ALLELE_PREDICTOR_NO_MASS_SPEC,
         auxiliary_input_features=["gene"],
         max_ensemble_size=1,
@@ -475,7 +475,7 @@ def test_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
     metric_rows = []
 
     def progress():
-        (_, ligandome_prediction, affinities_predictions) = (
+        (_, presentation_prediction, affinities_predictions) = (
             predictor.predict(
                 output="all",
                 peptides=mms_train_df.peptide.values,
@@ -483,7 +483,7 @@ def test_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
         affinities_predictions = from_ic50(affinities_predictions)
         for (kind, predictions) in [
                 ("affinities", affinities_predictions),
-                ("ligandome", ligandome_prediction)]:
+                ("presentation", presentation_prediction)]:
 
             mms_train_df["max_prediction"] = predictions.max(1)
             mms_train_df["predicted_allele"] = pandas.Series(alleles).loc[
@@ -520,7 +520,7 @@ def test_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
 
             update_motifs()
 
-        return (ligandome_prediction, auc)
+        return (presentation_prediction, auc)
 
     print("Pre fitting:")
     progress()
@@ -616,7 +616,7 @@ def test_synthetic_allele_refinement(max_epochs=10):
 
     train_df = pandas.concat([hits_df, decoys_df], ignore_index=True)
 
-    predictor = Class1LigandomeNeuralNetwork(
+    predictor = Class1PresentationNeuralNetwork(
         PAN_ALLELE_PREDICTOR_NO_MASS_SPEC,
         max_ensemble_size=1,
         max_epochs=max_epochs,
@@ -668,7 +668,7 @@ def test_synthetic_allele_refinement(max_epochs=10):
     metric_rows = []
 
     def progress():
-        (_, ligandome_prediction, affinities_predictions) = (
+        (_, presentation_prediction, affinities_predictions) = (
             predictor.predict(
                 output="all",
                 peptides=train_df.peptide.values,
@@ -676,7 +676,7 @@ def test_synthetic_allele_refinement(max_epochs=10):
         affinities_predictions = from_ic50(affinities_predictions)
         for (kind, predictions) in [
                 ("affinities", affinities_predictions),
-                ("ligandome", ligandome_prediction)]:
+                ("presentation", presentation_prediction)]:
 
             train_df["max_prediction"] = predictions.max(1)
             train_df["predicted_allele"] = pandas.Series(alleles).loc[
@@ -713,7 +713,7 @@ def test_synthetic_allele_refinement(max_epochs=10):
 
             update_motifs()
 
-        return (ligandome_prediction, auc)
+        return (presentation_prediction, auc)
 
     print("Pre fitting:")
     progress()
@@ -798,7 +798,7 @@ def test_batch_generator(sample_rate=0.1):
     combined_train_df = pandas.concat(
         [multi_train_df, pan_sub_train_df], ignore_index=True, sort=True)
 
-    ligandome_predictor = Class1LigandomeNeuralNetwork(
+    presentation_predictor = Class1PresentationNeuralNetwork(
         pan_predictor,
         auxiliary_input_features=[],
         max_ensemble_size=1,
@@ -809,7 +809,7 @@ def test_batch_generator(sample_rate=0.1):
         min_delta=0.0,
         random_negative_rate=1.0)
 
-    fit_results = ligandome_predictor.fit(
+    fit_results = presentation_predictor.fit(
         peptides=combined_train_df.peptide.values,
         labels=combined_train_df.label.values,
         allele_encoding=allele_encoding,

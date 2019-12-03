@@ -33,7 +33,7 @@ from .custom_loss import (
     ZeroLoss)
 
 
-class Class1LigandomePredictor(object):
+class Class1PresentationPredictor(object):
     def __init__(
             self,
             class1_ligandome_neural_networks,
@@ -229,7 +229,7 @@ class Class1LigandomePredictor(object):
         not exist it will be created.
 
         The serialization format consists of a file called "manifest.csv" with
-        the configurations of each Class1LigandomeNeuralNetwork, along with
+        the configurations of each Class1PresentationNeuralNetwork, along with
         per-network files giving the model weights.
 
         Parameters
@@ -321,8 +321,6 @@ class Class1LigandomePredictor(object):
         """
         if models_dir is None:
             models_dir = get_default_class1_models_dir()
-        if optimization_level is None:
-            optimization_level = OPTIMIZATION_LEVEL
 
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
