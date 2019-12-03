@@ -195,22 +195,23 @@ class Class1PresentationNeuralNetwork(object):
                 [node, auxiliary_input], name="affinities_with_auxiliary")
 
         layer = Dense(8, activation="tanh")
-        lifted = TimeDistributed(layer, name="ligandome_hidden1")
+        lifted = TimeDistributed(layer, name="presentation_hidden1")
         node = lifted(node)
 
         layer = Dense(1, activation="tanh")
-        lifted = TimeDistributed(layer, name="ligandome_output")
-        ligandome_adjustment = lifted(node)
+        lifted = TimeDistributed(layer, name="presentation_hidden2")
+        presentation_adjustment = lifted(node)
 
         def logit(x):
             import tensorflow as tf
             return - tf.log(1. / x - 1.)
 
-        ligandome_output_pre_sigmoid = Add()([
+        presentation_output_pre_sigmoid = Add()([
             Lambda(logit)(affinity_predictor_matrix_output),
-            ligandome_adjustment,
+            presentation_adjustment,
         ])
-        ligandome_output = Activation("sigmoid")(ligandome_output_pre_sigmoid)
+        presentation_output = Activation("sigmoid", name="presentation_output")(
+            presentation_output_pre_sigmoid)
 
         self.network = Model(
             inputs=[
@@ -219,10 +220,10 @@ class Class1PresentationNeuralNetwork(object):
             ] + ([] if auxiliary_input is None else [auxiliary_input]),
             outputs=[
                 affinity_predictor_output,
-                ligandome_output,
+                presentation_output,
                 affinity_predictor_matrix_output
             ],
-            name="ligandome",
+            name="presentation",
         )
         self.network.summary()
 

@@ -57,17 +57,17 @@ parser.add_argument(
 parser.add_argument(
     "--hyperparameters",
     metavar="FILE.json",
-    help="Ligandome predictor hyperparameters")
+    help="presentation predictor hyperparameters")
 parser.add_argument(
     "--out-affinity-predictor-dir",
     metavar="DIR",
     required=True,
     help="Directory to write refined models")
 parser.add_argument(
-    "--out-ligandome-predictor-dir",
+    "--out-presentation-predictor-dir",
     metavar="DIR",
     required=True,
-    help="Directory to write ligandome predictors")
+    help="Directory to write preentation predictor")
 parser.add_argument(
     "--verbosity",
     type=int,
@@ -89,8 +89,8 @@ def run(argv=sys.argv[1:]):
 
     args.out_affinity_predictor_dir = os.path.abspath(
         args.out_affinity_predictor_dir)
-    args.out_ligandome_predictor_dir = os.path.abspath(
-        args.out_ligandome_predictor_dir)
+    args.out_presentation_predictor_dir = os.path.abspath(
+        args.out_presentation_predictor_dir)
 
     configure_logging(verbose=args.verbosity > 1)
 

@@ -56,7 +56,6 @@ def data_path(name):
     return os.path.join(os.path.dirname(__file__), "data", name)
 
 
-
 def setup():
     global PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
     global PAN_ALLELE_MOTIFS_WITH_MASS_SPEC_DF

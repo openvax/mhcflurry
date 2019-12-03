@@ -36,11 +36,11 @@ from .custom_loss import (
 class Class1PresentationPredictor(object):
     def __init__(
             self,
-            class1_ligandome_neural_networks,
+            class1_presentation_neural_networks,
             allele_to_sequence,
             manifest_df=None,
             metadata_dataframes=None):
-        self.networks = class1_ligandome_neural_networks
+        self.networks = class1_presentation_neural_networks
         self.allele_to_sequence = allele_to_sequence
         self._manifest_df = manifest_df
         self.metadata_dataframes = (

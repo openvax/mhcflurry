@@ -103,7 +103,7 @@ class MultiallelicMassSpecBatchGenerator(object):
         batch_generator_batch_size=128,
         batch_generator_affinity_fraction=0.5)
     """
-    Hyperperameters for batch generation for the ligandome predictor.
+    Hyperperameters for batch generation for the presentation predictor.
     """
 
     def __init__(self, hyperparameters):
