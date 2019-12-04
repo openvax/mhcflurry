@@ -182,12 +182,15 @@ class Class1PresentationNeuralNetwork(object):
 
         # Apply allele mask: zero out all outputs corresponding to alleles
         # with the special index 0.
+        def alleles_to_mask(x):
+            import keras.backend as K
+            return K.cast(K.expand_dims(K.not_equal(x, 0.0)), "float32")
+
+        allele_mask = Lambda(alleles_to_mask, name="allele_mask")(input_alleles)
+
         affinity_predictor_matrix_output = Multiply(
                 name="affinity_matrix_output")([
-            Lambda(
-                lambda x: K.cast(
-                    K.expand_dims(K.not_equal(x, 0.0)),
-                    "float32"))(input_alleles),
+            allele_mask,
             pre_mask_affinity_predictor_matrix_output
         ])
 
@@ -241,10 +244,7 @@ class Class1PresentationNeuralNetwork(object):
         # Apply allele mask: zero out all outputs corresponding to alleles
         # with the special index 0.
         presentation_output = Multiply(name="presentation_output")([
-            Lambda(
-                lambda x: K.cast(
-                    K.expand_dims(K.not_equal(x, 0.0)),
-                    "float32"))(input_alleles),
+            allele_mask,
             pre_mask_presentation_output
         ])
 
@@ -711,14 +711,8 @@ class Class1PresentationNeuralNetwork(object):
         dict
 
         """
-        result = dict(self.__dict__)
-        result['network'] = None
-        result['network_json'] = None
-        result['network_weights'] = None
-
-        if self.network is not None:
-            result['network_json'] = self.network.to_json()
-            result['network_weights'] = self.network.get_weights()
+        result = self.get_config()
+        result['network_weights'] = self.get_weights()
         return result
 
     def __setstate__(self, state):
@@ -734,6 +728,19 @@ class Class1PresentationNeuralNetwork(object):
             if network_weights is not None:
                 self.network.set_weights(network_weights)
 
+    def get_weights(self):
+        """
+        Get the network weights
+
+        Returns
+        -------
+        list of numpy.array giving weights for each layer or None if there is no
+        network
+        """
+        if self.network is None:
+            return None
+        return self.network.get_weights()
+
     def get_config(self):
         """
         serialize to a dict all attributes except model weights
@@ -743,11 +750,9 @@ class Class1PresentationNeuralNetwork(object):
         dict
         """
         result = dict(self.__dict__)
-        result['network'] = None
-        result['network_weights'] = None
+        del result['network']
         result['network_json'] = None
         if self.network:
-            result['network_weights'] = self.network.get_weights()
             result['network_json'] = self.network.to_json()
         return result
 
@@ -771,12 +776,11 @@ class Class1PresentationNeuralNetwork(object):
         config = dict(config)
         instance = cls(**config.pop('hyperparameters'))
         network_json = config.pop('network_json')
-        network_weights = config.pop('network_weights')
         instance.__dict__.update(config)
         assert instance.network is None
         if network_json is not None:
             import keras.models
             instance.network = keras.models.model_from_json(network_json)
-            if network_weights is not None:
-                instance.network.set_weights(network_weights)
+            if weights is not None:
+                instance.network.set_weights(weights)
         return instance

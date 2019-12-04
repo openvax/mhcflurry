@@ -61,9 +61,10 @@ class Class1PresentationPredictor(object):
         if self._manifest_df is None:
             rows = []
             for (i, model) in enumerate(self.models):
+                model_config = model.get_config()
                 rows.append((
                     self.model_name(i),
-                    json.dumps(model.get_config()),
+                    json.dumps(model_config),
                     model
                 ))
             self._manifest_df = pandas.DataFrame(
@@ -244,8 +245,7 @@ class Class1PresentationPredictor(object):
             updated_network_config_jsons.append(
                 json.dumps(row.model.get_config()))
             weights_path = self.weights_path(models_dir, row.model_name)
-            self.save_weights(
-                row.model.get_weights(), weights_path)
+            save_weights(row.model.get_weights(), weights_path)
             logging.info("Wrote: %s", weights_path)
         sub_manifest_df["config_json"] = updated_network_config_jsons
         self.manifest_df.loc[

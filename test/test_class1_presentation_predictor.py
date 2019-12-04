@@ -23,6 +23,7 @@ import argparse
 import sys
 import copy
 import os
+import tempfile
 
 from numpy.testing import assert_, assert_equal, assert_allclose, assert_array_equal
 from nose.tools import assert_greater, assert_less
@@ -95,6 +96,7 @@ def test_basic():
     for affinity_network in affinity_predictor.class1_pan_allele_models:
         presentation_network = Class1PresentationNeuralNetwork()
         presentation_network.load_from_class1_neural_network(affinity_network)
+        print(presentation_network.network.get_config())
         models.append(presentation_network)
 
     predictor = Class1PresentationPredictor(
@@ -116,9 +118,24 @@ def test_basic():
     merged_df = pandas.merge(
         df, df2.set_index("peptide"), left_index=True, right_index=True)
 
-    assert_array_equal(merged_df["tightest_affinity"], merged_df["affinity"])
-    assert_array_equal(merged_df["tightest_affinity"], to_ic50(merged_df["score"]))
+    #import ipdb ; ipdb.set_trace()
+
+    assert_allclose(
+        merged_df["tightest_affinity"], merged_df["affinity"], rtol=1e-5)
+    assert_allclose(
+        merged_df["tightest_affinity"], to_ic50(merged_df["score"]), rtol=1e-5)
     assert_array_equal(merged_df["tightest_allele"], merged_df["allele"])
+
+    models_dir = tempfile.mkdtemp("_models")
+    print(models_dir)
+    predictor.save(models_dir)
+    predictor2 = Class1PresentationPredictor.load(models_dir)
+
+    df3 = predictor2.predict_to_dataframe(
+        peptides=df.index.values,
+        alleles=alleles)
+
+    assert_array_equal(df2.values, df3.values)
 
     # TODO: test fitting, saving, and loading
 
