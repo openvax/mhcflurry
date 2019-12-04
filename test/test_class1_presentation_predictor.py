@@ -24,6 +24,7 @@ import sys
 import copy
 import os
 import tempfile
+import pickle
 
 from numpy.testing import assert_, assert_equal, assert_allclose, assert_array_equal
 from nose.tools import assert_greater, assert_less
@@ -90,11 +91,14 @@ def teardown():
     cleanup()
 
 
-def test_basic():
+def Xtest_basic():
     affinity_predictor = PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
     models = []
     for affinity_network in affinity_predictor.class1_pan_allele_models:
-        presentation_network = Class1PresentationNeuralNetwork()
+        presentation_network = Class1PresentationNeuralNetwork(
+            max_epochs=1,
+            learning_rate=0.0001,
+            batch_generator_batch_size=256)
         presentation_network.load_from_class1_neural_network(affinity_network)
         print(presentation_network.network.get_config())
         models.append(presentation_network)
@@ -112,13 +116,13 @@ def test_basic():
     df["tightest_affinity"] = df.min(1)
     df["tightest_allele"] = df.idxmin(1)
 
-    df2 = predictor.predict_to_dataframe(
+    # Test untrained predictor gives predictions that match the affinity
+    # predictor
+    df_predictor = predictor.predict_to_dataframe(
         peptides=df.index.values,
         alleles=alleles)
     merged_df = pandas.merge(
-        df, df2.set_index("peptide"), left_index=True, right_index=True)
-
-    #import ipdb ; ipdb.set_trace()
+        df, df_predictor.set_index("peptide"), left_index=True, right_index=True)
 
     assert_allclose(
         merged_df["tightest_affinity"], merged_df["affinity"], rtol=1e-5)
@@ -126,18 +130,59 @@ def test_basic():
         merged_df["tightest_affinity"], to_ic50(merged_df["score"]), rtol=1e-5)
     assert_array_equal(merged_df["tightest_allele"], merged_df["allele"])
 
+    # Test saving and loading
     models_dir = tempfile.mkdtemp("_models")
     print(models_dir)
     predictor.save(models_dir)
     predictor2 = Class1PresentationPredictor.load(models_dir)
 
-    df3 = predictor2.predict_to_dataframe(
+    df_predictor2 = predictor2.predict_to_dataframe(
         peptides=df.index.values,
         alleles=alleles)
+    assert_array_equal(df_predictor.values, df_predictor2.values)
 
-    assert_array_equal(df2.values, df3.values)
+    # Test pickling
+    predictor3 = pickle.loads(
+        pickle.dumps(predictor, protocol=pickle.HIGHEST_PROTOCOL))
+    predictor4 = pickle.loads(
+        pickle.dumps(predictor2, protocol=pickle.HIGHEST_PROTOCOL))
+    df_predictor3 = predictor3.predict_to_dataframe(
+        peptides=df.index.values,
+        alleles=alleles)
+    df_predictor4 = predictor4.predict_to_dataframe(
+        peptides=df.index.values,
+        alleles=alleles)
+    assert_array_equal(df_predictor.values, df_predictor3.values)
+    assert_array_equal(df_predictor.values, df_predictor4.values)
 
-    # TODO: test fitting, saving, and loading
+    # Test that fitting a model changes the predictor but not the original model
+    train_df = pandas.DataFrame({
+        "peptide": random_peptides(256),
+    })
+    train_df["allele"] = "HLA-A*02:20"
+    train_df["experiment"] = "experiment1"
+    train_df["label"] = train_df.peptide.str.match("^[KSEQ]").astype("float32")
+    allele_encoding = MultipleAlleleEncoding(
+        experiment_names=train_df.experiment.values,
+        experiment_to_allele_list={
+            "experiment1": ["HLA-A*02:20", "HLA-A*02:01"],
+        },
+        allele_to_sequence=predictor4.allele_to_sequence)
+    model = predictor4.models[0]
+    new_predictor = Class1PresentationPredictor(
+        models=[model],
+        allele_to_sequence=predictor4.allele_to_sequence)
+    train_df["original_score"] = new_predictor.predict(
+        train_df.peptide.values, alleles=["HLA-A*02:20"])
+    model.fit(
+        peptides=train_df.peptide.values,
+        labels=train_df.label.values,
+        allele_encoding=allele_encoding)
+    train_df["updated_score"] = new_predictor.predict(
+        train_df.peptide.values,
+        alleles=["HLA-A*02:20"])
+    print(train_df)
+    import ipdb ; ipdb.set_trace()
 
 
 def scramble_peptide(peptide):
@@ -402,7 +447,8 @@ def Xtest_real_data_multiallelic_refinement(max_epochs=10):
     import ipdb ; ipdb.set_trace()
 
 
-def Xtest_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
+def test_synthetic_allele_refinement_with_affinity_data(
+        max_epochs=10, include_affinities=False):
     refine_allele = "HLA-C*01:02"
     alleles = [
         "HLA-A*02:01", "HLA-B*27:01", "HLA-C*07:01",
@@ -456,28 +502,34 @@ def Xtest_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
     mms_train_df = pandas.concat([hits_df, decoys_df], ignore_index=True)
     mms_train_df["label"] =  mms_train_df.hit
     mms_train_df["is_affinity"] = False
+    mms_train_df["measurement_inequality"] = None
 
-    affinity_train_df = pandas.read_csv(
-        get_path(
-            "models_class1_pan", "models.with_mass_spec/train_data.csv.bz2"))
-    affinity_train_df = affinity_train_df.loc[
-        affinity_train_df.allele.isin(alleles),
-        ["peptide", "allele",  "measurement_inequality", "measurement_value"]]
+    if include_affinities:
+        affinity_train_df = pandas.read_csv(
+            get_path(
+                "models_class1_pan", "models.with_mass_spec/train_data.csv.bz2"))
+        affinity_train_df = affinity_train_df.loc[
+            affinity_train_df.allele.isin(alleles),
+            ["peptide", "allele",  "measurement_inequality", "measurement_value"]]
 
-    affinity_train_df["label"] = affinity_train_df["measurement_value"]
-    del affinity_train_df["measurement_value"]
-    affinity_train_df["is_affinity"] = True
+        affinity_train_df["label"] = affinity_train_df["measurement_value"]
+        del affinity_train_df["measurement_value"]
+        affinity_train_df["is_affinity"] = True
+    else:
+        affinity_train_df = None
 
-    predictor = Class1PresentationNeuralNetwork(
-        PAN_ALLELE_PREDICTOR_NO_MASS_SPEC,
+    (affinity_model,) = PAN_ALLELE_PREDICTOR_NO_MASS_SPEC.class1_pan_allele_models
+    presentation_model = Class1PresentationNeuralNetwork(
         auxiliary_input_features=["gene"],
-        max_ensemble_size=1,
         max_epochs=max_epochs,
         learning_rate=0.0001,
         patience=5,
         min_delta=0.0,
-        random_negative_rate=1.0,
-        random_negative_constant=25)
+        random_negative_rate=0.0,
+        random_negative_constant=0)  # WHY DOES THIS BREAK WITH RANDOM NEG?
+    presentation_model.load_from_class1_neural_network(affinity_model)
+
+    presentation_model = pickle.loads(pickle.dumps(presentation_model))
 
     mms_allele_encoding = MultipleAlleleEncoding(
         experiment_names=["experiment1"] * len(mms_train_df),
@@ -488,27 +540,24 @@ def Xtest_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
         allele_to_sequence=PAN_ALLELE_PREDICTOR_NO_MASS_SPEC.allele_to_sequence,
     )
     allele_encoding = copy.deepcopy(mms_allele_encoding)
-    allele_encoding.append_alleles(affinity_train_df.allele.values)
+    if affinity_train_df is not None:
+        allele_encoding.append_alleles(affinity_train_df.allele.values)
+        train_df = pandas.concat(
+            [mms_train_df, affinity_train_df], ignore_index=True, sort=False)
+    else:
+        train_df = mms_train_df
+
     allele_encoding = allele_encoding.compact()
 
-    train_df = pandas.concat(
-        [mms_train_df, affinity_train_df], ignore_index=True, sort=False)
-
-    pre_predictions = from_ic50(
-        predictor.predict(
-            output="affinities_matrix",
+    pre_predictions = presentation_model.predict(
             peptides=mms_train_df.peptide.values,
-            alleles=mms_allele_encoding))
+            allele_encoding=mms_allele_encoding).score
 
-    (model,) = PAN_ALLELE_PREDICTOR_NO_MASS_SPEC.class1_pan_allele_models
     expected_pre_predictions = from_ic50(
-        model.predict(
+        affinity_model.predict(
             peptides=numpy.repeat(mms_train_df.peptide.values, len(alleles)),
             allele_encoding=mms_allele_encoding.allele_encoding,
     )).reshape((-1, len(alleles)))
-
-    #import ipdb ; ipdb.set_trace()
-
     mms_train_df["pre_max_prediction"] = pre_predictions.max(1)
     pre_auc = roc_auc_score(mms_train_df.hit.values, mms_train_df.pre_max_prediction.values)
     print("PRE_AUC", pre_auc)
@@ -526,6 +575,7 @@ def Xtest_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
 
     metric_rows = []
 
+    """
     def progress():
         (_, presentation_prediction, affinities_predictions) = (
             predictor.predict(
@@ -573,24 +623,26 @@ def Xtest_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
             update_motifs()
 
         return (presentation_prediction, auc)
+    
 
     print("Pre fitting:")
     progress()
     update_motifs()
     print("Fitting...")
-
-    predictor.fit(
+    """
+    presentation_model.fit(
         peptides=train_df.peptide.values,
         labels=train_df.label.values,
         inequalities=train_df.measurement_inequality.values,
         affinities_mask=train_df.is_affinity.values,
         allele_encoding=allele_encoding,
-        progress_callback=progress,
+        #progress_callback=progress,
     )
 
-    (predictions, final_auc) = progress()
-    print("Final AUC", final_auc)
+    #(predictions, final_auc) = progress()
+    #print("Final AUC", final_auc)
 
+    """
     update_motifs()
 
     motifs = pandas.DataFrame(
@@ -612,6 +664,7 @@ def Xtest_synthetic_allele_refinement_with_affinity_data(max_epochs=10):
         ])
 
     return (predictor, predictions, metrics, motifs)
+    """
 
 
 

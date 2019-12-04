@@ -80,9 +80,9 @@ class BatchPlan(object):
                 ("Batch %5d: " % i) + ", ".join(
                     "{key}[{value}]".format(key=key, value=value)
                     for (key, value) in label_counts.iteritems()))
-            if i == 5:
+            if i == 5 and len(self.batch_compositions) > i + 3:
                 lines.append("...")
-                i = len(self.batch_compositions) - 4
+                i = len(self.batch_compositions) - i + 1
             i += 1
 
         indent_spaces = "    " * indent

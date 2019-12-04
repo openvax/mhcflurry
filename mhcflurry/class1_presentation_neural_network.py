@@ -129,7 +129,7 @@ class Class1PresentationNeuralNetwork(object):
             output_dim=1029,
             input_length=self.hyperparameters['max_alleles'],
             trainable=False,
-            mask_zero=True)(input_alleles)
+            mask_zero=False)(input_alleles)
 
         allele_flat = allele_representation
 
@@ -427,7 +427,8 @@ class Class1PresentationNeuralNetwork(object):
         allele_representations_hash = self.set_allele_representations(
             allele_representations)
         self.network.compile(
-            loss=[affinities_loss.loss, mms_loss.loss, ZeroLoss.loss],
+            loss=[affinities_loss.keras_wrapped(), mms_loss.keras_wrapped(), ZeroLoss().keras_wrapped()],
+            #loss_weights=[1.0, 1.0, 1.0],
             optimizer=self.hyperparameters['optimizer'])
         if self.hyperparameters['learning_rate'] is not None:
             K.set_value(
@@ -544,6 +545,10 @@ class Class1PresentationNeuralNetwork(object):
 
             for (key, value) in fit_history.history.items():
                 fit_info[key].extend(value)
+
+            if numpy.isnan(fit_info['loss'][-1]):
+                import ipdb ; ipdb.set_trace()
+                raise ValueError("NaN loss")
 
             # Print progress no more often than once every few seconds.
             if progress_print_interval is not None and (

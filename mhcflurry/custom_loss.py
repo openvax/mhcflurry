@@ -57,6 +57,12 @@ class Loss(object):
     def __str__(self):
         return "<Loss: %s>" % self.name
 
+    def keras_wrapped(self, reduction="sum_over_batch_size"):
+        from keras.losses import LossFunctionWrapper
+        return LossFunctionWrapper(
+            self.loss, reduction=reduction, name=self.name)
+
+
 
 class StandardKerasLoss(Loss):
     """
@@ -132,6 +138,7 @@ class MSEWithInequalities(Loss):
         # We always delay import of Keras so that mhcflurry can be imported
         # initially without tensorflow debug output, etc.
         from keras import backend as K
+        import tensorflow as tf
 
         # Handle (=) inequalities
         diff1 = y_pred - y_true
@@ -153,8 +160,7 @@ class MSEWithInequalities(Loss):
             K.sum(K.square(diff1)) +
             K.sum(K.square(diff2)) +
             K.sum(K.square(diff3))) / K.cast(K.shape(y_pred)[0], "float32")
-
-        return result
+        return tf.where(tf.is_nan(result), tf.zeros_like(result), result)
 
 
 class MSEWithInequalitiesAndMultipleOutputs(Loss):
@@ -281,7 +287,8 @@ class ZeroLoss(Loss):
 
     @staticmethod
     def loss(y_true, y_pred):
-        return 0.0
+        import keras.backend as K
+        return K.constant(0.0)
 
 
 def check_shape(name, arr, expected_shape):
