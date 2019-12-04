@@ -26,6 +26,7 @@ from .regression_target import to_ic50
 from .version import __version__
 from .ensemble_centrality import CENTRALITY_MEASURES
 from .allele_encoding import AlleleEncoding
+from .common import save_weights, load_weights
 
 
 # Default function for combining predictions across models in an ensemble.
@@ -370,8 +371,7 @@ class Class1AffinityPredictor(object):
             updated_network_config_jsons.append(
                 json.dumps(row.model.get_config()))
             weights_path = self.weights_path(models_dir, row.model_name)
-            Class1AffinityPredictor.save_weights(
-                row.model.get_weights(), weights_path)
+            save_weights(row.model.get_weights(), weights_path)
             logging.info("Wrote: %s", weights_path)
         sub_manifest_df["config_json"] = updated_network_config_jsons
         self.manifest_df.loc[
@@ -469,9 +469,7 @@ class Class1AffinityPredictor(object):
             # We will lazy-load weights when the network is used.
             model = Class1NeuralNetwork.from_config(
                 config,
-                weights_loader=partial(
-                    Class1AffinityPredictor.load_weights,
-                    abspath(weights_filename)))
+                weights_loader=partial(load_weights, abspath(weights_filename)))
             if row.allele == "pan-class1":
                 class1_pan_allele_models.append(model)
             else:
@@ -1234,46 +1232,6 @@ class Class1AffinityPredictor(object):
         del df["supported_peptide_length"]
         del df["normalized_allele"]
         return df
-
-    @staticmethod
-    def save_weights(weights_list, filename):
-        """
-        Save the model weights to the given filename using numpy's ".npz"
-        format.
-    
-        Parameters
-        ----------
-        weights_list : list of array
-        
-        filename : string
-            Should end in ".npz".
-    
-        """
-        numpy.savez(
-            filename,
-            **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list)))
-
-    @staticmethod
-    def load_weights(filename):
-        """
-        Restore model weights from the given filename, which should have been
-        created with `save_weights`.
-    
-        Parameters
-        ----------
-        filename : string
-            Should end in ".npz".
-
-        Returns
-        ----------
-        list of array
-        """
-        with numpy.load(filename) as loaded:
-            weights = [
-                loaded["array_%d" % i]
-                for i in range(len(loaded.keys()))
-            ]
-        return weights
 
     def calibrate_percentile_ranks(
             self,

@@ -174,3 +174,35 @@ def positional_frequency_matrix(peptides):
     result = (counts / len(peptides)).fillna(0.0).T
     result.index.name = 'position'
     return result
+
+
+def save_weights(weights_list, filename):
+    """
+    Save model weights to the given filename using numpy's ".npz" format.
+
+    Parameters
+    ----------
+    weights_list : list of numpy array
+
+    filename : string
+    """
+    numpy.savez(filename,
+        **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list)))
+
+
+def load_weights(filename):
+    """
+    Restore model weights from the given filename, which should have been
+    created with `save_weights`.
+
+    Parameters
+    ----------
+    filename : string
+
+    Returns
+    ----------
+    list of array
+    """
+    with numpy.load(filename) as loaded:
+        weights = [loaded["array_%d" % i] for i in range(len(loaded.keys()))]
+    return weights

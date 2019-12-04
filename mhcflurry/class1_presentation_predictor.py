@@ -31,16 +31,19 @@ from .custom_loss import (
     MSEWithInequalities,
     MultiallelicMassSpecLoss,
     ZeroLoss)
+from .downloads import get_default_class1_presentation_models_dir
+from .class1_presentation_neural_network import Class1PresentationNeuralNetwork
+from .common import save_weights, load_weights
 
 
 class Class1PresentationPredictor(object):
     def __init__(
             self,
-            class1_presentation_neural_networks,
+            models,
             allele_to_sequence,
             manifest_df=None,
             metadata_dataframes=None):
-        self.networks = class1_presentation_neural_networks
+        self.models = models
         self.allele_to_sequence = allele_to_sequence
         self._manifest_df = manifest_df
         self.metadata_dataframes = (
@@ -57,7 +60,7 @@ class Class1PresentationPredictor(object):
         """
         if self._manifest_df is None:
             rows = []
-            for (i, model) in enumerate(self.networks):
+            for (i, model) in enumerate(self.models):
                 rows.append((
                     self.model_name(i),
                     json.dumps(model.get_config()),
@@ -70,10 +73,10 @@ class Class1PresentationPredictor(object):
 
     @property
     def max_alleles(self):
-        max_alleles = self.networks[0].hyperparameters['max_alleles']
+        max_alleles = self.models[0].hyperparameters['max_alleles']
         assert all(
             n.hyperparameters['max_alleles'] == self.max_alleles
-            for n in self.networks)
+            for n in self.models)
         return max_alleles
 
     @staticmethod
@@ -153,7 +156,7 @@ class Class1PresentationPredictor(object):
         score_array = []
         affinity_array = []
 
-        for (i, network) in enumerate(self.networks):
+        for (i, network) in enumerate(self.models):
             predictions = network.predict(
                 peptides=peptides,
                 allele_encoding=alleles,
@@ -191,24 +194,6 @@ class Class1PresentationPredictor(object):
                     numpy.percentile(affinity_array[:, :, i], 5.0, axis=0))
         return result_df
 
-    @staticmethod
-    def save_weights(weights_list, filename):
-        """
-        Save the model weights to the given filename using numpy's ".npz"
-        format.
-
-        Parameters
-        ----------
-        weights_list : list of array
-
-        filename : string
-            Should end in ".npz".
-
-        """
-        numpy.savez(
-            filename,
-            **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list)))
-
     def check_consistency(self):
         """
         Verify that self.manifest_df is consistent with instance variables.
@@ -217,10 +202,10 @@ class Class1PresentationPredictor(object):
 
         Throws AssertionError if inconsistent.
         """
-        assert len(self.manifest_df) == len(self.networks), (
+        assert len(self.manifest_df) == len(self.models), (
             "Manifest seems out of sync with models: %d vs %d entries: \n%s"% (
                 len(self.manifest_df),
-                len(self.networks),
+                len(self.models),
                 str(self.manifest_df)))
 
     def save(self, models_dir, model_names_to_write=None, write_metadata=True):
@@ -301,8 +286,8 @@ class Class1PresentationPredictor(object):
                 join(models_dir, "allele_sequences.csv"), index=False)
             logging.info("Wrote: %s", join(models_dir, "allele_sequences.csv"))
 
-    @staticmethod
-    def load(models_dir=None, max_models=None):
+    @classmethod
+    def load(cls, models_dir=None, max_models=None):
         """
         Deserialize a predictor from a directory on disk.
 
@@ -317,35 +302,24 @@ class Class1PresentationPredictor(object):
 
         Returns
         -------
-        `Class1AffinityPredictor` instance
+        `Class1PresentationPredictor` instance
         """
         if models_dir is None:
-            models_dir = get_default_class1_models_dir()
+            models_dir = get_default_class1_presentation_models_dir()
 
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
 
-        allele_to_allele_specific_models = collections.defaultdict(list)
-        class1_pan_allele_models = []
-        all_models = []
+        models = []
         for (_, row) in manifest_df.iterrows():
-            weights_filename = Class1AffinityPredictor.weights_path(
-                models_dir, row.model_name)
+            weights_filename = cls.weights_path(models_dir, row.model_name)
             config = json.loads(row.config_json)
-
-            # We will lazy-load weights when the network is used.
-            model = Class1NeuralNetwork.from_config(
+            model = Class1PresentationNeuralNetwork.from_config(
                 config,
-                weights_loader=partial(
-                    Class1AffinityPredictor.load_weights,
-                    abspath(weights_filename)))
-            if row.allele == "pan-class1":
-                class1_pan_allele_models.append(model)
-            else:
-                allele_to_allele_specific_models[row.allele].append(model)
-            all_models.append(model)
+                weights=load_weights(abspath(weights_filename)))
+            models.append(model)
 
-        manifest_df["model"] = all_models
+        manifest_df["model"] = models
 
         # Load allele sequences
         allele_to_sequence = None
@@ -354,40 +328,9 @@ class Class1PresentationPredictor(object):
                 join(models_dir, "allele_sequences.csv"),
                 index_col=0).iloc[:, 0].to_dict()
 
-        allele_to_percent_rank_transform = {}
-        percent_ranks_path = join(models_dir, "percent_ranks.csv")
-        if exists(percent_ranks_path):
-            percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
-            for allele in percent_ranks_df.columns:
-                allele_to_percent_rank_transform[allele] = (
-                    PercentRankTransform.from_series(percent_ranks_df[allele]))
-
-        logging.info(
-            "Loaded %d class1 pan allele predictors, %d allele sequences, "
-            "%d percent rank distributions, and %d allele specific models: %s",
-            len(class1_pan_allele_models),
-            len(allele_to_sequence) if allele_to_sequence else 0,
-            len(allele_to_percent_rank_transform),
-            sum(len(v) for v in allele_to_allele_specific_models.values()),
-            ", ".join(
-                "%s (%d)" % (allele, len(v))
-                for (allele, v)
-                in sorted(allele_to_allele_specific_models.items())))
-
-        result = Class1AffinityPredictor(
-            allele_to_allele_specific_models=allele_to_allele_specific_models,
-            class1_pan_allele_models=class1_pan_allele_models,
+        logging.info("Loaded %d class1 presentation models", len(models))
+        result = cls(
+            models=models,
             allele_to_sequence=allele_to_sequence,
-            manifest_df=manifest_df,
-            allele_to_percent_rank_transform=allele_to_percent_rank_transform,
-        )
-        if optimization_level >= 1:
-            optimized = result.optimize()
-            logging.info(
-                "Model optimization %s",
-                "succeeded" if optimized else "not supported for these models")
+            manifest_df=manifest_df)
         return result
-
-
-
-    # TODO: implement saving and loading

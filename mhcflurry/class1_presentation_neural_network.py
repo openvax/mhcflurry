@@ -699,4 +699,49 @@ class Class1PresentationNeuralNetwork(object):
             if network_weights is not None:
                 self.network.set_weights(network_weights)
 
+    def get_config(self):
+        """
+        serialize to a dict all attributes except model weights
 
+        Returns
+        -------
+        dict
+        """
+        result = dict(self.__dict__)
+        result['network'] = None
+        result['network_weights'] = None
+        result['network_json'] = None
+        if self.network:
+            result['network_weights'] = self.network.get_weights()
+            result['network_json'] = self.network.to_json()
+        return result
+
+    @classmethod
+    def from_config(cls, config, weights=None):
+        """
+        deserialize from a dict returned by get_config().
+
+        Parameters
+        ----------
+        config : dict
+        weights : list of array, optional
+            Network weights to restore
+        weights_loader : callable, optional
+            Function to call (no arguments) to load weights when needed
+
+        Returns
+        -------
+        Class1NeuralNetwork
+        """
+        config = dict(config)
+        instance = cls(**config.pop('hyperparameters'))
+        network_json = config.pop('network_json')
+        network_weights = config.pop('network_weights')
+        instance.__dict__.update(config)
+        assert instance.network is None
+        if network_json is not None:
+            import keras.models
+            instance.network = keras.models.model_from_json(network_json)
+            if network_weights is not None:
+                instance.network.set_weights(network_weights)
+        return instance
