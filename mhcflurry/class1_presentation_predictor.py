@@ -75,7 +75,7 @@ class Class1PresentationPredictor(object):
     def max_alleles(self):
         max_alleles = self.models[0].hyperparameters['max_alleles']
         assert all(
-            n.hyperparameters['max_alleles'] == self.max_alleles
+            n.hyperparameters['max_alleles'] == max_alleles
             for n in self.models)
         return max_alleles
 
@@ -170,11 +170,12 @@ class Class1PresentationPredictor(object):
         ensemble_scores = numpy.mean(score_array, axis=0)
         ensemble_affinity = numpy.mean(affinity_array, axis=0)
         top_allele_index = numpy.argmax(ensemble_scores, axis=-1)
-        top_score = ensemble_scores[top_allele_index]
-        top_affinity = ensemble_affinity[top_allele_index]
-
+        top_allele_flat_indices = (
+            numpy.arange(len(peptides)) * self.max_alleles + top_allele_index)
+        top_score = ensemble_scores.flatten()[top_allele_flat_indices]
+        top_affinity = ensemble_affinity.flatten()[top_allele_flat_indices]
         result_df = pandas.DataFrame({"peptide": peptides.sequences})
-        result_df["allele"] = alleles.alleles[top_allele_index]
+        result_df["allele"] = alleles.alleles.flatten()[top_allele_flat_indices]
         result_df["score"] = top_score
         result_df["affinity"] = to_ic50(top_affinity)
 

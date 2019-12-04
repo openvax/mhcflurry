@@ -89,7 +89,7 @@ class Class1PresentationNeuralNetwork(object):
         self.fit_info = []
         self.allele_representation_hash = None
 
-    def lift_from_class1_neural_network(self, class1_neural_network):
+    def load_from_class1_neural_network(self, class1_neural_network):
         import keras.backend as K
         from keras.layers import (
             Input,
@@ -101,8 +101,13 @@ class Class1PresentationNeuralNetwork(object):
             Activation,
             Lambda,
             Add,
+            Multiply,
             Embedding)
         from keras.models import Model
+        from keras.initializers import Zeros
+
+        if isinstance(class1_neural_network, Class1NeuralNetwork):
+            class1_neural_network = class1_neural_network.network()
 
         peptide_shape = tuple(
             int(x) for x in K.int_shape(class1_neural_network.inputs[0])[1:])
@@ -173,8 +178,21 @@ class Class1PresentationNeuralNetwork(object):
                 node = layer(input_nodes)
             layer_name_to_new_node[layer.name] = node
 
-        affinity_predictor_matrix_output = node
+        pre_mask_affinity_predictor_matrix_output = node
 
+        # Apply allele mask: zero out all outputs corresponding to alleles
+        # with the special index 0.
+        affinity_predictor_matrix_output = Multiply(
+                name="affinity_matrix_output")([
+            Lambda(
+                lambda x: K.cast(
+                    K.expand_dims(K.not_equal(x, 0.0)),
+                    "float32"))(input_alleles),
+            pre_mask_affinity_predictor_matrix_output
+        ])
+
+        # First allele (i.e. the first column of the alleles matrix) is given
+        # its own output. This is used for the affinity prediction loss.
         affinity_predictor_output = Lambda(
             lambda x: x[:, 0], name="affinity_output")(
                 affinity_predictor_matrix_output)
@@ -195,11 +213,17 @@ class Class1PresentationNeuralNetwork(object):
                 [node, auxiliary_input], name="affinities_with_auxiliary")
 
         layer = Dense(8, activation="tanh")
-        lifted = TimeDistributed(layer, name="presentation_hidden1")
+        lifted = TimeDistributed(layer, name="presentation_adjustment_hidden1")
         node = lifted(node)
 
-        layer = Dense(1, activation="tanh")
-        lifted = TimeDistributed(layer, name="presentation_hidden2")
+        # By initializing to zero we ensure that before training the
+        # presentation output is the same as the affinity output.
+        layer = Dense(
+            1,
+            activation="tanh",
+            kernel_initializer=Zeros(),
+            bias_initializer=Zeros())
+        lifted = TimeDistributed(layer, name="presentation_adjustment")
         presentation_adjustment = lifted(node)
 
         def logit(x):
@@ -210,8 +234,19 @@ class Class1PresentationNeuralNetwork(object):
             Lambda(logit)(affinity_predictor_matrix_output),
             presentation_adjustment,
         ])
-        presentation_output = Activation("sigmoid", name="presentation_output")(
-            presentation_output_pre_sigmoid)
+        pre_mask_presentation_output = Activation(
+            "sigmoid", name="unmasked_presentation_output")(
+                presentation_output_pre_sigmoid)
+
+        # Apply allele mask: zero out all outputs corresponding to alleles
+        # with the special index 0.
+        presentation_output = Multiply(name="presentation_output")([
+            Lambda(
+                lambda x: K.cast(
+                    K.expand_dims(K.not_equal(x, 0.0)),
+                    "float32"))(input_alleles),
+            pre_mask_presentation_output
+        ])
 
         self.network = Model(
             inputs=[
@@ -578,7 +613,7 @@ class Class1PresentationNeuralNetwork(object):
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
 
         peptides = EncodableSequences.create(peptides)
-        assert isinstance(AlleleEncoding, MultipleAlleleEncoding)
+        assert isinstance(allele_encoding, MultipleAlleleEncoding)
 
         (allele_encoding_input, allele_representations) = (
                 self.allele_encoding_to_network_input(allele_encoding.compact()))
