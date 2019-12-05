@@ -17,10 +17,7 @@ from .random_negative_peptides import RandomNegativePeptides
 from .allele_encoding import MultipleAlleleEncoding, AlleleEncoding
 from .auxiliary_input import AuxiliaryInputEncoder
 from .batch_generator import MultiallelicMassSpecBatchGenerator
-from .custom_loss import (
-    MSEWithInequalities,
-    MultiallelicMassSpecLoss,
-    ZeroLoss)
+from .custom_loss import MSEWithInequalities, MultiallelicMassSpecLoss
 
 
 class Class1PresentationNeuralNetwork(object):
@@ -97,6 +94,7 @@ class Class1PresentationNeuralNetwork(object):
             Dense,
             Flatten,
             RepeatVector,
+            Reshape,
             concatenate,
             Activation,
             Lambda,
@@ -178,13 +176,18 @@ class Class1PresentationNeuralNetwork(object):
                 node = layer(input_nodes)
             layer_name_to_new_node[layer.name] = node
 
+        node = Reshape(
+            (self.hyperparameters['max_alleles'],),
+            name="unmasked_affinity_matrix_output")(node)
+
         pre_mask_affinity_predictor_matrix_output = node
 
         # Apply allele mask: zero out all outputs corresponding to alleles
         # with the special index 0.
         def alleles_to_mask(x):
             import keras.backend as K
-            return K.cast(K.expand_dims(K.not_equal(x, 0.0)), "float32")
+            result = K.cast(K.not_equal(x, 0), "float32")
+            return result
 
         allele_mask = Lambda(alleles_to_mask, name="allele_mask")(input_alleles)
 
@@ -193,12 +196,10 @@ class Class1PresentationNeuralNetwork(object):
             allele_mask,
             pre_mask_affinity_predictor_matrix_output
         ])
-
-        # First allele (i.e. the first column of the alleles matrix) is given
-        # its own output. This is used for the affinity prediction loss.
-        affinity_predictor_output = Lambda(
-            lambda x: x[:, 0], name="affinity_output")(
-                affinity_predictor_matrix_output)
+        node = Reshape(
+            (self.hyperparameters['max_alleles'], 1),
+            name="expand_dims_affinity_matrix_output")(
+            affinity_predictor_matrix_output)
 
         auxiliary_input = None
         if self.hyperparameters['auxiliary_input_features']:
@@ -228,13 +229,20 @@ class Class1PresentationNeuralNetwork(object):
             bias_initializer=Zeros())
         lifted = TimeDistributed(layer, name="presentation_adjustment")
         presentation_adjustment = lifted(node)
+        presentation_adjustment = Reshape(
+            target_shape=(self.hyperparameters['max_alleles'],),
+            name="reshaped_presentation_adjustment")(presentation_adjustment)
+
 
         def logit(x):
             import tensorflow as tf
-            return - tf.log(1. / x - 1.)
+            return - tf.log(
+                tf.maximum(
+                    tf.math.divide_no_nan(1., x) - 1.,
+                    0.0))
 
         presentation_output_pre_sigmoid = Add()([
-            Lambda(logit)(affinity_predictor_matrix_output),
+            Lambda(logit, name="logit")(affinity_predictor_matrix_output),
             presentation_adjustment,
         ])
         pre_mask_presentation_output = Activation(
@@ -254,9 +262,8 @@ class Class1PresentationNeuralNetwork(object):
                 input_alleles,
             ] + ([] if auxiliary_input is None else [auxiliary_input]),
             outputs=[
-                affinity_predictor_output,
+                affinity_predictor_matrix_output,
                 presentation_output,
-                affinity_predictor_matrix_output
             ],
             name="presentation",
         )
@@ -405,7 +412,12 @@ class Class1PresentationNeuralNetwork(object):
             y1,
         ])
 
-        affinities_loss = MSEWithInequalities()
+        def keras_max(matrix):
+            import keras.backend as K
+            result = K.max(matrix, axis=1)
+            return result
+
+        affinities_loss = MSEWithInequalities(transform_function=keras_max)
         encoded_y1 = affinities_loss.encode_y(
             y1_with_random_negatives,
             inequalities=adjusted_inequalities_with_random_negative)
@@ -426,9 +438,12 @@ class Class1PresentationNeuralNetwork(object):
 
         allele_representations_hash = self.set_allele_representations(
             allele_representations)
+        loss_reduction = "none"
         self.network.compile(
-            loss=[affinities_loss.keras_wrapped(), mms_loss.keras_wrapped(), ZeroLoss().keras_wrapped()],
-            #loss_weights=[1.0, 1.0, 1.0],
+            loss=[
+                affinities_loss.get_keras_loss(reduction=loss_reduction),
+                mms_loss.get_keras_loss(reduction=loss_reduction),
+            ],
             optimizer=self.hyperparameters['optimizer'])
         if self.hyperparameters['learning_rate'] is not None:
             K.set_value(
@@ -527,7 +542,7 @@ class Class1PresentationNeuralNetwork(object):
             (train_generator, test_generator) = (
                 batch_generator.get_train_and_test_generators(
                     x_dict=x_dict_with_random_negatives,
-                    y_list=[encoded_y1, encoded_y2, encoded_y2],
+                    y_list=[encoded_y1, encoded_y2],
                     epochs=1))
             self.assert_allele_representations_hash(allele_representations_hash)
             fit_history = self.network.fit_generator(
@@ -547,7 +562,6 @@ class Class1PresentationNeuralNetwork(object):
                 fit_info[key].extend(value)
 
             if numpy.isnan(fit_info['loss'][-1]):
-                import ipdb ; ipdb.set_trace()
                 raise ValueError("NaN loss")
 
             # Print progress no more often than once every few seconds.
@@ -567,7 +581,6 @@ class Class1PresentationNeuralNetwork(object):
                 last_progress_print = time.time()
 
             if batch_generator.num_test_batches:
-                #import ipdb ; ipdb.set_trace()
                 val_loss = fit_info['val_loss'][-1]
                 if min_val_loss is None or (
                         val_loss < min_val_loss -
@@ -609,7 +622,7 @@ class Class1PresentationNeuralNetwork(object):
 
     Predictions = collections.namedtuple(
         "ligandone_neural_network_predictions",
-        "score affinity")
+        "affinity score")
 
     def predict(
             self,
@@ -638,11 +651,8 @@ class Class1PresentationNeuralNetwork(object):
                 feature_parameters=self.hyperparameters[
                     'auxiliary_input_feature_parameters'])
 
-        predictions = self.Predictions._make([
-            numpy.squeeze(output)
-            for output in self.network.predict(
-                x_dict, batch_size=batch_size)[1:]
-        ])
+        predictions = self.Predictions._make(
+            self.network.predict(x_dict, batch_size=batch_size))
         return predictions
 
     def set_allele_representations(self, allele_representations):

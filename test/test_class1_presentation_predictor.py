@@ -91,13 +91,16 @@ def teardown():
     cleanup()
 
 
-def Xtest_basic():
+def test_basic():
     affinity_predictor = PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
     models = []
     for affinity_network in affinity_predictor.class1_pan_allele_models:
         presentation_network = Class1PresentationNeuralNetwork(
-            max_epochs=1,
-            learning_rate=0.0001,
+            optimizer="adam",
+            random_negative_rate=0.0,
+            random_negative_constant=0,
+            max_epochs=5,
+            learning_rate=0.001,
             batch_generator_batch_size=256)
         presentation_network.load_from_class1_neural_network(affinity_network)
         print(presentation_network.network.get_config())
@@ -123,6 +126,8 @@ def Xtest_basic():
         alleles=alleles)
     merged_df = pandas.merge(
         df, df_predictor.set_index("peptide"), left_index=True, right_index=True)
+
+    print(merged_df)
 
     assert_allclose(
         merged_df["tightest_affinity"], merged_df["affinity"], rtol=1e-5)
@@ -157,7 +162,10 @@ def Xtest_basic():
 
     # Test that fitting a model changes the predictor but not the original model
     train_df = pandas.DataFrame({
-        "peptide": random_peptides(256),
+        "peptide": numpy.concatenate([
+            random_peptides(256, length=length)
+            for length in range(8,16)
+        ]),
     })
     train_df["allele"] = "HLA-A*02:20"
     train_df["experiment"] = "experiment1"
@@ -167,7 +175,7 @@ def Xtest_basic():
         experiment_to_allele_list={
             "experiment1": ["HLA-A*02:20", "HLA-A*02:01"],
         },
-        allele_to_sequence=predictor4.allele_to_sequence)
+        allele_to_sequence=predictor.allele_to_sequence)
     model = predictor4.models[0]
     new_predictor = Class1PresentationPredictor(
         models=[model],
@@ -182,7 +190,7 @@ def Xtest_basic():
         train_df.peptide.values,
         alleles=["HLA-A*02:20"])
     print(train_df)
-    import ipdb ; ipdb.set_trace()
+    #import ipdb ; ipdb.set_trace()
 
 
 def scramble_peptide(peptide):
@@ -447,7 +455,7 @@ def Xtest_real_data_multiallelic_refinement(max_epochs=10):
     import ipdb ; ipdb.set_trace()
 
 
-def test_synthetic_allele_refinement_with_affinity_data(
+def Xtest_synthetic_allele_refinement_with_affinity_data(
         max_epochs=10, include_affinities=False):
     refine_allele = "HLA-C*01:02"
     alleles = [

@@ -58,9 +58,12 @@ class BatchPlan(object):
         for indices in self.batch_indices_generator(epochs=epochs):
             batch_x_dict = {}
             for (item, value) in x_dict.items():
+                assert not numpy.isnan(value[indices]).any(), (item, value)
                 batch_x_dict[item] = value[indices]
             batch_y_list = []
             for value in y_list:
+                assert not numpy.isnan(value[indices]).any(), (
+                    len(batch_y_list), value)
                 batch_y_list.append(value[indices])
             yield (batch_x_dict, batch_y_list)
 

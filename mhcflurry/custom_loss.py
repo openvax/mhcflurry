@@ -57,11 +57,13 @@ class Loss(object):
     def __str__(self):
         return "<Loss: %s>" % self.name
 
-    def keras_wrapped(self, reduction="sum_over_batch_size"):
+    def loss(self, y_true, y_pred):
+        raise NotImplementedError()
+
+    def get_keras_loss(self, reduction="sum_over_batch_size"):
         from keras.losses import LossFunctionWrapper
         return LossFunctionWrapper(
             self.loss, reduction=reduction, name=self.name)
-
 
 
 class StandardKerasLoss(Loss):
@@ -109,6 +111,9 @@ class MSEWithInequalities(Loss):
     supports_inequalities = True
     supports_multiple_outputs = False
 
+    def __init__(self, transform_function=None):
+        self.transform_function = transform_function
+
     @staticmethod
     def encode_y(y, inequalities=None):
         y = array(y, dtype="float32")
@@ -133,12 +138,16 @@ class MSEWithInequalities(Loss):
         assert not isnan(encoded).any()
         return encoded
 
-    @staticmethod
-    def loss(y_true, y_pred):
+    def loss(self, y_true, y_pred):
         # We always delay import of Keras so that mhcflurry can be imported
         # initially without tensorflow debug output, etc.
         from keras import backend as K
         import tensorflow as tf
+
+        if self.transform_function:
+            y_pred = self.transform_function(y_pred)
+
+        y_true = K.squeeze(y_true, axis=-1)
 
         # Handle (=) inequalities
         diff1 = y_pred - y_true
@@ -160,7 +169,10 @@ class MSEWithInequalities(Loss):
             K.sum(K.square(diff1)) +
             K.sum(K.square(diff2)) +
             K.sum(K.square(diff3))) / K.cast(K.shape(y_pred)[0], "float32")
-        return tf.where(tf.is_nan(result), tf.zeros_like(result), result)
+
+        return result
+
+        #return tf.where(tf.is_nan(result), tf.zeros_like(result), result)
 
 
 class MSEWithInequalitiesAndMultipleOutputs(Loss):
@@ -188,6 +200,9 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
     supports_inequalities = True
     supports_multiple_outputs = True
 
+    def __init__(self, transform_function=None):
+        self.transform_function = transform_function
+
     @staticmethod
     def encode_y(y, inequalities=None, output_indices=None):
         y = array(y, dtype="float32")
@@ -211,9 +226,11 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
 
         return encoded
 
-    @staticmethod
-    def loss(y_true, y_pred):
+    def loss(self, y_true, y_pred):
         from keras import backend as K
+
+        if self.transform_function:
+            y_pred = self.transform_function(y_pred)
 
         y_true = K.flatten(y_true)
 
@@ -236,7 +253,7 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
         # ], axis=-1)
         #updated_y_pred = tf.gather_nd(y_pred, indexer)
 
-        return MSEWithInequalities.loss(updated_y_true, updated_y_pred)
+        return MSEWithInequalities().loss(updated_y_true, updated_y_pred)
 
 
 class MultiallelicMassSpecLoss(Loss):
@@ -261,10 +278,7 @@ class MultiallelicMassSpecLoss(Loss):
 
     def loss(self, y_true, y_pred):
         import tensorflow as tf
-
-        y_pred = tf.squeeze(y_pred, axis=-1)
         y_true = tf.reshape(y_true, (-1,))
-
         pos = tf.boolean_mask(y_pred, tf.math.equal(y_true, 1.0))
         pos_max = tf.reduce_max(pos, axis=1)
         neg = tf.boolean_mask(y_pred, tf.math.equal(y_true, 0.0))
@@ -272,23 +286,6 @@ class MultiallelicMassSpecLoss(Loss):
         result = tf.reduce_sum(tf.maximum(0.0, term) ** 2) / tf.cast(
             tf.shape(term)[0], tf.float32) * self.multiplier
         return tf.where(tf.is_nan(result), 0.0, result)
-
-
-class ZeroLoss(Loss):
-    """
-    """
-    name = "zero_loss"
-    supports_inequalities = False
-    supports_multiple_outputs = False
-
-    @staticmethod
-    def encode_y(y):
-        return y
-
-    @staticmethod
-    def loss(y_true, y_pred):
-        import keras.backend as K
-        return K.constant(0.0)
 
 
 def check_shape(name, arr, expected_shape):
@@ -308,7 +305,10 @@ def check_shape(name, arr, expected_shape):
 
 
 # Register custom losses.
-for cls in [MSEWithInequalities, MSEWithInequalitiesAndMultipleOutputs, MultiallelicMassSpecLoss, ZeroLoss]:
+for cls in [
+        MSEWithInequalities,
+        MSEWithInequalitiesAndMultipleOutputs,
+        MultiallelicMassSpecLoss]:
     CUSTOM_LOSSES[cls.name] = cls()
 
 

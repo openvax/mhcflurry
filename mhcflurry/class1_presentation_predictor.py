@@ -18,23 +18,14 @@ import pandas
 
 import mhcnames
 
-from .hyperparameters import HyperparameterDefaults
 from .version import __version__
 from .class1_neural_network import Class1NeuralNetwork, DEFAULT_PREDICT_BATCH_SIZE
 from .encodable_sequences import EncodableSequences
 from .regression_target import from_ic50, to_ic50
-from .random_negative_peptides import RandomNegativePeptides
-from .allele_encoding import MultipleAlleleEncoding, AlleleEncoding
-from .auxiliary_input import AuxiliaryInputEncoder
-from .batch_generator import MultiallelicMassSpecBatchGenerator
-from .custom_loss import (
-    MSEWithInequalities,
-    MultiallelicMassSpecLoss,
-    ZeroLoss)
+from .allele_encoding import MultipleAlleleEncoding
 from .downloads import get_default_class1_presentation_models_dir
 from .class1_presentation_neural_network import Class1PresentationNeuralNetwork
 from .common import save_weights, load_weights
-
 
 class Class1PresentationPredictor(object):
     def __init__(
