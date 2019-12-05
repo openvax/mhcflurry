@@ -91,7 +91,7 @@ def teardown():
     cleanup()
 
 
-def test_basic():
+def Xtest_basic():
     affinity_predictor = PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
     models = []
     for affinity_network in affinity_predictor.class1_pan_allele_models:
@@ -224,7 +224,7 @@ def evaluate_loss(loss, y_true, y_pred):
         raise ValueError("Unsupported backend: %s" % K.backend())
 
 
-def Xtest_loss():
+def test_loss():
     for delta in [0.0, 0.3]:
         print("delta", delta)
         # Hit labels
@@ -234,7 +234,8 @@ def Xtest_loss():
             1.0,
             -1.0,  # ignored
             1.0,
-            0.0
+            0.0,
+            1.0,
         ]
         y_true = numpy.array(y_true)
         y_pred = [
@@ -244,7 +245,7 @@ def Xtest_loss():
             [0.9, 0.1, 0.2],
             [0.1, 0.7, 0.1],
             [0.8, 0.2, 0.4],
-
+            [0.1, 0.2, 0.4],
         ]
         y_pred = numpy.array(y_pred)
 
@@ -262,11 +263,10 @@ def Xtest_loss():
                 for j in range(len(y_true)):
                     if y_true[j] == 0.0:
                         tightest_i = max(y_pred[i])
-                        contribution = sum(
-                            max(0, y_pred[j, k] - tightest_i + delta)**2
-                            for k in range(y_pred.shape[1])
-                        )
-                        contributions.append(contribution)
+                        for k in range(y_pred.shape[1]):
+                            contribution = max(
+                                0, y_pred[j, k] - tightest_i + delta)**2
+                            contributions.append(contribution)
         contributions = numpy.array(contributions)
         expected1 = contributions.sum() / len(contributions)
 
@@ -278,18 +278,21 @@ def Xtest_loss():
         ])
 
         neg = y_pred[(y_true == 0.0).astype(bool)]
+        term = neg.reshape((-1, 1)) - pos + delta
+        print("Term:")
+        print(term)
         expected2 = (
-                numpy.maximum(0, neg.reshape((-1, 1)) - pos + delta)**2).sum() / (
-            len(pos) * len(neg))
+                numpy.maximum(0, term)**2).sum() / (
+            len(pos) * neg.shape[0] * neg.shape[1])
 
-        yield numpy.testing.assert_almost_equal, expected1, expected2, 4
+        numpy.testing.assert_almost_equal(expected1, expected2)
 
         computed = evaluate_loss(
             MultiallelicMassSpecLoss(delta=delta).loss,
             y_true,
-            y_pred.reshape(y_pred.shape + (1,)))
+            y_pred.reshape(y_pred.shape))
 
-        yield numpy.testing.assert_almost_equal, computed, expected1, 4
+        numpy.testing.assert_almost_equal(computed, expected1, 4)
 
 
 AA_DIST = pandas.Series(

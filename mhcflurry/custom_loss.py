@@ -286,14 +286,14 @@ class MultiallelicMassSpecLoss(Loss):
 
     def loss(self, y_true, y_pred):
         import tensorflow as tf
-        y_true = tf.reshape(y_true, (-1,))
+        y_true = tf.squeeze(y_true, axis=-1)
         pos = tf.boolean_mask(y_pred, tf.math.equal(y_true, 1.0))
         pos_max = tf.reduce_max(pos, axis=1)
         neg = tf.boolean_mask(y_pred, tf.math.equal(y_true, 0.0))
         term = tf.reshape(neg, (-1, 1)) - pos_max + self.delta
         result = tf.reduce_sum(tf.maximum(0.0, term) ** 2) / tf.cast(
-            tf.shape(term)[0], tf.float32) * self.multiplier
-        return tf.where(tf.is_nan(result), 0.0, result)
+            tf.size(term), tf.float32) * self.multiplier
+        return result
 
 
 def check_shape(name, arr, expected_shape):
