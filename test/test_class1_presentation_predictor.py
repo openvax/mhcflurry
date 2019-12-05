@@ -91,7 +91,7 @@ def teardown():
     cleanup()
 
 
-def Xtest_basic():
+def test_basic():
     affinity_predictor = PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
     models = []
     for affinity_network in affinity_predictor.class1_pan_allele_models:
@@ -99,11 +99,10 @@ def Xtest_basic():
             optimizer="adam",
             random_negative_rate=0.0,
             random_negative_constant=0,
-            max_epochs=5,
+            max_epochs=100,
             learning_rate=0.001,
             batch_generator_batch_size=256)
         presentation_network.load_from_class1_neural_network(affinity_network)
-        print(presentation_network.network.get_config())
         models.append(presentation_network)
 
     predictor = Class1PresentationPredictor(
@@ -164,12 +163,14 @@ def Xtest_basic():
     train_df = pandas.DataFrame({
         "peptide": numpy.concatenate([
             random_peptides(256, length=length)
-            for length in range(8,16)
+            for length in [9]
         ]),
     })
     train_df["allele"] = "HLA-A*02:20"
     train_df["experiment"] = "experiment1"
     train_df["label"] = train_df.peptide.str.match("^[KSEQ]").astype("float32")
+    train_df["pre_train_affinity_prediction"] = affinity_predictor.predict(
+        train_df.peptide.values, alleles=train_df.allele.values)
     allele_encoding = MultipleAlleleEncoding(
         experiment_names=train_df.experiment.values,
         experiment_to_allele_list={
@@ -189,8 +190,18 @@ def Xtest_basic():
     train_df["updated_score"] = new_predictor.predict(
         train_df.peptide.values,
         alleles=["HLA-A*02:20"])
+    train_df["score_diff"] = train_df.updated_score - train_df.original_score
+    mean_change = train_df.groupby("label").score_diff.mean()
+    print("Mean change:")
+    print(mean_change)
+    assert_greater(mean_change[1.0], mean_change[0.0])
     print(train_df)
-    #import ipdb ; ipdb.set_trace()
+    train_df["post_train_affinity_prediction"] = affinity_predictor.predict(
+        train_df.peptide.values,
+        alleles=train_df.allele.values)
+    assert_array_equal(
+        train_df.pre_train_affinity_prediction.values,
+        train_df.post_train_affinity_prediction.values)
 
 
 def scramble_peptide(peptide):
@@ -279,8 +290,6 @@ def test_loss():
 
         neg = y_pred[(y_true == 0.0).astype(bool)]
         term = neg.reshape((-1, 1)) - pos + delta
-        print("Term:")
-        print(term)
         expected2 = (
                 numpy.maximum(0, term)**2).sum() / (
             len(pos) * neg.shape[0] * neg.shape[1])
