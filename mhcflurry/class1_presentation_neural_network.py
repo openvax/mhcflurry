@@ -17,7 +17,10 @@ from .random_negative_peptides import RandomNegativePeptides
 from .allele_encoding import MultipleAlleleEncoding, AlleleEncoding
 from .auxiliary_input import AuxiliaryInputEncoder
 from .batch_generator import MultiallelicMassSpecBatchGenerator
-from .custom_loss import MSEWithInequalities, MultiallelicMassSpecLoss
+from .custom_loss import (
+    MSEWithInequalities,
+    TransformPredictionsLossWrapper,
+    MultiallelicMassSpecLoss)
 
 
 class Class1PresentationNeuralNetwork(object):
@@ -412,12 +415,13 @@ class Class1PresentationNeuralNetwork(object):
             y1,
         ])
 
-        def keras_max(matrix):
+        def tensor_max(matrix):
             import keras.backend as K
-            result = K.max(matrix, axis=1)
-            return result
+            return K.max(matrix, axis=1)
 
-        affinities_loss = MSEWithInequalities(transform_function=keras_max)
+        affinities_loss = TransformPredictionsLossWrapper(
+            loss=MSEWithInequalities(),
+            y_pred_transform=tensor_max)
         encoded_y1 = affinities_loss.encode_y(
             y1_with_random_negatives,
             inequalities=adjusted_inequalities_with_random_negative)

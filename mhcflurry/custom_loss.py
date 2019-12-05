@@ -82,6 +82,31 @@ class StandardKerasLoss(Loss):
         return y
 
 
+class TransformPredictionsLossWrapper(Loss):
+    """
+    Wrapper that applies an arbitrary transform to y_pred before calling an
+    underlying loss function.
+
+    The y_pred_transform function should be a tensor -> tensor function.
+    """
+    def __init__(
+            self,
+            loss,
+            y_pred_transform=None):
+        self.wrapped_loss = loss
+        self.name = "transformed_%s" % loss.name
+        self.y_pred_transform = y_pred_transform
+        self.supports_inequalities = loss.supports_inequalities
+        self.supports_multiple_outputs = loss.supports_multiple_outputs
+
+    def encode_y(self, *args, **kwargs):
+        return self.wrapped_loss.encode_y(*args, **kwargs)
+
+    def loss(self, y_true, y_pred):
+        y_pred_transformed = self.y_pred_transform(y_pred)
+        return self.wrapped_loss.loss(y_true, y_pred_transformed)
+
+
 class MSEWithInequalities(Loss):
     """
     Supports training a regression model on data that includes inequalities
@@ -111,9 +136,6 @@ class MSEWithInequalities(Loss):
     supports_inequalities = True
     supports_multiple_outputs = False
 
-    def __init__(self, transform_function=None):
-        self.transform_function = transform_function
-
     @staticmethod
     def encode_y(y, inequalities=None):
         y = array(y, dtype="float32")
@@ -142,11 +164,6 @@ class MSEWithInequalities(Loss):
         # We always delay import of Keras so that mhcflurry can be imported
         # initially without tensorflow debug output, etc.
         from keras import backend as K
-        import tensorflow as tf
-
-        if self.transform_function:
-            y_pred = self.transform_function(y_pred)
-
         y_true = K.squeeze(y_true, axis=-1)
 
         # Handle (=) inequalities
@@ -171,8 +188,6 @@ class MSEWithInequalities(Loss):
             K.sum(K.square(diff3))) / K.cast(K.shape(y_pred)[0], "float32")
 
         return result
-
-        #return tf.where(tf.is_nan(result), tf.zeros_like(result), result)
 
 
 class MSEWithInequalitiesAndMultipleOutputs(Loss):
@@ -200,9 +215,6 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
     supports_inequalities = True
     supports_multiple_outputs = True
 
-    def __init__(self, transform_function=None):
-        self.transform_function = transform_function
-
     @staticmethod
     def encode_y(y, inequalities=None, output_indices=None):
         y = array(y, dtype="float32")
@@ -228,10 +240,6 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
 
     def loss(self, y_true, y_pred):
         from keras import backend as K
-
-        if self.transform_function:
-            y_pred = self.transform_function(y_pred)
-
         y_true = K.flatten(y_true)
 
         output_indices = y_true // 10
