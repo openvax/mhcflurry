@@ -89,7 +89,7 @@ class Class1PresentationNeuralNetwork(object):
         self.fit_info = []
         self.allele_representation_hash = None
 
-    def load_from_class1_neural_network(self, class1_neural_network):
+    def load_from_class1_neural_network(self, model):
         import keras.backend as K
         from keras.layers import (
             Input,
@@ -107,11 +107,11 @@ class Class1PresentationNeuralNetwork(object):
         from keras.models import Model
         from keras.initializers import Zeros
 
-        if isinstance(class1_neural_network, Class1NeuralNetwork):
-            class1_neural_network = class1_neural_network.network()
+        assert isinstance(model, Class1NeuralNetwork), model
+        affinity_network = model.network()
 
         peptide_shape = tuple(
-            int(x) for x in K.int_shape(class1_neural_network.inputs[0])[1:])
+            int(x) for x in K.int_shape(affinity_network.inputs[0])[1:])
 
         input_alleles = Input(
             shape=(self.hyperparameters['max_alleles'],), name="allele")
@@ -138,7 +138,7 @@ class Class1PresentationNeuralNetwork(object):
             [peptides_repeated, allele_flat], name="allele_peptide_merged")
 
         layer_names = [
-            layer.name for layer in class1_neural_network.layers
+            layer.name for layer in affinity_network.layers
         ]
 
         pan_allele_layer_initial_names = [
@@ -153,7 +153,7 @@ class Class1PresentationNeuralNetwork(object):
         assert startswith(
             layer_names, pan_allele_layer_initial_names), layer_names
 
-        layers = class1_neural_network.layers[
+        layers = affinity_network.layers[
             pan_allele_layer_initial_names.index(
                 "allele_peptide_merged") + 1:
         ]
@@ -270,7 +270,13 @@ class Class1PresentationNeuralNetwork(object):
             ],
             name="presentation",
         )
-        self.network.summary()
+
+    def copy_weights_to_affinity_model(self, model):
+        # We assume that the other model's layers are a prefix of ours.
+        self.clear_allele_representations()
+        model.clear_allele_representations()
+        model.network().set_weights(
+            self.get_weights()[:len(model.get_weights())])
 
     def peptides_to_network_input(self, peptides):
         """
@@ -659,15 +665,27 @@ class Class1PresentationNeuralNetwork(object):
             self.network.predict(x_dict, batch_size=batch_size))
         return predictions
 
-    def set_allele_representations(self, allele_representations):
+    def clear_allele_representations(self):
+        """
+        Set allele representations to an empty array. Useful before saving to
+        save a smaller version of the model.
+        """
+        layer = self.network.get_layer("allele_representation")
+        existing_weights_shape = (layer.input_dim, layer.output_dim)
+        self.set_allele_representations(
+            numpy.zeros(shape=(0,) + existing_weights_shape[1:]),
+            force_surgery=True)
+
+    def set_allele_representations(self, allele_representations, force_surgery=False):
         """
         """
         from keras.models import clone_model
         import keras.backend as K
         import tensorflow as tf
 
-        reshaped = allele_representations.reshape(
-            (allele_representations.shape[0], -1))
+        reshaped = allele_representations.reshape((
+            allele_representations.shape[0],
+            numpy.product(allele_representations.shape[1:])))
         original_model = self.network
 
         layer = original_model.get_layer("allele_representation")
@@ -677,7 +695,7 @@ class Class1PresentationNeuralNetwork(object):
         # the allele sequences) are allowed.
         assert existing_weights_shape[1:] == reshaped.shape[1:]
 
-        if existing_weights_shape[0] > reshaped.shape[0]:
+        if existing_weights_shape[0] > reshaped.shape[0] and not force_surgery:
             # Extend with NaNs so we can avoid having to reshape the weights
             # matrix, which is expensive.
             reshaped = numpy.append(

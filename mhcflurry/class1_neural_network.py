@@ -1384,7 +1384,6 @@ class Class1NeuralNetwork(object):
             numpy.zeros(shape=(0,) + existing_weights_shape[1:]),
             force_surgery=True)
 
-
     def set_allele_representations(self, allele_representations, force_surgery=False):
         """
         Set the allele representations in use by this model. This means mutating
