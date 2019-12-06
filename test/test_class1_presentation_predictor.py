@@ -19,10 +19,10 @@ from mhcflurry.common import random_peptides
 from mhcflurry.testing_utils import cleanup, startup
 from mhcflurry.regression_target import to_ic50
 
-PAN_ALLELE_PREDICTOR_NO_MASS_SPEC = None
+AFFINITY_PREDICTOR = None
 
 def setup():
-    global PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
+    global AFFINITY_PREDICTOR
     startup()
     PAN_ALLELE_PREDICTOR_NO_MASS_SPEC = Class1AffinityPredictor.load(
         get_path("models_class1_pan", "models.no_mass_spec"),
@@ -31,13 +31,13 @@ def setup():
 
 
 def teardown():
-    global PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
+    global AFFINITY_PREDICTOR
     PAN_ALLELE_PREDICTOR_NO_MASS_SPEC = None
     cleanup()
 
 
 def test_basic():
-    affinity_predictor = PAN_ALLELE_PREDICTOR_NO_MASS_SPEC
+    affinity_predictor = AFFINITY_PREDICTOR
     models = []
     for affinity_network in affinity_predictor.class1_pan_allele_models:
         presentation_network = Class1PresentationNeuralNetwork(
