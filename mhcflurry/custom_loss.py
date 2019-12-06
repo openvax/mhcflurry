@@ -164,7 +164,8 @@ class MSEWithInequalities(Loss):
         # We always delay import of Keras so that mhcflurry can be imported
         # initially without tensorflow debug output, etc.
         from keras import backend as K
-        y_true = K.squeeze(y_true, axis=-1)
+        y_true = K.flatten(y_true)
+        y_pred = K.flatten(y_pred)
 
         # Handle (=) inequalities
         diff1 = y_pred - y_true
@@ -286,7 +287,7 @@ class MultiallelicMassSpecLoss(Loss):
 
     def loss(self, y_true, y_pred):
         import tensorflow as tf
-        y_true = tf.squeeze(y_true, axis=-1)
+        y_true = tf.reshape(y_true, (-1,))
         pos = tf.boolean_mask(y_pred, tf.math.equal(y_true, 1.0))
         pos_max = tf.reduce_max(pos, axis=1)
         neg = tf.boolean_mask(y_pred, tf.math.equal(y_true, 0.0))
