@@ -24,7 +24,7 @@ AFFINITY_PREDICTOR = None
 def setup():
     global AFFINITY_PREDICTOR
     startup()
-    PAN_ALLELE_PREDICTOR_NO_MASS_SPEC = Class1AffinityPredictor.load(
+    AFFINITY_PREDICTOR = Class1AffinityPredictor.load(
         get_path("models_class1_pan", "models.no_mass_spec"),
         optimization_level=0,
         max_models=1)
@@ -32,7 +32,7 @@ def setup():
 
 def teardown():
     global AFFINITY_PREDICTOR
-    PAN_ALLELE_PREDICTOR_NO_MASS_SPEC = None
+    AFFINITY_PREDICTOR = None
     cleanup()
 
 

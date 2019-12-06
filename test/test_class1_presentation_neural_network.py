@@ -360,4 +360,3 @@ def test_real_data_multiallelic_refinement(max_epochs=10):
     print(refine_allele, "final motif lysine-1 rate: ", final_motif.loc[1, "K"])
 
     assert_greater(final_motif.loc[1, "K"], original_motif.loc[1, "K"])
-    
