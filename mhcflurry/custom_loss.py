@@ -291,8 +291,9 @@ class MultiallelicMassSpecLoss(Loss):
         pos_max = tf.reduce_max(pos, axis=1)
         neg = tf.boolean_mask(y_pred, tf.math.equal(y_true, 0.0))
         term = tf.reshape(neg, (-1, 1)) - pos_max + self.delta
-        result = tf.reduce_sum(tf.maximum(0.0, term) ** 2) / tf.cast(
-            tf.size(term), tf.float32) * self.multiplier
+        result = tf.math.divide_no_nan(
+            tf.reduce_sum(tf.maximum(0.0, term) ** 2),
+            tf.cast(tf.size(term), tf.float32)) * self.multiplier
         return result
 
 
