@@ -44,6 +44,7 @@ script:
   -
     wget
       $(mhcflurry-downloads url data_curated)
+      $(mhcflurry-downloads url data_mass_spec_annotated)
       $(mhcflurry-downloads url models_class1)
       $(mhcflurry-downloads url models_class1_pan)
       $(mhcflurry-downloads url allele_sequences)
@@ -52,6 +53,7 @@ script:
   -
     mhcflurry-downloads fetch
     data_curated
+    data_mass_spec_annotated
     models_class1
     models_class1_pan
     allele_sequences
