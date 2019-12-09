@@ -47,7 +47,6 @@ pip freeze
 git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
-cd /var/folders/jc/fyrvcrcs3sb8g4mkdg6nl_t80000gq/T/mhcflurry-downloads-generation/models_class1_pan_refined
 
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
