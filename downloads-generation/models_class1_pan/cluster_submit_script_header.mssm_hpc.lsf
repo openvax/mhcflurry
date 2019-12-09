@@ -28,7 +28,7 @@ free -m
 module add cuda/10.0.130 cudnn/7.1.1
 module list
 
-# python -c 'import tensorflow as tf ; print("GPU AVAILABLE" if tf.test.is_gpu_available() else "GPU NOT AVAILABLE")'
+python -c 'import tensorflow as tf ; print("GPU AVAILABLE" if tf.test.is_gpu_available() else "GPU NOT AVAILABLE")'
 
 env
 
