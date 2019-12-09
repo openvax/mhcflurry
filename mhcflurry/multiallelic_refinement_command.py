@@ -8,7 +8,8 @@ import sys
 import time
 import traceback
 import hashlib
-from pprint import pprint
+import yaml
+import pickle
 
 import numpy
 import pandas
@@ -17,8 +18,9 @@ import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .encodable_sequences import EncodableSequences
-from .allele_encoding import AlleleEncoding
+from .class1_presentation_neural_network import Class1PresentationNeuralNetwork
+from .class1_presentation_predictor import Class1PresentationPredictor
+from .allele_encoding import MultipleAlleleEncoding
 from .common import configure_logging
 from .local_parallelism import (
     worker_pool_with_gpu_assignments_from_args,
@@ -26,7 +28,6 @@ from .local_parallelism import (
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
-from .regression_target import from_ic50
 
 
 # To avoid pickling large matrices to send to child processes when running in
@@ -47,8 +48,7 @@ parser.add_argument(
     "--monoallelic-data",
     metavar="FILE.csv",
     required=False,
-    help=(
-        "Affinity meaurements and monoallelic mass spec data."))
+    help="Affinity meaurements and monoallelic mass spec data.")
 parser.add_argument(
     "--models-dir",
     metavar="DIR",
@@ -87,6 +87,8 @@ def run(argv=sys.argv[1:]):
 
     args = parser.parse_args(argv)
 
+    hyperparameters = yaml.load(open(args.hyperparameters))
+
     args.out_affinity_predictor_dir = os.path.abspath(
         args.out_affinity_predictor_dir)
     args.out_presentation_predictor_dir = os.path.abspath(
@@ -94,7 +96,7 @@ def run(argv=sys.argv[1:]):
 
     configure_logging(verbose=args.verbosity > 1)
 
-    multiallelic_df = pandas.read_csv(args.multiallelic_df)
+    multiallelic_df = pandas.read_csv(args.multiallelic_data)
     print("Loaded multiallelic data: %s" % (str(multiallelic_df.shape)))
 
     monoallelic_df = pandas.read_csv(args.monoallelic_data)
@@ -104,49 +106,20 @@ def run(argv=sys.argv[1:]):
         args.models_dir, optimization_level=0)
     print("Loaded: %s" % input_predictor)
 
-    import ipdb ; ipdb.set_trace()
+    sample_table = multiallelic_df.drop_duplicates(
+        "sample_id").set_index("sample_id").loc[
+        multiallelic_df.sample_id.unique()
+    ]
+    grouped = multiallelic_df.groupby("sample_id").nunique()
+    for col in sample_table.columns:
+        if (grouped[col] > 1).any():
+            del sample_table[col]
+    sample_table["alleles"] = sample_table.hla.str.split()
 
-
-
-
-
-
-    alleles = input_predictor.supported_alleles
-    (min_peptide_length, max_peptide_length) = (
-        input_predictor.supported_peptide_lengths)
-
-
-
-
-
-
-
-
-    metadata_dfs = {}
-
-    fold_cols = [c for c in df if c.startswith("fold_")]
+    fold_cols = [c for c in monoallelic_df if c.startswith("fold_")]
     num_folds = len(fold_cols)
     if num_folds <= 1:
         raise ValueError("Too few folds: ", num_folds)
-
-    df = df.loc[
-        (df.peptide.str.len() >= min_peptide_length) &
-        (df.peptide.str.len() <= max_peptide_length)
-    ]
-    print("Subselected to %d-%dmers: %s" % (
-        min_peptide_length, max_peptide_length, str(df.shape)))
-
-    print("Num folds: ", num_folds, "fraction included:")
-    print(df[fold_cols].mean())
-
-    # Allele names in data are assumed to be already normalized.
-    df = df.loc[df.allele.isin(alleles)].dropna()
-    print("Subselected to supported alleles: %s" % str(df.shape))
-
-    metadata_dfs["model_selection_data"] = df
-
-    df["mass_spec"] = df.measurement_source.str.contains(
-        args.mass_spec_regex)
 
     def make_train_peptide_hash(sub_df):
         train_peptide_hash = hashlib.sha1()
@@ -154,41 +127,48 @@ def run(argv=sys.argv[1:]):
             train_peptide_hash.update(peptide.encode())
         return train_peptide_hash.hexdigest()
 
-    folds_to_predictors = dict(
-        (int(col.split("_")[-1]), (
-            [],
-            make_train_peptide_hash(df.loc[df[col] == 1])))
-        for col in fold_cols)
-    print(folds_to_predictors)
+    work_items = []
     for model in input_predictor.class1_pan_allele_models:
         training_info = model.fit_info[-1]['training_info']
         fold_num = training_info['fold_num']
         assert num_folds == training_info['num_folds']
-        (lst, hash) = folds_to_predictors[fold_num]
-        train_peptide_hash = training_info['train_peptide_hash']
-        numpy.testing.assert_equal(hash, train_peptide_hash)
-        lst.append(model)
-
-    work_items = []
-    for (fold_num, (models, _)) in folds_to_predictors.items():
+        fold_col = "fold_%d" % fold_num
+        observed_hash = make_train_peptide_hash(
+            monoallelic_df.loc[monoallelic_df[fold_col] == 1])
+        saved_hash = training_info['train_peptide_hash']
+        #numpy.testing.assert_equal(observed_hash, saved_hash)
         work_items.append({
-            'fold_num': fold_num,
-            'models': models,
-            'min_models': args.min_models_per_fold,
-            'max_models': args.max_models_per_fold,
+            "work_item_num": len(work_items),
+            "affinity_model": model,
+            "fold_num": fold_num,
         })
 
-    GLOBAL_DATA["data"] = df
-    GLOBAL_DATA["input_predictor"] = input_predictor
+    work_items_dict = dict((item['work_item_num'], item) for item in work_items)
 
-    if not os.path.exists(args.out_models_dir):
-        print("Attempting to create directory: %s" % args.out_models_dir)
-        os.mkdir(args.out_models_dir)
-        print("Done.")
+    GLOBAL_DATA["monoallelic_data"] = monoallelic_df
+    GLOBAL_DATA["multiallelic_data"] = multiallelic_df
+    GLOBAL_DATA["multiallelic_sample_table"] = sample_table
+    GLOBAL_DATA["hyperparameters"] = hyperparameters
+    GLOBAL_DATA["allele_to_sequence"] = input_predictor.allele_to_sequence
 
-    result_predictor = Class1AffinityPredictor(
-        allele_to_sequence=input_predictor.allele_to_sequence,
-        metadata_dataframes=metadata_dfs)
+    out_dirs = [
+        args.out_affinity_predictor_dir,
+        args.out_presentation_predictor_dir
+    ]
+
+    for out in out_dirs:
+        if not os.path.exists(out):
+            print("Attempting to create directory:", out)
+            os.mkdir(out)
+            print("Done.")
+
+    metadata_dfs = {
+        "monoallelic_train_data": monoallelic_df,
+        "multiallelic_train_data": multiallelic_df,
+    }
+
+    affinity_models = []
+    presentation_models = []
 
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
     worker_pool = None
@@ -196,13 +176,13 @@ def run(argv=sys.argv[1:]):
     if serial_run:
         # Serial run
         print("Running in serial.")
-        results = (model_select(**item) for item in work_items)
+        results = (refine_model(**item) for item in work_items)
     elif args.cluster_parallelism:
         # Run using separate processes HPC cluster.
         print("Running on cluster.")
         results = cluster_results_from_args(
             args,
-            work_function=model_select,
+            work_function=refine_model,
             work_items=work_items,
             constant_data=GLOBAL_DATA,
             result_serialization_method="pickle")
@@ -216,131 +196,109 @@ def run(argv=sys.argv[1:]):
 
         # Parallel run
         results = worker_pool.imap_unordered(
-            do_model_select_task,
+            do_refine_model_task,
             work_items,
             chunksize=1)
 
-    models_by_fold = {}
-    summary_dfs = []
     for result in tqdm.tqdm(results, total=len(work_items)):
-        pprint(result)
-        fold_num = result['fold_num']
-        (all_models_for_fold, _) = folds_to_predictors[fold_num]
-        models = [
-            all_models_for_fold[i]
-            for i in result['selected_indices']
-        ]
-        summary_df = result['summary'].copy()
-        summary_df.index = summary_df.index.map(
-            lambda idx: all_models_for_fold[idx])
-        summary_dfs.append(summary_df)
-
-        print("Selected %d models for fold %d: %s" % (
-            len(models), fold_num, result['selected_indices']))
-        models_by_fold[fold_num] = models
-        for model in models:
-            model.clear_allele_representations()
-            result_predictor.add_pan_allele_model(model)
-
-    summary_df = pandas.concat(summary_dfs, ignore_index=False)
-    summary_df["model_config"] = summary_df.index.map(lambda m: m.get_config())
-    result_predictor.metadata_dataframes["model_selection_summary"] = (
-        summary_df.reset_index(drop=True))
-
-    result_predictor.save(args.out_models_dir)
-
-    model_selection_time = time.time() - start
+        work_item_num = result['work_item_num']
+        work_item = work_items_dict[work_item_num]
+        affinity_model = work_item['affinity_model']
+        presentation_model = pickle.loads(result['presentation_model'])
+        presentation_model.copy_weights_to_affinity_model(affinity_model)
+        affinity_models.append(affinity_model)
+        presentation_models.append(presentation_model)
 
     if worker_pool:
         worker_pool.close()
         worker_pool.join()
 
-    print("Model selection time %0.2f min." % (model_selection_time / 60.0))
-    print("Predictor [%d models] written to: %s" % (
-        len(result_predictor.neural_networks),
-        args.out_models_dir))
+    print("Done model fitting. Writing predictors.")
+
+    result_affinity_predictor = Class1AffinityPredictor(
+        class1_pan_allele_models=affinity_models,
+        allele_to_sequence=input_predictor.allele_to_sequence)
+    result_affinity_predictor.save(args.out_affinity_predictor_dir)
+    print("Wrote", args.out_affinity_predictor_dir)
+
+    result_presentation_predictor = Class1PresentationPredictor(
+        models=presentation_models,
+        allele_to_sequence=input_predictor.allele_to_sequence,
+        metadata_dataframes=metadata_dfs)
+    result_presentation_predictor.save(args.out_presentation_predictor_dir)
+    print("Wrote", args.out_presentation_predictor_dir)
 
 
-def do_model_select_task(item, constant_data=GLOBAL_DATA):
-    return model_select(constant_data=constant_data, **item)
+def do_refine_model_task(item, constant_data=GLOBAL_DATA):
+    return refine_model(constant_data=constant_data, **item)
 
 
-def model_select(
-        fold_num, models, min_models, max_models, constant_data=GLOBAL_DATA):
+def refine_model(
+        work_item_num, affinity_model, fold_num, constant_data=GLOBAL_DATA):
     """
-    Model select for a fold.
-
-    Parameters
-    ----------
-    fold_num : int
-    models : list of Class1NeuralNetwork
-    min_models : int
-    max_models : int
-    constant_data : dict
-
-    Returns
-    -------
-    dict with keys 'fold_num', 'selected_indices', 'summary'
+    Refine a model.
     """
-    full_data = constant_data["data"]
-    input_predictor = constant_data["input_predictor"]
-    df = full_data.loc[
-        full_data["fold_%d" % fold_num] == 0
-    ]
+    monoallelic_df = constant_data["monoallelic_data"]
+    multiallelic_df = constant_data["multiallelic_data"]
+    sample_table = constant_data["multiallelic_sample_table"]
+    hyperparameters = constant_data["hyperparameters"]
+    allele_to_sequence = constant_data["allele_to_sequence"]
 
-    peptides = EncodableSequences.create(df.peptide.values)
-    alleles = AlleleEncoding(
-        df.allele.values,
-        borrow_from=input_predictor.master_allele_encoding)
+    fold_col = "fold_%d" % fold_num
 
-    predictions_df = df.copy()
-    for (i, model) in enumerate(models):
-        predictions_df[i] = from_ic50(model.predict(peptides, alleles))
+    multiallelic_train_df = multiallelic_df[
+        ["sample_id", "peptide", "hit"]
+    ].rename(columns={"hit": "label"}).copy()
+    multiallelic_train_df["is_affinity"] = False
+    multiallelic_train_df["validation_weight"] = 1.0
 
-    actual = from_ic50(predictions_df.measurement_value)
+    monoallelic_train_df = monoallelic_df[
+        ["peptide", "allele", "measurement_inequality", "measurement_value"]
+    ].copy()
+    monoallelic_train_df["label"] = monoallelic_train_df["measurement_value"]
+    del monoallelic_train_df["measurement_value"]
+    monoallelic_train_df["is_affinity"] = True
 
-    selected = []
-    selected_score = 0
-    remaining_models = set(numpy.arange(len(models)))
-    individual_model_scores = {}
-    while remaining_models and len(selected) < max_models:
-        best_model = None
-        best_model_score = 0
-        for i in remaining_models:
-            possible_ensemble = list(selected) + [i]
-            predictions = predictions_df[possible_ensemble].mean(1)
-            mse_score = 1 - mse(
-                predictions,
-                actual,
-                inequalities=(
-                    predictions_df.measurement_inequality
-                    if 'measurement_inequality' in predictions_df.columns
-                    else None),
-                affinities_are_already_01_transformed=True)
-            if mse_score >= best_model_score:
-                best_model = i
-                best_model_score = mse_score
-            if not selected:
-                # First iteration. Store individual model scores.
-                individual_model_scores[i] = mse_score
-        if len(selected) < min_models or best_model_score > selected_score:
-            selected_score = best_model_score
-            remaining_models.remove(best_model)
-            selected.append(best_model)
-        else:
-            break
+    # We force all validation affinities to be from the validation set used
+    # originally to train the predictor. To ensure proportional sampling between
+    # the affinity and multiallelic mass spec data, we set their weight to
+    # as follows.
+    monoallelic_train_df["validation_weight"] = (
+        (monoallelic_df[fold_col] == 0).astype(float) * (
+            (monoallelic_df[fold_col] == 1).sum() /
+            (monoallelic_df[fold_col] == 0).sum()))
 
-    assert selected
+    combined_train_df = pandas.concat(
+        [multiallelic_train_df, monoallelic_train_df],
+        ignore_index=True,
+        sort=False)
 
-    summary_df = pandas.Series(individual_model_scores)[
-        numpy.arange(len(models))
-    ].to_frame()
-    summary_df.columns = ['mse_score']
+    allele_encoding = MultipleAlleleEncoding(
+        experiment_names=multiallelic_train_df.sample_id.values,
+        experiment_to_allele_list=sample_table.alleles.to_dict(),
+        allele_to_sequence=allele_to_sequence,
+    )
+    allele_encoding.append_alleles(monoallelic_train_df.allele.values)
+    allele_encoding = allele_encoding.compact()
+
+    presentation_model = Class1PresentationNeuralNetwork(**hyperparameters)
+    presentation_model.load_from_class1_neural_network(affinity_model)
+    presentation_model.fit(
+        peptides=combined_train_df.peptide.values,
+        labels=combined_train_df.label.values,
+        allele_encoding=allele_encoding,
+        affinities_mask=combined_train_df.is_affinity.values,
+        inequalities=combined_train_df.measurement_inequality.values,
+        validation_weights=combined_train_df.validation_weight.values)
 
     return {
-        'fold_num': fold_num,
-        'selected_indices': selected,
-        'summary': summary_df,  # indexed by model index
+        'work_item_num': work_item_num,
+
+        # We pickle it here so it always gets pickled, even when running in one
+        # process. This prevents tensorflow errors when using thread-level
+        # parallelism.
+        'presentation_model': pickle.dumps(
+            presentation_model, pickle.HIGHEST_PROTOCOL),
     }
 
 

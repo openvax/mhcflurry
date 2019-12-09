@@ -239,7 +239,7 @@ class Class1PresentationNeuralNetwork(object):
 
         def logit(x):
             import tensorflow as tf
-            return - tf.log(
+            return - tf.math.log(
                 tf.maximum(
                     tf.math.divide_no_nan(1., x) - 1.,
                     0.0))
@@ -325,6 +325,7 @@ class Class1PresentationNeuralNetwork(object):
             allele_encoding,
             affinities_mask=None,  # True when a peptide/label is actually a peptide and an affinity
             inequalities=None,  # interpreted only for elements where affinities_mask is True, otherwise ignored
+            validation_weights=None,
             verbose=1,
             progress_callback=None,
             progress_preamble="",
@@ -349,6 +350,10 @@ class Class1PresentationNeuralNetwork(object):
             affinities_mask = numpy.array(affinities_mask, copy=False)
         else:
             affinities_mask = numpy.tile(False, len(labels))
+        if validation_weights is None:
+            validation_weights = numpy.tile(1.0, len(labels))
+        else:
+            validation_weights = numpy.array(validation_weights, copy=False)
         inequalities[~affinities_mask] = "="
 
         random_negatives_planner = RandomNegativePeptides(
@@ -486,9 +491,9 @@ class Class1PresentationNeuralNetwork(object):
                 numpy.tile(False, num_random_negatives),
                 numpy.where(affinities_mask, labels, to_ic50(labels)) < 1000.0
             ]),
-            potential_validation_mask=numpy.concatenate([
-                numpy.tile(False, num_random_negatives),
-                numpy.tile(True, len(labels))
+            validation_weights=numpy.concatenate([
+                numpy.tile(0.0, num_random_negatives),
+                validation_weights
             ]),
         )
         if verbose:

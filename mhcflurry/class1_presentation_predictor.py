@@ -25,7 +25,8 @@ from .regression_target import from_ic50, to_ic50
 from .allele_encoding import MultipleAlleleEncoding
 from .downloads import get_default_class1_presentation_models_dir
 from .class1_presentation_neural_network import Class1PresentationNeuralNetwork
-from .common import save_weights, load_weights
+from .common import save_weights, load_weights, NumpyJSONEncoder
+
 
 class Class1PresentationPredictor(object):
     def __init__(
@@ -55,7 +56,7 @@ class Class1PresentationPredictor(object):
                 model_config = model.get_config()
                 rows.append((
                     self.model_name(i),
-                    json.dumps(model_config),
+                    json.dumps(model_config, cls=NumpyJSONEncoder),
                     model
                 ))
             self._manifest_df = pandas.DataFrame(
@@ -234,7 +235,7 @@ class Class1PresentationPredictor(object):
         updated_network_config_jsons = []
         for (_, row) in sub_manifest_df.iterrows():
             updated_network_config_jsons.append(
-                json.dumps(row.model.get_config()))
+                json.dumps(row.model.get_config(), cls=NumpyJSONEncoder))
             weights_path = self.weights_path(models_dir, row.model_name)
             save_weights(row.model.get_weights(), weights_path)
             logging.info("Wrote: %s", weights_path)

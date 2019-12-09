@@ -36,42 +36,58 @@ rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
 mkdir -p "$SCRATCH_DIR/$DOWNLOAD_NAME"
 
 # Send stdout and stderr to a logfile included with the archive.
-#LOG="$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.$(date +%s).txt"
-#exec >  >(tee -ia "$LOG")
-#exec 2> >(tee -ia "$LOG" >&2)
+LOG="$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.$(date +%s).txt"
+exec >  >(tee -ia "$LOG")
+exec 2> >(tee -ia "$LOG" >&2)
 
 # Log some environment info
-#echo "Invocation: $0 $@"
-#date
-#pip freeze
-#git status
+echo "Invocation: $0 $@"
+date
+pip freeze
+git status
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
+cd /var/folders/jc/fyrvcrcs3sb8g4mkdg6nl_t80000gq/T/mhcflurry-downloads-generation/models_class1_pan_refined
 
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
-# CAHNGE TO CP
-ln -s $SCRIPT_DIR/make_multiallelic_training_data.py .
+cp $SCRIPT_DIR/make_multiallelic_training_data.py .
+cp $SCRIPT_DIR/hyperparameters.yaml .
 
 time python make_multiallelic_training_data.py \
     --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
     --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
     --out train.multiallelic.csv
 
+MONOALLELIC_TRAIN="$(mhcflurry-downloads path models_class1_pan)/models.with_mass_spec/train_data.csv.bz2"
+
+ALLELE_LIST=$(bzcat "$MONOALLELIC_TRAIN" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
+ALLELE_LIST+=$(cat train.multiallelic.csv | cut -f 7 -d , | gerp -v hla | uniq | tr ' ' '\n' | sort | uniq)
+ALLELE_LIST+=$(echo " " $(cat $SCRIPT_DIR/additional_alleles.txt | grep -v '#') )
+
 time mhcflurry-multiallelic-refinement \
-    --monoallelic-data "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
+    --monoallelic-data "$MONOALLELIC_TRAIN" \
     --multiallelic-data train.multiallelic.csv \
-    --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.with_mass_spec"
+    --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.with_mass_spec" \
     --hyperparameters hyperparameters.yaml \
     --out-affinity-predictor-dir $(pwd)/models.affinity \
     --out-presentation-predictor-dir $(pwd)/models.presentation \
     --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
     $PARALLELISM_ARGS
 
+time mhcflurry-calibrate-percentile-ranks \
+    --models-dir $(pwd)/models.affinity  \
+    --match-amino-acid-distribution-data "$MONOALLELIC_TRAIN" \
+    --motif-summary \
+    --num-peptides-per-length 100000 \
+    --allele $ALLELE_LIST \
+    --verbosity 1 \
+    $PARALLELISM_ARGS
+
 echo "Done training."
 
-bzip2 train.multiallelic.csv
+rm train.multiallelic.csv
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 -f "$LOG"
@@ -79,4 +95,3 @@ for i in $(ls LOG-worker.*.txt) ; do bzip2 -f $i ; done
 RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
 tar -cjf "$RESULT" *
 echo "Created archive: $RESULT"
-

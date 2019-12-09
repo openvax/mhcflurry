@@ -194,7 +194,7 @@ class MultiallelicMassSpecBatchGenerator(object):
             experiment_names,
             alleles_matrix,
             is_binder,
-            potential_validation_mask=None):
+            validation_weights=None):
         affinities_mask = numpy.array(affinities_mask, copy=False, dtype=bool)
         experiment_names = numpy.array(experiment_names, copy=False)
         alleles_matrix = numpy.array(alleles_matrix, copy=False)
@@ -206,14 +206,18 @@ class MultiallelicMassSpecBatchGenerator(object):
         numpy.testing.assert_equal(len(is_binder), n)
         numpy.testing.assert_equal(
             affinities_mask, pandas.isnull(experiment_names))
-        if potential_validation_mask is not None:
-            numpy.testing.assert_equal(len(potential_validation_mask), n)
+
+        if validation_weights is not None:
+            validation_weights = numpy.array(
+                validation_weights, copy=True, dtype=float)
+            numpy.testing.assert_equal(len(validation_weights), n)
+            validation_weights /= validation_weights.sum()
 
         validation_items = numpy.random.choice(
-            n if potential_validation_mask is None
-                else numpy.where(potential_validation_mask)[0],
-            int(self.hyperparameters['batch_generator_validation_split'] * n),
-            replace=False)
+            n,
+            int((self.hyperparameters['batch_generator_validation_split']) * n),
+            replace=False,
+            p=validation_weights)
         validation_mask = numpy.zeros(n, dtype=bool)
         validation_mask[validation_items] = True
 
