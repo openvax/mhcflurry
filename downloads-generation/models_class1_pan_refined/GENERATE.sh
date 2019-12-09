@@ -54,12 +54,43 @@ export PYTHONUNBUFFERED=1
 cp $SCRIPT_DIR/make_multiallelic_training_data.py .
 cp $SCRIPT_DIR/hyperparameters.yaml .
 
+MONOALLELIC_TRAIN="$(mhcflurry-downloads path models_class1_pan)/models.with_mass_spec/train_data.csv.bz2"
+
+# ********************************************************
+# First we refine a single model excluding chromosome 1.
+echo "Beginning testing run."
+time python make_multiallelic_training_data.py \
+    --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+    --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
+    --exclude-contig "1" \
+    --out train.multiallelic.no_chr1.csv
+
+time mhcflurry-multiallelic-refinement \
+    --monoallelic-data "$MONOALLELIC_TRAIN" \
+    --multiallelic-data train.multiallelic.no_chr1.csv \
+    --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.with_mass_spec" \
+    --max-models 1 \
+    --hyperparameters hyperparameters.yaml \
+    --out-affinity-predictor-dir $(pwd)/test_models.no_chr1.affinity \
+    --out-presentation-predictor-dir $(pwd)/test_models.no_chr1.presentation \
+    --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+    $PARALLELISM_ARGS
+
+time mhcflurry-calibrate-percentile-ranks \
+    --models-dir $(pwd)/test_models.no_chr1.affinity   \
+    --match-amino-acid-distribution-data "$MONOALLELIC_TRAIN" \
+    --motif-summary \
+    --num-peptides-per-length 100000 \
+    --allele "HLA-A*02:01" "HLA-A*02:20" "HLA-C*02:10" \
+    --verbosity 1 \
+    $PARALLELISM_ARGS
+
+# ********************************************************
+echo "Beginning production run"
 time python make_multiallelic_training_data.py \
     --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
     --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
     --out train.multiallelic.csv
-
-MONOALLELIC_TRAIN="$(mhcflurry-downloads path models_class1_pan)/models.with_mass_spec/train_data.csv.bz2"
 
 ALLELE_LIST=$(bzcat "$MONOALLELIC_TRAIN" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
 ALLELE_LIST+=$(cat train.multiallelic.csv | cut -f 7 -d , | gerp -v hla | uniq | tr ' ' '\n' | sort | uniq)
@@ -86,7 +117,7 @@ time mhcflurry-calibrate-percentile-ranks \
 
 echo "Done training."
 
-rm train.multiallelic.csv
+rm train.multiallelic.*
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 -f "$LOG"

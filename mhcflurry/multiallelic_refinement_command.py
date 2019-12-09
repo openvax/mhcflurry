@@ -69,6 +69,10 @@ parser.add_argument(
     required=True,
     help="Directory to write preentation predictor")
 parser.add_argument(
+    "--max-models",
+    type=int,
+    default=None)
+parser.add_argument(
     "--verbosity",
     type=int,
     help="Keras verbosity. Default: %(default)s",
@@ -103,7 +107,7 @@ def run(argv=sys.argv[1:]):
     print("Loaded monoallelic data: %s" % (str(monoallelic_df.shape)))
 
     input_predictor = Class1AffinityPredictor.load(
-        args.models_dir, optimization_level=0)
+        args.models_dir, optimization_level=0, max_models=args.max_models)
     print("Loaded: %s" % input_predictor)
 
     sample_table = multiallelic_df.drop_duplicates(

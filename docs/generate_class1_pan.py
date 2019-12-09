@@ -35,6 +35,13 @@ parser.add_argument(
     help="Class1 models. Default: %(default)s",
 )
 parser.add_argument(
+    "--class1-models-dir-refined",
+    metavar="DIR",
+    default=get_path(
+        "models_class1_pan_refined", "models.affinity", test_exists=False),
+    help="Class1 refined models. Default: %(default)s",
+)
+parser.add_argument(
     "--logo-cutoff",
     default=0.01,
     type=float,
@@ -80,8 +87,13 @@ def model_info(models_dir):
         join(models_dir, "length_distributions.csv.bz2"))
     frequency_matrices_df = pandas.read_csv(
         join(models_dir, "frequency_matrices.csv.bz2"))
-    train_data_df = pandas.read_csv(
-        join(models_dir, "train_data.csv.bz2"))
+    try:
+        train_data_df = pandas.read_csv(
+            join(models_dir, "train_data.csv.bz2"))
+        observations_per_allele = (
+            train_data_df.groupby("allele").peptide.nunique().to_dict())
+    except IOError:
+        observations_per_allele = None
 
     distribution = frequency_matrices_df.loc[
         (frequency_matrices_df.cutoff_fraction == 1.0), AMINO_ACIDS
@@ -90,9 +102,6 @@ def model_info(models_dir):
     normalized_frequency_matrices = frequency_matrices_df.copy()
     normalized_frequency_matrices.loc[:, AMINO_ACIDS] = (
             normalized_frequency_matrices[AMINO_ACIDS] / distribution)
-
-    observations_per_allele = (
-        train_data_df.groupby("allele").peptide.nunique().to_dict())
 
     return {
         'length_distributions': length_distributions_df,
@@ -182,6 +191,7 @@ def go(argv):
 
     predictors = [
         ("with_mass_spec", args.class1_models_dir_with_ms),
+        ("refined", args.class1_models_dir_refined),
         ("no_mass_spec", args.class1_models_dir_no_ms),
     ]
     info_per_predictor = OrderedDict()
@@ -240,14 +250,15 @@ def go(argv):
                 models_label=label)
             if not length_distribution_image_path:
                 continue
-
-            w(
-                "*" + (
-                    "With mass-spec" if label == "with_mass_spec" else "Affinities only")
-                + "*\n")
-            w("Training observations (unique peptides): %d" % (
-                info['observations_per_allele'].get(allele, 0)))
-            w("\n")
+            w("*%s*\n" % {
+                "with_mass_spec": "With mass-spec",
+                "no_mass_spec": "Affinities only",
+                "refined": "With mass-spec after multiallelic refinement",
+            }[label])
+            if info['observations_per_allele'] is not None:
+                w("Training observations (unique peptides): %d" % (
+                    info['observations_per_allele'].get(allele, 0)))
+                w("\n")
             w(image(length_distribution_image_path))
             w(image(write_logo(
                 normalized_frequency_matrices=normalized_frequency_matrices,

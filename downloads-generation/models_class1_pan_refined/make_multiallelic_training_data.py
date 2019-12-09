@@ -32,10 +32,14 @@ parser.add_argument(
     default=None,
     help="If not specified will use all possible decoys")
 parser.add_argument(
+    "--exclude-contig",
+    help="Exclude entries annotated to the given contig")
+parser.add_argument(
     "--out",
     metavar="CSV",
     required=True,
     help="File to write")
+
 
 def run():
     args = parser.parse_args(sys.argv[1:])
@@ -47,6 +51,20 @@ def run():
         (hit_df.peptide.str.len() >= 7) &
         (~hit_df.protein_ensembl.isnull())
     ]
+    if args.exclude_contig:
+        new_hit_df = hit_df.loc[
+            hit_df.protein_primary_ensembl_contig.astype(str) !=
+            args.exclude_contig
+        ]
+        print(
+            "Excluding contig",
+            args.exclude_contig,
+            "reduced dataset from",
+            len(hit_df),
+            "to",
+            len(new_hit_df))
+        hit_df = new_hit_df.copy()
+
     hit_df["alleles"] = hit_df.hla.str.split()
 
     sample_table = hit_df.drop_duplicates("sample_id").set_index("sample_id")
