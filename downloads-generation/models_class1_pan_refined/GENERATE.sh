@@ -63,13 +63,13 @@ time python make_multiallelic_training_data.py \
     --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
     --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
     --exclude-contig "1" \
+    --decoys-per-hit 1 \
     --out train.multiallelic.no_chr1.csv
 
 time mhcflurry-multiallelic-refinement \
     --monoallelic-data "$MONOALLELIC_TRAIN" \
     --multiallelic-data train.multiallelic.no_chr1.csv \
     --models-dir "$(mhcflurry-downloads path models_class1_pan)/models.with_mass_spec" \
-    --max-models 1 \
     --hyperparameters hyperparameters.yaml \
     --out-affinity-predictor-dir $(pwd)/test_models.no_chr1.affinity \
     --out-presentation-predictor-dir $(pwd)/test_models.no_chr1.presentation \
@@ -90,6 +90,7 @@ echo "Beginning production run"
 time python make_multiallelic_training_data.py \
     --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
     --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
+    --decoys-per-hit 1 \
     --out train.multiallelic.csv
 
 ALLELE_LIST=$(bzcat "$MONOALLELIC_TRAIN" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
