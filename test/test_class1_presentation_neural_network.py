@@ -91,7 +91,7 @@ def make_motif(presentation_predictor, allele, peptides, frac=0.01):
 # TESTS
 ###################################################
 
-def test_synthetic_allele_refinement(include_affinities=False):
+def test_synthetic_allele_refinement(include_affinities=True):
     """
     Test that in a synthetic example the model is able to learn that HLA-C*01:02
     prefers P at position 3.

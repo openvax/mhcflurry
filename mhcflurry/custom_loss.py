@@ -183,10 +183,14 @@ class MSEWithInequalities(Loss):
         diff3 *= K.cast(y_true >= 4.0, "float32")
         diff3 *= K.cast(diff3 > 0.0, "float32")
 
+        denominator = K.maximum(
+            K.sum(K.cast(K.not_equal(y_true, 2.0), "float32"), 0),
+            1.0)
+
         result = (
             K.sum(K.square(diff1)) +
             K.sum(K.square(diff2)) +
-            K.sum(K.square(diff3))) / K.cast(K.shape(y_pred)[0], "float32")
+            K.sum(K.square(diff3))) / denominator
 
         return result
 

@@ -554,6 +554,26 @@ class Class1PresentationNeuralNetwork(object):
                         "peptide"
                     ][:num_random_negatives] = random_negative_peptides_encoding
 
+            if i == 0:
+                (train_generator, test_generator) = (
+                    batch_generator.get_train_and_test_generators(
+                        x_dict=x_dict_with_random_negatives,
+                        y_list=[encoded_y1, encoded_y2],
+                        epochs=1))
+                pairs = [
+                    ("train", train_generator, batch_generator.num_train_batches),
+                    ("test", test_generator, batch_generator.num_test_batches),
+                ]
+                for (kind, generator, steps) in pairs:
+                    self.assert_allele_representations_hash(
+                        allele_representations_hash)
+                    metrics = self.network.evaluate_generator(
+                        generator=generator,
+                        steps=steps,
+                        workers=0,
+                        use_multiprocessing=False)
+                    for (key, val) in zip(self.network.metrics_names, metrics):
+                        fit_info["pre_fit_%s_%s" % (kind, key)] = val
             (train_generator, test_generator) = (
                 batch_generator.get_train_and_test_generators(
                     x_dict=x_dict_with_random_negatives,
@@ -631,7 +651,7 @@ class Class1PresentationNeuralNetwork(object):
         return {
             'batch_generator': batch_generator,
             'last_x': x_dict_with_random_negatives,
-            'last_y': [encoded_y1, encoded_y2, encoded_y2],
+            'last_y': [encoded_y1, encoded_y2],
             'fit_info': fit_info,
         }
 
