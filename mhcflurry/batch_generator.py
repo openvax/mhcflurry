@@ -71,9 +71,9 @@ class BatchPlan(object):
         lines = []
         equivalence_class_labels = self.equivalence_class_labels
         if equivalence_class_labels is None:
-            equivalence_class_labels = (
-                "class-" + numpy.arange(self.equivalence_classes).astype("str"))
-
+            equivalence_class_labels = numpy.array([
+                "class-%d" % i for i in range(len(self.equivalence_classes))
+            ])
         i = 0
         while i < len(self.batch_compositions):
             composition = self.batch_compositions[i]
@@ -100,18 +100,111 @@ class BatchPlan(object):
         return max(len(b) for b in self.batch_compositions)
 
 
-class MultiallelicMassSpecBatchGenerator(object):
+class BatchGenerator(object):
+    implementations = {}
     hyperparameter_defaults = HyperparameterDefaults(
+        batch_generator="simple",
         batch_generator_validation_split=0.1,
-        batch_generator_batch_size=128,
+        batch_generator_batch_size=128)
+
+    @staticmethod
+    def register_implementation(name, klass):
+        BatchGenerator.implementations[name] = klass
+        BatchGenerator.hyperparameter_defaults = (
+            BatchGenerator.hyperparameter_defaults.extend(
+                klass.hyperparameter_defaults))
+
+    @staticmethod
+    def create(hyperparameters):
+        name = hyperparameters['batch_generator']
+        return BatchGenerator.implementations[name](hyperparameters)
+
+    def __init__(self, hyperparameters):
+        self.hyperparameters = BatchGenerator.hyperparameter_defaults.with_defaults(
+            hyperparameters)
+        self.train_batch_plan = None
+        self.test_batch_plan = None
+
+    def plan(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def summary(self):
+        return (
+            "Train:\n" + self.train_batch_plan.summary(indent=1) +
+            "\n***\nTest: " + self.test_batch_plan.summary(indent=1))
+
+    def get_train_and_test_generators(self, x_dict, y_list, epochs=1):
+        train_generator = self.train_batch_plan.batches_generator(
+            x_dict, y_list, epochs=epochs)
+        test_generator = self.test_batch_plan.batches_generator(
+            x_dict, y_list, epochs=epochs)
+        return (train_generator, test_generator)
+
+    @property
+    def num_train_batches(self):
+        return self.train_batch_plan.num_batches
+
+    @property
+    def num_test_batches(self):
+        return self.test_batch_plan.num_batches
+
+
+class SimpleBatchGenerator(BatchGenerator):
+    hyperparameter_defaults = HyperparameterDefaults()
+
+    def __init__(self, hyperparameters):
+        BatchGenerator.__init__(self, hyperparameters)
+
+    def plan(self, num, validation_weights=None, **kwargs):
+        if validation_weights is not None:
+            validation_weights = numpy.array(
+                validation_weights, copy=True, dtype=float)
+            numpy.testing.assert_equal(len(validation_weights), num)
+            validation_weights /= validation_weights.sum()
+
+        validation_items = numpy.random.choice(
+            num,
+            int((self.hyperparameters['batch_generator_validation_split']) * num),
+            replace=False,
+            p=validation_weights)
+        validation_items_set = set(validation_items)
+        numpy.testing.assert_equal(
+            len(validation_items), len(validation_items_set))
+        training_items = numpy.array([
+            x for x in range(num) if x not in validation_items_set
+        ], dtype=int)
+        numpy.testing.assert_equal(
+            len(validation_items) + len(training_items), num)
+
+        def simple_compositions(
+                num,
+                num_per_batch=self.hyperparameters['batch_generator_batch_size']):
+            full_batch = numpy.zeros(num_per_batch, dtype=int)
+            result = [full_batch] * int(numpy.floor(num / num_per_batch))
+            if num % num_per_batch != 0:
+                result.append(numpy.zeros(num % num_per_batch, dtype=int))
+            numpy.testing.assert_equal(sum(len(x) for x in result), num)
+            return result
+
+        self.train_batch_plan = BatchPlan(
+            equivalence_classes=[training_items],
+            batch_compositions=simple_compositions(len(training_items)))
+        self.test_batch_plan = BatchPlan(
+            equivalence_classes=[validation_items],
+            batch_compositions=simple_compositions(len(validation_items)))
+
+
+BatchGenerator.register_implementation("simple", SimpleBatchGenerator)
+
+class MultiallelicMassSpecBatchGenerator(BatchGenerator):
+    hyperparameter_defaults = HyperparameterDefaults(
         batch_generator_affinity_fraction=0.5)
     """
     Hyperperameters for batch generation for the presentation predictor.
     """
 
     def __init__(self, hyperparameters):
-        self.hyperparameters = self.hyperparameter_defaults.with_defaults(
-            hyperparameters)
+        BatchGenerator.__init__(self, hyperparameters)
         self.equivalence_classes = None
         self.batch_indices = None
 
@@ -194,18 +287,19 @@ class MultiallelicMassSpecBatchGenerator(object):
             experiment_names,
             alleles_matrix,
             is_binder,
-            validation_weights=None):
+            validation_weights=None,
+            num=None):
         affinities_mask = numpy.array(affinities_mask, copy=False, dtype=bool)
         experiment_names = numpy.array(experiment_names, copy=False)
         alleles_matrix = numpy.array(alleles_matrix, copy=False)
         is_binder = numpy.array(is_binder, copy=False, dtype=bool)
         n = len(experiment_names)
+        if num is not None:
+            numpy.testing.assert_equal(num, n)
 
         numpy.testing.assert_equal(len(affinities_mask), n)
         numpy.testing.assert_equal(len(alleles_matrix), n)
         numpy.testing.assert_equal(len(is_binder), n)
-        numpy.testing.assert_equal(
-            affinities_mask, pandas.isnull(experiment_names))
 
         if validation_weights is not None:
             validation_weights = numpy.array(
@@ -238,22 +332,5 @@ class MultiallelicMassSpecBatchGenerator(object):
         self.test_batch_plan = self.plan_from_dataframe(
             test_df, self.hyperparameters)
 
-    def summary(self):
-        return (
-            "Train:\n" + self.train_batch_plan.summary(indent=1) +
-            "\n***\nTest: " + self.test_batch_plan.summary(indent=1))
-
-    def get_train_and_test_generators(self, x_dict, y_list, epochs=1):
-        train_generator = self.train_batch_plan.batches_generator(
-            x_dict, y_list, epochs=epochs)
-        test_generator = self.test_batch_plan.batches_generator(
-            x_dict, y_list, epochs=epochs)
-        return (train_generator, test_generator)
-
-    @property
-    def num_train_batches(self):
-        return self.train_batch_plan.num_batches
-
-    @property
-    def num_test_batches(self):
-        return self.test_batch_plan.num_batches
+BatchGenerator.register_implementation(
+    "multiallelic_mass_spec", MultiallelicMassSpecBatchGenerator)

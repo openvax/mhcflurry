@@ -16,7 +16,7 @@ from .regression_target import from_ic50, to_ic50
 from .random_negative_peptides import RandomNegativePeptides
 from .allele_encoding import MultipleAlleleEncoding, AlleleEncoding
 from .auxiliary_input import AuxiliaryInputEncoder
-from .batch_generator import MultiallelicMassSpecBatchGenerator
+from .batch_generator import BatchGenerator
 from .custom_loss import (
     MSEWithInequalities,
     TransformPredictionsLossWrapper,
@@ -43,7 +43,7 @@ class Class1PresentationNeuralNetwork(object):
         early_stopping=True,
         random_negative_affinity_min=20000.0,).extend(
         RandomNegativePeptides.hyperparameter_defaults).extend(
-        MultiallelicMassSpecBatchGenerator.hyperparameter_defaults
+        BatchGenerator.hyperparameter_defaults
     )
     """
     Hyperparameters for neural network training.
@@ -470,11 +470,12 @@ class Class1PresentationNeuralNetwork(object):
         if verbose:
             self.network.summary()
 
-        batch_generator = MultiallelicMassSpecBatchGenerator(
-            MultiallelicMassSpecBatchGenerator.hyperparameter_defaults.subselect(
+        batch_generator = BatchGenerator.create(
+            hyperparameters=BatchGenerator.hyperparameter_defaults.subselect(
                 self.hyperparameters))
         start = time.time()
         batch_generator.plan(
+            num=len(peptides) + num_random_negatives,
             affinities_mask=numpy.concatenate([
                 numpy.tile(True, num_random_negatives),
                 affinities_mask
@@ -669,7 +670,7 @@ class Class1PresentationNeuralNetwork(object):
         assert isinstance(allele_encoding, MultipleAlleleEncoding)
 
         (allele_encoding_input, allele_representations) = (
-                self.allele_encoding_to_network_input(allele_encoding.compact()))
+                self.allele_encoding_to_network_input(allele_encoding))
         self.set_allele_representations(allele_representations)
         x_dict = {
             'peptide': self.peptides_to_network_input(peptides),
