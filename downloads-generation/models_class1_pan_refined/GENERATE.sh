@@ -125,7 +125,7 @@ time mhcflurry-calibrate-percentile-ranks \
 
 echo "Done training."
 
-rm train.multiallelic.*
+#rm train.multiallelic.*
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 -f "$LOG"
