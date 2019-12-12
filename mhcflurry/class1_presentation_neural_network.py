@@ -453,7 +453,7 @@ class Class1PresentationNeuralNetwork(object):
 
         allele_representations_hash = self.set_allele_representations(
             allele_representations)
-        loss_reduction = "sum_over_batch_size"
+        loss_reduction = "sum"
         self.network.compile(
             loss=[
                 affinities_loss.get_keras_loss(reduction=loss_reduction),
