@@ -89,11 +89,16 @@ fi
 
 # ********************************************************
 echo "Beginning production run"
-time python make_multiallelic_training_data.py \
-    --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
-    --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
-    --decoys-per-hit 1 \
-    --out train.multiallelic.csv
+if [ -f "$SCRIPT_DIR/train.multiallelic.csv" ]; then
+    echo "Using existing multiallelic train data."
+    cp "$SCRIPT_DIR/train.multiallelic.csv" .
+else
+    time python make_multiallelic_training_data.py \
+        --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+        --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
+        --decoys-per-hit 1 \
+        --out train.multiallelic.csv
+fi
 
 ALLELE_LIST=$(bzcat "$MONOALLELIC_TRAIN" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
 ALLELE_LIST+=$(cat train.multiallelic.csv | cut -f 7 -d , | gerp -v hla | uniq | tr ' ' '\n' | sort | uniq)
