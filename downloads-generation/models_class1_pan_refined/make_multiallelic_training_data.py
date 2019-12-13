@@ -44,6 +44,7 @@ parser.add_argument(
     nargs="+",
     help="Include only the specified alleles")
 
+
 def run():
     args = parser.parse_args(sys.argv[1:])
     hit_df = pandas.read_csv(args.hits)
@@ -72,7 +73,7 @@ def run():
     if args.alleles:
         filter_alleles = set(args.alleles)
         new_hit_df = hit_df.loc[
-            hit_df.alleles.isin.map(
+            hit_df.alleles.map(
                 lambda a: len(set(a).intersection(filter_alleles)) > 0)
         ]
         print(
