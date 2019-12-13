@@ -39,12 +39,17 @@ parser.add_argument(
     metavar="CSV",
     required=True,
     help="File to write")
-
+parser.add_argument(
+    "--alleles",
+    nargs="+",
+    help="Include only the specified alleles")
 
 def run():
     args = parser.parse_args(sys.argv[1:])
     hit_df = pandas.read_csv(args.hits)
     expression_df = pandas.read_csv(args.expression, index_col=0).fillna(0)
+    hit_df["alleles"] = hit_df.hla.str.split()
+
     hit_df = hit_df.loc[
         (hit_df.mhc_class == "I") &
         (hit_df.peptide.str.len() <= 15) &
@@ -64,8 +69,20 @@ def run():
             "to",
             len(new_hit_df))
         hit_df = new_hit_df.copy()
-
-    hit_df["alleles"] = hit_df.hla.str.split()
+    if args.alleles:
+        filter_alleles = set(args.alleles)
+        new_hit_df = hit_df.loc[
+            hit_df.alleles.isin.map(
+                lambda a: len(set(a).intersection(filter_alleles)) > 0)
+        ]
+        print(
+            "Selecting alleles",
+            args.alleles,
+            "reduced dataset from",
+            len(hit_df),
+            "to",
+            len(new_hit_df))
+        hit_df = new_hit_df.copy()
 
     sample_table = hit_df.drop_duplicates("sample_id").set_index("sample_id")
     grouped = hit_df.groupby("sample_id").nunique()
