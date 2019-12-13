@@ -73,6 +73,10 @@ parser.add_argument(
     type=int,
     default=None)
 parser.add_argument(
+    "--only-alleles-with-mass-spec",
+    type=int,
+    default=None)
+parser.add_argument(
     "--verbosity",
     type=int,
     help="Keras verbosity. Default: %(default)s",
@@ -105,6 +109,23 @@ def run(argv=sys.argv[1:]):
 
     monoallelic_df = pandas.read_csv(args.monoallelic_data)
     print("Loaded monoallelic data: %s" % (str(monoallelic_df.shape)))
+
+    if args.only_alleles_with_mass_spec:
+        multiallelic_alleles = set()
+        for hla in multiallelic_df.hla.unique():
+            multiallelic_alleles.update(hla.split())
+        print(
+            "Multiallelic alleles (%d)" % len(multiallelic_alleles),
+            multiallelic_alleles)
+        new_monoallelic_df = monoallelic_df.loc[
+            monoallelic_df.allele.isin((multiallelic_alleles))
+        ].copy()
+        print(
+            "Allele selection reduced monoallelic data from",
+            len(monoallelic_df),
+            "to",
+            len(new_monoallelic_df))
+        monoallelic_df = new_monoallelic_df
 
     input_predictor = Class1AffinityPredictor.load(
         args.models_dir, optimization_level=0, max_models=args.max_models)

@@ -98,7 +98,6 @@ else
         --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
         --decoys-per-hit 1 \
         --out train.multiallelic.csv \
-        --alleles "HLA-A*02:01" "HLA-B*27:01" "HLA-C*07:01" "HLA-A*03:01" "HLA-B*15:01" "HLA-C*01:02"
 fi
 
 ALLELE_LIST=$(bzcat "$MONOALLELIC_TRAIN" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
@@ -113,6 +112,7 @@ time mhcflurry-multiallelic-refinement \
     --out-affinity-predictor-dir $(pwd)/models.affinity \
     --out-presentation-predictor-dir $(pwd)/models.presentation \
     --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+    --only-alleles-with-mass-spec \
     $PARALLELISM_ARGS
 
 time mhcflurry-calibrate-percentile-ranks \
