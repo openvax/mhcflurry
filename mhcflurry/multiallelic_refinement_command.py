@@ -74,7 +74,6 @@ parser.add_argument(
     default=None)
 parser.add_argument(
     "--only-alleles-with-mass-spec",
-    type=bool,
     default=False,
     action="store_true")
 parser.add_argument(
