@@ -98,6 +98,7 @@ else
         --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
         --decoys-per-hit 1 \
         --out train.multiallelic.csv \
+        --alleles "HLA-A*02:20"
 fi
 
 ALLELE_LIST=$(bzcat "$MONOALLELIC_TRAIN" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
