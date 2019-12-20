@@ -36,7 +36,7 @@ wget -q https://github.com/openvax/mhcflurry/releases/download/pre-1.1/bdata.201
 mkdir ms
 
 ############################################
-# MS: Multiallelic class I
+# MS: Class I
 ############################################
 # Bassani-Sternberg, ..., Gfeller PLOS Comp. Bio. 2017 [PMID 28832583]
 # The first dataset is from this work. The second dataset is originally from:
@@ -106,13 +106,23 @@ PMID=27869121
 mkdir -p ms/$PMID
 wget -q "https://static-content.springer.com/esm/art%3A10.1038%2Fncomms13404/MediaObjects/41467_2016_BFncomms13404_MOESM1318_ESM.xlsx" -P ms/$PMID
 
+# Sarkizova, ..., Keskin Nature Biotechnology 2019 [PMID 31844290]
+PMID=31844290
+mkdir -p ms/$PMID
+# Monoallelic:
+wget -q "https://static-content.springer.com/esm/art%3A10.1038%2Fs41587-019-0322-9/MediaObjects/41587_2019_322_MOESM3_ESM.xlsx" -P ms/$PMID
+# Multiallelic:
+wget -q "https://static-content.springer.com/esm/art%3A10.1038%2Fs41587-019-0322-9/MediaObjects/41587_2019_322_MOESM4_ESM.xlsx" -P ms/$PMID
+
+
 ############################################
-# MS: Monoallelic class II
+# MS: Class II
 ############################################
 # Abelin, ..., Rooney Immunity 2019 [PMID 31495665]
 PMID=31495665
 mkdir -p ms/$PMID
 wget -q https://ars.els-cdn.com/content/image/1-s2.0-S1074761319303632-mmc2.xlsx -P ms/$PMID
+
 
 ############################################
 # RNA-seq expression data (TPMs)

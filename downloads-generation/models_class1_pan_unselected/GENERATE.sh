@@ -59,7 +59,7 @@ then
     python generate_hyperparameters.py > hyperparameters.yaml
 fi
 
-for kind in with_mass_spec no_mass_spec
+for kind in combined
 do
     EXTRA_TRAIN_ARGS=""
     if [ "$1" == "continue-incomplete" ] && [ -d "models.${kind}" ]
@@ -69,7 +69,7 @@ do
     fi
 
     mhcflurry-class1-train-pan-allele-models \
-        --data "$(mhcflurry-downloads path data_curated)/curated_training_data.${kind}.csv.bz2" \
+        --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
         --allele-sequences "$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv" \
         --pretrain-data "$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2" \
         --held-out-measurements-per-allele-fraction-and-max 0.25 100 \

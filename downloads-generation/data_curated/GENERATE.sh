@@ -48,23 +48,14 @@ do
 done
 
 time python curate_ms_by_pmid.py $CURATE_BY_PMID_ARGS \
-    --ms-out ms.nontraining_curated.by_pmid.csv \
+    --ms-out ms.by_pmid.csv \
     --expression-out rna_expression.csv \
     --expression-metadata-out rna_expression.metadata.csv
 
-bzip2 ms.nontraining_curated.by_pmid.csv
+bzip2 ms.by_pmid.csv
 bzip2 rna_expression.csv
 
-
 rm -rf ms
-
-# No mass-spec data
-time python curate.py \
-    --data-iedb \
-        "$(mhcflurry-downloads path data_iedb)/mhc_ligand_full.csv.bz2" \
-    --data-kim2014 \
-        "$(mhcflurry-downloads path data_published)/bdata.20130222.mhci.public.1.txt" \
-    --out-csv curated_training_data.no_mass_spec.csv
 
 # With mass-spec data
 time python curate.py \
@@ -74,11 +65,15 @@ time python curate.py \
         "$(mhcflurry-downloads path data_published)/bdata.20130222.mhci.public.1.txt" \
     --data-systemhc-atlas \
         "$(mhcflurry-downloads path data_systemhcatlas)/data.csv.bz2" \
-    --include-iedb-mass-spec \
-    --out-csv curated_training_data.with_mass_spec.csv
+    --data-additional-ms "$(pwd)/ms.by_pmid.csv.bz2" \
+    --out-csv curated_training_data.csv \
+    --out-affinity-csv curated_training_data.affinity.csv \
+    --out-mass-spec-csv curated_training_data.mass_spec.csv
 
-bzip2 curated_training_data.no_mass_spec.csv
-bzip2 curated_training_data.with_mass_spec.csv
+for i in $(ls *.csv)
+do
+    bzip2 $i
+done
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt

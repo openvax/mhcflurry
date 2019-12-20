@@ -762,6 +762,96 @@ def handle_pmid_31154438(*filenames):
     result_df = pandas.concat(results, ignore_index=True)
     return result_df
 
+
+def handle_pmid_31844290(*filenames):
+    """Sarkizova, ..., Keskin Nature Biotechnology 2019 [PMID 31844290]"""
+    (mono_filename, multi_filename) = sorted(filenames)
+
+    # Monoallelic
+    mono = pandas.read_excel(mono_filename, sheet_name=None)
+    dfs = []
+    for (key, value) in mono.items():
+        if key == 'Sheet1':
+            continue
+        allele = normalize_allele_name("HLA-" + key)
+        assert allele != "UNKNOWN"
+        df = pandas.DataFrame({"peptide": value.sequence.values})
+        df["sample_id"] = "keskin_%s" % key
+        df["hla"] = allele
+        df["pulldown_antibody"] = "W6/32"
+        df["format"] = "monoallelic"
+        df["mhc_class"] = "I"
+        df["sample_type"] = "B-CELL"
+        df["cell_line"] = "b721"
+        dfs.append(df)
+
+    # Multiallelic
+    multi = pandas.read_excel(multi_filename, sheet_name=None)
+    metadata = multi['Tissue Sample Characteristics']
+    allele_table = metadata.drop_duplicates(
+        "Clinical ID").set_index("Clinical ID").loc[
+        :, [c for c in metadata if c.startswith("HLA-")]
+    ]
+    allele_table = allele_table.loc[~allele_table.index.isnull()]
+    allele_table = allele_table.loc[allele_table["HLA-A"] != 'n.d.']
+    allele_table = allele_table.applymap(
+        lambda s: s[1:] if s.startswith("-") else s)
+    allele_table = allele_table.applymap(
+        lambda s: "B5101" if s == "B51" else s)
+    allele_table = allele_table.applymap(normalize_allele_name)
+
+    sample_info = metadata.drop_duplicates(
+        "Clinical ID").set_index("Clinical ID")[['Cancer type', 'IP Ab']]
+    sample_info = sample_info.loc[~sample_info.index.isnull()].fillna(
+        method='ffill')
+    sample_info = sample_info.loc[sample_info.index.isin(allele_table.index)]
+    sample_info = sample_info.loc[allele_table.index]
+    sample_info["hla"] = [" ".join(row) for _, row in allele_table.iterrows()]
+    sample_info["sample_type"] = sample_info['Cancer type'].map({
+        'CLL': "B-CELL",
+        'GBM': "GLIOBLASTOMA_TISSUE",
+        'Melanoma': "MELANOMA",
+        "Ovarian": "OVARY",
+        'ccRCC': "KIDNEY",
+    })
+    assert not sample_info["sample_type"].isnull().any()
+    assert not "UNKNOWN" in sample_info["hla"].any()
+
+    for (key, value) in multi.items():
+        if key == 'Tissue Sample Characteristics':
+            continue
+        for (directory, sub_df) in value.groupby("directory"):
+            if 'Pat7' in directory or 'Pat9' in directory:
+                print("Skipping due to no HLA typing", directory)
+                continue
+            try:
+                (sample_id,) = sample_info.loc[
+                    sample_info.index.map(
+                        lambda idx: (
+                            idx in directory or
+                            idx.replace("-", "_").replace("MEL_", "") in directory or
+                            idx.replace(" ", "_") in directory
+                        ))
+                ].index
+            except ValueError as e:
+                print(directory, e)
+                import ipdb ; ipdb.set_trace()
+            info = sample_info.loc[sample_id]
+            df = pandas.DataFrame({"peptide": sub_df.sequence.values})
+            df["sample_id"] = "keskin_%s" % sample_id.replace(" ", "_")
+            df["hla"] = info['hla']
+            df["pulldown_antibody"] = info['IP Ab']
+            df["format"] = "multiallelic"
+            df["mhc_class"] = "I"
+            df["sample_type"] = info['sample_type']
+            df["cell_line"] = None
+            dfs.append(df)
+
+    result_df = pandas.concat(dfs, ignore_index=True)
+    result_df["peptide"] = result_df.peptide.str.upper()
+    return result_df
+
+
 EXPRESSION_GROUPS_ROWS = []
 
 
@@ -815,6 +905,7 @@ def handle_expression_expression_atlas_22460905(filename):
         "sample_type:B-CELL": matches("b-cell"),
         "sample_type:B721-LIKE": matches("b-cell"),
         "sample_type:MELANOMA_CELL_LINE": matches("melanoma"),
+        "sample_type:MELANOMA": matches("melanoma"),
         "sample_type:A375-LIKE": matches("melanoma"),
         "sample_type:KG1-LIKE": matches("myeloid leukemia"),
 
@@ -888,6 +979,8 @@ def handle_expression_human_protein_atlas(*filenames):
             groups={
                 "sample_type:LUNG": ["lung"],
                 "sample_type:SPLEEN": ["spleen"],
+                "sample_type:OVARY": ["ovary"],
+                "sample_type:KIDNEY": ["kidney"],
             }),
     ]
 
