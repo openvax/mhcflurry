@@ -57,7 +57,7 @@ UNSELECTED_PATH="$(mhcflurry-downloads path models_class1_pan_unselected)"
 # For now we calibrate percentile ranks only for alleles for which there
 # is training data. Calibrating all alleles would be too slow.
 # This could be improved though.
-ALLELE_LIST=$(bzcat "$UNSELECTED_PATH/models.with_mass_spec/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
+ALLELE_LIST=$(bzcat "$UNSELECTED_PATH/models.combined/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
 ALLELE_LIST+=$(echo " " $(cat additional_alleles.txt | grep -v '#') )
 
 for kind in combined
