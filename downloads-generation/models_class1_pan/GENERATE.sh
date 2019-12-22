@@ -1,6 +1,8 @@
 #!/bin/bash
 # Model select pan-allele MHCflurry Class I models and calibrate percentile ranks.
 #
+# Usage: GENERATE.sh <local|cluster>
+#
 set -e
 set -x
 
@@ -27,18 +29,26 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 cp $SCRIPT_ABSOLUTE_PATH .
 cp $SCRIPT_DIR/additional_alleles.txt .
 
-GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
-echo "Detected GPUS: $GPUS"
 
-PROCESSORS=$(getconf _NPROCESSORS_ONLN)
-echo "Detected processors: $PROCESSORS"
+if [ "$1" != "cluster" ]
+then
+    GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
+    echo "Detected GPUS: $GPUS"
 
-if [ "$GPUS" -eq "0" ]; then
-   NUM_JOBS=${NUM_JOBS-1}
+    PROCESSORS=$(getconf _NPROCESSORS_ONLN)
+    echo "Detected processors: $PROCESSORS"
+
+    if [ "$GPUS" -eq "0" ]; then
+       NUM_JOBS=${NUM_JOBS-1}
+    else
+        NUM_JOBS=${NUM_JOBS-$GPUS}
+    fi
+    echo "Num jobs: $NUM_JOBS"
+    PARALLELISM_ARGS+=" --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1"
 else
-    NUM_JOBS=${NUM_JOBS-$GPUS}
+    PARALLELISM_ARGS+=" --cluster-parallelism --cluster-max-retries 3 --cluster-submit-command bsub --cluster-results-workdir $HOME/mhcflurry-scratch --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf"
 fi
-echo "Num jobs: $NUM_JOBS"
+
 
 export PYTHONUNBUFFERED=1
 
@@ -50,7 +60,7 @@ UNSELECTED_PATH="$(mhcflurry-downloads path models_class1_pan_unselected)"
 ALLELE_LIST=$(bzcat "$UNSELECTED_PATH/models.with_mass_spec/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
 ALLELE_LIST+=$(echo " " $(cat additional_alleles.txt | grep -v '#') )
 
-for kind in with_mass_spec no_mass_spec
+for kind in combined
 do
     MODELS_DIR="$UNSELECTED_PATH/models.${kind}"
     time mhcflurry-class1-select-pan-allele-models \
@@ -59,8 +69,7 @@ do
         --out-models-dir models.${kind} \
         --min-models 2 \
         --max-models 8 \
-        --num-jobs 0 \
-        --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
+        $PARALLELISM_ARGS
 
     cp "$MODELS_DIR/train_data.csv.bz2" "models.${kind}/"
 
@@ -74,7 +83,7 @@ do
         --num-peptides-per-length 100000 \
         --allele $ALLELE_LIST \
         --verbosity 1 \
-        --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1
+        $PARALLELISM_ARGS
 done
 
 bzip2 LOG.txt

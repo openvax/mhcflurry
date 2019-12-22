@@ -26,7 +26,7 @@ releases:
 
             - name: models_class1_pan_unselected
               part_urls:
-                - https://github.com/openvax/mhcflurry/releases/download/pre-1.4.0/models_class1_pan_unselected.20190924.tar.bz2.part.aa
+                - https://github.com/openvax/mhcflurry/releases/download/1.4.0/models_class1_pan_unselected.20191221.tar.bz2.part.aa
               default: false
 
             - name: models_class1_pan_refined
