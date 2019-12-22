@@ -138,7 +138,7 @@ do
             --result-dtype "float16" \
             --predictor netmhcpan4-$kind \
             --chunk-size 1000 \
-            --allele $(cat alleles.txt) \
+            --allele $(cat alleles.txt | grep -v '31:0102') \
             --out "$OUT_DIR" \
             --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
             --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf \
