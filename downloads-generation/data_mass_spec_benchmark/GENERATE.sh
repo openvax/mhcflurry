@@ -147,7 +147,7 @@ do
 
 
     # Run MHCflurry
-    for kind in with_mass_spec no_mass_spec
+    for kind in combined
     do
         OUT_DIR=predictions/${subset}.mhcflurry.${kind}
         REUSE1=""
