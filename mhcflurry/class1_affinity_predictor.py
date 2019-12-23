@@ -1120,15 +1120,14 @@ class Class1AffinityPredictor(object):
                 masked_allele_encoding = AlleleEncoding(
                     df.normalized_allele,
                     borrow_from=master_allele_encoding)
-                masked_peptides = peptides
+                masked_peptides = EncodableSequences.create(peptides)
             elif mask.sum() > 0:
                 row_slice = mask
                 masked_allele_encoding = AlleleEncoding(
                     df.loc[mask].normalized_allele,
                     borrow_from=master_allele_encoding)
-                masked_peptides = peptides.sequences[mask]
-
-            masked_peptides = EncodableSequences.create(masked_peptides)
+                masked_peptides = EncodableSequences.create(
+                    peptides.sequences[mask])
 
             if row_slice is not None:
                 # The following line is a performance optimization that may be
