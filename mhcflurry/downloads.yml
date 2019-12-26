@@ -35,8 +35,8 @@ releases:
 
             - name: models_class1_pan_variants
               part_urls:
-                - https://github.com/openvax/mhcflurry/releases/download/1.4.0/models_class1_pan_variants.20191101.tar.bz2.part.aa
-                - https://github.com/openvax/mhcflurry/releases/download/1.4.0/models_class1_pan_variants.20191101.tar.bz2.part.ab
+                - https://github.com/openvax/mhcflurry/releases/download/1.4.0/models_class1_pan_variants.20191226.tar.bz2.part.aa
+                - https://github.com/openvax/mhcflurry/releases/download/1.4.0/models_class1_pan_variants.20191226.tar.bz2.part.ab
               default: false
 
             - name: data_mass_spec_benchmark
