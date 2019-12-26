@@ -58,7 +58,7 @@ releases:
               default: false
 
             - name: data_mass_spec_annotated
-              url: https://github.com/openvax/mhcflurry/releases/download/1.4.0/data_mass_spec_annotated.20191220.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/1.4.0/data_mass_spec_annotated.20191226.tar.bz2
               default: false
 
             - name: data_references

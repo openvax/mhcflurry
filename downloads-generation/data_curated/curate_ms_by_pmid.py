@@ -202,7 +202,7 @@ def handle_pmid_25576301(filename):
     result_df["format"] = "multiallelic"
 
     allele_map = {
-        'Fib': "HLA-A*03:01	HLA-A*23:01	HLA-B*08:01	HLA-B*15:18	HLA-C*07:02	HLA-C*07:04",
+        'Fib': "HLA-A*03:01 HLA-A*23:01 HLA-B*08:01 HLA-B*15:18 HLA-C*07:02 HLA-C*07:04",
         'HCC1937': "HLA-A*23:01 HLA-A*24:02 HLA-B*07:02 HLA-B*40:01 HLA-C*03:04 HLA-C*07:02",
         'SupB15WT': None,  # four digit alleles unknown, will drop sample
         'SupB15RT': None,
@@ -1114,6 +1114,7 @@ def run():
 
     ms_df = pandas.concat(ms_dfs, ignore_index=True, sort=False)
     ms_df["cell_line"] = ms_df["cell_line"].fillna("")
+    ms_df["hla"] = ms_df["hla"].str.strip().str.replace(r'\s+', ' ')
 
     sample_table = ms_df[
         ["sample_id", "pmid", "expression_dataset", "cell_line", "sample_type"]
