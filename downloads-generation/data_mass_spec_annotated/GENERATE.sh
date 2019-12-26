@@ -27,7 +27,7 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 cp $SCRIPT_DIR/annotate.py .
 
-PEPTIDES=$(mhcflurry-downloads path data_curated)/ms.nontraining_curated.by_pmid.csv.bz2
+PEPTIDES=$(mhcflurry-downloads path data_curated)/ms.by_pmid.csv.bz2
 REFERENCES_DIR=$(mhcflurry-downloads path data_references)
 
 python annotate.py \
