@@ -806,7 +806,10 @@ def handle_pmid_31844290(*filenames):
         method='ffill')
     sample_info = sample_info.loc[sample_info.index.isin(allele_table.index)]
     sample_info = sample_info.loc[allele_table.index]
-    sample_info["hla"] = [" ".join(row) for _, row in allele_table.iterrows()]
+    sample_info["hla"] = [
+        " ".join(row).replace("HLA-A*31:0102", "HLA-A*31:01")  # fix a typo
+        for _, row in allele_table.iterrows()
+    ]
     sample_info["sample_type"] = sample_info['Cancer type'].map({
         'CLL': "B-CELL",
         'GBM': "GLIOBLASTOMA_TISSUE",
