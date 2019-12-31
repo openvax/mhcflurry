@@ -43,7 +43,10 @@ cp $SCRIPT_ABSOLUTE_PATH .
 # pseudosequences but have associated training data
 TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2"
 
-python select_alleles_to_disambiguate.py "$TRAINING_DATA" --out training_data.alleles.txt
+python select_alleles_to_disambiguate.py \
+    "$TRAINING_DATA" \
+    --min-count 50 \
+    --out training_data.alleles.txt
 
 # Human
 wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/fasta/A_prot.fasta

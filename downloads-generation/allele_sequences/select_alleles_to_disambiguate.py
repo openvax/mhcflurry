@@ -17,7 +17,6 @@ parser.add_argument(
 parser.add_argument(
     "--min-count",
     type=int,
-    default=50,
     metavar="N",
     help="Keep only alleles with at least N measurements")
 parser.add_argument(
