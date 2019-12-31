@@ -87,7 +87,7 @@ do
     fi
 
     mhcflurry-class1-train-pan-allele-models \
-        --data "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
+        --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
         --allele-sequences "$ALLELE_SEQUENCES" \
         --pretrain-data "$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2" \
         --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
