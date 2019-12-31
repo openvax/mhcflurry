@@ -66,10 +66,11 @@ then
     python generate_hyperparameters.production.py > hyperparameters.production.yaml
     python generate_hyperparameters.py hyperparameters.production.yaml no_pretrain > hyperparameters.no_pretrain.yaml
     python generate_hyperparameters.py hyperparameters.no_pretrain.yaml single_hidden > hyperparameters.single_hidden_no_pretrain.yaml
+    python generate_hyperparameters.py hyperparameters.compact_peptide.yaml compact_peptide > hyperparameters.compact_peptide.yaml
     python normalize_allele_names.py "$(mhcflurry-downloads path allele_sequences)/class1_pseudosequences.csv"  --out allele_sequences.34mer.csv
 fi
 
-for kind in 34mer_sequence single_hidden_no_pretrain no_pretrain 
+for kind in 34mer_sequence single_hidden_no_pretrain no_pretrain compact_peptide
 do
     CONTINUE_INCOMPLETE_ARGS=""
     if [ "$2" == "continue-incomplete" ] && [ -d "models.unselected.${kind}" ]
@@ -100,7 +101,7 @@ done
 
 echo "Done training. Beginning model selection."
 
-for kind in single_hidden_no_pretrain no_pretrain 34mer_sequence
+for kind in single_hidden_no_pretrain no_pretrain 34mer_sequence compact_peptide
 do
     MODELS_DIR="models.unselected.${kind}"
     mhcflurry-class1-select-pan-allele-models \

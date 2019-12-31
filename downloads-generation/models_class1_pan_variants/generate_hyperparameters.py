@@ -14,7 +14,7 @@ parser.add_argument(
     help="Production (i.e. standard) hyperparameters grid.")
 parser.add_argument(
     "kind",
-    choices=('single_hidden', 'no_pretrain'),
+    choices=('single_hidden', 'no_pretrain', 'compact_peptide'),
     help="Hyperameters variant to output")
 
 args = parser.parse_args(argv[1:])
@@ -38,9 +38,16 @@ def transform_to_no_pretrain(hyperparameters):
     return [result]
 
 
+def transform_to_compact_peptide(hyperparameters):
+    result = deepcopy(hyperparameters)
+    result['peptide_encoding']['alignment_method'] = 'left_pad_right_pad'
+    return [result]
+
+
 TRANSFORMS={
     "single_hidden": transform_to_single_hidden,
     "no_pretrain": transform_to_no_pretrain,
+    "compact_peptide": transform_to_compact_peptide,
 }
 
 transform = TRANSFORMS[args.kind]
