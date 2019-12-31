@@ -141,22 +141,89 @@ def run():
             "Read %d alleles to differentiate:" % len(differentiate_alleles),
             differentiate_alleles)
 
-        allele_sequences_to_differentiate = allele_sequences.loc[
+        to_differentiate = allele_sequences.loc[
             allele_sequences.index.isin(differentiate_alleles)
-        ]
-        print(allele_sequences_to_differentiate.shape)
+        ].copy()
+        print(to_differentiate.shape)
 
         additional_positions = []
-        for (_, sub_df) in allele_sequences_to_differentiate.groupby("recapitulated"):
+
+        # Greedy search, looking ahead 3 positions at a time.
+        possible_additional_positions = set()
+        for (_, sub_df) in to_differentiate.groupby("recapitulated"):
             if sub_df.aligned.nunique() > 1:
                 differing = pandas.DataFrame(
                     dict([(pos, chars) for (pos, chars) in
                     enumerate(zip(*sub_df.aligned.values)) if
                     any(c != chars[0] for c in chars) and "X" not in chars])).T
-                print(sub_df)
-                print(differing)
-                print()
-                additional_positions.extend(differing.index)
+                possible_additional_positions.update(differing.index.values)
+
+        def disambiguation_score(sequences):
+            counts = pandas.Series(sequences, copy=False).value_counts()
+            score = -1 * (counts[counts > 1] - 1).sum()
+            return score
+
+        possible_additional_positions = sorted(possible_additional_positions)
+        current_sequences = to_differentiate.recapitulated
+        while current_sequences.value_counts().max() > 1:
+            to_differentiate["equivalence_class_size"] = (
+                current_sequences.map(current_sequences.value_counts())
+            )
+            print("Ambiguous alleles", " ".join(
+                to_differentiate.loc[
+                    to_differentiate.equivalence_class_size > 1
+                ].index))
+            position1s = []
+            position2s = []
+            position3s = []
+            negative_position1_distances = []
+            possible_additional_positions_scores = []
+            position1_scores = []
+            for position1 in possible_additional_positions:
+                new_sequence1 = (
+                        current_sequences +
+                        to_differentiate.aligned.str.get(position1))
+                negative_position1_distance = -1 * min(
+                    abs(position1 - selected) for selected in selected_positions)
+                position1_score = disambiguation_score(new_sequence1)
+
+                for (i, position2) in enumerate(possible_additional_positions):
+                    new_sequence2 = (
+                        new_sequence1 +
+                        to_differentiate.aligned.str.get(position2))
+                    for position3 in possible_additional_positions:
+                        new_sequence3 = (
+                            new_sequence2 +
+                            to_differentiate.aligned.str.get(position3))
+
+                        score = disambiguation_score(new_sequence3)
+                        position1s.append(position1)
+                        position2s.append(position2)
+                        position3s.append(position3)
+                        possible_additional_positions_scores.append(score)
+                        negative_position1_distances.append(
+                            negative_position1_distance)
+                        position1_scores.append(position1_score)
+
+            scores_df = pandas.DataFrame({
+                "position1": position1s,
+                "position2": position2s,
+                "position3": position3s,
+                "negative_position1_distance": negative_position1_distances,
+                "tuple_score": possible_additional_positions_scores,
+                "position1_score": position1_scores,
+            }).sort_values(
+                ["tuple_score", "position1_score", "negative_position1_distance"],
+                ascending=False)
+            print(scores_df)
+            selected_additional_position = scores_df.iloc[0].position1
+            print("Selected additional position", selected_additional_position)
+            additional_positions.append(selected_additional_position)
+            current_sequences = (
+                    current_sequences +
+                    to_differentiate.aligned.str.get(
+                        selected_additional_position))
+            possible_additional_positions.remove(selected_additional_position)
 
     additional_positions = sorted(set(additional_positions))
     print(

@@ -40,10 +40,9 @@ cp $SCRIPT_ABSOLUTE_PATH .
 # Training data is used to decide which additional positions to include in the
 # allele sequences to differentiate alleles that have identical traditional
 # pseudosequences but have associated training data
-TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2"
+TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2"
 
-bzcat "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
-    | cut -f 1 -d , | uniq | sort | uniq | grep -v allele > training_data.alleles.txt
+python select_alleles_to_disambiguate.py "$TRAINING_DATA" --out training_data.alleles.txt
 
 # Human
 wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/fasta/A_prot.fasta
