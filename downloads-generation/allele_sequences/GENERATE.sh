@@ -32,6 +32,7 @@ clustalo --version
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 cp $SCRIPT_DIR/make_allele_sequences.py .
+cp $SCRIPT_DIR/select_alleles_to_disambiguate.py .
 cp $SCRIPT_DIR/filter_sequences.py .
 cp $SCRIPT_DIR/class1_pseudosequences.csv .
 cp $SCRIPT_ABSOLUTE_PATH .
