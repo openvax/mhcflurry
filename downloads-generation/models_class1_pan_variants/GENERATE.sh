@@ -68,7 +68,7 @@ then
     python generate_hyperparameters.py hyperparameters.production.yaml compact_peptide > hyperparameters.compact_peptide.yaml
 fi
 
-for kind in 34mer_sequence single_hidden_no_pretrain no_pretrain compact_peptide no_additional_ms ms_only
+for kind in 34mer_sequence single_hidden_no_pretrain no_pretrain compact_peptide no_additional_ms ms_only affinity_only
 do
     CONTINUE_INCOMPLETE_ARGS=""
     if [ "$2" == "continue-incomplete" ] && [ -d "models.unselected.${kind}" ]
@@ -94,6 +94,10 @@ do
     then
         TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.mass_spec.csv.bz2"
     fi
+    if [ "$kind" == "affinity_only" ]
+    then
+        TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.affinity.csv.bz2"
+    fi
 
     mhcflurry-class1-train-pan-allele-models \
         --data "$TRAINING_DATA" \
@@ -109,7 +113,7 @@ done
 
 echo "Done training. Beginning model selection."
 
-for kind in single_hidden_no_pretrain no_pretrain 34mer_sequence compact_peptide no_additional_ms ms_only
+for kind in single_hidden_no_pretrain no_pretrain 34mer_sequence compact_peptide no_additional_ms ms_only affinity_only
 do
     MODELS_DIR="models.unselected.${kind}"
     mhcflurry-class1-select-pan-allele-models \
@@ -141,3 +145,12 @@ done
 split -b 2000M "$RESULT" "$PARTS"
 echo "Split into parts:"
 ls -lh "${PARTS}"*
+
+# Write out just the selected models
+# Move unselected into a hidden dir so it is excluded in the glob (*).
+mkdir .ignored
+mv models.unselected.* .ignored/
+RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.selected.$(date +%Y%m%d).tar.bz2"
+tar -cjf "$RESULT" *
+mv .ignored/* . && rmdir .ignored
+echo "Created archive: $RESULT"
