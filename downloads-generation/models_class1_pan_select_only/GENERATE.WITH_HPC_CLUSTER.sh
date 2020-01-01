@@ -1,1 +1,0 @@
-bash GENERATE.sh cluster

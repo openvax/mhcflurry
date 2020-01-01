@@ -79,6 +79,7 @@ do
 
     ALLELE_SEQUENCES="$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv"
     TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2"
+    HYPERPARAMETERS="hyperparameters.yaml"
 
     mhcflurry-class1-train-pan-allele-models \
         --data "$TRAINING_DATA" \
