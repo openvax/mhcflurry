@@ -62,15 +62,13 @@ if [ "$2" != "continue-incomplete" ]
 then
     cp $SCRIPT_DIR/generate_hyperparameters.production.py .
     cp $SCRIPT_DIR/generate_hyperparameters.py .
-    cp $SCRIPT_DIR/normalize_allele_names.py .
     python generate_hyperparameters.production.py > hyperparameters.production.yaml
     python generate_hyperparameters.py hyperparameters.production.yaml no_pretrain > hyperparameters.no_pretrain.yaml
     python generate_hyperparameters.py hyperparameters.no_pretrain.yaml single_hidden > hyperparameters.single_hidden_no_pretrain.yaml
     python generate_hyperparameters.py hyperparameters.production.yaml compact_peptide > hyperparameters.compact_peptide.yaml
-    python normalize_allele_names.py "$(mhcflurry-downloads path allele_sequences)/class1_pseudosequences.csv"  --out allele_sequences.34mer.csv
 fi
 
-for kind in 34mer_sequence single_hidden_no_pretrain no_pretrain compact_peptide
+for kind in 34mer_sequence single_hidden_no_pretrain no_pretrain compact_peptide no_additional_ms ms_only
 do
     CONTINUE_INCOMPLETE_ARGS=""
     if [ "$2" == "continue-incomplete" ] && [ -d "models.unselected.${kind}" ]
@@ -83,12 +81,22 @@ do
     HYPERPARAMETERS=hyperparameters.$kind.yaml
     if [ "$kind" == "34mer_sequence" ]
     then
-        ALLELE_SEQUENCES=allele_sequences.34mer.csv
+        ALLELE_SEQUENCES="$(mhcflurry-downloads path allele_sequences)/allele_sequences.no_differentiation.csv"
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
 
+    TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2"
+    if [ "$kind" == "no_additional_ms" ]
+    then
+        TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.no_additional_ms.csv.bz2"
+    fi
+    if [ "$kind" == "ms_only" ]
+    then
+        TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.mass_spec.csv.bz2"
+    fi
+
     mhcflurry-class1-train-pan-allele-models \
-        --data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+        --data "$TRAINING_DATA" \
         --allele-sequences "$ALLELE_SEQUENCES" \
         --pretrain-data "$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2" \
         --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
@@ -101,7 +109,7 @@ done
 
 echo "Done training. Beginning model selection."
 
-for kind in single_hidden_no_pretrain no_pretrain 34mer_sequence compact_peptide
+for kind in single_hidden_no_pretrain no_pretrain 34mer_sequence compact_peptide no_additional_ms ms_only
 do
     MODELS_DIR="models.unselected.${kind}"
     mhcflurry-class1-select-pan-allele-models \
