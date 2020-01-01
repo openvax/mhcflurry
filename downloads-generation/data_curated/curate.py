@@ -252,6 +252,7 @@ def load_data_additional_ms(filename):
     df["measurement_type"] = "qualitative"
     df["measurement_kind"] = "mass_spec"
     df["measurement_source"] = "MS:pmid:" + df["original_pmid"].map(str)
+    df["original_allele"] = ""
     return df
 
 
@@ -311,18 +312,26 @@ def run():
     print("Measurement kind:")
     print(df.measurement_kind.value_counts())
 
-    df.to_csv(args.out_csv, index=False)
-    print("Wrote: %s" % os.path.abspath(args.out_csv))
+    print("Measurement source / kind:")
+    print(
+        df.groupby(
+            ["measurement_source", "measurement_kind"]
+        ).peptide.count().sort_values())
 
+    def write(write_df, filename):
+        filename = os.path.abspath(filename)
+        write_df.to_csv(filename, index=False)
+        print("Wrote [%d lines]: %s" % (len(write_df), filename))
+
+    write(df, args.out_csv)
     if args.out_affinity_csv:
-        df.loc[df.measurement_kind == "affinity"].to_csv(
-            args.out_affinity_csv, index=False)
-        print("Wrote: %s" % os.path.abspath(args.out_affinity_csv))
-
+        write(
+            df.loc[df.measurement_kind == "affinity"],
+            args.out_affinity_csv)
     if args.out_mass_spec_csv:
-        df.loc[df.measurement_kind == "mass_spec"].to_csv(
-            args.out_mass_spec_csv, index=False)
-        print("Wrote: %s" % os.path.abspath(args.out_mass_spec_csv))
+        write(
+            df.loc[df.measurement_kind == "mass_spec"],
+            args.out_mass_spec_csv)
 
 
 if __name__ == '__main__':

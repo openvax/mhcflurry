@@ -57,7 +57,6 @@ bzip2 rna_expression.csv
 
 rm -rf ms
 
-# With mass-spec data
 time python curate.py \
     --data-iedb \
         "$(mhcflurry-downloads path data_iedb)/mhc_ligand_full.csv.bz2" \
@@ -69,6 +68,15 @@ time python curate.py \
     --out-csv curated_training_data.csv \
     --out-affinity-csv curated_training_data.affinity.csv \
     --out-mass-spec-csv curated_training_data.mass_spec.csv
+
+time python curate.py \
+    --data-iedb \
+        "$(mhcflurry-downloads path data_iedb)/mhc_ligand_full.csv.bz2" \
+    --data-kim2014 \
+        "$(mhcflurry-downloads path data_published)/bdata.20130222.mhci.public.1.txt" \
+    --data-systemhc-atlas \
+        "$(mhcflurry-downloads path data_systemhcatlas)/data.csv.bz2" \
+    --out-csv curated_training_data.no_additional_ms.csv
 
 for i in $(ls *.csv)
 do
