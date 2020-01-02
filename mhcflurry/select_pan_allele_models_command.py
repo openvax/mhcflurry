@@ -172,7 +172,7 @@ def run(argv=sys.argv[1:]):
     print(df[fold_cols].mean())
 
     # Allele names in data are assumed to be already normalized.
-    df = df.loc[df.allele.isin(alleles)].dropna()
+    df = df.loc[df.allele.isin(alleles)]
     print("Subselected to supported alleles: %s" % str(df.shape))
 
     metadata_dfs["model_selection_data"] = df
