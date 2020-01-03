@@ -83,7 +83,7 @@ releases:
               default: false
 
             - name: data_curated
-              url: https://github.com/openvax/mhcflurry/releases/download/1.4.0/data_curated.20200101.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_curated.20200103.tar.bz2
               default: true
 
             # Older downloads
