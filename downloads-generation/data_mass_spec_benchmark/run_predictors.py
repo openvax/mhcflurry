@@ -394,8 +394,31 @@ def do_predictions_mhctools(work_item_dicts, constant_data=None):
                 program_name="netMHCpan-4.0",
                 mode="elution_score")
         elif predictor_name == "mixmhcpred":
-            predictor = mhctools.MixMHCpred(
-                alleles=alleles)
+            # Empirically determine supported alleles.
+            mixmhcpred_usable_alleles = []
+            unusable_alleles = []
+            for allele in alleles:
+                predictor = mhctools.MixMHCpred(alleles=[allele])
+
+                # We use inf not nan to indicate unsupported alleles since
+                # we use nan to indicate incomplete results that still need
+                # to execute.
+                empty_results = pandas.Series(index=peptides,
+                    dtype=numpy.float16)
+                empty_results[:] = numpy.inf
+                try:
+                    predictor.predict_peptides_dataframe(["PEPTIDESS"])
+                    mixmhcpred_usable_alleles.append(allele)
+                except ValueError:
+                    unusable_alleles.append(allele)
+                    for col in cols:
+                        result["%s %s" % (allele, col)] = empty_results.values
+
+            print("MixMHCpred usable alleles: ", *mixmhcpred_usable_alleles)
+            print("MixMHCpred unusable alleles: ", *unusable_alleles)
+            predictor = mhctools.MixMHCpred(alleles=alleles)
+            assert mixmhcpred_usable_alleles, mixmhcpred_usable_alleles
+            alleles = mixmhcpred_usable_alleles
         else:
             raise ValueError("Unsupported", predictor_name)
 
