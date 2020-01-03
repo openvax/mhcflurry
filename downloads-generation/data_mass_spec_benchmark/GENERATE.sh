@@ -96,7 +96,8 @@ else
 fi
 
 # Write out and process peptides.
-for subset in all
+#for subset in all
+for subset in chr1
 do
     if [ "$2" == "reuse-all" ]
     then
@@ -133,6 +134,7 @@ do
         --out "$OUT_DIR" \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
         --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf \
+	--max-peptides 1000 \
         --reuse-predictions "$REUSE" $EXTRA_ARGS
 
     # Run netmhcpan4
