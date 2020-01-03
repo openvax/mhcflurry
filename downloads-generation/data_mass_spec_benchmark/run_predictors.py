@@ -395,9 +395,7 @@ def do_predictions_mhctools(work_item_dicts, constant_data=None):
                 mode="elution_score")
         elif predictor_name == "mixmhcpred":
             predictor = mhctools.MixMHCpred(
-                alleles=alleles,
-                program_name="netMHCpan-4.0",
-                mode="elution_score")
+                alleles=alleles)
         else:
             raise ValueError("Unsupported", predictor_name)
 
