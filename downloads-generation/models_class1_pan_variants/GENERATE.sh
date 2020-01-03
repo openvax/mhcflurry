@@ -89,14 +89,17 @@ do
     if [ "$kind" == "no_additional_ms" ]
     then
         TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.no_additional_ms.csv.bz2"
+        HYPERPARAMETERS=hyperparameters.production.yaml
     fi
     if [ "$kind" == "ms_only" ]
     then
         TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.mass_spec.csv.bz2"
+        HYPERPARAMETERS=hyperparameters.production.yaml
     fi
     if [ "$kind" == "affinity_only" ]
     then
         TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.affinity.csv.bz2"
+        HYPERPARAMETERS=hyperparameters.production.yaml
     fi
 
     mhcflurry-class1-train-pan-allele-models \
@@ -123,7 +126,7 @@ do
         --min-models 2 \
         --max-models 8 \
         $PARALLELISM_ARGS
-    ln -s "$MODELS_DIR/train_data.csv.bz2" "models.${kind}/train_data.csv.bz2"
+    cp "$MODELS_DIR/train_data.csv.bz2" "models.${kind}/train_data.csv.bz2"
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
