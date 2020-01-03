@@ -96,9 +96,7 @@ else
 fi
 
 # Write out and process peptides.
-# First just chr1 peptides, then all peptides.
-# TODO: switch this back
-for subset in chr1 all
+for subset in all
 do
     if [ "$2" == "reuse-all" ]
     then
@@ -118,19 +116,33 @@ do
         bzip2 proteome_peptides.$subset.csv
     fi
 
+    # Run mixmhcpred
+    OUT_DIR=predictions/${subset}.mixmhcpred
+    REUSE=""
+    if [ "${2:-reuse-none}" != "reuse-none" ]
+    then
+        REUSE="$EXISTING_DATA"/$OUT_DIR
+    fi
+
+    python run_predictors.py \
+        proteome_peptides.$subset.csv.bz2 \
+        --result-dtype "float16" \
+        --predictor mixmhcpred \
+        --chunk-size 500000 \
+        --allele $(cat alleles.txt) \
+        --out "$OUT_DIR" \
+        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf \
+        --reuse-predictions "$REUSE" $EXTRA_ARGS
+
     # Run netmhcpan4
     for kind in el ba
     do
         OUT_DIR=predictions/${subset}.netmhcpan4.$kind
-        REUSE1=""
-        REUSE2=""
-        if [ "$subset" == "all" ]
-        then
-            REUSE1="predictions/chr1.netmhcpan4.$kind"
-        fi
+        REUSE=""
         if [ "${2:-reuse-none}" != "reuse-none" ]
         then
-            REUSE2="$EXISTING_DATA"/$OUT_DIR
+            REUSE="$EXISTING_DATA"/$OUT_DIR
         fi
 
         python run_predictors.py \
@@ -138,11 +150,11 @@ do
             --result-dtype "float16" \
             --predictor netmhcpan4-$kind \
             --chunk-size 1000 \
-            --allele $(cat alleles.txt | grep -v '31:0102') \
+            --allele $(cat alleles.txt) \
             --out "$OUT_DIR" \
             --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
             --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf \
-            --reuse-predictions "$REUSE1" "$REUSE2" $EXTRA_ARGS
+            --reuse-predictions "$REUSE" $EXTRA_ARGS
     done
 
 
@@ -150,15 +162,10 @@ do
     for kind in combined
     do
         OUT_DIR=predictions/${subset}.mhcflurry.${kind}
-        REUSE1=""
-        REUSE2=""
-        if [ "$subset" == "all" ]
-        then
-            REUSE1="predictions/chr1.mhcflurry.${kind}"
-        fi
+        REUSE=""
         if [ "${2:-reuse-none}" != "reuse-none" ] && [ "${2:-reuse-none}" != "reuse-predictions-except-mhcflurry" ]
         then
-            REUSE2="$EXISTING_DATA"/$OUT_DIR
+            REUSE="$EXISTING_DATA"/$OUT_DIR
         fi
 
         python run_predictors.py \
@@ -172,7 +179,7 @@ do
             --out "$OUT_DIR" \
             --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
             --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.gpu.lsf \
-            --reuse-predictions "$REUSE1" "$REUSE2" $EXTRA_ARGS
+            --reuse-predictions "$REUSE" $EXTRA_ARGS
     done
 done
 

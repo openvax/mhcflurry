@@ -43,7 +43,7 @@ parser.add_argument(
 parser.add_argument(
     "--predictor",
     required=True,
-    choices=("mhcflurry", "netmhcpan4-ba", "netmhcpan4-el"))
+    choices=("mhcflurry", "netmhcpan4-ba", "netmhcpan4-el", "mixmhcpred"))
 parser.add_argument(
     "--mhcflurry-models-dir",
     metavar="DIR",
@@ -90,6 +90,7 @@ PREDICTOR_TO_COLS = {
     "mhcflurry": ["affinity"],
     "netmhcpan4-ba": ["affinity", "percentile_rank"],
     "netmhcpan4-el": ["elution_score"],
+    "mixmhcpred": ["elution_score"],
 }
 
 
@@ -389,6 +390,11 @@ def do_predictions_mhctools(work_item_dicts, constant_data=None):
                 mode="binding_affinity")
         elif predictor_name == "netmhcpan4-el":
             predictor = mhctools.NetMHCpan4(
+                alleles=alleles,
+                program_name="netMHCpan-4.0",
+                mode="elution_score")
+        elif predictor_name == "mixmhcpred":
+            predictor = mhctools.MixMHCpred(
                 alleles=alleles,
                 program_name="netMHCpan-4.0",
                 mode="elution_score")
