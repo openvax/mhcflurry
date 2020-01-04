@@ -37,6 +37,7 @@ ls "$NETMHC_BUNDLE_TMPDIR"
 ls "$TMPDIR"
 
 netMHCpan-4.0 -listMHC
+MixMHCpred -h
 free -m
 env
 
