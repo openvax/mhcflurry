@@ -128,7 +128,7 @@ do
         "$(pwd)/proteome_peptides.$subset.csv.bz2" \
         --result-dtype "float16" \
         --predictor mixmhcpred \
-        --chunk-size 500000 \
+        --chunk-size 10000 \
         --allele $(cat alleles.txt) \
         --out "$OUT_DIR" \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
