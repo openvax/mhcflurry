@@ -68,7 +68,7 @@ then
     python generate_hyperparameters.py hyperparameters.production.yaml compact_peptide > hyperparameters.compact_peptide.yaml
 fi
 
-for kind in 34mer_sequence single_hidden_no_pretrain no_pretrain compact_peptide no_additional_ms ms_only affinity_only
+for kind in no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only
 do
     CONTINUE_INCOMPLETE_ARGS=""
     if [ "$2" == "continue-incomplete" ] && [ -d "models.unselected.${kind}" ]
@@ -116,7 +116,7 @@ done
 
 echo "Done training. Beginning model selection."
 
-for kind in single_hidden_no_pretrain no_pretrain 34mer_sequence compact_peptide no_additional_ms ms_only affinity_only
+for kind in no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only
 do
     MODELS_DIR="models.unselected.${kind}"
     mhcflurry-class1-select-pan-allele-models \

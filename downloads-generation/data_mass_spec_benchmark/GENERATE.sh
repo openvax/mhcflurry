@@ -96,8 +96,7 @@ else
 fi
 
 # Write out and process peptides.
-#for subset in all
-for subset in chr1
+for subset in all
 do
     if [ "$2" == "reuse-all" ]
     then
@@ -126,7 +125,7 @@ do
     fi
 
     python run_predictors.py \
-        proteome_peptides.$subset.csv.bz2 \
+        "$(pwd)/proteome_peptides.$subset.csv.bz2" \
         --result-dtype "float16" \
         --predictor mixmhcpred \
         --chunk-size 500000 \
@@ -134,7 +133,6 @@ do
         --out "$OUT_DIR" \
         --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
         --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.nogpu.lsf \
-	--max-peptides 1000 \
         --reuse-predictions "$REUSE" $EXTRA_ARGS
 
     # Run netmhcpan4
@@ -148,7 +146,7 @@ do
         fi
 
         python run_predictors.py \
-            proteome_peptides.$subset.csv.bz2 \
+            "$(pwd)/proteome_peptides.$subset.csv.bz2" \
             --result-dtype "float16" \
             --predictor netmhcpan4-$kind \
             --chunk-size 1000 \
@@ -171,7 +169,7 @@ do
         fi
 
         python run_predictors.py \
-            proteome_peptides.${subset}.csv.bz2 \
+            "$(pwd)/proteome_peptides.$subset.csv.bz2" \
             --result-dtype "float16" \
             --predictor mhcflurry \
             --chunk-size 500000 \

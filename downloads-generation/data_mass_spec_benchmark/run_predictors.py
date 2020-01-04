@@ -89,8 +89,8 @@ add_cluster_parallelism_args(parser)
 PREDICTOR_TO_COLS = {
     "mhcflurry": ["affinity"],
     "netmhcpan4-ba": ["affinity", "percentile_rank"],
-    "netmhcpan4-el": ["elution_score"],
-    "mixmhcpred": ["elution_score"],
+    "netmhcpan4-el": ["score"],
+    "mixmhcpred": ["score"],
 }
 
 
@@ -405,7 +405,7 @@ def do_predictions_mhctools(work_item_dicts, constant_data=None):
                 # to execute.
                 empty_results = pandas.Series(index=peptides,
                     dtype=numpy.float16)
-                empty_results[:] = numpy.inf
+                empty_results[:] = float('-inf')
                 try:
                     predictor.predict_peptides_dataframe(["PEPTIDESS"])
                     mixmhcpred_usable_alleles.append(allele)
@@ -416,9 +416,8 @@ def do_predictions_mhctools(work_item_dicts, constant_data=None):
 
             print("MixMHCpred usable alleles: ", *mixmhcpred_usable_alleles)
             print("MixMHCpred unusable alleles: ", *unusable_alleles)
-            predictor = mhctools.MixMHCpred(alleles=alleles)
+            predictor = mhctools.MixMHCpred(alleles=mixmhcpred_usable_alleles)
             assert mixmhcpred_usable_alleles, mixmhcpred_usable_alleles
-            alleles = mixmhcpred_usable_alleles
         else:
             raise ValueError("Unsupported", predictor_name)
 
