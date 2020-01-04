@@ -260,17 +260,17 @@ def cluster_results(
             while True:
                 result_item = None
                 for d in result_items:
+                    if additional_complete_file:
+                        additional_complete_file_path = os.path.join(
+                            d['work_dir'], additional_complete_file)
                     if os.path.exists(d['finished_path']):
                         result_item = d
                         break
-                    if additional_complete_file:
-                        additional_complete_file_path = os.path.join(
-                            d['work_dir'],
-                            additional_complete_file)
-                        if os.path.exists(additional_complete_file_path):
-                            result_item = d
-                            print("Exists", additional_complete_file_path)
-                            break
+                    if additional_complete_file and os.path.exists(
+                            additional_complete_file_path):
+                        result_item = d
+                        print("Exists", additional_complete_file_path)
+                        break
 
                 if result_item is None:
                     time.sleep(60)
