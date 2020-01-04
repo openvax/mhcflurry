@@ -290,9 +290,14 @@ def cluster_results(
             if os.path.exists(error_path) or not os.path.exists(result_path):
                 if os.path.exists(error_path):
                     print("Error path exists", error_path)
-                    with open(error_path, "rb") as fd:
-                        exception = pickle.load(fd)
-                        print(exception)
+                    try:
+                        with open(error_path, "rb") as fd:
+                            exception = pickle.load(fd)
+                            print(exception)
+                    except Exception as e:
+                        exception = RuntimeError(
+                            "Error, but couldn't read error path: %s %s" % (
+                                type(e), str(e)))
                 else:
                     exception = RuntimeError("Error, but no exception saved")
                 if not os.path.exists(result_path):
