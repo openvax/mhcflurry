@@ -364,6 +364,7 @@ def do_predictions_mhctools(work_item_dicts, constant_data=None):
     # so we have to re-import everything here.
     import time
     import numpy
+    import pandas
     import numpy.testing
     import mhctools
 
