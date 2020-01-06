@@ -36,6 +36,7 @@ from tqdm import tqdm
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 import posixpath
+import pandas
 
 try:
     from urllib.request import urlretrieve
@@ -262,6 +263,10 @@ def fetch_subcommand(args):
             for member in tqdm(tar.getmembers(), desc='Extracting'):
                 tar.extractall(path=result_dir, members=[member])
             tar.close()
+
+            # Save URLs that were used for this download.
+            pandas.DataFrame({"url": urls}).to_csv(
+                os.path.join(result_dir, "DOWNLOAD_INFO.csv"), index=False)
             qprint("Extracted %d files to: %s" % (
                 len(names), quote(result_dir)))
         finally:
@@ -298,8 +303,8 @@ def info_subcommand(args):
 
     downloads = get_current_release_downloads()
 
-    format_string = "%-40s  %-12s  %-20s "
-    print(format_string % ("DOWNLOAD NAME", "DOWNLOADED?", "URL"))
+    format_string = "%-40s  %-12s  %-12s  %-20s "
+    print(format_string % ("DOWNLOAD NAME", "DOWNLOADED?", "UP TO DATE?", "URL"))
 
     for (item, info) in downloads.items():
         urls = (
@@ -313,6 +318,10 @@ def info_subcommand(args):
         print(format_string % (
             item,
             yes_no(info['downloaded']),
+            "" if not info['downloaded'] else (
+                "UNKNOWN" if info['up_to_date'] is None
+                else yes_no(info['up_to_date'])
+            ),
             url_description))
 
 
