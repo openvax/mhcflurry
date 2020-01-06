@@ -22,9 +22,10 @@ AMINO_ACIDS = sorted(COMMON_AMINO_ACIDS)
 parser = argparse.ArgumentParser(usage=__doc__)
 parser.add_argument(
     "--class1-models-dir-with-ms",
+    "--class1-models",
     metavar="DIR",
     default=get_path(
-        "models_class1_pan", "models.with_mass_spec", test_exists=False),
+        "models_class1_pan", "models.combined", test_exists=False),
     help="Class1 models. Default: %(default)s",
 )
 parser.add_argument(
@@ -190,9 +191,7 @@ def go(argv):
         mkdir(args.out_dir)
 
     predictors = [
-        ("with_mass_spec", args.class1_models_dir_with_ms),
-        ("refined", args.class1_models_dir_refined),
-        ("no_mass_spec", args.class1_models_dir_no_ms),
+        ("combined", args.class1_models_dir_with_ms),
     ]
     info_per_predictor = OrderedDict()
     alleles = set()
@@ -250,11 +249,7 @@ def go(argv):
                 models_label=label)
             if not length_distribution_image_path:
                 continue
-            w("*%s*\n" % {
-                "with_mass_spec": "With mass-spec",
-                "no_mass_spec": "Affinities only",
-                "refined": "With mass-spec after multiallelic refinement",
-            }[label])
+            w("*%s*\n")
             if info['observations_per_allele'] is not None:
                 w("Training observations (unique peptides): %d" % (
                     info['observations_per_allele'].get(allele, 0)))
