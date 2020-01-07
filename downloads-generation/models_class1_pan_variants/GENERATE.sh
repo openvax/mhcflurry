@@ -72,8 +72,7 @@ fi
 #VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only )
 VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence )
 
-
-for kind in "${variants[@]}"
+for kind in "${VARIANTS[@]}"
 do
     CONTINUE_INCOMPLETE_ARGS=""
     if [ "$2" == "continue-incomplete" ] && [ -d "models.unselected.${kind}" ]
@@ -164,7 +163,7 @@ done
 
 echo "Done training. Beginning model selection."
 
-for kind in "${variants[@]}"
+for kind in "${VARIANTS[@]}"
 do
     MODELS_DIR="models.unselected.${kind}"
     mhcflurry-class1-select-pan-allele-models \
