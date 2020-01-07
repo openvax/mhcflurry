@@ -34,7 +34,7 @@ def go(args):
         print("Filtering to MS only")
         df = df.loc[df.measurement_kind == "mass_spec"].copy()
 
-    if args.set_measurement_value:
+    if args.set_measurement_value is not None:
         indexer = df.measurement_kind == "mass_spec"
         df.loc[
             indexer,
