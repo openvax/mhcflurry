@@ -69,8 +69,8 @@ then
     python generate_hyperparameters.py hyperparameters.production.yaml compact_peptide > hyperparameters.compact_peptide.yaml
 fi
 
-#VARIANTS=( no_additional_ms_0nm 0nm ms_only_0nm no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only )
-VARIANTS=( no_additional_ms_0nm 0nm ms_only_0nm no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence )
+#VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only )
+VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence )
 
 
 for kind in "${variants[@]}"
@@ -97,9 +97,20 @@ do
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
 
+    if [ "$kind" == "no_additional_ms_ms_only_0nm" ]
+    then
+        TRAINING_DATA="train_data.$kind.csv"
+        python reassign_mass_spec_training_data.py \
+            "$(mhcflurry-downloads path data_curated)/curated_training_data.no_additional_ms.csv.bz2" \
+            --set-measurement-value 0 \
+            --ms-only \
+            --out-csv "$TRAINING_DATA"
+        HYPERPARAMETERS=hyperparameters.production.yaml
+    fi
+
     if [ "$kind" == "no_additional_ms_0nm" ]
     then
-        TRAINING_DATA="train_data.no_additional_ms_0nm.csv"
+        TRAINING_DATA="train_data.$kind.csv"
         python reassign_mass_spec_training_data.py \
             "$(mhcflurry-downloads path data_curated)/curated_training_data.no_additional_ms.csv.bz2" \
             --set-measurement-value 0 \
@@ -109,7 +120,7 @@ do
 
     if [ "$kind" == "0nm" ]
     then
-        TRAINING_DATA="train_data.0nm.csv"
+        TRAINING_DATA="train_data.$kind.csv"
         python reassign_mass_spec_training_data.py \
             "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
             --set-measurement-value 0 \
@@ -119,7 +130,7 @@ do
 
     if [ "$kind" == "ms_only_0nm" ]
     then
-        TRAINING_DATA="train_data.ms_only_0nm.csv"
+        TRAINING_DATA="train_data.$kind.csv"
         python reassign_mass_spec_training_data.py \
             "$(mhcflurry-downloads path data_curated)/curated_training_data.mass_spec.csv.bz2" \
             --set-measurement-value 0 \
