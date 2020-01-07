@@ -21,9 +21,10 @@ def go(args):
     df = pandas.read_csv(args.data)
     print(df)
 
-    bad = (
-        df.loc[df.measurement_kind == "mass_spec"].measurement_inequality
-        != "<")
+    bad = df.loc[
+        (df.measurement_kind == "mass_spec") &
+        (df.measurement_inequality != "<")
+    ]
     assert len(bad) == 0, bad
 
     if args.ms_only:
