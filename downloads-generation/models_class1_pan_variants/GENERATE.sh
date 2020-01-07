@@ -62,13 +62,18 @@ if [ "$2" != "continue-incomplete" ]
 then
     cp $SCRIPT_DIR/generate_hyperparameters.production.py .
     cp $SCRIPT_DIR/generate_hyperparameters.py .
+    cp $SCRIPT_DIR/reassign_mass_spec_training_data.py .
     python generate_hyperparameters.production.py > hyperparameters.production.yaml
     python generate_hyperparameters.py hyperparameters.production.yaml no_pretrain > hyperparameters.no_pretrain.yaml
     python generate_hyperparameters.py hyperparameters.no_pretrain.yaml single_hidden > hyperparameters.single_hidden_no_pretrain.yaml
     python generate_hyperparameters.py hyperparameters.production.yaml compact_peptide > hyperparameters.compact_peptide.yaml
 fi
 
-for kind in no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only
+#VARIANTS=( no_additional_ms_0nm 0nm ms_only_0nm no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only )
+VARIANTS=( no_additional_ms_0nm 0nm ms_only_0nm no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence )
+
+
+for kind in "${variants[@]}"
 do
     CONTINUE_INCOMPLETE_ARGS=""
     if [ "$2" == "continue-incomplete" ] && [ -d "models.unselected.${kind}" ]
@@ -91,11 +96,43 @@ do
         TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.no_additional_ms.csv.bz2"
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
+
+    if [ "$kind" == "no_additional_ms_0nm" ]
+    then
+        TRAINING_DATA="train_data.no_additional_ms_0nm.csv"
+        python reassign_mass_spec_training_data.py \
+            "$(mhcflurry-downloads path data_curated)/curated_training_data.no_additional_ms.csv.bz2" \
+            --set-measurement-value 0 \
+            --out-csv "$TRAINING_DATA"
+        HYPERPARAMETERS=hyperparameters.production.yaml
+    fi
+
+    if [ "$kind" == "0nm" ]
+    then
+        TRAINING_DATA="train_data.0nm.csv"
+        python reassign_mass_spec_training_data.py \
+            "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+            --set-measurement-value 0 \
+            --out-csv "$TRAINING_DATA"
+        HYPERPARAMETERS=hyperparameters.production.yaml
+    fi
+
+    if [ "$kind" == "ms_only_0nm" ]
+    then
+        TRAINING_DATA="train_data.ms_only_0nm.csv"
+        python reassign_mass_spec_training_data.py \
+            "$(mhcflurry-downloads path data_curated)/curated_training_data.mass_spec.csv.bz2" \
+            --set-measurement-value 0 \
+            --out-csv "$TRAINING_DATA"
+        HYPERPARAMETERS=hyperparameters.production.yaml
+    fi
+
     if [ "$kind" == "ms_only" ]
     then
         TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.mass_spec.csv.bz2"
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
+
     if [ "$kind" == "affinity_only" ]
     then
         TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.affinity.csv.bz2"
@@ -116,7 +153,7 @@ done
 
 echo "Done training. Beginning model selection."
 
-for kind in no_additional_ms ms_only no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only
+for kind in "${variants[@]}"
 do
     MODELS_DIR="models.unselected.${kind}"
     mhcflurry-class1-select-pan-allele-models \
