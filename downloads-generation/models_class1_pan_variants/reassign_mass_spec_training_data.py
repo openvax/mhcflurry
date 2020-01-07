@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser(usage=__doc__)
 
 parser.add_argument("data", metavar="CSV", help="Training data")
 parser.add_argument("--ms-only", action="store_true", default=False)
+parser.add_argument("--drop-negative-ms", action="store_true", default=False)
 parser.add_argument("--set-measurement-value", type=float)
 parser.add_argument("--out-csv")
 
@@ -21,11 +22,13 @@ def go(args):
     df = pandas.read_csv(args.data)
     print(df)
 
-    bad = df.loc[
-        (df.measurement_kind == "mass_spec") &
-        (df.measurement_inequality != "<")
-    ]
-    assert len(bad) == 0, bad
+    if args.drop_negative_ms:
+        bad = df.loc[
+            (df.measurement_kind == "mass_spec") &
+            (df.measurement_inequality != "<")
+        ]
+        print("Dropping ", len(bad))
+        df = df.loc[~df.index.isin(bad.index)].copy()
 
     if args.ms_only:
         print("Filtering to MS only")
