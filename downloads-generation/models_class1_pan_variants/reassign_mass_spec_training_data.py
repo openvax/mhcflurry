@@ -14,6 +14,8 @@ parser.add_argument("--ms-only", action="store_true", default=False)
 parser.add_argument("--set-measurement-value", type=float)
 parser.add_argument("--out-csv")
 
+pandas.set_option('display.max_columns', 500)
+
 
 def go(args):
     df = pandas.read_csv(args.data)
