@@ -32,7 +32,7 @@ def go(args):
 
     if args.ms_only:
         print("Filtering to MS only")
-        df = df.loc[df.kind == "mass_spec"]
+        df = df.loc[df.measurement_kind == "mass_spec"]
 
     if args.set_measurement_value:
         indexer = df.measurement_kind == "mass_spec"
