@@ -21,9 +21,10 @@ def go(args):
     df = pandas.read_csv(args.data)
     print(df)
 
-    assert (
+    bad = (
         df.loc[df.measurement_kind == "mass_spec"].measurement_inequality
-        == "<").all()
+        != "<")
+    assert len(bad) == 0, bad
 
     if args.ms_only:
         print("Filtering to MS only")
