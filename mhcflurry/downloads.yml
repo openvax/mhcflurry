@@ -33,7 +33,7 @@ releases:
               default: false
 
             - name: models_class1_pan_variants
-              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_pan_variants.selected.20200106.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_pan_variants.selected.20200108.tar.bz2
               default: false
 
             - name: data_mass_spec_benchmark
