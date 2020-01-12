@@ -110,6 +110,8 @@ class Class1CleavageNeuralNetwork(object):
         n_flank_length=10,
         c_flank_length=10,
         vector_encoding_name="BLOSUM62",
+        flanking_averages=False,
+        convoluational_kernel_l1=0.001,
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -134,7 +136,7 @@ class Class1CleavageNeuralNetwork(object):
     """
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
-        optimizer="rmsprop",
+        optimizer="adam",
         learning_rate=None,
     )
     """
@@ -349,7 +351,9 @@ class Class1CleavageNeuralNetwork(object):
             peptide_max_length,
             n_flank_length,
             c_flank_length,
-            vector_encoding_name):
+            vector_encoding_name,
+            flanking_averages,
+            convoluational_kernel_l1):
         """
         Helper function to make a keras network
         """
@@ -395,41 +399,62 @@ class Class1CleavageNeuralNetwork(object):
 
         inputs = [peptide_input1, peptide_input2, n_flank_input, c_flank_input]
 
-        sub_networks = []
+        conv_outputs = []
+        single_outputs = []
         for input_pair in [(n_flank_input, peptide_input1), (peptide_input2, c_flank_input)]:
             # need to stack them together
             current_layer = Concatenate(axis=1)(list(input_pair))
             for i in range(1):
                 current_layer = keras.layers.Conv1D(
                     filters=int(16 / 2**i),
+                    padding="same",
                     kernel_size=8,
-                    activation="tanh")(current_layer)
-                #current_layer = keras.layers.pooling.MaxPooling1D(
-                #    pool_size=4)(current_layer)
-            #current_layer = Flatten()(current_layer)
-            sub_networks.append(current_layer)
+                    kernel_regularizer=keras.regularizers.l1(convoluational_kernel_l1),
+                    activation="relu")(current_layer)
+            conv_outputs.append(current_layer)
+            current_layer = keras.layers.Conv1D(
+                filters=1,
+                kernel_size=1,
+                kernel_regularizer=keras.regularizers.l1(convoluational_kernel_l1),
+                activation="relu")(current_layer)
+            single_outputs.append(current_layer)
 
         extracted_layers = []
         extracted_layers.append(
-            keras.layers.Lambda(lambda x: x[:, n_flank_length])(sub_networks[0]))
+                keras.layers.Lambda(
+                    lambda x: x[:, n_flank_length])(single_outputs[0]))
+        if flanking_averages:
+            n_flank = keras.layers.Lambda(
+                lambda x: x[
+                    :, : n_flank_length
+                ])(conv_outputs[0])
+            extracted_layers.append(
+                keras.layers.pooling.GlobalAveragePooling1D()(n_flank))
         peptide_n_cleavage = keras.layers.Lambda(
             lambda x: x[
                 :, (n_flank_length + 1) :
-            ])(sub_networks[0])
+            ])(single_outputs[0])
         extracted_layers.append(
             keras.layers.pooling.GlobalMaxPooling1D()(peptide_n_cleavage))
+
         extracted_layers.append(
             keras.layers.Lambda(
-                lambda x: x[:, peptide_max_length])(sub_networks[1]))
+                lambda x: x[:, peptide_max_length])(single_outputs[1]))
+        if flanking_averages:
+            c_flank = keras.layers.Lambda(
+                lambda x: x[
+                    :, peptide_max_length :
+                ])(conv_outputs[1])
+            extracted_layers.append(
+                keras.layers.pooling.GlobalAveragePooling1D()(c_flank))
         peptide_c_cleavage = keras.layers.Lambda(
             lambda x: x[
                 :, 0 : peptide_max_length
-            ])(sub_networks[1])
+            ])(single_outputs[1])
         extracted_layers.append(
             keras.layers.pooling.GlobalMaxPooling1D()(peptide_c_cleavage))
 
         current_layer = Concatenate()(extracted_layers)
-
         output = Dense(
             1,
             activation="sigmoid",

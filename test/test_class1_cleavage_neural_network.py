@@ -1,7 +1,7 @@
 import logging
 logging.getLogger('tensorflow').disabled = True
 logging.getLogger('matplotlib').disabled = True
-
+import re
 import numpy
 from numpy import testing
 numpy.random.seed(0)
@@ -25,14 +25,26 @@ setup = startup
 def test_basic():
     hyperparameters = dict()
 
-    num = 10000
+    num = 100000
 
     df = pandas.DataFrame({
         "n_flank": random_peptides(num, 10),
         "c_flank": random_peptides(num, 10),
         "peptide": random_peptides(num, 9),
     })
-    df["hit"] = df.peptide.str.get(0).isin(["A", "I", "L"])
+    #df["hit"] = df.peptide.str.get(0).isin(["A", "I", "L"])
+
+    n_cleavage_regex = "[AILQSV].[MNPQYK]"
+
+    def is_hit(n_flank, c_flank, peptide):
+        if re.search(n_cleavage_regex, peptide):
+            return False  # peptide is cleaved
+        return bool(re.match(n_cleavage_regex, n_flank[-1:] + peptide))
+
+    df["hit"] = [
+        is_hit(row.n_flank, row.c_flank, row.peptide)
+        for (_, row) in df.iterrows()
+    ]
 
     train_df = df.sample(frac=0.1)
     test_df = df.loc[~df.index.isin(train_df.index)]
