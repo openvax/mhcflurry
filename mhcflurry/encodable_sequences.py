@@ -252,8 +252,10 @@ class EncodableSequences(object):
         3 * max_length.
         """
         if allow_unsupported_amino_acids:
+            fill_value = amino_acid.AMINO_ACID_INDEX['X']
+
             def get_amino_acid_index(a):
-                return amino_acid.AMINO_ACID_INDEX.get(a, "X")
+                return amino_acid.AMINO_ACID_INDEX.get(a, fill_value)
         else:
             get_amino_acid_index = amino_acid.AMINO_ACID_INDEX.__getitem__
 
