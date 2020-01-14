@@ -22,17 +22,20 @@ teardown = cleanup
 setup = startup
 
 
-def test_basic():
-    hyperparameters = dict()
+def test_big():
+    train_basic_network(num=100000)
 
-    num = 100000
 
+def test_small():
+    train_basic_network(num=10000)
+
+
+def train_basic_network(num, do_assertions=True, **hyperparameters):
     df = pandas.DataFrame({
         "n_flank": random_peptides(num, 10),
         "c_flank": random_peptides(num, 10),
         "peptide": random_peptides(num, 9),
     })
-    #df["hit"] = df.peptide.str.get(0).isin(["A", "I", "L"])
 
     n_cleavage_regex = "[AILQSV].[MNPQYK]"
 
@@ -75,3 +78,9 @@ def test_basic():
 
     print("Train auc", train_auc)
     print("Test auc", test_auc)
+
+    if do_assertions:
+        assert_greater(train_auc, 0.9)
+        assert_greater(test_auc, 0.85)
+
+    return network

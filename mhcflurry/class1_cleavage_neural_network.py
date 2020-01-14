@@ -80,27 +80,11 @@ from __future__ import print_function
 
 import time
 import collections
-from six import string_types
-
 import numpy
-import pandas
-import mhcnames
-import hashlib
 
 from .hyperparameters import HyperparameterDefaults
-from .class1_neural_network import Class1NeuralNetwork, DEFAULT_PREDICT_BATCH_SIZE
+from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .encodable_sequences import EncodableSequences
-from .regression_target import from_ic50, to_ic50
-from .random_negative_peptides import RandomNegativePeptides
-from .allele_encoding import MultipleAlleleEncoding, AlleleEncoding
-from .auxiliary_input import AuxiliaryInputEncoder
-from .batch_generator import BatchGenerator
-from .custom_loss import (
-    MSEWithInequalities,
-    TransformPredictionsLossWrapper,
-    MultiallelicMassSpecLoss)
-
-
 
 
 class Class1CleavageNeuralNetwork(object):
@@ -111,7 +95,11 @@ class Class1CleavageNeuralNetwork(object):
         c_flank_length=10,
         vector_encoding_name="BLOSUM62",
         flanking_averages=False,
-        convoluational_kernel_l1=0.001,
+        convolutional_filters=16,
+        convolutional_kernel_size=8,
+        convolutional_activation="relu",
+        convoluational_kernel_l1_l2=(0.001, 0.001),
+        dropout_rate=0.5,
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -121,14 +109,15 @@ class Class1CleavageNeuralNetwork(object):
     fit_hyperparameter_defaults = HyperparameterDefaults(
         max_epochs=500,
         validation_split=0.1,
-        early_stopping=True
+        early_stopping=True,
+        minibatch_size=256,
     )
     """
     Hyperparameters for neural network training.
     """
 
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
-        patience=5,
+        patience=30,
         min_delta=0.0,
     )
     """
@@ -229,7 +218,7 @@ class Class1CleavageNeuralNetwork(object):
                 x_list,
                 targets,
                 validation_split=self.hyperparameters['validation_split'],
-                shuffle=True,
+                batch_size=self.hyperparameters['minibatch_size'],
                 epochs=i + 1,
                 sample_weight=sample_weights,
                 initial_epoch=i,
@@ -288,6 +277,12 @@ class Class1CleavageNeuralNetwork(object):
         fit_info["num_points"] = len(peptides)
         self.fit_info.append(dict(fit_info))
 
+        if verbose:
+            print(
+                "Output weights",
+                *numpy.array(
+                    self.network.get_layer("output").get_weights()).flatten())
+
     def predict(
             self,
             peptides,
@@ -300,7 +295,7 @@ class Class1CleavageNeuralNetwork(object):
             peptides, n_flanks, c_flanks)
         raw_predictions = self.network.predict(
             x_list, batch_size=batch_size)
-        predictions = numpy.array(raw_predictions, dtype="float64")
+        predictions = numpy.array(raw_predictions, dtype="float64")[:,0]
         return predictions
 
     def peptides_and_flanking_to_network_input(self, peptides, n_flanks, c_flanks):
@@ -353,7 +348,11 @@ class Class1CleavageNeuralNetwork(object):
             c_flank_length,
             vector_encoding_name,
             flanking_averages,
-            convoluational_kernel_l1):
+            convolutional_filters,
+            convolutional_kernel_size,
+            convolutional_activation,
+            convoluational_kernel_l1_l2,
+            dropout_rate):
         """
         Helper function to make a keras network
         """
@@ -377,8 +376,6 @@ class Class1CleavageNeuralNetwork(object):
                 c_flanks=[]))
 
         print((peptides_empty, _, n_flanks_empty, c_flanks_empty))
-
-        #import ipdb ; ipdb.set_trace()
 
         peptide_input1 = Input(
             shape=peptides_empty.shape[1:],
@@ -404,19 +401,26 @@ class Class1CleavageNeuralNetwork(object):
         for input_pair in [(n_flank_input, peptide_input1), (peptide_input2, c_flank_input)]:
             # need to stack them together
             current_layer = Concatenate(axis=1)(list(input_pair))
-            for i in range(1):
-                current_layer = keras.layers.Conv1D(
-                    filters=int(16 / 2**i),
-                    padding="same",
-                    kernel_size=8,
-                    kernel_regularizer=keras.regularizers.l1(convoluational_kernel_l1),
-                    activation="relu")(current_layer)
+            current_layer = keras.layers.Conv1D(
+                filters=convolutional_filters,
+                kernel_size=convolutional_kernel_size,
+                kernel_regularizer=keras.regularizers.l1_l2(
+                    *convoluational_kernel_l1_l2),
+                padding="same",
+                activation=convolutional_activation)(current_layer)
+            if dropout_rate > 0:
+                current_layer = keras.layers.Dropout(
+                    rate=dropout_rate,
+                    noise_shape=(
+                        None, 1, int(current_layer.get_shape()[-1])))(
+                    current_layer)
             conv_outputs.append(current_layer)
             current_layer = keras.layers.Conv1D(
                 filters=1,
                 kernel_size=1,
-                kernel_regularizer=keras.regularizers.l1(convoluational_kernel_l1),
-                activation="relu")(current_layer)
+                kernel_regularizer=keras.regularizers.l1_l2(
+                    *convoluational_kernel_l1_l2),
+                activation=convolutional_activation)(current_layer)
             single_outputs.append(current_layer)
 
         extracted_layers = []
@@ -435,7 +439,9 @@ class Class1CleavageNeuralNetwork(object):
                 :, (n_flank_length + 1) :
             ])(single_outputs[0])
         extracted_layers.append(
-            keras.layers.pooling.GlobalMaxPooling1D()(peptide_n_cleavage))
+            keras.layers.Lambda(lambda x: -x)(
+                keras.layers.pooling.GlobalMaxPooling1D()(
+                    peptide_n_cleavage)))
 
         extracted_layers.append(
             keras.layers.Lambda(
@@ -452,13 +458,16 @@ class Class1CleavageNeuralNetwork(object):
                 :, 0 : peptide_max_length
             ])(single_outputs[1])
         extracted_layers.append(
-            keras.layers.pooling.GlobalMaxPooling1D()(peptide_c_cleavage))
+            keras.layers.Lambda(lambda x: -x)(
+                keras.layers.pooling.GlobalMaxPooling1D()(peptide_c_cleavage)))
 
         current_layer = Concatenate()(extracted_layers)
         output = Dense(
             1,
             activation="sigmoid",
-            name="output")(current_layer)
+            name="output",
+            kernel_initializer=keras.initializers.Ones(),
+        )(current_layer)
         model = keras.models.Model(
             inputs=inputs,
             outputs=[output],
@@ -466,3 +475,85 @@ class Class1CleavageNeuralNetwork(object):
 
         return model
 
+    def __getstate__(self):
+        """
+        serialize to a dict. Model weights are included. For pickle support.
+
+        Returns
+        -------
+        dict
+
+        """
+        result = self.get_config()
+        result['network_weights'] = self.get_weights()
+        return result
+
+    def __setstate__(self, state):
+        """
+        Deserialize. For pickle support.
+        """
+        network_json = state.pop("network_json")
+        network_weights = state.pop("network_weights")
+        self.__dict__.update(state)
+        if network_json is not None:
+            import keras.models
+            self.network = keras.models.model_from_json(network_json)
+            if network_weights is not None:
+                self.network.set_weights(network_weights)
+
+    def get_weights(self):
+        """
+        Get the network weights
+
+        Returns
+        -------
+        list of numpy.array giving weights for each layer or None if there is no
+        network
+        """
+        if self.network is None:
+            return None
+        return self.network.get_weights()
+
+    def get_config(self):
+        """
+        serialize to a dict all attributes except model weights
+
+        Returns
+        -------
+        dict
+        """
+        result = dict(self.__dict__)
+        del result['network']
+        result['network_json'] = None
+        if self.network:
+            result['network_json'] = self.network.to_json()
+        return result
+
+    @classmethod
+    def from_config(cls, config, weights=None):
+        """
+        deserialize from a dict returned by get_config().
+
+        Parameters
+        ----------
+        config : dict
+        weights : list of array, optional
+            Network weights to restore
+        weights_loader : callable, optional
+            Function to call (no arguments) to load weights when needed
+
+        Returns
+        -------
+        Class1CleavageNeuralNetwork
+        """
+        config = dict(config)
+        instance = cls(**config.pop('hyperparameters'))
+        network_json = config.pop('network_json')
+        instance.__dict__.update(config)
+        assert instance.network is None
+        if network_json is not None:
+            import keras.models
+            instance.network = keras.models.model_from_json(network_json)
+            if weights is not None:
+                instance.network.set_weights(weights)
+        return instance
