@@ -98,8 +98,9 @@ class Class1CleavageNeuralNetwork(object):
         convolutional_filters=16,
         convolutional_kernel_size=8,
         convolutional_activation="relu",
-        convoluational_kernel_l1_l2=(0.001, 0.001),
+        convolutional_kernel_l1_l2=(0.001, 0.001),
         dropout_rate=0.5,
+        post_convolutional_dense_layer_sizes=[],
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -183,7 +184,7 @@ class Class1CleavageNeuralNetwork(object):
         n_flanks = EncodableSequences.create(n_flanks)
         c_flanks = EncodableSequences.create(c_flanks)
 
-        x_list = self.peptides_and_flanking_to_network_input(
+        x_dict = self.peptides_and_flanking_to_network_input(
             peptides, n_flanks, c_flanks)
 
         # Shuffle
@@ -193,7 +194,8 @@ class Class1CleavageNeuralNetwork(object):
         assert numpy.isnan(targets).sum() == 0, targets
         if sample_weights is not None:
             sample_weights = numpy.array(sample_weights)[shuffle_permutation]
-        x_list = [x[shuffle_permutation] for x in x_list]
+        for key in list(x_dict):
+            x_dict[key] = x_dict[key][shuffle_permutation]
 
         fit_info = collections.defaultdict(list)
 
@@ -215,7 +217,7 @@ class Class1CleavageNeuralNetwork(object):
         for i in range(self.hyperparameters['max_epochs']):
             epoch_start = time.time()
             fit_history = self.network.fit(
-                x_list,
+                x_dict,
                 targets,
                 validation_split=self.hyperparameters['validation_split'],
                 batch_size=self.hyperparameters['minibatch_size'],
@@ -312,32 +314,40 @@ class Class1CleavageNeuralNetwork(object):
         numpy.array
         """
         peptides = EncodableSequences.create(peptides)
-        n_flanks = EncodableSequences.create(n_flanks)
-        c_flanks = EncodableSequences.create(c_flanks)
 
-        peptide_encoded1 = peptides.variable_length_to_fixed_length_vector_encoding(
-            vector_encoding_name=self.hyperparameters['vector_encoding_name'],
-            max_length=self.hyperparameters['peptide_max_length'],
-            alignment_method='right_pad')
-        peptide_encoded2 = peptides.variable_length_to_fixed_length_vector_encoding(
-            vector_encoding_name=self.hyperparameters['vector_encoding_name'],
-            max_length=self.hyperparameters['peptide_max_length'],
-            alignment_method='left_pad')
-        n_flanks_encoded = n_flanks.variable_length_to_fixed_length_vector_encoding(
-            vector_encoding_name=self.hyperparameters['vector_encoding_name'],
-            max_length=self.hyperparameters['n_flank_length'],
-            alignment_method='right_pad')
-        c_flanks_encoded = c_flanks.variable_length_to_fixed_length_vector_encoding(
-            vector_encoding_name=self.hyperparameters['vector_encoding_name'],
-            max_length=self.hyperparameters['c_flank_length'],
-            alignment_method='left_pad')
+        result = {}
+        result['peptide_right_pad'] = (
+            peptides.variable_length_to_fixed_length_vector_encoding(
+                vector_encoding_name=self.hyperparameters['vector_encoding_name'],
+                max_length=self.hyperparameters['peptide_max_length'],
+                alignment_method='right_pad'))
+        result['peptide_left_pad'] = (
+            peptides.variable_length_to_fixed_length_vector_encoding(
+                vector_encoding_name=self.hyperparameters['vector_encoding_name'],
+                max_length=self.hyperparameters['peptide_max_length'],
+                alignment_method='left_pad'))
 
-        return [
-            peptide_encoded1,
-            peptide_encoded2,
-            n_flanks_encoded,
-            c_flanks_encoded
-        ]
+        if self.hyperparameters['n_flank_length'] > 0:
+            n_flanks = EncodableSequences.create(n_flanks)
+            result['n_flank'] = (
+                n_flanks.variable_length_to_fixed_length_vector_encoding(
+                    vector_encoding_name=self.hyperparameters['vector_encoding_name'],
+                    max_length=self.hyperparameters['n_flank_length'],
+                    alignment_method='left_pad',
+                    trim=True,
+                    allow_unsupported_amino_acids=True))
+
+        if self.hyperparameters['c_flank_length'] > 0:
+            c_flanks = EncodableSequences.create(c_flanks)
+            result['c_flank'] = (
+                c_flanks.variable_length_to_fixed_length_vector_encoding(
+                    vector_encoding_name=self.hyperparameters['vector_encoding_name'],
+                    max_length=self.hyperparameters['c_flank_length'],
+                    alignment_method='right_pad',
+                    trim=True,
+                    allow_unsupported_amino_acids=True))
+
+        return result
 
 
     def make_network(
@@ -351,8 +361,9 @@ class Class1CleavageNeuralNetwork(object):
             convolutional_filters,
             convolutional_kernel_size,
             convolutional_activation,
-            convoluational_kernel_l1_l2,
-            dropout_rate):
+            convolutional_kernel_l1_l2,
+            dropout_rate,
+            post_convolutional_dense_layer_sizes):
         """
         Helper function to make a keras network
         """
@@ -361,107 +372,132 @@ class Class1CleavageNeuralNetwork(object):
         # are actually about to use Keras.
 
         from keras.layers import Input
-        import keras.layers
         import keras.layers.pooling
         from keras.layers.core import Dense, Flatten, Dropout
-        from keras.layers.embeddings import Embedding
-        from keras.layers.normalization import BatchNormalization
         from keras.layers.merge import Concatenate
-        import keras.backend as K
 
-        (peptides_empty, _, n_flanks_empty, c_flanks_empty) = (
-            self.peptides_and_flanking_to_network_input(
-                peptides=[],
-                n_flanks=[],
-                c_flanks=[]))
+        empty_x_dict = self.peptides_and_flanking_to_network_input(
+            peptides=[], n_flanks=[], c_flanks=[])
 
-        print((peptides_empty, _, n_flanks_empty, c_flanks_empty))
+        model_inputs = {}
 
-        peptide_input1 = Input(
-            shape=peptides_empty.shape[1:],
+        model_inputs['peptide_right_pad'] = Input(
+            shape=empty_x_dict['peptide_right_pad'].shape[1:],
             dtype='float32',
-            name='peptide1')
-        peptide_input2 = Input(
-            shape=peptides_empty.shape[1:],
+            name='peptide_right_pad')
+        model_inputs['peptide_left_pad'] = Input(
+            shape=empty_x_dict['peptide_left_pad'].shape[1:],
             dtype='float32',
-            name='peptide2')
-        n_flank_input = Input(
-            shape=n_flanks_empty.shape[1:],
-            dtype='float32',
-            name='n_flank')
-        c_flank_input = Input(
-            shape=c_flanks_empty.shape[1:],
-            dtype='float32',
-            name='c_flank')
+            name='peptide_left_pad')
 
-        inputs = [peptide_input1, peptide_input2, n_flank_input, c_flank_input]
+        if 'n_flank' in empty_x_dict:
+            model_inputs['n_flank'] = Input(
+                shape=empty_x_dict['n_flank'].shape[1:],
+                dtype='float32',
+                name='n_flank')
 
-        conv_outputs = []
-        single_outputs = []
-        for input_pair in [(n_flank_input, peptide_input1), (peptide_input2, c_flank_input)]:
-            # need to stack them together
-            current_layer = Concatenate(axis=1)(list(input_pair))
+        if 'c_flank' in empty_x_dict:
+            model_inputs['c_flank'] = Input(
+                shape=empty_x_dict['c_flank'].shape[1:],
+                dtype='float32',
+                name='c_flank')
+
+        outputs_for_final_dense = []
+
+        for flank in ["n_flank", "c_flank"]:
+            include_flank = flank in model_inputs
+
+            if flank == "n_flank":
+                peptide_input = "peptide_right_pad"
+                concat_order = [flank, peptide_input]
+                cleavage_position = n_flank_length
+                noncleaved_peptide_extractor = lambda x: x[
+                    :, (n_flank_length + 1):]
+                flanking_extractor = lambda x: x[
+                    :, : n_flank_length
+                ]
+            else:
+                assert flank == "c_flank"
+                peptide_input = "peptide_left_pad"
+                concat_order = [peptide_input, flank]
+                cleavage_position = peptide_max_length - 1
+                noncleaved_peptide_extractor = lambda x: x[
+                    :, 0 : peptide_max_length - 1]
+                flanking_extractor = lambda x: x[
+                    :, peptide_max_length :
+                ]
+
+            if include_flank:
+                current_layer = Concatenate(
+                    axis=1,
+                    name="_".join(concat_order))([
+                        model_inputs[item] for item in concat_order
+                ])
+            else:
+                current_layer = model_inputs[peptide_input]
+
             current_layer = keras.layers.Conv1D(
                 filters=convolutional_filters,
                 kernel_size=convolutional_kernel_size,
                 kernel_regularizer=keras.regularizers.l1_l2(
-                    *convoluational_kernel_l1_l2),
+                    *convolutional_kernel_l1_l2),
                 padding="same",
-                activation=convolutional_activation)(current_layer)
+                activation=convolutional_activation,
+                name="%s_conv" % flank)(current_layer)
             if dropout_rate > 0:
                 current_layer = keras.layers.Dropout(
+                    name="%s_dropout" % flank,
                     rate=dropout_rate,
                     noise_shape=(
                         None, 1, int(current_layer.get_shape()[-1])))(
                     current_layer)
-            conv_outputs.append(current_layer)
-            current_layer = keras.layers.Conv1D(
-                filters=1,
-                kernel_size=1,
-                kernel_regularizer=keras.regularizers.l1_l2(
-                    *convoluational_kernel_l1_l2),
-                activation=convolutional_activation)(current_layer)
-            single_outputs.append(current_layer)
+            convolutional_result = current_layer
+            for (i, size) in enumerate(
+                    list(post_convolutional_dense_layer_sizes) + [1]):
+                current_layer = keras.layers.Conv1D(
+                    name="%s_post_%d" % (flank, i),
+                    filters=1,
+                    kernel_size=size,
+                    kernel_regularizer=keras.regularizers.l1_l2(
+                        *convolutional_kernel_l1_l2),
+                    activation=convolutional_activation)(current_layer)
+            single_output_result = current_layer
 
-        extracted_layers = []
-        extracted_layers.append(
-                keras.layers.Lambda(
-                    lambda x: x[:, n_flank_length])(single_outputs[0]))
-        if flanking_averages:
-            n_flank = keras.layers.Lambda(
-                lambda x: x[
-                    :, : n_flank_length
-                ])(conv_outputs[0])
-            extracted_layers.append(
-                keras.layers.pooling.GlobalAveragePooling1D()(n_flank))
-        peptide_n_cleavage = keras.layers.Lambda(
-            lambda x: x[
-                :, (n_flank_length + 1) :
-            ])(single_outputs[0])
-        extracted_layers.append(
-            keras.layers.Lambda(lambda x: -x)(
-                keras.layers.pooling.GlobalMaxPooling1D()(
-                    peptide_n_cleavage)))
+            # Single output at cleavage position
+            single_output_at_cleavage_position = keras.layers.Lambda(
+                lambda x: x[:, cleavage_position])(single_output_result)
+            outputs_for_final_dense.append(single_output_at_cleavage_position)
 
-        extracted_layers.append(
-            keras.layers.Lambda(
-                lambda x: x[:, peptide_max_length])(single_outputs[1]))
-        if flanking_averages:
-            c_flank = keras.layers.Lambda(
-                lambda x: x[
-                    :, peptide_max_length :
-                ])(conv_outputs[1])
-            extracted_layers.append(
-                keras.layers.pooling.GlobalAveragePooling1D()(c_flank))
-        peptide_c_cleavage = keras.layers.Lambda(
-            lambda x: x[
-                :, 0 : peptide_max_length
-            ])(single_outputs[1])
-        extracted_layers.append(
-            keras.layers.Lambda(lambda x: -x)(
-                keras.layers.pooling.GlobalMaxPooling1D()(peptide_c_cleavage)))
+            # Max of single-output at non-cleaved (peptide) positions.
+            non_cleaved_single_outputs = keras.layers.Lambda(
+                noncleaved_peptide_extractor, name="%s_noncleaved" % flank)(
+                    single_output_result)
+            non_cleaved_pooled = keras.layers.pooling.GlobalMaxPooling1D(
+                name="%s_noncleaved_pooled" % flank)(non_cleaved_single_outputs)
+            # We flip it so that initializing the final dense layer weights to
+            # 1s is reasonable.
+            non_cleaved_pooled_flipped = keras.layers.Lambda(
+                lambda x: -x,
+                name="%s_noncleaved_pooled_flip" % flank)(non_cleaved_pooled)
+            outputs_for_final_dense.append(non_cleaved_pooled_flipped)
 
-        current_layer = Concatenate()(extracted_layers)
+            if include_flank and flanking_averages:
+                # Also include average pooled of flanking sequences
+                extracted_flank = keras.layers.Lambda(
+                    flanking_extractor, name="%s_extracted" % flank)(
+                        convolutional_result)
+                pooled_flank = keras.layers.pooling.GlobalAveragePooling1D(
+                    name="%s_avg" % flank,
+                )(extracted_flank)
+                dense_flank = Dense(
+                    1, activation="tanh", name="%s_avg_dense" % flank)(
+                    pooled_flank)
+                outputs_for_final_dense.append(dense_flank)
+
+        if len(outputs_for_final_dense) == 1:
+            (current_layer,) = outputs_for_final_dense
+        else:
+            current_layer = Concatenate(name="final")(outputs_for_final_dense)
         output = Dense(
             1,
             activation="sigmoid",
@@ -469,7 +505,7 @@ class Class1CleavageNeuralNetwork(object):
             kernel_initializer=keras.initializers.Ones(),
         )(current_layer)
         model = keras.models.Model(
-            inputs=inputs,
+            inputs=[model_inputs[name] for name in sorted(model_inputs)],
             outputs=[output],
             name="predictor")
 

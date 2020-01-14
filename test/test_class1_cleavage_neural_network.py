@@ -30,14 +30,30 @@ def test_small():
     train_basic_network(num=10000)
 
 
-def train_basic_network(num, do_assertions=True, **hyperparameters):
-    df = pandas.DataFrame({
-        "n_flank": random_peptides(num, 10),
-        "c_flank": random_peptides(num, 10),
-        "peptide": random_peptides(num, 9),
-    })
+def test_more():
+    train_basic_network(
+        num=10000,
+        flanking_averages=False,
+        convolutional_kernel_size=3,
+        c_flank_length=0,
+        n_flank_length=3)
 
-    n_cleavage_regex = "[AILQSV].[MNPQYK]"
+
+def train_basic_network(num, do_assertions=True, **hyperparameters):
+    use_hyperparameters = {
+        "n_flank_length": 5,
+        "c_flank_length": 5,
+        "convolutional_kernel_size": 3,
+    }
+    use_hyperparameters.update(hyperparameters)
+
+    df = pandas.DataFrame({
+        "n_flank": random_peptides(num / 2, 10) + random_peptides(num / 2, 1),
+        "c_flank": random_peptides(num, 10),
+        "peptide": random_peptides(num / 2, 11) + random_peptides(num / 2, 8),
+    }).sample(frac=1.0)
+
+    n_cleavage_regex = "[AILQSV][SINFEKLH][MNPQYK]"
 
     def is_hit(n_flank, c_flank, peptide):
         if re.search(n_cleavage_regex, peptide):
@@ -60,7 +76,7 @@ def train_basic_network(num, do_assertions=True, **hyperparameters):
         "frac:",
         df.hit.mean())
 
-    network = Class1CleavageNeuralNetwork(**hyperparameters)
+    network = Class1CleavageNeuralNetwork(**use_hyperparameters)
     network.fit(
         train_df.peptide.values,
         train_df.n_flank.values,
