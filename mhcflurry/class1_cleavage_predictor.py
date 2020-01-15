@@ -9,8 +9,8 @@ import time
 import json
 import hashlib
 import logging
+import collections
 from six import string_types
-
 
 import numpy
 import pandas
@@ -33,6 +33,30 @@ class Class1CleavagePredictor(object):
         self._manifest_df = manifest_df
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
+
+    def add_models(self, models):
+        new_model_names = []
+        original_manifest = self.manifest_df
+        new_manifest_rows = []
+        for model in models:
+            model_name = self.model_name(len(self.models))
+            row = pandas.Series(collections.OrderedDict([
+                ("model_name", model_name),
+                ("config_json", json.dumps(
+                    model.get_config(), cls=NumpyJSONEncoder)),
+                ("model", model),
+            ])).to_frame().T
+            new_manifest_rows.append(row)
+            self.models.append(model)
+            new_model_names.append(model_name)
+
+        self._manifest_df = pandas.concat(
+            [original_manifest] + new_manifest_rows,
+            ignore_index=True)
+
+        self.check_consistency()
+        return new_model_names
+
 
     @property
     def manifest_df(self):

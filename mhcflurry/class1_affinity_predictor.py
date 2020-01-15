@@ -215,7 +215,7 @@ class Class1AffinityPredictor(object):
 
     def merge_in_place(self, others):
         """
-        Add the models present other predictors into the current predictor.
+        Add the models present in other predictors into the current predictor.
 
         Parameters
         ----------
