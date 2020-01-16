@@ -69,11 +69,7 @@ then
     python generate_hyperparameters.py hyperparameters.production.yaml compact_peptide > hyperparameters.compact_peptide.yaml
 fi
 
-#VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm no_additional_ms no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only )
- VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm no_additional_ms no_pretrain compact_peptide 34mer_sequence )
-#VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms no_pretrain compact_peptide 34mer_sequence )
-
-
+VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm no_additional_ms no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only )
 
 for kind in "${VARIANTS[@]}"
 do
