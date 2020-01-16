@@ -40,6 +40,13 @@ def test_basic():
     })
     df["score"] = predictor.predict(df.peptide, df.n_flank, df.c_flank)
 
+    # Test predictions are deterministic
+    df1b = predictor.predict_to_dataframe(
+        peptides=df.peptide.values,
+        n_flanks=df.n_flank.values,
+        c_flanks=df.c_flank.values)
+    assert_array_equal(df.score.values, df1b.score.values)
+
     # Test saving and loading
     models_dir = tempfile.mkdtemp("_models")
     print(models_dir)
