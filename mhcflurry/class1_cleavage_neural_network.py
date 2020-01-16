@@ -456,8 +456,8 @@ class Class1CleavageNeuralNetwork(object):
                     list(post_convolutional_dense_layer_sizes) + [1]):
                 current_layer = keras.layers.Conv1D(
                     name="%s_post_%d" % (flank, i),
-                    filters=1,
-                    kernel_size=size,
+                    filters=size,
+                    kernel_size=1,
                     kernel_regularizer=keras.regularizers.l1_l2(
                         *convolutional_kernel_l1_l2),
                     activation=convolutional_activation)(current_layer)

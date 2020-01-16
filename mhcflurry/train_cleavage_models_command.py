@@ -141,6 +141,7 @@ def assign_folds(df, num_folds, held_out_samples):
     for fold in range(num_folds):
         samples_to_exclude = sample_names.sample(n=held_out_samples)
         result_df["fold_%d" % fold] = ~df.sample_id.isin(samples_to_exclude)
+        print("Fold", fold, "holding out samples", *samples_to_exclude)
 
     print("Training points per fold")
     print(result_df.sum())
@@ -198,7 +199,14 @@ def initialize_training(args):
     hyperparameters_lst = yaml.load(open(args.hyperparameters))
     assert isinstance(hyperparameters_lst, list)
     print("Loaded hyperparameters list:")
-    pprint.pprint(hyperparameters_lst)
+
+    if len(hyperparameters_lst) > 7:
+        pprint.pprint(hyperparameters_lst[:3])
+        print("...")
+        pprint.pprint(hyperparameters_lst[-3:])
+    else:
+        pprint.pprint(hyperparameters_lst)
+    print("Length of hyperparameters list: %d" % (len(hyperparameters_lst)))
 
     df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
@@ -265,7 +273,7 @@ def train_models(args):
 
     print("Beginning training.")
     predictor = Class1CleavagePredictor.load(args.out_models_dir)
-    print("Loaded predictor with %d networks" % len(predictor.neural_networks))
+    print("Loaded predictor with %d networks" % len(predictor.models))
 
     with open(join(args.out_models_dir, "training_init_info.pkl"), "rb") as fd:
         GLOBAL_DATA.update(pickle.load(fd))
@@ -274,7 +282,7 @@ def train_models(args):
     all_work_items = GLOBAL_DATA["work_items"]
     complete_work_item_names = [
         network.fit_info[-1]["training_info"]["work_item_name"]
-        for network in predictor.neural_networks
+        for network in predictor.models
     ]
     work_items = [
         item for item in all_work_items
@@ -295,8 +303,6 @@ def train_models(args):
         item['predictor'] = predictor if serial_run else None
         item['save_to'] = args.out_models_dir if serial_run else None
         item['verbose'] = args.verbosity
-        if args.pretrain_data:
-            item['pretrain_data_filename'] = args.pretrain_data
 
     start = time.time()
 
@@ -415,6 +421,7 @@ def train_model(
         peptides=train_data.peptide.values,
         n_flanks=train_data.n_flank.values,
         c_flanks=train_data.c_flank.values,
+        targets=train_data.hit.values,
         progress_preamble=progress_preamble,
         progress_print_interval=progress_print_interval,
         verbose=verbose)

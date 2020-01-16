@@ -36,7 +36,8 @@ def test_more():
         flanking_averages=False,
         convolutional_kernel_size=3,
         c_flank_length=0,
-        n_flank_length=3)
+        n_flank_length=3,
+        post_convolutional_dense_layer_sizes=[8])
 
 
 def train_basic_network(num, do_assertions=True, **hyperparameters):
