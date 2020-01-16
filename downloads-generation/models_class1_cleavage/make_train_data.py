@@ -220,10 +220,6 @@ def run():
 
         result_df.append(sample_result_df)
 
-        import ipdb ; ipdb.set_trace()
-
-        break
-
     result_df = pandas.concat(result_df, ignore_index=True, sort=False)
     result_df["hla"] = result_df.sample_id.map(sample_table.hla)
 
@@ -242,9 +238,7 @@ def run():
 
     print("Median affinity predictions:")
     print(
-        result_df.loc[
-            result_df.hit == 0
-        ].groupby(["sample_id", "hit"]).affinity_prediction.median())
+        result_df.groupby(["sample_id", "hit"]).affinity_prediction.median())
 
     result_df.to_csv(args.out, index=False)
     print("Wrote: ", args.out)

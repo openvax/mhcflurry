@@ -108,7 +108,7 @@ fi
 
 mhcflurry-class1-train-cleavage-models \
     --data "$(pwd)/train_data.csv.bz2" \
-    --held-out-measurements-fraction 0.1 \
+    --held-out-samples 10 \
     --num-folds 4 \
     --hyperparameters "$(pwd)/hyperparameters.yaml" \
     --out-models-dir "$(pwd)/models.unselected" \
