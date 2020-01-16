@@ -56,8 +56,8 @@ def run_and_check(n_jobs=0, num=50000):
         for (_, row) in df.iterrows()
     ]
 
-    train_df = df.sample(frac=0.1)
-    test_df = df.loc[~df.index.isin(train_df.index)]
+    train_df = df.sample(frac=0.9)
+    test_df = df.loc[~df.index.isin(train_df.index)].copy()
 
     print(
         "Generated dataset",

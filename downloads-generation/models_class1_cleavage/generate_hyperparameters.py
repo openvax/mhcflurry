@@ -14,6 +14,7 @@ base_hyperparameters = dict(
     n_flank_length=15,
     c_flank_length=15,
     post_convolutional_dense_layer_sizes=[],
+    minibatch_size=4096,
     dropout_rate=0.5,)
 
 grid = []
@@ -21,9 +22,9 @@ grid = []
 
 def hyperparrameters_grid():
     for convolutional_filters in [64, 32]:
-        for flanking_averages in [True, False]:
+        for flanking_averages in [True]:
             for convolutional_kernel_size in [3, 4, 5, 6, 7, 8]:
-                for l1 in [0.0, 0.001, 0.0001, 0.00001]:
+                for l1 in [0.0]:  # [0.0, 0.00001, 0.000001]:
                     for s in [[], [8], [16]]:
                         for d in [0.5, 0.0]:
                             new = deepcopy(base_hyperparameters)

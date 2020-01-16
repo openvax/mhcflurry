@@ -66,7 +66,7 @@ def train_basic_network(num, do_assertions=True, **hyperparameters):
         for (_, row) in df.iterrows()
     ]
 
-    train_df = df.sample(frac=0.1)
+    train_df = df.sample(frac=0.9)
     test_df = df.loc[~df.index.isin(train_df.index)]
 
     print(
