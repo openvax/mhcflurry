@@ -1,7 +1,9 @@
 """
 Test cleavage train and model selection commands.
 """
-
+import logging
+logging.getLogger('tensorflow').disabled = True
+logging.getLogger('matplotlib').disabled = True
 import json
 import os
 import shutil
@@ -26,7 +28,13 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 HYPERPARAMETERS = [
     {
-        "max_epochs": 500,
+        "max_epochs": 5,
+        "n_flank_length": 5,
+        "c_flank_length": 5,
+        "convolutional_kernel_size": 3,
+    },
+    {
+        "max_epochs": 1,
         "n_flank_length": 5,
         "c_flank_length": 5,
         "convolutional_kernel_size": 3,
@@ -34,7 +42,7 @@ HYPERPARAMETERS = [
 ]
 
 
-def run_and_check(n_jobs=0, num=50000):
+def make_dataset(num=10000):
     df = pandas.DataFrame({
         "n_flank": random_peptides(num / 2, 10) + random_peptides(num / 2, 1),
         "c_flank": random_peptides(num, 10),
@@ -44,7 +52,7 @@ def run_and_check(n_jobs=0, num=50000):
         ["sample_%d" % (i + 1) for i in range(5)]).sample(
         n=len(df), replace=True).values
 
-    n_cleavage_regex = "[AILQSV][SINFEKLH][MNPQYK]"
+    n_cleavage_regex = "[AILQSVWEN].[MNPQYKV]"
 
     def is_hit(n_flank, c_flank, peptide):
         if re.search(n_cleavage_regex, peptide):
@@ -67,6 +75,12 @@ def run_and_check(n_jobs=0, num=50000):
         "frac:",
         df.hit.mean())
 
+    return (train_df, test_df)
+
+
+def run_and_check(n_jobs=0, additional_args=[], delete=False):
+    (train_df, test_df) = make_dataset()
+
     models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
     hyperparameters_filename = os.path.join(
         models_dir, "hyperparameters.yaml")
@@ -82,35 +96,59 @@ def run_and_check(n_jobs=0, num=50000):
         "--hyperparameters", hyperparameters_filename,
         "--out-models-dir", models_dir,
         "--held-out-samples", "2",
+        "--num-folds", "2",
         "--num-jobs", str(n_jobs),
-
     ]
     print("Running with args: %s" % args)
     subprocess.check_call(args)
 
-    predictor = Class1CleavagePredictor.load(models_dir)
-    print("Loaded models", len(predictor.models))
-    assert len(predictor.models) > 0
+    full_predictor = Class1CleavagePredictor.load(models_dir)
+    print("Loaded models", len(full_predictor.models))
+    assert_equal(len(full_predictor.models), 4)
 
-    test_df["prediction"] = predictor.predict(
+    test_df["full_predictor"] = full_predictor.predict(
         test_df.peptide.values,
         test_df.n_flank.values,
         test_df.c_flank.values)
 
-    test_auc = roc_auc_score(test_df.hit.values, test_df.prediction.values)
-    print("Test auc", test_auc)
-    assert test_auc > 0.85
+    test_auc = roc_auc_score(test_df.hit.values, test_df.full_predictor.values)
+    print("Full predictor auc", test_auc)
 
-    print("Deleting: %s" % models_dir)
-    shutil.rmtree(models_dir)
+    print("Performing model selection.")
 
+    # Run model selection
+    models_dir_selected = tempfile.mkdtemp(
+        prefix="mhcflurry-test-models-selected")
+    args = [
+        "mhcflurry-class1-select-cleavage-models",
+        "--data", os.path.join(models_dir, "train_data.csv.bz2"),
+        "--models-dir", models_dir,
+        "--out-models-dir", models_dir_selected,
+        "--max-models", "1",
+        "--num-jobs", str(n_jobs),
+    ] + additional_args
+    print("Running with args: %s" % args)
+    subprocess.check_call(args)
 
+    selected_predictor = Class1CleavagePredictor.load(models_dir_selected)
+    assert_equal(len(selected_predictor.models), 2)
+
+    test_df["selected_predictor"] = selected_predictor.predict(
+        test_df.peptide.values,
+        test_df.n_flank.values,
+        test_df.c_flank.values)
+
+    test_auc = roc_auc_score(test_df.hit.values, test_df.selected_predictor.values)
+    print("Selected predictor auc", test_auc)
+
+    if delete:
+        print("Deleting: %s" % models_dir)
+        shutil.rmtree(models_dir)
+        shutil.rmtree(models_dir_selected)
 
 def Xtest_run_parallel():
     run_and_check(n_jobs=2)
-    #run_and_check_with_model_selection(n_jobs=2)
 
 
 def test_run_serial():
     run_and_check(n_jobs=0)
-    #run_and_check_with_model_selection(n_jobs=0)

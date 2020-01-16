@@ -117,11 +117,11 @@ mhcflurry-class1-train-cleavage-models \
 
 echo "Done training. Beginning model selection."
 MODELS_DIR="$(pwd)/models.unselected"
-mhcflurry-class1-select-pan-allele-models \
+mhcflurry-class1-select-cleavage-models \
     --data "$MODELS_DIR/train_data.csv.bz2" \
     --models-dir "$MODELS_DIR" \
-    --out-models-dir models \
-    --min-models 2 \
+    --out-models-dir "$(pwd)/models" \
+    --min-models 1 \
     --max-models 8 \
     $PARALLELISM_ARGS
 cp "$MODELS_DIR/train_data.csv.bz2" "models/train_data.csv.bz2"
