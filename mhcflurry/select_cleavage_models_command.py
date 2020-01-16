@@ -291,7 +291,7 @@ def model_select(
     summary_df = pandas.Series(individual_model_scores)[
         numpy.arange(len(models))
     ].to_frame()
-    summary_df.columns = ['mse_score']
+    summary_df.columns = ['auc_score']
 
     return {
         'fold_num': fold_num,
