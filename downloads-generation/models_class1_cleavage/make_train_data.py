@@ -236,10 +236,6 @@ def run():
     print("Hit rates:")
     print(result_df.groupby("sample_id").hit.mean().sort_values())
 
-    print("Median affinity predictions:")
-    print(
-        result_df.groupby(["sample_id", "hit"]).affinity_prediction.median())
-
     result_df.to_csv(args.out, index=False)
     print("Wrote: ", args.out)
 
