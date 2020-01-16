@@ -325,7 +325,7 @@ def train_models(args):
             work_function=train_model,
             work_items=work_items,
             constant_data=GLOBAL_DATA,
-            result_serialization_method="save_predictor")
+            result_serialization_method="pickle")
     else:
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
