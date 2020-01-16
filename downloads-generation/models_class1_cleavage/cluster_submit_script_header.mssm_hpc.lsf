@@ -25,8 +25,16 @@ export KMP_SETTINGS=1
 
 free -m
 
-module add cuda/10.0.130 cudnn/7.1.1
+module add cuda/10.0.130
 module list
+
+export CUDNN_HOME=/hpc/users/odonnt02/oss/cudnn/cuda
+export LD_LIBRARY_PATH=$CUDNN_HOME/lib64:$LD_LIBRARY_PATH
+export CMAKE_LIBRARY_PATH=$CUDNN_HOME/lib64:$CMAKE_LIBRARY_PATH
+export INCLUDE_PATH=$CUDNN_HOME/include:$INCLUDE_PATH
+export C_INCLUDE_PATH=$CUDNN_HOME/include:$C_INCLUDE_PATH
+export CPLUS_INCLUDE_PATH=$CUDNN_HOME/include:$CPLUS_INCLUDE_PATH
+export CMAKE_INCLUDE_PATH=$CUDNN_HOME/include:$CMAKE_INCLUDE_PATH
 
 python -c 'import tensorflow as tf ; print("GPU AVAILABLE" if tf.test.is_gpu_available() else "GPU NOT AVAILABLE")'
 
