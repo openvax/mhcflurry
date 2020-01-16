@@ -149,8 +149,34 @@ class Class1CleavageNeuralNetwork(object):
     def __init__(self, **hyperparameters):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
             hyperparameters)
-        self.network = None
+        self._network = None
+        self.network_json = None
+        self.network_weights = None
         self.fit_info = []
+
+    def network(self):
+        """
+        Return the keras model associated with this network.
+        """
+        if self._network is None and self.network_json is not None:
+            import keras.models
+            self._network = keras.models.model_from_json(self.network_json)
+            if self.network_weights is not None:
+                self._network.set_weights(self.network_weights)
+        return self._network
+
+    def update_network_description(self):
+        """
+        Update self.network_json and self.network_weights properties based on
+        this instances's neural network.
+        """
+        network = self.network()
+        if network is None:
+            self.network_json = None
+            self.network_weights = None
+        else:
+            self.network_json = network.to_json()
+            self.network_weights = network.get_weights()
 
     def fit(
             self,
@@ -199,14 +225,14 @@ class Class1CleavageNeuralNetwork(object):
 
         fit_info = collections.defaultdict(list)
 
-        if self.network is None:
-            self.network = self.make_network(
+        if self._network is None:
+            self._network = self.make_network(
                 **self.network_hyperparameter_defaults.subselect(
                     self.hyperparameters))
             if verbose > 0:
-                self.network.summary()
+                self._network.summary()
 
-        self.network.compile(
+        self.network().compile(
             loss="binary_crossentropy",
             optimizer=self.hyperparameters['optimizer'])
 
@@ -216,7 +242,7 @@ class Class1CleavageNeuralNetwork(object):
         start = time.time()
         for i in range(self.hyperparameters['max_epochs']):
             epoch_start = time.time()
-            fit_history = self.network.fit(
+            fit_history = self.network().fit(
                 x_dict,
                 targets,
                 validation_split=self.hyperparameters['validation_split'],
@@ -283,7 +309,8 @@ class Class1CleavageNeuralNetwork(object):
             print(
                 "Output weights",
                 *numpy.array(
-                    self.network.get_layer("output").get_weights()).flatten())
+                    self.network().get_layer(
+                        "output").get_weights()).flatten())
 
     def predict(
             self,
@@ -295,7 +322,7 @@ class Class1CleavageNeuralNetwork(object):
         """
         x_list = self.peptides_and_flanking_to_network_input(
             peptides, n_flanks, c_flanks)
-        raw_predictions = self.network.predict(
+        raw_predictions = self.network().predict(
             x_list, batch_size=batch_size)
         predictions = numpy.array(raw_predictions, dtype="float64")[:,0]
         return predictions
@@ -520,22 +547,16 @@ class Class1CleavageNeuralNetwork(object):
         dict
 
         """
-        result = self.get_config()
-        result['network_weights'] = self.get_weights()
+        self.update_network_description()
+        result = dict(self.__dict__)
+        result['_network'] = None
         return result
 
     def __setstate__(self, state):
         """
         Deserialize. For pickle support.
         """
-        network_json = state.pop("network_json")
-        network_weights = state.pop("network_weights")
         self.__dict__.update(state)
-        if network_json is not None:
-            import keras.models
-            self.network = keras.models.model_from_json(network_json)
-            if network_weights is not None:
-                self.network.set_weights(network_weights)
 
     def get_weights(self):
         """
@@ -546,9 +567,8 @@ class Class1CleavageNeuralNetwork(object):
         list of numpy.array giving weights for each layer or None if there is no
         network
         """
-        if self.network is None:
-            return None
-        return self.network.get_weights()
+        self.update_network_description()
+        return self.network_weights
 
     def get_config(self):
         """
@@ -558,11 +578,10 @@ class Class1CleavageNeuralNetwork(object):
         -------
         dict
         """
+        self.update_network_description()
         result = dict(self.__dict__)
-        del result['network']
-        result['network_json'] = None
-        if self.network:
-            result['network_json'] = self.network.to_json()
+        del result['_network']
+        result['network_weights'] = None
         return result
 
     @classmethod
@@ -584,12 +603,7 @@ class Class1CleavageNeuralNetwork(object):
         """
         config = dict(config)
         instance = cls(**config.pop('hyperparameters'))
-        network_json = config.pop('network_json')
         instance.__dict__.update(config)
-        assert instance.network is None
-        if network_json is not None:
-            import keras.models
-            instance.network = keras.models.model_from_json(network_json)
-            if weights is not None:
-                instance.network.set_weights(weights)
+        instance.network_weights = weights
+        assert instance._network is None
         return instance
