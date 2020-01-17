@@ -34,7 +34,7 @@ def setup():
         'allele-specific': Class1AffinityPredictor.load(
             get_path("models_class1", "models")),
         'pan-allele': Class1AffinityPredictor.load(
-            get_path("models_class1_pan", "models.with_mass_spec"))
+            get_path("models_class1_pan", "models.combined"))
 }
 
 

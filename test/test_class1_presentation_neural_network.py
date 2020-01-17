@@ -43,7 +43,7 @@ def setup():
     global AFFINITY_PREDICTOR
     startup()
     AFFINITY_PREDICTOR = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.no_mass_spec"),
+        get_path("models_class1_pan", "models.combined"),
         optimization_level=0,
         max_models=1)
 
@@ -112,9 +112,9 @@ def Xtest_synthetic_allele_refinement_max_affinity(include_affinities=True):
     length = 9
 
     train_with_ms = pandas.read_csv(get_path("data_curated",
-        "curated_training_data.with_mass_spec.csv.bz2"))
+        "curated_training_data.csv.bz2"))
     train_no_ms = pandas.read_csv(
-        get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
+        get_path("data_curated", "curated_training_data.affinity.csv.bz2"))
 
     def filter_df(df):
         return df.loc[
@@ -153,7 +153,7 @@ def Xtest_synthetic_allele_refinement_max_affinity(include_affinities=True):
 
     if include_affinities:
         affinity_train_df = pandas.read_csv(get_path("models_class1_pan",
-            "models.with_mass_spec/train_data.csv.bz2"))
+            "models.combined/train_data.csv.bz2"))
         affinity_train_df = affinity_train_df.loc[
             affinity_train_df.allele.isin(alleles),
             ["peptide", "allele", "measurement_inequality", "measurement_value"]
@@ -267,7 +267,7 @@ def Xtest_synthetic_allele_refinement_max_affinity(include_affinities=True):
 
 
 
-def test_synthetic_allele_refinement(include_affinities=True):
+def Xtest_synthetic_allele_refinement(include_affinities=True):
     """
     Test that in a synthetic example the model is able to learn that HLA-C*01:02
     prefers P at position 3.
@@ -282,9 +282,9 @@ def test_synthetic_allele_refinement(include_affinities=True):
     length = 9
 
     train_with_ms = pandas.read_csv(get_path("data_curated",
-        "curated_training_data.with_mass_spec.csv.bz2"))
+        "curated_training_data.csv.bz2"))
     train_no_ms = pandas.read_csv(
-        get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
+        get_path("data_curated", "curated_training_data.affinity.csv.bz2"))
 
     def filter_df(df):
         return df.loc[
@@ -320,7 +320,7 @@ def test_synthetic_allele_refinement(include_affinities=True):
 
     if include_affinities:
         affinity_train_df = pandas.read_csv(get_path("models_class1_pan",
-            "models.with_mass_spec/train_data.csv.bz2"))
+            "models.combined/train_data.csv.bz2"))
         affinity_train_df = affinity_train_df.loc[
             affinity_train_df.allele.isin(alleles), ["peptide", "allele",
                 "measurement_inequality", "measurement_value"]]
@@ -499,7 +499,7 @@ def Xtest_real_data_multiallelic_refinement(max_epochs=10):
 
     pan_train_df = pandas.read_csv(
         get_path(
-            "models_class1_pan", "models.with_mass_spec/train_data.csv.bz2"))
+            "models_class1_pan", "models.combined/train_data.csv.bz2"))
 
     pan_sub_train_df = pan_train_df.loc[
         #pan_train_df.allele.isin(multi_train_alleles),
