@@ -87,7 +87,8 @@ def get_default_class1_models_dir(test_exists=True):
         if test_exists and not exists(result):
             raise IOError("No such directory: %s" % result)
         return result
-    return get_path("models_class1", "models", test_exists=test_exists)
+    return get_path(
+        "models_class1_pan", "models.combined", test_exists=test_exists)
 
 
 def get_default_class1_presentation_models_dir(test_exists=True):

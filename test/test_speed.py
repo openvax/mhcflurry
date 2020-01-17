@@ -2,6 +2,10 @@
 Profile prediction speed
 
 """
+import logging
+logging.getLogger('tensorflow').disabled = True
+logging.getLogger('matplotlib').disabled = True
+
 import numpy
 numpy.random.seed(0)
 import time
@@ -32,7 +36,7 @@ def setup():
         get_path("models_class1", "models"))
 
     PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.with_mass_spec"))
+        get_path("models_class1_pan", "models.combined"))
 
 
 def teardown():

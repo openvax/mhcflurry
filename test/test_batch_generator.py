@@ -139,7 +139,7 @@ def test_large(sample_rate=1.0):
 
     pan_train_df = pandas.read_csv(
         get_path(
-            "models_class1_pan", "models.with_mass_spec/train_data.csv.bz2"))
+            "models_class1_pan", "models.combined/train_data.csv.bz2"))
     pan_sub_train_df = pan_train_df
     pan_sub_train_df["label"] = pan_sub_train_df["measurement_value"]
     del pan_sub_train_df["measurement_value"]
@@ -149,7 +149,7 @@ def test_large(sample_rate=1.0):
     multi_train_df = multi_train_df.sample(frac=sample_rate)
 
     pan_predictor = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.with_mass_spec"),
+        get_path("models_class1_pan", "models.combined"),
         optimization_level=0,
         max_models=1)
 

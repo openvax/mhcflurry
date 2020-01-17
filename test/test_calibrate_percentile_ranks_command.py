@@ -20,7 +20,7 @@ setup = startup
 
 
 def run_and_check(n_jobs=0, delete=True, additional_args=[]):
-    source_models_dir = get_path("models_class1_pan", "models.with_mass_spec")
+    source_models_dir = get_path("models_class1_pan", "models.combined")
     dest_models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
 
     # Save a new predictor that has no percent rank calibration data.
@@ -40,7 +40,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
         "mhcflurry-calibrate-percentile-ranks",
         "--models-dir", dest_models_dir,
         "--match-amino-acid-distribution-data", get_path(
-            "data_curated", "curated_training_data.no_mass_spec.csv.bz2"),
+            "data_curated", "curated_training_data.affinity.csv.bz2"),
         "--motif-summary",
         "--num-peptides-per-length", "1000",
         "--allele", "HLA-A*02:01", "HLA-B*07:02",

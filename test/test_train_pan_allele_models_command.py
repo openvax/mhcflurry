@@ -116,7 +116,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
         json.dump(HYPERPARAMETERS_LIST, fd)
 
     data_df = pandas.read_csv(
-        get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
+        get_path("data_curated", "curated_training_data.affinity.csv.bz2"))
     selected_data_df = data_df.loc[data_df.allele.str.startswith("HLA-A")]
     selected_data_df.to_csv(
         os.path.join(models_dir, "_train_data.csv"), index=False)
