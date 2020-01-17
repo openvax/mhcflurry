@@ -343,7 +343,7 @@ def train_models(args):
     if results_generator:
         for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
             save_start = time.time()
-            (model,) = predictor.models
+            (model,) = new_predictor.models
             pprint.pprint(model.fit_info[-1]['training_info'])
             (new_model_name,) = predictor.add_models(new_predictor.models)
             predictor.save(

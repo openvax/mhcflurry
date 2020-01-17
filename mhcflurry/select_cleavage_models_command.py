@@ -273,7 +273,7 @@ def model_select(
             possible_ensemble = list(selected) + [i]
             predictions = predictions_df[possible_ensemble].mean(1)
             auc_score = roc_auc_score(df.hit.values, predictions.values)
-            if auc_score >= best_model_score:
+            if auc_score > best_model_score:
                 best_model = i
                 best_model_score = auc_score
             if not selected:
