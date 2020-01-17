@@ -316,6 +316,7 @@ def train_models(args):
             item = work_items.pop(0)  # want to keep freeing up memory
             work_predictor = train_model(**item)
             assert work_predictor is predictor
+            pprint.pprint(predictor.models[-1].fit_info[-1]['training_info'])
         assert not work_items
         results_generator = None
     elif args.cluster_parallelism:
@@ -342,6 +343,8 @@ def train_models(args):
     if results_generator:
         for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
             save_start = time.time()
+            (model,) = predictor.models
+            pprint.pprint(model.fit_info[-1]['training_info'])
             (new_model_name,) = predictor.add_models(new_predictor.models)
             predictor.save(
                 args.out_models_dir,
@@ -387,6 +390,8 @@ def train_model(
         save_to,
         constant_data=GLOBAL_DATA):
 
+    from sklearn.metrics import roc_auc_score
+
     df = constant_data["train_data"]
     folds_df = constant_data["folds_df"]
 
@@ -397,7 +402,12 @@ def train_model(
 
     train_data = df.loc[
         folds_df["fold_%d" % fold_num]
-    ].sample(frac=1.0)
+    ].sample(frac=1.0).copy()
+
+    test_data = df.loc[~folds_df["fold_%d" % fold_num]].copy()
+
+    print("Training on %d points (%d points held-out)." % (
+        len(train_data), len(test_data)))
 
     progress_preamble = (
         "[task %2d / %2d]: "
@@ -431,6 +441,18 @@ def train_model(
     for peptide in sorted(train_data.peptide.values):
         train_peptide_hash.update(peptide.encode())
 
+    # Compute AUC on held-out data just so it can be logged.
+    for some_df in [train_data, test_data]:
+        some_df["prediction"] = model.predict(
+            peptides=some_df.peptide.values,
+            n_flanks=some_df.n_flank.values,
+            c_flanks=some_df.c_flank.values)
+    train_auc = roc_auc_score(
+        train_data.hit.values, train_data.prediction.values)
+    test_auc = roc_auc_score(test_data.hit.values, test_data.prediction.values)
+    print("Train AUC", train_auc)
+    print("Test AUC", test_auc)
+
     model.fit_info[-1].setdefault("training_info", {}).update({
         "fold_num": fold_num,
         "num_folds": num_folds,
@@ -440,6 +462,8 @@ def train_model(
         "num_architectures": num_architectures,
         "train_peptide_hash": train_peptide_hash.hexdigest(),
         "work_item_name": work_item_name,
+        "train_auc": train_auc,
+        "test_auc": test_auc,
     })
 
     numpy.testing.assert_equal(

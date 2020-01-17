@@ -28,7 +28,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 HYPERPARAMETERS = [
     {
-        "max_epochs": 5,
+        "max_epochs": 100,
         "n_flank_length": 5,
         "c_flank_length": 5,
         "convolutional_kernel_size": 3,
