@@ -2,6 +2,10 @@
 Test that pan-allele and allele-specific predictors are highly correlated.
 """
 from __future__ import print_function
+import logging
+logging.getLogger('tensorflow').disabled = True
+logging.getLogger('matplotlib').disabled = True
+
 import os
 import sys
 import argparse
@@ -27,7 +31,7 @@ def setup():
         'allele-specific': Class1AffinityPredictor.load(
             get_path("models_class1", "models")),
         'pan-allele': Class1AffinityPredictor.load(
-            get_path("models_class1_pan", "models.combined"))
+            get_path("models_class1_pan", "models.combined"), max_models=2)
     }
 
 
@@ -39,7 +43,7 @@ def teardown():
 
 def test_correlation(
         alleles=None,
-        num_peptides_per_length=100,
+        num_peptides_per_length=1000,
         lengths=[8, 9, 10],
         debug=False):
     peptides = []
@@ -77,7 +81,8 @@ def test_correlation(
     results_df = pandas.DataFrame(results_df, columns=["allele", "correlation"])
     print(results_df)
 
-    assert_greater(results_df.correlation.mean(), 0.70)
+    print("Mean correlation", results_df.correlation.mean())
+    assert_greater(results_df.correlation.mean(), 0.65)
 
     return results_df
 
