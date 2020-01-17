@@ -42,6 +42,7 @@ def test_more():
 
 def train_basic_network(num, do_assertions=True, **hyperparameters):
     use_hyperparameters = {
+        "max_epochs": 30,
         "n_flank_length": 5,
         "c_flank_length": 5,
         "convolutional_kernel_size": 3,
@@ -82,7 +83,8 @@ def train_basic_network(num, do_assertions=True, **hyperparameters):
         train_df.peptide.values,
         train_df.n_flank.values,
         train_df.c_flank.values,
-        train_df.hit.values)
+        train_df.hit.values,
+        verbose=0)
 
     for df in [train_df, test_df]:
         df["predictions"] = network.predict(
