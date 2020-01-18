@@ -14,7 +14,7 @@ base_hyperparameters = dict(
     n_flank_length=15,
     c_flank_length=15,
     post_convolutional_dense_layer_sizes=[],
-    minibatch_size=1024,
+    minibatch_size=512,
     dropout_rate=0.5,
     convolutional_activation="relu",
     learning_rate=0.001)
@@ -27,7 +27,7 @@ def hyperparrameters_grid():
         for convolutional_activation in ["relu", "tanh"]:
             for convolutional_filters in [64, 128]:
                 for flanking_averages in [True]:
-                    for convolutional_kernel_size in [7, 8, 9]:
+                    for convolutional_kernel_size in [5, 6, 7, 8, 9]:
                         for l1 in [0.0, 0.0001, 0.000001]:
                             for s in [[], [8]]:
                                 for d in [0.5]:
