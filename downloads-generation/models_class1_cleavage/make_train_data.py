@@ -203,13 +203,19 @@ def run():
             predictions_df[prediction_col])
         merged_df = merged_df.sort_values("affinity_prediction", ascending=True)
 
-        num_to_take = len(sub_hit_df) * args.hit_multiplier_to_take
+        num_to_take = int(len(sub_hit_df) * args.hit_multiplier_to_take)
         selected_df = merged_df.head(num_to_take)[
                 columns_to_keep
         ].sample(frac=1.0).copy()
         selected_df["hit"] = selected_df["hit"].fillna(0)
         selected_df["sample_id"] = sample_id
         result_df.append(selected_df)
+
+        print(
+            "Processed sample",
+            sample_id,
+            "with hit and decoys:\n",
+            selected_df.hit.value_counts())
 
     result_df = pandas.concat(result_df, ignore_index=True, sort=False)
     result_df["hla"] = result_df.sample_id.map(sample_table.hla)
