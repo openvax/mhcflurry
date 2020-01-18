@@ -29,9 +29,9 @@ parser.add_argument(
     required=True,
     help="Proteome peptides")
 parser.add_argument(
-    "--decoys-per-hit",
-    type=int,
-    default=2,
+    "--hit-multiplier-to-take",
+    type=float,
+    default=1,
     help="")
 parser.add_argument(
     "--ppv-multiplier",
@@ -190,35 +190,26 @@ def run():
                         "protein_accession", "peptide", "n_flank", "c_flank"
                 ]].drop_duplicates("peptide"))
 
-        decoys_df = pandas.concat(decoys_df, ignore_index=True, sort=False)
+        merged_df = pandas.concat(
+            [sub_hit_df] + decoys_df, ignore_index=True, sort=False)
 
         prediction_col = "%s affinity" % sample_table.loc[sample_id].hla
         predictions_df = pandas.DataFrame(
-            index=numpy.concatenate([
-                sub_hit_df.peptide.unique(),
-                decoys_df.peptide.unique()
-            ]),
+            index=merged_df.peptide.unique(),
             columns=[prediction_col])
         load_predictions(args.predictions, result_df=predictions_df)
 
-        sub_hit_df["affinity_prediction"] = sub_hit_df.peptide.map(
+        merged_df["affinity_prediction"] = merged_df.peptide.map(
             predictions_df[prediction_col])
-        decoys_df["affinity_prediction"] = decoys_df.peptide.map(
-            predictions_df[prediction_col])
+        merged_df = merged_df.sort_values("affinity_prediction", ascending=True)
 
-        decoys_df = decoys_df.sort_values("affinity_prediction", ascending=True)
-
-        sub_decoys_df = decoys_df.head(
-            len(sub_hit_df) * args.decoys_per_hit).copy()
-        sub_decoys_df["hit"] = 0
-        sub_decoys_df["sample_id"] = sample_id
-
-        sample_result_df = pandas.concat(
-            [sub_hit_df, sub_decoys_df],
-            ignore_index=True,
-            sort=False)[columns_to_keep].sample(frac=1.0)
-
-        result_df.append(sample_result_df)
+        num_to_take = len(sub_hit_df) * args.hit_multiplier_to_take
+        selected_df = merged_df.head(num_to_take)[
+                columns_to_keep
+        ].sample(frac=1.0).copy()
+        selected_df["hit"] = selected_df["hit"].fillna(0)
+        selected_df["sample_id"] = sample_id
+        result_df.append(selected_df)
 
     result_df = pandas.concat(result_df, ignore_index=True, sort=False)
     result_df["hla"] = result_df.sample_id.map(sample_table.hla)

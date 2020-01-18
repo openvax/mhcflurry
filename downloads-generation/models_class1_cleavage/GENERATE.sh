@@ -94,7 +94,8 @@ else
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
         --predictions "$(mhcflurry-downloads path data_mass_spec_benchmark)/predictions/all.mhcflurry.combined" \
         --proteome-peptides "$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2" \
-        --decoys-per-hit 2 \
+        --ppv-multiplier 100 \
+        --hit-multiplier-to-take 1 \
         --out "$(pwd)/train_data.csv"
     bzip2 -f train_data.csv
 fi
