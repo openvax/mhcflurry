@@ -80,9 +80,7 @@ def load_predictions(dirname, result_df=None, columns=None):
 
     manifest_df = manifest_df.loc[manifest_df.col.isin(result_df.columns)]
 
-    print("Will load", len(peptides), "peptides and", len(manifest_df), "cols")
-
-    for _, row in tqdm.tqdm(manifest_df.iterrows(), total=len(manifest_df)):
+    for _, row in manifest_df.iterrows():
         with open(os.path.join(dirname, row.path), "rb") as fd:
             value = numpy.load(fd)['arr_0']
             if mask is not None:
@@ -108,6 +106,9 @@ def run():
     hit_df = hit_df.loc[hit_df.format == "MONOALLELIC"].copy()
     print("Subselected to %d monoallelic samples" % hit_df.sample_id.nunique())
     hit_df["allele"] = hit_df.hla
+
+    hit_df = hit_df.loc[hit_df.allele.str.match("^HLA-[ABC]")]
+    print("Subselected to %d HLA-A/B/C samples" % hit_df.sample_id.nunique())
 
     if args.exclude_contig:
         new_hit_df = hit_df.loc[
