@@ -123,7 +123,7 @@ mhcflurry-class1-select-cleavage-models \
     --models-dir "$MODELS_DIR" \
     --out-models-dir "$(pwd)/models" \
     --min-models 1 \
-    --max-models 8 \
+    --max-models 2 \
     $PARALLELISM_ARGS
 cp "$MODELS_DIR/train_data.csv.bz2" "models/train_data.csv.bz2"
 
