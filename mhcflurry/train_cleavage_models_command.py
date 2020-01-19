@@ -1,6 +1,7 @@
 """
 Train Class1 cleavage models.
 """
+from __future__ import print_function
 import argparse
 import os
 from os.path import join
