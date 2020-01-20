@@ -151,7 +151,7 @@ ls -lh "${PARTS}"*
 # Write out just the selected models
 # Move unselected into a hidden dir so it is excluded in the glob (*).
 mkdir .ignored
-mv models.unselected .ignored/
+mv models.unselected hits_with_tpm.csv.bz2 .ignored/
 RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.selected.$(date +%Y%m%d).tar.bz2"
 tar -cjf "$RESULT" *
 mv .ignored/* . && rmdir .ignored

@@ -13,16 +13,53 @@ from sklearn.metrics import roc_auc_score
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
 import pandas
+import pprint
 
 from mhcflurry.class1_cleavage_neural_network import Class1CleavageNeuralNetwork
 from mhcflurry.common import random_peptides
+from mhcflurry.amino_acid import BLOSUM62_MATRIX
 
 from mhcflurry.testing_utils import cleanup, startup
 teardown = cleanup
 setup = startup
 
 
-def test_big():
+def Xtest_neural_network_input():
+    model = Class1CleavageNeuralNetwork(
+        peptide_max_length=12,
+        n_flank_length=8,
+        c_flank_length=8)
+
+    tests = [
+        {
+            # Input
+            "peptide": "SIINFEKL",
+            "n_flank": "QWERTYIPSDFG",
+            "c_flank": "FGHKLCVNMQWE",
+
+            # Expected results
+            "peptide_left_pad": "",
+            "peptide_right_pad": "",
+            "c_flank": "",
+            "n_flank": "",
+
+        }
+    ]
+
+    for (i, d) in enumerate(tests):
+        print("Test", i + 1)
+        pprint.pprint(d)
+        results = model.peptides_and_flanking_to_network_input(
+            peptides=[d['peptide']],
+            n_flanks=[d['n_flank']],
+            c_flanks=[d['n_flank']])
+        import ipdb ; ipdb.set_trace()
+
+
+    model.peptides_and_flanking_to_network_input()
+
+
+def Xtest_big():
     train_basic_network(num=100000)
 
 
@@ -30,7 +67,7 @@ def test_small():
     train_basic_network(num=10000)
 
 
-def test_more():
+def Xtest_more():
     train_basic_network(
         num=10000,
         flanking_averages=False,
@@ -43,8 +80,9 @@ def test_more():
 def train_basic_network(num, do_assertions=True, **hyperparameters):
     use_hyperparameters = {
         "max_epochs": 30,
-        "n_flank_length": 5,
-        "c_flank_length": 5,
+        "peptide_max_length": 12,
+        "n_flank_length": 8,
+        "c_flank_length": 8,
         "convolutional_kernel_size": 3,
     }
     use_hyperparameters.update(hyperparameters)
