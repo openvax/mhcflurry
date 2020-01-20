@@ -17,7 +17,7 @@ import pandas
 
 from .version import __version__
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
-from .encodable_sequences import EncodableSequences
+from .flanking_encoding import FlankingEncoding
 from .downloads import get_default_class1_cleavage_models_dir
 from .class1_cleavage_neural_network import Class1CleavageNeuralNetwork
 from .common import save_weights, load_weights, NumpyJSONEncoder
@@ -119,6 +119,7 @@ class Class1CleavagePredictor(object):
             n_flanks,
             c_flanks,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+
         return self.predict_to_dataframe(
             peptides=peptides,
             n_flanks=n_flanks,
@@ -132,34 +133,27 @@ class Class1CleavagePredictor(object):
             c_flanks,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
 
-        for (name, value) in [
-                ("peptides", peptides),
-                ("n_flanks", n_flanks),
-                ("c_flanks", c_flanks)]:
-            if isinstance(value, string_types):
-                raise TypeError(
-                    "%s must be a list or array, not a string" % name)
+        sequences = FlankingEncoding(
+            peptides=peptides, n_flanks=n_flanks, c_flanks=c_flanks)
+        return self.predict_to_dataframe_encoded(
+            sequences=sequences, batch_size=batch_size)
 
-        peptides = EncodableSequences.create(peptides)
-        n_flanks = EncodableSequences.create(n_flanks)
-        c_flanks = EncodableSequences.create(c_flanks)
+    def predict_to_dataframe_encoded(
+            self, sequences, batch_size=DEFAULT_PREDICT_BATCH_SIZE):
 
         score_array = []
 
         for (i, network) in enumerate(self.models):
-            predictions = network.predict(
-                peptides=peptides,
-                n_flanks=n_flanks,
-                c_flanks=c_flanks,
-                batch_size=batch_size)
+            predictions = network.predict_encoded(
+                encoded, batch_size=batch_size)
             score_array.append(predictions)
 
         score_array = numpy.array(score_array)
 
         result_df = pandas.DataFrame({
-            "peptide": peptides.sequences,
-            "n_flank": n_flanks.sequences,
-            "c_flank": c_flanks.sequences,
+            "peptide": encoded.dataframe.peptide,
+            "n_flank": encoded.dataframe.n_flank,
+            "c_flank": encoded.dataframe.c_flank,
             "score": numpy.mean(score_array, axis=0),
         })
         return result_df
