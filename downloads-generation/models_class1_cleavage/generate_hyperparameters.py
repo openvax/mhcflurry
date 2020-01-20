@@ -23,12 +23,12 @@ grid = []
 
 
 def hyperparrameters_grid():
-    for learning_rate in [0.001, 0.0001]:
+    for learning_rate in [0.001]:
         for convolutional_activation in ["relu", "tanh"]:
             for convolutional_filters in [64, 128]:
                 for flanking_averages in [True]:
-                    for convolutional_kernel_size in [5, 6, 7, 8, 9]:
-                        for l1 in [0.0, 0.0001, 0.000001]:
+                    for convolutional_kernel_size in [8, 9]:
+                        for l1 in [0.0, 0.000001]:
                             for s in [[], [8]]:
                                 for d in [0.5]:
                                     new = deepcopy(base_hyperparameters)

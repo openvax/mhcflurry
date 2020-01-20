@@ -81,6 +81,7 @@ from __future__ import print_function
 import time
 import collections
 import numpy
+import pandas
 
 from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
@@ -204,8 +205,6 @@ class Class1CleavageNeuralNetwork(object):
         -------
 
         """
-        import keras.backend as K
-
         peptides = EncodableSequences.create(peptides)
         n_flanks = EncodableSequences.create(n_flanks)
         c_flanks = EncodableSequences.create(c_flanks)
@@ -341,39 +340,107 @@ class Class1CleavageNeuralNetwork(object):
         numpy.array
         """
         peptides = EncodableSequences.create(peptides)
+        peptides_df  = pandas.DataFrame({
+            "peptide": peptides.sequences,
+        })
+        if len(peptides_df) > 0:
+            peptides_df["length"] = peptides_df.peptide.str.len()
+        else:
+            peptides_df["length"] = []
+
+        network_peptide_size = int(
+            self.hyperparameters['peptide_max_length'] +
+            numpy.ceil(
+                self.hyperparameters['convolutional_kernel_size'] / 2))
 
         result = {}
         result['peptide_right_pad'] = (
             peptides.variable_length_to_fixed_length_vector_encoding(
                 vector_encoding_name=self.hyperparameters['vector_encoding_name'],
-                max_length=self.hyperparameters['peptide_max_length'],
+                max_length=network_peptide_size,
                 alignment_method='right_pad'))
         result['peptide_left_pad'] = (
             peptides.variable_length_to_fixed_length_vector_encoding(
                 vector_encoding_name=self.hyperparameters['vector_encoding_name'],
-                max_length=self.hyperparameters['peptide_max_length'],
+                max_length=network_peptide_size,
                 alignment_method='left_pad'))
+
+        flank_needed_to_fill_peptide = (
+            network_peptide_size - peptides_df.length.min())
 
         if self.hyperparameters['n_flank_length'] > 0:
             n_flanks = EncodableSequences.create(n_flanks)
-            result['n_flank'] = (
+            n_flank_encoded = (
                 n_flanks.variable_length_to_fixed_length_vector_encoding(
                     vector_encoding_name=self.hyperparameters['vector_encoding_name'],
-                    max_length=self.hyperparameters['n_flank_length'],
+                    max_length=max(
+                        self.hyperparameters['n_flank_length'],
+                        flank_needed_to_fill_peptide),
                     alignment_method='left_pad',
                     trim=True,
                     allow_unsupported_amino_acids=True))
 
+            if n_flank_encoded.shape[1] == self.hyperparameters['n_flank_length']:
+                result['n_flank'] = n_flank_encoded
+            else:
+                result['n_flank'] = n_flank_encoded[
+                    :,
+                    (-self.hyperparameters['n_flank_length']):,
+                    :
+                ]
+            assert (
+                result['n_flank'].shape[1] ==
+                self.hyperparameters['n_flank_length'])
+
+            # Switch out X for N-terminal residues in peptide_left_pad.
+            for (length, sub_df) in peptides_df.groupby("length"):
+                num_to_set = network_peptide_size - length
+                result['peptide_left_pad'][
+                    sub_df.index.values,
+                    :num_to_set,
+                    :
+                ] = n_flank_encoded[
+                    sub_df.index.values,
+                    (-num_to_set):,
+                    :
+                ]
+
         if self.hyperparameters['c_flank_length'] > 0:
             c_flanks = EncodableSequences.create(c_flanks)
-            result['c_flank'] = (
+            c_flank_encoded = (
                 c_flanks.variable_length_to_fixed_length_vector_encoding(
                     vector_encoding_name=self.hyperparameters['vector_encoding_name'],
-                    max_length=self.hyperparameters['c_flank_length'],
+                    max_length=max(
+                        self.hyperparameters['n_flank_length'],
+                        flank_needed_to_fill_peptide),
                     alignment_method='right_pad',
                     trim=True,
                     allow_unsupported_amino_acids=True))
 
+            if c_flank_encoded.shape[1] == self.hyperparameters['c_flank_length']:
+                result['c_flank'] = c_flank_encoded
+            else:
+                result['c_flank'] = c_flank_encoded[
+                    :,
+                    :self.hyperparameters['c_flank_length'],
+                    :
+                ]
+            assert (
+                result['c_flank'].shape[1] ==
+                self.hyperparameters['c_flank_length'])
+
+            # Switch out X for C-terminal residues in peptide_right_pad.
+            for (length, sub_df) in peptides_df.groupby("length"):
+                num_to_set = network_peptide_size - length
+                result['peptide_right_pad'][
+                    sub_df.index.values,
+                    length:,
+                    :
+                ] = result['c_flank'][
+                    sub_df.index.values,
+                    :num_to_set,
+                    :
+                ]
         return result
 
 
