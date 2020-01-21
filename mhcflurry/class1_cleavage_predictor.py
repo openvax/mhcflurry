@@ -145,15 +145,15 @@ class Class1CleavagePredictor(object):
 
         for (i, network) in enumerate(self.models):
             predictions = network.predict_encoded(
-                encoded, batch_size=batch_size)
+                sequences, batch_size=batch_size)
             score_array.append(predictions)
 
         score_array = numpy.array(score_array)
 
         result_df = pandas.DataFrame({
-            "peptide": encoded.dataframe.peptide,
-            "n_flank": encoded.dataframe.n_flank,
-            "c_flank": encoded.dataframe.c_flank,
+            "peptide": sequences.dataframe.peptide,
+            "n_flank": sequences.dataframe.n_flank,
+            "c_flank": sequences.dataframe.c_flank,
             "score": numpy.mean(score_array, axis=0),
         })
         return result_df

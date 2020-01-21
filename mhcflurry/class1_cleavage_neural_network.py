@@ -220,7 +220,7 @@ class Class1CleavageNeuralNetwork(object):
             self._network = self.make_network(
                 **self.network_hyperparameter_defaults.subselect(
                     self.hyperparameters))
-            if verbose > 0:
+            if verbose > -1:
                 self._network.summary()
 
         self.network().compile(
@@ -296,7 +296,7 @@ class Class1CleavageNeuralNetwork(object):
         fit_info["num_points"] = len(sequences.dataframe)
         self.fit_info.append(dict(fit_info))
 
-        if verbose:
+        if verbose > -1:
             print(
                 "Output weights",
                 *numpy.array(
@@ -431,6 +431,7 @@ class Class1CleavageNeuralNetwork(object):
                     ))(current_layer)
             single_output_result = current_layer
 
+            dense_flank = None
             if flank == "n_flank":
                 def cleavage_extractor(x):
                     return x[:, n_flank_length]
@@ -441,15 +442,30 @@ class Class1CleavageNeuralNetwork(object):
 
                 def max_pool_over_peptide_extractor(lst):
                     import tensorflow as tf
-                    import tensorflow.ragged
                     (x, peptide_length) = lst
 
+                    # We generate a per-sample mask that is 1 for all peptide
+                    # positions except the first position, and 0 for all other
+                    # positions (i.e. n flank, c flank, and the first peptide
+                    # position).
                     starts = n_flank_length + 1
-                    limits = n_flank_length + tf.squeeze(peptide_length)
-                    range = tensorflow.ragged.range(starts, limits)
-                    values = tf.gather(x, range, batch_dims=1, axis=1)
-                    max_value = tf.reduce_max(values, axis=0)
-                    return max_value
+                    limits = n_flank_length + peptide_length
+                    row = tf.expand_dims(tf.range(0, x.shape[1]), axis=0)
+                    mask = tf.logical_and(
+                        tf.greater_equal(row, starts),
+                        tf.less(row, limits))
+
+                    # We are assuming that x >= -1. The final activation in the
+                    # previous layer should be a function that satisfies this
+                    # (e.g. sigmoid, tanh, relu).
+                    max_value = tf.reduce_max(
+                        (x + 1) * tf.expand_dims(
+                            tf.cast(mask, tf.float32), axis=-1),
+                        axis=1) - 1
+
+                    # We flip the sign so that initializing the final dense
+                    # layer weights to 1s is reasonable.
+                    return -1 * max_value
 
                 max_over_peptide = keras.layers.Lambda(
                     max_pool_over_peptide_extractor,
@@ -457,6 +473,38 @@ class Class1CleavageNeuralNetwork(object):
                         single_output_result,
                         model_inputs['peptide_length']
                     ])
+
+                def flanking_extractor(lst):
+                    import tensorflow as tf
+                    (x, peptide_length) = lst
+
+                    # mask is 1 for n_flank positions and 0 elsewhere.
+                    starts = 0
+                    limits = n_flank_length
+                    row = tf.expand_dims(tf.range(0, x.shape[1]), axis=0)
+                    mask = tf.logical_and(
+                        tf.greater_equal(row, starts),
+                        tf.less(row, limits))
+
+                    # We are assuming that x >= -1. The final activation in the
+                    # previous layer should be a function that satisfies this
+                    # (e.g. sigmoid, tanh, relu).
+                    average_value = tf.reduce_mean(
+                        (x + 1) * tf.expand_dims(
+                            tf.cast(mask, tf.float32), axis=-1),
+                        axis=1) - 1
+                    return average_value
+
+                if flanking_averages and n_flank_length > 0:
+                    # Also include average pooled of flanking sequences
+                    pooled_flank = keras.layers.Lambda(
+                        flanking_extractor, name="%s_extracted" % flank)([
+                            convolutional_result,
+                            model_inputs['peptide_length']
+                    ])
+                    dense_flank = Dense(
+                        1, activation="tanh", name="%s_avg_dense" % flank)(
+                        pooled_flank)
             else:
                 assert flank == "c_flank"
 
@@ -475,148 +523,76 @@ class Class1CleavageNeuralNetwork(object):
                         model_inputs['peptide_length']
                     ])
 
-                max_over_peptide = None
+                def max_pool_over_peptide_extractor(lst):
+                    import tensorflow as tf
+                    (x, peptide_length) = lst
+
+                    # We generate a per-sample mask that is 1 for all peptide
+                    # positions except the last position, and 0 for all other
+                    # positions (i.e. n flank, c flank, and the last peptide
+                    # position).
+                    starts = n_flank_length
+                    limits = n_flank_length + peptide_length - 1
+                    row = tf.expand_dims(tf.range(0, x.shape[1]), axis=0)
+                    mask = tf.logical_and(
+                        tf.greater_equal(row, starts),
+                        tf.less(row, limits))
+
+                    # We are assuming that x >= -1. The final activation in the
+                    # previous layer should be a function that satisfies this
+                    # (e.g. sigmoid, tanh, relu).
+                    max_value = tf.reduce_max(
+                        (x + 1) * tf.expand_dims(
+                            tf.cast(mask, tf.float32), axis=-1),
+                        axis=1) - 1
+
+                    # We flip the sign so that initializing the final dense
+                    # layer weights to 1s is reasonable.
+                    return -1 * max_value
+
+                max_over_peptide = keras.layers.Lambda(
+                    max_pool_over_peptide_extractor,
+                    name="%s_internal_cleaved" % flank)([
+                        single_output_result,
+                        model_inputs['peptide_length']
+                    ])
+
+                def flanking_extractor(lst):
+                    import tensorflow as tf
+                    (x, peptide_length) = lst
+
+                    # mask is 1 for c_flank positions and 0 elsewhere.
+                    starts = n_flank_length + peptide_length
+                    limits = n_flank_length + peptide_length + c_flank_length
+                    row = tf.expand_dims(tf.range(0, x.shape[1]), axis=0)
+                    mask = tf.logical_and(
+                        tf.greater_equal(row, starts),
+                        tf.less(row, limits))
+
+                    # We are assuming that x >= -1. The final activation in the
+                    # previous layer should be a function that satisfies this
+                    # (e.g. sigmoid, tanh, relu).
+                    average_value = tf.reduce_mean(
+                        (x + 1) * tf.expand_dims(
+                            tf.cast(mask, tf.float32), axis=-1),
+                        axis=1) - 1
+                    return average_value
+
+                if flanking_averages and c_flank_length > 0:
+                    # Also include average pooled of flanking sequences
+                    pooled_flank = keras.layers.Lambda(
+                        flanking_extractor, name="%s_extracted" % flank)([
+                            convolutional_result,
+                            model_inputs['peptide_length']
+                    ])
+                    dense_flank = Dense(
+                        1, activation="tanh", name="%s_avg_dense" % flank)(
+                        pooled_flank)
 
             outputs_for_final_dense.append(single_output_at_cleavage_position)
-            if max_over_peptide is not None:
-                outputs_for_final_dense.append(max_over_peptide)
-
-
-
-            """
-
-            # Single output at cleavage position
-            single_output_at_cleavage_position = keras.layers.Lambda(
-                cleavage_position_extractor)(single_output_result)
-            outputs_for_final_dense.append(single_output_at_cleavage_position)
-
-            # Max of single-output at non-cleaved (peptide) positions.
-            non_cleaved_single_outputs = keras.layers.Lambda(
-                noncleaved_peptide_extractor, name="%s_noncleaved" % flank)(
-                    single_output_result)
-            non_cleaved_pooled = keras.layers.pooling.GlobalMaxPooling1D(
-                name="%s_noncleaved_pooled" % flank)(non_cleaved_single_outputs)
-            # We flip it so that initializing the final dense layer weights to
-            # 1s is reasonable.
-            non_cleaved_pooled_flipped = keras.layers.Lambda(
-                lambda x: -x,
-                name="%s_noncleaved_pooled_flip" % flank)(non_cleaved_pooled)
-            outputs_for_final_dense.append(non_cleaved_pooled_flipped)
-
-            if include_flank and flanking_averages:
-                # Also include average pooled of flanking sequences
-                extracted_flank = keras.layers.Lambda(
-                    flanking_extractor, name="%s_extracted" % flank)(
-                        convolutional_result)
-                pooled_flank = keras.layers.pooling.GlobalAveragePooling1D(
-                    name="%s_avg" % flank,
-                )(extracted_flank)
-                dense_flank = Dense(
-                    1, activation="tanh", name="%s_avg_dense" % flank)(
-                    pooled_flank)
+            outputs_for_final_dense.append(max_over_peptide)
+            if dense_flank is not None:
                 outputs_for_final_dense.append(dense_flank)
-
-
-
-
-
-
-
-
-
-
-
-
-
-            include_flank = flank in model_inputs
-
-            if flank == "n_flank":
-                peptide_input = "peptide_right_pad"
-                concat_order = [flank, peptide_input]
-                noncleaved_peptide_extractor = lambda x: x[
-                    :, (n_flank_length + 1):]
-                flanking_extractor = lambda x: x[
-                    :, : n_flank_length
-                ]
-                cleavage_position_extractor = lambda x: x[:, n_flank_length]
-            else:
-                assert flank == "c_flank"
-                peptide_input = "peptide_left_pad"
-                concat_order = [peptide_input, flank]
-                noncleaved_peptide_extractor = lambda x: x[
-                    :, 0 : peptide_max_length - 1]
-                flanking_extractor = lambda x: x[
-                    :, peptide_max_length :
-                ]
-                cleavage_position_extractor = lambda x: x[:, peptide_max_length - 1]
-
-            if include_flank:
-                current_layer = Concatenate(
-                    axis=1,
-                    name="_".join(concat_order))([
-                        model_inputs[item] for item in concat_order
-                ])
-            else:
-                current_layer = model_inputs[peptide_input]
-
-            current_layer = keras.layers.Conv1D(
-                filters=convolutional_filters,
-                kernel_size=convolutional_kernel_size,
-                kernel_regularizer=keras.regularizers.l1_l2(
-                    *convolutional_kernel_l1_l2),
-                padding="same",
-                activation=convolutional_activation,
-                name="%s_conv" % flank)(current_layer)
-            if dropout_rate > 0:
-                current_layer = keras.layers.Dropout(
-                    name="%s_dropout" % flank,
-                    rate=dropout_rate,
-                    noise_shape=(
-                        None, 1, int(current_layer.get_shape()[-1])))(
-                    current_layer)
-            convolutional_result = current_layer
-            for (i, size) in enumerate(
-                    list(post_convolutional_dense_layer_sizes) + [1]):
-                current_layer = keras.layers.Conv1D(
-                    name="%s_post_%d" % (flank, i),
-                    filters=size,
-                    kernel_size=1,
-                    kernel_regularizer=keras.regularizers.l1_l2(
-                        *convolutional_kernel_l1_l2),
-                    activation=convolutional_activation)(current_layer)
-            single_output_result = current_layer
-
-            # Single output at cleavage position
-            single_output_at_cleavage_position = keras.layers.Lambda(
-                cleavage_position_extractor)(single_output_result)
-            outputs_for_final_dense.append(single_output_at_cleavage_position)
-
-            # Max of single-output at non-cleaved (peptide) positions.
-            non_cleaved_single_outputs = keras.layers.Lambda(
-                noncleaved_peptide_extractor, name="%s_noncleaved" % flank)(
-                    single_output_result)
-            non_cleaved_pooled = keras.layers.pooling.GlobalMaxPooling1D(
-                name="%s_noncleaved_pooled" % flank)(non_cleaved_single_outputs)
-            # We flip it so that initializing the final dense layer weights to
-            # 1s is reasonable.
-            non_cleaved_pooled_flipped = keras.layers.Lambda(
-                lambda x: -x,
-                name="%s_noncleaved_pooled_flip" % flank)(non_cleaved_pooled)
-            outputs_for_final_dense.append(non_cleaved_pooled_flipped)
-
-            if include_flank and flanking_averages:
-                # Also include average pooled of flanking sequences
-                extracted_flank = keras.layers.Lambda(
-                    flanking_extractor, name="%s_extracted" % flank)(
-                        convolutional_result)
-                pooled_flank = keras.layers.pooling.GlobalAveragePooling1D(
-                    name="%s_avg" % flank,
-                )(extracted_flank)
-                dense_flank = Dense(
-                    1, activation="tanh", name="%s_avg_dense" % flank)(
-                    pooled_flank)
-                outputs_for_final_dense.append(dense_flank)
-            """
 
         if len(outputs_for_final_dense) == 1:
             (current_layer,) = outputs_for_final_dense

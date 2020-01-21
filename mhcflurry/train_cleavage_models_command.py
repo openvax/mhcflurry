@@ -392,6 +392,7 @@ def train_model(
         constant_data=GLOBAL_DATA):
 
     from sklearn.metrics import roc_auc_score
+    from mhcflurry.flanking_encoding import FlankingEncoding
 
     df = constant_data["train_data"]
     folds_df = constant_data["folds_df"]
@@ -429,9 +430,10 @@ def train_model(
 
     model = Class1CleavageNeuralNetwork(**hyperparameters)
     model.fit(
-        peptides=train_data.peptide.values,
-        n_flanks=train_data.n_flank.values,
-        c_flanks=train_data.c_flank.values,
+        sequences=FlankingEncoding(
+            peptides=train_data.peptide.values,
+            n_flanks=train_data.n_flank.values,
+            c_flanks=train_data.c_flank.values),
         targets=train_data.hit.values,
         progress_preamble=progress_preamble,
         progress_print_interval=progress_print_interval,

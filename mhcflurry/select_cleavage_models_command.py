@@ -23,7 +23,7 @@ import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_cleavage_predictor import Class1CleavagePredictor
-from .encodable_sequences import EncodableSequences
+from .flanking_encoding import FlankingEncoding
 from .common import configure_logging
 from .local_parallelism import (
     worker_pool_with_gpu_assignments_from_args,
@@ -246,26 +246,28 @@ def model_select(
     -------
     dict with keys 'fold_num', 'selected_indices', 'summary'
     """
+    from .flanking_encoding import FlankingEncoding
+
     full_data = constant_data["data"]
     df = full_data.loc[
         full_data["fold_%d" % fold_num] == 0
     ]
 
-    peptides = EncodableSequences.create(df.peptide.values)
-    n_flanks = EncodableSequences.create(df.n_flank.values)
-    c_flanks = EncodableSequences.create(df.c_flank.values)
+    sequences = FlankingEncoding(
+        peptides=df.peptide.values,
+        n_flanks=df.n_flank.values,
+        c_flanks=df.c_flank.values)
 
     predictions_df = df.copy()
     for (i, model) in enumerate(models):
-        predictions_df[i] = model.predict(
-            peptides=peptides,
-            n_flanks=n_flanks,
-            c_flanks=c_flanks)
+        predictions_df[i] = model.predict_encoded(sequences)
 
     selected = []
     selected_score = 0
     remaining_models = set(numpy.arange(len(models)))
     individual_model_scores = {}
+    selected_in_round = {}
+    ensemble_score_when_selected = {}
     while remaining_models and len(selected) < max_models:
         best_model = None
         best_model_score = 0
@@ -283,6 +285,8 @@ def model_select(
             selected_score = best_model_score
             remaining_models.remove(best_model)
             selected.append(best_model)
+            selected_in_round[best_model] = len(selected)
+            ensemble_score_when_selected[best_model] = selected_score
         else:
             break
 
@@ -292,6 +296,11 @@ def model_select(
         numpy.arange(len(models))
     ].to_frame()
     summary_df.columns = ['auc_score']
+    summary_df["selected_in_round"] = pandas.Series(selected_in_round)
+    summary_df["ensemble_score_when_selected"] = pandas.Series(
+        ensemble_score_when_selected)
+
+    print(summary_df)
 
     return {
         'fold_num': fold_num,

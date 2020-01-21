@@ -30,6 +30,19 @@ table = BLOSUM62_MATRIX.apply(
 
 
 def decode_matrix(array):
+    """
+    Convert BLOSSUM62-encoded sequences to amino acid strings.
+
+    Parameters
+    ----------
+    array : shape (num, length, dim) where num is number of sequences,
+    length is the length of the sequences, and dim is the BLOSUM62 dimensions
+    (i.e. 21).
+
+    Returns
+    -------
+    list of strings
+    """
     (num, length, dim) = array.shape
     assert dim == 21
 
@@ -118,7 +131,7 @@ def test_neural_network_input():
         results['peptide_length'], df.peptide.str.len().values)
 
 
-def Xtest_big():
+def test_big():
     train_basic_network(num=100000)
 
 
@@ -126,7 +139,7 @@ def test_small():
     train_basic_network(num=10000)
 
 
-def Xtest_more():
+def test_more():
     train_basic_network(
         num=10000,
         flanking_averages=False,
@@ -163,6 +176,8 @@ def train_basic_network(num, do_assertions=True, is_hit=None, **hyperparameters)
         "n_flank_length": 8,
         "c_flank_length": 8,
         "convolutional_kernel_size": 3,
+        "flanking_averages": True,
+        "min_delta": 0.01,
     }
     use_hyperparameters.update(hyperparameters)
 
@@ -212,9 +227,6 @@ def train_basic_network(num, do_assertions=True, is_hit=None, **hyperparameters)
             df.peptide.values,
             df.n_flank.values,
             df.c_flank.values)
-
-    print(df)
-    print(df.loc[df.hit])
 
     train_auc = roc_auc_score(train_df.hit.values, train_df.predictions.values)
     test_auc = roc_auc_score(test_df.hit.values, test_df.predictions.values)
