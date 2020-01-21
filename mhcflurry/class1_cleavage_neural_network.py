@@ -426,7 +426,9 @@ class Class1CleavageNeuralNetwork(object):
                     kernel_size=1,
                     kernel_regularizer=keras.regularizers.l1_l2(
                         *convolutional_kernel_l1_l2),
-                    activation=convolutional_activation)(current_layer)
+                    activation=(
+                        "tanh" if size == 1 else convolutional_activation
+                    ))(current_layer)
             single_output_result = current_layer
 
             if flank == "n_flank":
@@ -436,6 +438,25 @@ class Class1CleavageNeuralNetwork(object):
                 single_output_at_cleavage_position = keras.layers.Lambda(
                     cleavage_extractor, name="%s_cleaved" % flank)(
                     single_output_result)
+
+                def max_pool_over_peptide_extractor(lst):
+                    import tensorflow as tf
+                    import tensorflow.ragged
+                    (x, peptide_length) = lst
+
+                    starts = n_flank_length + 1
+                    limits = n_flank_length + tf.squeeze(peptide_length)
+                    range = tensorflow.ragged.range(starts, limits)
+                    values = tf.gather(x, range, batch_dims=1, axis=1)
+                    max_value = tf.reduce_max(values, axis=0)
+                    return max_value
+
+                max_over_peptide = keras.layers.Lambda(
+                    max_pool_over_peptide_extractor,
+                    name="%s_internal_cleaved" % flank)([
+                        single_output_result,
+                        model_inputs['peptide_length']
+                    ])
             else:
                 assert flank == "c_flank"
 
@@ -454,7 +475,11 @@ class Class1CleavageNeuralNetwork(object):
                         model_inputs['peptide_length']
                     ])
 
+                max_over_peptide = None
+
             outputs_for_final_dense.append(single_output_at_cleavage_position)
+            if max_over_peptide is not None:
+                outputs_for_final_dense.append(max_over_peptide)
 
 
 
