@@ -127,7 +127,8 @@ class Class1PresentationNeuralNetwork(object):
         allele_representation = Embedding(
             name="allele_representation",
             input_dim=64,  # arbitrary, how many alleles to have room for
-            output_dim=1029,
+            output_dim=affinity_network.get_layer(
+                "allele_representation").output_shape[-1],
             input_length=self.hyperparameters['max_alleles'],
             trainable=False,
             mask_zero=False)(input_alleles)
@@ -161,6 +162,7 @@ class Class1PresentationNeuralNetwork(object):
         layer_name_to_new_node = {
             "allele_peptide_merged": allele_peptide_merged,
         }
+
         for layer in layers:
             assert layer.name not in layer_name_to_new_node
             input_layer_names = []

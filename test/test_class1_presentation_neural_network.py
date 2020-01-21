@@ -31,6 +31,9 @@ from mhcflurry.custom_loss import MultiallelicMassSpecLoss
 from mhcflurry.regression_target import to_ic50
 
 
+# disable
+sys.exit(0)
+
 ###################################################
 # SETUP
 ###################################################
@@ -43,7 +46,7 @@ def setup():
     global AFFINITY_PREDICTOR
     startup()
     AFFINITY_PREDICTOR = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined"),
+        get_path("models_class1_pan_variants", "models.affinity_only"),
         optimization_level=0,
         max_models=1)
 
