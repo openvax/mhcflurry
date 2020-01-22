@@ -17,6 +17,7 @@ base_hyperparameters = dict(
     minibatch_size=512,
     dropout_rate=0.5,
     convolutional_activation="relu",
+    patience=20,
     learning_rate=0.001)
 
 grid = []
@@ -25,12 +26,12 @@ grid = []
 def hyperparrameters_grid():
     for learning_rate in [0.001]:
         for convolutional_activation in ["tanh", "relu"]:
-            for convolutional_filters in [64, 128, 256]:
+            for convolutional_filters in [256, 512]:
                 for flanking_averages in [True]:
-                    for convolutional_kernel_size in [8, 10, 12, 14]:
-                        for l1 in [0.0]:  #0.000001
-                            for s in [[], [8]]:
-                                for d in [0.5]:
+                    for convolutional_kernel_size in [11, 13, 15, 17]:
+                        for l1 in [0.0, 1e-6]:
+                            for s in [[8], [16]]:
+                                for d in [0.3, 0.5]:
                                     new = deepcopy(base_hyperparameters)
                                     new["learning_rate"] = learning_rate
                                     new["convolutional_activation"] = convolutional_activation
