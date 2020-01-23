@@ -170,13 +170,9 @@ class Class1CleavageNeuralNetwork(object):
         Update self.network_json and self.network_weights properties based on
         this instances's neural network.
         """
-        network = self.network()
-        if network is None:
-            self.network_json = None
-            self.network_weights = None
-        else:
-            self.network_json = network.to_json()
-            self.network_weights = network.get_weights()
+        if self._network is not None:
+            self.network_json = self._network.to_json()
+            self.network_weights = self._network.get_weights()
 
     def fit(
             self,
