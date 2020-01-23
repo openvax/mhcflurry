@@ -16,7 +16,7 @@ class RandomNegativePeptides(object):
 
     hyperparameter_defaults = HyperparameterDefaults(
         random_negative_rate=0.0,
-        random_negative_constant=25,
+        random_negative_constant=0,
         random_negative_match_distribution=True,
         random_negative_distribution_smoothing=0.0,
         random_negative_method="recommended",

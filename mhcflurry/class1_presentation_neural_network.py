@@ -8,29 +8,19 @@ import numpy
 import pandas
 import mhcnames
 import hashlib
+from copy import copy
 
 from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import Class1NeuralNetwork, DEFAULT_PREDICT_BATCH_SIZE
+from .class1_cleavage_neural_network import Class1CleavageNeuralNetwork
 from .encodable_sequences import EncodableSequences
-from .regression_target import from_ic50, to_ic50
-from .random_negative_peptides import RandomNegativePeptides
 from .allele_encoding import MultipleAlleleEncoding, AlleleEncoding
 from .auxiliary_input import AuxiliaryInputEncoder
-from .batch_generator import BatchGenerator
-from .custom_loss import (
-    MSEWithInequalities,
-    TransformPredictionsLossWrapper,
-    MultiallelicMassSpecLoss)
+from .flanking_encoding import FlankingEncoding
 
 
 class Class1PresentationNeuralNetwork(object):
     network_hyperparameter_defaults = HyperparameterDefaults(
-        allele_amino_acid_encoding="BLOSUM62",
-        peptide_encoding={
-            'vector_encoding_name': 'BLOSUM62',
-            'alignment_method': 'left_pad_centered_right_pad',
-            'max_length': 15,
-        },
         max_alleles=6,
     )
     """
@@ -39,11 +29,12 @@ class Class1PresentationNeuralNetwork(object):
     """
 
     fit_hyperparameter_defaults = HyperparameterDefaults(
+        trainable_cleavage_predictor=False,
+        trainable_affinity_predictor=False,
         max_epochs=500,
+        validation_split=0.1,
         early_stopping=True,
-        random_negative_affinity_min=20000.0,).extend(
-        RandomNegativePeptides.hyperparameter_defaults).extend(
-        BatchGenerator.hyperparameter_defaults
+        minibatch_size=256,
     )
     """
     Hyperparameters for neural network training.
@@ -58,8 +49,7 @@ class Class1PresentationNeuralNetwork(object):
     """
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
-        loss_multiallelic_mass_spec_delta=0.2,
-        loss_multiallelic_mass_spec_multiplier=1.0,
+        loss="binary_crossentropy",
         optimizer="rmsprop",
         learning_rate=None,
     )
@@ -71,6 +61,7 @@ class Class1PresentationNeuralNetwork(object):
     auxiliary_input_hyperparameter_defaults = HyperparameterDefaults(
         auxiliary_input_features=["gene"],
         auxiliary_input_feature_parameters={},
+        include_cleavage=True,
     )
     """
     Allele feature hyperparameters.
@@ -88,54 +79,48 @@ class Class1PresentationNeuralNetwork(object):
         self.network = None
         self.fit_info = []
         self.allele_representation_hash = None
+        self.affinity_model = None
+        self.cleavage_model = None
 
-    def load_from_class1_neural_network(self, model):
+    def build(self, affinity_model, cleavage_model=None):
         import keras.backend as K
-        from keras.layers import (
-            Input,
-            TimeDistributed,
-            Dense,
-            Flatten,
-            RepeatVector,
-            Reshape,
-            concatenate,
-            Activation,
-            Lambda,
-            Add,
-            Multiply,
-            Embedding)
-        from keras.models import Model
-        from keras.initializers import Zeros
+        import keras.models
 
-        assert isinstance(model, Class1NeuralNetwork), model
-        affinity_network = model.network()
+        assert isinstance(affinity_model, Class1NeuralNetwork), affinity_model
+        affinity_model = copy(affinity_model)
+
+        self.affinity_model = affinity_model
+        affinity_network = affinity_model.network()
+
+        model_inputs = {}
 
         peptide_shape = tuple(
             int(x) for x in K.int_shape(affinity_network.inputs[0])[1:])
 
-        input_alleles = Input(
-            shape=(self.hyperparameters['max_alleles'],), name="allele")
-        input_peptides = Input(
+        model_inputs['allele_set'] = keras.layers.Input(
+            shape=(self.hyperparameters['max_alleles'],), name="allele_set")
+        model_inputs['peptide'] = keras.layers.Input(
             shape=peptide_shape,
             dtype='float32',
             name='peptide')
 
-        peptides_flattened = Flatten()(input_peptides)
-        peptides_repeated = RepeatVector(self.hyperparameters['max_alleles'])(
+        peptides_flattened = keras.layers.Flatten()(model_inputs['peptide'])
+        peptides_repeated = keras.layers.RepeatVector(
+            self.hyperparameters['max_alleles'])(
             peptides_flattened)
 
-        allele_representation = Embedding(
+        allele_representation = keras.layers.Embedding(
             name="allele_representation",
             input_dim=64,  # arbitrary, how many alleles to have room for
             output_dim=affinity_network.get_layer(
                 "allele_representation").output_shape[-1],
             input_length=self.hyperparameters['max_alleles'],
             trainable=False,
-            mask_zero=False)(input_alleles)
+            mask_zero=False)(model_inputs['allele_set'])
 
         allele_flat = allele_representation
 
-        allele_peptide_merged = concatenate(
+        allele_peptide_merged = keras.layers.concatenate(
             [peptides_repeated, allele_flat], name="allele_peptide_merged")
 
         layer_names = [
@@ -159,56 +144,61 @@ class Class1PresentationNeuralNetwork(object):
                 "allele_peptide_merged") + 1:
         ]
         node = allele_peptide_merged
-        layer_name_to_new_node = {
+        affinity_predictor_layer_name_to_new_node = {
             "allele_peptide_merged": allele_peptide_merged,
         }
 
         for layer in layers:
-            assert layer.name not in layer_name_to_new_node
+            assert layer.name not in affinity_predictor_layer_name_to_new_node
             input_layer_names = []
             for inbound_node in layer._inbound_nodes:
                 for inbound_layer in inbound_node.inbound_layers:
                     input_layer_names.append(inbound_layer.name)
             input_nodes = [
-                layer_name_to_new_node[name]
+                affinity_predictor_layer_name_to_new_node[name]
                 for name in input_layer_names
             ]
 
             if len(input_nodes) == 1:
-                lifted = TimeDistributed(layer)
+                lifted = keras.layers.TimeDistributed(layer, name=layer.name)
                 node = lifted(input_nodes[0])
             else:
                 node = layer(input_nodes)
-            layer_name_to_new_node[layer.name] = node
+            affinity_predictor_layer_name_to_new_node[layer.name] = node
 
-        node = Reshape(
-            (self.hyperparameters['max_alleles'],),
-            name="unmasked_affinity_matrix_output")(node)
+        def logit(x):
+            import tensorflow as tf
+            return -tf.log(1. / x - 1.)
 
-        pre_mask_affinity_predictor_matrix_output = node
+        #node = keras.layers.Lambda(logit, name="logit")(node)
+        affinity_prediction_and_other_signals = [node]
+        if self.hyperparameters['include_cleavage']:
+            assert isinstance(cleavage_model, Class1CleavageNeuralNetwork)
+            cleavage_model = copy(cleavage_model)
+            self.cleavage_model = cleavage_model
+            cleavage_network = cleavage_model.network()
 
-        # Apply allele mask: zero out all outputs corresponding to alleles
-        # with the special index 0.
-        def alleles_to_mask(x):
-            import keras.backend as K
-            result = K.cast(K.not_equal(x, 0), "float32")
-            return result
+            model_inputs['sequence'] = keras.layers.Input(
+                shape=cleavage_network.get_layer("sequence").output_shape[1:],
+                dtype='float32',
+                name='sequence')
+            model_inputs['peptide_length'] = keras.layers.Input(
+                shape=(1,),
+                dtype='int32',
+                name='peptide_length')
+            cleavage_network.name = "cleavage_predictor"
+            cleavage_prediction = cleavage_network([
+                model_inputs['peptide_length'],
+                model_inputs['sequence'],
+            ])
+            cleavage_prediction.trainable = False
+            cleavage_prediction_repeated = keras.layers.RepeatVector(
+                self.hyperparameters['max_alleles'])(cleavage_prediction)
+            affinity_prediction_and_other_signals.append(
+                cleavage_prediction_repeated)
 
-        allele_mask = Lambda(alleles_to_mask, name="allele_mask")(input_alleles)
-
-        affinity_predictor_matrix_output = Multiply(
-                name="affinity_matrix_output")([
-            allele_mask,
-            pre_mask_affinity_predictor_matrix_output
-        ])
-        node = Reshape(
-            (self.hyperparameters['max_alleles'], 1),
-            name="expand_dims_affinity_matrix_output")(
-            affinity_predictor_matrix_output)
-
-        auxiliary_input = None
         if self.hyperparameters['auxiliary_input_features']:
-            auxiliary_input = Input(
+            model_inputs['auxiliary'] = keras.layers.Input(
                 shape=(
                     self.hyperparameters['max_alleles'],
                     len(
@@ -218,116 +208,154 @@ class Class1PresentationNeuralNetwork(object):
                                 'auxiliary_input_feature_parameters']))),
                 dtype="float32",
                 name="auxiliary")
-            node = concatenate(
-                [node, auxiliary_input], name="affinities_with_auxiliary")
+            affinity_prediction_and_other_signals.append(
+                model_inputs['auxiliary'])
 
-        layer = Dense(8, activation="tanh")
-        lifted = TimeDistributed(layer, name="presentation_adjustment_hidden1")
-        node = lifted(node)
-
-        # By initializing to zero we ensure that before training the
-        # presentation output is the same as the affinity output.
-        layer = Dense(
-            1,
-            activation="tanh",
-            kernel_initializer=Zeros(),
-            bias_initializer=Zeros())
-        lifted = TimeDistributed(layer, name="presentation_adjustment")
-        presentation_adjustment = lifted(node)
-        presentation_adjustment = Reshape(
-            target_shape=(self.hyperparameters['max_alleles'],),
-            name="reshaped_presentation_adjustment")(presentation_adjustment)
-
-
-        def logit(x):
-            import tensorflow as tf
-            return - tf.math.log(
-                tf.maximum(
-                    tf.math.divide_no_nan(1., x) - 1.,
-                    0.0))
-
-        presentation_output_pre_sigmoid = Add()([
-            Lambda(logit, name="logit")(affinity_predictor_matrix_output),
-            presentation_adjustment,
-        ])
-        pre_mask_presentation_output = Activation(
-            "sigmoid", name="unmasked_presentation_output")(
-                presentation_output_pre_sigmoid)
+        if len(affinity_prediction_and_other_signals) > 1:
+            node = keras.layers.concatenate(
+                affinity_prediction_and_other_signals,
+                name="affinity_prediction_and_other_signals")
+            layer = keras.layers.Dense(
+                1,
+                activation="sigmoid",
+                kernel_initializer=keras.initializers.Ones(),
+                name="combine")
+            lifted = keras.layers.TimeDistributed(layer, name="per_allele_output")
+            node = lifted(node)
+        else:
+            (node,) = affinity_prediction_and_other_signals
 
         # Apply allele mask: zero out all outputs corresponding to alleles
         # with the special index 0.
-        presentation_output = Multiply(name="presentation_output")([
-            allele_mask,
-            pre_mask_presentation_output
-        ])
+        #def alleles_to_mask(x):
+        #    import keras.backend as K
+        #    result = K.expand_dims(
+        #        K.cast(K.not_equal(x, 0), "float32"), axis=-1)
+        #    return result
 
-        self.network = Model(
-            inputs=[
-                input_peptides,
-                input_alleles,
-            ] + ([] if auxiliary_input is None else [auxiliary_input]),
-            outputs=[
-                affinity_predictor_matrix_output,
-                presentation_output,
-            ],
+        #allele_mask = keras.layers.Lambda(
+        #    alleles_to_mask, name="allele_mask")(model_inputs['allele_set'])
+
+        #node = keras.layers.Multiply(
+        #    name="masked_per_allele_outputs")(
+        #    [allele_mask, node])
+
+        presentation_output = keras.layers.Reshape(
+            target_shape=(self.hyperparameters['max_alleles'],))(
+            node)
+
+        self.network = keras.models.Model(
+            inputs=list(model_inputs.values()),
+            outputs=presentation_output,
             name="presentation",
         )
 
-    def copy_weights_to_affinity_model(self, model):
-        # We assume that the other model's layers are a prefix of ours.
-        self.clear_allele_representations()
-        model.clear_allele_representations()
-        model.network().set_weights(
-            self.get_weights()[:len(model.get_weights())])
+        if not self.hyperparameters['trainable_cleavage_predictor']:
+            if self.hyperparameters['include_cleavage']:
+                self.network.get_layer("cleavage_predictor").trainable = False
 
-    def peptides_to_network_input(self, peptides):
+        self.affinity_predictor_layer_names = list(
+            affinity_predictor_layer_name_to_new_node)
+
+        self.set_trainable(
+            trainable_affinity_predictor=(
+                self.hyperparameters['trainable_affinity_predictor']))
+
+    def set_trainable(self, trainable_affinity_predictor=None):
+        if trainable_affinity_predictor is not None:
+            for name in self.affinity_predictor_layer_names:
+                self.network.get_layer(name).trainable = trainable_affinity_predictor
+
+
+    @staticmethod
+    def loss(y_true, y_pred):
+        # Binary cross entropy
+        from keras import backend as K
+        import tensorflow as tf
+
+        y_pred = K.constant(y_pred) if not K.is_tensor(y_pred) else y_pred
+        y_true = K.cast(y_true, y_pred.dtype)
+
+        #y_pred = tf.Print(y_pred, [y_pred], message="y_pred", summarize=50)
+        #y_true = tf.Print(y_true, [y_true], message="y_true", summarize=50)
+
+        #logit_y_pred = -tf.log(1. / y_pred - 1.)
+        #logit_y_pred = tf.Print(logit_y_pred, [logit_y_pred], message="logit_y_pred", summarize=50)
+
+        #softmax = K.softmax(5 * logit_y_pred, axis=-1)
+        #softmax = tf.Print(softmax, [softmax], message="softmax", summarize=50)
+
+        #product = softmax * y_pred
+        #product = tf.Print(product, [product], message="product", summarize=50)
+
+        #result = tf.reduce_sum(product, axis=-1)
+        #result = tf.Print(result, [result], message="result", summarize=50)
+
+        #result = tf.reduce_max(y_pred, axis=-1)
+        result = tf.reduce_sum(y_pred, axis=-1)
+
+        return K.mean(
+            K.binary_crossentropy(y_true, result),
+            axis=-1)
+
+    def network_input(
+            self, peptides, allele_encoding, flanking_encoding=None):
         """
-        Encode peptides to the fixed-length encoding expected by the neural
-        network (which depends on the architecture).
 
         Parameters
         ----------
         peptides : EncodableSequences or list of string
 
+        allele_encoding : AlleleEncoding
+
+        flanking_encoding: Flank
+
+
         Returns
         -------
         numpy.array
         """
-        encoder = EncodableSequences.create(peptides)
-        encoded = encoder.variable_length_to_fixed_length_vector_encoding(
-            **self.hyperparameters['peptide_encoding'])
-        assert len(encoded) == len(peptides)
-        return encoded
+        assert self.affinity_model is not None
 
-    def allele_encoding_to_network_input(self, allele_encoding):
-        """
-        Encode alleles to the fixed-length encoding expected by the neural
-        network (which depends on the architecture).
-
-        Parameters
-        ----------
-        allele_encoding : AlleleEncoding
-
-        Returns
-        -------
-        (numpy.array, numpy.array)
-
-        Indices and allele representations.
-
-        """
-        return (
-            allele_encoding.indices,
-            allele_encoding.allele_representations(
-                self.hyperparameters['allele_amino_acid_encoding']))
+        (allele_input, allele_representations) = (
+            self.affinity_model.allele_encoding_to_network_input(
+                allele_encoding))
+        peptides = EncodableSequences.create(peptides)
+        x_dict = {
+            'peptide': self.affinity_model.peptides_to_network_input(peptides),
+            'allele_set': allele_input,
+        }
+        if self.hyperparameters['include_cleavage']:
+            assert self.cleavage_model  is not None
+            numpy.testing.assert_array_equal(
+                peptides.sequences,
+                flanking_encoding.dataframe.peptide.values)
+            if flanking_encoding is None:
+                raise RuntimeError("flanking_encoding required")
+            cleavage_x_dict = self.cleavage_model.network_input(
+                flanking_encoding)
+            x_dict.update(cleavage_x_dict)
+        if self.hyperparameters['auxiliary_input_features']:
+            auxiliary_encoder = AuxiliaryInputEncoder(
+                alleles=allele_encoding.alleles,
+                peptides=peptides.sequences)
+            x_dict[
+                'auxiliary'
+            ] = auxiliary_encoder.get_array(
+                features=self.hyperparameters['auxiliary_input_features'],
+                feature_parameters=self.hyperparameters[
+                    'auxiliary_input_feature_parameters']) * 0.01
+        #import ipdb;ipdb.set_trace()
+        return (x_dict, allele_representations)
 
     def fit(
             self,
+            targets,
             peptides,
-            labels,
             allele_encoding,
-            affinities_mask=None,  # True when a peptide/label is actually a peptide and an affinity
-            inequalities=None,  # interpreted only for elements where affinities_mask is True, otherwise ignored
-            validation_weights=None,
+            flanking_encoding=None,
+            sample_weights=None,
+            shuffle_permutation=None,
             verbose=1,
             progress_callback=None,
             progress_preamble="",
@@ -340,260 +368,59 @@ class Class1PresentationNeuralNetwork(object):
             allele_encoding.max_alleles_per_experiment ==
             self.hyperparameters['max_alleles'])
 
-        encodable_peptides = EncodableSequences.create(peptides)
+        (x_dict, allele_representations) = (
+            self.network_input(
+                peptides=peptides,
+                allele_encoding=allele_encoding,
+                flanking_encoding=flanking_encoding))
 
-        if labels is not None:
-            labels = numpy.array(labels, copy=False)
-        if inequalities is not None:
-            inequalities = numpy.array(inequalities, copy=True)
-        else:
-            inequalities = numpy.tile("=", len(labels))
-        if affinities_mask is not None:
-            affinities_mask = numpy.array(affinities_mask, copy=False)
-        else:
-            affinities_mask = numpy.tile(False, len(labels))
-        if validation_weights is None:
-            validation_weights = numpy.tile(1.0, len(labels))
-        else:
-            validation_weights = numpy.array(validation_weights, copy=False)
-        inequalities[~affinities_mask] = "="
-
-        random_negatives_planner = RandomNegativePeptides(
-            **RandomNegativePeptides.hyperparameter_defaults.subselect(
-                self.hyperparameters))
-        random_negatives_planner.plan(
-            peptides=encodable_peptides.sequences,
-            affinities=numpy.where(affinities_mask, labels, to_ic50(labels)),
-            alleles=[
-                numpy.random.choice(row[row != numpy.array(None)])
-                for row in allele_encoding.alleles
-            ],
-            inequalities=inequalities)
-
-        peptide_input = self.peptides_to_network_input(encodable_peptides)
-
-        # Optional optimization
-        (allele_encoding_input, allele_representations) = (
-            self.allele_encoding_to_network_input(allele_encoding))
-
-        x_dict_without_random_negatives = {
-            'peptide': peptide_input,
-            'allele': allele_encoding_input,
-        }
-        if self.hyperparameters['auxiliary_input_features']:
-            auxiliary_encoder = AuxiliaryInputEncoder(
-                alleles=allele_encoding.alleles,
-                peptides=peptides)
-            x_dict_without_random_negatives[
-                'auxiliary'
-            ] = auxiliary_encoder.get_array(
-                features=self.hyperparameters['auxiliary_input_features'],
-                feature_parameters=self.hyperparameters[
-                    'auxiliary_input_feature_parameters'])
-
-        y1 = numpy.zeros(shape=len(labels))
-        y1[affinities_mask] = from_ic50(labels[affinities_mask])
-
-        random_negative_alleles = random_negatives_planner.get_alleles()
-        random_negatives_allele_encoding = MultipleAlleleEncoding(
-            experiment_names=random_negative_alleles,
-            experiment_to_allele_list=dict(
-                (a, [a]) for a in random_negative_alleles),
-            max_alleles_per_experiment=(
-                allele_encoding.max_alleles_per_experiment),
-            borrow_from=allele_encoding.allele_encoding)
-        num_random_negatives = random_negatives_planner.get_total_count()
-
-        # Reverse inequalities because from_ic50() flips the direction
-        # (i.e. lower affinity results in higher y values).
-        adjusted_inequalities = pandas.Series(inequalities).map({
-            "=": "=",
-            ">": "<",
-            "<": ">",
-        }).values
-        adjusted_inequalities[~affinities_mask] = ">"
-
-        # Note: we are using "<" here not ">" because the inequalities are
-        # now in target-space (0-1) not affinity-space.
-        adjusted_inequalities_with_random_negative = numpy.concatenate([
-            numpy.tile("<", num_random_negatives),
-            adjusted_inequalities
-        ])
-        random_negative_ic50 = self.hyperparameters[
-            'random_negative_affinity_min'
-        ]
-        y1_with_random_negatives = numpy.concatenate([
-            numpy.tile(
-                from_ic50(random_negative_ic50), num_random_negatives),
-            y1,
-        ])
-
-        def tensor_max(matrix):
-            import keras.backend as K
-            return K.max(matrix, axis=1)
-
-        affinities_loss = TransformPredictionsLossWrapper(
-            loss=MSEWithInequalities(),
-            y_pred_transform=tensor_max)
-        encoded_y1 = affinities_loss.encode_y(
-            y1_with_random_negatives,
-            inequalities=adjusted_inequalities_with_random_negative)
-
-        mms_loss = MultiallelicMassSpecLoss(
-            delta=self.hyperparameters['loss_multiallelic_mass_spec_delta'],
-            multiplier=self.hyperparameters[
-                'loss_multiallelic_mass_spec_multiplier'])
-        y2 = labels.copy()
-        y2[affinities_mask] = -1
-        y2_with_random_negatives = numpy.concatenate([
-            numpy.tile(0.0, num_random_negatives),
-            y2,
-        ])
-        encoded_y2 = mms_loss.encode_y(y2_with_random_negatives)
+        # Shuffle
+        if shuffle_permutation is None:
+            shuffle_permutation = numpy.random.permutation(len(targets))
+        targets = numpy.array(targets)[shuffle_permutation]
+        assert numpy.isnan(targets).sum() == 0, targets
+        if sample_weights is not None:
+            sample_weights = numpy.array(sample_weights)[shuffle_permutation]
+        for key in list(x_dict):
+            x_dict[key] = x_dict[key][shuffle_permutation]
+        del peptides
+        del allele_encoding
+        del flanking_encoding
 
         fit_info = collections.defaultdict(list)
 
         allele_representations_hash = self.set_allele_representations(
             allele_representations)
-        loss_reduction = "sum"
+
         self.network.compile(
-            loss=[
-                affinities_loss.get_keras_loss(reduction=loss_reduction),
-                mms_loss.get_keras_loss(reduction=loss_reduction),
-            ],
+            loss=self.loss,
             optimizer=self.hyperparameters['optimizer'])
         if self.hyperparameters['learning_rate'] is not None:
             K.set_value(
                 self.network.optimizer.lr,
                 self.hyperparameters['learning_rate'])
-        fit_info["learning_rate"] = float(
-            K.get_value(self.network.optimizer.lr))
+        fit_info["learning_rate"] = float(K.get_value(self.network.optimizer.lr))
 
         if verbose:
             self.network.summary()
 
-        batch_generator = BatchGenerator.create(
-            hyperparameters=BatchGenerator.hyperparameter_defaults.subselect(
-                self.hyperparameters))
-        start = time.time()
-        batch_generator.plan(
-            num=len(peptides) + num_random_negatives,
-            affinities_mask=numpy.concatenate([
-                numpy.tile(True, num_random_negatives),
-                affinities_mask
-            ]),
-            experiment_names=numpy.concatenate([
-                numpy.tile(None, num_random_negatives),
-                allele_encoding.experiment_names
-            ]),
-            alleles_matrix=numpy.concatenate([
-                random_negatives_allele_encoding.alleles,
-                allele_encoding.alleles,
-            ]),
-            is_binder=numpy.concatenate([
-                numpy.tile(False, num_random_negatives),
-                numpy.where(affinities_mask, labels, to_ic50(labels)) < 1000.0
-            ]),
-            validation_weights=numpy.concatenate([
-                numpy.tile(0.0, num_random_negatives),
-                validation_weights
-            ]),
-        )
-        if verbose:
-            print("Generated batch generation plan in %0.2f sec." % (
-                time.time() - start))
-            print(batch_generator.summary())
+        training_start = time.time()
 
         min_val_loss_iteration = None
         min_val_loss = None
         last_progress_print = 0
-        start = time.time()
-        x_dict_with_random_negatives = {}
         for i in range(self.hyperparameters['max_epochs']):
             epoch_start = time.time()
-
-            random_negative_peptides = EncodableSequences.create(
-                random_negatives_planner.get_peptides())
-            random_negative_peptides_encoding = (
-                self.peptides_to_network_input(random_negative_peptides))
-
-            if not x_dict_with_random_negatives:
-                if len(random_negative_peptides) > 0:
-                    x_dict_with_random_negatives[
-                        "peptide"
-                    ] = numpy.concatenate([
-                        random_negative_peptides_encoding,
-                        x_dict_without_random_negatives['peptide'],
-                    ])
-                    x_dict_with_random_negatives[
-                        'allele'
-                    ] = numpy.concatenate([
-                        self.allele_encoding_to_network_input(
-                            random_negatives_allele_encoding)[0],
-                        x_dict_without_random_negatives['allele']
-                    ])
-                    if 'auxiliary' in x_dict_without_random_negatives:
-                        random_negative_auxiliary_encoder = AuxiliaryInputEncoder(
-                            alleles=random_negatives_allele_encoding.alleles,
-                            #peptides=random_negative_peptides.sequences
-                        )
-                        x_dict_with_random_negatives['auxiliary'] = (
-                            numpy.concatenate([
-                                random_negative_auxiliary_encoder.get_array(
-                                    features=self.hyperparameters[
-                                        'auxiliary_input_features'],
-                                    feature_parameters=self.hyperparameters[
-                                        'auxiliary_input_feature_parameters']),
-                                x_dict_without_random_negatives['auxiliary']
-                            ]))
-                else:
-                    x_dict_with_random_negatives = (
-                        x_dict_without_random_negatives)
-            else:
-                # Update x_dict_with_random_negatives in place.
-                # This is more memory efficient than recreating it as above.
-                if len(random_negative_peptides) > 0:
-                    x_dict_with_random_negatives[
-                        "peptide"
-                    ][:num_random_negatives] = random_negative_peptides_encoding
-
-            if i == 0:
-                (train_generator, test_generator) = (
-                    batch_generator.get_train_and_test_generators(
-                        x_dict=x_dict_with_random_negatives,
-                        y_list=[encoded_y1, encoded_y2],
-                        epochs=1))
-                pairs = [
-                    ("train", train_generator, batch_generator.num_train_batches),
-                    ("test", test_generator, batch_generator.num_test_batches),
-                ]
-                for (kind, generator, steps) in pairs:
-                    self.assert_allele_representations_hash(
-                        allele_representations_hash)
-                    metrics = self.network.evaluate_generator(
-                        generator=generator,
-                        steps=steps,
-                        workers=0,
-                        use_multiprocessing=False)
-                    for (key, val) in zip(self.network.metrics_names, metrics):
-                        fit_info["pre_fit_%s_%s" % (kind, key)] = val
-            (train_generator, test_generator) = (
-                batch_generator.get_train_and_test_generators(
-                    x_dict=x_dict_with_random_negatives,
-                    y_list=[encoded_y1, encoded_y2],
-                    epochs=1))
             self.assert_allele_representations_hash(allele_representations_hash)
-            fit_history = self.network.fit_generator(
-                train_generator,
-                steps_per_epoch=batch_generator.num_train_batches,
+            fit_history = self.network.fit(
+                x_dict,
+                targets,
+                validation_split=self.hyperparameters['validation_split'],
+                batch_size=self.hyperparameters['minibatch_size'],
                 epochs=i + 1,
+                sample_weight=sample_weights,
                 initial_epoch=i,
-                verbose=verbose,
-                use_multiprocessing=False,
-                workers=0,
-                validation_data=test_generator,
-                validation_steps=batch_generator.num_test_batches)
-
+                verbose=verbose)
             epoch_time = time.time() - epoch_start
 
             for (key, value) in fit_history.history.items():
@@ -608,21 +435,25 @@ class Class1PresentationNeuralNetwork(object):
                         time.time() - last_progress_print
                         > progress_print_interval)):
                 print((progress_preamble + " " +
-                       "Epoch %3d / %3d [%0.2f sec]: loss=%g. "
+                       "Epoch %3d / %3d [%0.2f sec]: loss=%g val_loss=%g. "
                        "Min val loss (%s) at epoch %s" % (
                            i,
                            self.hyperparameters['max_epochs'],
                            epoch_time,
                            fit_info['loss'][-1],
+                           (
+                               fit_info['val_loss'][-1]
+                               if 'val_loss' in fit_info else numpy.nan
+                           ),
                            str(min_val_loss),
                            min_val_loss_iteration)).strip())
                 last_progress_print = time.time()
 
-            if batch_generator.num_test_batches:
+            if self.hyperparameters['validation_split']:
                 val_loss = fit_info['val_loss'][-1]
+
                 if min_val_loss is None or (
-                        val_loss < min_val_loss -
-                        self.hyperparameters['min_delta']):
+                        val_loss < min_val_loss - self.hyperparameters['min_delta']):
                     min_val_loss = val_loss
                     min_val_loss_iteration = i
 
@@ -647,51 +478,28 @@ class Class1PresentationNeuralNetwork(object):
             if progress_callback:
                 progress_callback()
 
-        fit_info["time"] = time.time() - start
-        fit_info["num_points"] = len(labels)
+        fit_info["time"] = time.time() - training_start
+        fit_info["num_points"] = len(targets)
         self.fit_info.append(dict(fit_info))
-
-        return {
-            'batch_generator': batch_generator,
-            'last_x': x_dict_with_random_negatives,
-            'last_y': [encoded_y1, encoded_y2],
-            'fit_info': fit_info,
-        }
-
-    Predictions = collections.namedtuple(
-        "ligandone_neural_network_predictions",
-        "affinity score")
 
     def predict(
             self,
             peptides,
-            allele_encoding=None,
+            allele_encoding,
+            flanking_encoding=None,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
 
         peptides = EncodableSequences.create(peptides)
         assert isinstance(allele_encoding, MultipleAlleleEncoding)
 
-        (allele_encoding_input, allele_representations) = (
-                self.allele_encoding_to_network_input(allele_encoding))
-        self.set_allele_representations(allele_representations)
-        x_dict = {
-            'peptide': self.peptides_to_network_input(peptides),
-            'allele': allele_encoding_input,
-        }
-        if self.hyperparameters['auxiliary_input_features']:
-            auxiliary_encoder = AuxiliaryInputEncoder(
-                alleles=allele_encoding.alleles,
-                peptides=peptides.sequences)
-            x_dict[
-                'auxiliary'
-            ] = auxiliary_encoder.get_array(
-                features=self.hyperparameters['auxiliary_input_features'],
-                feature_parameters=self.hyperparameters[
-                    'auxiliary_input_feature_parameters'])
+        (x_dict, allele_representations) = self.network_input(
+            peptides=peptides,
+            allele_encoding=allele_encoding,
+            flanking_encoding=flanking_encoding)
 
-        predictions = self.Predictions._make(
-            self.network.predict(x_dict, batch_size=batch_size))
-        return predictions
+        self.set_allele_representations(allele_representations)
+        raw_predictions = self.network.predict(x_dict, batch_size=batch_size)
+        return raw_predictions
 
     def clear_allele_representations(self):
         """

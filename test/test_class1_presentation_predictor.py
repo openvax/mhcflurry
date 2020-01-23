@@ -130,7 +130,7 @@ def Xtest_basic():
         train_df.peptide.values, alleles=["HLA-A*02:20"])
     model.fit(
         peptides=train_df.peptide.values,
-        labels=train_df.label.values,
+        targets=train_df.label.values,
         allele_encoding=allele_encoding)
     train_df["updated_score"] = new_predictor.predict(
         train_df.peptide.values,

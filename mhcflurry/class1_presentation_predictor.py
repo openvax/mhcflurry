@@ -26,6 +26,7 @@ from .allele_encoding import MultipleAlleleEncoding
 from .downloads import get_default_class1_presentation_models_dir
 from .class1_presentation_neural_network import Class1PresentationNeuralNetwork
 from .common import save_weights, load_weights, NumpyJSONEncoder
+from .flanking_encoding import FlankingEncoding
 
 
 class Class1PresentationPredictor(object):
@@ -104,16 +105,27 @@ class Class1PresentationPredictor(object):
         """
         return join(models_dir, "weights_%s.npz" % model_name)
 
-    def predict(self, peptides, alleles, batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+    def predict(
+            self,
+            peptides,
+            alleles,
+            n_flanks=None,
+            c_flanks=None,
+            batch_size=DEFAULT_PREDICT_BATCH_SIZE):
         return self.predict_to_dataframe(
             peptides=peptides,
             alleles=alleles,
+            n_flanks=n_flanks,
+            c_flanks=c_flanks,
             batch_size=batch_size).score.values
 
     def predict_to_dataframe(
             self,
             peptides,
             alleles,
+            n_flanks=None,
+            c_flanks=None,
+            flanking_encoding=None,
             include_details=False,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
 
@@ -146,31 +158,38 @@ class Class1PresentationPredictor(object):
                 allele_to_sequence=self.allele_to_sequence,
                 max_alleles_per_experiment=self.max_alleles)
 
+        if n_flanks is not None:
+            if flanking_encoding is not None:
+                raise ValueError(
+                    "Specify either n_flanks/c_flanks or flanking_encoding, not"
+                    "both.")
+            if c_flanks is None:
+                raise ValueError("Both flanks required")
+            flanking_encoding = FlankingEncoding(
+                peptides=peptides.sequences,
+                n_flanks=n_flanks,
+                c_flanks=c_flanks)
+
         score_array = []
-        affinity_array = []
 
         for (i, network) in enumerate(self.models):
             predictions = network.predict(
                 peptides=peptides,
                 allele_encoding=alleles,
+                flanking_encoding=flanking_encoding,
                 batch_size=batch_size)
-            score_array.append(predictions.score)
-            affinity_array.append(predictions.affinity)
+            score_array.append(predictions)
 
         score_array = numpy.array(score_array)
-        affinity_array = numpy.array(affinity_array)
 
         ensemble_scores = numpy.mean(score_array, axis=0)
-        ensemble_affinity = numpy.mean(affinity_array, axis=0)
         top_allele_index = numpy.argmax(ensemble_scores, axis=-1)
         top_allele_flat_indices = (
             numpy.arange(len(peptides)) * self.max_alleles + top_allele_index)
         top_score = ensemble_scores.flatten()[top_allele_flat_indices]
-        top_affinity = ensemble_affinity.flatten()[top_allele_flat_indices]
         result_df = pandas.DataFrame({"peptide": peptides.sequences})
         result_df["allele"] = alleles.alleles.flatten()[top_allele_flat_indices]
         result_df["score"] = top_score
-        result_df["affinity"] = to_ic50(top_affinity)
 
         if include_details:
             for i in range(self.max_alleles):
@@ -180,12 +199,6 @@ class Class1PresentationPredictor(object):
                     score_array[:, :, i], 5.0, axis=0)
                 result_df["allele%d score high" % (i + 1)] = numpy.percentile(
                     score_array[:, :, i], 95.0, axis=0)
-                result_df["allele%d affinity" % (i + 1)] = to_ic50(
-                    ensemble_affinity[:, i])
-                result_df["allele%d affinity low" % (i + 1)] = to_ic50(
-                    numpy.percentile(affinity_array[:, :, i], 95.0, axis=0))
-                result_df["allele%d affinity high" % (i + 1)] = to_ic50(
-                    numpy.percentile(affinity_array[:, :, i], 5.0, axis=0))
         return result_df
 
     def check_consistency(self):

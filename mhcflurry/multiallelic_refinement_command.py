@@ -310,7 +310,7 @@ def refine_model(
     presentation_model.load_from_class1_neural_network(affinity_model)
     presentation_model.fit(
         peptides=combined_train_df.peptide.values,
-        labels=combined_train_df.label.values,
+        targets=combined_train_df.label.values,
         allele_encoding=allele_encoding,
         affinities_mask=combined_train_df.is_affinity.values,
         inequalities=combined_train_df.measurement_inequality.values,
