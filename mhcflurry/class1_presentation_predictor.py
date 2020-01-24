@@ -12,133 +12,226 @@ import hashlib
 import logging
 from six import string_types
 
-
 import numpy
 import pandas
+import sklearn
+import sklearn.linear_model
 
 import mhcnames
 
+try:
+    import tqdm
+except ImportError:
+    tdqm = None
+
 from .version import __version__
-from .class1_neural_network import Class1NeuralNetwork, DEFAULT_PREDICT_BATCH_SIZE
+from .class1_affinity_predictor import Class1AffinityPredictor
+from .class1_cleavage_predictor import Class1CleavagePredictor
+from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .encodable_sequences import EncodableSequences
 from .regression_target import from_ic50, to_ic50
-from .allele_encoding import MultipleAlleleEncoding
+from .multiple_allele_encoding import MultipleAlleleEncoding
 from .downloads import get_default_class1_presentation_models_dir
-from .class1_presentation_neural_network import Class1PresentationNeuralNetwork
-from .common import save_weights, load_weights, NumpyJSONEncoder
-from .flanking_encoding import FlankingEncoding
+from .common import load_weights
+
+
+MAX_ALLELES_PER_SAMPLE = 6
+PREDICT_BATCH_SIZE = DEFAULT_PREDICT_BATCH_SIZE
 
 
 class Class1PresentationPredictor(object):
+    model_inputs = ["affinity_score", "cleavage_prediction"]
+
     def __init__(
             self,
-            models,
-            allele_to_sequence,
-            manifest_df=None,
+            affinity_predictor=None,
+            cleavage_predictor_with_flanks=None,
+            cleavage_predictor_without_flanks=None,
+            weights_dataframe=None,
             metadata_dataframes=None):
-        self.models = models
-        self.allele_to_sequence = allele_to_sequence
-        self._manifest_df = manifest_df
+
+        self.affinity_predictor = affinity_predictor
+        self.cleavage_predictor_with_flanks = cleavage_predictor_with_flanks
+        self.cleavage_predictor_without_flanks = cleavage_predictor_without_flanks
+        self.weights_dataframe = weights_dataframe
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
+        self._models_cache = {}
 
-    @property
-    def manifest_df(self):
-        """
-        A pandas.DataFrame describing the models included in this predictor.
+    def get_affinity_predictions(
+            self, peptides, experiment_names, alleles, verbose=1):
 
-        Returns
-        -------
-        pandas.DataFrame
-        """
-        if self._manifest_df is None:
-            rows = []
-            for (i, model) in enumerate(self.models):
-                model_config = model.get_config()
-                rows.append((
-                    self.model_name(i),
-                    json.dumps(model_config, cls=NumpyJSONEncoder),
-                    model
-                ))
-            self._manifest_df = pandas.DataFrame(
-                rows,
-                columns=["model_name", "config_json", "model"])
-        return self._manifest_df
+        df = pandas.DataFrame({
+            "peptide": numpy.array(peptides, copy=False),
+            "experiment_name": numpy.array(experiment_names, copy=False),
+        })
 
-    @property
-    def max_alleles(self):
-        max_alleles = self.models[0].hyperparameters['max_alleles']
-        assert all(
-            n.hyperparameters['max_alleles'] == max_alleles
-            for n in self.models)
-        return max_alleles
+        iterator = df.groupby("experiment_name")
+        if verbose > 0:
+            print("Predicting affinities.")
+            if tqdm is not None:
+                iterator = tqdm.tqdm(
+                    iterator, total=df.experiment_name.nunique())
 
-    @staticmethod
-    def model_name(num):
-        """
-        Generate a model name
+        for (experiment, sub_df) in iterator:
+            predictions_df = pandas.DataFrame(index=sub_df.index)
+            experiment_peptides = EncodableSequences.create(sub_df.peptide.values)
+            for allele in alleles[experiment]:
+                predictions_df[allele] = self.affinity_predictor.predict(
+                    peptides=experiment_peptides,
+                    allele=allele,
+                    model_kwargs={'batch_size': PREDICT_BATCH_SIZE})
+            df.loc[
+                sub_df.index, "tightest_affinity"
+            ] = predictions_df.min(1).values
+            df.loc[
+                sub_df.index, "tightest_affinity_allele"
+            ] = predictions_df.idxmin(1).values
 
-        Returns
-        -------
-        string
+        return df
 
-        """
-        random_string = hashlib.sha1(
-            str(time.time()).encode()).hexdigest()[:16]
-        return "LIGANDOME-CLASSI-%d-%s" % (
-            num,
-            random_string)
+    def get_cleavage_predictions(
+            self, peptides, n_flanks=None, c_flanks=None, verbose=1):
 
-    @staticmethod
-    def weights_path(models_dir, model_name):
-        """
-        Generate the path to the weights file for a model
+        if verbose > 0:
+            print("Predicting cleavage.")
 
-        Parameters
-        ----------
-        models_dir : string
-        model_name : string
+        if (n_flanks is None) != (c_flanks is None):
+            raise ValueError("Specify both or neither of n_flanks, c_flanks")
 
-        Returns
-        -------
-        string
-        """
-        return join(models_dir, "weights_%s.npz" % model_name)
+        if n_flanks is None:
+            if self.cleavage_predictor_without_flanks is None:
+                raise ValueError("No cleavage predictor without flanks")
+            predictor = self.cleavage_predictor_without_flanks
+            n_flanks = [""] * len(peptides)
+            c_flanks = n_flanks
+        else:
+            if self.cleavage_predictor_with_flanks is None:
+                raise ValueError("No cleavage predictor with flanks")
+            predictor = self.cleavage_predictor_with_flanks
+
+        result = predictor.predict(
+            peptides=peptides,
+            n_flanks=n_flanks,
+            c_flanks=c_flanks,
+            batch_size=PREDICT_BATCH_SIZE)
+
+        return result
+
+    def fit(
+            self,
+            targets,
+            peptides,
+            experiment_names,
+            alleles,
+            n_flanks=None,
+            c_flanks=None,
+            verbose=1):
+
+        df = self.get_affinity_predictions(
+            peptides=peptides,
+            experiment_names=experiment_names,
+            alleles=alleles,
+            verbose=verbose)
+        df["affinity_score"] = from_ic50(df.tightest_affinity)
+        df["target"] = numpy.array(targets, copy=False)
+
+        if (n_flanks is None) != (c_flanks is None):
+            raise ValueError("Specify both or neither of n_flanks, c_flanks")
+
+        with_flanks_list = []
+        if self.cleavage_predictor_without_flanks is not None:
+            with_flanks_list.append(False)
+
+        if n_flanks is not None and self.cleavage_predictor_with_flanks is not None:
+            with_flanks_list.append(True)
+
+        if not with_flanks_list:
+            raise RuntimeError("Can't fit any models")
+
+        if self.weights_dataframe is None:
+            self.weights_dataframe = pandas.DataFrame()
+
+        for with_flanks in with_flanks_list:
+            model_name = 'with_flanks' if with_flanks else "without_flanks"
+            if verbose > 0:
+                print("Training variant", model_name)
+
+            df["cleavage_prediction"] = self.get_cleavage_predictions(
+                peptides=df.peptide.values,
+                n_flanks=n_flanks if with_flanks else None,
+                c_flanks=c_flanks if with_flanks else None,
+                verbose=verbose)
+
+            model = self.get_model()
+            if verbose > 0:
+                print("Fitting LR model.")
+                print(df)
+
+            model.fit(
+                X=df[self.model_inputs].values,
+                y=df.target.astype(float))
+
+            self.weights_dataframe.loc[model_name, "intercept"] = model.intercept_
+            for (name, value) in zip(self.model_inputs, numpy.squeeze(model.coef_)):
+                self.weights_dataframe.loc[model_name, name] = value
+            self._models_cache[model_name] = model
+
+    def get_model(self, name=None):
+        if name is None or name not in self._models_cache:
+            model = sklearn.linear_model.LogisticRegression(solver="lbfgs")
+            if name is not None:
+                row = self.weights_dataframe.loc[name]
+                model.intercept_ = row.intercept
+                model.coef_ = numpy.expand_dims(
+                    row[self.model_inputs].values, axis=0)
+        else:
+            model = self._models_cache[name]
+        return model
+
+    def predict_sequences(self, alleles, sequences):
+        raise NotImplementedError
 
     def predict(
             self,
             peptides,
             alleles,
+            experiment_names=None,
             n_flanks=None,
             c_flanks=None,
-            batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+            verbose=1):
         return self.predict_to_dataframe(
             peptides=peptides,
             alleles=alleles,
+            experiment_names=experiment_names,
             n_flanks=n_flanks,
             c_flanks=c_flanks,
-            batch_size=batch_size).score.values
+            verbose=verbose).score.values
 
     def predict_to_dataframe(
             self,
             peptides,
             alleles,
+            experiment_names=None,
             n_flanks=None,
             c_flanks=None,
-            flanking_encoding=None,
-            include_details=False,
-            batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+            verbose=1):
 
         if isinstance(peptides, string_types):
-            raise TypeError("peptides must be a list or array, not a string")
+            raise TypeError("peptides must be a list not a string")
         if isinstance(alleles, string_types):
-            raise TypeError(
-                "alleles must be an iterable or MultipleAlleleEncoding")
+            raise TypeError("alleles must be a list or dict")
 
-        peptides = EncodableSequences.create(peptides)
-
-        if not isinstance(alleles, MultipleAlleleEncoding):
-            if len(alleles) > self.max_alleles:
+        if isinstance(alleles, dict):
+            if experiment_names is None:
+                raise ValueError(
+                    "experiment_names must be supplied when alleles is a dict")
+        else:
+            if experiment_names is not None:
+                raise ValueError(
+                    "alleles must be a dict when experiment_names is specified")
+            alleles = numpy.array(alleles, copy=False)
+            if len(alleles) > MAX_ALLELES_PER_SAMPLE:
                 raise ValueError(
                     "When alleles is a list, it must have at most %d elements. "
                     "These alleles are taken to be a genotype for an "
@@ -146,151 +239,79 @@ class Class1PresentationPredictor(object):
                     "will be taken for each peptide. Note that this differs "
                     "from Class1AffinityPredictor.predict(), where alleles "
                     "is expected to be the same length as peptides."
-                    % (
-                        self.max_alleles))
-            alleles = MultipleAlleleEncoding(
-                experiment_names=numpy.tile("experiment", len(peptides)),
-                experiment_to_allele_list={
-                    "experiment": [
-                        mhcnames.normalize_allele_name(a) for a in alleles
-                    ],
-                },
-                allele_to_sequence=self.allele_to_sequence,
-                max_alleles_per_experiment=self.max_alleles)
+                    % MAX_ALLELES_PER_SAMPLE)
 
-        if n_flanks is not None:
-            if flanking_encoding is not None:
-                raise ValueError(
-                    "Specify either n_flanks/c_flanks or flanking_encoding, not"
-                    "both.")
-            if c_flanks is None:
-                raise ValueError("Both flanks required")
-            flanking_encoding = FlankingEncoding(
-                peptides=peptides.sequences,
-                n_flanks=n_flanks,
-                c_flanks=c_flanks)
+            experiment_names = ["experiment1"] * len(peptides)
+            alleles = {
+                "experiment1": alleles,
+            }
 
-        score_array = []
+        df = self.get_affinity_predictions(
+            peptides=peptides,
+            experiment_names=experiment_names,
+            alleles=alleles,
+            verbose=verbose)
+        df["affinity_score"] = from_ic50(df.tightest_affinity)
 
-        for (i, network) in enumerate(self.models):
-            predictions = network.predict(
-                peptides=peptides,
-                allele_encoding=alleles,
-                flanking_encoding=flanking_encoding,
-                batch_size=batch_size)
-            score_array.append(predictions)
+        if (n_flanks is None) != (c_flanks is None):
+            raise ValueError("Specify both or neither of n_flanks, c_flanks")
 
-        score_array = numpy.array(score_array)
+        df["cleavage_prediction"] = self.get_cleavage_predictions(
+            peptides=df.peptide.values,
+            n_flanks=n_flanks,
+            c_flanks=c_flanks,
+            verbose=verbose)
 
-        ensemble_scores = numpy.mean(score_array, axis=0)
-        top_allele_index = numpy.argmax(ensemble_scores, axis=-1)
-        top_allele_flat_indices = (
-            numpy.arange(len(peptides)) * self.max_alleles + top_allele_index)
-        top_score = ensemble_scores.flatten()[top_allele_flat_indices]
-        result_df = pandas.DataFrame({"peptide": peptides.sequences})
-        result_df["allele"] = alleles.alleles.flatten()[top_allele_flat_indices]
-        result_df["score"] = top_score
+        model_name = 'with_flanks' if n_flanks is not None else "without_flanks"
+        model = self.get_model(model_name)
+        df["score"] = model.predict_proba(df[self.model_inputs].values)[:,1]
+        return df
 
-        if include_details:
-            for i in range(self.max_alleles):
-                result_df["allele%d" % (i + 1)] = alleles.allele[:, i]
-                result_df["allele%d score" % (i + 1)] = ensemble_scores[:, i]
-                result_df["allele%d score low" % (i + 1)] = numpy.percentile(
-                    score_array[:, :, i], 5.0, axis=0)
-                result_df["allele%d score high" % (i + 1)] = numpy.percentile(
-                    score_array[:, :, i], 95.0, axis=0)
-        return result_df
-
-    def check_consistency(self):
-        """
-        Verify that self.manifest_df is consistent with instance variables.
-
-        Currently only checks for agreement on the total number of models.
-
-        Throws AssertionError if inconsistent.
-        """
-        assert len(self.manifest_df) == len(self.models), (
-            "Manifest seems out of sync with models: %d vs %d entries: \n%s"% (
-                len(self.manifest_df),
-                len(self.models),
-                str(self.manifest_df)))
-
-    def save(self, models_dir, model_names_to_write=None, write_metadata=True):
+    def save(self, models_dir):
         """
         Serialize the predictor to a directory on disk. If the directory does
         not exist it will be created.
-
-        The serialization format consists of a file called "manifest.csv" with
-        the configurations of each Class1PresentationNeuralNetwork, along with
-        per-network files giving the model weights.
 
         Parameters
         ----------
         models_dir : string
             Path to directory. It will be created if it doesn't exist.
         """
-        self.check_consistency()
 
-        if model_names_to_write is None:
-            # Write all models
-            model_names_to_write = self.manifest_df.model_name.values
+        if self.weights_dataframe is None:
+            raise RuntimeError("Can't save before fitting")
 
         if not exists(models_dir):
             mkdir(models_dir)
 
-        sub_manifest_df = self.manifest_df.loc[
-            self.manifest_df.model_name.isin(model_names_to_write)
-        ].copy()
+        # Save underlying predictors
+        self.affinity_predictor.save(join(models_dir, "affinity_predictor"))
+        if self.cleavage_predictor_with_flanks is not None:
+            self.cleavage_predictor_with_flanks.save(
+                join(models_dir, "cleavage_predictor_with_flanks"))
+        if self.cleavage_predictor_without_flanks is not None:
+            self.cleavage_predictor_without_flanks.save(
+                join(models_dir, "cleavage_predictor_without_flanks"))
 
-        # Network JSON configs may have changed since the models were added,
-        # for example due to changes to the allele representation layer.
-        # So we update the JSON configs here also.
-        updated_network_config_jsons = []
-        for (_, row) in sub_manifest_df.iterrows():
-            updated_network_config_jsons.append(
-                json.dumps(row.model.get_config(), cls=NumpyJSONEncoder))
-            weights_path = self.weights_path(models_dir, row.model_name)
-            save_weights(row.model.get_weights(), weights_path)
-            logging.info("Wrote: %s", weights_path)
-        sub_manifest_df["config_json"] = updated_network_config_jsons
-        self.manifest_df.loc[
-            sub_manifest_df.index,
-            "config_json"
-        ] = updated_network_config_jsons
+        # Save model coefficients.
+        self.weights_dataframe.to_csv(join(models_dir, "weights.csv"))
 
-        write_manifest_df = self.manifest_df[[
-            c for c in self.manifest_df.columns if c != "model"
-        ]]
-        manifest_path = join(models_dir, "manifest.csv")
-        write_manifest_df.to_csv(manifest_path, index=False)
-        logging.info("Wrote: %s", manifest_path)
+        # Write "info.txt"
+        info_path = join(models_dir, "info.txt")
+        rows = [
+            ("trained on", time.asctime()),
+            ("package   ", "mhcflurry %s" % __version__),
+            ("hostname  ", gethostname()),
+            ("user      ", getuser()),
+        ]
+        pandas.DataFrame(rows).to_csv(
+            info_path, sep="\t", header=False, index=False)
 
-        if write_metadata:
-            # Write "info.txt"
-            info_path = join(models_dir, "info.txt")
-            rows = [
-                ("trained on", time.asctime()),
-                ("package   ", "mhcflurry %s" % __version__),
-                ("hostname  ", gethostname()),
-                ("user      ", getuser()),
-            ]
-            pandas.DataFrame(rows).to_csv(
-                info_path, sep="\t", header=False, index=False)
+        if self.metadata_dataframes:
+            for (name, df) in self.metadata_dataframes.items():
+                metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
+                df.to_csv(metadata_df_path, index=False, compression="bz2")
 
-            if self.metadata_dataframes:
-                for (name, df) in self.metadata_dataframes.items():
-                    metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
-                    df.to_csv(metadata_df_path, index=False, compression="bz2")
-
-        # Save allele sequences
-        if self.allele_to_sequence is not None:
-            allele_to_sequence_df = pandas.DataFrame(
-                list(self.allele_to_sequence.items()),
-                columns=['allele', 'sequence']
-            )
-            allele_to_sequence_df.to_csv(
-                join(models_dir, "allele_sequences.csv"), index=False)
-            logging.info("Wrote: %s", join(models_dir, "allele_sequences.csv"))
 
     @classmethod
     def load(cls, models_dir=None, max_models=None):
@@ -304,7 +325,8 @@ class Class1PresentationPredictor(object):
             used.
 
         max_models : int, optional
-            Maximum number of models to load
+            Maximum number of affinity and cleavage (counted separately)
+            models to load
 
         Returns
         -------
@@ -313,30 +335,28 @@ class Class1PresentationPredictor(object):
         if models_dir is None:
             models_dir = get_default_class1_presentation_models_dir()
 
-        manifest_path = join(models_dir, "manifest.csv")
-        manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
+        affinity_predictor = Class1AffinityPredictor.load(
+            join(models_dir, "affinity_predictor"), max_models=max_models)
 
-        models = []
-        for (_, row) in manifest_df.iterrows():
-            weights_filename = cls.weights_path(models_dir, row.model_name)
-            config = json.loads(row.config_json)
-            model = Class1PresentationNeuralNetwork.from_config(
-                config,
-                weights=load_weights(abspath(weights_filename)))
-            models.append(model)
+        cleavage_predictor_with_flanks = None
+        if exists(join(models_dir, "cleavage_predictor_with_flanks")):
+            cleavage_predictor_with_flanks = Class1CleavagePredictor.load(
+                join(models_dir, "cleavage_predictor_with_flanks"),
+                max_models=max_models)
 
-        manifest_df["model"] = models
+        cleavage_predictor_without_flanks = None
+        if exists(join(models_dir, "cleavage_predictor_without_flanks")):
+            cleavage_predictor_without_flanks = Class1CleavagePredictor.load(
+                join(models_dir, "cleavage_predictor_without_flanks"),
+                max_models=max_models)
 
-        # Load allele sequences
-        allele_to_sequence = None
-        if exists(join(models_dir, "allele_sequences.csv")):
-            allele_to_sequence = pandas.read_csv(
-                join(models_dir, "allele_sequences.csv"),
-                index_col=0).iloc[:, 0].to_dict()
+        weights_dataframe = pandas.read_csv(
+            join(models_dir, "weights.csv"),
+            index_col=0)
 
-        logging.info("Loaded %d class1 presentation models", len(models))
         result = cls(
-            models=models,
-            allele_to_sequence=allele_to_sequence,
-            manifest_df=manifest_df)
+            affinity_predictor=affinity_predictor,
+            cleavage_predictor_with_flanks=cleavage_predictor_with_flanks,
+            cleavage_predictor_without_flanks=cleavage_predictor_without_flanks,
+            weights_dataframe=weights_dataframe)
         return result
