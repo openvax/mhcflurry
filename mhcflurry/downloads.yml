@@ -40,6 +40,10 @@ releases:
               url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_pan_variants.selected.20200109.tar.bz2
               default: false
 
+            - name: models_class1_cleavage_variants
+              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_cleavage_variants.selected.20200124.tar.bz2
+              default: false
+
             - name: data_mass_spec_benchmark
               part_urls:
                 - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.aa

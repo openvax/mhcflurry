@@ -19,6 +19,10 @@ from .auxiliary_input import AuxiliaryInputEncoder
 from .flanking_encoding import FlankingEncoding
 
 
+def combine_layer_kernel_initializer(shape, dtype=None):
+    import keras.backend as K
+    return K.constant([[1.0, 1e-3, 1e-4]], dtype=dtype, shape=shape)
+
 class Class1PresentationNeuralNetwork(object):
     network_hyperparameter_defaults = HyperparameterDefaults(
         max_alleles=6,
@@ -49,13 +53,11 @@ class Class1PresentationNeuralNetwork(object):
     """
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
-        loss="binary_crossentropy",
-        optimizer="rmsprop",
+        optimizer="adam",
         learning_rate=None,
     )
     """
-    Loss and optimizer hyperparameters. Any values supported by keras may be
-    used.
+    Optimizer hyperparameters. Any values supported by keras may be used.
     """
 
     auxiliary_input_hyperparameter_defaults = HyperparameterDefaults(
@@ -170,7 +172,7 @@ class Class1PresentationNeuralNetwork(object):
             import tensorflow as tf
             return -tf.log(1. / x - 1.)
 
-        #node = keras.layers.Lambda(logit, name="logit")(node)
+        node = keras.layers.Lambda(logit, name="logit")(node)
         affinity_prediction_and_other_signals = [node]
         if self.hyperparameters['include_cleavage']:
             assert isinstance(cleavage_model, Class1CleavageNeuralNetwork)
@@ -215,10 +217,18 @@ class Class1PresentationNeuralNetwork(object):
             node = keras.layers.concatenate(
                 affinity_prediction_and_other_signals,
                 name="affinity_prediction_and_other_signals")
+
+            def show(x):
+                import tensorflow as tf
+                return  x
+                #return tf.Print(x, [x], summarize=100, message="combine_input")
+
+            node = keras.layers.Lambda(show)(node)
+
             layer = keras.layers.Dense(
                 1,
                 activation="sigmoid",
-                kernel_initializer=keras.initializers.Ones(),
+                kernel_initializer=combine_layer_kernel_initializer,
                 name="combine")
             lifted = keras.layers.TimeDistributed(layer, name="per_allele_output")
             node = lifted(node)
@@ -227,18 +237,18 @@ class Class1PresentationNeuralNetwork(object):
 
         # Apply allele mask: zero out all outputs corresponding to alleles
         # with the special index 0.
-        #def alleles_to_mask(x):
-        #    import keras.backend as K
-        #    result = K.expand_dims(
-        #        K.cast(K.not_equal(x, 0), "float32"), axis=-1)
-        #    return result
+        def alleles_to_mask(x):
+            import keras.backend as K
+            result = K.expand_dims(
+                K.cast(K.not_equal(x, 0), "float32"), axis=-1)
+            return result
 
-        #allele_mask = keras.layers.Lambda(
-        #    alleles_to_mask, name="allele_mask")(model_inputs['allele_set'])
+        allele_mask = keras.layers.Lambda(
+            alleles_to_mask, name="allele_mask")(model_inputs['allele_set'])
 
-        #node = keras.layers.Multiply(
-        #    name="masked_per_allele_outputs")(
-        #    [allele_mask, node])
+        node = keras.layers.Multiply(
+            name="masked_per_allele_outputs")(
+            [allele_mask, node])
 
         presentation_output = keras.layers.Reshape(
             target_shape=(self.hyperparameters['max_alleles'],))(
@@ -269,30 +279,29 @@ class Class1PresentationNeuralNetwork(object):
 
     @staticmethod
     def loss(y_true, y_pred):
-        # Binary cross entropy
+        # Binary cross entropy.
+        # We take the weighted average of the per-allele predictions, where the
+        # weighting is the softmax of the predictions.
         from keras import backend as K
         import tensorflow as tf
 
         y_pred = K.constant(y_pred) if not K.is_tensor(y_pred) else y_pred
         y_true = K.cast(y_true, y_pred.dtype)
 
-        #y_pred = tf.Print(y_pred, [y_pred], message="y_pred", summarize=50)
-        #y_true = tf.Print(y_true, [y_true], message="y_true", summarize=50)
-
-        #logit_y_pred = -tf.log(1. / y_pred - 1.)
+        logit_y_pred = -tf.log(1. / y_pred - 1.)
         #logit_y_pred = tf.Print(logit_y_pred, [logit_y_pred], message="logit_y_pred", summarize=50)
 
-        #softmax = K.softmax(5 * logit_y_pred, axis=-1)
+        softmax = K.softmax(5 * logit_y_pred, axis=-1)
         #softmax = tf.Print(softmax, [softmax], message="softmax", summarize=50)
 
-        #product = softmax * y_pred
+        product = softmax * y_pred
         #product = tf.Print(product, [product], message="product", summarize=50)
 
-        #result = tf.reduce_sum(product, axis=-1)
+        result = tf.reduce_sum(product, axis=-1)
         #result = tf.Print(result, [result], message="result", summarize=50)
 
+        # Alternative to all of the above:
         #result = tf.reduce_max(y_pred, axis=-1)
-        result = tf.reduce_sum(y_pred, axis=-1)
 
         return K.mean(
             K.binary_crossentropy(y_true, result),
@@ -344,8 +353,7 @@ class Class1PresentationNeuralNetwork(object):
             ] = auxiliary_encoder.get_array(
                 features=self.hyperparameters['auxiliary_input_features'],
                 feature_parameters=self.hyperparameters[
-                    'auxiliary_input_feature_parameters']) * 0.01
-        #import ipdb;ipdb.set_trace()
+                    'auxiliary_input_feature_parameters'])
         return (x_dict, allele_representations)
 
     def fit(

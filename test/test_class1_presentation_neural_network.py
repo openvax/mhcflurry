@@ -188,10 +188,6 @@ def test_synthetic_allele_refinement():
     presentation_model.build(affinity_model)
     print(presentation_model.network.summary())
 
-    presentation_predictor = Class1PresentationPredictor(
-        models=[presentation_model],
-        allele_to_sequence=AFFINITY_PREDICTOR.allele_to_sequence)
-
     allele_encoding = MultipleAlleleEncoding(
         experiment_names=["experiment1"] * len(train_df),
         experiment_to_allele_list={
@@ -200,6 +196,10 @@ def test_synthetic_allele_refinement():
         allele_to_sequence=AFFINITY_PREDICTOR.allele_to_sequence, )
 
     allele_encoding = allele_encoding.compact()
+
+    presentation_predictor = Class1PresentationPredictor(
+        models=[presentation_model],
+        allele_to_sequence=allele_encoding.allele_encoding.allele_to_sequence)
 
     pre_predictions = presentation_model.predict(
         peptides=train_df.peptide.values,
@@ -252,7 +252,7 @@ def test_synthetic_allele_refinement():
         return (auc, correct_allele_fraction)
 
     (pre_auc, pre_correct_allele_fraction) = progress(label="Pre fitting")
-    #import ipdb ; ipdb.set_trace()
+    """
     presentation_model.fit(
         peptides=train_df.peptide.values,
         targets=train_df.hit.values,
@@ -260,6 +260,7 @@ def test_synthetic_allele_refinement():
         progress_callback=progress)
 
     progress(label="Done fitting first round")
+    """
 
     presentation_model.set_trainable(trainable_affinity_predictor=True)
     presentation_model.hyperparameters['learning_rate'] = 1e-4
