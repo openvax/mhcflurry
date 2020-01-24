@@ -82,6 +82,7 @@ else
         --proteome-peptides "$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2" \
         --decoys-per-hit 99 \
         --exclude-pmid 31844290 31495665 31154438 \
+        --only-format MULTIALLELIC \
         --out "$(pwd)/train_data.csv"
     bzip2 -f train_data.csv
 fi
@@ -89,10 +90,9 @@ fi
 mhcflurry-class1-train-presentation-models \
     --data "$(pwd)/train_data.csv.bz2" \
     --affinity-predictor "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
-    --cleavage-predictor-with-flanking "$(mhcflurry-downloads path models_class1_cleavage)/models.selected" \
-    --cleavage-predictor-without-flanking "$(mhcflurry-downloads path models_class1_cleavage_variants)/models.selected.no_flank" \
+    --cleavage-predictor-with-flanks "$(mhcflurry-downloads path models_class1_cleavage)/models.selected" \
+    --cleavage-predictor-without-flanks "$(mhcflurry-downloads path models_class1_cleavage_variants)/models.selected.no_flank" \
     --out-models-dir "$(pwd)/models" \
-    --only-format MULTIALLELIC \
     --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
     $PARALLELISM_ARGS
 

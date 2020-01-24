@@ -87,8 +87,8 @@ if __name__ == '__main__':
                     'mhcflurry.select_cleavage_models_command:run',
                 'mhcflurry-calibrate-percentile-ranks = '
                     'mhcflurry.calibrate_percentile_ranks_command:run',
-                'mhcflurry-multiallelic-refinement = '
-                    'mhcflurry.multiallelic_refinement_command:run',
+                'mhcflurry-class1-train-presentation-models = '
+                    'mhcflurry.train_presentation_models_command:run',
                 '_mhcflurry-cluster-worker-entry-point = '
                     'mhcflurry.cluster_parallelism:worker_entry_point',
             ]
