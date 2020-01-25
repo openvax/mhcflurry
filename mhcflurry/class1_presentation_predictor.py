@@ -26,7 +26,7 @@ except ImportError:
 
 from .version import __version__
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .class1_cleavage_predictor import Class1CleavagePredictor
+from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .encodable_sequences import EncodableSequences
 from .regression_target import from_ic50, to_ic50
@@ -40,19 +40,19 @@ PREDICT_BATCH_SIZE = DEFAULT_PREDICT_BATCH_SIZE
 
 
 class Class1PresentationPredictor(object):
-    model_inputs = ["affinity_score", "cleavage_prediction"]
+    model_inputs = ["affinity_score", "processing_score"]
 
     def __init__(
             self,
             affinity_predictor=None,
-            cleavage_predictor_with_flanks=None,
-            cleavage_predictor_without_flanks=None,
+            processing_predictor_with_flanks=None,
+            processing_predictor_without_flanks=None,
             weights_dataframe=None,
             metadata_dataframes=None):
 
         self.affinity_predictor = affinity_predictor
-        self.cleavage_predictor_with_flanks = cleavage_predictor_with_flanks
-        self.cleavage_predictor_without_flanks = cleavage_predictor_without_flanks
+        self.processing_predictor_with_flanks = processing_predictor_with_flanks
+        self.processing_predictor_without_flanks = processing_predictor_without_flanks
         self.weights_dataframe = weights_dataframe
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
@@ -111,25 +111,25 @@ class Class1PresentationPredictor(object):
 
         return df
 
-    def predict_cleavage(
+    def predict_processing(
             self, peptides, n_flanks=None, c_flanks=None, verbose=1):
 
         if verbose > 0:
-            print("Predicting cleavage.")
+            print("Predicting processing.")
 
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
 
         if n_flanks is None:
-            if self.cleavage_predictor_without_flanks is None:
-                raise ValueError("No cleavage predictor without flanks")
-            predictor = self.cleavage_predictor_without_flanks
+            if self.processing_predictor_without_flanks is None:
+                raise ValueError("No processing predictor without flanks")
+            predictor = self.processing_predictor_without_flanks
             n_flanks = [""] * len(peptides)
             c_flanks = n_flanks
         else:
-            if self.cleavage_predictor_with_flanks is None:
-                raise ValueError("No cleavage predictor with flanks")
-            predictor = self.cleavage_predictor_with_flanks
+            if self.processing_predictor_with_flanks is None:
+                raise ValueError("No processing predictor with flanks")
+            predictor = self.processing_predictor_with_flanks
 
         result = predictor.predict(
             peptides=peptides,
@@ -161,10 +161,10 @@ class Class1PresentationPredictor(object):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
 
         with_flanks_list = []
-        if self.cleavage_predictor_without_flanks is not None:
+        if self.processing_predictor_without_flanks is not None:
             with_flanks_list.append(False)
 
-        if n_flanks is not None and self.cleavage_predictor_with_flanks is not None:
+        if n_flanks is not None and self.processing_predictor_with_flanks is not None:
             with_flanks_list.append(True)
 
         if not with_flanks_list:
@@ -178,7 +178,7 @@ class Class1PresentationPredictor(object):
             if verbose > 0:
                 print("Training variant", model_name)
 
-            df["cleavage_prediction"] = self.predict_cleavage(
+            df["processing_score"] = self.predict_processing(
                 peptides=df.peptide.values,
                 n_flanks=n_flanks if with_flanks else None,
                 c_flanks=c_flanks if with_flanks else None,
@@ -281,7 +281,7 @@ class Class1PresentationPredictor(object):
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
 
-        df["cleavage_prediction"] = self.predict_cleavage(
+        df["processing_score"] = self.predict_processing(
             peptides=df.peptide.values,
             n_flanks=n_flanks,
             c_flanks=c_flanks,
@@ -313,12 +313,12 @@ class Class1PresentationPredictor(object):
 
         # Save underlying predictors
         self.affinity_predictor.save(join(models_dir, "affinity_predictor"))
-        if self.cleavage_predictor_with_flanks is not None:
-            self.cleavage_predictor_with_flanks.save(
-                join(models_dir, "cleavage_predictor_with_flanks"))
-        if self.cleavage_predictor_without_flanks is not None:
-            self.cleavage_predictor_without_flanks.save(
-                join(models_dir, "cleavage_predictor_without_flanks"))
+        if self.processing_predictor_with_flanks is not None:
+            self.processing_predictor_with_flanks.save(
+                join(models_dir, "processing_predictor_with_flanks"))
+        if self.processing_predictor_without_flanks is not None:
+            self.processing_predictor_without_flanks.save(
+                join(models_dir, "processing_predictor_without_flanks"))
 
         # Save model coefficients.
         self.weights_dataframe.to_csv(join(models_dir, "weights.csv"))
@@ -352,7 +352,7 @@ class Class1PresentationPredictor(object):
             used.
 
         max_models : int, optional
-            Maximum number of affinity and cleavage (counted separately)
+            Maximum number of affinity and processing (counted separately)
             models to load
 
         Returns
@@ -365,16 +365,16 @@ class Class1PresentationPredictor(object):
         affinity_predictor = Class1AffinityPredictor.load(
             join(models_dir, "affinity_predictor"), max_models=max_models)
 
-        cleavage_predictor_with_flanks = None
-        if exists(join(models_dir, "cleavage_predictor_with_flanks")):
-            cleavage_predictor_with_flanks = Class1CleavagePredictor.load(
-                join(models_dir, "cleavage_predictor_with_flanks"),
+        processing_predictor_with_flanks = None
+        if exists(join(models_dir, "processing_predictor_with_flanks")):
+            processing_predictor_with_flanks = Class1ProcessingPredictor.load(
+                join(models_dir, "processing_predictor_with_flanks"),
                 max_models=max_models)
 
-        cleavage_predictor_without_flanks = None
-        if exists(join(models_dir, "cleavage_predictor_without_flanks")):
-            cleavage_predictor_without_flanks = Class1CleavagePredictor.load(
-                join(models_dir, "cleavage_predictor_without_flanks"),
+        processing_predictor_without_flanks = None
+        if exists(join(models_dir, "processing_predictor_without_flanks")):
+            processing_predictor_without_flanks = Class1ProcessingPredictor.load(
+                join(models_dir, "processing_predictor_without_flanks"),
                 max_models=max_models)
 
         weights_dataframe = pandas.read_csv(
@@ -383,7 +383,7 @@ class Class1PresentationPredictor(object):
 
         result = cls(
             affinity_predictor=affinity_predictor,
-            cleavage_predictor_with_flanks=cleavage_predictor_with_flanks,
-            cleavage_predictor_without_flanks=cleavage_predictor_without_flanks,
+            processing_predictor_with_flanks=processing_predictor_with_flanks,
+            processing_predictor_without_flanks=processing_predictor_without_flanks,
             weights_dataframe=weights_dataframe)
         return result

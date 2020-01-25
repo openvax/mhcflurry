@@ -12,7 +12,7 @@ import numpy
 
 from sklearn.metrics import roc_auc_score
 
-from mhcflurry import Class1AffinityPredictor, Class1CleavagePredictor
+from mhcflurry import Class1AffinityPredictor, Class1ProcessingPredictor
 from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
 from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
@@ -35,10 +35,10 @@ def setup():
         get_path("models_class1_pan", "models.combined"),
         optimization_level=0,
         max_models=1)
-    CLEAVAGE_PREDICTOR = Class1CleavagePredictor.load(
-        get_path("models_class1_cleavage", "models"), max_models=1)
-    CLEAVAGE_PREDICTOR_NO_FLANKING = Class1CleavagePredictor.load(
-        get_path("models_class1_cleavage_variants", "models.selected.no_flank"),
+    CLEAVAGE_PREDICTOR = Class1ProcessingPredictor.load(
+        get_path("models_class1_processing", "models"), max_models=1)
+    CLEAVAGE_PREDICTOR_NO_FLANKING = Class1ProcessingPredictor.load(
+        get_path("models_class1_processing_variants", "models.selected.no_flank"),
         max_models=1)
 
 
@@ -67,8 +67,8 @@ def test_basic():
 
     predictor = Class1PresentationPredictor(
         affinity_predictor=AFFINITY_PREDICTOR,
-        cleavage_predictor_without_flanks=CLEAVAGE_PREDICTOR_NO_FLANKING,
-        cleavage_predictor_with_flanks=CLEAVAGE_PREDICTOR)
+        processing_predictor_without_flanks=CLEAVAGE_PREDICTOR_NO_FLANKING,
+        processing_predictor_with_flanks=CLEAVAGE_PREDICTOR)
 
     predictor.fit(
         targets=train_df.hit.values,

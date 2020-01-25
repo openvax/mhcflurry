@@ -18,12 +18,12 @@ import pandas
 from .version import __version__
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
-from .downloads import get_default_class1_cleavage_models_dir
-from .class1_cleavage_neural_network import Class1CleavageNeuralNetwork
+from .downloads import get_default_class1_processing_models_dir
+from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from .common import save_weights, load_weights, NumpyJSONEncoder
 
 
-class Class1CleavagePredictor(object):
+class Class1ProcessingPredictor(object):
     def __init__(
             self,
             models,
@@ -178,7 +178,7 @@ class Class1CleavagePredictor(object):
         not exist it will be created.
 
         The serialization format consists of a file called "manifest.csv" with
-        the configurations of each Class1CleavageNeuralNetwork, along with
+        the configurations of each Class1ProcessingNeuralNetwork, along with
         per-network files giving the model weights.
 
         Parameters
@@ -254,10 +254,10 @@ class Class1CleavagePredictor(object):
 
         Returns
         -------
-        `Class1CleavagePredictor` instance
+        `Class1ProcessingPredictor` instance
         """
         if models_dir is None:
-            models_dir = get_default_class1_cleavage_models_dir()
+            models_dir = get_default_class1_processing_models_dir()
 
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
@@ -266,14 +266,14 @@ class Class1CleavagePredictor(object):
         for (_, row) in manifest_df.iterrows():
             weights_filename = cls.weights_path(models_dir, row.model_name)
             config = json.loads(row.config_json)
-            model = Class1CleavageNeuralNetwork.from_config(
+            model = Class1ProcessingNeuralNetwork.from_config(
                 config,
                 weights=load_weights(abspath(weights_filename)))
             models.append(model)
 
         manifest_df["model"] = models
 
-        logging.info("Loaded %d class1 cleavage models", len(models))
+        logging.info("Loaded %d class1 processing models", len(models))
         result = cls(
             models=models,
             manifest_df=manifest_df)

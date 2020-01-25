@@ -94,14 +94,14 @@ else
     mhcflurry-class1-train-presentation-models \
         --data "$(pwd)/train_data.csv.bz2" \
         --affinity-predictor "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
-        --cleavage-predictor-with-flanks "$(mhcflurry-downloads path models_class1_cleavage)/models" \
-        --cleavage-predictor-without-flanks "$(mhcflurry-downloads path models_class1_cleavage_variants)/models.selected.no_flank" \
+        --processing-predictor-with-flanks "$(mhcflurry-downloads path models_class1_processing)/models" \
+        --processing-predictor-without-flanks "$(mhcflurry-downloads path models_class1_processing_variants)/models.selected.no_flank" \
         --out-models-dir "$(pwd)/models"
 fi
 
 cp "$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2" models/affinity_predictor_train_data.csv.bz2
-cp "$(mhcflurry-downloads path models_class1_cleavage)/models/train_data.csv.bz2" models/cleavage_predictor_train_data.csv.bz2
-cp "$(mhcflurry-downloads path models_class1_cleavage_variants)/models.selected.no_flank/train_data.csv.bz2" models/cleavage_predictor_no_flank_train_data.csv.bz2
+cp "$(mhcflurry-downloads path models_class1_processing)/models/train_data.csv.bz2" models/processing_predictor_train_data.csv.bz2
+cp "$(mhcflurry-downloads path models_class1_processing_variants)/models.selected.no_flank/train_data.csv.bz2" models/processing_predictor_no_flank_train_data.csv.bz2
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 -f "$LOG"

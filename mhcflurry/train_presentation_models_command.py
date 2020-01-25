@@ -13,7 +13,7 @@ import pandas
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
-from .class1_cleavage_predictor import Class1CleavagePredictor
+from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
 from .common import configure_logging
@@ -35,15 +35,15 @@ parser.add_argument(
     required=True,
     help="Affinity predictor models dir")
 parser.add_argument(
-    "--cleavage-predictor-with-flanks",
+    "--processing-predictor-with-flanks",
     metavar="DIR",
     required=True,
-    help="Cleavage predictor with flanks")
+    help="Processing predictor with flanks")
 parser.add_argument(
-    "--cleavage-predictor-without-flanks",
+    "--processing-predictor-without-flanks",
     metavar="DIR",
     required=True,
-    help="Cleavage predictor without flanks")
+    help="Processing predictor without flanks")
 parser.add_argument(
     "--verbosity",
     type=int,
@@ -106,15 +106,15 @@ def main(args):
         print("Done.")
 
     affinity_predictor = Class1AffinityPredictor.load(args.affinity_predictor)
-    cleavage_predictor_with_flanks = Class1CleavagePredictor.load(
-        args.cleavage_predictor_with_flanks)
-    cleavage_predictor_without_flanks = Class1CleavagePredictor.load(
-        args.cleavage_predictor_without_flanks)
+    processing_predictor_with_flanks = Class1ProcessingPredictor.load(
+        args.processing_predictor_with_flanks)
+    processing_predictor_without_flanks = Class1ProcessingPredictor.load(
+        args.processing_predictor_without_flanks)
 
     predictor = Class1PresentationPredictor(
         affinity_predictor=affinity_predictor,
-        cleavage_predictor_with_flanks=cleavage_predictor_with_flanks,
-        cleavage_predictor_without_flanks=cleavage_predictor_without_flanks)
+        processing_predictor_with_flanks=processing_predictor_with_flanks,
+        processing_predictor_without_flanks=processing_predictor_without_flanks)
 
     print("Fitting.")
     start = time.time()

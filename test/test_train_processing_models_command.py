@@ -1,5 +1,5 @@
 """
-Test cleavage train and model selection commands.
+Test processing train and model selection commands.
 """
 import logging
 logging.getLogger('tensorflow').disabled = True
@@ -16,7 +16,7 @@ from numpy.testing import assert_array_less, assert_equal
 from sklearn.metrics import roc_auc_score
 import pandas
 
-from mhcflurry.class1_cleavage_predictor import Class1CleavagePredictor
+from mhcflurry.class1_processing_predictor import Class1ProcessingPredictor
 from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
@@ -52,12 +52,12 @@ def make_dataset(num=10000):
         ["sample_%d" % (i + 1) for i in range(5)]).sample(
         n=len(df), replace=True).values
 
-    n_cleavage_regex = "[AILQSVWEN].[MNPQYKV]"
+    n_regex = "[AILQSVWEN].[MNPQYKV]"
 
     def is_hit(n_flank, c_flank, peptide):
-        if re.search(n_cleavage_regex, peptide):
+        if re.search(n_regex, peptide):
             return False  # peptide is cleaved
-        return bool(re.match(n_cleavage_regex, n_flank[-1:] + peptide))
+        return bool(re.match(n_regex, n_flank[-1:] + peptide))
 
     df["hit"] = [
         is_hit(row.n_flank, row.c_flank, row.peptide)
@@ -91,7 +91,7 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
     train_df.to_csv(train_filename, index=False)
 
     args = [
-        "mhcflurry-class1-train-cleavage-models",
+        "mhcflurry-class1-train-processing-models",
         "--data", train_filename,
         "--hyperparameters", hyperparameters_filename,
         "--out-models-dir", models_dir,
@@ -102,7 +102,7 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
     print("Running with args: %s" % args)
     subprocess.check_call(args)
 
-    full_predictor = Class1CleavagePredictor.load(models_dir)
+    full_predictor = Class1ProcessingPredictor.load(models_dir)
     print("Loaded models", len(full_predictor.models))
     assert_equal(len(full_predictor.models), 4)
 
@@ -120,7 +120,7 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
     models_dir_selected = tempfile.mkdtemp(
         prefix="mhcflurry-test-models-selected")
     args = [
-        "mhcflurry-class1-select-cleavage-models",
+        "mhcflurry-class1-select-processing-models",
         "--data", os.path.join(models_dir, "train_data.csv.bz2"),
         "--models-dir", models_dir,
         "--out-models-dir", models_dir_selected,
@@ -130,7 +130,7 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
     print("Running with args: %s" % args)
     subprocess.check_call(args)
 
-    selected_predictor = Class1CleavagePredictor.load(models_dir_selected)
+    selected_predictor = Class1ProcessingPredictor.load(models_dir_selected)
     assert_equal(len(selected_predictor.models), 2)
 
     test_df["selected_predictor"] = selected_predictor.predict(

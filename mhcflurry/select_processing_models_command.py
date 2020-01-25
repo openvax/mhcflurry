@@ -1,5 +1,5 @@
 """
-Model select cleavage models.
+Model select antigen processing models.
 
 APPROACH: For each training fold, we select at least min and at most max models
 (where min and max are set by the --{min/max}-models-per-fold argument) using a
@@ -22,7 +22,7 @@ from sklearn.metrics import roc_auc_score
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
-from .class1_cleavage_predictor import Class1CleavagePredictor
+from .class1_processing_predictor import Class1ProcessingPredictor
 from .flanking_encoding import FlankingEncoding
 from .common import configure_logging
 from .local_parallelism import (
@@ -99,7 +99,7 @@ def run(argv=sys.argv[1:]):
     df = pandas.read_csv(args.data)
     print("Loaded data: %s" % (str(df.shape)))
 
-    input_predictor = Class1CleavagePredictor.load(args.models_dir)
+    input_predictor = Class1ProcessingPredictor.load(args.models_dir)
     print("Loaded: %s" % input_predictor)
 
     metadata_dfs = {}
@@ -153,7 +153,7 @@ def run(argv=sys.argv[1:]):
         os.mkdir(args.out_models_dir)
         print("Done.")
 
-    result_predictor = Class1CleavagePredictor(
+    result_predictor = Class1ProcessingPredictor(
         models=[],
         metadata_dataframes=metadata_dfs)
 

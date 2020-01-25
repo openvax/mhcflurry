@@ -154,7 +154,7 @@ model_args.add_argument(
     "--affinity-only",
     action="store_true",
     default=False,
-    help="Affinity prediction only (no cleavage or presentation)")
+    help="Affinity prediction only (no antigen processing or presentation)")
 model_args.add_argument(
     "--no-flanking",
     action="store_true",

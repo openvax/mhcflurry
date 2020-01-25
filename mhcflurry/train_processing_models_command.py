@@ -1,5 +1,5 @@
 """
-Train Class1 cleavage models.
+Train Class1 processing models.
 """
 from __future__ import print_function
 import argparse
@@ -22,8 +22,8 @@ import yaml
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
-from .class1_cleavage_predictor import Class1CleavagePredictor
-from .class1_cleavage_neural_network import Class1CleavageNeuralNetwork
+from .class1_processing_predictor import Class1ProcessingPredictor
+from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from .common import configure_logging
 from .local_parallelism import (
     add_local_parallelism_args,
@@ -225,7 +225,7 @@ def initialize_training(args):
         os.mkdir(args.out_models_dir)
         print("Done.")
 
-    predictor = Class1CleavagePredictor(
+    predictor = Class1ProcessingPredictor(
         models=[],
         metadata_dataframes={
             'train_data': pandas.merge(
@@ -273,7 +273,7 @@ def train_models(args):
     global GLOBAL_DATA
 
     print("Beginning training.")
-    predictor = Class1CleavagePredictor.load(args.out_models_dir)
+    predictor = Class1ProcessingPredictor.load(args.out_models_dir)
     print("Loaded predictor with %d networks" % len(predictor.models))
 
     with open(join(args.out_models_dir, "training_init_info.pkl"), "rb") as fd:
@@ -398,7 +398,7 @@ def train_model(
     folds_df = constant_data["folds_df"]
 
     if predictor is None:
-        predictor = Class1CleavagePredictor(models=[])
+        predictor = Class1ProcessingPredictor(models=[])
 
     numpy.testing.assert_equal(len(df), len(folds_df))
 
@@ -428,7 +428,7 @@ def train_model(
     print("%s [pid %d]. Hyperparameters:" % (progress_preamble, os.getpid()))
     pprint.pprint(hyperparameters)
 
-    model = Class1CleavageNeuralNetwork(**hyperparameters)
+    model = Class1ProcessingNeuralNetwork(**hyperparameters)
     model.fit(
         sequences=FlankingEncoding(
             peptides=train_data.peptide.values,

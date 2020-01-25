@@ -77,14 +77,14 @@ if __name__ == '__main__':
                     'mhcflurry.train_allele_specific_models_command:run',
                 'mhcflurry-class1-train-pan-allele-models = '
                     'mhcflurry.train_pan_allele_models_command:run',
-                'mhcflurry-class1-train-cleavage-models = '
-                    'mhcflurry.train_cleavage_models_command:run',
+                'mhcflurry-class1-train-processing-models = '
+                    'mhcflurry.train_processing_models_command:run',
                 'mhcflurry-class1-select-allele-specific-models = '
                     'mhcflurry.select_allele_specific_models_command:run',
                 'mhcflurry-class1-select-pan-allele-models = '
                     'mhcflurry.select_pan_allele_models_command:run',
-                'mhcflurry-class1-select-cleavage-models = '
-                    'mhcflurry.select_cleavage_models_command:run',
+                'mhcflurry-class1-select-processing-models = '
+                    'mhcflurry.select_processing_models_command:run',
                 'mhcflurry-calibrate-percentile-ranks = '
                     'mhcflurry.calibrate_percentile_ranks_command:run',
                 'mhcflurry-class1-train-presentation-models = '

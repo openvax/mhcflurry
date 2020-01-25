@@ -9,7 +9,7 @@
 set -e
 set -x
 
-DOWNLOAD_NAME=models_class1_cleavage
+DOWNLOAD_NAME=models_class1_processing
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
@@ -107,7 +107,7 @@ then
     CONTINUE_INCOMPLETE_ARGS="--continue-incomplete"
 fi
 
-mhcflurry-class1-train-cleavage-models \
+mhcflurry-class1-train-processing-models \
     --data "$(pwd)/train_data.csv.bz2" \
     --held-out-samples 10 \
     --num-folds 4 \
@@ -118,7 +118,7 @@ mhcflurry-class1-train-cleavage-models \
 
 echo "Done training. Beginning model selection."
 MODELS_DIR="$(pwd)/models.unselected"
-mhcflurry-class1-select-cleavage-models \
+mhcflurry-class1-select-processing-models \
     --data "$MODELS_DIR/train_data.csv.bz2" \
     --models-dir "$MODELS_DIR" \
     --out-models-dir "$(pwd)/models" \

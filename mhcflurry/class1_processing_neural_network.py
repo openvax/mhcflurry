@@ -1,79 +1,5 @@
 """
-Idea:
-
-Fully convolutional network with softmax output. Let it take a 35mer:
-- N flank [10 aa]
-- peptide [7-15 aa]
-- C flank [10 aa]
-
-Train on monoallelic mass spec. Match positive examples (hits) to negatives
-from the same sample by finding unobserved peptides with as close as possible
-a match for predicted binding affinity.
-
-In final layer, take max cleavage score over peptide and the individual score
-for the position right before the peptide terminus. Compute the ratio of these.
-Or actually reverse of that. Hits get label 1, decoys get 0.
-
-For a hit with sequence
-
-NNNNNNNNNNPPPPPPPPPCCCCCCCCCC
-
-penalize on:
-
-[----------1000000000---------]
-
-For a decoy with same sequence, penalize it on:
-
-[----------0-----------------]
-
-Train separate models for N- and C-terminal cleavage.
-
-Issue:
-- it'll learn mass spec biases in the peptide
-
-Possible fix:
-- Also provide the amino acid counts of the peptide as auxiliary inputs. After
-training, set the cysteine value to 0.
-
-Architecture:
-architecture (for N terminal: for C terminal reverse the sequences):
-
-input of length S=25 [flank + left-aligned peptide]
-*** conv [vector of length S] ***
-*** [more convs and local pools] ***
-*** output [vector of length S] ***
-*** extract: position 10 and max of peptide positions [2-vector]
-*** concat:[position 10, max of peptide positions, number of Alananine, ..., number of Y in peptide]
-*** single dense node, softmax activation [1-vector]
-
-Train on monoallelic.
-
-Decoys are length-matched to hits and sampled from the same transcripts, selecting
-an unobeserved peptide with as close as possible the same predicted affinity.
-
-
-    *** + repeat vector for each position
-
-
-*** conv ***
-*** conv ***
-*** ... conv n ***
-***                             repeat vector for each position
-*** dense per-position
-*** output [35-vector]
-*** extract: position 10 and max of peptide positions [2-vector]
-*** dense
-*** output
-
-
-IDEA 2:
-
-- Two inputs: N-flank + peptide (left aligned), peptide (right alighted +  C-flank
-- Bunch of convolutions
-- Global max pooling
-- Dense
-
-
+Antigen processing models
 """
 
 from __future__ import print_function
@@ -88,7 +14,7 @@ from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
 
 
-class Class1CleavageNeuralNetwork(object):
+class Class1ProcessingNeuralNetwork(object):
     network_hyperparameter_defaults = HyperparameterDefaults(
         amino_acid_encoding="BLOSUM62",
         peptide_max_length=15,
@@ -668,7 +594,7 @@ class Class1CleavageNeuralNetwork(object):
 
         Returns
         -------
-        Class1CleavageNeuralNetwork
+        Class1ProcessingNeuralNetwork
         """
         config = dict(config)
         instance = cls(**config.pop('hyperparameters'))

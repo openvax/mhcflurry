@@ -28,8 +28,8 @@ releases:
               url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_presentation.20200125.tar.bz2
               default: true
 
-            - name: models_class1_cleavage
-              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_cleavage.selected.20200122.tar.bz2
+            - name: models_class1_processing
+              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_processing.selected.20200122.tar.bz2
               default: false
 
             - name: models_class1_pan_unselected
@@ -40,8 +40,8 @@ releases:
               url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_pan_variants.selected.20200109.tar.bz2
               default: false
 
-            - name: models_class1_cleavage_variants
-              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_cleavage_variants.selected.20200124.tar.bz2
+            - name: models_class1_processing_variants
+              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_processing_variants.selected.20200124.tar.bz2
               default: false
 
             - name: data_mass_spec_benchmark

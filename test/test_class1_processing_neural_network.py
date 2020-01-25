@@ -15,7 +15,7 @@ from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 import pandas
 import pprint
 
-from mhcflurry.class1_cleavage_neural_network import Class1CleavageNeuralNetwork
+from mhcflurry.class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from mhcflurry.common import random_peptides
 from mhcflurry.amino_acid import BLOSUM62_MATRIX
 from mhcflurry.flanking_encoding import FlankingEncoding
@@ -56,7 +56,7 @@ def decode_matrix(array):
 
 
 def test_neural_network_input():
-    model = Class1CleavageNeuralNetwork(
+    model = Class1ProcessingNeuralNetwork(
         peptide_max_length=12,
         n_flank_length=8,
         c_flank_length=5)
@@ -211,7 +211,7 @@ def train_basic_network(num, do_assertions=True, is_hit=None, **hyperparameters)
         "frac:",
         df.hit.mean())
 
-    network = Class1CleavageNeuralNetwork(**use_hyperparameters)
+    network = Class1ProcessingNeuralNetwork(**use_hyperparameters)
     network.fit(
         sequences=FlankingEncoding(
             peptides=train_df.peptide.values,
