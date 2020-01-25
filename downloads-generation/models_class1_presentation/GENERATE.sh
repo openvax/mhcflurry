@@ -90,7 +90,7 @@ fi
 mhcflurry-class1-train-presentation-models \
     --data "$(pwd)/train_data.csv.bz2" \
     --affinity-predictor "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
-    --cleavage-predictor-with-flanks "$(mhcflurry-downloads path models_class1_cleavage)/models.selected" \
+    --cleavage-predictor-with-flanks "$(mhcflurry-downloads path models_class1_cleavage)/models" \
     --cleavage-predictor-without-flanks "$(mhcflurry-downloads path models_class1_cleavage_variants)/models.selected.no_flank" \
     --out-models-dir "$(pwd)/models"
 
