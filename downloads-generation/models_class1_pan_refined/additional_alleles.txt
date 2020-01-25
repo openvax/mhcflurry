@@ -1,1 +1,0 @@
-../models_class1_pan/additional_alleles.txt

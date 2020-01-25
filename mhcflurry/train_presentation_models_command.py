@@ -38,12 +38,12 @@ parser.add_argument(
     "--cleavage-predictor-with-flanks",
     metavar="DIR",
     required=True,
-    help="Cleavage predictor with flanking")
+    help="Cleavage predictor with flanks")
 parser.add_argument(
     "--cleavage-predictor-without-flanks",
     metavar="DIR",
     required=True,
-    help="Cleavage predictor without flanking")
+    help="Cleavage predictor without flanks")
 parser.add_argument(
     "--verbosity",
     type=int,
@@ -107,9 +107,9 @@ def main(args):
 
     affinity_predictor = Class1AffinityPredictor.load(args.affinity_predictor)
     cleavage_predictor_with_flanks = Class1CleavagePredictor.load(
-        args.cleavage_predictor_with_flanking)
+        args.cleavage_predictor_with_flanks)
     cleavage_predictor_without_flanks = Class1CleavagePredictor.load(
-        args.cleavage_predictor_without_flanking)
+        args.cleavage_predictor_without_flanks)
 
     predictor = Class1PresentationPredictor(
         affinity_predictor=affinity_predictor,
