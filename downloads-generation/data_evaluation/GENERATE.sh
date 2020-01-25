@@ -96,8 +96,10 @@ else
     time mhcflurry-predict \
         benchmark.monoallelic.csv.bz2 \
         --allele-column hla \
-        --prediction-column-prefix prediction.no_additional_ms \
+        --prediction-column-prefix no_additional_ms_ \
         --models "$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms" \
+        --affinity-only \
+        --no-affinity-percentile \
         --out benchmark.monoallelic.predictions.csv \
         --no-throw
     bzip2 -f benchmark.monoallelic.predictions.csv
@@ -126,27 +128,45 @@ then
     echo "Reusing existing multiallelic predictions"
 else
     cp $SCRIPT_DIR/predict.py .
-    time python predict.py \
-        benchmark.multiallelic.csv \
-        --models \
-            "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
-            "$(mhcflurry-downloads path models_class1_pan_variants)/models.*" \
-        --out "$(pwd)/benchmark.multiallelic.predictions.csv"
+    time mhcflurry-predict \
+        benchmark.multiallelic.csv.bz2 \
+        --allele-column hla \
+        --prediction-column-prefix mhcflurry_production_ \
+        --models "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
+        --affinity-only \
+        --no-affinity-percentile \
+        --out "$(pwd)/benchmark.multiallelic.predictions1.csv"
+
+    for variant in no_additional_ms compact_peptide affinity_only no_pretrain single_hidden_no_pretrain
+    do
+        time mhcflurry-predict \
+            "$(pwd)/benchmark.multiallelic.predictions1.csv" \
+            --allele-column hla \
+            --prediction-column-prefix "${variant}_" \
+            --models "$(mhcflurry-downloads path models_class1_pan_variants)/models.$variant" \
+            --affinity-only \
+            --no-affinity-percentile \
+            --out "$(pwd)/benchmark.multiallelic.predictions1.csv"
+    done
+
     bzip2 -f benchmark.multiallelic.predictions1.csv
     rm -f benchmark.multiallelic.predictions2.csv.bz2
 fi
+
 
 ### PRESENTATION: WITH FLANKS
 if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.predictions2.csv.bz2" ]
 then
     echo "Reusing existing multiallelic predictions2"
 else
-    mhcflurry-predict-presentation \
-        "$(pwd)/benchmark.multiallelic.predictions1.csv" \
-        --out "$(pwd)/benchmark.multiallelic.predictions2.csv" \
+    time mhcflurry-predict \
+        "$(pwd)/benchmark.multiallelic.predictions1.csv.bz2" \
+        --allele-column hla \
+        --prediction-column-prefix presentation_with_flanks_ \
         --models "$(mhcflurry-downloads path models_class1_presentation)/models" \
-        --include-details \
-        --prediction-col presentation_with_flanks \
+        --no-affinity-percentile \
+        --out "$(pwd)/benchmark.multiallelic.predictions2.csv"
+
     bzip2 -f benchmark.multiallelic.predictions2.csv
     rm -f benchmark.multiallelic.predictions3.csv.bz2
 fi
@@ -156,16 +176,17 @@ if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.predictions
 then
     echo "Reusing existing multiallelic predictions3"
 else
-    mhcflurry-predict-presentation \
-        "$(pwd)/benchmark.multiallelic.predictions2.csv" \
-        --out "$(pwd)/benchmark.multiallelic.predictions3.csv" \
+    time mhcflurry-predict \
+        "$(pwd)/benchmark.multiallelic.predictions2.csv.bz2" \
+        --allele-column hla \
+        --prediction-column-prefix presentation_with_flanks_ \
         --models "$(mhcflurry-downloads path models_class1_presentation)/models" \
-        --include-details \
-        --prediction-col presentation_without_flanks \
-        --no-flanks
+        --no-affinity-percentile \
+        --no-flanking \
+        --out "$(pwd)/benchmark.multiallelic.predictions3.csv"
+
     bzip2 -f benchmark.multiallelic.predictions3.csv
 fi
-
 
 
 cp $SCRIPT_ABSOLUTE_PATH .
