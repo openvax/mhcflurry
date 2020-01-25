@@ -53,6 +53,7 @@ parser.add_argument(
 def run():
     args = parser.parse_args(sys.argv[1:])
     hit_df = pandas.read_csv(args.hits)
+    original_sample_ids = hit_df.sample_id.unique()
     numpy.testing.assert_equal(hit_df.hit_id.nunique(), len(hit_df))
     hit_df = hit_df.loc[
         (hit_df.mhc_class == "I") &
@@ -74,8 +75,7 @@ def run():
         assert not (args.only_pmid and args.exclude_pmid)
 
         pmids = list(args.only_pmid) + list(args.exclude_pmid)
-        hit_pmids = hit_df.pmid.unique()
-        missing = [pmid for pmid in pmids if pmid not in hit_pmids]
+        missing = [pmid for pmid in pmids if pmid not in original_sample_ids]
         assert not missing, missing
 
         mask = hit_df.pmid.isin(pmids)
