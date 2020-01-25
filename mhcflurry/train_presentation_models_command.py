@@ -125,7 +125,7 @@ def main(args):
         experiment_names=df.experiment_id,
         n_flanks=df.n_flank.values,
         c_flanks=df.c_flank.values,
-        verbose=args.verbose)
+        verbose=args.verbosity)
     print("Done fitting in", time.time() - start, "seconds")
 
     print("Saving")
