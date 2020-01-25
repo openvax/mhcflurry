@@ -24,16 +24,16 @@ releases:
               url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_pan.selected.20200104.tar.bz2
               default: false
 
+            - name: models_class1_presentation
+              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_presentation.20200125.tar.bz2
+              default: true
+
             - name: models_class1_cleavage
               url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_cleavage.selected.20200122.tar.bz2
               default: false
 
             - name: models_class1_pan_unselected
               url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_pan.20200104.tar.bz2
-              default: false
-
-            - name: models_class1_pan_refined
-              url: https://github.com/openvax/mhcflurry/releases/download/1.4.0/models_class1_pan_refined.20191212c.tar.bz2
               default: false
 
             - name: models_class1_pan_variants
