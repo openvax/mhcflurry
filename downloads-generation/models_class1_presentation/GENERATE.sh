@@ -80,7 +80,7 @@ else
     time python make_benchmark.py \
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
         --proteome-peptides "$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2" \
-        --decoys-per-hit 99 \
+        --decoys-per-hit 2 \
         --exclude-pmid 31844290 31495665 31154438 \
         --only-format MULTIALLELIC \
         --out "$(pwd)/train_data.csv"
