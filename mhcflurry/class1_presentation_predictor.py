@@ -58,9 +58,22 @@ class Class1PresentationPredictor(object):
             dict(metadata_dataframes) if metadata_dataframes else {})
         self._models_cache = {}
 
-    def get_affinity_predictions(
-            self, peptides, experiment_names, alleles, verbose=1):
+    @property
+    def supported_alleles(self):
+        return self.affinity_predictor.supported_alleles
 
+    @property
+    def supported_peptide_lengths(self):
+        return self.affinity_predictor.supported_peptide_lengths
+
+    def predict_affinity(
+            self,
+            peptides,
+            experiment_names,
+            alleles,
+            include_affinity_percentile=False,
+            verbose=1,
+            throw=True):
         df = pandas.DataFrame({
             "peptide": numpy.array(peptides, copy=False),
             "experiment_name": numpy.array(experiment_names, copy=False),
@@ -80,17 +93,25 @@ class Class1PresentationPredictor(object):
                 predictions_df[allele] = self.affinity_predictor.predict(
                     peptides=experiment_peptides,
                     allele=allele,
-                    model_kwargs={'batch_size': PREDICT_BATCH_SIZE})
+                    model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
+                    throw=throw)
             df.loc[
-                sub_df.index, "tightest_affinity"
+                sub_df.index, "affinity"
             ] = predictions_df.min(1).values
             df.loc[
-                sub_df.index, "tightest_affinity_allele"
+                sub_df.index, "best_allele"
             ] = predictions_df.idxmin(1).values
+
+            if include_affinity_percentile:
+                df.loc[sub_df.index, "affinity_percentile"] = (
+                    self.affinity_predictor.percentile_ranks(
+                        df.loc[sub_df.index, "affinity"].values,
+                        alleles=df.loc[sub_df.index, "best_allele"].values,
+                        throw=False))
 
         return df
 
-    def get_cleavage_predictions(
+    def predict_cleavage(
             self, peptides, n_flanks=None, c_flanks=None, verbose=1):
 
         if verbose > 0:
@@ -128,12 +149,12 @@ class Class1PresentationPredictor(object):
             c_flanks=None,
             verbose=1):
 
-        df = self.get_affinity_predictions(
+        df = self.predict_affinity(
             peptides=peptides,
             experiment_names=experiment_names,
             alleles=alleles,
             verbose=verbose)
-        df["affinity_score"] = from_ic50(df.tightest_affinity)
+        df["affinity_score"] = from_ic50(df.affinity)
         df["target"] = numpy.array(targets, copy=False)
 
         if (n_flanks is None) != (c_flanks is None):
@@ -157,7 +178,7 @@ class Class1PresentationPredictor(object):
             if verbose > 0:
                 print("Training variant", model_name)
 
-            df["cleavage_prediction"] = self.get_cleavage_predictions(
+            df["cleavage_prediction"] = self.predict_cleavage(
                 peptides=df.peptide.values,
                 n_flanks=n_flanks if with_flanks else None,
                 c_flanks=c_flanks if with_flanks else None,
@@ -206,7 +227,7 @@ class Class1PresentationPredictor(object):
             experiment_names=experiment_names,
             n_flanks=n_flanks,
             c_flanks=c_flanks,
-            verbose=verbose).score.values
+            verbose=verbose).presentation_score.values
 
     def predict_to_dataframe(
             self,
@@ -215,7 +236,9 @@ class Class1PresentationPredictor(object):
             experiment_names=None,
             n_flanks=None,
             c_flanks=None,
-            verbose=1):
+            include_affinity_percentile=False,
+            verbose=1,
+            throw=True):
 
         if isinstance(peptides, string_types):
             raise TypeError("peptides must be a list not a string")
@@ -246,17 +269,19 @@ class Class1PresentationPredictor(object):
                 "experiment1": alleles,
             }
 
-        df = self.get_affinity_predictions(
+        df = self.predict_affinity(
             peptides=peptides,
             experiment_names=experiment_names,
             alleles=alleles,
-            verbose=verbose)
-        df["affinity_score"] = from_ic50(df.tightest_affinity)
+            include_affinity_percentile=include_affinity_percentile,
+            verbose=verbose,
+            throw=throw)
+        df["affinity_score"] = from_ic50(df.affinity)
 
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
 
-        df["cleavage_prediction"] = self.get_cleavage_predictions(
+        df["cleavage_prediction"] = self.predict_cleavage(
             peptides=df.peptide.values,
             n_flanks=n_flanks,
             c_flanks=c_flanks,
@@ -264,7 +289,9 @@ class Class1PresentationPredictor(object):
 
         model_name = 'with_flanks' if n_flanks is not None else "without_flanks"
         model = self.get_model(model_name)
-        df["score"] = model.predict_proba(df[self.model_inputs].values)[:,1]
+        df["presentation_score"] = model.predict_proba(
+            df[self.model_inputs].values)[:,1]
+        del df["affinity_score"]
         return df
 
     def save(self, models_dir):

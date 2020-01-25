@@ -892,11 +892,15 @@ class Class1AffinityPredictor(object):
         numpy.array of float
         """
         if allele is not None:
+            normalized_allele = mhcnames.normalize_allele_name(allele)
             try:
-                transform = self.allele_to_percent_rank_transform[allele]
+                transform = self.allele_to_percent_rank_transform[normalized_allele]
                 return transform.transform(affinities)
             except KeyError:
-                msg = "Allele %s has no percentile rank information" % allele
+                msg = "Allele %s has no percentile rank information" % (
+                    allele + (
+                        "" if allele == normalized_allele
+                        else " (normalized to %s)" % normalized_allele))
                 if throw:
                     raise ValueError(msg)
                 warnings.warn(msg)

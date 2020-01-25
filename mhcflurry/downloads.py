@@ -120,7 +120,7 @@ def get_default_class1_presentation_models_dir(test_exists=True):
             raise IOError("No such directory: %s" % result)
         return result
     return get_path(
-        "models_class1_pan_refined", "presentation", test_exists=test_exists)
+        "models_class1_presentation", "models", test_exists=test_exists)
 
 
 def get_default_class1_cleavage_models_dir(test_exists=True):
