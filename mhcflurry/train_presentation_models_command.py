@@ -96,7 +96,7 @@ def main(args):
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
 
-    df["experiment_id"] = df[args.hla_columns]
+    df["experiment_id"] = df[args.hla_column]
     experiment_to_alleles = dict((
         key, key.split()) for key in df.experiment_id.unique())
 

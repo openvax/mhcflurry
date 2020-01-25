@@ -53,7 +53,8 @@ parser.add_argument(
 def run():
     args = parser.parse_args(sys.argv[1:])
     hit_df = pandas.read_csv(args.hits)
-    original_sample_ids = hit_df.sample_id.unique()
+    hit_df["pmid"] = hit_df["pmid"].astype(str)
+    original_samples_pmids = hit_df.pmid.unique()
     numpy.testing.assert_equal(hit_df.hit_id.nunique(), len(hit_df))
     hit_df = hit_df.loc[
         (hit_df.mhc_class == "I") &
@@ -69,14 +70,12 @@ def run():
         print("Subselected to %d %s samples" % (
             hit_df.sample_id.nunique(), args.only_format))
 
-    hit_df["pmid"] = hit_df["pmid"].astype(str)
-
     if args.only_pmid or args.exclude_pmid:
         assert not (args.only_pmid and args.exclude_pmid)
 
         pmids = list(args.only_pmid) + list(args.exclude_pmid)
-        missing = [pmid for pmid in pmids if pmid not in original_sample_ids]
-        assert not missing, missing
+        missing = [pmid for pmid in pmids if pmid not in original_samples_pmids]
+        assert not missing, (missing, original_samples_pmids)
 
         mask = hit_df.pmid.isin(pmids)
         if args.exclude_pmid:
