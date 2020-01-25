@@ -96,8 +96,10 @@ else
     time mhcflurry-predict \
         benchmark.monoallelic.csv.bz2 \
         --allele-column hla \
+        --prediction-column-prefix prediction.no_additional_ms \
         --models "$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms" \
-        --out benchmark.monoallelic.predictions.csv
+        --out benchmark.monoallelic.predictions.csv \
+        --no-throw
     bzip2 -f benchmark.monoallelic.predictions.csv
     ls -lh benchmark.monoallelic.predictions.csv.bz2
 fi
