@@ -48,7 +48,7 @@ parser.add_argument(
     "--verbosity",
     type=int,
     help="Default: %(default)s",
-    default=0)
+    default=1)
 parser.add_argument(
     "--debug",
     action="store_true",
