@@ -100,7 +100,7 @@ else
         --out benchmark.monoallelic.predictions.csv
     bzip2 -f benchmark.monoallelic.predictions.csv
     ls -lh benchmark.monoallelic.predictions.csv.bz2
-done
+fi
 
 ### GENERATE BENCHMARK: MULTIALLELIC
 if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.csv.bz2" ]
@@ -112,7 +112,6 @@ else
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
         --proteome-peptides "$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2" \
         --decoys-per-hit 99 \
-        --only-pmid 31844290 31495665 31154438 \
         --only-format MULTIALLELIC \
         --out "$(pwd)/benchmark.multiallelic.csv"
     bzip2 -f benchmark.multiallelic.csv
