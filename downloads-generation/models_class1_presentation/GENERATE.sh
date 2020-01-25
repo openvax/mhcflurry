@@ -94,9 +94,16 @@ mhcflurry-class1-train-presentation-models \
     --cleavage-predictor-without-flanks "$(mhcflurry-downloads path models_class1_cleavage_variants)/models.selected.no_flank" \
     --out-models-dir "$(pwd)/models"
 
+cp "$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2" models/affinity_predictor_train_data.csv.bz2
+cp "$(mhcflurry-downloads path models_class1_cleavage)/models/train_data.csv.bz2" models/cleavage_predictor_train_data.csv.bz2
+cp "$(mhcflurry-downloads path models_class1_cleavage_variants)/models.selected.no_flank/train_data.csv.bz2" models/cleavage_predictor_no_flank_train_data.csv.bz2
+
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 -f "$LOG"
 for i in $(ls LOG-worker.*.txt) ; do bzip2 -f $i ; done
 RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
+mkdir .ignored
+mv hits_with_tpm.csv.bz2 .ignored/
 tar -cjf "$RESULT" *
+mv .ignored/* . && rmdir .ignored
 echo "Created archive: $RESULT"
