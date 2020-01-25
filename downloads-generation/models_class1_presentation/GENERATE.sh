@@ -87,12 +87,17 @@ else
     bzip2 -f train_data.csv
 fi
 
-mhcflurry-class1-train-presentation-models \
-    --data "$(pwd)/train_data.csv.bz2" \
-    --affinity-predictor "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
-    --cleavage-predictor-with-flanks "$(mhcflurry-downloads path models_class1_cleavage)/models" \
-    --cleavage-predictor-without-flanks "$(mhcflurry-downloads path models_class1_cleavage_variants)/models.selected.no_flank" \
-    --out-models-dir "$(pwd)/models"
+if [ "$2" == "continue-incomplete" ] && [ -f "models/weights.csv" ]
+then
+    echo "Reusing existing trained predictor"
+else
+    mhcflurry-class1-train-presentation-models \
+        --data "$(pwd)/train_data.csv.bz2" \
+        --affinity-predictor "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
+        --cleavage-predictor-with-flanks "$(mhcflurry-downloads path models_class1_cleavage)/models" \
+        --cleavage-predictor-without-flanks "$(mhcflurry-downloads path models_class1_cleavage_variants)/models.selected.no_flank" \
+        --out-models-dir "$(pwd)/models"
+fi
 
 cp "$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2" models/affinity_predictor_train_data.csv.bz2
 cp "$(mhcflurry-downloads path models_class1_cleavage)/models/train_data.csv.bz2" models/cleavage_predictor_train_data.csv.bz2
