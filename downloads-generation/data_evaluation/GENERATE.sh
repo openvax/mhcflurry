@@ -127,7 +127,6 @@ if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.predictions
 then
     echo "Reusing existing multiallelic predictions"
 else
-    cp $SCRIPT_DIR/predict.py .
     time mhcflurry-predict \
         benchmark.multiallelic.csv.bz2 \
         --allele-column hla \
