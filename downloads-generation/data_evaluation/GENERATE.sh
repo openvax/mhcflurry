@@ -195,7 +195,6 @@ else
         cat $i >> ${i}.lsf
         cat ${i}.lsf
         bsub -K < "${i}.lsf" &
-        bash $i
     done
     wait
 fi
