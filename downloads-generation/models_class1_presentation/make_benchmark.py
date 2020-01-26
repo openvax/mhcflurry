@@ -5,6 +5,7 @@ import sys
 import argparse
 import os
 import numpy
+import collections
 
 import pandas
 import tqdm
@@ -40,6 +41,11 @@ parser.add_argument(
     default=[],
     help="Include only the given PMID")
 parser.add_argument(
+    "--exclude-train-data",
+    nargs="+",
+    default=[],
+    help="Remove hits and decoys included in the given training data")
+parser.add_argument(
     "--only-format",
     choices=("MONOALLELIC", "MULTIALLELIC"),
     help="Include only data of the given format")
@@ -64,6 +70,7 @@ def run():
         (hit_df.peptide.str.match("^[%s]+$" % "".join(
             mhcflurry.amino_acid.COMMON_AMINO_ACIDS)))
     ]
+    hit_df['alleles'] = hit_df.hla.str.split().map(tuple)
     print("Loaded hits from %d samples" % hit_df.sample_id.nunique())
     if args.only_format:
         hit_df = hit_df.loc[hit_df.format == args.only_format].copy()
@@ -92,6 +99,31 @@ def run():
         hit_df = new_hit_df.copy()
         print("Subselected by pmid to %d samples" % hit_df.sample_id.nunique())
 
+    allele_to_excluded_peptides = collections.defaultdict(set)
+    for train_dataset in args.exclude_train_data:
+        print("Excluding hits from", train_dataset)
+        train_df = pandas.read_csv(train_dataset)
+        for (allele, peptides) in train_df.groupby("allele").peptide.unique().iteritems():
+            allele_to_excluded_peptides[allele].update(peptides)
+        train_counts = train_df.groupby(
+            ["allele", "peptide"]).measurement_value.count().to_dict()
+        hit_no_train = hit_df.loc[
+            [
+                not any([
+                    train_counts.get((allele, row.peptide))
+                    for allele in row.alleles
+                ])
+            for _, row in tqdm.tqdm(hit_df.iterrows(), total=len(hit_df))]
+        ]
+        print(
+            "Excluding hits from",
+            train_dataset,
+            "reduced dataset from",
+            len(hit_df),
+            "to",
+            len(hit_no_train))
+        hit_df = hit_no_train
+
     sample_table = hit_df.drop_duplicates("sample_id").set_index("sample_id")
     grouped = hit_df.groupby("sample_id").nunique()
     for col in sample_table.columns:
@@ -112,26 +144,13 @@ def run():
 
     all_peptides_by_length = dict(iter(all_peptides_df.groupby("length")))
 
-    columns_to_keep = [
-        "hit_id",
-        "protein_accession",
-        "n_flank",
-        "c_flank",
-        "peptide",
-        "sample_id",
-        "affinity_prediction",
-        "hit",
-    ]
-
     print("Selecting decoys.")
 
     lengths = [8, 9, 10, 11]
     result_df = []
 
     for sample_id, sub_df in tqdm.tqdm(
-            hit_df.loc[
-                (hit_df.peptide.str.len() <= 11) & (hit_df.peptide.str.len() >= 8)
-            ].groupby("sample_id"), total=hit_df.sample_id.nunique()):
+            hit_df.groupby("sample_id"), total=hit_df.sample_id.nunique()):
         result_df.append(
             sub_df[[
                 "protein_accession",
@@ -141,14 +160,29 @@ def run():
                 "c_flank",
             ]].copy())
         result_df[-1]["hit"] = 1
+
+        excluded_peptides = set()
+        for allele in sample_table.loc[sample_id].alleles:
+            excluded_peptides.update(allele_to_excluded_peptides[allele])
+        print(
+            sample_id,
+            "will exclude",
+            len(excluded_peptides),
+            "peptides from decoy universe")
+
         for length in lengths:
             universe = all_peptides_by_length[length]
-            result_df.append(universe.loc[
-                (~universe.peptide.isin(sub_df.peptide.unique())) & (
-                    universe.protein_accession.isin(
-                        sub_df.protein_accession.unique()))].sample(
-                n=int(len(sub_df) * args.decoys_per_hit / len(lengths)))[
-                ["protein_accession", "peptide", "n_flank", "c_flank"]])
+            possible_universe = universe.loc[
+                (~universe.peptide.isin(sub_df.peptide.unique())) &
+                (~universe.peptide.isin(excluded_peptides)) &
+                (universe.protein_accession.isin(sub_df.protein_accession.unique()))
+            ]
+            selected_decoys = possible_universe.sample(
+                n=int(len(sub_df) * args.decoys_per_hit / len(lengths)))
+
+            result_df.append(selected_decoys[
+                ["protein_accession", "peptide", "n_flank", "c_flank"]
+            ].copy())
             result_df[-1]["hit"] = 0
             result_df[-1]["sample_id"] = sample_id
 

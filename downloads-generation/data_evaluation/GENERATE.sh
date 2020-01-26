@@ -63,6 +63,7 @@ else
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
         --proteome-peptides "$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2" \
         --decoys-per-hit 99 \
+        --exclude-train-data "$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms/train_data.csv.bz2" \
         --only-format MONOALLELIC \
         --out "$(pwd)/benchmark.monoallelic.csv"
     bzip2 -f benchmark.monoallelic.csv
@@ -77,7 +78,8 @@ else
     cp $SCRIPT_DIR/make_benchmark.py .
     time python make_benchmark.py \
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-        --proteome-peptides \""$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2"\" \
+        --proteome-peptides "$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2" \
+        --exclude-train-data "$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2" \
         --decoys-per-hit 99 \
         --only-format MULTIALLELIC \
         --out "$(pwd)/benchmark.multiallelic.csv"
