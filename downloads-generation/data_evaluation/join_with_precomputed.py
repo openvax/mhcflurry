@@ -39,7 +39,9 @@ def load_results(dirname, result_df=None, columns=None):
         columns = manifest_df.col.values
 
     if result_df is None:
-        result_df = pandas.DataFrame(index=peptides, columns=columns,
+        result_df = pandas.DataFrame(
+            index=peptides,
+            columns=columns,
             dtype="float32")
         result_df[:] = numpy.nan
         peptides_to_assign = peptides
@@ -54,7 +56,7 @@ def load_results(dirname, result_df=None, columns=None):
 
     for _, row in tqdm.tqdm(manifest_df.iterrows(), total=len(manifest_df)):
         with open(os.path.join(dirname, row.path), "rb") as fd:
-            value = numpy.load(fd)['arr_0']
+            value = numpy.load(fd)['arr_0'].astype(numpy.float32)
             if mask is not None:
                 value = value[mask]
             result_df.loc[peptides_to_assign, row.col] = value
@@ -73,45 +75,50 @@ def run():
     for some in df.hla.unique():
         alleles.update(some.split())
 
-    predictions_dfs = {}
+    precomputed_dfs = {}
 
     if 'netmhcpan4.ba' in args.predictors:
-        predictions_dfs['netmhcpan4.ba'] = load_results(
+        precomputed_dfs['netmhcpan4.ba'] = load_results(
             get_path("data_mass_spec_benchmark", "predictions/all.netmhcpan4.ba"),
             result_df=pandas.DataFrame(
+                dtype=numpy.float32,
                 index=peptides,
                 columns=["%s affinity" % a for a in alleles])).rename(
             columns=lambda s: s.replace("affinity", "").strip())
-        predictions_dfs['netmhcpan4.ba'] *= -1
+        precomputed_dfs['netmhcpan4.ba'] *= -1
 
     if 'netmhcpan4.el' in args.predictors:
-        predictions_dfs['netmhcpan4.el'] = load_results(
+        precomputed_dfs['netmhcpan4.el'] = load_results(
             get_path("data_mass_spec_benchmark", "predictions/all.netmhcpan4.el"),
             result_df=pandas.DataFrame(
+                dtype=numpy.float32,
                 index=peptides,
                 columns=["%s score" % a for a in alleles])).rename(
             columns=lambda s: s.replace("score", "").strip())
 
     if 'mixmhcpred' in args.predictors:
-        predictions_dfs['mixmhcpred'] = load_results(
-        get_path("data_mass_spec_benchmark", "predictions/all.mixmhcpred"),
-        result_df=pandas.DataFrame(
-            index=peptides,
-            columns=["%s score" % a for a in alleles])).rename(
-        columns=lambda s: s.replace("score", "").strip())
+        precomputed_dfs['mixmhcpred'] = load_results(
+            get_path("data_mass_spec_benchmark", "predictions/all.mixmhcpred"),
+            result_df=pandas.DataFrame(
+                dtype=numpy.float32,
+                index=peptides,
+                columns=["%s score" % a for a in alleles])).rename(
+            columns=lambda s: s.replace("score", "").strip())
 
     skip_experiments = set()
 
     for hla_text, sub_df in tqdm.tqdm(df.groupby("hla"), total=df.hla.nunique()):
         hla = hla_text.split()
-        for (name, precomputed_df) in predictions_dfs.items():
+        for (name, precomputed_df) in precomputed_dfs.items():
             df.loc[sub_df.index, name] = numpy.nan
-            prediction_df = pandas.DataFrame(index=sub_df.peptide)
+            prediction_df = pandas.DataFrame(index=sub_df.peptide, dtype=float)
             for allele in hla:
                 if allele not in precomputed_df.columns or precomputed_df[allele].isnull().all():
                     print(sub_df.sample_id.unique(), hla)
                     skip_experiments.update(sub_df.sample_id.unique())
-                prediction_df[allele] = precomputed_df.loc[df.index, allele]
+                prediction_df[allele] = precomputed_df.loc[
+                    prediction_df.index, allele
+                ]
             df.loc[sub_df.index, name] = prediction_df.max(1, skipna=False).values
             df.loc[sub_df.index, name + " allele"] = prediction_df.idxmax(1, skipna=False).values
 
