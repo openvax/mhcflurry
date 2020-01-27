@@ -37,6 +37,7 @@ from .common import load_weights
 
 MAX_ALLELES_PER_SAMPLE = 6
 PREDICT_BATCH_SIZE = DEFAULT_PREDICT_BATCH_SIZE
+PREDICT_CHUNK_SIZE = 100000  # currently used only for cleavage prediction
 
 
 class Class1PresentationPredictor(object):
@@ -114,9 +115,6 @@ class Class1PresentationPredictor(object):
     def predict_processing(
             self, peptides, n_flanks=None, c_flanks=None, verbose=1):
 
-        if verbose > 0:
-            print("Predicting processing.")
-
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
 
@@ -131,13 +129,26 @@ class Class1PresentationPredictor(object):
                 raise ValueError("No processing predictor with flanks")
             predictor = self.processing_predictor_with_flanks
 
-        result = predictor.predict(
-            peptides=peptides,
-            n_flanks=n_flanks,
-            c_flanks=c_flanks,
-            batch_size=PREDICT_BATCH_SIZE)
+        num_chunks = int(numpy.ceil(len(peptides) / PREDICT_CHUNK_SIZE))
+        peptide_chunks = numpy.array_split(peptides, num_chunks)
+        n_flank_chunks = numpy.array_split(n_flanks, num_chunks)
+        c_flank_chunks = numpy.array_split(c_flanks, num_chunks)
 
-        return result
+        iterator = zip(peptide_chunks, n_flank_chunks, c_flank_chunks)
+        if verbose > 0:
+            print("Predicting processing.")
+            if tqdm is not None:
+                iterator = tqdm.tqdm(iterator, total=len(peptide_chunks))
+
+        result_chunks = []
+        for (peptide_chunk, n_flank_chunk, c_flank_chunk) in iterator:
+            result_chunk = predictor.predict(
+                peptides=peptide_chunk,
+                n_flanks=n_flank_chunk,
+                c_flanks=c_flank_chunk,
+                batch_size=PREDICT_BATCH_SIZE)
+            result_chunks.append(result_chunk)
+        return numpy.concatenate(result_chunks)
 
     def fit(
             self,
@@ -269,6 +280,15 @@ class Class1PresentationPredictor(object):
                 "experiment1": alleles,
             }
 
+        if (n_flanks is None) != (c_flanks is None):
+            raise ValueError("Specify both or neither of n_flanks, c_flanks")
+
+        processing_scores = self.predict_processing(
+            peptides=peptides,
+            n_flanks=n_flanks,
+            c_flanks=c_flanks,
+            verbose=verbose)
+
         df = self.predict_affinity(
             peptides=peptides,
             experiment_names=experiment_names,
@@ -277,15 +297,8 @@ class Class1PresentationPredictor(object):
             verbose=verbose,
             throw=throw)
         df["affinity_score"] = from_ic50(df.affinity)
+        df["processing_score"] = processing_scores
 
-        if (n_flanks is None) != (c_flanks is None):
-            raise ValueError("Specify both or neither of n_flanks, c_flanks")
-
-        df["processing_score"] = self.predict_processing(
-            peptides=df.peptide.values,
-            n_flanks=n_flanks,
-            c_flanks=c_flanks,
-            verbose=verbose)
 
         model_name = 'with_flanks' if n_flanks is not None else "without_flanks"
         model = self.get_model(model_name)

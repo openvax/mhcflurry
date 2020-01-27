@@ -18,6 +18,8 @@ from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 from mhcflurry.testing_utils import cleanup, startup
 from mhcflurry.regression_target import to_ic50
+import mhcflurry.class1_presentation_predictor
+mhcflurry.class1_presentation_predictor.PREDICT_CHUNK_SIZE = 15
 
 from . import data_path
 
