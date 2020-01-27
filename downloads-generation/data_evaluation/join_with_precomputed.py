@@ -83,7 +83,6 @@ def run():
                 index=peptides,
                 columns=["%s affinity" % a for a in alleles])).rename(
             columns=lambda s: s.replace("affinity", "").strip())
-        precomputed_dfs['netmhcpan4.ba'] *= -1
 
     if 'netmhcpan4.el' in args.predictors:
         precomputed_dfs['netmhcpan4.el'] = load_results(
