@@ -177,6 +177,18 @@ fi
 ### PRECOMPUTED ####
 for variant in netmhcpan4.ba netmhcpan4.el mixmhcpred
 do
+    if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.${variant}.csv.bz2" ]
+    then
+        echo "Reusing existing monoallelic ${variant}"
+    else
+        cp $SCRIPT_DIR/join_with_precomputed.py .
+        echo time python join_with_precomputed.py \
+            \""$(pwd)/benchmark.monoallelic.csv.bz2"\" \
+            ${variant} \
+            --out "$(pwd)/benchmark.monoallelic.${variant}.csv" >> commands/monoallelic.${variant}.sh
+        echo bzip2 -f "$(pwd)/benchmark.monoallelic.${variant}.csv"  >> commands/monoallelic.${variant}.sh
+    fi
+
     if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.${variant}.csv.bz2" ]
     then
         echo "Reusing existing multiallelic ${variant}"
