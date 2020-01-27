@@ -181,6 +181,7 @@ do
     then
         echo "Reusing existing multiallelic ${variant}"
     else
+        cp $SCRIPT_DIR/join_with_precomputed.py .
         echo time python join_with_precomputed.py \
             \""$(pwd)/benchmark.multiallelic.csv.bz2"\" \
             \""$(mhcflurry-downloads path data_mass_spec_benchmark)/predictions/all.${variant}"\" \
