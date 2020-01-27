@@ -75,7 +75,7 @@ def run():
 
     predictions_dfs = {}
 
-    if 'netmhcpan4.ba' in args.predictor:
+    if 'netmhcpan4.ba' in args.predictors:
         predictions_dfs['netmhcpan4.ba'] = load_results(
             get_path("data_mass_spec_benchmark", "predictions/all.netmhcpan4.ba"),
             result_df=pandas.DataFrame(
@@ -84,7 +84,7 @@ def run():
             columns=lambda s: s.replace("affinity", "").strip())
         predictions_dfs['netmhcpan4.ba'] *= -1
 
-    if 'netmhcpan4.el' in args.predictor:
+    if 'netmhcpan4.el' in args.predictors:
         predictions_dfs['netmhcpan4.el'] = load_results(
             get_path("data_mass_spec_benchmark", "predictions/all.netmhcpan4.el"),
             result_df=pandas.DataFrame(
@@ -92,7 +92,7 @@ def run():
                 columns=["%s score" % a for a in alleles])).rename(
             columns=lambda s: s.replace("score", "").strip())
 
-    if 'mixmhcpred' in args.predictor:
+    if 'mixmhcpred' in args.predictors:
         predictions_dfs['mixmhcpred'] = load_results(
         get_path("data_mass_spec_benchmark", "predictions/all.mixmhcpred"),
         result_df=pandas.DataFrame(
