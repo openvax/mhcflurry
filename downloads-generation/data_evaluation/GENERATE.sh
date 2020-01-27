@@ -63,7 +63,7 @@ else
     time python make_benchmark.py \
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
         --proteome-peptides "$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2" \
-        --decoys-per-hit 99 \
+        --decoys-per-hit 110 \
         --exclude-train-data "$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms/train_data.csv.bz2" \
         --only-format MONOALLELIC \
         --out "$(pwd)/benchmark.monoallelic.csv"
@@ -80,7 +80,7 @@ else
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
         --proteome-peptides "$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2" \
         --exclude-train-data "$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2" \
-        --decoys-per-hit 99 \
+        --decoys-per-hit 110 \
         --only-format MULTIALLELIC \
         --out "$(pwd)/benchmark.multiallelic.csv"
     bzip2 -f benchmark.multiallelic.csv
@@ -101,11 +101,10 @@ else
         --models \""$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms"\" \
         --affinity-only \
         --no-affinity-percentile \
-        --out "$(pwd)/benchmark.monoallelic.predictions.csv" \
+        --out "$(pwd)/benchmark.monoallelic.no_additional_ms.csv" \
         --no-throw >> commands/monoallelic.sh
     echo bzip2 -f "$(pwd)/benchmark.monoallelic.predictions.csv" >> commands/monoallelic.sh
 fi
-
 
 
 ### AFFINITY PREDICTORS: MULTIALLELIC
