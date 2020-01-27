@@ -40,6 +40,7 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
+export MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE=16384
 
 if [ "$2" == "continue-incomplete" ] && [ -f "hits_with_tpm.csv.bz2" ]
 then
@@ -67,7 +68,6 @@ else
         --only-format MONOALLELIC \
         --out "$(pwd)/benchmark.monoallelic.csv"
     bzip2 -f benchmark.monoallelic.csv
-    rm -f benchmark.monoallelic.predictions.csv.bz2
 fi
 
 ### GENERATE BENCHMARK: MULTIALLELIC
@@ -173,6 +173,22 @@ else
         --out "$(pwd)/benchmark.multiallelic.presentation_without_flanks.csv" >> commands/multiallelic.presentation_without_flanks.sh
     echo bzip2 -f "$(pwd)/benchmark.multiallelic.presentation_without_flanks.csv"  >> commands/multiallelic.presentation_without_flanks.sh
 fi
+
+### PRECOMPUTED ####
+for variant in netmhcpan4.ba netmhcpan4.el mixmhcpred
+do
+    if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.${variant}.csv.bz2" ]
+    then
+        echo "Reusing existing multiallelic ${variant}"
+    else
+        echo time python join_with_precomputed.py \
+            \""$(pwd)/benchmark.multiallelic.csv.bz2"\" \
+            \""$(mhcflurry-downloads path data_mass_spec_benchmark)/predictions/all.${variant}"\" \
+            ${variant} \
+            --out "$(pwd)/benchmark.multiallelic.${variant}.csv" >> commands/multiallelic.${variant}.sh
+        echo bzip2 -f "$(pwd)/benchmark.multiallelic.${variant}.csv"  >> commands/multiallelic.${variant}.sh
+    fi
+done
 
 ls -lh commands
 
