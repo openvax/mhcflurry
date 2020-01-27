@@ -126,7 +126,7 @@ def run():
     print("results")
     print(df)
 
-    df.to_csv(args.out)
+    df.to_csv(args.out, index=False)
     print("Wrote", args.out)
 
 if __name__ == '__main__':
