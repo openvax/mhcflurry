@@ -118,7 +118,8 @@ def run():
                     prediction_df.index, allele
                 ]
             df.loc[sub_df.index, name] = prediction_df.max(1, skipna=False).values
-            df.loc[sub_df.index, name + " allele"] = prediction_df.idxmax(1, skipna=False).values
+            df.loc[sub_df.index, name + "_best_allele"] = prediction_df.idxmax(
+                1, skipna=False).values
 
     if 'netmhcpan4.ba' in args.predictors:
         # unflip the values
