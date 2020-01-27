@@ -105,7 +105,9 @@ def main(args):
         os.mkdir(args.out_models_dir)
         print("Done.")
 
-    affinity_predictor = Class1AffinityPredictor.load(args.affinity_predictor)
+    affinity_predictor = Class1AffinityPredictor.load(
+        args.affinity_predictor,
+        optimization_level=0)
     processing_predictor_with_flanks = Class1ProcessingPredictor.load(
         args.processing_predictor_with_flanks)
     processing_predictor_without_flanks = Class1ProcessingPredictor.load(
