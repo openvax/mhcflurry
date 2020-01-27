@@ -68,8 +68,6 @@ def run():
     args = parser.parse_args(sys.argv[1:])
     df = pandas.read_csv(args.benchmark)
 
-    df["alleles"] = df.hla.str.split()
-
     peptides = df.peptide.unique()
     alleles = set()
     for some in df.hla.unique():
