@@ -83,6 +83,7 @@ def run():
                 index=peptides,
                 columns=["%s affinity" % a for a in alleles])).rename(
             columns=lambda s: s.replace("affinity", "").strip())
+        precomputed_dfs['netmhcpan4.ba'] *= -1  # flip since it's affinities
 
     if 'netmhcpan4.el' in args.predictors:
         precomputed_dfs['netmhcpan4.el'] = load_results(
@@ -118,6 +119,10 @@ def run():
                 ]
             df.loc[sub_df.index, name] = prediction_df.max(1, skipna=False).values
             df.loc[sub_df.index, name + " allele"] = prediction_df.idxmax(1, skipna=False).values
+
+    if 'netmhcpan4.ba' in args.predictors:
+        # unflip the values
+        df['netmhcpan4.ba'] *= -1
 
     print("Skip experiments", skip_experiments)
     print("results")
