@@ -18,8 +18,6 @@ parser = argparse.ArgumentParser(usage=__doc__)
 parser.add_argument(
     "benchmark")
 parser.add_argument(
-    "precomputed_data")
-parser.add_argument(
     "predictors",
     nargs="+",
     choices=("netmhcpan4.ba", "netmhcpan4.el", "mixmhcpred"))
@@ -66,7 +64,7 @@ def load_results(dirname, result_df=None, columns=None):
 
 def run():
     args = parser.parse_args(sys.argv[1:])
-    df = pandas.read_csv(args.hits)
+    df = pandas.read_csv(args.benchmark)
 
     df["alleles"] = df.hla.str.split()
 
