@@ -897,6 +897,20 @@ class Class1AffinityPredictor(object):
                 transform = self.allele_to_percent_rank_transform[normalized_allele]
                 return transform.transform(affinities)
             except KeyError:
+                if self.allele_to_sequence:
+                    # See if we have information for an equivalent allele
+                    sequence = self.allele_to_sequence[normalized_allele]
+                    other_alleles = [
+                        other_allele for (other_allele, other_sequence)
+                        in self.allele_to_sequence.items()
+                        if other_sequence == sequence
+                    ]
+                    for other_allele in other_alleles:
+                        if other_allele in self.allele_to_percent_rank_transform:
+                            transform = self.allele_to_percent_rank_transform[
+                                other_allele]
+                            return transform.transform(affinities)
+
                 msg = "Allele %s has no percentile rank information" % (
                     allele + (
                         "" if allele == normalized_allele

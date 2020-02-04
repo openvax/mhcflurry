@@ -86,6 +86,12 @@ parser.add_argument(
     default=4096,
     help="Keras batch size for predictions")
 parser.add_argument(
+    "--alleles-per-work-chunk",
+    type=int,
+    metavar="N",
+    default=1,
+    help="Number of alleles per work chunk. Default: %(default)s.")
+parser.add_argument(
     "--verbosity",
     type=int,
     help="Keras verbosity. Default: %(default)s",
@@ -120,7 +126,26 @@ def run(argv=sys.argv[1:]):
     else:
         alleles = predictor.supported_alleles
 
-    alleles = sorted(set(alleles))
+    allele_set = set(alleles)
+
+    if predictor.allele_to_sequence:
+        # Remove alleles that have the same sequence.
+        new_allele_set = set()
+        sequence_to_allele = collections.defaultdict(set)
+        for allele in list(allele_set):
+            sequence_to_allele[predictor.allele_to_sequence[allele]].add(allele)
+        for equivalent_alleles in sequence_to_allele.values():
+            equivalent_alleles = sorted(equivalent_alleles)
+            keep = equivalent_alleles.pop(0)
+            new_allele_set.add(keep)
+        print(
+            "Sequence comparison reduced num alleles from",
+            len(allele_set),
+            "to",
+            len(new_allele_set))
+        allele_set = new_allele_set
+
+    alleles = sorted(allele_set)
 
     distribution = None
     if args.match_amino_acid_distribution_data:
@@ -171,7 +196,14 @@ def run(argv=sys.argv[1:]):
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
     worker_pool = None
     start = time.time()
-    work_items = [{"allele": allele} for allele in alleles]
+
+    work_items = []
+    for allele in alleles:
+        if not work_items or len(
+                work_items[-1]['alleles']) >= args.alleles_per_work_chunk:
+            work_items.append({"alleles": []})
+        work_items[-1]['alleles'].append(allele)
+
     if serial_run:
         # Serial run
         print("Running in serial.")
@@ -197,12 +229,13 @@ def run(argv=sys.argv[1:]):
             chunksize=1)
 
     summary_results_lists = collections.defaultdict(list)
-    for (transforms, summary_results) in tqdm.tqdm(results, total=len(work_items)):
-        predictor.allele_to_percent_rank_transform.update(transforms)
-        if summary_results is not None:
-            for (item, value) in summary_results.items():
-                summary_results_lists[item].append(value)
-    print("Done calibrating %d alleles." % len(work_items))
+    for work_item in tqdm.tqdm(results, total=len(work_items)):
+        for (transforms, summary_results) in work_item:
+            predictor.allele_to_percent_rank_transform.update(transforms)
+            if summary_results is not None:
+                for (item, value) in summary_results.items():
+                    summary_results_lists[item].append(value)
+    print("Done calibrating %d alleles." % len(alleles))
     if summary_results_lists:
         for (name, lst) in summary_results_lists.items():
             df = pandas.concat(lst, ignore_index=True)
@@ -223,12 +256,17 @@ def run(argv=sys.argv[1:]):
     print("Predictor written to: %s" % args.models_dir)
 
 
-def do_calibrate_percentile_ranks(allele, constant_data=GLOBAL_DATA):
-    return calibrate_percentile_ranks(
-        allele,
-        constant_data['predictor'],
-        peptides=constant_data['calibration_peptides'],
-        **constant_data["args"])
+def do_calibrate_percentile_ranks(alleles, constant_data=GLOBAL_DATA):
+    result_list = []
+    for (i, allele) in enumerate(alleles):
+        print("Processing allele", i + 1, "of", len(alleles))
+        result_item = calibrate_percentile_ranks(
+            allele,
+            constant_data['predictor'],
+            peptides=constant_data['calibration_peptides'],
+            **constant_data["args"])
+        result_list.append(result_item)
+    return result_list
 
 
 def calibrate_percentile_ranks(

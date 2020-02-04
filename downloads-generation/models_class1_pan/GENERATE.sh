@@ -99,11 +99,10 @@ for kind in combined
 do
     MODELS_DIR="models.unselected.${kind}"
 
-    # For now we calibrate percentile ranks only for alleles for which there
-    # is training data. Calibrating all alleles would be too slow.
-    # This could be improved though.
-    ALLELE_LIST=$(bzcat "$MODELS_DIR/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
-    ALLELE_LIST+=$(echo " " $(cat additional_alleles.txt | grep -v '#') )
+    # Older method calibrated only particular alleles. We are now calibrating
+    # all alleles, so this is commented out.
+    #ALLELE_LIST=$(bzcat "$MODELS_DIR/train_data.csv.bz2" | cut -f 1 -d , | grep -v allele | uniq | sort | uniq)
+    #ALLELE_LIST+=$(echo " " $(cat additional_alleles.txt | grep -v '#') )
 
     mhcflurry-class1-select-pan-allele-models \
         --data "$MODELS_DIR/train_data.csv.bz2" \
@@ -114,17 +113,17 @@ do
         $PARALLELISM_ARGS
     cp "$MODELS_DIR/train_data.csv.bz2" "models.${kind}/train_data.csv.bz2"
 
-    # For now we calibrate percentile ranks only for alleles for which there
-    # is training data. Calibrating all alleles would be too slow.
-    # This could be improved though.
+    # We are now calibrating all alleles.
+    # Previously had argument:  --allele $ALLELE_LIST \
     time mhcflurry-calibrate-percentile-ranks \
         --models-dir models.${kind} \
         --match-amino-acid-distribution-data "$MODELS_DIR/train_data.csv.bz2" \
         --motif-summary \
         --num-peptides-per-length 100000 \
-        --allele $ALLELE_LIST \
+        --alleles-per-work-chunk 10 \
         --verbosity 1 \
         $PARALLELISM_ARGS
+
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
