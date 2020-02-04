@@ -80,6 +80,14 @@ class Class1ProcessingNeuralNetwork(object):
         self.network_weights = None
         self.fit_info = []
 
+    @property
+    def sequence_lengths(self):
+        return {
+            "peptide": self.hyperparameters['peptide_max_length'],
+            "n_flank": self.hyperparameters['n_flank_length'],
+            "c_flank": self.hyperparameters['c_flank_length'],
+        }
+
     def network(self):
         """
         Return the keras model associated with this network.

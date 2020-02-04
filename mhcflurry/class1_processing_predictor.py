@@ -34,6 +34,15 @@ class Class1ProcessingPredictor(object):
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
 
+    @property
+    def sequence_lengths(self):
+        df = pandas.DataFrame([model.sequence_lengths for model in self.models])
+        return {
+            "peptide": df.peptide.min(),  # min: anything greater is error
+            "n_flank": df.n_flank.max(),  # max: anything greater is ignored
+            "c_flank": df.c_flank.max(),
+        }
+
     def add_models(self, models):
         new_model_names = []
         original_manifest = self.manifest_df

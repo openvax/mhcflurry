@@ -240,6 +240,111 @@ class Class1PresentationPredictor(object):
             c_flanks=c_flanks,
             verbose=verbose).presentation_score.values
 
+    def predict_scan(
+            self,
+            sequences,
+            alleles,
+            result="best",  # or "all" or "filtered"
+            comparison_quantity="presentation_score",
+            comparison_value=None,
+            peptide_lengths=[8, 9, 10, 11],
+            use_flanks=True,
+            include_affinity_percentile=False,
+            verbose=1,
+            throw=True):
+
+        processing_predictor = self.processing_predictor_with_flanks
+        if not use_flanks or processing_predictor is None:
+            processing_predictor = self.processing_predictor_without_flanks
+
+        supported_sequence_lengths = processing_predictor.sequence_lengths
+        n_flank_length = supported_sequence_lengths["n_flank"]
+        c_flank_length = supported_sequence_lengths["c_flank"]
+
+        sequence_names = []
+        n_flanks = [] if use_flanks else None
+        c_flanks = [] if use_flanks else None
+        peptides = []
+
+        if isinstance(sequences, string_types):
+            sequences = [sequences]
+
+        if not isinstance(sequences, dict):
+            sequences = collections.OrderedDict(
+                ("sequence_%04d" % (i + 1), sequence)
+                for (i, sequence) in enumerate(sequences))
+
+        if not isinstance(alleles, dict):
+            alleles = dict((name, alleles) for name in sequences.keys())
+
+        missing = [key for key in sequences if key not in alleles]
+        if missing:
+            raise ValueError(
+                "Sequence names missing from alleles dict: ", missing)
+
+        for (name, sequence) in sequences.items():
+            if not isinstance(sequence, string_types):
+                raise ValueError("Expected string, not %s (%s)" % (
+                    sequence, type(sequence)))
+            for peptide_start in range(len(sequence) - min(peptide_lengths)):
+                n_flank_start = max(0, peptide_start - n_flank_length)
+                for peptide_length in peptide_lengths:
+                    c_flank_end = (
+                        peptide_start + peptide_length + c_flank_length)
+                    sequence_names.append(name)
+                    peptides.append(
+                        sequence[peptide_start: peptide_start + peptide_length])
+                    if use_flanks:
+                        n_flanks.append(
+                            sequence[n_flank_start : peptide_start])
+                        c_flanks.append(
+                            sequence[peptide_start + peptide_length : c_flank_end])
+
+        result_df = self.predict_to_dataframe(
+            peptides=peptides,
+            alleles=alleles,
+            n_flanks=n_flanks,
+            c_flanks=c_flanks,
+            experiment_names=sequence_names,
+            include_affinity_percentile=include_affinity_percentile,
+            verbose=verbose,
+            throw=throw)
+
+        result_df = result_df.rename(
+            columns={"experiment_name": "sequence_name"})
+
+        comparison_is_score = comparison_quantity.endswith("score")
+
+        result_df = result_df.sort_values(
+            comparison_quantity,
+            ascending=not comparison_is_score)
+
+        if result == "best":
+            result_df = result_df.drop_duplicates(
+                "sequence_name", keep="first").sort_values("sequence_name")
+        elif result == "filtered":
+            if comparison_is_score:
+                result_df = result_df.loc[
+                    result_df[comparison_quantity] >= comparison_value
+                ]
+            else:
+                result_df = result_df.loc[
+                    result_df[comparison_quantity] <= comparison_value
+                ]
+        elif result == "all":
+            pass
+        else:
+            raise ValueError(
+                "Unknown result: %s. Valid choices are: best, filtered, all"
+                % result)
+
+        result_df = result_df.reset_index(drop=True)
+        result_df = result_df.copy()
+
+        return result_df
+
+
+
     def predict_to_dataframe(
             self,
             peptides,
@@ -298,7 +403,10 @@ class Class1PresentationPredictor(object):
             throw=throw)
         df["affinity_score"] = from_ic50(df.affinity)
         df["processing_score"] = processing_scores
-
+        if c_flanks is not None:
+            df.insert(1, "c_flank", c_flanks)
+        if n_flanks is not None:
+            df.insert(1, "n_flank", n_flanks)
 
         model_name = 'with_flanks' if n_flanks is not None else "without_flanks"
         model = self.get_model(model_name)
@@ -383,12 +491,20 @@ class Class1PresentationPredictor(object):
             processing_predictor_with_flanks = Class1ProcessingPredictor.load(
                 join(models_dir, "processing_predictor_with_flanks"),
                 max_models=max_models)
+        else:
+            logging.warning(
+                "Presentation predictor is missing processing predictor: %s",
+                join(models_dir, "processing_predictor_with_flanks"))
 
         processing_predictor_without_flanks = None
         if exists(join(models_dir, "processing_predictor_without_flanks")):
             processing_predictor_without_flanks = Class1ProcessingPredictor.load(
                 join(models_dir, "processing_predictor_without_flanks"),
                 max_models=max_models)
+        else:
+            logging.warning(
+                "Presentation predictor is missing processing predictor: %s",
+                join(models_dir, "processing_predictor_without_flanks"))
 
         weights_dataframe = pandas.read_csv(
             join(models_dir, "weights.csv"),

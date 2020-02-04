@@ -26,12 +26,14 @@ from . import data_path
 AFFINITY_PREDICTOR = None
 CLEAVAGE_PREDICTOR = None
 CLEAVAGE_PREDICTOR_NO_FLANKING = None
+PRESENTATION_PREDICTOR = None
 
 
 def setup():
     global AFFINITY_PREDICTOR
     global CLEAVAGE_PREDICTOR
     global CLEAVAGE_PREDICTOR_NO_FLANKING
+    global PRESENTATION_PREDICTOR
     startup()
     AFFINITY_PREDICTOR = Class1AffinityPredictor.load(
         get_path("models_class1_pan", "models.combined"),
@@ -42,15 +44,18 @@ def setup():
     CLEAVAGE_PREDICTOR_NO_FLANKING = Class1ProcessingPredictor.load(
         get_path("models_class1_processing_variants", "models.selected.no_flank"),
         max_models=1)
+    PRESENTATION_PREDICTOR = Class1PresentationPredictor.load()
 
 
 def teardown():
     global AFFINITY_PREDICTOR
     global CLEAVAGE_PREDICTOR
     global CLEAVAGE_PREDICTOR_NO_FLANKING
+    global PRESENTATION_PREDICTOR
     AFFINITY_PREDICTOR = None
     CLEAVAGE_PREDICTOR = None
     CLEAVAGE_PREDICTOR_NO_FLANKING = None
+    PRESENTATION_PREDICTOR = None
     cleanup()
 
 
@@ -126,3 +131,92 @@ def test_basic():
             test_df["prediction1"], other_test_df["prediction1"], decimal=6)
         numpy.testing.assert_array_almost_equal(
             test_df["prediction2"], other_test_df["prediction2"], decimal=6)
+
+def test_downloaded_predictor():
+    global PRESENTATION_PREDICTOR
+
+    # Test sequence scanning
+    scan_results1 = PRESENTATION_PREDICTOR.predict_scan(
+        sequences=[
+            "MESLVPGFNEKTHVQLSLPVLQVRDVLVRGFGDSVEEVLSEARQHLKDGTCGLVEVEKGVLPQLE",
+            "QPYVFIKRSDARTAPHGHVMVELVAELEGIQYGRSGETLGVLVPHVGEIPVAYRKVLLRKNGNKG",
+            "AGGHSYGADLKSFDLGDELGTDPYEDFQENWNTKHSSGVTRELMRELNGGAYTRYVDNNFCGPDG",
+        ],
+        alleles=[
+            "HLA-A*02:01",
+            "HLA-A*03:01",
+            "HLA-B*57:01",
+            "HLA-B*44:02",
+            "HLA-C*02:01",
+            "HLA-C*07:01",
+        ])
+    print(scan_results1)
+
+    assert_equal(len(scan_results1), 3)
+    assert (scan_results1.affinity < 200).all()
+    assert (scan_results1.presentation_score > 0.7).all()
+
+    scan_results2 = PRESENTATION_PREDICTOR.predict_scan(
+        result="filtered",
+        comparison_value=500,
+        comparison_quantity="affinity",
+        sequences={
+            "seq1": "MESLVPGFNEKTHVQLSLPVLQVRDVLVRGFGDSVEEVLSEARQHLKDGTCGLVEVEKGVLPQLE",
+            "seq2": "QPYVFIKRSDARTAPHGHVMVELVAELEGIQYGRSGETLGVLVPHVGEIPVAYRKVLLRKNGNKG",
+            "seq3": "AGGHSYGADLKSFDLGDELGTDPYEDFQENWNTKHSSGVTRELMRELNGGAYTRYVDNNFCGPDG",
+        },
+        alleles=[
+            "HLA-A*02:01",
+            "HLA-A*03:01",
+            "HLA-B*57:01",
+            "HLA-B*44:02",
+            "HLA-C*02:01",
+            "HLA-C*07:01",
+        ])
+    print(scan_results2)
+
+    assert len(scan_results2) > 10
+    assert (scan_results2.affinity <= 500).all()
+
+    scan_results3 = PRESENTATION_PREDICTOR.predict_scan(
+        result="filtered",
+        comparison_value=0.9,
+        comparison_quantity="presentation_score",
+        sequences={
+            "seq1": "MESLVPGFNEKTHVQLSLPVLQVRDVLVRGFGDSVEEVLSEARQHLKDGTCGLVEVEKGVLPQLE",
+            "seq2": "QPYVFIKRSDARTAPHGHVMVELVAELEGIQYGRSGETLGVLVPHVGEIPVAYRKVLLRKNGNKG",
+            "seq3": "AGGHSYGADLKSFDLGDELGTDPYEDFQENWNTKHSSGVTRELMRELNGGAYTRYVDNNFCGPDG",
+        },
+        alleles=[
+            "HLA-A*02:01",
+            "HLA-A*03:01",
+            "HLA-B*57:01",
+            "HLA-B*44:02",
+            "HLA-C*02:01",
+            "HLA-C*07:01",
+        ])
+    print(scan_results3)
+
+    assert len(scan_results3) > 5, len(scan_results3)
+    assert (scan_results3.presentation_score >= 0.9).all()
+
+    scan_results4 = PRESENTATION_PREDICTOR.predict_scan(
+        result="all",
+        comparison_quantity="affinity",
+        sequences={
+            "seq1": "MESLVPGFNEKTHVQLSLPVLQVRDVLVRGFGDSVEEVLSEARQHLKDGTCGLVEVEKGVLPQLE",
+            "seq2": "QPYVFIKRSDARTAPHGHVMVELVAELEGIQYGRSGETLGVLVPHVGEIPVAYRKVLLRKNGNKG",
+            "seq3": "AGGHSYGADLKSFDLGDELGTDPYEDFQENWNTKHSSGVTRELMRELNGGAYTRYVDNNFCGPDG",
+        },
+        alleles=[
+            "HLA-A*02:01",
+            "HLA-A*03:01",
+            "HLA-B*57:01",
+            "HLA-B*44:02",
+            "HLA-C*02:01",
+            "HLA-C*07:01",
+        ])
+    print(scan_results4)
+
+    assert len(scan_results4) > 200, len(scan_results4)
+    assert_less(scan_results4.iloc[0].affinity, 100)

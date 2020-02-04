@@ -67,3 +67,4 @@ def test_basic():
         n_flanks=df.n_flank.values,
         c_flanks=df.c_flank.values)
     assert_array_equal(df.score.values, df3.score.values)
+
