@@ -217,6 +217,7 @@ class Class1PresentationPredictor(object):
                 model.intercept_ = row.intercept
                 model.coef_ = numpy.expand_dims(
                     row[self.model_inputs].values, axis=0)
+                model.classes_ = numpy.array([0, 1])
         else:
             model = self._models_cache[name]
         return model

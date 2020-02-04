@@ -114,7 +114,7 @@ do
     cp "$MODELS_DIR/train_data.csv.bz2" "models.${kind}/train_data.csv.bz2"
 
     # We are now calibrating all alleles.
-    # Previously had argument:  --allele $ALLELE_LIST \
+    # Previously had argument:  --allele $ALLELE_LIST
     time mhcflurry-calibrate-percentile-ranks \
         --models-dir models.${kind} \
         --match-amino-acid-distribution-data "$MODELS_DIR/train_data.csv.bz2" \
