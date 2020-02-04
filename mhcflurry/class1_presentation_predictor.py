@@ -129,7 +129,7 @@ class Class1PresentationPredictor(object):
                 raise ValueError("No processing predictor with flanks")
             predictor = self.processing_predictor_with_flanks
 
-        num_chunks = int(numpy.ceil(len(peptides) / PREDICT_CHUNK_SIZE))
+        num_chunks = int(numpy.ceil(float(len(peptides)) / PREDICT_CHUNK_SIZE))
         peptide_chunks = numpy.array_split(peptides, num_chunks)
         n_flank_chunks = numpy.array_split(n_flanks, num_chunks)
         c_flank_chunks = numpy.array_split(c_flanks, num_chunks)
@@ -222,9 +222,6 @@ class Class1PresentationPredictor(object):
             model = self._models_cache[name]
         return model
 
-    def predict_sequences(self, alleles, sequences):
-        raise NotImplementedError
-
     def predict(
             self,
             peptides,
@@ -241,7 +238,7 @@ class Class1PresentationPredictor(object):
             c_flanks=c_flanks,
             verbose=verbose).presentation_score.values
 
-    def predict_scan(
+    def predict_sequences(
             self,
             sequences,
             alleles,
@@ -275,8 +272,24 @@ class Class1PresentationPredictor(object):
                 ("sequence_%04d" % (i + 1), sequence)
                 for (i, sequence) in enumerate(sequences))
 
+        if isinstance(alleles, string_types):
+            alleles = [alleles]
+
         if not isinstance(alleles, dict):
-            alleles = dict((name, alleles) for name in sequences.keys())
+            if all([isinstance(item, string_types) for item in alleles]):
+                alleles = dict((name, alleles) for name in sequences.keys())
+            elif len(alleles) != len(sequences):
+                raise ValueError(
+                    "alleles must be (1) a string (a single allele), (2) a list of "
+                    "strings (a single genotype), (3) a list of list of strings ("
+                    "(multiple genotypes, where the total number of genotypes "
+                    "must equal the number of sequences), or (4) a dict (in which "
+                    "case the keys must match the sequences dict keys). Here "
+                    "it seemed like option (3) was being used, but the length "
+                    "of alleles (%d) did not match the length of sequences (%d)."
+                    % (len(alleles), len(sequences)))
+            else:
+                alleles = dict(zip(sequences.keys(), alleles))
 
         missing = [key for key in sequences if key not in alleles]
         if missing:

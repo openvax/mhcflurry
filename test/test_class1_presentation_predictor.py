@@ -136,7 +136,7 @@ def test_downloaded_predictor():
     global PRESENTATION_PREDICTOR
 
     # Test sequence scanning
-    scan_results1 = PRESENTATION_PREDICTOR.predict_scan(
+    scan_results1 = PRESENTATION_PREDICTOR.predict_sequences(
         sequences=[
             "MESLVPGFNEKTHVQLSLPVLQVRDVLVRGFGDSVEEVLSEARQHLKDGTCGLVEVEKGVLPQLE",
             "QPYVFIKRSDARTAPHGHVMVELVAELEGIQYGRSGETLGVLVPHVGEIPVAYRKVLLRKNGNKG",
@@ -156,7 +156,7 @@ def test_downloaded_predictor():
     assert (scan_results1.affinity < 200).all()
     assert (scan_results1.presentation_score > 0.7).all()
 
-    scan_results2 = PRESENTATION_PREDICTOR.predict_scan(
+    scan_results2 = PRESENTATION_PREDICTOR.predict_sequences(
         result="filtered",
         comparison_value=500,
         comparison_quantity="affinity",
@@ -178,7 +178,7 @@ def test_downloaded_predictor():
     assert len(scan_results2) > 10
     assert (scan_results2.affinity <= 500).all()
 
-    scan_results3 = PRESENTATION_PREDICTOR.predict_scan(
+    scan_results3 = PRESENTATION_PREDICTOR.predict_sequences(
         result="filtered",
         comparison_value=0.9,
         comparison_quantity="presentation_score",
@@ -200,7 +200,7 @@ def test_downloaded_predictor():
     assert len(scan_results3) > 5, len(scan_results3)
     assert (scan_results3.presentation_score >= 0.9).all()
 
-    scan_results4 = PRESENTATION_PREDICTOR.predict_scan(
+    scan_results4 = PRESENTATION_PREDICTOR.predict_sequences(
         result="all",
         comparison_quantity="affinity",
         sequences={
