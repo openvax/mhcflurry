@@ -131,10 +131,6 @@ def test_neural_network_input():
         results['peptide_length'], df.peptide.str.len().values)
 
 
-def test_big():
-    train_basic_network(num=100000)
-
-
 def test_small():
     train_basic_network(num=10000)
 
