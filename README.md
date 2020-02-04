@@ -8,7 +8,7 @@ prediction package with competitive accuracy and a fast and
 MHCflurry implements class I peptide/MHC binding affinity prediction. By default
 it supports 112 MHC alleles using ensembles of allele-specific models.
 Pan-allele predictors supporting virtually any MHC allele of known sequence
-are available for testing (see below). MHCflurry runs on Python 2.7 and 3.4+ using the
+are available for testing (see below). MHCflurry runs on Python 3.4+ using the
 [keras](https://keras.io) neural network library.
 It exposes [command-line](http://openvax.github.io/mhcflurry/commandline_tutorial.html)
 and [Python library](http://openvax.github.io/mhcflurry/python_tutorial.html)

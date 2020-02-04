@@ -422,7 +422,7 @@ class Class1AffinityPredictor(object):
                 numpy.testing.assert_array_almost_equal(
                     series.index.values,
                     percent_ranks_df.index.values)
-                percent_ranks_df[allele] = series
+                percent_ranks_df[allele] = series.values
             percent_ranks_path = join(models_dir, "percent_ranks.csv")
             percent_ranks_df.to_csv(
                 percent_ranks_path,
