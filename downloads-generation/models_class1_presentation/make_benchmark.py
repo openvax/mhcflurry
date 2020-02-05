@@ -37,7 +37,7 @@ parser.add_argument(
     help="Exclude given PMID")
 parser.add_argument(
     "--only-pmid",
-    nargs="+",
+    nargs="*",
     default=[],
     help="Include only the given PMID")
 parser.add_argument(
@@ -101,6 +101,8 @@ def run():
 
     allele_to_excluded_peptides = collections.defaultdict(set)
     for train_dataset in args.exclude_train_data:
+        if not train_dataset:
+            continue
         print("Excluding hits from", train_dataset)
         train_df = pandas.read_csv(train_dataset)
         for (allele, peptides) in train_df.groupby("allele").peptide.unique().iteritems():
