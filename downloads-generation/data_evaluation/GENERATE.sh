@@ -110,7 +110,7 @@ mkdir commands
 for kind in train_excluded all
 do
     ### AFFINITY PREDICTOR VARIANT: MONOALLELIC
-    if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.predictions.$kind.csv.bz2" ]
+    if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.no_additional_ms.$kind.csv.bz2" ]
     then
         echo "Reusing existing monoallelic benchmark predictions"
     else
@@ -123,7 +123,7 @@ do
             --no-affinity-percentile \
             --out "$(pwd)/benchmark.monoallelic.no_additional_ms.$kind.csv" \
             --no-throw >> commands/monoallelic.$kind.sh
-        echo bzip2 -f "$(pwd)/benchmark.monoallelic.predictions.$kind.csv" >> commands/monoallelic.$kind.sh
+        echo bzip2 -f "$(pwd)/benchmark.monoallelic.no_additional_ms.$kind.csv" >> commands/monoallelic.$kind.sh
     fi
 
 
