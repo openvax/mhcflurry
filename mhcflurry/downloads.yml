@@ -45,7 +45,7 @@ releases:
               default: false
 
             - name: data_evaluation
-              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_evaluation.20200127.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_evaluation.20200209.tar.bz2
               default: false
 
             - name: data_mass_spec_benchmark
