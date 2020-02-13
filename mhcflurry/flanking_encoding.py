@@ -109,7 +109,8 @@ class FlankingEncoding(object):
                 "total peptides with this length." % (
                     error_df.iloc[0].peptide,
                     len(error_df.iloc[0].peptide),
-                    len(error_df)))
+                    len(error_df)),
+                supported_peptide_lengths=(1, peptide_max_length + 1))
 
         if n_flank_length > 0:
             n_flanks = df.n_flank.str.pad(
