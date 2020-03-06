@@ -69,7 +69,7 @@ then
     python generate_hyperparameters.py hyperparameters.production.yaml compact_peptide > hyperparameters.compact_peptide.yaml
 fi
 
-VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm no_additional_ms no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only )
+VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm 500nm no_additional_ms no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only )
 
 for kind in "${VARIANTS[@]}"
 do
@@ -123,6 +123,16 @@ do
         python reassign_mass_spec_training_data.py \
             "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
             --set-measurement-value 0 \
+            --out-csv "$TRAINING_DATA"
+        HYPERPARAMETERS=hyperparameters.production.yaml
+    fi
+
+    if [ "$kind" == "500nm" ]
+    then
+        TRAINING_DATA="train_data.$kind.csv"
+        python reassign_mass_spec_training_data.py \
+            "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+            --set-measurement-value 500 \
             --out-csv "$TRAINING_DATA"
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
