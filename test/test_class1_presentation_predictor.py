@@ -158,7 +158,7 @@ def test_downloaded_predictor():
 
     scan_results2 = PRESENTATION_PREDICTOR.predict_sequences(
         result="filtered",
-        comparison_value=500,
+        filter_value=500,
         comparison_quantity="affinity",
         sequences={
             "seq1": "MESLVPGFNEKTHVQLSLPVLQVRDVLVRGFGDSVEEVLSEARQHLKDGTCGLVEVEKGVLPQLE",
@@ -180,7 +180,7 @@ def test_downloaded_predictor():
 
     scan_results3 = PRESENTATION_PREDICTOR.predict_sequences(
         result="filtered",
-        comparison_value=0.9,
+        filter_value=0.9,
         comparison_quantity="presentation_score",
         sequences={
             "seq1": "MESLVPGFNEKTHVQLSLPVLQVRDVLVRGFGDSVEEVLSEARQHLKDGTCGLVEVEKGVLPQLE",

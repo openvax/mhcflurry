@@ -1,14 +1,12 @@
 from __future__ import print_function
 
-from os.path import join, exists, abspath
-from os import mkdir, environ
+from os.path import join, exists
+from os import mkdir
 from socket import gethostname
 from getpass import getuser
 
 import time
 import collections
-import json
-import hashlib
 import logging
 from six import string_types
 
@@ -17,7 +15,6 @@ import pandas
 import sklearn
 import sklearn.linear_model
 
-import mhcnames
 
 try:
     import tqdm
@@ -30,9 +27,7 @@ from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .encodable_sequences import EncodableSequences
 from .regression_target import from_ic50, to_ic50
-from .multiple_allele_encoding import MultipleAlleleEncoding
 from .downloads import get_default_class1_presentation_models_dir
-from .common import load_weights
 
 
 MAX_ALLELES_PER_SAMPLE = 6
@@ -41,6 +36,12 @@ PREDICT_CHUNK_SIZE = 100000  # currently used only for cleavage prediction
 
 
 class Class1PresentationPredictor(object):
+    """
+    A logistic regression model over predicted binding affinity (BA) and antigen
+    processing (AP) score.
+
+    See load() and predict() methods for basic usage.
+    """
     model_inputs = ["affinity_score", "processing_score"]
 
     def __init__(
@@ -61,10 +62,16 @@ class Class1PresentationPredictor(object):
 
     @property
     def supported_alleles(self):
+        """
+        List of alleles supported by the underlying Class1AffinityPredictor
+        """
         return self.affinity_predictor.supported_alleles
 
     @property
     def supported_peptide_lengths(self):
+        """
+        (min, max) of supported peptide lengths, inclusive.
+        """
         return self.affinity_predictor.supported_peptide_lengths
 
     def predict_affinity(
@@ -75,6 +82,21 @@ class Class1PresentationPredictor(object):
             include_affinity_percentile=False,
             verbose=1,
             throw=True):
+        """
+
+        Parameters
+        ----------
+        peptides
+        experiment_names
+        alleles
+        include_affinity_percentile
+        verbose
+        throw
+
+        Returns
+        -------
+
+        """
         df = pandas.DataFrame({
             "peptide": numpy.array(peptides, copy=False),
             "experiment_name": numpy.array(experiment_names, copy=False),
@@ -242,14 +264,62 @@ class Class1PresentationPredictor(object):
             self,
             sequences,
             alleles,
-            result="best",  # or "all" or "filtered"
+            result="best",
             comparison_quantity="presentation_score",
-            comparison_value=None,
+            filter_value=None,
             peptide_lengths=[8, 9, 10, 11],
             use_flanks=True,
             include_affinity_percentile=False,
             verbose=1,
             throw=True):
+        """
+        Predict across protein sequences.
+
+        Parameters
+        ----------
+        sequences : str, list of string, or string -> string dict
+            Protein sequences. If a dict is given, the keys are arbitrary (
+            e.g. protein names), and the values are the amino acid sequences.
+        alleles : str, list of string, list of list of string, or string -> string dict
+            MHC I alleles. Can be: (1) a string (a single allele), (2) a list of
+            strings (a single genotype), (3) a list of list of strings
+            (multiple genotypes, where the total number of genotypes must equal
+            the number of sequences), or (4) a dict (in which case the keys must
+            match the sequences dict keys).
+        result : string
+            One of:
+             - "best": return the strongest peptide for each sequence
+             - "all": return predictions for all peptides
+             - "filtered": return predictions stronger where comparison_quantity
+               is stronger than filter_value.
+        comparison_quantity : string
+            One of "presentation_score", "processing_score", or "affinity".
+            Quantity to use to rank (if result is "best") or filter (if result
+            is "filtered") results.
+        filter_value : float
+            Threshold value to use, only relevant when result is "filtered".
+            If comparison_quantity is "affinity", then all results less than
+            (i.e. tighter than) the specified nM affinity are retained. If it's
+            "presentation_score" or "processing_score" then results greater than
+            the indicated filter_value are retained.
+        peptide_lengths : list of int
+            Peptide lengths to predict for.
+        use_flanks : bool
+            Whether to include flanking sequences when running the AP predictor
+            (for better cleavage prediction).
+        include_affinity_percentile : bool
+            Whether to include affinity percentile ranks in output.
+        verbose : int
+            Set to 0 for quiet mode.
+        throw : boolean
+            Whether to throw exceptions (vs. log warnings) on invalid inputs.
+
+        Returns
+        -------
+        pandas.DataFrame with columns:
+            peptide, n_flank, c_flank, sequence_name, affinity, best_allele,
+            processing_score, presentation_score
+        """
 
         processing_predictor = self.processing_predictor_with_flanks
         if not use_flanks or processing_predictor is None:
@@ -339,11 +409,11 @@ class Class1PresentationPredictor(object):
         elif result == "filtered":
             if comparison_is_score:
                 result_df = result_df.loc[
-                    result_df[comparison_quantity] >= comparison_value
+                    result_df[comparison_quantity] >= filter_value
                 ]
             else:
                 result_df = result_df.loc[
-                    result_df[comparison_quantity] <= comparison_value
+                    result_df[comparison_quantity] <= filter_value
                 ]
         elif result == "all":
             pass
