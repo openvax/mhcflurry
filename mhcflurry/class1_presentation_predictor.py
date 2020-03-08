@@ -252,6 +252,22 @@ class Class1PresentationPredictor(object):
             n_flanks=None,
             c_flanks=None,
             verbose=1):
+        """
+        Predict presentation scores across a set of peptides.
+
+        Parameters
+        ----------
+        peptides : list of string, or EncodableSequences
+        alleles : list of string or string -> string dict
+        experiment_names :
+        n_flanks
+        c_flanks
+        verbose
+
+        Returns
+        -------
+
+        """
         return self.predict_to_dataframe(
             peptides=peptides,
             alleles=alleles,
@@ -273,7 +289,7 @@ class Class1PresentationPredictor(object):
             verbose=1,
             throw=True):
         """
-        Predict across protein sequences.
+        Predict presentation across protein sequences.
 
         Parameters
         ----------
@@ -439,6 +455,23 @@ class Class1PresentationPredictor(object):
             include_affinity_percentile=False,
             verbose=1,
             throw=True):
+        """
+
+        Parameters
+        ----------
+        peptides
+        alleles
+        experiment_names
+        n_flanks
+        c_flanks
+        include_affinity_percentile
+        verbose
+        throw
+
+        Returns
+        -------
+
+        """
 
         if isinstance(peptides, string_types):
             raise TypeError("peptides must be a list not a string")

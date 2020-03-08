@@ -143,7 +143,7 @@ do
         echo bzip2 -f "$(pwd)/benchmark.multiallelic.production.$kind.csv" >> commands/multiallelic.production.$kind.sh
     fi
 
-    for variant in no_additional_ms compact_peptide affinity_only no_pretrain single_hidden_no_pretrain
+    for variant in no_additional_ms compact_peptide affinity_only no_pretrain single_hidden_no_pretrain 500nm
     do
         if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.${variant}.$kind.csv.bz2" ]
         then
