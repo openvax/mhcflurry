@@ -141,11 +141,20 @@ class EncodableSequences(object):
             encodings is given by available_vector_encodings().
         alignment_method : string
             One of "pad_middle" or "left_pad_right_pad"
-        left_edge : int, size of fixed-position left side
+        left_edge : int
+            Size of fixed-position left side.
             Only relevant for pad_middle alignment method
-        right_edge : int, size of the fixed-position right side
+        right_edge : int
+            Size of the fixed-position right side.
             Only relevant for pad_middle alignment method
-        max_length : maximum supported peptide length
+        max_length : int
+            Maximum supported peptide length
+        trim : bool
+            If True, longer sequences will be trimmed to fit the maximum
+            supported length. Not supported for all alignment methods.
+        allow_unsupported_amino_acids : bool
+            If True, non-canonical amino acids will be replaced with the X
+            character before encoding.
 
         Returns
         -------
@@ -237,11 +246,20 @@ class EncodableSequences(object):
         sequences : list of string
         alignment_method : string
             One of "pad_middle" or "left_pad_right_pad"
-        left_edge : int, size of fixed-position left side
+        left_edge : int
+            Size of fixed-position left side.
             Only relevant for pad_middle alignment method
-        right_edge : int, size of the fixed-position right side
+        right_edge : int
+            Size of the fixed-position right side.
             Only relevant for pad_middle alignment method
-        max_length : maximum supported peptide length
+        max_length : int
+            maximum supported peptide length
+        trim : bool
+            If True, longer sequences will be trimmed to fit the maximum
+            supported length. Not supported for all alignment methods.
+        allow_unsupported_amino_acids : bool
+            If True, non-canonical amino acids will be replaced with the X
+            character before encoding.
 
         Returns
         -------

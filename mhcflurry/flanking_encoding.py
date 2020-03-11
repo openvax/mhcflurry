@@ -17,12 +17,33 @@ import pandas
 EncodingResult =  namedtuple(
     "EncodingResult", ["array", "peptide_lengths"])
 
+
 class FlankingEncoding(object):
     """
+    Encode peptides and optionally their N- and C-flanking sequences into fixed
+    size numerical matrices. Similar to EncodableSequences but with support
+    for flanking sequences and the encoding scheme used by the processing
+    predictor.
+
+    Instances of this class have an immutable list of peptides with
+    flanking sequences. Encodings are cached in the instances for faster
+    performance when the same set of peptides needs to encoded more than once.
     """
     unknown_character = "X"
 
     def __init__(self, peptides, n_flanks, c_flanks):
+        """
+        Constructor. Sequences of any lengths can be passed.
+
+        Parameters
+        ----------
+        peptides : list of string
+            Peptide sequences
+        n_flanks : list of string [same length as peptides]
+            Upstream sequences
+        c_flanks : list of string [same length as peptides]
+            Downstream sequences
+        """
         self.dataframe = pandas.DataFrame({
             "peptide": peptides,
             "n_flank": n_flanks,
@@ -31,6 +52,9 @@ class FlankingEncoding(object):
         self.encoding_cache = {}
 
     def __len__(self):
+        """
+        Number of peptides.
+        """
         return len(self.dataframe)
 
     def vector_encode(
@@ -41,35 +65,31 @@ class FlankingEncoding(object):
             c_flank_length,
             allow_unsupported_amino_acids=True):
         """
-        Encode variable-length sequences to a fixed-size matrix. Amino acids
-        are encoded as specified by the vector_encoding_name argument.
-
-        See `sequences_to_fixed_length_index_encoded_array` for details.
-
-        See also: variable_length_to_fixed_length_categorical.
+        Encode variable-length sequences to a fixed-size matrix.
 
         Parameters
         ----------
         vector_encoding_name : string
-            How to represent amino acids.
-            One of "BLOSUM62", "one-hot", etc. Full list of supported vector
-            encodings is given by available_vector_encodings().
-        alignment_method : string
-            One of "pad_middle" or "left_pad_right_pad"
-        left_edge : int, size of fixed-position left side
-            Only relevant for pad_middle alignment method
-        right_edge : int, size of the fixed-position right side
-            Only relevant for pad_middle alignment method
-        max_length : maximum supported peptide length
+            How to represent amino acids. One of "BLOSUM62", "one-hot", etc.
+            See `amino_acid.available_vector_encodings()`.
+        peptide_max_length : int
+            Maximum supported peptide length.
+        n_flank_length : int
+            Maximum supported N-flank length
+        c_flank_length : int
+            Maximum supported C-flank length
+        allow_unsupported_amino_acids : bool
+            If True, non-canonical amino acids will be replaced with the X
+            character before encoding.
 
         Returns
         -------
-        numpy.array with shape (num sequences, encoded length, m)
+        numpy.array with shape (num sequences, length, m)
 
         where
+            - num sequences is number of peptides, i.e. len(self)
+            - length is peptide_max_length + n_flank_length + c_flank_length
             - m is the vector encoding length (usually 21).
-            - encoded length is max_length if alignment_method is pad_middle;
-              3 * max_length if it's left_pad_right_pad.
         """
         cache_key = (
             "vector_encode",
@@ -91,13 +111,29 @@ class FlankingEncoding(object):
 
     @staticmethod
     def encode(
-        vector_encoding_name,
-        df,
-        peptide_max_length,
-        n_flank_length,
-        c_flank_length,
-        allow_unsupported_amino_acids=False):
+            vector_encoding_name,
+            df,
+            peptide_max_length,
+            n_flank_length,
+            c_flank_length,
+            allow_unsupported_amino_acids=False):
         """
+        Encode variable-length sequences to a fixed-size matrix.
+
+        Helper function. Users should use `vector_encode`.
+
+        Parameters
+        ----------
+        vector_encoding_name : string
+        df : pandas.DataFrame
+        peptide_max_length : int
+        n_flank_length : int
+        c_flank_length : int
+        allow_unsupported_amino_acids : bool
+
+        Returns
+        -------
+        numpy.array
         """
         error_df = df.loc[
             (df.peptide.str.len() > peptide_max_length) |

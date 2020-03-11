@@ -210,6 +210,9 @@ def load_weights(filename):
 
 
 class NumpyJSONEncoder(json.JSONEncoder):
+    """
+    JSON encoder (used with json module) that can handle numpy arrays.
+    """
     def default(self, obj):
         if isinstance(obj, (
                 numpy.int_, numpy.intc, numpy.intp, numpy.int8,

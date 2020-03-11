@@ -1,5 +1,5 @@
 """
-Antigen processing models
+Antigen processing neural network implementation
 """
 
 from __future__ import print_function
@@ -7,7 +7,6 @@ from __future__ import print_function
 import time
 import collections
 import numpy
-import pandas
 
 from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
@@ -15,6 +14,9 @@ from .flanking_encoding import FlankingEncoding
 
 
 class Class1ProcessingNeuralNetwork(object):
+    """
+    A neural network for antigen processing prediction
+    """
     network_hyperparameter_defaults = HyperparameterDefaults(
         amino_acid_encoding="BLOSUM62",
         peptide_max_length=15,
@@ -82,6 +84,16 @@ class Class1ProcessingNeuralNetwork(object):
 
     @property
     def sequence_lengths(self):
+        """
+        Supported maximum sequence lengths
+
+        Returns
+        -------
+        dict of string -> int
+
+        Keys are "peptide", "n_flank", "c_flank". Values give the maximum
+        supported sequence length.
+        """
         return {
             "peptide": self.hyperparameters['peptide_max_length'],
             "n_flank": self.hyperparameters['n_flank_length'],
@@ -119,18 +131,28 @@ class Class1ProcessingNeuralNetwork(object):
             progress_preamble="",
             progress_print_interval=5.0):
         """
-
+        Fit the neural network.
 
         Parameters
         ----------
-        peptides
-        n_flanks
-        c_flanks
-        targets : array of {0, 1} indicating hits (1) or decoys (0)
-
-        Returns
-        -------
-
+        sequences : FlankingEncoding
+            Peptides and upstream/downstream flanking sequences
+        targets : list of float
+            1 indicates hit, 0 indicates decoy
+        sample_weights : list of float
+            If not specified all samples have equal weight.
+        shuffle_permutation : list of int
+            Permutation (integer list) of same length as peptides and affinities
+            If None, then a random permutation will be generated.
+        verbose : int
+            Keras verbosity level
+        progress_callback : function
+            No-argument function to call after each epoch.
+        progress_preamble : string
+            Optional string of information to include in each progress update
+        progress_print_interval : float
+            How often (in seconds) to print progress update. Set to None to
+            disable.
         """
         x_dict = self.network_input(sequences)
 
@@ -236,9 +258,35 @@ class Class1ProcessingNeuralNetwork(object):
     def predict(
             self,
             peptides,
-            n_flanks,
-            c_flanks,
+            n_flanks=None,
+            c_flanks=None,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+        """
+        Predict antigen processing.
+
+        Parameters
+        ----------
+        peptides : list of string
+            Peptide sequences
+        n_flanks : list of string
+            Upstream sequence before each peptide
+        c_flanks : list of string
+            Downstream sequence after each peptide
+        batch_size : int
+            Prediction keras batch size.
+
+        Returns
+        -------
+        numpy.array
+
+        Processing scores. Range is 0-1, higher indicates more favorable
+        processing.
+        """
+        if n_flanks is None:
+            n_flanks = [""] * len(peptides)
+        if c_flanks is None:
+            c_flanks = [""] * len(peptides)
+
         sequences = FlankingEncoding(
             peptides=peptides, n_flanks=n_flanks, c_flanks=c_flanks)
         return self.predict_encoded(sequences=sequences, batch_size=batch_size)
@@ -248,6 +296,18 @@ class Class1ProcessingNeuralNetwork(object):
             sequences,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
         """
+        Predict antigen processing.
+
+        Parameters
+        ----------
+        sequences : FlankingEncoding
+            Peptides and flanking sequences
+        batch_size : int
+            Prediction keras batch size.
+
+        Returns
+        -------
+        numpy.array
         """
         x_dict = self.network_input(sequences)
         raw_predictions = self.network().predict(
@@ -262,7 +322,8 @@ class Class1ProcessingNeuralNetwork(object):
 
         Parameters
         ----------
-        peptides : EncodableSequences or list of string
+        sequences : FlankingEncoding
+            Peptides and flanking sequences
 
         Returns
         -------
@@ -295,14 +356,13 @@ class Class1ProcessingNeuralNetwork(object):
             dropout_rate,
             post_convolutional_dense_layer_sizes):
         """
-        Helper function to make a keras network
+        Helper function to make a keras network given hyperparameters.
         """
 
         # We import keras here to avoid tensorflow debug output, etc. unless we
         # are actually about to use Keras.
 
         from keras.layers import Input
-        import keras.layers.pooling
         import keras.initializers
         from keras.layers.core import Dense, Flatten, Dropout
         from keras.layers.merge import Concatenate
@@ -597,8 +657,6 @@ class Class1ProcessingNeuralNetwork(object):
         config : dict
         weights : list of array, optional
             Network weights to restore
-        weights_loader : callable, optional
-            Function to call (no arguments) to load weights when needed
 
         Returns
         -------

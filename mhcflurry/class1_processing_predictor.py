@@ -10,7 +10,6 @@ import json
 import hashlib
 import logging
 import collections
-from six import string_types
 
 import numpy
 import pandas
@@ -24,11 +23,32 @@ from .common import save_weights, load_weights, NumpyJSONEncoder
 
 
 class Class1ProcessingPredictor(object):
+    """
+    User-facing interface to antigen processing prediction.
+
+    Delegates to an ensemble of Class1ProcessingNeuralNetwork instances.
+    """
     def __init__(
             self,
             models,
             manifest_df=None,
             metadata_dataframes=None):
+        """
+        Instantiate a new Class1ProcessingPredictor
+
+        Users will generally call load() to restore a saved predictor rather
+        than using this constructor.
+
+        Parameters
+        ----------
+        models : list of Class1ProcessingNeuralNetwork
+            Neural networks in the ensemble.
+        manifest_df : pandas.DataFrame
+            Manifest dataframe. If not specified a new one will be created when
+            needed.
+        metadata_dataframes : dict of string -> pandas.DataFrame
+            Arbitrary metadata associated with this predictor
+        """
         self.models = models
         self._manifest_df = manifest_df
         self.metadata_dataframes = (
@@ -36,6 +56,22 @@ class Class1ProcessingPredictor(object):
 
     @property
     def sequence_lengths(self):
+        """
+        Supported maximum sequence lengths.
+
+        Passing a peptide greater than the maximum supported length results
+        in an error.
+
+        Passing an N- or C-flank sequence greater than the maximum supported
+        length results in some part of it being ignored.
+
+        Returns
+        -------
+        dict of string -> int
+
+        Keys are "peptide", "n_flank", "c_flank". Values give the maximum
+        supported sequence length.
+        """
         df = pandas.DataFrame([model.sequence_lengths for model in self.models])
         return {
             "peptide": df.peptide.min(),  # min: anything greater is error
@@ -44,6 +80,19 @@ class Class1ProcessingPredictor(object):
         }
 
     def add_models(self, models):
+        """
+        Add models to the ensemble (in-place).
+
+        Parameters
+        ----------
+        models : list of Class1ProcessingNeuralNetwork
+
+        Returns
+        -------
+        list of string
+
+        Names of the new models.
+        """
         new_model_names = []
         original_manifest = self.manifest_df
         new_manifest_rows = []
@@ -125,10 +174,30 @@ class Class1ProcessingPredictor(object):
     def predict(
             self,
             peptides,
-            n_flanks,
-            c_flanks,
+            n_flanks=None,
+            c_flanks=None,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+        """
+        Predict antigen processing.
 
+        Parameters
+        ----------
+        peptides : list of string
+            Peptide sequences
+        n_flanks : list of string
+            Upstream sequence before each peptide
+        c_flanks : list of string
+            Downstream sequence after each peptide
+        batch_size : int
+            Prediction keras batch size.
+
+        Returns
+        -------
+        numpy.array
+
+        Processing scores. Range is 0-1, higher indicates more favorable
+        processing.
+        """
         return self.predict_to_dataframe(
             peptides=peptides,
             n_flanks=n_flanks,
@@ -138,9 +207,26 @@ class Class1ProcessingPredictor(object):
     def predict_to_dataframe(
             self,
             peptides,
-            n_flanks,
-            c_flanks,
+            n_flanks=None,
+            c_flanks=None,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+        """
+        Predict antigen processing.
+
+        See `predict` method for parameter descriptions.
+
+        Returns
+        -------
+        pandas.DataFrame
+
+        Processing predictions are in the "score" column. Also includes
+        peptides and flanking sequences.
+        """
+
+        if n_flanks is None:
+            n_flanks = [""] * len(peptides)
+        if c_flanks is None:
+            c_flanks = [""] * len(peptides)
 
         sequences = FlankingEncoding(
             peptides=peptides, n_flanks=n_flanks, c_flanks=c_flanks)
@@ -149,6 +235,20 @@ class Class1ProcessingPredictor(object):
 
     def predict_to_dataframe_encoded(
             self, sequences, batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+        """
+        Predict antigen processing.
+
+        See `predict` method for more information.
+
+        Parameters
+        ----------
+        sequences : FlankingEncoding
+        batch_size : int
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
 
         score_array = []
 

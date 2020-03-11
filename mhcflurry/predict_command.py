@@ -1,19 +1,22 @@
 '''
-Run MHCflurry predictor on specified peptide/allele pairs.
+Run MHCflurry predictor on specified peptides.
+
+By default, the presentation predictor is used, and predictions for
+MHC I binding affinity, antigen processing, and the composite presentation score
+are returned. If you just want binding affinity predictions, pass
+--affinity-only.
 
 Examples:
 
-Write a CSV file containing the contents of INPUT.csv plus an
-additional column giving MHCflurry binding affinity predictions:
+Write a CSV file containing the contents of INPUT.csv plus additional columns
+giving MHCflurry predictions:
 
     $ mhcflurry-predict INPUT.csv --out RESULT.csv
 
-The input CSV file is expected to contain columns ``allele`` and ``peptide``.
-The predictions are written to a column called ``mhcflurry_prediction``.
-These default column names may be changed with the `--allele-column`,
-`--peptide-column`, and `--prediction-column` options.
+The input CSV file is expected to contain columns "allele", "peptide", and,
+optionally, "n_flank", and "c_flank".
 
-If `--out` is not specified, results are written to standard out.
+If `--out` is not specified, results are written to stdout.
 
 You can also run on alleles and peptides specified on the commandline, in
 which case predictions are written for all combinations of alleles and
@@ -35,8 +38,7 @@ import os
 
 import pandas
 
-from .common import set_keras_backend
-from .downloads import get_default_class1_models_dir, get_default_class1_presentation_models_dir
+from .downloads import get_default_class1_presentation_models_dir
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
 from .version import __version__
@@ -148,8 +150,10 @@ model_args.add_argument(
     "--models",
     metavar="DIR",
     default=None,
-    help="Directory containing models. "
-    "Default: %s" % get_default_class1_models_dir(test_exists=False))
+    help="Directory containing models. Either a binding affinity predictor or "
+    "a presentation predictor can be used. "
+    "Default: %s" % get_default_class1_presentation_models_dir(
+        test_exists=False))
 model_args.add_argument(
     "--affinity-only",
     action="store_true",
@@ -160,6 +164,7 @@ model_args.add_argument(
     action="store_true",
     default=False,
     help="Do not use flanking sequence information even when available")
+
 
 def run(argv=sys.argv[1:]):
     logging.getLogger('tensorflow').disabled = True
@@ -195,8 +200,6 @@ def run(argv=sys.argv[1:]):
                 "--affinity-only. Specify this argument to silence this warning.")
             args.affinity_only = True
 
-    # The following two are informative commands that can come 
-    # if a wrapper would like to incorporate input validation.
     if args.list_supported_alleles:
         print("\n".join(predictor.supported_alleles))
         return

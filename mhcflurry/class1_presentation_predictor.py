@@ -40,6 +40,11 @@ class Class1PresentationPredictor(object):
     A logistic regression model over predicted binding affinity (BA) and antigen
     processing (AP) score.
 
+    Instances of this class delegate to Class1AffinityPredictor and
+    Class1ProcessingPredictor instances to generate BA and AP predictions.
+    These predictions are combined using a logistic regression model to give
+    a "presentation score" prediction.
+
     See load() and predict() methods for basic usage.
     """
     model_inputs = ["affinity_score", "processing_score"]
@@ -77,65 +82,124 @@ class Class1PresentationPredictor(object):
     def predict_affinity(
             self,
             peptides,
-            experiment_names,
             alleles,
+            experiment_names=None,
             include_affinity_percentile=False,
             verbose=1,
             throw=True):
         """
+        Predict binding affinities.
 
         Parameters
         ----------
-        peptides
-        experiment_names
-        alleles
-        include_affinity_percentile
-        verbose
-        throw
+        peptides : list of string
+        experiment_names : list of string [same length as peptides]
+            Sample names corresponding to each peptide. These are used to
+            lookup the alleles for each peptide in the alleles dict.
+        alleles : dict of string -> list of string
+            Keys are experiment names, values are the alleles for that sample
+        include_affinity_percentile : bool
+            Whether to include affinity percentile ranks
+        verbose : int
+            Set to 0 for quiet.
+        throw : verbose
+            Whether to throw exception (vs. just log a warning) on invalid
+            peptides, etc.
 
         Returns
         -------
-
+        pandas.DataFrame : predictions
         """
         df = pandas.DataFrame({
             "peptide": numpy.array(peptides, copy=False),
-            "experiment_name": numpy.array(experiment_names, copy=False),
         })
+        if experiment_names is None:
+            peptides = EncodableSequences.create(peptides)
+            all_alleles = set()
+            for lst in alleles.values():
+                all_alleles.update(lst)
 
-        iterator = df.groupby("experiment_name")
-        if verbose > 0:
-            print("Predicting affinities.")
-            if tqdm is not None:
-                iterator = tqdm.tqdm(
-                    iterator, total=df.experiment_name.nunique())
+            iterator = sorted(all_alleles)
 
-        for (experiment, sub_df) in iterator:
-            predictions_df = pandas.DataFrame(index=sub_df.index)
-            experiment_peptides = EncodableSequences.create(sub_df.peptide.values)
-            for allele in alleles[experiment]:
+            if verbose > 0:
+                print("Predicting affinities.")
+                if tqdm is not None:
+                    iterator = tqdm.tqdm(iterator, total=len(all_alleles))
+
+            predictions_df = pandas.DataFrame(index=df.index)
+            for allele in iterator:
                 predictions_df[allele] = self.affinity_predictor.predict(
-                    peptides=experiment_peptides,
+                    peptides=peptides,
                     allele=allele,
                     model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
                     throw=throw)
-            df.loc[
-                sub_df.index, "affinity"
-            ] = predictions_df.min(1).values
-            df.loc[
-                sub_df.index, "best_allele"
-            ] = predictions_df.idxmin(1).values
 
-            if include_affinity_percentile:
-                df.loc[sub_df.index, "affinity_percentile"] = (
-                    self.affinity_predictor.percentile_ranks(
-                        df.loc[sub_df.index, "affinity"].values,
-                        alleles=df.loc[sub_df.index, "best_allele"].values,
-                        throw=False))
+            dfs = []
+            for (experiment_name, experiment_alleles) in alleles.items():
+                new_df = df.copy()
+                new_df["experiment_name"] = experiment_name
+                new_df["affinity"] = predictions_df[
+                    experiment_alleles
+                ].min(1).values
+                new_df["best_allele"] = predictions_df[
+                    experiment_alleles
+                ].idxmin(1).values
 
-        return df
+            result_df = pandas.concat(dfs, ignore_index=True)
+        else:
+            df["experiment_name"] = numpy.array(experiment_names, copy=False)
+
+            iterator = df.groupby("experiment_name")
+            if verbose > 0:
+                print("Predicting affinities.")
+                if tqdm is not None:
+                    iterator = tqdm.tqdm(
+                        iterator, total=df.experiment_name.nunique())
+
+            for (experiment, sub_df) in iterator:
+                predictions_df = pandas.DataFrame(index=sub_df.index)
+                experiment_peptides = EncodableSequences.create(sub_df.peptide.values)
+                for allele in alleles[experiment]:
+                    predictions_df[allele] = self.affinity_predictor.predict(
+                        peptides=experiment_peptides,
+                        allele=allele,
+                        model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
+                        throw=throw)
+                df.loc[
+                    sub_df.index, "affinity"
+                ] = predictions_df.min(1).values
+                df.loc[
+                    sub_df.index, "best_allele"
+                ] = predictions_df.idxmin(1).values
+
+            result_df = df
+
+        if include_affinity_percentile:
+            result_df["affinity_percentile"] = (
+                self.affinity_predictor.percentile_ranks(
+                    df.affinity.values,
+                    alleles=df.best_alleles.values,
+                    throw=False))
+
+        return result_df
 
     def predict_processing(
             self, peptides, n_flanks=None, c_flanks=None, verbose=1):
+        """
+        Predict antigen processing scores for individual peptides, optionally
+        including flanking sequences for better cleavage prediction.
+
+        Parameters
+        ----------
+        peptides : list of string
+        n_flanks : list of string [same length as peptides]
+        c_flanks : list of string [same length as peptides]
+        verbose  : int
+
+        Returns
+        -------
+        numpy.array : Antigen processing scores for each peptide
+        """
 
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
@@ -181,11 +245,26 @@ class Class1PresentationPredictor(object):
             n_flanks=None,
             c_flanks=None,
             verbose=1):
+        """
+        Fit the presentation score logistic regression model.
+
+        Parameters
+        ----------
+        targets : list of int/float
+            1 indicates hit, 0 indicates decoy
+        peptides : list of string [same length as targets]
+        experiment_names : list of string [same length as targets]
+        alleles : dict of string -> list of string
+            Keys are experiment names, values are the alleles for that sample
+        n_flanks : list of string [same length as targets]
+        c_flanks : list of string [same length as targets]
+        verbose : int
+        """
 
         df = self.predict_affinity(
             peptides=peptides,
-            experiment_names=experiment_names,
             alleles=alleles,
+            experiment_names=experiment_names,
             verbose=verbose)
         df["affinity_score"] = from_ic50(df.affinity)
         df["target"] = numpy.array(targets, copy=False)
@@ -232,6 +311,20 @@ class Class1PresentationPredictor(object):
             self._models_cache[model_name] = model
 
     def get_model(self, name=None):
+        """
+        Load or instantiate a new logistic regression model. Private helper
+        method.
+
+        Parameters
+        ----------
+        name : string
+            If None (the default), an un-fit LR model is returned. Otherwise the
+            weights are loaded for the specified model.
+
+        Returns
+        -------
+        sklearn.linear_model.LogisticRegression
+        """
         if name is None or name not in self._models_cache:
             model = sklearn.linear_model.LogisticRegression(solver="lbfgs")
             if name is not None:
@@ -255,18 +348,41 @@ class Class1PresentationPredictor(object):
         """
         Predict presentation scores across a set of peptides.
 
+        Presentation scores combine predictions for MHC I binding affinity
+        and antigen processing.
+
+        For intermediate results, see the `predict_to_dataframe` method.
+
         Parameters
         ----------
-        peptides : list of string, or EncodableSequences
+        peptides : list of string
+            Peptide sequences
         alleles : list of string or string -> string dict
-        experiment_names :
-        n_flanks
-        c_flanks
-        verbose
+            If you are predicting for a single sample, pass a list of strings
+            (up to 6) indicating the genotype. If you are predicting across
+            multiple samples, pass a dict where the keys are (arbitrary)
+            experiment names and the values are the alleles to predict for that
+            sample.
+        experiment_names : list of string [same length as peptides]
+            If you are passing a dict for 'alleles', use this argument to
+            specify which peptides go with which experiments.
+        n_flanks : list of string [same length as peptides]
+            Upstream sequences before the peptide. Sequences of any length can
+            be given and a suffix of the size supported by the model will be
+            used.
+        c_flanks : list of string [same length as peptides]
+            Downstream sequences after the peptide. Sequences of any length can
+            be given and a prefix of the size supported by the model will be
+            used.
+        verbose : int
+            Set to 0 for quiet mode.
 
         Returns
         -------
+        numpy.array
 
+        Presentation scores for each peptide. Scores range from 0 to 1, with
+        higher values indicating more favorable presentation likelihood.
         """
         return self.predict_to_dataframe(
             peptides=peptides,
@@ -275,6 +391,121 @@ class Class1PresentationPredictor(object):
             n_flanks=n_flanks,
             c_flanks=c_flanks,
             verbose=verbose).presentation_score.values
+
+    def predict_to_dataframe(
+            self,
+            peptides,
+            alleles,
+            experiment_names=None,
+            n_flanks=None,
+            c_flanks=None,
+            include_affinity_percentile=False,
+            verbose=1,
+            throw=True):
+        """
+        Predict presentation scores across a set of peptides.
+
+        Presentation scores combine predictions for MHC I binding affinity
+        and antigen processing.
+
+        This method returns a pandas.DataFrame giving presentation scores plus
+        the binding affinity and processing predictions and other intermediate
+        results.
+
+        Parameters
+        ----------
+        peptides : list of string
+            Peptide sequences
+        alleles : list of string or string -> string dict
+            If you are predicting for a single sample, pass a list of strings
+            (up to 6) indicating the genotype. If you are predicting across
+            multiple samples, pass a dict where the keys are (arbitrary)
+            experiment names and the values are the alleles to predict for that
+            sample.
+        experiment_names : list of string [same length as peptides]
+            If you are passing a dict for 'alleles', use this argument to
+            specify which peptides go with which experiments.
+        n_flanks : list of string [same length as peptides]
+            Upstream sequences before the peptide. Sequences of any length can
+            be given and a suffix of the size supported by the model will be
+            used.
+        c_flanks : list of string [same length as peptides]
+            Downstream sequences after the peptide. Sequences of any length can
+            be given and a prefix of the size supported by the model will be
+            used.
+        include_affinity_percentile : bool
+            Whether to include affinity percentile ranks
+        verbose : int
+            Set to 0 for quiet.
+        throw : verbose
+            Whether to throw exception (vs. just log a warning) on invalid
+            peptides, etc.
+
+        Returns
+        -------
+        pandas.DataFrame
+
+        Presentation scores and intermediate results.
+        """
+
+        if isinstance(peptides, string_types):
+            raise TypeError("peptides must be a list not a string")
+        if isinstance(alleles, string_types):
+            raise TypeError("alleles must be a list or dict")
+
+        if isinstance(alleles, dict):
+            if experiment_names is None:
+                raise ValueError(
+                    "experiment_names must be supplied when alleles is a dict")
+        else:
+            if experiment_names is not None:
+                raise ValueError(
+                    "alleles must be a dict when experiment_names is specified")
+            alleles = numpy.array(alleles, copy=False)
+            if len(alleles) > MAX_ALLELES_PER_SAMPLE:
+                raise ValueError(
+                    "When alleles is a list, it must have at most %d elements. "
+                    "These alleles are taken to be a genotype for an "
+                    "individual, and the strongest prediction across alleles "
+                    "will be taken for each peptide. Note that this differs "
+                    "from Class1AffinityPredictor.predict(), where alleles "
+                    "is expected to be the same length as peptides."
+                    % MAX_ALLELES_PER_SAMPLE)
+
+            experiment_names = ["experiment1"] * len(peptides)
+            alleles = {
+                "experiment1": alleles,
+            }
+
+        if (n_flanks is None) != (c_flanks is None):
+            raise ValueError("Specify both or neither of n_flanks, c_flanks")
+
+        processing_scores = self.predict_processing(
+            peptides=peptides,
+            n_flanks=n_flanks,
+            c_flanks=c_flanks,
+            verbose=verbose)
+
+        df = self.predict_affinity(
+            peptides=peptides,
+            experiment_names=experiment_names,
+            alleles=alleles,
+            include_affinity_percentile=include_affinity_percentile,
+            verbose=verbose,
+            throw=throw)
+        df["affinity_score"] = from_ic50(df.affinity)
+        df["processing_score"] = processing_scores
+        if c_flanks is not None:
+            df.insert(1, "c_flank", c_flanks)
+        if n_flanks is not None:
+            df.insert(1, "n_flank", n_flanks)
+
+        model_name = 'with_flanks' if n_flanks is not None else "without_flanks"
+        model = self.get_model(model_name)
+        df["presentation_score"] = model.predict_proba(
+            df[self.model_inputs].values)[:,1]
+        del df["affinity_score"]
+        return df
 
     def predict_sequences(
             self,
@@ -306,8 +537,8 @@ class Class1PresentationPredictor(object):
             One of:
              - "best": return the strongest peptide for each sequence
              - "all": return predictions for all peptides
-             - "filtered": return predictions stronger where comparison_quantity
-               is stronger than filter_value.
+             - "filtered": return predictions where comparison_quantity is
+             stronger (i.e (<) for affinity, (>) for scores) than filter_value.
         comparison_quantity : string
             One of "presentation_score", "processing_score", or "affinity".
             Quantity to use to rank (if result is "best") or filter (if result
@@ -443,99 +674,13 @@ class Class1PresentationPredictor(object):
 
         return result_df
 
-
-
-    def predict_to_dataframe(
-            self,
-            peptides,
-            alleles,
-            experiment_names=None,
-            n_flanks=None,
-            c_flanks=None,
-            include_affinity_percentile=False,
-            verbose=1,
-            throw=True):
-        """
-
-        Parameters
-        ----------
-        peptides
-        alleles
-        experiment_names
-        n_flanks
-        c_flanks
-        include_affinity_percentile
-        verbose
-        throw
-
-        Returns
-        -------
-
-        """
-
-        if isinstance(peptides, string_types):
-            raise TypeError("peptides must be a list not a string")
-        if isinstance(alleles, string_types):
-            raise TypeError("alleles must be a list or dict")
-
-        if isinstance(alleles, dict):
-            if experiment_names is None:
-                raise ValueError(
-                    "experiment_names must be supplied when alleles is a dict")
-        else:
-            if experiment_names is not None:
-                raise ValueError(
-                    "alleles must be a dict when experiment_names is specified")
-            alleles = numpy.array(alleles, copy=False)
-            if len(alleles) > MAX_ALLELES_PER_SAMPLE:
-                raise ValueError(
-                    "When alleles is a list, it must have at most %d elements. "
-                    "These alleles are taken to be a genotype for an "
-                    "individual, and the strongest prediction across alleles "
-                    "will be taken for each peptide. Note that this differs "
-                    "from Class1AffinityPredictor.predict(), where alleles "
-                    "is expected to be the same length as peptides."
-                    % MAX_ALLELES_PER_SAMPLE)
-
-            experiment_names = ["experiment1"] * len(peptides)
-            alleles = {
-                "experiment1": alleles,
-            }
-
-        if (n_flanks is None) != (c_flanks is None):
-            raise ValueError("Specify both or neither of n_flanks, c_flanks")
-
-        processing_scores = self.predict_processing(
-            peptides=peptides,
-            n_flanks=n_flanks,
-            c_flanks=c_flanks,
-            verbose=verbose)
-
-        df = self.predict_affinity(
-            peptides=peptides,
-            experiment_names=experiment_names,
-            alleles=alleles,
-            include_affinity_percentile=include_affinity_percentile,
-            verbose=verbose,
-            throw=throw)
-        df["affinity_score"] = from_ic50(df.affinity)
-        df["processing_score"] = processing_scores
-        if c_flanks is not None:
-            df.insert(1, "c_flank", c_flanks)
-        if n_flanks is not None:
-            df.insert(1, "n_flank", n_flanks)
-
-        model_name = 'with_flanks' if n_flanks is not None else "without_flanks"
-        model = self.get_model(model_name)
-        df["presentation_score"] = model.predict_proba(
-            df[self.model_inputs].values)[:,1]
-        del df["affinity_score"]
-        return df
-
     def save(self, models_dir):
         """
-        Serialize the predictor to a directory on disk. If the directory does
+        Save the predictor to a directory on disk. If the directory does
         not exist it will be created.
+
+        The wrapped Class1AffinityPredictor and Class1ProcessingPredictor
+        instances are included in the saved data.
 
         Parameters
         ----------
@@ -582,6 +727,9 @@ class Class1PresentationPredictor(object):
     def load(cls, models_dir=None, max_models=None):
         """
         Deserialize a predictor from a directory on disk.
+
+        This will also load the wrapped Class1AffinityPredictor and
+        Class1ProcessingPredictor instances.
 
         Parameters
         ----------
