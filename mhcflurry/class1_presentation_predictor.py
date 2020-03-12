@@ -113,6 +113,7 @@ class Class1PresentationPredictor(object):
         df = pandas.DataFrame({
             "peptide": numpy.array(peptides, copy=False),
         })
+        df["peptide_num"] = df.index
         if experiment_names is None:
             peptides = EncodableSequences.create(peptides)
             all_alleles = set()
@@ -141,9 +142,13 @@ class Class1PresentationPredictor(object):
                 new_df["affinity"] = predictions_df[
                     experiment_alleles
                 ].min(1).values
-                new_df["best_allele"] = predictions_df[
-                    experiment_alleles
-                ].idxmin(1).values
+                if len(df) == 0:
+                    new_df["best_allele"] = []
+                else:
+                    new_df["best_allele"] = predictions_df[
+                        experiment_alleles
+                    ].idxmin(1).values
+                dfs.append(new_df)
 
             result_df = pandas.concat(dfs, ignore_index=True)
         else:
@@ -177,8 +182,8 @@ class Class1PresentationPredictor(object):
         if include_affinity_percentile:
             result_df["affinity_percentile"] = (
                 self.affinity_predictor.percentile_ranks(
-                    df.affinity.values,
-                    alleles=df.best_alleles.values,
+                    result_df.affinity.values,
+                    alleles=result_df.best_allele.values,
                     throw=False))
 
         return result_df
@@ -214,6 +219,9 @@ class Class1PresentationPredictor(object):
             if self.processing_predictor_with_flanks is None:
                 raise ValueError("No processing predictor with flanks")
             predictor = self.processing_predictor_with_flanks
+
+        if len(peptides) == 0:
+            return numpy.array([], dtype=float)
 
         num_chunks = int(numpy.ceil(float(len(peptides)) / PREDICT_CHUNK_SIZE))
         peptide_chunks = numpy.array_split(peptides, num_chunks)
@@ -384,6 +392,13 @@ class Class1PresentationPredictor(object):
         Presentation scores for each peptide. Scores range from 0 to 1, with
         higher values indicating more favorable presentation likelihood.
         """
+        if isinstance(alleles, dict):
+            if experiment_names is None:
+                raise ValueError(
+                    "experiment_names must be supplied when alleles is a dict. "
+                    "Alternatively, call predict_to_dataframe to predict over "
+                    "all experiments")
+
         return self.predict_to_dataframe(
             peptides=peptides,
             alleles=alleles,
@@ -416,15 +431,17 @@ class Class1PresentationPredictor(object):
         ----------
         peptides : list of string
             Peptide sequences
-        alleles : list of string or string -> string dict
+        alleles : list of string or string -> list of string dict
             If you are predicting for a single sample, pass a list of strings
             (up to 6) indicating the genotype. If you are predicting across
             multiple samples, pass a dict where the keys are (arbitrary)
             experiment names and the values are the alleles to predict for that
             sample.
         experiment_names : list of string [same length as peptides]
-            If you are passing a dict for 'alleles', use this argument to
-            specify which peptides go with which experiments.
+            If you are passing a dict for 'alleles', you can use this argument to
+            specify which peptides go with which experiments. If it is None,
+            then predictions will be performed for each peptide across all
+            experiments.
         n_flanks : list of string [same length as peptides]
             Upstream sequences before the peptide. Sequences of any length can
             be given and a suffix of the size supported by the model will be
@@ -453,14 +470,12 @@ class Class1PresentationPredictor(object):
         if isinstance(alleles, string_types):
             raise TypeError("alleles must be a list or dict")
 
-        if isinstance(alleles, dict):
-            if experiment_names is None:
-                raise ValueError(
-                    "experiment_names must be supplied when alleles is a dict")
-        else:
+        if not isinstance(alleles, dict):
+            # Make alleles into a dict.
             if experiment_names is not None:
                 raise ValueError(
                     "alleles must be a dict when experiment_names is specified")
+
             alleles = numpy.array(alleles, copy=False)
             if len(alleles) > MAX_ALLELES_PER_SAMPLE:
                 raise ValueError(
@@ -472,7 +487,6 @@ class Class1PresentationPredictor(object):
                     "is expected to be the same length as peptides."
                     % MAX_ALLELES_PER_SAMPLE)
 
-            experiment_names = ["experiment1"] * len(peptides)
             alleles = {
                 "experiment1": alleles,
             }
@@ -488,22 +502,27 @@ class Class1PresentationPredictor(object):
 
         df = self.predict_affinity(
             peptides=peptides,
-            experiment_names=experiment_names,
             alleles=alleles,
+            experiment_names=experiment_names,  # might be None
             include_affinity_percentile=include_affinity_percentile,
             verbose=verbose,
             throw=throw)
+
         df["affinity_score"] = from_ic50(df.affinity)
-        df["processing_score"] = processing_scores
+        df["processing_score"] = df.peptide_num.map(
+            pandas.Series(processing_scores))
         if c_flanks is not None:
-            df.insert(1, "c_flank", c_flanks)
+            df.insert(1, "c_flank", df.peptide_num.map(pandas.Series(c_flanks)))
         if n_flanks is not None:
-            df.insert(1, "n_flank", n_flanks)
+            df.insert(1, "n_flank", df.peptide_num.map(pandas.Series(n_flanks)))
 
         model_name = 'with_flanks' if n_flanks is not None else "without_flanks"
         model = self.get_model(model_name)
-        df["presentation_score"] = model.predict_proba(
-            df[self.model_inputs].values)[:,1]
+        if len(df) > 0:
+            df["presentation_score"] = model.predict_proba(
+                df[self.model_inputs].values)[:,1]
+        else:
+            df["presentation_score"] = []
         del df["affinity_score"]
         return df
 
@@ -514,9 +533,9 @@ class Class1PresentationPredictor(object):
             result="best",
             comparison_quantity="presentation_score",
             filter_value=None,
-            peptide_lengths=[8, 9, 10, 11],
+            peptide_lengths=(8, 9, 10, 11),
             use_flanks=True,
-            include_affinity_percentile=False,
+            include_affinity_percentile=True,
             verbose=1,
             throw=True):
         """
@@ -527,22 +546,21 @@ class Class1PresentationPredictor(object):
         sequences : str, list of string, or string -> string dict
             Protein sequences. If a dict is given, the keys are arbitrary (
             e.g. protein names), and the values are the amino acid sequences.
-        alleles : str, list of string, list of list of string, or string -> string dict
+        alleles : list of string, list of list of string, or dict of string -> list of string
             MHC I alleles. Can be: (1) a string (a single allele), (2) a list of
             strings (a single genotype), (3) a list of list of strings
             (multiple genotypes, where the total number of genotypes must equal
-            the number of sequences), or (4) a dict (in which case the keys must
-            match the sequences dict keys).
+            the number of sequences), or (4) a dict giving multiple genotypes,
+            which will each be run over the sequences.
         result : string
-            One of:
-             - "best": return the strongest peptide for each sequence
-             - "all": return predictions for all peptides
-             - "filtered": return predictions where comparison_quantity is
-             stronger (i.e (<) for affinity, (>) for scores) than filter_value.
+            Specify 'best' to return the strongest peptide for each sequence,
+            'all' to return predictions for all peptides, or 'filtered' to
+            return predictions where the comparison_quantity is stronger
+            (i.e (<) for affinity, (>) for scores) than filter_value.
         comparison_quantity : string
-            One of "presentation_score", "processing_score", or "affinity".
-            Quantity to use to rank (if result is "best") or filter (if result
-            is "filtered") results.
+            One of "presentation_score", "processing_score", "affinity", or
+            "affinity_percentile". Prediction to use to rank (if result is
+            "best") or filter (if result is "filtered") results.
         filter_value : float
             Threshold value to use, only relevant when result is "filtered".
             If comparison_quantity is "affinity", then all results less than
@@ -589,42 +607,62 @@ class Class1PresentationPredictor(object):
                 ("sequence_%04d" % (i + 1), sequence)
                 for (i, sequence) in enumerate(sequences))
 
+        cross_product = True
         if isinstance(alleles, string_types):
+            # Case (1) - alleles is a string
             alleles = [alleles]
 
-        if not isinstance(alleles, dict):
-            if all([isinstance(item, string_types) for item in alleles]):
-                alleles = dict((name, alleles) for name in sequences.keys())
-            elif len(alleles) != len(sequences):
+        if isinstance(alleles, dict):
+            if any([isinstance(v, string_types) for v in alleles.values()]):
                 raise ValueError(
-                    "alleles must be (1) a string (a single allele), (2) a list of "
-                    "strings (a single genotype), (3) a list of list of strings ("
-                    "(multiple genotypes, where the total number of genotypes "
-                    "must equal the number of sequences), or (4) a dict (in which "
-                    "case the keys must match the sequences dict keys). Here "
-                    "it seemed like option (3) was being used, but the length "
-                    "of alleles (%d) did not match the length of sequences (%d)."
-                    % (len(alleles), len(sequences)))
+                    "The values in the alleles dict must be lists, not strings")
+        else:
+            if all(isinstance(a, string_types) for a in alleles):
+                # Case (2) - a simple list of alleles
+                alleles = {
+                    'genotype': alleles
+                }
             else:
-                alleles = dict(zip(sequences.keys(), alleles))
+                # Case (3) - a list of lists
+                alleles = collections.OrderedDict(
+                    ("genotype_%04d" % (i + 1), genotype)
+                    for (i, genotype) in enumerate(alleles))
+                cross_product = False
 
-        missing = [key for key in sequences if key not in alleles]
-        if missing:
-            raise ValueError(
-                "Sequence names missing from alleles dict: ", missing)
+                if len(alleles) != len(sequences):
+                    raise ValueError(
+                        "When passing a list of lists for the alleles argument "
+                        "the length of the list (%d) must match the length of "
+                        "the sequences being predicted (%d)" % (
+                            len(alleles), len(sequences)))
 
-        for (name, sequence) in sequences.items():
+        if not isinstance(alleles, dict):
+            raise ValueError("Invalid type for alleles: ", type(alleles))
+
+        experiment_names = None if cross_product else []
+        genotype_names = list(alleles)
+        position_in_sequence = []
+        for (i, (name, sequence)) in enumerate(sequences.items()):
+            genotype_name = None if cross_product else genotype_names[i]
+
             if not isinstance(sequence, string_types):
                 raise ValueError("Expected string, not %s (%s)" % (
                     sequence, type(sequence)))
-            for peptide_start in range(len(sequence) - min(peptide_lengths)):
+            for peptide_start in range(len(sequence) - min(peptide_lengths) + 1):
                 n_flank_start = max(0, peptide_start - n_flank_length)
                 for peptide_length in peptide_lengths:
+                    peptide = sequence[
+                        peptide_start: peptide_start + peptide_length
+                    ]
+                    if len(peptide) != peptide_length:
+                        continue
                     c_flank_end = (
                         peptide_start + peptide_length + c_flank_length)
                     sequence_names.append(name)
-                    peptides.append(
-                        sequence[peptide_start: peptide_start + peptide_length])
+                    position_in_sequence.append(peptide_start)
+                    if not cross_product:
+                        experiment_names.append(genotype_name)
+                    peptides.append(peptide)
                     if use_flanks:
                         n_flanks.append(
                             sequence[n_flank_start : peptide_start])
@@ -636,13 +674,20 @@ class Class1PresentationPredictor(object):
             alleles=alleles,
             n_flanks=n_flanks,
             c_flanks=c_flanks,
-            experiment_names=sequence_names,
+            experiment_names=experiment_names,
             include_affinity_percentile=include_affinity_percentile,
             verbose=verbose,
             throw=throw)
 
-        result_df = result_df.rename(
-            columns={"experiment_name": "sequence_name"})
+        result_df.insert(
+            0,
+            "sequence_name",
+            result_df.peptide_num.map(pandas.Series(sequence_names)))
+        result_df.insert(
+            1,
+            "position_in_sequence",
+            result_df.peptide_num.map(pandas.Series(position_in_sequence)))
+        del result_df["peptide_num"]
 
         comparison_is_score = comparison_quantity.endswith("score")
 
@@ -652,7 +697,8 @@ class Class1PresentationPredictor(object):
 
         if result == "best":
             result_df = result_df.drop_duplicates(
-                "sequence_name", keep="first").sort_values("sequence_name")
+                ["sequence_name", "experiment_name"], keep="first"
+            ).sort_values("sequence_name")
         elif result == "filtered":
             if comparison_is_score:
                 result_df = result_df.loc[

@@ -73,6 +73,7 @@ if __name__ == '__main__':
             'console_scripts': [
                 'mhcflurry-downloads = mhcflurry.downloads_command:run',
                 'mhcflurry-predict = mhcflurry.predict_command:run',
+                'mhcflurry-predict-scan = mhcflurry.predict_scan_command:run',
                 'mhcflurry-class1-train-allele-specific-models = '
                     'mhcflurry.train_allele_specific_models_command:run',
                 'mhcflurry-class1-train-pan-allele-models = '

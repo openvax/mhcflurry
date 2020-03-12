@@ -132,6 +132,87 @@ def test_basic():
         numpy.testing.assert_array_almost_equal(
             test_df["prediction2"], other_test_df["prediction2"], decimal=6)
 
+
+def test_downloaded_predictor_small():
+    global PRESENTATION_PREDICTOR
+
+    # Test sequence scanning
+    scan_results = PRESENTATION_PREDICTOR.predict_sequences(
+        sequences=[
+            "MESLVPGFN",
+            "QPYVFIKRS",
+            "AGGHSYGAD",
+        ],
+        alleles={
+            "HLA-A*02:01": ["HLA-A*02:01"],
+            "HLA-C*02:01": ["HLA-C*02:01"],
+        },
+        peptide_lengths=[9],
+        result="best")
+    print(scan_results)
+    assert_equal(len(scan_results), 6)
+
+    scan_results = PRESENTATION_PREDICTOR.predict_sequences(
+        sequences=[
+            "MESLVPGFN",
+            "QPYVFIKRS",
+            "AGGHSYGAD",
+        ],
+        alleles={
+            "HLA-A*02:01": ["HLA-A*02:01"],
+            "HLA-C*02:01": ["HLA-C*02:01"],
+        },
+        peptide_lengths=[8, 9],
+        result="best")
+    print(scan_results)
+    assert_equal(len(scan_results), 6)
+
+    scan_results = PRESENTATION_PREDICTOR.predict_sequences(
+        sequences=[
+            "MESLVPGFN",
+            "QPYVFIKRS",
+            "AGGHSYGAD",
+        ],
+        alleles={
+            "HLA-A*02:01": ["HLA-A*02:01"],
+            "HLA-C*02:01": ["HLA-C*02:01"],
+        },
+        peptide_lengths=[9],
+        result="all")
+    print(scan_results)
+    assert_equal(len(scan_results), 6)
+
+    scan_results = PRESENTATION_PREDICTOR.predict_sequences(
+        sequences=[
+            "MESLVPGFN",
+            "QPYVFIKRS",
+            "AGGHSYGAD",
+        ],
+        alleles={
+            "HLA-A*02:01": ["HLA-A*02:01"],
+            "HLA-C*02:01": ["HLA-C*02:01"],
+        },
+        peptide_lengths=[8, 9],
+        result="all")
+    print(scan_results)
+    assert_equal(len(scan_results), 18)
+
+    scan_results = PRESENTATION_PREDICTOR.predict_sequences(
+        sequences=[
+            "MESLVPGFN",
+            "QPYVFIKRS",
+            "AGGHSYGAD",
+        ],
+        alleles={
+            "HLA-A*02:01": ["HLA-A*02:01"],
+            "HLA-C*02:01": ["HLA-C*02:01"],
+        },
+        peptide_lengths=[10],
+        result="all")
+    print(scan_results)
+    assert_equal(len(scan_results), 0)
+
+
 def test_downloaded_predictor():
     global PRESENTATION_PREDICTOR
 
@@ -220,3 +301,32 @@ def test_downloaded_predictor():
 
     assert len(scan_results4) > 200, len(scan_results4)
     assert_less(scan_results4.iloc[0].affinity, 100)
+
+    scan_results5 = PRESENTATION_PREDICTOR.predict_sequences(
+        result="all",
+        comparison_quantity="affinity",
+        sequences={
+            "seq1": "MESLVPGFNEKTHVQLSLPVLQVRDVLVRGFGDSVEEVLSEARQHLKDGTCGLVEVEKGVLPQLE",
+            "seq2": "QPYVFIKRSDARTAPHGHVMVELVAELEGIQYGRSGETLGVLVPHVGEIPVAYRKVLLRKNGNKG",
+            "seq3": "AGGHSYGADLKSFDLGDELGTDPYEDFQENWNTKHSSGVTRELMRELNGGAYTRYVDNNFCGPDG",
+        },
+        alleles={
+            "sample1": [
+                "HLA-A*02:01",
+                "HLA-A*03:01",
+                "HLA-B*57:01",
+                "HLA-B*44:02",
+                "HLA-C*02:01",
+                "HLA-C*07:01",
+            ],
+            "sample2": [
+                "HLA-A*01:01",
+                "HLA-A*02:06",
+                "HLA-B*07:02",
+                "HLA-B*44:02",
+                "HLA-C*03:01",
+                "HLA-C*07:02",
+            ],
+        })
+    print(scan_results5)
+    assert_equal(len(scan_results5), len(scan_results4) * 2)
