@@ -1,37 +1,39 @@
 '''
 Scan protein sequences using the MHCflurry presentation predictor.
 
-By default, subsequences with affinity percentile ranks less than 2.0 are
-returned. You can also specify --results-all to return predictions for all
-subsequences, or --results-best to return the top subsequence for each sequence.
+By default, sub-sequences (peptides) with affinity percentile ranks less than
+2.0 are returned. You can also specify --results-all to return predictions for
+all peptides, or --results-best to return the top peptide for each sequence.
 
 Examples:
 
 Scan a set of sequences in a FASTA file for binders to any alleles in a MHC I
 genotype:
 
-    mhcflurry-predict-scan \
-        test/data/example.fasta \
-        --alleles HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:01,HLA-C*07:02
+$ mhcflurry-predict-scan \
+    test/data/example.fasta \
+    --alleles HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:01,HLA-C*07:02
 
 Instead of a FASTA, you can also pass a CSV that has "sequence_id" and "sequence"
 columns.
 
-You can also specify multiple MHC I genotypes to scan:
+You can also specify multiple MHC I genotypes to scan as space-separated
+arguments to the --alleles option:
 
-    mhcflurry-predict-scan \
-        test/data/example.fasta \
-        --alleles \
-            HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:01,HLA-C*07:02 \
-            HLA-A*01:01,HLA-A*02:06,HLA-B*68:01,HLA-B*07:02,HLA-C*01:01,HLA-C*03:01
+$ mhcflurry-predict-scan \
+    test/data/example.fasta \
+    --alleles \
+        HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02 \
+        HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:02,HLA-C*03:01
 
 If `--out` is not specified, results are written to standard out.
 
-You can also run on sequences specified on the commandline:
+You can also specify sequences on the commandline:
 
 mhcflurry-predict-scan \
     --sequences MGYINVFAFPFTIYSLLLCRMNSRNYIAQVDVVNFNLT \
-    --alleles HLA-A0201 H-2Kb
+    --alleles HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02
+
 '''
 from __future__ import (
     print_function,
@@ -48,7 +50,6 @@ import os
 import pandas
 
 from .downloads import get_default_class1_presentation_models_dir
-from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
 from .fasta import read_fasta_to_dataframe
 from .version import __version__
@@ -70,13 +71,13 @@ helper_args.add_argument(
     "--list-supported-alleles",
     action="store_true",
     default=False,
-    help="Prints the list of supported alleles and exits"
+    help="Print the list of supported alleles and exits"
 )
 helper_args.add_argument(
     "--list-supported-peptide-lengths",
     action="store_true",
     default=False,
-    help="Prints the list of supported peptide lengths and exits"
+    help="Print the list of supported peptide lengths and exits"
 )
 helper_args.add_argument(
     "--version",
@@ -87,7 +88,7 @@ helper_args.add_argument(
 input_args = parser.add_argument_group(title="Input options")
 input_args.add_argument(
     "input",
-    metavar="INPUT.csv",
+    metavar="INPUT",
     nargs="?",
     help="Input CSV or FASTA")
 input_args.add_argument(
@@ -139,7 +140,7 @@ results_args.add_argument(
     "--results-all",
     action="store_true",
     default=False,
-    help="")
+    help="Return results for all peptides regardless of affinity, etc.")
 results_args.add_argument(
     "--results-best",
     choices=comparison_quantities,
@@ -229,7 +230,8 @@ def run(argv=sys.argv[1:]):
             "--results-filtered")
 
     (result,) = [key for (key, value) in result_args.items() if value]
-    result_comparison_quantity = result_args[result]
+    result_comparison_quantity = (
+        None if result == "all" else result_args[result])
     result_filter_value = None if result != "filtered" else {
         "presentation_score": args.threshold_presentation_score,
         "processing_score": args.threshold_processing_score,

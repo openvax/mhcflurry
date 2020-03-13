@@ -93,11 +93,13 @@ class Class1PresentationPredictor(object):
         Parameters
         ----------
         peptides : list of string
+        alleles : dict of string -> list of string
+            Keys are experiment names, values are the alleles (genotype) for
+            that sample
         experiment_names : list of string [same length as peptides]
             Sample names corresponding to each peptide. These are used to
-            lookup the alleles for each peptide in the alleles dict.
-        alleles : dict of string -> list of string
-            Keys are experiment names, values are the alleles for that sample
+            lookup the alleles for each peptide in the alleles dict. If not
+            specified, then all combinations of experiment names
         include_affinity_percentile : bool
             Whether to include affinity percentile ranks
         verbose : int
@@ -585,6 +587,8 @@ class Class1PresentationPredictor(object):
             peptide, n_flank, c_flank, sequence_name, affinity, best_allele,
             processing_score, presentation_score
         """
+        if comparison_quantity is None:
+            comparison_quantity = "presentation_score"
 
         processing_predictor = self.processing_predictor_with_flanks
         if not use_flanks or processing_predictor is None:

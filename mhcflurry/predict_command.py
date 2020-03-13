@@ -11,7 +11,7 @@ Examples:
 Write a CSV file containing the contents of INPUT.csv plus additional columns
 giving MHCflurry predictions:
 
-    $ mhcflurry-predict INPUT.csv --out RESULT.csv
+$ mhcflurry-predict INPUT.csv --out RESULT.csv
 
 The input CSV file is expected to contain columns "allele", "peptide", and,
 optionally, "n_flank", and "c_flank".
@@ -19,10 +19,23 @@ optionally, "n_flank", and "c_flank".
 If `--out` is not specified, results are written to stdout.
 
 You can also run on alleles and peptides specified on the commandline, in
-which case predictions are written for all combinations of alleles and
+which case predictions are written for *all combinations* of alleles and
 peptides:
 
-    $ mhcflurry-predict --alleles HLA-A0201 H-2Kb --peptides SIINFEKL DENDREKLLL
+$ mhcflurry-predict --alleles HLA-A0201 H-2Kb --peptides SIINFEKL DENDREKLLL
+
+Instead of individual alleles (in a CSV or on the command line), you can also
+give a comma separated list of alleles giving a sample genotype. In this case,
+the tightest binding affinity across the alleles for the sample will be
+returned. For example:
+
+$ mhcflurry-predict --peptides SIINFEKL DENDREKLLL \
+    --alleles \
+        HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:01,HLA-C*07:02 \
+        HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:01,HLA-C*03:01
+
+will give the tightest predicted affinities across alleles for each of the two
+genotypes specified for each peptide.
 '''
 from __future__ import (
     print_function,

@@ -1,3 +1,7 @@
+import logging
+logging.getLogger('matplotlib').disabled = True
+logging.getLogger('tensorflow').disabled = True
+
 import tempfile
 import os
 
