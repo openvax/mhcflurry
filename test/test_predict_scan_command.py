@@ -17,6 +17,11 @@ setup = startup
 
 from . import data_path
 
+def read_output_csv(filename):
+    return pandas.read_csv(
+        filename,
+        converters={"n_flank": str, "c_flank": str})
+
 
 def test_fasta():
     args = [
@@ -31,7 +36,7 @@ def test_fasta():
         full_args = args + ["--out", fd_out.name]
         print("Running with args: %s" % full_args)
         predict_scan_command.run(full_args)
-        result = pandas.read_csv(fd_out.name)
+        result = read_output_csv(fd_out.name)
         print(result)
         assert not result.isnull().any().any()
     finally:
@@ -58,7 +63,7 @@ def test_fasta_50nm():
         full_args = args + ["--out", fd_out.name]
         print("Running with args: %s" % full_args)
         predict_scan_command.run(full_args)
-        result = pandas.read_csv(fd_out.name)
+        result = read_output_csv(fd_out.name)
         print(result)
         assert not result.isnull().any().any()
     finally:
@@ -83,7 +88,7 @@ def test_fasta_best():
         full_args = args + ["--out", fd_out.name]
         print("Running with args: %s" % full_args)
         predict_scan_command.run(full_args)
-        result = pandas.read_csv(fd_out.name)
+        result = read_output_csv(fd_out.name)
         print(result)
         assert not result.isnull().any().any()
     finally:
@@ -110,7 +115,7 @@ def test_commandline_sequences():
         full_args = args + ["--out", fd_out.name]
         print("Running with args: %s" % full_args)
         predict_scan_command.run(full_args)
-        result = pandas.read_csv(fd_out.name)
+        result = read_output_csv(fd_out.name)
         print(result)
     finally:
         for delete in deletes:
