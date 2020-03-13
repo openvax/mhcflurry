@@ -278,7 +278,7 @@ def run(argv=sys.argv[1:]):
             del predictions["best_allele"]
 
     for col in predictions.columns:
-        if col not in ("allele", "peptide", "experiment_name"):
+        if col not in ("allele", "peptide", "experiment_name", "peptide_num"):
             df[args.prediction_column_prefix + col] = predictions[col]
 
     if args.out:
