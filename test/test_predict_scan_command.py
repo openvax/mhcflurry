@@ -17,6 +17,7 @@ setup = startup
 
 from . import data_path
 
+
 def read_output_csv(filename):
     return pandas.read_csv(
         filename,
@@ -125,6 +126,6 @@ def test_commandline_sequences():
 
     assert_equal(result.sequence_name.nunique(), 2)
     assert_equal(result.best_allele.nunique(), 3)
-    assert_equal(result.experiment_name.nunique(), 2)
+    assert_equal(result.sample_name.nunique(), 2)
     assert_equal((result.peptide == "ASDFGHKL").sum(), 2)
     assert_equal((result.peptide != "ASDFGHKL").sum(), 10)

@@ -45,7 +45,8 @@ class Class1PresentationPredictor(object):
     These predictions are combined using a logistic regression model to give
     a "presentation score" prediction.
 
-    See load() and predict() methods for basic usage.
+    Most users will call the `load` static method to get an instance of this
+    class, then call the `predict_to_dataframe` method to generate predictions.
     """
     model_inputs = ["affinity_score", "processing_score"]
 
@@ -83,23 +84,62 @@ class Class1PresentationPredictor(object):
             self,
             peptides,
             alleles,
-            experiment_names=None,
+            sample_names=None,
             include_affinity_percentile=False,
             verbose=1,
             throw=True):
         """
         Predict binding affinities.
 
+        Two modes are supported: each peptide can be evaluated for binding to
+        any of the alleles in any sample (this is what happens when sample_names
+        is None), or the i'th peptide can be evaluated for binding the alleles
+        of the sample given by the i'th entry in sample_names.
+
+        For example, if we don't specify sample_names, then predictions
+        are taken for all combinations of samples and peptides:
+
+        >>> predictor = Class1PresentationPredictor.load()
+        >>> predictor.predict_affinity(
+        ...    peptides=["SIINFEKL", "PEPTIDE"],
+        ...    alleles={
+        ...        "sample1": ["A0201", "A0301", "B0702"],
+        ...        "sample2": ["A0101", "C0202"],
+        ...    },
+        ...    verbose=0)
+            peptide  peptide_num sample_name      affinity best_allele
+        0  SIINFEKL            0     sample1  12906.787792       A0201
+        1   PEPTIDE            1     sample1  36827.681130       B0702
+        2  SIINFEKL            0     sample2   3588.413748       C0202
+        3   PEPTIDE            1     sample2  34362.109211       C0202
+
+        In contrast, here we specify sample_names, so peptide is evaluated for
+        binding the alleles in the corresponding sample:
+
+        >>> predictor.predict_affinity(
+        ...    peptides=["SIINFEKL", "PEPTIDE"],
+        ...    alleles={
+        ...        "sample1": ["A0201", "A0301", "B0702"],
+        ...        "sample2": ["A0101", "C0202"],
+        ...    },
+        ...    sample_names=["sample2", "sample1"],
+        ...    verbose=0)
+            peptide  peptide_num sample_name      affinity best_allele
+        0  SIINFEKL            0     sample2   3588.412141       C0202
+        1   PEPTIDE            1     sample1  36827.682779       B0702
+
+
         Parameters
         ----------
         peptides : list of string
         alleles : dict of string -> list of string
-            Keys are experiment names, values are the alleles (genotype) for
+            Keys are sample names, values are the alleles (genotype) for
             that sample
-        experiment_names : list of string [same length as peptides]
+        sample_names : list of string [same length as peptides]
             Sample names corresponding to each peptide. These are used to
             lookup the alleles for each peptide in the alleles dict. If not
-            specified, then all combinations of experiment names
+            specified, then predictions are generated for all sample genotypes
+            across all peptides.
         include_affinity_percentile : bool
             Whether to include affinity percentile ranks
         verbose : int
@@ -116,7 +156,7 @@ class Class1PresentationPredictor(object):
             "peptide": numpy.array(peptides, copy=False),
         })
         df["peptide_num"] = df.index
-        if experiment_names is None:
+        if sample_names is None:
             peptides = EncodableSequences.create(peptides)
             all_alleles = set()
             for lst in alleles.values():
@@ -138,37 +178,37 @@ class Class1PresentationPredictor(object):
                     throw=throw)
 
             dfs = []
-            for (experiment_name, experiment_alleles) in alleles.items():
+            for (sample_name, sample_alleles) in alleles.items():
                 new_df = df.copy()
-                new_df["experiment_name"] = experiment_name
+                new_df["sample_name"] = sample_name
                 new_df["affinity"] = predictions_df[
-                    experiment_alleles
+                    sample_alleles
                 ].min(1).values
                 if len(df) == 0:
                     new_df["best_allele"] = []
                 else:
                     new_df["best_allele"] = predictions_df[
-                        experiment_alleles
+                        sample_alleles
                     ].idxmin(1).values
                 dfs.append(new_df)
 
             result_df = pandas.concat(dfs, ignore_index=True)
         else:
-            df["experiment_name"] = numpy.array(experiment_names, copy=False)
+            df["sample_name"] = numpy.array(sample_names, copy=False)
 
-            iterator = df.groupby("experiment_name")
+            iterator = df.groupby("sample_name")
             if verbose > 0:
                 print("Predicting affinities.")
                 if tqdm is not None:
                     iterator = tqdm.tqdm(
-                        iterator, total=df.experiment_name.nunique())
+                        iterator, total=df.sample_name.nunique())
 
-            for (experiment, sub_df) in iterator:
+            for (sample, sub_df) in iterator:
                 predictions_df = pandas.DataFrame(index=sub_df.index)
-                experiment_peptides = EncodableSequences.create(sub_df.peptide.values)
-                for allele in alleles[experiment]:
+                sample_peptides = EncodableSequences.create(sub_df.peptide.values)
+                for allele in alleles[sample]:
                     predictions_df[allele] = self.affinity_predictor.predict(
-                        peptides=experiment_peptides,
+                        peptides=sample_peptides,
                         allele=allele,
                         model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
                         throw=throw)
@@ -250,7 +290,7 @@ class Class1PresentationPredictor(object):
             self,
             targets,
             peptides,
-            experiment_names,
+            sample_names,
             alleles,
             n_flanks=None,
             c_flanks=None,
@@ -263,9 +303,9 @@ class Class1PresentationPredictor(object):
         targets : list of int/float
             1 indicates hit, 0 indicates decoy
         peptides : list of string [same length as targets]
-        experiment_names : list of string [same length as targets]
+        sample_names : list of string [same length as targets]
         alleles : dict of string -> list of string
-            Keys are experiment names, values are the alleles for that sample
+            Keys are sample names, values are the alleles for that sample
         n_flanks : list of string [same length as targets]
         c_flanks : list of string [same length as targets]
         verbose : int
@@ -274,7 +314,7 @@ class Class1PresentationPredictor(object):
         df = self.predict_affinity(
             peptides=peptides,
             alleles=alleles,
-            experiment_names=experiment_names,
+            sample_names=sample_names,
             verbose=verbose)
         df["affinity_score"] = from_ic50(df.affinity)
         df["target"] = numpy.array(targets, copy=False)
@@ -351,7 +391,7 @@ class Class1PresentationPredictor(object):
             self,
             peptides,
             alleles,
-            experiment_names=None,
+            sample_names=None,
             n_flanks=None,
             c_flanks=None,
             verbose=1):
@@ -371,11 +411,11 @@ class Class1PresentationPredictor(object):
             If you are predicting for a single sample, pass a list of strings
             (up to 6) indicating the genotype. If you are predicting across
             multiple samples, pass a dict where the keys are (arbitrary)
-            experiment names and the values are the alleles to predict for that
+            sample names and the values are the alleles to predict for that
             sample.
-        experiment_names : list of string [same length as peptides]
+        sample_names : list of string [same length as peptides]
             If you are passing a dict for 'alleles', use this argument to
-            specify which peptides go with which experiments.
+            specify which peptides go with which sample.
         n_flanks : list of string [same length as peptides]
             Upstream sequences before the peptide. Sequences of any length can
             be given and a suffix of the size supported by the model will be
@@ -395,16 +435,16 @@ class Class1PresentationPredictor(object):
         higher values indicating more favorable presentation likelihood.
         """
         if isinstance(alleles, dict):
-            if experiment_names is None:
+            if sample_names is None:
                 raise ValueError(
-                    "experiment_names must be supplied when alleles is a dict. "
+                    "sample_names must be supplied when alleles is a dict. "
                     "Alternatively, call predict_to_dataframe to predict over "
-                    "all experiments")
+                    "all samples")
 
         return self.predict_to_dataframe(
             peptides=peptides,
             alleles=alleles,
-            experiment_names=experiment_names,
+            sample_names=sample_names,
             n_flanks=n_flanks,
             c_flanks=c_flanks,
             verbose=verbose).presentation_score.values
@@ -413,7 +453,7 @@ class Class1PresentationPredictor(object):
             self,
             peptides,
             alleles,
-            experiment_names=None,
+            sample_names=None,
             n_flanks=None,
             c_flanks=None,
             include_affinity_percentile=False,
@@ -437,13 +477,14 @@ class Class1PresentationPredictor(object):
             If you are predicting for a single sample, pass a list of strings
             (up to 6) indicating the genotype. If you are predicting across
             multiple samples, pass a dict where the keys are (arbitrary)
-            experiment names and the values are the alleles to predict for that
+            sample names and the values are the alleles to predict for that
             sample.
-        experiment_names : list of string [same length as peptides]
-            If you are passing a dict for 'alleles', you can use this argument to
-            specify which peptides go with which experiments. If it is None,
+        sample_names : list of string [same length as peptides]
+            If you are passing a dict for 'alleles', you can use this
+            argument to
+            specify which peptides go with which samples. If it is None,
             then predictions will be performed for each peptide across all
-            experiments.
+            samples.
         n_flanks : list of string [same length as peptides]
             Upstream sequences before the peptide. Sequences of any length can
             be given and a suffix of the size supported by the model will be
@@ -474,9 +515,9 @@ class Class1PresentationPredictor(object):
 
         if not isinstance(alleles, dict):
             # Make alleles into a dict.
-            if experiment_names is not None:
+            if sample_names is not None:
                 raise ValueError(
-                    "alleles must be a dict when experiment_names is specified")
+                    "alleles must be a dict when sample_names is specified")
 
             alleles = numpy.array(alleles, copy=False)
             if len(alleles) > MAX_ALLELES_PER_SAMPLE:
@@ -490,7 +531,7 @@ class Class1PresentationPredictor(object):
                     % MAX_ALLELES_PER_SAMPLE)
 
             alleles = {
-                "experiment1": alleles,
+                "sample1": alleles,
             }
 
         if (n_flanks is None) != (c_flanks is None):
@@ -505,7 +546,7 @@ class Class1PresentationPredictor(object):
         df = self.predict_affinity(
             peptides=peptides,
             alleles=alleles,
-            experiment_names=experiment_names,  # might be None
+            sample_names=sample_names,  # might be None
             include_affinity_percentile=include_affinity_percentile,
             verbose=verbose,
             throw=throw)
@@ -643,7 +684,7 @@ class Class1PresentationPredictor(object):
         if not isinstance(alleles, dict):
             raise ValueError("Invalid type for alleles: ", type(alleles))
 
-        experiment_names = None if cross_product else []
+        sample_names = None if cross_product else []
         genotype_names = list(alleles)
         position_in_sequence = []
         for (i, (name, sequence)) in enumerate(sequences.items()):
@@ -665,7 +706,7 @@ class Class1PresentationPredictor(object):
                     sequence_names.append(name)
                     position_in_sequence.append(peptide_start)
                     if not cross_product:
-                        experiment_names.append(genotype_name)
+                        sample_names.append(genotype_name)
                     peptides.append(peptide)
                     if use_flanks:
                         n_flanks.append(
@@ -678,7 +719,7 @@ class Class1PresentationPredictor(object):
             alleles=alleles,
             n_flanks=n_flanks,
             c_flanks=c_flanks,
-            experiment_names=experiment_names,
+            sample_names=sample_names,
             include_affinity_percentile=include_affinity_percentile,
             verbose=verbose,
             throw=throw)
@@ -701,7 +742,7 @@ class Class1PresentationPredictor(object):
 
         if result == "best":
             result_df = result_df.drop_duplicates(
-                ["sequence_name", "experiment_name"], keep="first"
+                ["sequence_name", "sample_name"], keep="first"
             ).sort_values("sequence_name")
         elif result == "filtered":
             if comparison_is_score:

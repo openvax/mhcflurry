@@ -260,7 +260,7 @@ def run(argv=sys.argv[1:]):
         predictions = predictor.predict_affinity(
             peptides=df[args.peptide_column].values,
             alleles=allele_string_to_alleles,
-            experiment_names=df[args.allele_column],
+            sample_names=df[args.allele_column],
             throw=not args.no_throw,
             include_affinity_percentile=not args.no_affinity_percentile)
     else:
@@ -280,7 +280,7 @@ def run(argv=sys.argv[1:]):
             n_flanks=n_flanks,
             c_flanks=c_flanks,
             alleles=allele_string_to_alleles,
-            experiment_names=df[args.allele_column],
+            sample_names=df[args.allele_column],
             throw=not args.no_throw,
             include_affinity_percentile=not args.no_affinity_percentile)
 
@@ -291,7 +291,7 @@ def run(argv=sys.argv[1:]):
             del predictions["best_allele"]
 
     for col in predictions.columns:
-        if col not in ("allele", "peptide", "experiment_name", "peptide_num"):
+        if col not in ("allele", "peptide", "sample_name", "peptide_num"):
             df[args.prediction_column_prefix + col] = predictions[col]
 
     if args.out:

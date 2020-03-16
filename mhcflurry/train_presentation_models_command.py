@@ -124,7 +124,7 @@ def main(args):
         targets=df[args.target_column].values,
         peptides=df.peptide.values,
         alleles=experiment_to_alleles,
-        experiment_names=df.experiment_id,
+        sample_names=df.experiment_id,
         n_flanks=df.n_flank.values,
         c_flanks=df.c_flank.values,
         verbose=args.verbosity)

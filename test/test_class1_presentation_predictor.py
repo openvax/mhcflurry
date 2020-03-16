@@ -15,9 +15,7 @@ from sklearn.metrics import roc_auc_score
 from mhcflurry import Class1AffinityPredictor, Class1ProcessingPredictor
 from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
 from mhcflurry.downloads import get_path
-from mhcflurry.common import random_peptides
 from mhcflurry.testing_utils import cleanup, startup
-from mhcflurry.regression_target import to_ic50
 import mhcflurry.class1_presentation_predictor
 mhcflurry.class1_presentation_predictor.PREDICT_CHUNK_SIZE = 15
 
@@ -80,7 +78,7 @@ def test_basic():
     predictor.fit(
         targets=train_df.hit.values,
         peptides=train_df.peptide.values,
-        experiment_names=train_df.sample_id.values,
+        sample_names=train_df.sample_id.values,
         alleles=experiment_to_alleles,
         n_flanks=train_df.n_flank.values,
         c_flanks=train_df.c_flank.values,
@@ -89,7 +87,7 @@ def test_basic():
     def add_prediction_cols(test_df, predictor):
         test_df["prediction1"] = predictor.predict(
             peptides=test_df.peptide.values,
-            experiment_names=test_df.sample_id.values,
+            sample_names=test_df.sample_id.values,
             alleles=experiment_to_alleles,
             n_flanks=test_df.n_flank.values,
             c_flanks=test_df.c_flank.values,
@@ -97,7 +95,7 @@ def test_basic():
 
         test_df["prediction2"] = predictor.predict(
             peptides=test_df.peptide.values,
-            experiment_names=test_df.sample_id.values,
+            sample_names=test_df.sample_id.values,
             alleles=experiment_to_alleles,
             verbose=2)
 
