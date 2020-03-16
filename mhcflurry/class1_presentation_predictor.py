@@ -89,7 +89,8 @@ class Class1PresentationPredictor(object):
             verbose=1,
             throw=True):
         """
-        Predict binding affinities.
+        Predict binding affinities across samples (each corresponding to up to
+        six MHC  I alleles).
 
         Two modes are supported: each peptide can be evaluated for binding to
         any of the alleles in any sample (this is what happens when sample_names
@@ -97,7 +98,8 @@ class Class1PresentationPredictor(object):
         of the sample given by the i'th entry in sample_names.
 
         For example, if we don't specify sample_names, then predictions
-        are taken for all combinations of samples and peptides:
+        are taken for all combinations of samples and peptides, for a result
+        size of num peptides *  num samples:
 
         >>> predictor = Class1PresentationPredictor.load()
         >>> predictor.predict_affinity(
@@ -114,7 +116,8 @@ class Class1PresentationPredictor(object):
         3   PEPTIDE            1     sample2  34362.109211       C0202
 
         In contrast, here we specify sample_names, so peptide is evaluated for
-        binding the alleles in the corresponding sample:
+        binding the alleles in the corresponding sample, for a result size equal
+        to the number of peptides:
 
         >>> predictor.predict_affinity(
         ...    peptides=["SIINFEKL", "PEPTIDE"],
@@ -132,14 +135,14 @@ class Class1PresentationPredictor(object):
         Parameters
         ----------
         peptides : list of string
+            Peptide sequences
         alleles : dict of string -> list of string
             Keys are sample names, values are the alleles (genotype) for
             that sample
         sample_names : list of string [same length as peptides]
-            Sample names corresponding to each peptide. These are used to
-            lookup the alleles for each peptide in the alleles dict. If not
-            specified, then predictions are generated for all sample genotypes
-            across all peptides.
+            Sample names corresponding to each peptide. If None, then
+            predictions are generated for all sample genotypes  across all
+            peptides.
         include_affinity_percentile : bool
             Whether to include affinity percentile ranks
         verbose : int
@@ -469,11 +472,33 @@ class Class1PresentationPredictor(object):
         the binding affinity and processing predictions and other intermediate
         results.
 
+        Example:
+
+        >>> predictor = Class1PresentationPredictor.load()
+        >>> predictor.predict_to_dataframe(
+        ...    peptides=["SIINFEKL", "PEPTIDE"],
+        ...    n_flanks=["NNN", "SNS"],
+        ...    c_flanks=["CCC", "CNC"],
+        ...    alleles={
+        ...        "sample1": ["A0201", "A0301", "B0702"],
+        ...        "sample2": ["A0101", "C0202"],
+        ...    },
+        ...    verbose=0)
+            peptide n_flank c_flank  peptide_num sample_name      affinity best_allele  processing_score  presentation_score
+        0  SIINFEKL     NNN     CCC            0     sample1  12906.787792       A0201          0.802466            0.140365
+        1   PEPTIDE     SNS     CNC            1     sample1  36827.681130       B0702          0.105260            0.004059
+        2  SIINFEKL     NNN     CCC            0     sample2   3588.413748       C0202          0.802466            0.338647
+        3   PEPTIDE     SNS     CNC            1     sample2  34362.109211       C0202          0.105260            0.004317
+
+        You can also specify sample_names, in which case peptide is evaluated
+        for binding the alleles in the corresponding sample only. See
+        `predict_affinity` for an examples.
+
         Parameters
         ----------
         peptides : list of string
             Peptide sequences
-        alleles : list of string or string -> list of string dict
+        alleles : list of string or dict of string -> list of string
             If you are predicting for a single sample, pass a list of strings
             (up to 6) indicating the genotype. If you are predicting across
             multiple samples, pass a dict where the keys are (arbitrary)
@@ -481,9 +506,8 @@ class Class1PresentationPredictor(object):
             sample.
         sample_names : list of string [same length as peptides]
             If you are passing a dict for 'alleles', you can use this
-            argument to
-            specify which peptides go with which samples. If it is None,
-            then predictions will be performed for each peptide across all
+            argument to specify which peptides go with which samples. If it is
+            None, then predictions will be performed for each peptide across all
             samples.
         n_flanks : list of string [same length as peptides]
             Upstream sequences before the peptide. Sequences of any length can
@@ -584,6 +608,34 @@ class Class1PresentationPredictor(object):
         """
         Predict presentation across protein sequences.
 
+        Example:
+
+        >>> predictor = Class1PresentationPredictor.load()
+        >>> predictor.predict_sequences(
+        ...    sequences={
+        ...        'protein1': "MDSKGSSQKGSRLLLLLVVSNLL",
+        ...        'protein2': "SSLPTPEDKEQAQQTHH",
+        ...    },
+        ...    alleles={
+        ...        "sample1": ["A0201", "A0301", "B0702"],
+        ...        "sample2": ["A0101", "C0202"],
+        ...    },
+        ...    result="filtered",
+        ...    comparison_quantity="affinity",
+        ...    filter_value=500,
+        ...    verbose=0)
+          sequence_name  pos     peptide         n_flank     c_flank sample_name    affinity best_allele  affinity_percentile  processing_score  presentation_score
+        0      protein1   13   LLLLVVSNL   MDSKGSSQKGSRL           L     sample1   38.206225       A0201             0.380125          0.017644            0.571060
+        1      protein1   14   LLLVVSNLL  MDSKGSSQKGSRLL                 sample1   42.243472       A0201             0.420250          0.090984            0.619213
+        2      protein1    5   SSQKGSRLL           MDSKG   LLLVVSNLL     sample2   66.749223       C0202             0.803375          0.383608            0.774468
+        3      protein1    6   SQKGSRLLL          MDSKGS    LLVVSNLL     sample2  178.033474       C0202             1.820000          0.275019            0.482206
+        4      protein1   13  LLLLVVSNLL   MDSKGSSQKGSRL                 sample1  202.208167       A0201             1.112500          0.058782            0.261320
+        5      protein1   12  LLLLLVVSNL    MDSKGSSQKGSR           L     sample1  202.506582       A0201             1.112500          0.010025            0.225648
+        6      protein2    0   SSLPTPEDK                    EQAQQTHH     sample1  335.529377       A0301             1.011750          0.010443            0.156798
+        7      protein2    0   SSLPTPEDK                    EQAQQTHH     sample2  353.451759       C0202             2.674250          0.010443            0.150753
+        8      protein1    8   KGSRLLLLL        MDSKGSSQ      VVSNLL     sample2  410.327286       C0202             2.887000          0.121374            0.194081
+        9      protein1    5    SSQKGSRL           MDSKG  LLLLVVSNLL     sample2  477.285954       C0202             3.107375          0.111982            0.168572
+
         Parameters
         ----------
         sequences : str, list of string, or string -> string dict
@@ -665,7 +717,7 @@ class Class1PresentationPredictor(object):
             if all(isinstance(a, string_types) for a in alleles):
                 # Case (2) - a simple list of alleles
                 alleles = {
-                    'genotype': alleles
+                    'sample1': alleles
                 }
             else:
                 # Case (3) - a list of lists
@@ -730,7 +782,7 @@ class Class1PresentationPredictor(object):
             result_df.peptide_num.map(pandas.Series(sequence_names)))
         result_df.insert(
             1,
-            "position_in_sequence",
+            "pos",
             result_df.peptide_num.map(pandas.Series(position_in_sequence)))
         del result_df["peptide_num"]
 
