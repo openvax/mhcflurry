@@ -49,21 +49,19 @@ help:
 	@echo "  coverage   to run coverage check of the documentation (if enabled)"
 	@echo "  dummy      to check syntax errors of document sources"
 
-# Added by Tim:
+# Added by Tim
 .PHONY: generate
 generate:
 	sphinx-apidoc -M -f -o _build/ ../mhcflurry
 	mhcflurry-downloads fetch models_class1_pan
 	python generate_class1_pan.py --out-dir model-info
 
-# Added by Tim:
-.PHONY: readme
-readme: text
-	rm -f package_readme/readme.generated.txt
-	cat package_readme/readme_header.rst \
-	    _build/text/package_readme/readme.template.txt \
-	    > package_readme/readme.generated.txt
-	chmod 444 package_readme/readme.generated.txt  # read only
+# Added by Tim
+.PHONY: generate_model_info
+generate_model_info:
+	sphinx-apidoc -M -f -o _build/ ../mhcflurry
+	mhcflurry-downloads fetch models_class1_pan
+	python generate_class1_pan.py --out-dir model-info
 
 .PHONY: clean
 clean:
@@ -72,6 +70,10 @@ clean:
 	mv $(BUILDDIR)/html /tmp/html-bk
 	rm -rf $(BUILDDIR)/*
 	mv /tmp/html-bk $(BUILDDIR)/html
+
+# Added by Tim
+.PHONY: clean_model_info
+clean_model_info:
 	rm -rf model-info
 
 .PHONY: html

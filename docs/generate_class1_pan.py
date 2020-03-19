@@ -12,35 +12,23 @@ from os import mkdir
 import pandas
 import logomaker
 
+import tqdm
+
 from matplotlib import pyplot
 
 from mhcflurry.downloads import get_path
 from mhcflurry.amino_acid import COMMON_AMINO_ACIDS
+from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
 
 AMINO_ACIDS = sorted(COMMON_AMINO_ACIDS)
 
 parser = argparse.ArgumentParser(usage=__doc__)
 parser.add_argument(
-    "--class1-models-dir-with-ms",
-    "--class1-models",
+    "--class1-models-dir",
     metavar="DIR",
     default=get_path(
         "models_class1_pan", "models.combined", test_exists=False),
     help="Class1 models. Default: %(default)s",
-)
-parser.add_argument(
-    "--class1-models-dir-no-ms",
-    metavar="DIR",
-    default=get_path(
-        "models_class1_pan", "models.no_mass_spec", test_exists=False),
-    help="Class1 models. Default: %(default)s",
-)
-parser.add_argument(
-    "--class1-models-dir-refined",
-    metavar="DIR",
-    default=get_path(
-        "models_class1_pan_refined", "models.affinity", test_exists=False),
-    help="Class1 refined models. Default: %(default)s",
 )
 parser.add_argument(
     "--logo-cutoff",
@@ -84,6 +72,9 @@ parser.add_argument(
 
 
 def model_info(models_dir):
+    allele_to_sequence = Class1AffinityPredictor.load(
+        models_dir).allele_to_sequence
+
     length_distributions_df = pandas.read_csv(
         join(models_dir, "length_distributions.csv.bz2"))
     frequency_matrices_df = pandas.read_csv(
@@ -104,10 +95,21 @@ def model_info(models_dir):
     normalized_frequency_matrices.loc[:, AMINO_ACIDS] = (
             normalized_frequency_matrices[AMINO_ACIDS] / distribution)
 
+    sequence_to_alleles = defaultdict(list)
+    for allele in normalized_frequency_matrices.allele.unique():
+        sequence = allele_to_sequence[allele]
+        sequence_to_alleles[sequence].append(allele)
+
+    allele_equivalance_classes = sorted([
+        sorted(equivalence_group)
+        for equivalence_group in sequence_to_alleles.values()
+    ], key=lambda equivalence_group: equivalence_group[0])
+
     return {
         'length_distributions': length_distributions_df,
         'normalized_frequency_matrices': normalized_frequency_matrices,
         'observations_per_allele': observations_per_allele,
+        'allele_equivalance_classes': allele_equivalance_classes,
     }
 
 
@@ -191,7 +193,7 @@ def go(argv):
         mkdir(args.out_dir)
 
     predictors = [
-        ("combined", args.class1_models_dir_with_ms),
+        ("combined", args.class1_models_dir),
     ]
     info_per_predictor = OrderedDict()
     alleles = set()
@@ -224,7 +226,6 @@ def go(argv):
 
     w(".. contents:: :local:", "")
 
-
     def image(name):
         if name is None:
             return ""
@@ -234,7 +235,7 @@ def go(argv):
     if args.max_alleles:
         alleles = alleles[:args.max_alleles]
 
-    for allele in alleles:
+    for allele in tqdm.tqdm(alleles):
         w(allele, "-" * 80, "")
         for (label, info) in info_per_predictor.items():
             length_distribution = info["length_distributions"]

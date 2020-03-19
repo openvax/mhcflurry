@@ -54,7 +54,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'numpydoc',
-    'sphinxcontrib.autorun2',
+    'sphinx_autorun',
     'sphinxcontrib.programoutput',
     'sphinxcontrib.autoprogram',
     'sphinx.ext.githubpages',
@@ -76,7 +76,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'MHCflurry'
-copyright = '2019, Timothy O\'Donnell'
+copyright = 'Timothy O\'Donnell'
 author = 'Timothy O\'Donnell'
 
 # The version info for the project you're documenting, acts as replacement for
