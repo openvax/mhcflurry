@@ -46,7 +46,7 @@ class Class1PresentationPredictor(object):
     a "presentation score" prediction.
 
     Most users will call the `load` static method to get an instance of this
-    class, then call the `predict_to_dataframe` method to generate predictions.
+    class, then call the `predict` method to generate predictions.
     """
     model_inputs = ["affinity_score", "processing_score"]
 
@@ -85,7 +85,7 @@ class Class1PresentationPredictor(object):
             peptides,
             alleles,
             sample_names=None,
-            include_affinity_percentile=False,
+            include_affinity_percentile=True,
             verbose=1,
             throw=True):
         """
@@ -397,68 +397,6 @@ class Class1PresentationPredictor(object):
             sample_names=None,
             n_flanks=None,
             c_flanks=None,
-            verbose=1):
-        """
-        Predict presentation scores across a set of peptides.
-
-        Presentation scores combine predictions for MHC I binding affinity
-        and antigen processing.
-
-        For intermediate results, see the `predict_to_dataframe` method.
-
-        Parameters
-        ----------
-        peptides : list of string
-            Peptide sequences
-        alleles : list of string or string -> string dict
-            If you are predicting for a single sample, pass a list of strings
-            (up to 6) indicating the genotype. If you are predicting across
-            multiple samples, pass a dict where the keys are (arbitrary)
-            sample names and the values are the alleles to predict for that
-            sample.
-        sample_names : list of string [same length as peptides]
-            If you are passing a dict for 'alleles', use this argument to
-            specify which peptides go with which sample.
-        n_flanks : list of string [same length as peptides]
-            Upstream sequences before the peptide. Sequences of any length can
-            be given and a suffix of the size supported by the model will be
-            used.
-        c_flanks : list of string [same length as peptides]
-            Downstream sequences after the peptide. Sequences of any length can
-            be given and a prefix of the size supported by the model will be
-            used.
-        verbose : int
-            Set to 0 for quiet mode.
-
-        Returns
-        -------
-        numpy.array
-
-        Presentation scores for each peptide. Scores range from 0 to 1, with
-        higher values indicating more favorable presentation likelihood.
-        """
-        if isinstance(alleles, dict):
-            if sample_names is None:
-                raise ValueError(
-                    "sample_names must be supplied when alleles is a dict. "
-                    "Alternatively, call predict_to_dataframe to predict over "
-                    "all samples")
-
-        return self.predict_to_dataframe(
-            peptides=peptides,
-            alleles=alleles,
-            sample_names=sample_names,
-            n_flanks=n_flanks,
-            c_flanks=c_flanks,
-            verbose=verbose).presentation_score.values
-
-    def predict_to_dataframe(
-            self,
-            peptides,
-            alleles,
-            sample_names=None,
-            n_flanks=None,
-            c_flanks=None,
             include_affinity_percentile=False,
             verbose=1,
             throw=True):
@@ -475,7 +413,7 @@ class Class1PresentationPredictor(object):
         Example:
 
         >>> predictor = Class1PresentationPredictor.load()
-        >>> predictor.predict_to_dataframe(
+        >>> predictor.predict(
         ...    peptides=["SIINFEKL", "PEPTIDE"],
         ...    n_flanks=["NNN", "SNS"],
         ...    c_flanks=["CCC", "CNC"],
@@ -766,7 +704,7 @@ class Class1PresentationPredictor(object):
                         c_flanks.append(
                             sequence[peptide_start + peptide_length : c_flank_end])
 
-        result_df = self.predict_to_dataframe(
+        result_df = self.predict(
             peptides=peptides,
             alleles=alleles,
             n_flanks=n_flanks,

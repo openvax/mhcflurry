@@ -15,7 +15,7 @@ endif
 # Internal variables.
 PAPEROPT_a4     = -D latex_paper_size=a4
 PAPEROPT_letter = -D latex_paper_size=letter
-ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
+ALLSPHINXOPTS   = -v -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 
@@ -53,15 +53,6 @@ help:
 .PHONY: generate
 generate:
 	sphinx-apidoc -M -f -o _build/ ../mhcflurry
-	mhcflurry-downloads fetch models_class1_pan
-	python generate_class1_pan.py --out-dir model-info
-
-# Added by Tim
-.PHONY: generate_model_info
-generate_model_info:
-	sphinx-apidoc -M -f -o _build/ ../mhcflurry
-	mhcflurry-downloads fetch models_class1_pan
-	python generate_class1_pan.py --out-dir model-info
 
 .PHONY: clean
 clean:
@@ -70,11 +61,6 @@ clean:
 	mv $(BUILDDIR)/html /tmp/html-bk
 	rm -rf $(BUILDDIR)/*
 	mv /tmp/html-bk $(BUILDDIR)/html
-
-# Added by Tim
-.PHONY: clean_model_info
-clean_model_info:
-	rm -rf model-info
 
 .PHONY: html
 html:

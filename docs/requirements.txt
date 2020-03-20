@@ -1,10 +1,9 @@
 sphinx
-sphinxcontrib-autorun
 sphinxcontrib-programoutput
 sphinxcontrib-autoprogram
 sphinx-rtd-theme
 numpydoc
-pypandoc
+ypandoc
 mhctools
 pydot
 tabulate

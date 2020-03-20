@@ -275,7 +275,7 @@ def run(argv=sys.argv[1:]):
                     "No flanking information provided. Specify --no-flanking "
                     "to silence this warning")
 
-        predictions = predictor.predict_to_dataframe(
+        predictions = predictor.predict(
             peptides=df[args.peptide_column].values,
             n_flanks=n_flanks,
             c_flanks=c_flanks,

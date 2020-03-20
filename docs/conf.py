@@ -54,11 +54,21 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'numpydoc',
-    'sphinx_autorun',
     'sphinxcontrib.programoutput',
     'sphinxcontrib.autoprogram',
     'sphinx.ext.githubpages',
 ]
+
+doctest_global_setup = '''
+import logging
+logging.getLogger('matplotlib').disabled = True
+logging.getLogger('tensorflow').disabled = True
+import numpy
+import pandas
+import mhcflurry
+'''
+
+doctest_test_doctest_blocks = ''
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

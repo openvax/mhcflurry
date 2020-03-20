@@ -22,11 +22,9 @@ directory. To get the path to downloaded data, you can use:
 .. command-output:: mhcflurry-downloads path models_class1_presentation
     :nostderr:
 
-We also release a few other "downloads," such as curated training data and some
-experimental models. To see what's available and what you have downloaded, run:
-
-.. command-output:: mhcflurry-downloads info
-    :nostderr:
+We also release a number of other "downloads," such as curated training data and some
+experimental models. To see what's available and what you have downloaded, run
+``mhcflurry-downloads info``.
 
 Most users will only need ``models_class1_presentation``, however, as the
 presentation predictor includes a peptide / MHC I binding affinity (BA) predictor
@@ -42,8 +40,8 @@ Generating predictions
 ----------------------
 
 The :ref:`mhcflurry-predict` command generates predictions for individual peptides
-(as opposed to scanning protein sequences for epitopes).
-By default it will use the pre-trained models you downloaded above. Other
+(see the next section for how to scan protein sequences for epitopes). By
+default it will use the pre-trained models you downloaded above. Other
 models can be used by specifying the ``--models`` argument.
 
 Running:
@@ -60,23 +58,39 @@ results in a file like this:
 .. command-output::
     cat /tmp/predictions.csv
 
-The predictions are given as affinities (KD) in nM in the ``mhcflurry_prediction``
-column. The other fields give the 5-95 percentile predictions across
-the models in the ensemble and the quantile of the affinity prediction among
-a large number of random peptides tested on that allele.
+The binding affinity predictions are given as affinities (KD) in nM in the
+``mhcflurry_affinity`` column. Lower values indicate stronger binders. A commonly-used
+threshold for peptides with a reasonable chance of being immunogenic is 500 nM.
 
-The predictions shown above were generated with MHCflurry |version|. Different versions of
-MHCflurry can give considerably different results. Even
-on the same version, exact predictions may vary (up to about 1 nM) depending
-on the Keras backend and other details.
+The ``mhcflurry_affinity_percentile`` gives the quantile of the affinity
+prediction among a large number of random peptides tested on that allele. Lower
+is stronger. Two percent is a commonly-used threshold.
+
+The last two columns give the antigen processing and presentation scores,
+respectively. These range from 0 to 1 with higher values indicating more
+favorable processing or presentation.
+
+.. note::
+
+    The processing predictor is experimental and under
+    development. It models allele-independent effects that influence whether a
+    peptide will be detected in a mass spec experiment. The presentation score is
+    a simple logistic regression model that combines the (log) binding affinity
+    prediction with the processing score to give a composite prediction. The resulting
+    prediction is appropriate for prioritizing potential epitopes to test, but no
+    thresholds have yet been established for what constitutes a "high enough"
+    presentation score.
 
 In most cases you'll want to specify the input as a CSV file instead of passing
-peptides and alleles as commandline arguments. See :ref:`mhcflurry-predict` docs.
+peptides and alleles as commandline arguments. If you're relying on the
+processing or presentation scores, you may also want to pass the upstream and
+downstream sequences of the peptides from their source proteins for potentially more
+accurate cleavage prediction. See the :ref:`mhcflurry-predict` docs.
 
 Scanning protein sequences for predicted MHC I ligands
 -------------------------------------------------
 
-Starting in version 1.6.0, MHCflurry supports scanning proteins for MHC I binding
+Starting in version 1.6.0, MHCflurry supports scanning proteins for MHC-binding
 peptides using the ``mhcflurry-predict-scan`` command.
 
 We'll generate predictions across ``example.fasta``, a FASTA file with two short
@@ -84,23 +98,18 @@ sequences:
 
 .. literalinclude:: /example.fasta
 
-Here's the ``mhctools`` invocation.
+Here's the ``mhcflurry-predict-scan`` invocation to scan the proteins for
+binders to either of two MHC I genotypes:
 
 .. command-output::
-    mhctools
-        --mhc-predictor mhcflurry
-        --input-fasta-file example.fasta
-        --mhc-alleles A02:01,A03:01
-        --mhc-peptide-lengths 8,9,10,11
-        --extract-subsequences
-        --output-csv /tmp/subsequence_predictions.csv
-    :ellipsis: 2,-2
+    mhcflurry-predict-scan
+        example.fasta
+        --alleles
+            HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02
+            HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:02,HLA-C*03:01
+        --results-filtered affinity_percentile
+        --threshold-affinity-percentile 1.0
     :nostderr:
-
-This will write a file giving predictions for all subsequences of the specified lengths:
-
-.. command-output::
-    head -n 3 /tmp/subsequence_predictions.csv
 
 See the :ref:`mhcflurry-predict-scan` docs for more options.
 
@@ -108,9 +117,12 @@ See the :ref:`mhcflurry-predict-scan` docs for more options.
 Fitting your own models
 -----------------------
 
-The :ref:`mhcflurry-class1-train-allele-specific-models` command is used to
-fit models to training data. The models we release with MHCflurry are trained
-with a command like:
+If you have your own data and want to fit your own MHCflurry models, you have
+a few options. If you have data for only one or a few MHC I alleles, the best
+approach is to use the
+:ref:`mhcflurry-class1-train-allele-specific-models` command to fit an
+"allele-specific" predictor, in which separate neural networks are used for
+each allele. Here's an example:
 
 .. code-block:: shell
 
@@ -120,21 +132,23 @@ with a command like:
         --min-measurements-per-allele 75 \
         --out-models-dir models
 
-MHCflurry predictors are serialized to disk as many files in a directory. The
-command above will write the models to the output directory specified by the
-``--out-models-dir`` argument. This directory has files like:
+.. note::
 
-.. program-output::
-    ls "$(mhcflurry-downloads path models_class1)/models"
-    :shell:
-    :nostderr:
-    :ellipsis: 4,-4
+    MHCflurry predictors are serialized to disk as many files in a directory. The
+    command above will write the models to the output directory specified by the
+    ``--out-models-dir`` argument. This directory has files like:
 
-The ``manifest.csv`` file gives metadata for all the models used in the predictor.
-There will be a ``weights_...`` file for each model giving its weights
-(the parameters for the neural network). The ``percent_ranks.csv`` stores a
-histogram of model predictions for each allele over a large number of random
-peptides. It is used for generating the percent ranks at prediction time.
+    .. program-output::
+        ls "$(mhcflurry-downloads path models_class1)/models"
+        :shell:
+        :nostderr:
+        :ellipsis: 4,-4
+
+    The ``manifest.csv`` file gives metadata for all the models used in the predictor.
+    There will be a ``weights_...`` file for each model giving its weights
+    (the parameters for the neural network). The ``percent_ranks.csv`` stores a
+    histogram of model predictions for each allele over a large number of random
+    peptides. It is used for generating the percent ranks at prediction time.
 
 To call :ref:`mhcflurry-class1-train-allele-specific-models` you'll need some
 training data. The data we use for our released predictors can be downloaded with
@@ -151,7 +165,12 @@ It looks like this:
     :shell:
     :nostderr:
 
-
+To fit pan-allele models like the ones released with MHCflurry, you can use
+a similar tool, ``mhcflurry-class1-train-pan-allele-models``. You'll probably
+also want to take a look at the scripts used to generate the production models,
+which are available in the *downloads-generation* directory in the MHCflurry
+repository. The production MHCflurry models were fit using a cluster with several
+dozen GPUs over a period of about two days.
 
 
 Environment variables

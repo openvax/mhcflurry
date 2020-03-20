@@ -68,3 +68,4 @@ script:
       --already-downloaded-dir /tmp/downloads
   - mhcflurry-downloads info  # just to test this command works
   - nosetests --with-timer -sv test
+  - cd docs && bash ./doctest.sh
