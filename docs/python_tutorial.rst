@@ -151,7 +151,7 @@ useful methods.
 Lower level interfaces
 ----------------------------------
 
-The `~mhcflurry.Class1PresentationPredictor` predictor delegates to a
+The `~mhcflurry.Class1PresentationPredictor` delegates to a
 `~mhcflurry.Class1AffinityPredictor` instance for binding affinity predictions.
 If all you need are binding affinities, you can use this instance directly.
 
