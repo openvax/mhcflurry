@@ -91,13 +91,13 @@ def test_basic():
             alleles=experiment_to_alleles,
             n_flanks=test_df.n_flank.values,
             c_flanks=test_df.c_flank.values,
-            verbose=2)
+            verbose=2).presentation_score.values
 
         test_df["prediction2"] = predictor.predict(
             peptides=test_df.peptide.values,
             sample_names=test_df.sample_id.values,
             alleles=experiment_to_alleles,
-            verbose=2)
+            verbose=2).presentation_score.values
 
     add_prediction_cols(test_df, predictor)
 

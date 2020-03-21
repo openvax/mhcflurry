@@ -161,7 +161,7 @@ training data. The data we use for our released predictors can be downloaded wit
 It looks like this:
 
 .. command-output::
-    bzcat "$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2" | head -n 3
+    bzcat "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" | head -n 3
     :shell:
     :nostderr:
 
