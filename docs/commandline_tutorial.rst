@@ -33,7 +33,7 @@ as well as an antigen processing (AP) predictor.
 .. note::
 
     The code we use for *generating* the downloads is in the
-    ``downloads_generation`` directory in the repository.
+    ``downloads_generation`` directory in the repository (https://github.com/openvax/mhcflurry/tree/master/downloads-generation)
 
 
 Generating predictions
@@ -99,7 +99,7 @@ sequences:
 .. literalinclude:: /example.fasta
 
 Here's the ``mhcflurry-predict-scan`` invocation to scan the proteins for
-binders to either of two MHC I genotypes:
+binders to either of two MHC I genotypes (using a 100 nM threshold):
 
 .. command-output::
     mhcflurry-predict-scan
@@ -107,8 +107,8 @@ binders to either of two MHC I genotypes:
         --alleles
             HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02
             HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:02,HLA-C*03:01
-        --results-filtered affinity_percentile
-        --threshold-affinity-percentile 1.0
+        --results-filtered affinity
+        --threshold-affinity 100
     :nostderr:
 
 See the :ref:`mhcflurry-predict-scan` docs for more options.

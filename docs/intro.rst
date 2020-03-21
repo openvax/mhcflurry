@@ -2,7 +2,7 @@ Introduction and setup
 =======================
 
 MHCflurry is an open source package for peptide/MHC I binding affinity prediction. It
-attempts to provide competitive accuracy with a fast and documented implementation.
+aims to provide competitive accuracy with a fast and documented implementation.
 
 You can download pre-trained MHCflurry models fit to mass spec-identified MHC I
 ligands and peptide/MHC affinity measurements deposited in IEDB (plus a few other
@@ -63,7 +63,7 @@ tensorflow.
 
 .. code-block:: shell
 
-    $ conda create -q -n mhcflurry-env python=3.6 tensorflow
+    $ conda create -q -n mhcflurry-env python=3.6 'tensorflow<2.0.0'
     $ source activate mhcflurry-env
 
 Then continue as above:
