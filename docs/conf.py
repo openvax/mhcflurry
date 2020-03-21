@@ -66,6 +66,8 @@ logging.getLogger('tensorflow').disabled = True
 import numpy
 import pandas
 import mhcflurry
+pandas.set_option('max_columns', 20)
+pandas.set_option('display.expand_frame_repr', False)
 '''
 
 doctest_test_doctest_blocks = ''

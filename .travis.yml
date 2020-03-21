@@ -18,7 +18,6 @@ before_install:
   # Useful for debugging any issues with conda
   - conda info -a
   - free -m
-  - make -v
 addons:
   apt:
     packages:
