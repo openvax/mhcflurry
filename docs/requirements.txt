@@ -3,7 +3,7 @@ sphinxcontrib-programoutput
 sphinxcontrib-autoprogram
 sphinx-rtd-theme
 numpydoc
-ypandoc
+pypandoc
 mhctools
 pydot
 tabulate
