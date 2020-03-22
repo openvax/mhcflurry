@@ -25,7 +25,8 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib mkl-service 'tensorflow>=1.1.0,<2.0.0' pypandoc
+      numpy scipy nose pandas matplotlib mkl-service 'tensorflow>=1.1.0,<2.0.0'
+      pypandoc sphinx
   - source activate test-environment
   - pip install nose-timer
   - pip install -r requirements.txt
