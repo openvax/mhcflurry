@@ -7,15 +7,10 @@ SPHINXBUILD   = sphinx-build
 PAPER         =
 BUILDDIR      = _build
 
-# User-friendly check for sphinx-build
-ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
-	$(error The '$(SPHINXBUILD)' command was not found. Make sure you have Sphinx installed, then set the SPHINXBUILD environment variable to point to the full path of the '$(SPHINXBUILD)' executable. Alternatively you can add the directory with the executable to your PATH. If you don\'t have Sphinx installed, grab it from http://sphinx-doc.org/)
-endif
-
 # Internal variables.
 PAPEROPT_a4     = -D latex_paper_size=a4
 PAPEROPT_letter = -D latex_paper_size=letter
-ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
+ALLSPHINXOPTS   = -v -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 
@@ -49,21 +44,10 @@ help:
 	@echo "  coverage   to run coverage check of the documentation (if enabled)"
 	@echo "  dummy      to check syntax errors of document sources"
 
-# Added by Tim:
+# Added by Tim
 .PHONY: generate
 generate:
 	sphinx-apidoc -M -f -o _build/ ../mhcflurry
-	mhcflurry-downloads fetch models_class1_pan
-	python generate_class1_pan.py --out-dir model-info
-
-# Added by Tim:
-.PHONY: readme
-readme: text
-	rm -f package_readme/readme.generated.txt
-	cat package_readme/readme_header.rst \
-	    _build/text/package_readme/readme.template.txt \
-	    > package_readme/readme.generated.txt
-	chmod 444 package_readme/readme.generated.txt  # read only
 
 .PHONY: clean
 clean:
@@ -72,7 +56,6 @@ clean:
 	mv $(BUILDDIR)/html /tmp/html-bk
 	rm -rf $(BUILDDIR)/*
 	mv /tmp/html-bk $(BUILDDIR)/html
-	rm -rf model-info
 
 .PHONY: html
 html:

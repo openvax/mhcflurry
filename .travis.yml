@@ -1,7 +1,8 @@
+dist: bionic
 language: python
 python:
-  - "2.7"
   - "3.6"
+  - "3.7"
 before_install:
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
       wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
@@ -24,10 +25,12 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib mkl-service 'tensorflow>=1.1.0,<2.0.0' pypandoc
+      numpy scipy nose pandas matplotlib mkl-service 'tensorflow>=1.1.0,<2.0.0'
+      pypandoc sphinx numpydoc
   - source activate test-environment
   - pip install nose-timer
   - pip install -r requirements.txt
+  - pip install -r docs/requirements.txt
   - pip install .
   - pip freeze
 env:
@@ -44,17 +47,27 @@ script:
   -
     wget
       $(mhcflurry-downloads url data_curated)
+      $(mhcflurry-downloads url data_mass_spec_annotated)
       $(mhcflurry-downloads url models_class1)
+      $(mhcflurry-downloads url models_class1_presentation)
+      $(mhcflurry-downloads url models_class1_processing)
+      $(mhcflurry-downloads url models_class1_processing_variants)
       $(mhcflurry-downloads url models_class1_pan)
+      $(mhcflurry-downloads url models_class1_pan_variants)
       $(mhcflurry-downloads url allele_sequences)
       -P /tmp/downloads
   - ls -lh /tmp/downloads
   -
     mhcflurry-downloads fetch
-    data_curated
-    models_class1
-    models_class1_pan
-    allele_sequences
-    --already-downloaded-dir /tmp/downloads
+      data_curated
+      data_mass_spec_annotated
+      models_class1
+      models_class1_presentation
+      models_class1_processing
+      models_class1_processing_variants
+      models_class1_pan
+      models_class1_pan_variants
+      allele_sequences
+      --already-downloaded-dir /tmp/downloads
   - mhcflurry-downloads info  # just to test this command works
   - nosetests --with-timer -sv test

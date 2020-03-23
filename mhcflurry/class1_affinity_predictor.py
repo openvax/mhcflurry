@@ -26,6 +26,7 @@ from .regression_target import to_ic50
 from .version import __version__
 from .ensemble_centrality import CENTRALITY_MEASURES
 from .allele_encoding import AlleleEncoding
+from .common import save_weights, load_weights
 
 
 # Default function for combining predictions across models in an ensemble.
@@ -214,7 +215,7 @@ class Class1AffinityPredictor(object):
 
     def merge_in_place(self, others):
         """
-        Add the models present other predictors into the current predictor.
+        Add the models present in other predictors into the current predictor.
 
         Parameters
         ----------
@@ -370,8 +371,7 @@ class Class1AffinityPredictor(object):
             updated_network_config_jsons.append(
                 json.dumps(row.model.get_config()))
             weights_path = self.weights_path(models_dir, row.model_name)
-            Class1AffinityPredictor.save_weights(
-                row.model.get_weights(), weights_path)
+            save_weights(row.model.get_weights(), weights_path)
             logging.info("Wrote: %s", weights_path)
         sub_manifest_df["config_json"] = updated_network_config_jsons
         self.manifest_df.loc[
@@ -419,8 +419,10 @@ class Class1AffinityPredictor(object):
                 series = transform.to_series()
                 if percent_ranks_df is None:
                     percent_ranks_df = pandas.DataFrame(index=series.index)
-                assert_equal(series.index.values, percent_ranks_df.index.values)
-                percent_ranks_df[allele] = series
+                numpy.testing.assert_array_almost_equal(
+                    series.index.values,
+                    percent_ranks_df.index.values)
+                percent_ranks_df[allele] = series.values
             percent_ranks_path = join(models_dir, "percent_ranks.csv")
             percent_ranks_df.to_csv(
                 percent_ranks_path,
@@ -469,9 +471,7 @@ class Class1AffinityPredictor(object):
             # We will lazy-load weights when the network is used.
             model = Class1NeuralNetwork.from_config(
                 config,
-                weights_loader=partial(
-                    Class1AffinityPredictor.load_weights,
-                    abspath(weights_filename)))
+                weights_loader=partial(load_weights, abspath(weights_filename)))
             if row.allele == "pan-class1":
                 class1_pan_allele_models.append(model)
             else:
@@ -521,7 +521,7 @@ class Class1AffinityPredictor(object):
                 "succeeded" if optimized else "not supported for these models")
         return result
 
-    def optimize(self):
+    def optimize(self, warn=True):
         """
         EXPERIMENTAL: Optimize the predictor for faster predictions.
 
@@ -545,7 +545,8 @@ class Class1AffinityPredictor(object):
                         merge_method="concatenate")
                 ]
             except NotImplementedError as e:
-                logging.warning("Optimization failed: %s", str(e))
+                if warn:
+                    logging.warning("Optimization failed: %s", str(e))
                 return False
             self._manifest_df = None
             self.clear_cache()
@@ -893,11 +894,29 @@ class Class1AffinityPredictor(object):
         numpy.array of float
         """
         if allele is not None:
+            normalized_allele = mhcnames.normalize_allele_name(allele)
             try:
-                transform = self.allele_to_percent_rank_transform[allele]
+                transform = self.allele_to_percent_rank_transform[normalized_allele]
                 return transform.transform(affinities)
             except KeyError:
-                msg = "Allele %s has no percentile rank information" % allele
+                if self.allele_to_sequence:
+                    # See if we have information for an equivalent allele
+                    sequence = self.allele_to_sequence[normalized_allele]
+                    other_alleles = [
+                        other_allele for (other_allele, other_sequence)
+                        in self.allele_to_sequence.items()
+                        if other_sequence == sequence
+                    ]
+                    for other_allele in other_alleles:
+                        if other_allele in self.allele_to_percent_rank_transform:
+                            transform = self.allele_to_percent_rank_transform[
+                                other_allele]
+                            return transform.transform(affinities)
+
+                msg = "Allele %s has no percentile rank information" % (
+                    allele + (
+                        "" if allele == normalized_allele
+                        else " (normalized to %s)" % normalized_allele))
                 if throw:
                     raise ValueError(msg)
                 warnings.warn(msg)
@@ -1121,15 +1140,14 @@ class Class1AffinityPredictor(object):
                 masked_allele_encoding = AlleleEncoding(
                     df.normalized_allele,
                     borrow_from=master_allele_encoding)
-                masked_peptides = peptides
+                masked_peptides = EncodableSequences.create(peptides)
             elif mask.sum() > 0:
                 row_slice = mask
                 masked_allele_encoding = AlleleEncoding(
                     df.loc[mask].normalized_allele,
                     borrow_from=master_allele_encoding)
-                masked_peptides = peptides.sequences[mask]
-
-            masked_peptides = EncodableSequences.create(masked_peptides)
+                masked_peptides = EncodableSequences.create(
+                    peptides.sequences[mask])
 
             if row_slice is not None:
                 # The following line is a performance optimization that may be
@@ -1233,46 +1251,6 @@ class Class1AffinityPredictor(object):
         del df["supported_peptide_length"]
         del df["normalized_allele"]
         return df
-
-    @staticmethod
-    def save_weights(weights_list, filename):
-        """
-        Save the model weights to the given filename using numpy's ".npz"
-        format.
-    
-        Parameters
-        ----------
-        weights_list : list of array
-        
-        filename : string
-            Should end in ".npz".
-    
-        """
-        numpy.savez(
-            filename,
-            **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list)))
-
-    @staticmethod
-    def load_weights(filename):
-        """
-        Restore model weights from the given filename, which should have been
-        created with `save_weights`.
-    
-        Parameters
-        ----------
-        filename : string
-            Should end in ".npz".
-
-        Returns
-        ----------
-        list of array
-        """
-        with numpy.load(filename) as loaded:
-            weights = [
-                loaded["array_%d" % i]
-                for i in range(len(loaded.keys()))
-            ]
-        return weights
 
     def calibrate_percentile_ranks(
             self,

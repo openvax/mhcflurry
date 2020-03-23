@@ -64,6 +64,7 @@ def cluster_results_from_args(
         work_function,
         work_items,
         constant_data=None,
+        input_serialization_method="pickle",
         result_serialization_method="pickle",
         clear_constant_data=False):
     """
@@ -95,6 +96,7 @@ def cluster_results_from_args(
         results_workdir=args.cluster_results_workdir,
         additional_complete_file=args.additional_complete_file,
         script_prefix_path=args.cluster_script_prefix_path,
+        input_serialization_method=input_serialization_method,
         result_serialization_method=result_serialization_method,
         max_retries=args.cluster_max_retries,
         clear_constant_data=clear_constant_data
@@ -109,6 +111,7 @@ def cluster_results(
         results_workdir="./cluster-workdir",
         additional_complete_file=None,
         script_prefix_path=None,
+        input_serialization_method="pickle",
         result_serialization_method="pickle",
         max_retries=3,
         clear_constant_data=False):
@@ -156,18 +159,33 @@ def cluster_results(
     generator of B
     """
 
+    if input_serialization_method == "dill":
+        import dill
+        input_serialization_module = dill
+    else:
+        assert input_serialization_method == "pickle"
+        input_serialization_module = pickle
+
     constant_payload = {
         'constant_data': constant_data,
         'function': work_function,
     }
+    if not os.path.exists(results_workdir):
+        os.mkdir(results_workdir)
+
     work_dir = os.path.join(
         os.path.abspath(results_workdir),
         str(int(time.time())))
     os.mkdir(work_dir)
 
-    constant_payload_path = os.path.join(work_dir, "global_data.pkl")
+    constant_payload_path = os.path.join(
+        work_dir,
+        "global_data." + input_serialization_method)
     with open(constant_payload_path, "wb") as fd:
-        pickle.dump(constant_payload, fd, protocol=pickle.HIGHEST_PROTOCOL)
+        input_serialization_module.dump(
+            constant_payload,
+            fd,
+            protocol=input_serialization_module.HIGHEST_PROTOCOL)
     print("Wrote:", constant_payload_path)
     if clear_constant_data:
         constant_data.clear()
@@ -186,9 +204,11 @@ def cluster_results(
             work_dir, "work-item.%03d-of-%03d" % (i, len(work_items)))
         os.mkdir(item_workdir)
 
-        item_data_path = os.path.join(item_workdir, "data.pkl")
+        item_data_path = os.path.join(
+            item_workdir, "data." + input_serialization_method)
         with open(item_data_path, "wb") as fd:
-            pickle.dump(item, fd, protocol=pickle.HIGHEST_PROTOCOL)
+            input_serialization_module.dump(
+                item, fd, protocol=input_serialization_module.HIGHEST_PROTOCOL)
         print("Wrote:", item_data_path)
 
         item_result_path = os.path.join(item_workdir, "result")
@@ -205,6 +225,7 @@ def cluster_results(
             "--result-out", quote(item_result_path),
             "--error-out", quote(item_error_path),
             "--complete-dir", quote(item_finished_path),
+            "--input-serialization-method", input_serialization_method,
             "--result-serialization-method", result_serialization_method,
         ]))
         item_script = "\n".join(item_script_pieces)
@@ -231,6 +252,7 @@ def cluster_results(
         })
 
     def result_generator():
+        additional_complete_file_path = None
         start = time.time()
         while result_items:
             print("[%0.1f sec elapsed] waiting on %d / %d items." % (
@@ -238,17 +260,17 @@ def cluster_results(
             while True:
                 result_item = None
                 for d in result_items:
+                    if additional_complete_file:
+                        additional_complete_file_path = os.path.join(
+                            d['work_dir'], additional_complete_file)
                     if os.path.exists(d['finished_path']):
                         result_item = d
                         break
-                    if additional_complete_file:
-                        additional_complete_file_path = os.path.join(
-                            d['work_dir'],
-                            additional_complete_file)
-                        if os.path.exists(additional_complete_file_path):
-                            result_item = d
-                            print("Exists", additional_complete_file_path)
-                            break
+                    if additional_complete_file and os.path.exists(
+                            additional_complete_file_path):
+                        result_item = d
+                        print("Exists", additional_complete_file_path)
+                        break
 
                 if result_item is None:
                     time.sleep(60)
@@ -268,9 +290,16 @@ def cluster_results(
             if os.path.exists(error_path) or not os.path.exists(result_path):
                 if os.path.exists(error_path):
                     print("Error path exists", error_path)
-                    with open(error_path, "rb") as fd:
-                        exception = pickle.load(fd)
-                        print(exception)
+                    try:
+                        with open(error_path, "rb") as fd:
+                            exception = pickle.load(fd)
+                            print(exception)
+                    except Exception as e:
+                        exception = RuntimeError(
+                            "Error, but couldn't read error path: %s %s" % (
+                                type(e), str(e)))
+                else:
+                    exception = RuntimeError("Error, but no exception saved")
                 if not os.path.exists(result_path):
                     print("Result path does NOT exist", result_path)
 
@@ -280,7 +309,8 @@ def cluster_results(
                         result_item['work_dir'], "attempt.%d" % retry_num)
                     if os.path.exists(complete_dir):
                         shutil.move(complete_dir, attempt_dir)  # directory
-                    if os.path.exists(additional_complete_file_path):
+                    if additional_complete_file and os.path.exists(
+                            additional_complete_file_path):
                         shutil.move(additional_complete_file_path, attempt_dir)
                     if os.path.exists(error_path):
                         shutil.move(error_path, attempt_dir)
@@ -297,10 +327,14 @@ def cluster_results(
                 print("Result path exists", result_path)
                 if result_serialization_method == "save_predictor":
                     result = Class1AffinityPredictor.load(result_path)
-                else:
-                    assert result_serialization_method == "pickle"
+                elif result_serialization_method == "pickle":
                     with open(result_path, "rb") as fd:
                         result = pickle.load(fd)
+                else:
+                    raise ValueError(
+                        "Unsupported serialization method",
+                        result_serialization_method)
+
                 yield result
             else:
                 raise RuntimeError("Results do not exist", result_path)
@@ -330,6 +364,10 @@ parser.add_argument(
     "--complete-dir",
 )
 parser.add_argument(
+    "--input-serialization-method",
+    choices=("pickle", "dill"),
+    default="pickle")
+parser.add_argument(
     "--result-serialization-method",
     choices=("pickle", "save_predictor"),
     default="pickle")
@@ -349,11 +387,18 @@ def worker_entry_point(argv=sys.argv[1:]):
 
     args = parser.parse_args(argv)
 
+    if args.input_serialization_method == "dill":
+        import dill
+        input_serialization_module = dill
+    else:
+        assert args.input_serialization_method == "pickle"
+        input_serialization_module = pickle
+
     with open(args.constant_data, "rb") as fd:
-        constant_payload = pickle.load(fd)
+        constant_payload = input_serialization_module.load(fd)
 
     with open(args.worker_data, "rb") as fd:
-        worker_data = pickle.load(fd)
+        worker_data = input_serialization_module.load(fd)
 
     kwargs = dict(worker_data)
     if constant_payload['constant_data'] is not None:

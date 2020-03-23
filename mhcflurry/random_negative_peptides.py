@@ -16,7 +16,7 @@ class RandomNegativePeptides(object):
 
     hyperparameter_defaults = HyperparameterDefaults(
         random_negative_rate=0.0,
-        random_negative_constant=25,
+        random_negative_constant=0,
         random_negative_match_distribution=True,
         random_negative_distribution_smoothing=0.0,
         random_negative_method="recommended",
@@ -70,6 +70,12 @@ class RandomNegativePeptides(object):
         pandas.DataFrame indicating number of random negatives for each length
         and allele.
         """
+        numpy.testing.assert_equal(len(peptides), len(affinities))
+        if alleles is not None:
+            numpy.testing.assert_equal(len(peptides), len(alleles))
+        if inequalities is not None:
+            numpy.testing.assert_equal(len(peptides), len(inequalities))
+
         peptides = pandas.Series(peptides, copy=False)
         peptide_lengths = peptides.str.len()
 

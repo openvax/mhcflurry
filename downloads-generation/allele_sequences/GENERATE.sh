@@ -32,6 +32,7 @@ clustalo --version
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 cp $SCRIPT_DIR/make_allele_sequences.py .
+cp $SCRIPT_DIR/select_alleles_to_disambiguate.py .
 cp $SCRIPT_DIR/filter_sequences.py .
 cp $SCRIPT_DIR/class1_pseudosequences.csv .
 cp $SCRIPT_ABSOLUTE_PATH .
@@ -40,10 +41,12 @@ cp $SCRIPT_ABSOLUTE_PATH .
 # Training data is used to decide which additional positions to include in the
 # allele sequences to differentiate alleles that have identical traditional
 # pseudosequences but have associated training data
-TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2"
+TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2"
 
-bzcat "$(mhcflurry-downloads path data_curated)/curated_training_data.with_mass_spec.csv.bz2" \
-    | cut -f 1 -d , | uniq | sort | uniq | grep -v allele > training_data.alleles.txt
+python select_alleles_to_disambiguate.py \
+    "$TRAINING_DATA" \
+    --min-count 50 \
+    --out training_data.alleles.txt
 
 # Human
 wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/fasta/A_prot.fasta
@@ -81,6 +84,11 @@ time python make_allele_sequences.py \
     --differentiate-alleles training_data.alleles.txt \
     --out-csv allele_sequences.csv
 
+time python make_allele_sequences.py \
+    class1.aligned.fasta \
+    --recapitulate-sequences class1_pseudosequences.csv \
+    --out-csv allele_sequences.no_differentiation.csv
+
 # Cleanup
 gzip -f class1.fasta
 gzip -f class1.aligned.fasta
@@ -88,6 +96,6 @@ rm *.fasta
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 LOG.txt
-tar -cjf "../${DOWNLOAD_NAME}.tar.bz2" *
-
-echo "Created archive: $SCRATCH_DIR/$DOWNLOAD_NAME.tar.bz2"
+RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
+tar -cjf "$RESULT" *
+echo "Created archive: $RESULT"

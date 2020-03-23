@@ -1,3 +1,7 @@
+import logging
+logging.getLogger('matplotlib').disabled = True
+logging.getLogger('tensorflow').disabled = True
+
 import tempfile
 import os
 
@@ -45,6 +49,7 @@ def test_no_csv():
         "--alleles", "HLA-A0201", "H-2-Kb",
         "--peptides", "SIINFEKL", "DENDREKLLL", "PICKLEEE",
         "--prediction-column-prefix", "mhcflurry1_",
+        "--affinity-only",
     ]
 
     deletes = []
@@ -61,8 +66,9 @@ def test_no_csv():
             os.unlink(delete)
 
     print(result)
-    assert_equal(result.shape, (6, 6))
+    assert_equal(len(result), 6)
     sub_result1 = result.loc[result.peptide == "SIINFEKL"].set_index("allele")
+    print(sub_result1)
     assert (
-        sub_result1.loc["H-2-Kb"].mhcflurry1_prediction <
-        sub_result1.loc["HLA-A0201"].mhcflurry1_prediction)
+        sub_result1.loc["H-2-Kb"].mhcflurry1_affinity <
+        sub_result1.loc["HLA-A0201"].mhcflurry1_affinity)

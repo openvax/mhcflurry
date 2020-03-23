@@ -63,7 +63,7 @@ def test_a1_known_epitopes_in_newly_trained_model():
     allele = "HLA-A*01:01"
     df = pandas.read_csv(
         get_path(
-            "data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
+            "data_curated", "curated_training_data.affinity.csv.bz2"))
     df = df.loc[
         (df.allele == allele) &
         (df.peptide.str.len() >= 8) &
@@ -149,7 +149,7 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
 
     df = pandas.read_csv(
         get_path(
-            "data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
+            "data_curated", "curated_training_data.affinity.csv.bz2"))
     df = df.loc[
         df.allele == allele
     ]

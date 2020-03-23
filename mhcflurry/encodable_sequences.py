@@ -9,6 +9,7 @@ from __future__ import (
 
 import math
 from six import string_types
+from functools import partial
 
 import numpy
 import pandas
@@ -121,7 +122,9 @@ class EncodableSequences(object):
             alignment_method="pad_middle",
             left_edge=4,
             right_edge=4,
-            max_length=15):
+            max_length=15,
+            trim=False,
+            allow_unsupported_amino_acids=False):
         """
         Encode variable-length sequences to a fixed-size matrix. Amino acids
         are encoded as specified by the vector_encoding_name argument.
@@ -138,11 +141,20 @@ class EncodableSequences(object):
             encodings is given by available_vector_encodings().
         alignment_method : string
             One of "pad_middle" or "left_pad_right_pad"
-        left_edge : int, size of fixed-position left side
+        left_edge : int
+            Size of fixed-position left side.
             Only relevant for pad_middle alignment method
-        right_edge : int, size of the fixed-position right side
+        right_edge : int
+            Size of the fixed-position right side.
             Only relevant for pad_middle alignment method
-        max_length : maximum supported peptide length
+        max_length : int
+            Maximum supported peptide length
+        trim : bool
+            If True, longer sequences will be trimmed to fit the maximum
+            supported length. Not supported for all alignment methods.
+        allow_unsupported_amino_acids : bool
+            If True, non-canonical amino acids will be replaced with the X
+            character before encoding.
 
         Returns
         -------
@@ -159,7 +171,9 @@ class EncodableSequences(object):
             alignment_method,
             left_edge,
             right_edge,
-            max_length)
+            max_length,
+            trim,
+            allow_unsupported_amino_acids)
         if cache_key not in self.encoding_cache:
             fixed_length_sequences = (
                 self.sequences_to_fixed_length_index_encoded_array(
@@ -167,7 +181,9 @@ class EncodableSequences(object):
                     alignment_method=alignment_method,
                     left_edge=left_edge,
                     right_edge=right_edge,
-                    max_length=max_length))
+                    max_length=max_length,
+                    trim=trim,
+                    allow_unsupported_amino_acids=allow_unsupported_amino_acids))
             result = amino_acid.fixed_vectors_encoding(
                 fixed_length_sequences,
                 amino_acid.ENCODING_DATA_FRAMES[vector_encoding_name])
@@ -182,7 +198,9 @@ class EncodableSequences(object):
             alignment_method="pad_middle",
             left_edge=4,
             right_edge=4,
-            max_length=15):
+            max_length=15,
+            trim=False,
+            allow_unsupported_amino_acids=False):
         """
         Encode variable-length sequences to a fixed-size index-encoded (integer)
         matrix.
@@ -228,11 +246,20 @@ class EncodableSequences(object):
         sequences : list of string
         alignment_method : string
             One of "pad_middle" or "left_pad_right_pad"
-        left_edge : int, size of fixed-position left side
+        left_edge : int
+            Size of fixed-position left side.
             Only relevant for pad_middle alignment method
-        right_edge : int, size of the fixed-position right side
+        right_edge : int
+            Size of the fixed-position right side.
             Only relevant for pad_middle alignment method
-        max_length : maximum supported peptide length
+        max_length : int
+            maximum supported peptide length
+        trim : bool
+            If True, longer sequences will be trimmed to fit the maximum
+            supported length. Not supported for all alignment methods.
+        allow_unsupported_amino_acids : bool
+            If True, non-canonical amino acids will be replaced with the X
+            character before encoding.
 
         Returns
         -------
@@ -242,8 +269,19 @@ class EncodableSequences(object):
         it's 2 * max_length. For left_pad_centered_right_pad, it's
         3 * max_length.
         """
+        if allow_unsupported_amino_acids:
+            fill_value = amino_acid.AMINO_ACID_INDEX['X']
+
+            def get_amino_acid_index(a):
+                return amino_acid.AMINO_ACID_INDEX.get(a, fill_value)
+        else:
+            get_amino_acid_index = amino_acid.AMINO_ACID_INDEX.__getitem__
+
         result = None
         if alignment_method == 'pad_middle':
+            if trim:
+                raise NotImplementedError("trim not supported")
+
             # Result array is int32, filled with X (null amino acid) value.
             result = numpy.full(
                 fill_value=amino_acid.AMINO_ACID_INDEX['X'],
@@ -273,7 +311,7 @@ class EncodableSequences(object):
                 fixed_length_sequences = numpy.stack(
                     sub_df.peptide.map(
                         lambda s: numpy.array([
-                            amino_acid.AMINO_ACID_INDEX[char] for char in s
+                            get_amino_acid_index(char) for char in s
                         ])).values)
 
                 num_null = max_length - length
@@ -300,6 +338,9 @@ class EncodableSequences(object):
                     -right_edge:
                 ] = fixed_length_sequences[:, -right_edge:]
         elif alignment_method == "left_pad_right_pad":
+            if trim:
+                raise NotImplementedError("trim not supported")
+
             # We arbitrarily set a minimum length of 5, although this encoding
             # could handle smaller peptides.
             min_length = 5
@@ -328,7 +369,7 @@ class EncodableSequences(object):
                 # amino acid encoding each peptide of the current length.
                 fixed_length_sequences = numpy.stack(sub_df.peptide.map(
                     lambda s: numpy.array([
-                        amino_acid.AMINO_ACID_INDEX[char] for char in s
+                        get_amino_acid_index(char) for char in s
                     ])).values)
 
                 # Set left edge
@@ -337,6 +378,9 @@ class EncodableSequences(object):
                 # Set right edge.
                 result[sub_df.index, -length:] = fixed_length_sequences
         elif alignment_method == "left_pad_centered_right_pad":
+            if trim:
+                raise NotImplementedError("trim not supported")
+
             # We arbitrarily set a minimum length of 5, although this encoding
             # could handle smaller peptides.
             min_length = 5
@@ -365,7 +409,7 @@ class EncodableSequences(object):
                 # amino acid encoding each peptide of the current length.
                 fixed_length_sequences = numpy.stack(sub_df.peptide.map(
                     lambda s: numpy.array([
-                        amino_acid.AMINO_ACID_INDEX[char] for char in s
+                        get_amino_acid_index(char) for char in s
                     ])).values)
 
                 # Set left edge
@@ -382,7 +426,54 @@ class EncodableSequences(object):
                     sub_df.index,
                     center_left_offset : center_left_offset + length
                 ] = fixed_length_sequences
+        elif alignment_method in ("right_pad", "left_pad"):
+            min_length = 1
+
+            # Result array is int32, filled with X (null amino acid) value.
+            result = numpy.full(
+                fill_value=amino_acid.AMINO_ACID_INDEX['X'],
+                shape=(len(sequences), max_length),
+                dtype="int32")
+
+            df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
+
+            # For efficiency we handle each supported peptide length using bulk
+            # array operations.
+            for (length, sub_df) in df.groupby(df.peptide.str.len()):
+                if length < min_length or (not trim and length > max_length):
+                    raise EncodingError(
+                        "Sequence '%s' (length %d) unsupported. There are %d "
+                        "total peptides with this length." % (
+                            sub_df.iloc[0].peptide,
+                            length,
+                            len(sub_df)), supported_peptide_lengths=(
+                                min_length, max_length))
+
+                peptides = sub_df.peptide
+                if length > max_length:
+                    # Trim.
+                    if alignment_method == "right_pad":
+                        peptides = peptides.str.slice(0, max_length)
+                    else:
+                        peptides = peptides.str.slice(length - max_length)
+
+                # Array of shape (num peptides, length) giving fixed-length
+                # amino acid encoding each peptide of the current length.
+                fixed_length_sequences = numpy.stack(peptides.map(
+                    lambda s: numpy.array([
+                        get_amino_acid_index(char) for char in s
+                    ])).values)
+
+                if alignment_method == "right_pad":
+                    # Left align (i.e. pad right): set left edge
+                    result[sub_df.index, :length] = fixed_length_sequences
+                else:
+                    # Right align: set right edge.
+                    result[sub_df.index, -length:] = fixed_length_sequences
+
         else:
             raise NotImplementedError(
                 "Unsupported alignment method: %s" % alignment_method)
+
+
         return result

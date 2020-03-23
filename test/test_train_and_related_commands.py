@@ -65,7 +65,7 @@ def run_and_check(n_jobs=0):
 
     args = [
         "mhcflurry-class1-train-allele-specific-models",
-        "--data", get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"),
+        "--data", get_path("data_curated", "curated_training_data.affinity.csv.bz2"),
         "--hyperparameters", hyperparameters_filename,
         "--allele", "HLA-A*02:01", "HLA-A*03:01",
         "--out-models-dir", models_dir,
@@ -117,7 +117,7 @@ def run_and_check_with_model_selection(n_jobs=1):
 
     args = [
         "mhcflurry-class1-train-allele-specific-models",
-        "--data", get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"),
+        "--data", get_path("data_curated", "curated_training_data.affinity.csv.bz2"),
         "--hyperparameters", hyperparameters_filename,
         "--allele", "HLA-A*02:01", "HLA-A*03:01",
         "--out-models-dir", models_dir1,
@@ -135,7 +135,7 @@ def run_and_check_with_model_selection(n_jobs=1):
     args = [
         "mhcflurry-class1-select-allele-specific-models",
         "--data",
-        get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2"),
+        get_path("data_curated", "curated_training_data.affinity.csv.bz2"),
         "--exclude-data", models_dir1 + "/train_data.csv.bz2",
         "--out-models-dir", models_dir2,
         "--models-dir", models_dir1,

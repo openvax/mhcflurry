@@ -51,9 +51,9 @@ if __name__ == '__main__':
         'six',
         'numpy>=1.11',
         'pandas>=0.20.3',
-        'Keras>=2.2.5',
+        'Keras>=2.3.0',
         'appdirs',
-        'tensorflow>=1.1.0,<2.0.0',
+        'tensorflow>=1.15.0,<2.0.0',
         'scikit-learn',
         'mhcnames',
         'pyyaml',
@@ -73,16 +73,23 @@ if __name__ == '__main__':
             'console_scripts': [
                 'mhcflurry-downloads = mhcflurry.downloads_command:run',
                 'mhcflurry-predict = mhcflurry.predict_command:run',
+                'mhcflurry-predict-scan = mhcflurry.predict_scan_command:run',
                 'mhcflurry-class1-train-allele-specific-models = '
                     'mhcflurry.train_allele_specific_models_command:run',
                 'mhcflurry-class1-train-pan-allele-models = '
                     'mhcflurry.train_pan_allele_models_command:run',
+                'mhcflurry-class1-train-processing-models = '
+                    'mhcflurry.train_processing_models_command:run',
                 'mhcflurry-class1-select-allele-specific-models = '
                     'mhcflurry.select_allele_specific_models_command:run',
                 'mhcflurry-class1-select-pan-allele-models = '
                     'mhcflurry.select_pan_allele_models_command:run',
+                'mhcflurry-class1-select-processing-models = '
+                    'mhcflurry.select_processing_models_command:run',
                 'mhcflurry-calibrate-percentile-ranks = '
                     'mhcflurry.calibrate_percentile_ranks_command:run',
+                'mhcflurry-class1-train-presentation-models = '
+                    'mhcflurry.train_presentation_models_command:run',
                 '_mhcflurry-cluster-worker-entry-point = '
                     'mhcflurry.cluster_parallelism:worker_entry_point',
             ]

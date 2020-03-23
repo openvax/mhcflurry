@@ -17,7 +17,6 @@ class HyperparameterDefaults(object):
     *supported* by a model and their defaults. The particular
     hyperparameter settings to be used, for example, to train a model
     are kept in plain dicts.
-
     """
     def __init__(self, **defaults):
         self.defaults = dict(defaults)

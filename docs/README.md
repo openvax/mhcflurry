@@ -1,8 +1,5 @@
 # MHCflurry documentation
 
-Due to our use of `sphinxcontrib-autorun2` we unfortunately require Python 2.7
-to build to the docs. Python 3 is not supported.
-
 To generate Sphinx documentation, from this directory run:
 
 ```
@@ -12,3 +9,11 @@ $ make generate html
 
 Documentation is written to the _build/ directory. These files should not be
 checked into the repo.
+
+To test example code:
+```
+$ make doctest 
+```
+
+Then take a look at _build/doctest for detailed output.
+

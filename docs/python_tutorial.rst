@@ -1,159 +1,183 @@
 Python library tutorial
 =======================
 
-Predicting
-----------
-
 The MHCflurry Python API exposes additional options and features beyond those
-supported by the commandline tools. This tutorial gives a basic overview
-of the most important functionality. See the :ref:`API-documentation` for further details.
+supported by the commandline tools and can be more convenient for interactive
+analyses and bioinformatic pipelines. This tutorial gives a basic overview
+of the most important functionality. See the :ref:`API-documentation` for further
+details.
 
-The `~mhcflurry.Class1AffinityPredictor` class is the primary user-facing interface.
-Use the `~mhcflurry.Class1AffinityPredictor.load` static method to load a
+Loading a predictor
+----------------------------------
+
+Most prediction tasks can be performed using the
+`~mhcflurry.Class1PresentationPredictor` class, which provides a programmatic API
+to the functionality in the :ref:`mhcflurry-predict` and
+:ref:`mhcflurry-predict-scan` commands.
+
+Instances of `~mhcflurry.Class1PresentationPredictor` wrap a
+`~mhcflurry.Class1AffinityPredictor` to generate binding affinity predictions
+and a `~mhcflurry.Class1ProcessingPredictor` to generate antigen processing
+predictions. The presentation score is computed using a logistic regression
+model over binding affinity and processing predictions.
+
+Use the `~mhcflurry.Class1PresentationPredictor.load` static method to load a
 trained predictor from disk. With no arguments this method will load the predictor
 released with MHCflurry (see :ref:`downloading`\ ). If you pass a path to a
 models directory, then it will load that predictor instead.
 
-.. runblock:: pycon
+.. doctest::
 
-    >>> from mhcflurry import Class1AffinityPredictor
-    >>> predictor = Class1AffinityPredictor.load()
-    >>> predictor.supported_alleles[:10]
+    >>> from mhcflurry import Class1PresentationPredictor
+    >>> predictor = Class1PresentationPredictor.load()
+    >>> predictor.supported_alleles[:5]
+    ['Atbe-B*01:01', 'Atbe-E*03:01', 'Atbe-G*03:01', 'Atbe-G*03:02', 'Atbe-G*06:01']
 
-With a predictor loaded we can now generate some binding predictions:
+Predicting for individual peptides
+----------------------------------
 
-.. runblock:: pycon
+To generate predictions for individual peptides, we can use the
+`~mhcflurry.Class1AffinityPredictor.predict` method of the `~mhcflurry.Class1PresentationPredictor`,
+loaded above. This method returns a `pandas.DataFrame` with binding affinity, processing, and presentation
+predictions:
 
-    >>> predictor.predict(allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
+.. doctest::
+
+    >>> predictor.predict(
+    ...     peptides=["SIINFEKL", "NLVPMVATV"],
+    ...     alleles=["HLA-A0201", "HLA-A0301"],
+    ...     verbose=0)
+         peptide  peptide_num sample_name      affinity best_allele  processing_score  presentation_score
+    0   SIINFEKL            0     sample1  12906.786173   HLA-A0201          0.101473            0.012503
+    1  NLVPMVATV            1     sample1     15.038358   HLA-A0201          0.676289            0.975463
+
+Here, the list of alleles is taken to be an individual's MHC I genotype (i.e. up
+to 6 alleles), and the strongest binder across alleles for each peptide is
+reported.
 
 .. note::
 
-    MHCflurry normalizes allele names using the `mhcnames <https://github.com/hammerlab/mhcnames>`__
+    MHCflurry normalizes allele names using the `mhcnames <https://github.com/openvax/mhcnames>`__
     package. Names like ``HLA-A0201`` or ``A*02:01`` will be
     normalized to ``HLA-A*02:01``, so most naming conventions can be used
-    with methods such as `~mhcflurry.Class1AffinityPredictor.predict`.
+    with methods such as `~mhcflurry.Class1PresentationPredictor.predict`.
 
-For more detailed results, we can use
-`~mhcflurry.Class1AffinityPredictor.predict_to_dataframe`.
+If you have multiple sample genotypes, you can pass a dict, where the
+keys are arbitrary sample names:
 
-.. runblock:: pycon
+.. doctest::
 
-    >>> predictor.predict_to_dataframe(allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
+    >>> predictor.predict(
+    ...     peptides=["KSEYMTSWFY", "NLVPMVATV"],
+    ...     alleles={
+    ...        "sample1": ["A0201", "A0301", "B0702", "B4402", "C0201", "C0702"],
+    ...        "sample2": ["A0101", "A0206", "B5701", "C0202"],
+    ...     },
+    ...     verbose=0)
+          peptide  peptide_num sample_name      affinity best_allele  processing_score  presentation_score
+    0  KSEYMTSWFY            0     sample1  16737.745268       A0301          0.381632            0.026550
+    1   NLVPMVATV            1     sample1     15.038358       A0201          0.676289            0.975463
+    2  KSEYMTSWFY            0     sample2     62.540779       A0101          0.381632            0.796731
+    3   NLVPMVATV            1     sample2     15.765500       A0206          0.676289            0.974439
 
-Instead of a single allele and multiple peptides, we may need predictions for
-allele/peptide pairs. We can predict across pairs by specifying
-the `alleles` argument instead of `allele`. The list of alleles
-must be the same length as the list of peptides (i.e. it is predicting over pairs,
-*not* taking the cross product).
+Here the strongest binder for each sample / peptide pair is returned.
 
-.. runblock:: pycon
+Many users will focus on the binding affinity predictions, as the
+processing and presentation predictions are experimental. If you do use the latter
+scores, however, when available you should provide the upstream (N-flank)
+and downstream (C-flank) sequences from the source proteins of the peptides for
+a small boost in accuracy. To do so, specify the ``n_flank`` and ``c_flank``
+arguments, which give the flanking sequences for the corresponding peptides:
 
-    >>> predictor.predict(alleles=["HLA-A0201", "HLA-B*57:01"], peptides=["SIINFEKL", "SIINFEQL"])
+.. doctest::
 
-Training
---------
+    >>> predictor.predict(
+    ...     peptides=["KSEYMTSWFY", "NLVPMVATV"],
+    ...     n_flanks=["NNNNNNN", "SSSSSSSS"],
+    ...     c_flanks=["CCCCCCCC", "YYYAAAA"],
+    ...     alleles={
+    ...        "sample1": ["A0201", "A0301", "B0702", "B4402", "C0201", "C0702"],
+    ...        "sample2": ["A0101", "A0206", "B5701", "C0202"],
+    ...     },
+    ...     verbose=0)
+          peptide   n_flank   c_flank  peptide_num sample_name      affinity best_allele  processing_score  presentation_score
+    0  KSEYMTSWFY   NNNNNNN  CCCCCCCC            0     sample1  16737.745268       A0301          0.605816            0.056190
+    1   NLVPMVATV  SSSSSSSS   YYYAAAA            1     sample1     15.038358       A0201          0.824994            0.986719
+    2  KSEYMTSWFY   NNNNNNN  CCCCCCCC            0     sample2     62.540779       A0101          0.605816            0.897493
+    3   NLVPMVATV  SSSSSSSS   YYYAAAA            1     sample2     15.765500       A0206          0.824994            0.986155
 
-Let's fit our own MHCflurry predictor. First we need some training data. If you
-haven't already, run this in a shell to download the MHCflurry training data:
+Scanning protein sequences
+--------------------------
 
-.. code-block:: shell
+The `~mhcflurry.Class1PresentationPredictor.predict_sequences` method supports
+scanning protein sequences for MHC ligands. Here's an example to identify all
+peptides with a predicted binding affinity of 500 nM or tighter to any allele
+across two sample genotypes and two short peptide sequences.
 
-    $ mhcflurry-downloads fetch data_curated
+.. doctest::
 
-We can get the path to this data from Python using `mhcflurry.downloads.get_path`:
-
-.. runblock:: pycon
-
-    >>> from mhcflurry.downloads import get_path
-    >>> data_path = get_path("data_curated", "curated_training_data.no_mass_spec.csv.bz2")
-    >>> data_path
-
-Now let's load it with pandas and filter to reasonably-sized peptides:
-
-.. runblock:: pycon
-
-    >>> import pandas
-    >>> df = pandas.read_csv(data_path)
-    >>> df = df.loc[(df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)]
-    >>> df.head(5)
-
-We'll make an untrained `~mhcflurry.Class1AffinityPredictor` and then call
-`~mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors` to fit
-some models.
-
-.. runblock:: pycon
-
-    >>> new_predictor = Class1AffinityPredictor()
-    >>> single_allele_train_data = df.loc[df.allele == "HLA-B*57:01"].sample(100)
-    >>> new_predictor.fit_allele_specific_predictors(
-    ...    n_models=1,
-    ...    architecture_hyperparameters_list=[{
-    ...         "layer_sizes": [16],
-    ...         "max_epochs": 5,
-    ...         "random_negative_constant": 5,
-    ...    }],
-    ...    peptides=single_allele_train_data.peptide.values,
-    ...    affinities=single_allele_train_data.measurement_value.values,
-    ...    allele="HLA-B*57:01")
-
-
-The `~mhcflurry.Class1AffinityPredictor.fit_allele_specific_predictors` method
-can be called any number of times on the same instance to build up ensembles
-of models across alleles. The architecture hyperparameters we specified are
-for demonstration purposes; to fit real models you would usually train for
-more epochs.
-
-Now we can generate predictions:
-
-.. runblock:: pycon
-
-    >>> new_predictor.predict(["SYNPEPII"], allele="HLA-B*57:01")
-
-We can save our predictor to the specified directory on disk by running:
-
-.. runblock:: pycon
-
-    >>> new_predictor.save("/tmp/new-predictor")
-
-and restore it:
-
-.. runblock:: pycon
-
-    >>> new_predictor2 = Class1AffinityPredictor.load("/tmp/new-predictor")
-    >>> new_predictor2.supported_alleles
-
-
-Lower level interface
----------------------
-
-The high-level `Class1AffinityPredictor` delegates to low-level
-`~mhcflurry.Class1NeuralNetwork` objects, each of which represents
-a single neural network. The purpose of `~mhcflurry.Class1AffinityPredictor`
-is to implement several important features:
-
-ensembles
-    More than one neural network can be used to generate each prediction. The
-    predictions returned to the user are the geometric mean of the individual
-    model predictions. This gives higher accuracy in most situations
-
-multiple alleles
-    A `~mhcflurry.Class1NeuralNetwork` generates predictions for only a single
-    allele. The `~mhcflurry.Class1AffinityPredictor` maps alleles to the
-    relevant `~mhcflurry.Class1NeuralNetwork` instances
-
-serialization
-    Loading and saving predictors is implemented in `~mhcflurry.Class1AffinityPredictor`.
-
-Sometimes it's easiest to work directly with `~mhcflurry.Class1NeuralNetwork`.
-Here is a simple example of doing so:
-
-.. runblock:: pycon
-
-    >>> from mhcflurry import Class1NeuralNetwork
-    >>> network = Class1NeuralNetwork()
-    >>> network.fit(
-    ...    single_allele_train_data.peptide.values,
-    ...    single_allele_train_data.measurement_value.values,
+    >>> predictor.predict_sequences(
+    ...    sequences={
+    ...        'protein1': "MDSKGSSQKGSRLLLLLVVSNLL",
+    ...        'protein2': "SSLPTPEDKEQAQQTHH",
+    ...    },
+    ...    alleles={
+    ...        "sample1": ["A0201", "A0301", "B0702"],
+    ...        "sample2": ["A0101", "C0202"],
+    ...    },
+    ...    result="filtered",
+    ...    comparison_quantity="affinity",
+    ...    filter_value=500,
     ...    verbose=0)
-    >>> network.predict(["SIINFEKLL"])
+      sequence_name  pos     peptide         n_flank     c_flank sample_name    affinity best_allele  affinity_percentile  processing_score  presentation_score
+    0      protein1   13   LLLLVVSNL   MDSKGSSQKGSRL           L     sample1   38.206225       A0201             0.380125          0.017644            0.571060
+    1      protein1   14   LLLVVSNLL  MDSKGSSQKGSRLL                 sample1   42.243472       A0201             0.420250          0.090984            0.619213
+    2      protein1    5   SSQKGSRLL           MDSKG   LLLVVSNLL     sample2   66.749223       C0202             0.803375          0.383608            0.774468
+    3      protein1    6   SQKGSRLLL          MDSKGS    LLVVSNLL     sample2  178.033467       C0202             1.820000          0.275019            0.482206
+    4      protein1   13  LLLLVVSNLL   MDSKGSSQKGSRL                 sample1  202.208167       A0201             1.112500          0.058782            0.261320
+    5      protein1   12  LLLLLVVSNL    MDSKGSSQKGSR           L     sample1  202.506582       A0201             1.112500          0.010025            0.225648
+    6      protein2    0   SSLPTPEDK                    EQAQQTHH     sample1  335.529377       A0301             1.011750          0.010443            0.156798
+    7      protein2    0   SSLPTPEDK                    EQAQQTHH     sample2  353.451759       C0202             2.674250          0.010443            0.150753
+    8      protein1    8   KGSRLLLLL        MDSKGSSQ      VVSNLL     sample2  410.327286       C0202             2.887000          0.121374            0.194081
+    9      protein1    5    SSQKGSRL           MDSKG  LLLLVVSNLL     sample2  477.285937       C0202             3.107375          0.111982            0.168572
 
+When using ``predict_sequences``, the flanking sequences for each peptide are
+automatically included in the processing and presentation predictions.
+
+See the documentation for `~mhcflurry.Class1PresentationPredictor` for other
+useful methods.
+
+
+Lower level interfaces
+----------------------------------
+
+The `~mhcflurry.Class1PresentationPredictor` delegates to a
+`~mhcflurry.Class1AffinityPredictor` instance for binding affinity predictions.
+If all you need are binding affinities, you can use this instance directly.
+
+Here's an example:
+
+.. doctest::
+
+    >>> from mhcflurry import Class1AffinityPredictor
+    >>> predictor = Class1AffinityPredictor.load()
+    >>> predictor.predict_to_dataframe(allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
+        peptide     allele    prediction  prediction_low  prediction_high  prediction_percentile
+    0  SIINFEKL  HLA-A0201  12906.786173     8829.460289     18029.923061               6.566375
+    1  SIINFEQL  HLA-A0201  13025.300796     9050.056312     18338.004869               6.623625
+
+The ``prediction_low`` and ``prediction_high`` fields give the 5-95 percentile
+predictions across the models in the ensemble. This detailed information is not
+available through the higher-level `~mhcflurry.Class1PresentationPredictor`
+interface.
+
+Under the hood, `Class1AffinityPredictor` itself delegates to an ensemble of
+of `~mhcflurry.Class1NeuralNetwork` instances, which implement the neural network
+models used for prediction. To fit your own affinity prediction models, call
+`~mhcflurry.Class1NeuralNetwork.fit`.
+
+You can similarly use `~mhcflurry.Class1ProcessingPredictor` directly for
+antigen processing prediction, and there is a low-level
+`~mhcflurry.Class1ProcessingNeuralNetwork` with a `~mhcflurry.Class1ProcessingNeuralNetwork.fit` method.
+
+See the API documentation of these classes for details.

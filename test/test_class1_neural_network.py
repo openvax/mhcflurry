@@ -44,7 +44,7 @@ def test_class1_neural_network_a0205_training_accuracy():
 
     df = pandas.read_csv(
         get_path(
-            "data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
+            "data_curated", "curated_training_data.affinity.csv.bz2"))
     df = df.loc[
         df.allele == allele
     ]

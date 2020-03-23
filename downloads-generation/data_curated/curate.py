@@ -3,6 +3,7 @@ Filter and combine various peptide/MHC datasets to derive a composite training s
 optionally including eluted peptides identified by mass-spec.
 """
 import sys
+import os
 import argparse
 
 import pandas
@@ -30,24 +31,32 @@ parser.add_argument(
     default=[],
     help="Path to IEDB-style affinity data (e.g. mhc_ligand_full.csv)")
 parser.add_argument(
+    "--data-additional-ms",
+    action="append",
+    default=[],
+    help="Path to additional monoallelic mass spec hits")
+parser.add_argument(
     "--data-systemhc-atlas",
     action="append",
     default=[],
     help="Path to systemhc-atlas-style mass-spec data")
-parser.add_argument(
-    "--include-iedb-mass-spec",
-    action="store_true",
-    default=False,
-    help="Include mass-spec observations in IEDB")
 
 parser.add_argument(
     "--out-csv",
     required=True,
+    help="Combined result file")
+parser.add_argument(
+    "--out-affinity-csv",
+    required=False,
+    help="Result file")
+parser.add_argument(
+    "--out-mass-spec-csv",
+    required=False,
     help="Result file")
 
 QUALITATIVE_TO_AFFINITY_AND_INEQUALITY = {
     "Negative": (5000.0, ">"),
-    "Positive": (500.0, "<"),  # used for mass-spec hits
+    "Positive": (50.0, "<"),  # used for mass-spec hits
     "Positive-High": (100.0, "<"),
     "Positive-Intermediate": (1000.0, "<"),
     "Positive-Low": (5000.0, "<"),
@@ -70,6 +79,7 @@ def load_data_kim2014(filename):
     df = pandas.read_table(filename)
     print("Loaded kim2014 data: %s" % str(df.shape))
     df["measurement_source"] = "kim2014"
+    df["measurement_kind"] = "affinity"
     df["measurement_value"] = df.meas
     df["measurement_type"] = (df.inequality == "=").map({
         True: "quantitative",
@@ -91,6 +101,7 @@ def load_data_systemhc_atlas(filename, min_probability=0.99):
     df = pandas.read_csv(filename)
     print("Loaded systemhc atlas data: %s" % str(df.shape))
 
+    df["measurement_kind"] = "mass_spec"
     df["measurement_source"] = "systemhc-atlas"
     df["measurement_value"] = QUALITATIVE_TO_AFFINITY["Positive"]
     df["measurement_inequality"] = "<"
@@ -115,7 +126,7 @@ def load_data_systemhc_atlas(filename, min_probability=0.99):
     return df
 
 
-def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
+def load_data_iedb(iedb_csv, include_qualitative=True):
     iedb_df = pandas.read_csv(iedb_csv, skiprows=1, low_memory=False)
     print("Loaded iedb data: %s" % str(iedb_df.shape))
 
@@ -154,6 +165,7 @@ def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
     print("IEDB measurements per allele:\n%s" % iedb_df.allele.value_counts())
 
     quantitative = iedb_df.loc[iedb_df["Units"] == "nM"].copy()
+    quantitative["measurement_kind"] = "affinity"
     quantitative["measurement_type"] = "quantitative"
     quantitative["measurement_inequality"] = quantitative[
         "Measurement Inequality"
@@ -162,11 +174,13 @@ def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
 
     qualitative = iedb_df.loc[iedb_df["Units"].isnull()].copy()
     qualitative["measurement_type"] = "qualitative"
+    qualitative["measurement_kind"] = qualitative[
+        "Method/Technique"
+    ].str.contains("mass spec").map({
+        True: "mass_spec",
+        False: "affinity",
+    })
     print("Qualitative measurements: %d" % len(qualitative))
-    if not include_mass_spec:
-        qualitative = qualitative.loc[
-            (~qualitative["Method/Technique"].str.contains("mass spec"))
-        ].copy()
 
     qualitative["Quantitative measurement"] = (
         qualitative["Qualitative Measure"].map(QUALITATIVE_TO_AFFINITY))
@@ -213,9 +227,33 @@ def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
     train_data["allele"] = iedb_df["allele"].values
     train_data["original_allele"] = iedb_df["Allele Name"].values
     train_data["measurement_type"] = iedb_df["measurement_type"].values
+    train_data["measurement_kind"] = iedb_df["measurement_kind"].values
     train_data = train_data.drop_duplicates().reset_index(drop=True)
 
     return train_data
+
+
+def load_data_additional_ms(filename):
+    df = pandas.read_csv(filename)
+    print("Loaded additional MS", filename, df.shape)
+    print(df)
+    print("Entries:", len(df))
+
+    print("Subselecting to monoallelic")
+    df = df.loc[
+        df.format == "MONOALLELIC"
+    ].copy()
+    print("Now", len(df))
+
+    df["allele"] = df["hla"].map(normalize_allele_name)
+    assert not (df.allele == "UNKNOWN").any()
+    df["measurement_value"] = QUALITATIVE_TO_AFFINITY["Positive"]
+    df["measurement_inequality"] = "<"
+    df["measurement_type"] = "qualitative"
+    df["measurement_kind"] = "mass_spec"
+    df["measurement_source"] = "MS:pmid:" + df["original_pmid"].map(str)
+    df["original_allele"] = ""
+    return df
 
 
 def run():
@@ -223,7 +261,7 @@ def run():
 
     dfs = []
     for filename in args.data_iedb:
-        df = load_data_iedb(filename, include_mass_spec=args.include_iedb_mass_spec)
+        df = load_data_iedb(filename)
         dfs.append(df)
     for filename in args.data_kim2014:
         df = load_data_kim2014(filename)
@@ -243,11 +281,16 @@ def run():
         df = load_data_systemhc_atlas(filename)
         dfs.append(df)
 
+    for filename in args.data_additional_ms:
+        df = load_data_additional_ms(filename)
+        dfs.append(df)
+
     df = pandas.concat(dfs, ignore_index=True)
     print("Combined df: %s" % (str(df.shape)))
 
     print("Removing combined duplicates")
-    df = df.drop_duplicates(["allele", "peptide", "measurement_value"])
+    df = df.drop_duplicates(
+        ["allele", "peptide", "measurement_value", "measurement_kind"])
     print("New combined df: %s" % (str(df.shape)))
 
     df = df[[
@@ -256,14 +299,40 @@ def run():
         "measurement_value",
         "measurement_inequality",
         "measurement_type",
+        "measurement_kind",
         "measurement_source",
         "original_allele",
     ]].sort_values(["allele", "peptide"]).dropna()
 
     print("Final combined df: %s" % (str(df.shape)))
 
-    df.to_csv(args.out_csv, index=False)
-    print("Wrote: %s" % args.out_csv)
+    print("Measurement sources:")
+    print(df.measurement_source.value_counts())
+
+    print("Measurement kind:")
+    print(df.measurement_kind.value_counts())
+
+    print("Measurement source / kind:")
+    print(
+        df.groupby(
+            ["measurement_source", "measurement_kind"]
+        ).peptide.count().sort_values())
+
+    def write(write_df, filename):
+        filename = os.path.abspath(filename)
+        write_df.to_csv(filename, index=False)
+        print("Wrote [%d lines]: %s" % (len(write_df), filename))
+
+    write(df, args.out_csv)
+    if args.out_affinity_csv:
+        write(
+            df.loc[df.measurement_kind == "affinity"],
+            args.out_affinity_csv)
+    if args.out_mass_spec_csv:
+        write(
+            df.loc[df.measurement_kind == "mass_spec"],
+            args.out_mass_spec_csv)
+
 
 if __name__ == '__main__':
     run()

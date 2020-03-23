@@ -82,8 +82,7 @@ class Class1NeuralNetwork(object):
         learning_rate=None,
     )
     """
-    Loss and optimizer hyperparameters. Any values supported by keras may be
-    used.
+    Loss and optimizer hyperparameters.
     """
 
     fit_hyperparameter_defaults = HyperparameterDefaults(
@@ -1384,7 +1383,6 @@ class Class1NeuralNetwork(object):
         self.set_allele_representations(
             numpy.zeros(shape=(0,) + existing_weights_shape[1:]),
             force_surgery=True)
-
 
     def set_allele_representations(self, allele_representations, force_surgery=False):
         """

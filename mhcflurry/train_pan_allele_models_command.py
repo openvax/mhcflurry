@@ -309,7 +309,7 @@ def initialize_training(args):
     pprint.pprint(hyperparameters_lst)
 
     allele_sequences = pandas.read_csv(
-        args.allele_sequences, index_col=0).sequence
+        args.allele_sequences, index_col=0).iloc[:,0]
 
     df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
@@ -423,13 +423,13 @@ def train_models(args):
     global GLOBAL_DATA
 
     print("Beginning training.")
-    predictor = Class1AffinityPredictor.load(args.out_models_dir)
+    predictor = Class1AffinityPredictor.load(
+        args.out_models_dir, optimization_level=0)
     print("Loaded predictor with %d networks" % len(predictor.neural_networks))
 
     with open(join(args.out_models_dir, "training_init_info.pkl"), "rb") as fd:
         GLOBAL_DATA.update(pickle.load(fd))
-    print("Loaded training init info:")
-    print(GLOBAL_DATA)
+    print("Loaded training init info.")
 
     all_work_items = GLOBAL_DATA["work_items"]
     complete_work_item_names = [

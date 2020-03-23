@@ -1,3 +1,7 @@
+import logging
+logging.getLogger('tensorflow').disabled = True
+logging.getLogger('matplotlib').disabled = True
+
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
 import numpy
@@ -9,7 +13,7 @@ logging.getLogger('tensorflow').disabled = True
 
 import keras.backend as K
 
-from mhcflurry.custom_loss import CUSTOM_LOSSES
+from mhcflurry.custom_loss import CUSTOM_LOSSES, MultiallelicMassSpecLoss
 
 from mhcflurry.testing_utils import cleanup, startup
 teardown = cleanup
@@ -144,3 +148,71 @@ def test_mse_with_inequalities_and_multiple_outputs():
         ])
     assert_almost_equal(loss0, 0.02 / 4)
 
+
+def test_multiallelic_mass_spec_loss():
+    for delta in [0.0, 0.3]:
+        print("delta", delta)
+        # Hit labels
+        y_true = [
+            1.0,
+            0.0,
+            1.0,
+            -1.0,  # ignored
+            1.0,
+            0.0,
+            1.0,
+        ]
+        y_true = numpy.array(y_true)
+        y_pred = [
+            [0.3, 0.7, 0.5],
+            [0.2, 0.4, 0.6],
+            [0.1, 0.5, 0.3],
+            [0.9, 0.1, 0.2],
+            [0.1, 0.7, 0.1],
+            [0.8, 0.2, 0.4],
+            [0.1, 0.2, 0.4],
+        ]
+        y_pred = numpy.array(y_pred)
+
+        # reference implementation 1
+
+        def smooth_max(x, alpha):
+            x = numpy.array(x)
+            alpha = numpy.array([alpha])
+            return (x * numpy.exp(x * alpha)).sum() / (
+                numpy.exp(x * alpha)).sum()
+
+        contributions = []
+        for i in range(len(y_true)):
+            if y_true[i] == 1.0:
+                for j in range(len(y_true)):
+                    if y_true[j] == 0.0:
+                        tightest_i = max(y_pred[i])
+                        for k in range(y_pred.shape[1]):
+                            contribution = max(
+                                0, y_pred[j, k] - tightest_i + delta)**2
+                            contributions.append(contribution)
+        contributions = numpy.array(contributions)
+        expected1 = contributions.sum() / len(contributions)
+
+        # reference implementation 2: numpy
+        pos = numpy.array([
+            max(y_pred[i])
+            for i in range(len(y_pred))
+            if y_true[i] == 1.0
+        ])
+
+        neg = y_pred[(y_true == 0.0).astype(bool)]
+        term = neg.reshape((-1, 1)) - pos + delta
+        expected2 = (
+                numpy.maximum(0, term)**2).sum() / (
+            len(pos) * neg.shape[0] * neg.shape[1])
+
+        numpy.testing.assert_almost_equal(expected1, expected2)
+
+        computed = evaluate_loss(
+            MultiallelicMassSpecLoss(delta=delta).loss,
+            y_true,
+            y_pred.reshape(y_pred.shape))
+
+        numpy.testing.assert_almost_equal(computed, expected1, 4)

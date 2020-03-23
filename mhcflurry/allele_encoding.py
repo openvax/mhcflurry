@@ -13,12 +13,13 @@ class AlleleEncoding(object):
         integer indices in a consistent way by keeping track of the universe
         of alleles under use, i.e. a distinction is made between the universe
         of supported alleles (what's in `allele_to_sequence`) and the actual
-        set of alleles used (what's in `alleles`).
+        set of alleles used for some task (what's in `alleles`).
 
         Parameters
         ----------
         alleles : list of string
-            Allele names
+            Allele names. If any allele is None instead of string, it will be
+            mapped to the special index value -1.
 
         allele_to_sequence : dict of str -> str
             Allele name to amino acid sequence
@@ -41,10 +42,12 @@ class AlleleEncoding(object):
                 sorted(allele_to_sequence))
             self.allele_to_index = dict(
                 (allele, i)
-                for (i, allele) in enumerate(all_alleles))
-            unpadded = pandas.Series(
-                [allele_to_sequence[a] for a in all_alleles],
-                index=all_alleles)
+                for (i, allele) in enumerate([None] + all_alleles))
+            unpadded = pandas.Series([
+                    allele_to_sequence[a] if a is not None else ""
+                    for a in [None] + all_alleles
+                ],
+                index=[None] + all_alleles)
             self.sequences = unpadded.str.pad(
                 unpadded.str.len().max(), fillchar="X")
         else:
@@ -80,7 +83,8 @@ class AlleleEncoding(object):
             alleles=self.alleles,
             allele_to_sequence=dict(
                 (allele, self.allele_to_sequence[allele])
-                for allele in self.alleles.unique()))
+                for allele in self.alleles.unique()
+                if allele is not None))
 
     def allele_representations(self, encoding_name):
         """

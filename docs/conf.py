@@ -54,11 +54,23 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'numpydoc',
-    'sphinxcontrib.autorun2',
     'sphinxcontrib.programoutput',
     'sphinxcontrib.autoprogram',
     'sphinx.ext.githubpages',
 ]
+
+doctest_global_setup = '''
+import logging
+logging.getLogger('matplotlib').disabled = True
+logging.getLogger('tensorflow').disabled = True
+import numpy
+import pandas
+import mhcflurry
+pandas.set_option('max_columns', 20)
+pandas.set_option('display.expand_frame_repr', False)
+'''
+
+doctest_test_doctest_blocks = ''
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -76,7 +88,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'MHCflurry'
-copyright = '2019, Timothy O\'Donnell'
+copyright = 'Timothy O\'Donnell'
 author = 'Timothy O\'Donnell'
 
 # The version info for the project you're documenting, acts as replacement for

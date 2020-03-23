@@ -172,7 +172,7 @@ def run(argv=sys.argv[1:]):
     print(df[fold_cols].mean())
 
     # Allele names in data are assumed to be already normalized.
-    df = df.loc[df.allele.isin(alleles)].dropna()
+    df = df.loc[df.allele.isin(alleles)]
     print("Subselected to supported alleles: %s" % str(df.shape))
 
     metadata_dfs["model_selection_data"] = df
@@ -258,10 +258,7 @@ def run(argv=sys.argv[1:]):
         pprint(result)
         fold_num = result['fold_num']
         (all_models_for_fold, _) = folds_to_predictors[fold_num]
-        models = [
-            all_models_for_fold[i]
-            for i in result['selected_indices']
-        ]
+        models = result['selected_models']
         summary_df = result['summary'].copy()
         summary_df.index = summary_df.index.map(
             lambda idx: all_models_for_fold[idx])
@@ -271,7 +268,6 @@ def run(argv=sys.argv[1:]):
             len(models), fold_num, result['selected_indices']))
         models_by_fold[fold_num] = models
         for model in models:
-            model.clear_allele_representations()
             result_predictor.add_pan_allele_model(model)
 
     summary_df = pandas.concat(summary_dfs, ignore_index=False)
@@ -363,6 +359,9 @@ def model_select(
             break
 
     assert selected
+    selected_models = [models[i] for i in selected]
+    for model in selected_models:
+        model.clear_allele_representations()
 
     summary_df = pandas.Series(individual_model_scores)[
         numpy.arange(len(models))
@@ -372,6 +371,7 @@ def model_select(
     return {
         'fold_num': fold_num,
         'selected_indices': selected,
+        'selected_models': selected_models,
         'summary': summary_df,  # indexed by model index
     }
 

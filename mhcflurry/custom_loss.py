@@ -57,6 +57,14 @@ class Loss(object):
     def __str__(self):
         return "<Loss: %s>" % self.name
 
+    def loss(self, y_true, y_pred):
+        raise NotImplementedError()
+
+    def get_keras_loss(self, reduction="sum_over_batch_size"):
+        from keras.losses import LossFunctionWrapper
+        return LossFunctionWrapper(
+            self.loss, reduction=reduction, name=self.name)
+
 
 class StandardKerasLoss(Loss):
     """
@@ -72,6 +80,31 @@ class StandardKerasLoss(Loss):
     @staticmethod
     def encode_y(y):
         return y
+
+
+class TransformPredictionsLossWrapper(Loss):
+    """
+    Wrapper that applies an arbitrary transform to y_pred before calling an
+    underlying loss function.
+
+    The y_pred_transform function should be a tensor -> tensor function.
+    """
+    def __init__(
+            self,
+            loss,
+            y_pred_transform=None):
+        self.wrapped_loss = loss
+        self.name = "transformed_%s" % loss.name
+        self.y_pred_transform = y_pred_transform
+        self.supports_inequalities = loss.supports_inequalities
+        self.supports_multiple_outputs = loss.supports_multiple_outputs
+
+    def encode_y(self, *args, **kwargs):
+        return self.wrapped_loss.encode_y(*args, **kwargs)
+
+    def loss(self, y_true, y_pred):
+        y_pred_transformed = self.y_pred_transform(y_pred)
+        return self.wrapped_loss.loss(y_true, y_pred_transformed)
 
 
 class MSEWithInequalities(Loss):
@@ -92,12 +125,12 @@ class MSEWithInequalities(Loss):
        y_pred is greater or less than y_true.
 
     between 2 - 3:
-       Treated as a "<" inequality. Penalty (y_pred - (y_true - 2))**2 is
-       applied only if y_pred is greater than y_true - 2.
+       Treated as a ">" inequality. Penalty (y_pred - (y_true - 2))**2 is
+       applied only if y_pred is less than y_true - 2.
 
     between 4 - 5:
-       Treated as a ">" inequality. Penalty (y_pred - (y_true - 4))**2 is
-       applied only if y_pred is less than y_true - 4.
+       Treated as a "<" inequality. Penalty (y_pred - (y_true - 4))**2 is
+       applied only if y_pred is greater than y_true - 4.
     """
     name = "mse_with_inequalities"
     supports_inequalities = True
@@ -127,11 +160,12 @@ class MSEWithInequalities(Loss):
         assert not isnan(encoded).any()
         return encoded
 
-    @staticmethod
-    def loss(y_true, y_pred):
+    def loss(self, y_true, y_pred):
         # We always delay import of Keras so that mhcflurry can be imported
         # initially without tensorflow debug output, etc.
         from keras import backend as K
+        y_true = K.flatten(y_true)
+        y_pred = K.flatten(y_pred)
 
         # Handle (=) inequalities
         diff1 = y_pred - y_true
@@ -149,10 +183,14 @@ class MSEWithInequalities(Loss):
         diff3 *= K.cast(y_true >= 4.0, "float32")
         diff3 *= K.cast(diff3 > 0.0, "float32")
 
+        denominator = K.maximum(
+            K.sum(K.cast(K.not_equal(y_true, 2.0), "float32"), 0),
+            1.0)
+
         result = (
             K.sum(K.square(diff1)) +
             K.sum(K.square(diff2)) +
-            K.sum(K.square(diff3))) / K.cast(K.shape(y_pred)[0], "float32")
+            K.sum(K.square(diff3))) / denominator
 
         return result
 
@@ -205,10 +243,8 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
 
         return encoded
 
-    @staticmethod
-    def loss(y_true, y_pred):
+    def loss(self, y_true, y_pred):
         from keras import backend as K
-
         y_true = K.flatten(y_true)
 
         output_indices = y_true // 10
@@ -230,7 +266,40 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
         # ], axis=-1)
         #updated_y_pred = tf.gather_nd(y_pred, indexer)
 
-        return MSEWithInequalities.loss(updated_y_true, updated_y_pred)
+        return MSEWithInequalities().loss(updated_y_true, updated_y_pred)
+
+
+class MultiallelicMassSpecLoss(Loss):
+    """
+    """
+    name = "multiallelic_mass_spec_loss"
+    supports_inequalities = True
+    supports_multiple_outputs = False
+
+    def __init__(self, delta=0.2, multiplier=1.0):
+        self.delta = delta
+        self.multiplier = multiplier
+
+    @staticmethod
+    def encode_y(y):
+        encoded = pandas.Series(y, dtype="float32", copy=True)
+        assert all(item in (-1.0, 1.0, 0.0) for item in encoded), set(y)
+        print(
+            "MultiallelicMassSpecLoss: y-value counts:\n",
+            encoded.value_counts())
+        return encoded.values
+
+    def loss(self, y_true, y_pred):
+        import tensorflow as tf
+        y_true = tf.reshape(y_true, (-1,))
+        pos = tf.boolean_mask(y_pred, tf.math.equal(y_true, 1.0))
+        pos_max = tf.reduce_max(pos, axis=1)
+        neg = tf.boolean_mask(y_pred, tf.math.equal(y_true, 0.0))
+        term = tf.reshape(neg, (-1, 1)) - pos_max + self.delta
+        result = tf.math.divide_no_nan(
+            tf.reduce_sum(tf.maximum(0.0, term) ** 2),
+            tf.cast(tf.size(term), tf.float32)) * self.multiplier
+        return result
 
 
 def check_shape(name, arr, expected_shape):
@@ -250,5 +319,10 @@ def check_shape(name, arr, expected_shape):
 
 
 # Register custom losses.
-for cls in [MSEWithInequalities, MSEWithInequalitiesAndMultipleOutputs]:
+for cls in [
+        MSEWithInequalities,
+        MSEWithInequalitiesAndMultipleOutputs,
+        MultiallelicMassSpecLoss]:
     CUSTOM_LOSSES[cls.name] = cls()
+
+

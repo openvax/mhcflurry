@@ -16,6 +16,8 @@ from collections import OrderedDict
 from appdirs import user_data_dir
 from pkg_resources import resource_string
 
+import pandas
+
 ENVIRONMENT_VARIABLES = [
     "MHCFLURRY_DATA_DIR",
     "MHCFLURRY_DOWNLOADS_CURRENT_RELEASE",
@@ -28,6 +30,10 @@ _CURRENT_RELEASE = None
 _METADATA = None
 _MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR = environ.get(
     "MHCFLURRY_DEFAULT_CLASS1_MODELS")
+_MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR = environ.get(
+    "MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR")
+_MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR = environ.get(
+    "MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR")
 
 
 def get_downloads_dir():
@@ -81,7 +87,72 @@ def get_default_class1_models_dir(test_exists=True):
         if test_exists and not exists(result):
             raise IOError("No such directory: %s" % result)
         return result
-    return get_path("models_class1", "models", test_exists=test_exists)
+    return get_path(
+        "models_class1_pan", "models.combined", test_exists=test_exists)
+
+
+def get_default_class1_presentation_models_dir(test_exists=True):
+    """
+    Return the absolute path to the default class1 presentation models dir.
+
+    See `get_default_class1_models_dir`.
+
+    If environment variable MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS is set
+    to an absolute path, return that path. If it's set to a relative path (does
+    not start with /) then return that path taken to be relative to the mhcflurry
+    downloads dir.
+
+    Parameters
+    ----------
+
+    test_exists : boolean, optional
+        Whether to raise an exception of the path does not exist
+
+    Returns
+    -------
+    string : absolute path
+    """
+    if _MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR:
+        result = join(
+            get_downloads_dir(),
+            _MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR)
+        if test_exists and not exists(result):
+            raise IOError("No such directory: %s" % result)
+        return result
+    return get_path(
+        "models_class1_presentation", "models", test_exists=test_exists)
+
+
+def get_default_class1_processing_models_dir(test_exists=True):
+    """
+    Return the absolute path to the default class1 processing models dir.
+
+    See `get_default_class1_models_dir`.
+
+    If environment variable MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS is set
+    to an absolute path, return that path. If it's set to a relative path (does
+    not start with /) then return that path taken to be relative to the mhcflurry
+    downloads dir.
+
+    Parameters
+    ----------
+
+    test_exists : boolean, optional
+        Whether to raise an exception of the path does not exist
+
+    Returns
+    -------
+    string : absolute path
+    """
+    if _MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR:
+        result = join(
+            get_downloads_dir(),
+            _MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR)
+        if test_exists and not exists(result):
+            raise IOError("No such directory: %s" % result)
+        return result
+    return get_path(
+        "models_class1_processing", "models", test_exists=test_exists)
 
 
 def get_current_release_downloads():
@@ -96,15 +167,30 @@ def get_current_release_downloads():
 
     metadata : dict
         Info about the download from downloads.yml such as URL
+
+    up_to_date : bool or None
+        Whether the download URL(s) match what was used to download the current
+        data. This is None if it cannot be determined.
     """
     downloads = (
         get_downloads_metadata()
         ['releases']
         [get_current_release()]
         ['downloads'])
+
+    def up_to_date(dir, urls):
+        try:
+            df = pandas.read_csv(join(dir, "DOWNLOAD_INFO.csv"))
+            return list(df.url) == list(urls)
+        except IOError:
+            return None
+
     return OrderedDict(
         (download["name"], {
             'downloaded': exists(join(get_downloads_dir(), download["name"])),
+            'up_to_date': up_to_date(
+                join(get_downloads_dir(), download["name"]),
+                [download['url']] if 'url' in download else download['part_urls']),
             'metadata': download,
         }) for download in downloads
     )

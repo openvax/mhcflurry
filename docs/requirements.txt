@@ -1,5 +1,4 @@
 sphinx
-sphinxcontrib-autorun2
 sphinxcontrib-programoutput
 sphinxcontrib-autoprogram
 sphinx-rtd-theme
@@ -9,3 +8,4 @@ mhctools
 pydot
 tabulate
 logomaker
+tqdm

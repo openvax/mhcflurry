@@ -36,7 +36,7 @@ base_hyperparameters = {
     'peptide_amino_acid_encoding': 'BLOSUM62',
     'peptide_dense_layer_sizes': [],
     'random_negative_affinity_max': 50000.0,
-    'random_negative_affinity_min': 20000.0,
+    'random_negative_affinity_min': 35000.0,
     'random_negative_constant': 1,
     'random_negative_distribution_smoothing': 0.0,
     'random_negative_match_distribution': True,

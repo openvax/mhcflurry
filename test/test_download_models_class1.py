@@ -63,9 +63,11 @@ def test_a2_hiv_epitope_downloaded_models():
 
 
 def test_caching():
-    Class1NeuralNetwork.KERAS_MODELS_CACHE.clear()
-    DOWNLOADED_PREDICTOR.predict(
-        peptides=["SIINFEKL"],
-        allele="HLA-A*02:01")
-    num_cached = len(Class1NeuralNetwork.KERAS_MODELS_CACHE)
-    assert num_cached > 0
+    if not DOWNLOADED_PREDICTOR.allele_to_sequence:
+        # Only run this test on allele-specific predictors.
+        Class1NeuralNetwork.KERAS_MODELS_CACHE.clear()
+        DOWNLOADED_PREDICTOR.predict(
+            peptides=["SIINFEKL"],
+            allele="HLA-A*02:01")
+        num_cached = len(Class1NeuralNetwork.KERAS_MODELS_CACHE)
+        assert num_cached > 0

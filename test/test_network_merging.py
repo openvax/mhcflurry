@@ -10,7 +10,6 @@ from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import cleanup, startup
 
-
 PAN_ALLELE_PREDICTOR = None
 
 
@@ -18,7 +17,7 @@ def setup():
     global PAN_ALLELE_PREDICTOR
     startup()
     PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.with_mass_spec"),
+        get_path("models_class1_pan", "models.combined"),
         optimization_level=0,)
 
 
@@ -30,7 +29,6 @@ def teardown():
 
 def test_merge():
     assert len(PAN_ALLELE_PREDICTOR.class1_pan_allele_models) > 1
-
     peptides = random_peptides(100, length=9)
     peptides.extend(random_peptides(100, length=10))
     peptides = pandas.Series(peptides).sample(frac=1.0)

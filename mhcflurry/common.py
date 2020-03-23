@@ -4,6 +4,7 @@ import logging
 import sys
 import os
 import warnings
+import json
 
 import numpy
 import pandas
@@ -174,3 +175,54 @@ def positional_frequency_matrix(peptides):
     result = (counts / len(peptides)).fillna(0.0).T
     result.index.name = 'position'
     return result
+
+
+def save_weights(weights_list, filename):
+    """
+    Save model weights to the given filename using numpy's ".npz" format.
+
+    Parameters
+    ----------
+    weights_list : list of numpy array
+
+    filename : string
+    """
+    numpy.savez(filename,
+        **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list)))
+
+
+def load_weights(filename):
+    """
+    Restore model weights from the given filename, which should have been
+    created with `save_weights`.
+
+    Parameters
+    ----------
+    filename : string
+
+    Returns
+    ----------
+    list of array
+    """
+    with numpy.load(filename) as loaded:
+        weights = [loaded["array_%d" % i] for i in range(len(loaded.keys()))]
+    return weights
+
+
+class NumpyJSONEncoder(json.JSONEncoder):
+    """
+    JSON encoder (used with json module) that can handle numpy arrays.
+    """
+    def default(self, obj):
+        if isinstance(obj, (
+                numpy.int_, numpy.intc, numpy.intp, numpy.int8,
+                numpy.int16, numpy.int32, numpy.int64, numpy.uint8,
+                numpy.uint16, numpy.uint32, numpy.uint64)):
+            return int(obj)
+        elif isinstance(obj, (
+                numpy.float_, numpy.float16, numpy.float32,
+                numpy.float64)):
+            return float(obj)
+        if isinstance(obj, numpy.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)

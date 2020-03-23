@@ -1,13 +1,16 @@
 """
 Tests for training and predicting using Class1 pan-allele models.
 """
+import logging
+logging.getLogger('tensorflow').disabled = True
+logging.getLogger('matplotlib').disabled = True
 
 from sklearn.metrics import roc_auc_score
 import pandas
 
 from numpy.testing import assert_, assert_equal
 
-from mhcflurry import Class1AffinityPredictor,Class1NeuralNetwork
+from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
 
@@ -63,7 +66,7 @@ ALLELE_TO_SEQUENCE = pandas.read_csv(
 
 TRAIN_DF = pandas.read_csv(
     get_path(
-        "data_curated", "curated_training_data.no_mass_spec.csv.bz2"))
+        "data_curated", "curated_training_data.affinity.csv.bz2"))
 
 TRAIN_DF = TRAIN_DF.loc[TRAIN_DF.allele.isin(ALLELE_TO_SEQUENCE)]
 TRAIN_DF = TRAIN_DF.loc[TRAIN_DF.peptide.str.len() >= 8]
@@ -76,7 +79,7 @@ TRAIN_DF = TRAIN_DF.loc[
 
 MS_HITS_DF = pandas.read_csv(
     get_path(
-        "data_curated", "curated_training_data.with_mass_spec.csv.bz2"))
+        "data_curated", "curated_training_data.csv.bz2"))
 MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.allele.isin(TRAIN_DF.allele.unique())]
 MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.peptide.str.len() >= 8]
 MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.peptide.str.len() <= 15]
