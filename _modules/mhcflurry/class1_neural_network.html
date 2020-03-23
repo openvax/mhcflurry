@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.class1_neural_network &mdash; MHCflurry 1.3.0 documentation</title>
+  <title>mhcflurry.class1_neural_network &mdash; MHCflurry 1.6.0 documentation</title>
   
 
   
@@ -17,39 +17,33 @@
   
 
   
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
-  
-  
     
 
   
-
-  
-  
-    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.3.0 documentation" href="../../index.html"/>
-        <link rel="up" title="Module code" href="../index.html"/> 
-
-  
-  <script src="../../_static/js/modernizr.min.js"></script>
-
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
-
     
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search">
+        <div class="wy-side-nav-search" >
           
 
           
@@ -63,7 +57,7 @@
             
             
               <div class="version">
-                1.3.0
+                1.6.0
               </div>
             
           
@@ -104,7 +98,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../../index.html">MHCflurry</a>
@@ -112,9 +106,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -144,8 +139,6 @@
     
       <li class="wy-breadcrumbs-aside">
         
-            
-        
       </li>
     
   </ul>
@@ -164,18 +157,20 @@
 <span class="kn">import</span> <span class="nn">itertools</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">math</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span>
 <span class="kn">import</span> <span class="nn">pandas</span>
 
 <span class="kn">from</span> <span class="nn">.hyperparameters</span> <span class="k">import</span> <span class="n">HyperparameterDefaults</span>
-
 <span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span><span class="p">,</span> <span class="n">EncodingError</span>
+<span class="kn">from</span> <span class="nn">.allele_encoding</span> <span class="k">import</span> <span class="n">AlleleEncoding</span>
 <span class="kn">from</span> <span class="nn">.regression_target</span> <span class="k">import</span> <span class="n">to_ic50</span><span class="p">,</span> <span class="n">from_ic50</span>
 <span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">random_peptides</span><span class="p">,</span> <span class="n">amino_acid_distribution</span>
 <span class="kn">from</span> <span class="nn">.custom_loss</span> <span class="k">import</span> <span class="n">get_loss</span>
 <span class="kn">from</span> <span class="nn">.data_dependent_weights_initialization</span> <span class="k">import</span> <span class="n">lsuv_init</span>
+<span class="kn">from</span> <span class="nn">.random_negative_peptides</span> <span class="k">import</span> <span class="n">RandomNegativePeptides</span>
 
 
 <span class="n">DEFAULT_PREDICT_BATCH_SIZE</span> <span class="o">=</span> <span class="mi">4096</span>
@@ -225,6 +220,7 @@
                 <span class="s2">&quot;kernel_size&quot;</span><span class="p">:</span> <span class="mi">3</span>
             <span class="p">}</span>
         <span class="p">],</span>
+        <span class="n">topology</span><span class="o">=</span><span class="s2">&quot;feedforward&quot;</span><span class="p">,</span>
         <span class="n">num_outputs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="sd">&quot;&quot;&quot;</span>
@@ -238,8 +234,7 @@
         <span class="n">learning_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Loss and optimizer hyperparameters. Any values supported by keras may be</span>
-<span class="sd">    used.</span>
+<span class="sd">    Loss and optimizer hyperparameters.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">fit_hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
@@ -248,13 +243,10 @@
         <span class="n">early_stopping</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">minibatch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
         <span class="n">data_dependent_initialization_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">random_negative_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-        <span class="n">random_negative_constant</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span>
         <span class="n">random_negative_affinity_min</span><span class="o">=</span><span class="mf">20000.0</span><span class="p">,</span>
         <span class="n">random_negative_affinity_max</span><span class="o">=</span><span class="mf">50000.0</span><span class="p">,</span>
-        <span class="n">random_negative_match_distribution</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="n">random_negative_distribution_smoothing</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-        <span class="n">random_negative_output_indices</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">random_negative_output_indices</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="n">RandomNegativePeptides</span><span class="o">.</span><span class="n">hyperparameter_defaults</span><span class="p">)</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Hyperparameters for neural network training.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -895,29 +887,21 @@
         <span class="n">peptide_encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">encodable_peptides</span><span class="p">)</span>
         <span class="n">fit_info</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
 
-        <span class="n">length_counts</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">encodable_peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+        <span class="n">random_negatives_planner</span> <span class="o">=</span> <span class="n">RandomNegativePeptides</span><span class="p">(</span>
+            <span class="o">**</span><span class="n">RandomNegativePeptides</span><span class="o">.</span><span class="n">hyperparameter_defaults</span><span class="o">.</span><span class="n">subselect</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">))</span>
+        <span class="n">random_negatives_planner</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span>
+            <span class="n">peptides</span><span class="o">=</span><span class="n">encodable_peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">,</span>
+            <span class="n">affinities</span><span class="o">=</span><span class="n">affinities</span><span class="p">,</span>
+            <span class="n">alleles</span><span class="o">=</span><span class="n">allele_encoding</span><span class="o">.</span><span class="n">alleles</span> <span class="k">if</span> <span class="n">allele_encoding</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">inequalities</span><span class="o">=</span><span class="n">inequalities</span><span class="p">)</span>
 
-        <span class="n">num_random_negative</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">):</span>
-            <span class="n">num_random_negative</span><span class="p">[</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
-                <span class="n">length_counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_rate&#39;</span><span class="p">]</span> <span class="o">+</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_constant&#39;</span><span class="p">])</span>
-        <span class="n">num_random_negative</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">num_random_negative</span><span class="p">)</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Random negative counts per length:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
-            <span class="nb">str</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())))</span>
-
-        <span class="n">aa_distribution</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_match_distribution&#39;</span><span class="p">]:</span>
-            <span class="n">aa_distribution</span> <span class="o">=</span> <span class="n">amino_acid_distribution</span><span class="p">(</span>
-                <span class="n">encodable_peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">,</span>
-                <span class="n">smoothing</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
-                    <span class="s1">&#39;random_negative_distribution_smoothing&#39;</span><span class="p">])</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="s2">&quot;Using amino acid distribution for random negative:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                <span class="nb">str</span><span class="p">(</span><span class="n">aa_distribution</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())))</span>
+        <span class="n">random_negatives_allele_encoding</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">allele_encoding</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">random_negatives_allele_encoding</span> <span class="o">=</span> <span class="n">AlleleEncoding</span><span class="p">(</span>
+                <span class="n">random_negatives_planner</span><span class="o">.</span><span class="n">get_alleles</span><span class="p">(),</span>
+                <span class="n">borrow_from</span><span class="o">=</span><span class="n">allele_encoding</span><span class="p">)</span>
+        <span class="n">num_random_negatives</span> <span class="o">=</span> <span class="n">random_negatives_planner</span><span class="o">.</span><span class="n">get_total_count</span><span class="p">()</span>
 
         <span class="n">y_values</span> <span class="o">=</span> <span class="n">from_ic50</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">affinities</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
         <span class="k">assert</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y_values</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="n">y_values</span>
@@ -1010,15 +994,14 @@
             <span class="n">y_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{</span>
                 <span class="s2">&quot;output&quot;</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
                     <span class="n">numpy</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span>
-                        <span class="n">random_negative_target</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">())),</span>
+                        <span class="n">random_negative_target</span><span class="p">,</span> <span class="n">num_random_negatives</span><span class="p">),</span>
                     <span class="n">y_values</span><span class="p">,</span>
                 <span class="p">]),</span>
             <span class="p">}</span>
             <span class="c1"># Note: we are using &quot;&lt;&quot; here not &quot;&gt;&quot; because the inequalities are</span>
             <span class="c1"># now in target-space (0-1) not affinity-space.</span>
             <span class="n">adjusted_inequalities_with_random_negatives</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="p">[</span><span class="s2">&quot;&lt;&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span> <span class="o">+</span>
-                <span class="nb">list</span><span class="p">(</span><span class="n">adjusted_inequalities</span><span class="p">))</span>
+                <span class="p">[</span><span class="s2">&quot;&lt;&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">num_random_negatives</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">adjusted_inequalities</span><span class="p">))</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Randomly sample random negative affinities</span>
             <span class="n">y_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{</span>
@@ -1029,7 +1012,7 @@
                                 <span class="s1">&#39;random_negative_affinity_min&#39;</span><span class="p">],</span>
                             <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
                                 <span class="s1">&#39;random_negative_affinity_max&#39;</span><span class="p">],</span>
-                            <span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">()))),</span>
+                            <span class="n">num_random_negatives</span><span class="p">)),</span>
                     <span class="n">y_values</span><span class="p">,</span>
                 <span class="p">]),</span>
             <span class="p">}</span>
@@ -1038,7 +1021,7 @@
             <span class="n">y_dict_with_random_negatives</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">sample_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">sample_weights_with_random_negatives</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
-                <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">())),</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_random_negatives</span><span class="p">),</span>
                 <span class="n">sample_weights</span><span class="p">])</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">sample_weights_with_random_negatives</span> <span class="o">=</span> <span class="kc">None</span>
@@ -1050,7 +1033,7 @@
                 <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;num_outputs&#39;</span><span class="p">])))</span>
             <span class="n">output_indices_with_random_negatives</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
                 <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">random_negative_output_indices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
-                    <span class="n">n</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">num_random_negative</span><span class="o">.</span><span class="n">sum</span><span class="p">()),</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+                    <span class="n">n</span><span class="o">=</span><span class="n">num_random_negatives</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
                 <span class="n">output_indices</span>
             <span class="p">])</span>
         <span class="k">else</span><span class="p">:</span>
@@ -1081,31 +1064,25 @@
         <span class="n">last_progress_print</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">x_dict_with_random_negatives</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;max_epochs&#39;</span><span class="p">]):</span>
-            <span class="n">random_negative_peptides_list</span> <span class="o">=</span> <span class="p">[]</span>
-            <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span> <span class="ow">in</span> <span class="n">num_random_negative</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
-                <span class="n">random_negative_peptides_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                    <span class="n">random_peptides</span><span class="p">(</span>
-                        <span class="n">count</span><span class="p">,</span>
-                        <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">,</span>
-                        <span class="n">distribution</span><span class="o">=</span><span class="n">aa_distribution</span><span class="p">))</span>
             <span class="n">random_negative_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
-                <span class="n">random_negative_peptides_list</span><span class="p">)</span>
+                <span class="n">random_negatives_planner</span><span class="o">.</span><span class="n">get_peptides</span><span class="p">())</span>
             <span class="n">random_negative_peptides_encoding</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">))</span>
 
             <span class="k">if</span> <span class="ow">not</span> <span class="n">x_dict_with_random_negatives</span><span class="p">:</span>
                 <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s2">&quot;peptide&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                    <span class="n">x_dict_with_random_negatives</span><span class="p">[</span>
+                        <span class="s2">&quot;peptide&quot;</span>
+                    <span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
                         <span class="n">random_negative_peptides_encoding</span><span class="p">,</span>
-                        <span class="n">peptide_encoding</span><span class="p">,</span>
+                        <span class="n">x_dict_without_random_negatives</span><span class="p">[</span><span class="s1">&#39;peptide&#39;</span><span class="p">],</span>
                     <span class="p">])</span>
                     <span class="k">if</span> <span class="s1">&#39;allele&#39;</span> <span class="ow">in</span> <span class="n">x_dict_without_random_negatives</span><span class="p">:</span>
-                        <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
-                            <span class="n">x_dict_without_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">][</span>
-                                <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
-                                    <span class="n">x_dict_without_random_negatives</span><span class="p">[</span>
-                                        <span class="s1">&#39;allele&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-                                    <span class="n">size</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides_list</span><span class="p">))],</span>
+                        <span class="n">x_dict_with_random_negatives</span><span class="p">[</span>
+                            <span class="s1">&#39;allele&#39;</span>
+                        <span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">allele_encoding_to_network_input</span><span class="p">(</span>
+                                <span class="n">random_negatives_allele_encoding</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span>
                             <span class="n">x_dict_without_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">]</span>
                         <span class="p">])</span>
                 <span class="k">else</span><span class="p">:</span>
@@ -1115,18 +1092,9 @@
                 <span class="c1"># Update x_dict_with_random_negatives in place.</span>
                 <span class="c1"># This is more memory efficient than recreating it as above.</span>
                 <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s2">&quot;peptide&quot;</span><span class="p">][:</span><span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span>
-                        <span class="n">random_negative_peptides_encoding</span>
-                    <span class="p">)</span>
-                    <span class="k">if</span> <span class="s1">&#39;allele&#39;</span> <span class="ow">in</span> <span class="n">x_dict_with_random_negatives</span><span class="p">:</span>
-                        <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">][:</span><span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span>
-                            <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">][</span>
-                                <span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">)</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
-                                    <span class="n">x_dict_with_random_negatives</span><span class="p">[</span><span class="s1">&#39;allele&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span>
-                                    <span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">),</span>
-                                    <span class="n">size</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">random_negative_peptides</span><span class="p">))</span>
-                            <span class="p">]</span>
-                        <span class="p">)</span>
+                    <span class="n">x_dict_with_random_negatives</span><span class="p">[</span>
+                        <span class="s2">&quot;peptide&quot;</span>
+                    <span class="p">][:</span><span class="n">num_random_negatives</span><span class="p">]</span> <span class="o">=</span> <span class="n">random_negative_peptides_encoding</span>
 
             <span class="k">if</span> <span class="n">needs_initialization</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">data_dependent_weights_initialization</span><span class="p">(</span>
@@ -1312,13 +1280,25 @@
             <span class="k">for</span> <span class="n">network</span> <span class="ow">in</span> <span class="n">networks</span>
         <span class="p">]</span>
 
-        <span class="n">pan_allele_layer_names</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">pan_allele_layer_initial_names</span> <span class="o">=</span> <span class="p">[</span>
             <span class="s1">&#39;allele&#39;</span><span class="p">,</span> <span class="s1">&#39;peptide&#39;</span><span class="p">,</span> <span class="s1">&#39;allele_representation&#39;</span><span class="p">,</span> <span class="s1">&#39;flattened_0&#39;</span><span class="p">,</span>
             <span class="s1">&#39;allele_flat&#39;</span><span class="p">,</span> <span class="s1">&#39;allele_peptide_merged&#39;</span><span class="p">,</span> <span class="s1">&#39;dense_0&#39;</span><span class="p">,</span> <span class="s1">&#39;dropout_0&#39;</span><span class="p">,</span>
-            <span class="s1">&#39;dense_1&#39;</span><span class="p">,</span> <span class="s1">&#39;dropout_1&#39;</span><span class="p">,</span> <span class="s1">&#39;output&#39;</span><span class="p">,</span>
+            <span class="c1">#&#39;dense_1&#39;, &#39;dropout_1&#39;, &#39;output&#39;,</span>
+        <span class="p">]</span>
+        <span class="n">pan_allele_layer_final_names</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;output&#39;</span>
         <span class="p">]</span>
 
-        <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">names</span> <span class="o">==</span> <span class="n">pan_allele_layer_names</span> <span class="k">for</span> <span class="n">names</span> <span class="ow">in</span> <span class="n">layer_names</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">startswith</span><span class="p">(</span><span class="n">lst</span><span class="p">,</span> <span class="n">prefix</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">lst</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">)]</span> <span class="o">==</span> <span class="n">prefix</span>
+
+        <span class="k">def</span> <span class="nf">endswith</span><span class="p">(</span><span class="n">lst</span><span class="p">,</span> <span class="n">suffix</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">lst</span><span class="p">[</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">suffix</span><span class="p">):]</span> <span class="o">==</span> <span class="n">suffix</span>
+
+        <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">startswith</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="n">pan_allele_layer_initial_names</span><span class="p">)</span> <span class="ow">and</span>
+                <span class="n">endswith</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="n">pan_allele_layer_final_names</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">names</span> <span class="ow">in</span> <span class="n">layer_names</span><span class="p">):</span>
+
             <span class="c1"># Merging an ensemble of pan-allele architectures</span>
             <span class="n">network</span> <span class="o">=</span> <span class="n">networks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
             <span class="n">peptide_input</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span>
@@ -1337,15 +1317,35 @@
             <span class="n">allele_peptide_merged</span> <span class="o">=</span> <span class="n">network</span><span class="o">.</span><span class="n">get_layer</span><span class="p">(</span><span class="s2">&quot;allele_peptide_merged&quot;</span><span class="p">)(</span>
                 <span class="p">[</span><span class="n">peptide_flat</span><span class="p">,</span> <span class="n">allele_flat</span><span class="p">])</span>
 
+
             <span class="n">sub_networks</span> <span class="o">=</span> <span class="p">[]</span>
             <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">network</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">networks</span><span class="p">):</span>
                 <span class="n">layers</span> <span class="o">=</span> <span class="n">network</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span>
-                    <span class="n">pan_allele_layer_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;allele_peptide_merged&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">pan_allele_layer_initial_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span>
+                        <span class="s2">&quot;allele_peptide_merged&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
                 <span class="p">]</span>
-                <span class="n">node</span> <span class="o">=</span> <span class="n">allele_peptide_merged</span>
                 <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">layers</span><span class="p">:</span>
                     <span class="n">layer</span><span class="o">.</span><span class="n">name</span> <span class="o">+=</span> <span class="s2">&quot;_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span>
-                    <span class="n">node</span> <span class="o">=</span> <span class="n">layer</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+
+                <span class="n">node</span> <span class="o">=</span> <span class="n">allele_peptide_merged</span>
+                <span class="n">layer_name_to_new_node</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;allele_peptide_merged&quot;</span><span class="p">:</span> <span class="n">allele_peptide_merged</span><span class="p">,</span>
+                <span class="p">}</span>
+                <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">layers</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="n">layer</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">layer_name_to_new_node</span>
+                    <span class="n">input_layer_names</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="k">for</span> <span class="n">inbound_node</span> <span class="ow">in</span> <span class="n">layer</span><span class="o">.</span><span class="n">_inbound_nodes</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">inbound_layer</span> <span class="ow">in</span> <span class="n">inbound_node</span><span class="o">.</span><span class="n">inbound_layers</span><span class="p">:</span>
+                            <span class="n">input_layer_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">inbound_layer</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                    <span class="n">input_nodes</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">layer_name_to_new_node</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+                        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">input_layer_names</span>
+                    <span class="p">]</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_nodes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="n">node</span> <span class="o">=</span> <span class="n">layer</span><span class="p">(</span><span class="n">input_nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">node</span> <span class="o">=</span> <span class="n">layer</span><span class="p">(</span><span class="n">input_nodes</span><span class="p">)</span>
+                    <span class="n">layer_name_to_new_node</span><span class="p">[</span><span class="n">layer</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span>
                 <span class="n">sub_networks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">merge_method</span> <span class="o">==</span> <span class="s1">&#39;average&#39;</span><span class="p">:</span>
@@ -1387,6 +1387,7 @@
             <span class="n">dropout_probability</span><span class="p">,</span>
             <span class="n">batch_normalization</span><span class="p">,</span>
             <span class="n">locally_connected_layers</span><span class="p">,</span>
+            <span class="n">topology</span><span class="p">,</span>
             <span class="n">num_outputs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
             <span class="n">allele_representations</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -1476,8 +1477,22 @@
                     <span class="n">peptide_allele_merge_activation</span><span class="p">,</span>
                     <span class="n">name</span><span class="o">=</span><span class="s2">&quot;alelle_peptide_merged_</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span>
                          <span class="n">peptide_allele_merge_activation</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
-            
+
+        <span class="k">if</span> <span class="n">topology</span> <span class="o">==</span> <span class="s2">&quot;feedforward&quot;</span><span class="p">:</span>
+            <span class="n">densenet_layers</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">elif</span> <span class="n">topology</span> <span class="o">==</span> <span class="s2">&quot;with-skip-connections&quot;</span><span class="p">:</span>
+            <span class="n">densenet_layers</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="n">topology</span><span class="p">)</span>
         <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">layer_size</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">layer_sizes</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">densenet_layers</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">densenet_layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current_layer</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">densenet_layers</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">current_layer</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+                        <span class="n">densenet_layers</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">:])</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="p">(</span><span class="n">current_layer</span><span class="p">,)</span> <span class="o">=</span> <span class="n">densenet_layers</span>
+
             <span class="n">current_layer</span> <span class="o">=</span> <span class="n">Dense</span><span class="p">(</span>
                 <span class="n">layer_size</span><span class="p">,</span>
                 <span class="n">activation</span><span class="o">=</span><span class="n">activation</span><span class="p">,</span>
@@ -1493,6 +1508,10 @@
                     <span class="n">rate</span><span class="o">=</span><span class="mi">1</span> <span class="o">-</span> <span class="n">dropout_probability</span><span class="p">,</span>
                     <span class="n">name</span><span class="o">=</span><span class="s2">&quot;dropout_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">)(</span><span class="n">current_layer</span><span class="p">)</span>
 
+        <span class="c1"># Note that when using densenet topology, we intentionally do not have</span>
+        <span class="c1"># any skip connections to the final output node. This empirically seems</span>
+        <span class="c1"># to work better.</span>
+
         <span class="n">output</span> <span class="o">=</span> <span class="n">Dense</span><span class="p">(</span>
             <span class="n">num_outputs</span><span class="p">,</span>
             <span class="n">kernel_initializer</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
@@ -1505,7 +1524,19 @@
 
         <span class="k">return</span> <span class="n">model</span></div>
 
-<div class="viewcode-block" id="Class1NeuralNetwork.set_allele_representations"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.set_allele_representations">[docs]</a>    <span class="k">def</span> <span class="nf">set_allele_representations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele_representations</span><span class="p">):</span>
+<div class="viewcode-block" id="Class1NeuralNetwork.clear_allele_representations"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.clear_allele_representations">[docs]</a>    <span class="k">def</span> <span class="nf">clear_allele_representations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set allele representations to an empty array. Useful before saving to</span>
+<span class="sd">        save a smaller version of the model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">original_model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">()</span>
+        <span class="n">layer</span> <span class="o">=</span> <span class="n">original_model</span><span class="o">.</span><span class="n">get_layer</span><span class="p">(</span><span class="s2">&quot;allele_representation&quot;</span><span class="p">)</span>
+        <span class="n">existing_weights_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">input_dim</span><span class="p">,</span> <span class="n">layer</span><span class="o">.</span><span class="n">output_dim</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_allele_representations</span><span class="p">(</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">+</span> <span class="n">existing_weights_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span>
+            <span class="n">force_surgery</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Class1NeuralNetwork.set_allele_representations"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.set_allele_representations">[docs]</a>    <span class="k">def</span> <span class="nf">set_allele_representations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele_representations</span><span class="p">,</span> <span class="n">force_surgery</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Set the allele representations in use by this model. This means mutating</span>
 <span class="sd">        the weights for the allele input embedding layer.</span>
@@ -1530,17 +1561,20 @@
         <span class="kn">import</span> <span class="nn">keras.backend</span> <span class="k">as</span> <span class="nn">K</span>
         <span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
 
-        <span class="n">reshaped</span> <span class="o">=</span> <span class="n">allele_representations</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
-            <span class="p">(</span><span class="n">allele_representations</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">reshaped</span> <span class="o">=</span> <span class="n">allele_representations</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span>
+            <span class="n">allele_representations</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">product</span><span class="p">(</span><span class="n">allele_representations</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="p">))</span>
         <span class="n">original_model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">network</span><span class="p">()</span>
         <span class="n">layer</span> <span class="o">=</span> <span class="n">original_model</span><span class="o">.</span><span class="n">get_layer</span><span class="p">(</span><span class="s2">&quot;allele_representation&quot;</span><span class="p">)</span>
         <span class="n">existing_weights_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">input_dim</span><span class="p">,</span> <span class="n">layer</span><span class="o">.</span><span class="n">output_dim</span><span class="p">)</span>
 
         <span class="c1"># Only changes to the number of supported alleles (not the length of</span>
         <span class="c1"># the allele sequences) are allowed.</span>
-        <span class="k">assert</span> <span class="n">existing_weights_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">==</span> <span class="n">reshaped</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="k">assert</span> <span class="n">existing_weights_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">==</span> <span class="n">reshaped</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="p">(</span>
+            <span class="n">existing_weights_shape</span><span class="p">,</span> <span class="n">reshaped</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">existing_weights_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">reshaped</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">existing_weights_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">reshaped</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">force_surgery</span><span class="p">:</span>
             <span class="c1"># Extend with NaNs so we can avoid having to reshape the weights</span>
             <span class="c1"># matrix, which is expensive.</span>
             <span class="n">reshaped</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
@@ -1572,6 +1606,8 @@
             <span class="k">def</span> <span class="nf">throw</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Using a disabled model!&quot;</span><span class="p">)</span>
             <span class="n">original_model</span><span class="o">.</span><span class="n">predict</span> <span class="o">=</span> \
+                <span class="n">original_model</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> \
+                <span class="n">original_model</span><span class="o">.</span><span class="n">get_weights</span> <span class="o">=</span> \
                 <span class="n">original_model</span><span class="o">.</span><span class="n">fit</span> <span class="o">=</span> \
                 <span class="n">original_model</span><span class="o">.</span><span class="n">fit_generator</span> <span class="o">=</span> <span class="n">throw</span>
 
@@ -1579,9 +1615,7 @@
 </pre></div>
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -1590,12 +1624,14 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2019, Timothy O&#39;Donnell.
-      Last updated on Sep 10, 2019.
+        &copy; Copyright Timothy O&#39;Donnell
+      <span class="lastupdated">
+        Last updated on Mar 23, 2020.
+      </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -1608,36 +1644,15 @@
   
 
 
-  
-
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'../../',
-            VERSION:'1.3.0',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="../../_static/jquery.js"></script>
-      <script type="text/javascript" src="../../_static/underscore.js"></script>
-      <script type="text/javascript" src="../../_static/doctools.js"></script>
-
-  
-
-  
-  
-    <script type="text/javascript" src="../../_static/js/theme.js"></script>
-  
-
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
   </script>
+
+  
+  
+    
    
 
 </body>

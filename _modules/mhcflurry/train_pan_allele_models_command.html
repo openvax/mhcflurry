@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.train_pan_allele_models_command &mdash; MHCflurry 1.3.0 documentation</title>
+  <title>mhcflurry.train_pan_allele_models_command &mdash; MHCflurry 1.6.0 documentation</title>
   
 
   
@@ -17,39 +17,33 @@
   
 
   
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
-  
-  
     
 
   
-
-  
-  
-    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.3.0 documentation" href="../../index.html"/>
-        <link rel="up" title="Module code" href="../index.html"/> 
-
-  
-  <script src="../../_static/js/modernizr.min.js"></script>
-
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
-
     
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search">
+        <div class="wy-side-nav-search" >
           
 
           
@@ -63,7 +57,7 @@
             
             
               <div class="version">
-                1.3.0
+                1.6.0
               </div>
             
           
@@ -104,7 +98,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../../index.html">MHCflurry</a>
@@ -112,9 +106,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -143,8 +138,6 @@
     
     
       <li class="wy-breadcrumbs-aside">
-        
-            
         
       </li>
     
@@ -243,11 +236,11 @@
     <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Do not use affinity value inequalities even when present in data&quot;</span><span class="p">)</span>
 <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
-    <span class="s2">&quot;--ensemble-size&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;--num-folds&quot;</span><span class="p">,</span>
     <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
     <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
-    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Ensemble size, i.e. how many models to retain the final predictor. &quot;</span>
-    <span class="s2">&quot;In the current implementation, this is also the number of training folds.&quot;</span><span class="p">)</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Number of training folds.&quot;</span><span class="p">)</span>
 <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
     <span class="s2">&quot;--num-replicates&quot;</span><span class="p">,</span>
     <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
@@ -455,7 +448,7 @@
         <span class="s2">&quot;data&quot;</span><span class="p">,</span>
         <span class="s2">&quot;out_models_dir&quot;</span><span class="p">,</span>
         <span class="s2">&quot;hyperparameters&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;ensemble_size&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;num_folds&quot;</span><span class="p">,</span>
     <span class="p">]</span>
     <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">required_arguments</span><span class="p">:</span>
         <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">arg</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -468,7 +461,7 @@
     <span class="n">pprint</span><span class="o">.</span><span class="n">pprint</span><span class="p">(</span><span class="n">hyperparameters_lst</span><span class="p">)</span>
 
     <span class="n">allele_sequences</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
-        <span class="n">args</span><span class="o">.</span><span class="n">allele_sequences</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sequence</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">allele_sequences</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Loaded training data: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
@@ -497,7 +490,7 @@
 
     <span class="n">folds_df</span> <span class="o">=</span> <span class="n">assign_folds</span><span class="p">(</span>
         <span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span>
-        <span class="n">num_folds</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">ensemble_size</span><span class="p">,</span>
+        <span class="n">num_folds</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">num_folds</span><span class="p">,</span>
         <span class="n">held_out_fraction</span><span class="o">=</span><span class="n">held_out_fraction</span><span class="p">,</span>
         <span class="n">held_out_max</span><span class="o">=</span><span class="n">held_out_max</span><span class="p">)</span>
 
@@ -546,14 +539,14 @@
             <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">pretrain_data</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;--pretrain-data is required&quot;</span><span class="p">)</span>
 
-        <span class="k">for</span> <span class="n">fold</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">ensemble_size</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">fold</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">num_folds</span><span class="p">):</span>
             <span class="k">for</span> <span class="n">replicate</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">num_replicates</span><span class="p">):</span>
                 <span class="n">work_dict</span> <span class="o">=</span> <span class="p">{</span>
                     <span class="s1">&#39;work_item_name&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()),</span>
                     <span class="s1">&#39;architecture_num&#39;</span><span class="p">:</span> <span class="n">h</span><span class="p">,</span>
                     <span class="s1">&#39;num_architectures&#39;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">hyperparameters_lst</span><span class="p">),</span>
                     <span class="s1">&#39;fold_num&#39;</span><span class="p">:</span> <span class="n">fold</span><span class="p">,</span>
-                    <span class="s1">&#39;num_folds&#39;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">ensemble_size</span><span class="p">,</span>
+                    <span class="s1">&#39;num_folds&#39;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">num_folds</span><span class="p">,</span>
                     <span class="s1">&#39;replicate_num&#39;</span><span class="p">:</span> <span class="n">replicate</span><span class="p">,</span>
                     <span class="s1">&#39;num_replicates&#39;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">num_replicates</span><span class="p">,</span>
                     <span class="s1">&#39;hyperparameters&#39;</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="p">,</span>
@@ -582,13 +575,13 @@
     <span class="k">global</span> <span class="n">GLOBAL_DATA</span>
 
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Beginning training.&quot;</span><span class="p">)</span>
-    <span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
+    <span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">,</span> <span class="n">optimization_level</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Loaded predictor with </span><span class="si">%d</span><span class="s2"> networks&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">predictor</span><span class="o">.</span><span class="n">neural_networks</span><span class="p">))</span>
 
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">,</span> <span class="s2">&quot;training_init_info.pkl&quot;</span><span class="p">),</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
         <span class="n">GLOBAL_DATA</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fd</span><span class="p">))</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Loaded training init info:&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">GLOBAL_DATA</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Loaded training init info.&quot;</span><span class="p">)</span>
 
     <span class="n">all_work_items</span> <span class="o">=</span> <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;work_items&quot;</span><span class="p">]</span>
     <span class="n">complete_work_item_names</span> <span class="o">=</span> <span class="p">[</span>
@@ -852,6 +845,7 @@
     <span class="n">predictor</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
 
     <span class="c1"># Delete the network to release memory</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">clear_allele_representations</span><span class="p">()</span>
     <span class="n">model</span><span class="o">.</span><span class="n">update_network_description</span><span class="p">()</span>  <span class="c1"># save weights and config</span>
     <span class="n">model</span><span class="o">.</span><span class="n">_network</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># release tensorflow network</span>
     <span class="k">return</span> <span class="n">predictor</span></div>
@@ -862,9 +856,7 @@
 </pre></div>
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -873,12 +865,14 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2019, Timothy O&#39;Donnell.
-      Last updated on Sep 10, 2019.
+        &copy; Copyright Timothy O&#39;Donnell
+      <span class="lastupdated">
+        Last updated on Mar 23, 2020.
+      </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -891,36 +885,15 @@
   
 
 
-  
-
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'../../',
-            VERSION:'1.3.0',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="../../_static/jquery.js"></script>
-      <script type="text/javascript" src="../../_static/underscore.js"></script>
-      <script type="text/javascript" src="../../_static/doctools.js"></script>
-
-  
-
-  
-  
-    <script type="text/javascript" src="../../_static/js/theme.js"></script>
-  
-
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
   </script>
+
+  
+  
+    
    
 
 </body>

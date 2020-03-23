@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>MHCflurry documentation &mdash; MHCflurry 1.3.0 documentation</title>
+  <title>MHCflurry documentation &mdash; MHCflurry 1.6.0 documentation</title>
   
 
   
@@ -17,39 +17,34 @@
   
 
   
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
 
-  
-  
     
 
   
-
-  
-  
-    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="MHCflurry 1.3.0 documentation" href="#"/>
-        <link rel="next" title="Introduction and setup" href="intro.html"/> 
-
-  
-  <script src="_static/js/modernizr.min.js"></script>
-
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Introduction and setup" href="intro.html" /> 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
-
     
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search">
+        <div class="wy-side-nav-search" >
           
 
           
@@ -63,7 +58,7 @@
             
             
               <div class="version">
-                1.3.0
+                1.6.0
               </div>
             
           
@@ -104,7 +99,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="#">MHCflurry</a>
@@ -112,9 +107,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -168,28 +164,35 @@
 <li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="commandline_tutorial.html#downloading-models">Downloading models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="commandline_tutorial.html#generating-predictions">Generating predictions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tutorial.html#scanning-protein-sequences-for-predicted-mhc-i-ligands">Scanning protein sequences for predicted MHC I ligands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="commandline_tutorial.html#fitting-your-own-models">Fitting your own models</a></li>
-<li class="toctree-l2"><a class="reference internal" href="commandline_tutorial.html#scanning-protein-sequences-for-predicted-epitopes">Scanning protein sequences for predicted epitopes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="commandline_tutorial.html#environment-variables">Environment variables</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="python_tutorial.html#predicting">Predicting</a></li>
-<li class="toctree-l2"><a class="reference internal" href="python_tutorial.html#training">Training</a></li>
-<li class="toctree-l2"><a class="reference internal" href="python_tutorial.html#lower-level-interface">Lower level interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_tutorial.html#loading-a-predictor">Loading a predictor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_tutorial.html#predicting-for-individual-peptides">Predicting for individual peptides</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_tutorial.html#scanning-protein-sequences">Scanning protein sequences</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_tutorial.html#lower-level-interfaces">Lower level interfaces</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-predict">mhcflurry-predict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-predict-scan">mhcflurry-predict-scan</a></li>
 <li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-downloads">mhcflurry-downloads</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="commandline_tools.html#mhcflurry-downloads-fetch">mhcflurry-downloads fetch</a></li>
 <li class="toctree-l3"><a class="reference internal" href="commandline_tools.html#mhcflurry-downloads-info">mhcflurry-downloads info</a></li>
 <li class="toctree-l3"><a class="reference internal" href="commandline_tools.html#mhcflurry-downloads-path">mhcflurry-downloads path</a></li>
+<li class="toctree-l3"><a class="reference internal" href="commandline_tools.html#mhcflurry-downloads-url">mhcflurry-downloads url</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-class1-train-allele-specific-models">mhcflurry-class1-train-allele-specific-models</a></li>
-<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-calibrate-percentile-ranks">mhcflurry-calibrate-percentile-ranks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-class1-select-allele-specific-models">mhcflurry-class1-select-allele-specific-models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-class1-train-pan-allele-models">mhcflurry-class1-train-pan-allele-models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-class1-select-pan-allele-models">mhcflurry-class1-select-pan-allele-models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-class1-train-processing-models">mhcflurry-class1-train-processing-models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-class1-select-processing-models">mhcflurry-class1-select-processing-models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-class1-train-presentation-models">mhcflurry-class1-train-presentation-models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a><ul>
@@ -199,6 +202,9 @@
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.calibrate_percentile_ranks_command">mhcflurry.calibrate_percentile_ranks_command module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_affinity_predictor">mhcflurry.class1_affinity_predictor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_neural_network">mhcflurry.class1_neural_network module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_presentation_predictor">mhcflurry.class1_presentation_predictor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_processing_neural_network">mhcflurry.class1_processing_neural_network module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_processing_predictor">mhcflurry.class1_processing_predictor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.cluster_parallelism">mhcflurry.cluster_parallelism module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.common">mhcflurry.common module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.custom_loss">mhcflurry.custom_loss module</a></li>
@@ -207,17 +213,24 @@
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.downloads_command">mhcflurry.downloads_command module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.encodable_sequences">mhcflurry.encodable_sequences module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.ensemble_centrality">mhcflurry.ensemble_centrality module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.fasta">mhcflurry.fasta module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.flanking_encoding">mhcflurry.flanking_encoding module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.hyperparameters">mhcflurry.hyperparameters module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.local_parallelism">mhcflurry.local_parallelism module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.percent_rank_transform">mhcflurry.percent_rank_transform module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.predict_command">mhcflurry.predict_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.predict_scan_command">mhcflurry.predict_scan_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.random_negative_peptides">mhcflurry.random_negative_peptides module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.regression_target">mhcflurry.regression_target module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.scoring">mhcflurry.scoring module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.select_allele_specific_models_command">mhcflurry.select_allele_specific_models_command module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.select_pan_allele_models_command">mhcflurry.select_pan_allele_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.select_processing_models_command">mhcflurry.select_processing_models_command module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.testing_utils">mhcflurry.testing_utils module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.train_allele_specific_models_command">mhcflurry.train_allele_specific_models_command module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.train_pan_allele_models_command">mhcflurry.train_pan_allele_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.train_presentation_models_command">mhcflurry.train_presentation_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.train_processing_models_command">mhcflurry.train_processing_models_command module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.version">mhcflurry.version module</a></li>
 </ul>
 </li>
@@ -227,9 +240,7 @@
 
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -245,12 +256,14 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2019, Timothy O&#39;Donnell.
-      Last updated on Sep 10, 2019.
+        &copy; Copyright Timothy O&#39;Donnell
+      <span class="lastupdated">
+        Last updated on Mar 23, 2020.
+      </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -263,36 +276,15 @@
   
 
 
-  
-
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'1.3.0',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
-
-  
-
-  
-  
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-  
-
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
   </script>
+
+  
+  
+    
    
 
 </body>

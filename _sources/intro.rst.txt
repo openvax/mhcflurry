@@ -2,25 +2,33 @@ Introduction and setup
 =======================
 
 MHCflurry is an open source package for peptide/MHC I binding affinity prediction. It
-provides competitive accuracy with a fast and documented implementation.
+aims to provide competitive accuracy with a fast and documented implementation.
 
-You can download pre-trained MHCflurry models fit to affinity measurements
-deposited in IEDB or train a MHCflurry predictor on your own data.
+You can download pre-trained MHCflurry models fit to mass spec-identified MHC I
+ligands and peptide/MHC affinity measurements deposited in IEDB (plus a few other
+sources) or train a MHCflurry predictor on your own data.
 
-Currently only allele-specific prediction is implemented, in which separate models
-are trained for each allele. The released models therefore support a fixed set of common
-class I alleles for which sufficient published training data is available
-(see :ref:`models_supported_alleles`\ ).
+Starting in version 1.6.0, the default MHCflurry binding affinity predictors
+are "pan-allele" models that support most sequenced MHC I alleles across humans
+and a few other species (about 14,000 alleles in total). This version also
+introduces two experimental predictors, an "antigen processing" predictor
+that attempts to model MHC allele-independent effects such as proteosomal
+cleavage and a "presentation" predictor that integrates processing predictions
+with binding affinity predictions to give a composite "presentation score." Both
+models are trained on mass spec-identified MHC ligands.
 
-MHCflurry supports Python versions 2.7 and 3.4+. It uses the `keras <https://keras.io>`__
+MHCflurry supports Python 3.4+. It uses the `keras <https://keras.io>`__
 neural network library via either the Tensorflow or Theano backends. GPUs may
-optionally be used for a generally modest speed improvement.
+optionally be used for a modest speed improvement.
 
 If you find MHCflurry useful in your research please cite:
 
-    O'Donnell, T. et al., 2017. MHCflurry: open-source class I MHC
-    binding affinity prediction. bioRxiv. Available at:
-    http://www.biorxiv.org/content/early/2017/08/09/174243.
+    T. J. O’Donnell, et al., "MHCflurry: Open-Source Class I MHC Binding Affinity
+    Prediction," *Cell Systems*, 2018.
+    https://www.cell.com/cell-systems/fulltext/S2405-4712(18)30232-1.
+
+If you have questions or encounter problems, please file an issue at the
+MHCflurry github repo: https://github.com/openvax/mhcflurry
 
 
 Installation (pip)
@@ -55,7 +63,7 @@ tensorflow.
 
 .. code-block:: shell
 
-    $ conda create -q -n mhcflurry-env python=3.6 tensorflow
+    $ conda create -q -n mhcflurry-env python=3.6 'tensorflow<2.0.0'
     $ source activate mhcflurry-env
 
 Then continue as above:

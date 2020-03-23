@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Command-line tutorial &mdash; MHCflurry 1.3.0 documentation</title>
+  <title>Command-line tutorial &mdash; MHCflurry 1.6.0 documentation</title>
   
 
   
@@ -17,40 +17,35 @@
   
 
   
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
 
-  
-  
     
 
   
-
-  
-  
-    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="MHCflurry 1.3.0 documentation" href="index.html"/>
-        <link rel="next" title="Python library tutorial" href="python_tutorial.html"/>
-        <link rel="prev" title="Introduction and setup" href="intro.html"/> 
-
-  
-  <script src="_static/js/modernizr.min.js"></script>
-
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Python library tutorial" href="python_tutorial.html" />
+    <link rel="prev" title="Introduction and setup" href="intro.html" /> 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
-
     
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search">
+        <div class="wy-side-nav-search" >
           
 
           
@@ -64,7 +59,7 @@
             
             
               <div class="version">
-                1.3.0
+                1.6.0
               </div>
             
           
@@ -93,8 +88,8 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Command-line tutorial</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#downloading-models">Downloading models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#generating-predictions">Generating predictions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#scanning-protein-sequences-for-predicted-mhc-i-ligands">Scanning protein sequences for predicted MHC I ligands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#fitting-your-own-models">Fitting your own models</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#scanning-protein-sequences-for-predicted-epitopes">Scanning protein sequences for predicted epitopes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment variables</a></li>
 </ul>
 </li>
@@ -112,7 +107,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">MHCflurry</a>
@@ -120,9 +115,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -171,103 +167,182 @@
 <p>Most users will use pre-trained MHCflurry models that we release. These models
 are distributed separately from the pip package and may be downloaded with the
 <a class="reference internal" href="commandline_tools.html#mhcflurry-downloads"><span class="std std-ref">mhcflurry-downloads</span></a> tool:</p>
-<div class="highlight-shell"><div class="highlight"><pre><span></span>$ mhcflurry-downloads fetch models_class1
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ mhcflurry-downloads fetch models_class1_presentation
 </pre></div>
 </div>
 <p>Files downloaded with <a class="reference internal" href="commandline_tools.html#mhcflurry-downloads"><span class="std std-ref">mhcflurry-downloads</span></a> are stored in a platform-specific
 directory. To get the path to downloaded data, you can use:</p>
-<div class="highlight-text"><div class="highlight"><pre><span></span>$ mhcflurry-downloads path models_class1
-/Users/tim/Library/Application Support/mhcflurry/4/1.3.0/models_class1/
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ mhcflurry-downloads path models_class1_presentation
+/Users/tim/Library/Application Support/mhcflurry/4/1.6.0/models_class1_presentation/
 </pre></div>
 </div>
-<p>We also release a few other “downloads,” such as curated training data and some
-experimental models. To see what’s available and what you have downloaded, run:</p>
-<div class="highlight-text"><div class="highlight"><pre><span></span>$ mhcflurry-downloads info
-Environment variables
-  MHCFLURRY_DATA_DIR                  [unset or empty]
-  MHCFLURRY_DOWNLOADS_CURRENT_RELEASE [unset or empty]
-  MHCFLURRY_DOWNLOADS_DIR             [unset or empty]
-  MHCFLURRY_DEFAULT_CLASS1_MODELS     [unset or empty]
-
-Configuration
-  current release                     = 1.3.0                
-  downloads dir                       = &#39;/Users/tim/Library/Application Support/mhcflurry/4/1.3.0&#39; [exists]
-
-DOWNLOAD NAME                             DOWNLOADED?   URL                  
-models_class1_pan                         YES           https://github.com/openvax/mhcflurry/releases/download/pan-dev1/models_class1_pan.20190829.tar.bz2 
-models_class1_pan_unselected              NO            https://github.com/openvax/mhcflurry/releases/download/pan-dev1/models_class1_pan_unselected.20190826.tar.bz2.part.aa + 1 more parts 
-data_iedb                                 NO            https://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_iedb.20190610.tar.bz2 
-data_systemhcatlas                        NO            https://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_systemhcatlas.20190506.tar.bz2 
-allele_sequences                          YES           https://github.com/openvax/mhcflurry/releases/download/pan-dev1/allele_sequences.20190506.tar.bz2 
-random_peptide_predictions                NO            https://github.com/openvax/mhcflurry/releases/download/pan-dev1/random_peptide_predictions.20190506.tar.bz2 
-data_published                            NO            https://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_published.tar.bz2 
-data_curated                              YES           https://github.com/openvax/mhcflurry/releases/download/pan-dev1/data_curated.20190516.tar.bz2 
-models_class1                             YES           https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1.20180225.tar.bz2 
-models_class1_selected_no_mass_spec       NO            https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_selected_no_mass_spec.20180225.tar.bz2 
-models_class1_unselected                  YES           https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_unselected.20180221.tar.bz2 
-models_class1_trained_with_mass_spec      NO            https://github.com/openvax/mhcflurry/releases/download/pre-1.2.1/models_class1_trained_with_mass_spec.20180228.tar.bz2 
-models_class1_unselected_with_mass_spec   NO            https://github.com/openvax/mhcflurry/releases/download/pre-1.2.1/models_class1_unselected_with_mass_spec.20180227.tar.bz2 
-models_class1_minimal                     NO            https://github.com/openvax/mhcflurry/releases/download/pre-1.2/models_class1_minimal.20180226.tar.bz2
-</pre></div>
-</div>
+<p>We also release a number of other “downloads,” such as curated training data and some
+experimental models. To see what’s available and what you have downloaded, run
+<code class="docutils literal notranslate"><span class="pre">mhcflurry-downloads</span> <span class="pre">info</span></code>.</p>
+<p>Most users will only need <code class="docutils literal notranslate"><span class="pre">models_class1_presentation</span></code>, however, as the
+presentation predictor includes a peptide / MHC I binding affinity (BA) predictor
+as well as an antigen processing (AP) predictor.</p>
 <div class="admonition note">
-<p class="first admonition-title">Note</p>
-<p class="last">The code we use for <em>generating</em> the downloads is in the
-<code class="docutils literal"><span class="pre">downloads_generation</span></code> directory in the repository.</p>
+<p class="admonition-title">Note</p>
+<p>The code we use for <em>generating</em> the downloads is in the
+<code class="docutils literal notranslate"><span class="pre">downloads_generation</span></code> directory in the repository (<a class="reference external" href="https://github.com/openvax/mhcflurry/tree/master/downloads-generation">https://github.com/openvax/mhcflurry/tree/master/downloads-generation</a>)</p>
 </div>
 </div>
 <div class="section" id="generating-predictions">
 <h2>Generating predictions<a class="headerlink" href="#generating-predictions" title="Permalink to this headline">¶</a></h2>
-<p>The <a class="reference internal" href="commandline_tools.html#mhcflurry-predict"><span class="std std-ref">mhcflurry-predict</span></a> command generates predictions from the command-line.
-By default it will use the pre-trained models you downloaded above; other
-models can be used by specifying the <code class="docutils literal"><span class="pre">--models</span></code> argument.</p>
+<p>The <a class="reference internal" href="commandline_tools.html#mhcflurry-predict"><span class="std std-ref">mhcflurry-predict</span></a> command generates predictions for individual peptides
+(see the next section for how to scan protein sequences for epitopes). By
+default it will use the pre-trained models you downloaded above. Other
+models can be used by specifying the <code class="docutils literal notranslate"><span class="pre">--models</span></code> argument.</p>
 <p>Running:</p>
-<div class="highlight-text"><div class="highlight"><pre><span></span>$ mhcflurry-predict
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ mhcflurry-predict
     --alleles HLA-A0201 HLA-A0301
     --peptides SIINFEKL SIINFEKD SIINFEKQ
     --out /tmp/predictions.csv
-Forcing tensorflow backend.
+Predicting processing.
+Predicting affinities.
 Wrote: /tmp/predictions.csv
 </pre></div>
 </div>
 <p>results in a file like this:</p>
-<div class="highlight-text"><div class="highlight"><pre><span></span>$ cat /tmp/predictions.csv
-allele,peptide,mhcflurry_prediction,mhcflurry_prediction_low,mhcflurry_prediction_high,mhcflurry_prediction_percentile
-HLA-A0201,SIINFEKL,4571.9837338925745,2093.5416199928345,11331.82765707368,6.381625000000002
-HLA-A0201,SIINFEKD,20649.720227493523,14353.611034127305,32423.368823383964,55.223
-HLA-A0201,SIINFEKQ,18592.22794116855,12515.669089205081,29905.258689598362,41.16749999999999
-HLA-A0301,SIINFEKL,21589.976542675962,17277.679104286573,30373.806137826843,41.669124999999994
-HLA-A0301,SIINFEKD,23079.079503467212,19624.486594831662,32525.429771105642,50.41887499999998
-HLA-A0301,SIINFEKQ,18610.52335594213,14780.167277309405,27340.837897606812,29.12987499999999
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ cat /tmp/predictions.csv
+allele,peptide,mhcflurry_affinity,mhcflurry_affinity_percentile,mhcflurry_processing_score,mhcflurry_presentation_score
+HLA-A0201,SIINFEKL,12906.786866783777,6.566374999999997,0.10147304146084934,0.012502709574418581
+HLA-A0201,SIINFEKD,34491.778276696794,44.61275000000001,0.015448467253008857,0.00387464531700359
+HLA-A0201,SIINFEKQ,31476.142209308568,30.217625,0.0359264743165113,0.004518140004135804
+HLA-A0301,SIINFEKL,32253.5874797359,20.37875,0.10147304146084934,0.0055786327707357695
+HLA-A0301,SIINFEKD,37075.86269121571,58.8585,0.015448467253008857,0.0036345557828772576
+HLA-A0301,SIINFEKQ,33258.4276356094,24.029125,0.0359264743165113,0.004303226784859033
 </pre></div>
 </div>
-<p>The predictions are given as affinities (KD) in nM in the <code class="docutils literal"><span class="pre">mhcflurry_prediction</span></code>
-column. The other fields give the 5-95 percentile predictions across
-the models in the ensemble and the quantile of the affinity prediction among
-a large number of random peptides tested on that allele.</p>
-<p>The predictions shown above were generated with MHCflurry 1.3.0. Different versions of
-MHCflurry can give considerably different results. Even
-on the same version, exact predictions may vary (up to about 1 nM) depending
-on the Keras backend and other details.</p>
+<p>The binding affinity predictions are given as affinities (KD) in nM in the
+<code class="docutils literal notranslate"><span class="pre">mhcflurry_affinity</span></code> column. Lower values indicate stronger binders. A commonly-used
+threshold for peptides with a reasonable chance of being immunogenic is 500 nM.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">mhcflurry_affinity_percentile</span></code> gives the percentile of the affinity
+prediction among a large number of random peptides tested on that allele (range
+0 - 100). Lower is stronger. Two percent is a commonly-used threshold.</p>
+<p>The last two columns give the antigen processing and presentation scores,
+respectively. These range from 0 to 1 with higher values indicating more
+favorable processing or presentation.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The processing predictor is experimental. It models allele-independent
+effects that influence whether a
+peptide will be detected in a mass spec experiment. The presentation score is
+a simple logistic regression model that combines the (log) binding affinity
+prediction with the processing score to give a composite prediction. The resulting
+prediction may be useful for prioritizing potential epitopes, but no
+thresholds have been established for what constitutes a “high enough”
+presentation score.</p>
+</div>
 <p>In most cases you’ll want to specify the input as a CSV file instead of passing
-peptides and alleles as commandline arguments. See <a class="reference internal" href="commandline_tools.html#mhcflurry-predict"><span class="std std-ref">mhcflurry-predict</span></a> docs.</p>
+peptides and alleles as commandline arguments. If you’re relying on the
+processing or presentation scores, you may also want to pass the upstream and
+downstream sequences of the peptides from their source proteins for potentially more
+accurate cleavage prediction. See the <a class="reference internal" href="commandline_tools.html#mhcflurry-predict"><span class="std std-ref">mhcflurry-predict</span></a> docs.</p>
+</div>
+<div class="section" id="scanning-protein-sequences-for-predicted-mhc-i-ligands">
+<h2>Scanning protein sequences for predicted MHC I ligands<a class="headerlink" href="#scanning-protein-sequences-for-predicted-mhc-i-ligands" title="Permalink to this headline">¶</a></h2>
+<p>Starting in version 1.6.0, MHCflurry supports scanning proteins for MHC-binding
+peptides using the <code class="docutils literal notranslate"><span class="pre">mhcflurry-predict-scan</span></code> command.</p>
+<p>We’ll generate predictions across <code class="docutils literal notranslate"><span class="pre">example.fasta</span></code>, a FASTA file with two short
+sequences:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span><span class="n">protein1</span>
+<span class="n">MSSSSTPVCPNGPGNCQV</span>
+<span class="o">&gt;</span><span class="n">protein2</span>
+<span class="n">MVENKRLLEGMEMIFGQVIPGA</span>
+</pre></div>
+</div>
+<p>Here’s the <code class="docutils literal notranslate"><span class="pre">mhcflurry-predict-scan</span></code> invocation to scan the proteins for
+binders to either of two MHC I genotypes (using a 100 nM threshold):</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ mhcflurry-predict-scan
+    example.fasta
+    --alleles
+        HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02
+        HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:02,HLA-C*03:01
+    --results-filtered affinity
+    --threshold-affinity 100
+Guessed input file format: fasta
+Read input fasta with 2 sequences
+  sequence_id                sequence
+0    protein1      MSSSSTPVCPNGPGNCQV
+1    protein2  MVENKRLLEGMEMIFGQVIPGA
+Predicting processing.
+Predicting affinities.
+sequence_name,pos,peptide,n_flank,c_flank,sample_name,affinity,best_allele,affinity_percentile,processing_score,presentation_score
+protein2,5,RLLEGMEMI,MVENK,FGQVIPGA,genotype_00,15.506647240532306,HLA-A*02:01,0.06800000000000002,0.9045842811465263,0.9899999181261543
+protein2,5,RLLEGMEMI,MVENK,FGQVIPGA,genotype_01,17.618050003789662,HLA-A*02:06,0.09587500000000006,0.9045842811465263,0.9888061128232571
+protein2,12,MIFGQVIPGA,MVENKRLLEGME,,genotype_01,27.74054476375278,HLA-A*02:06,0.2527499999999999,0.9025756493210793,0.9831738588268119
+protein2,4,KRLLEGMEM,MVEN,IFGQVIPGA,genotype_00,29.368389637130125,HLA-C*07:02,0.09150000000000004,0.49434878677129745,0.9171519649768841
+protein2,12,MIFGQVIPGA,MVENKRLLEGME,,genotype_00,35.083004993507345,HLA-A*02:01,0.34662499999999985,0.9025756493210793,0.9793299707138564
+protein1,8,CPNGPGNCQV,MSSSSTPV,,genotype_01,44.167261275374614,HLA-B*07:02,0.236125,0.16842720657587051,0.6796971953334389
+protein2,10,MEMIFGQVI,MVENKRLLEG,PGA,genotype_00,48.90184726168596,HLA-B*45:01,0.180375,0.40690354630351067,0.8325127154379427
+protein2,10,MEMIFGQVI,MVENKRLLEG,PGA,genotype_01,77.43363203601268,HLA-B*44:02,0.3624999999999998,0.40690354630351067,0.7673069170016388
+protein2,4,KRLLEGMEMIF,MVEN,GQVIPGA,genotype_00,88.06509237659311,HLA-C*07:02,0.8623749999999999,0.46066924184560776,0.7842639917310846
+</pre></div>
+</div>
+<p>See the <a class="reference internal" href="commandline_tools.html#mhcflurry-predict-scan"><span class="std std-ref">mhcflurry-predict-scan</span></a> docs for more options.</p>
 </div>
 <div class="section" id="fitting-your-own-models">
 <h2>Fitting your own models<a class="headerlink" href="#fitting-your-own-models" title="Permalink to this headline">¶</a></h2>
-<p>The <a class="reference internal" href="commandline_tools.html#mhcflurry-class1-train-allele-specific-models"><span class="std std-ref">mhcflurry-class1-train-allele-specific-models</span></a> command is used to
-fit models to training data. The models we release with MHCflurry are trained
-with a command like:</p>
-<div class="highlight-shell"><div class="highlight"><pre><span></span>$ mhcflurry-class1-train-allele-specific-models <span class="se">\</span>
-    --data TRAINING_DATA.csv <span class="se">\</span>
+<p>If you have your own data and want to fit your own MHCflurry models, you have
+a few options. If you have data for only one or a few MHC I alleles, the best
+approach is to use the
+<a class="reference internal" href="commandline_tools.html#mhcflurry-class1-train-allele-specific-models"><span class="std std-ref">mhcflurry-class1-train-allele-specific-models</span></a> command to fit an
+“allele-specific” predictor, in which separate neural networks are used for
+each allele.</p>
+<p>To call <a class="reference internal" href="commandline_tools.html#mhcflurry-class1-train-allele-specific-models"><span class="std std-ref">mhcflurry-class1-train-allele-specific-models</span></a> you’ll need some
+training data. The data we use for our released predictors can be downloaded with
+<a class="reference internal" href="commandline_tools.html#mhcflurry-downloads"><span class="std std-ref">mhcflurry-downloads</span></a>:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ mhcflurry-downloads fetch data_curated
+</pre></div>
+</div>
+<p>It looks like this:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ bzcat &quot;$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2&quot; | head -n 3
+allele,peptide,measurement_value,measurement_inequality,measurement_type,measurement_kind,measurement_source,original_allele
+BoLA-1*21:01,AENDTLVVSV,7817.0,=,quantitative,affinity,Barlow - purified MHC/competitive/fluorescence,BoLA-1*02101
+BoLA-1*21:01,NQFNGGCLLV,1086.0,=,quantitative,affinity,Barlow - purified MHC/direct/fluorescence,BoLA-1*02101
+</pre></div>
+</div>
+<p>Here’s an example invocation to fit a predictor:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ mhcflurry-class1-train-allele-specific-models <span class="se">\</span>
+    --data curated_training_data.csv.bz2 <span class="se">\</span>
     --hyperparameters hyperparameters.yaml <span class="se">\</span>
     --min-measurements-per-allele <span class="m">75</span> <span class="se">\</span>
     --out-models-dir models
 </pre></div>
 </div>
+<p>The <code class="docutils literal notranslate"><span class="pre">hyperparameters.yaml</span></code> file gives the list of neural network architectures
+to train models for. Here’s an example specifying a single architecture:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">activation</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">tanh</span>
+  <span class="l l-Scalar l-Scalar-Plain">dense_layer_l1_regularization</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">0.0</span>
+  <span class="l l-Scalar l-Scalar-Plain">dropout_probability</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">0.0</span>
+  <span class="l l-Scalar l-Scalar-Plain">early_stopping</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+  <span class="l l-Scalar l-Scalar-Plain">layer_sizes</span><span class="p p-Indicator">:</span> <span class="p p-Indicator">[</span><span class="nv">8</span><span class="p p-Indicator">]</span>
+  <span class="l l-Scalar l-Scalar-Plain">locally_connected_layers</span><span class="p p-Indicator">:</span> <span class="p p-Indicator">[]</span>
+  <span class="l l-Scalar l-Scalar-Plain">loss</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">custom:mse_with_inequalities</span>
+  <span class="l l-Scalar l-Scalar-Plain">max_epochs</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">500</span>
+  <span class="l l-Scalar l-Scalar-Plain">minibatch_size</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">128</span>
+  <span class="l l-Scalar l-Scalar-Plain">n_models</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">4</span>
+  <span class="l l-Scalar l-Scalar-Plain">output_activation</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">sigmoid</span>
+  <span class="l l-Scalar l-Scalar-Plain">patience</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">20</span>
+  <span class="l l-Scalar l-Scalar-Plain">peptide_amino_acid_encoding</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">BLOSUM62</span>
+  <span class="l l-Scalar l-Scalar-Plain">random_negative_affinity_max</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">50000.0</span>
+  <span class="l l-Scalar l-Scalar-Plain">random_negative_affinity_min</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">20000.0</span>
+  <span class="l l-Scalar l-Scalar-Plain">random_negative_constant</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">25</span>
+  <span class="l l-Scalar l-Scalar-Plain">random_negative_rate</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">0.0</span>
+  <span class="l l-Scalar l-Scalar-Plain">validation_split</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">0.1</span>
+</pre></div>
+</div>
+<p>The available hyperparameters for binding predictors are defined in
+<a class="reference internal" href="api.html#mhcflurry.Class1NeuralNetwork" title="mhcflurry.Class1NeuralNetwork"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Class1NeuralNetwork</span></code></a>. To see exactly how
+these are used you will need to read the source code.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
 <p>MHCflurry predictors are serialized to disk as many files in a directory. The
-command above will write the models to the output directory specified by the
-<code class="docutils literal"><span class="pre">--out-models-dir</span></code> argument. This directory has files like:</p>
-<div class="highlight-text"><div class="highlight"><pre><span></span>info.txt
+model training command above will write the models to the output directory specified by the
+<code class="docutils literal notranslate"><span class="pre">--out-models-dir</span></code> argument. This directory has files like:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>info.txt
 manifest.csv
 model_selection.csv.bz2
 model_selection_data.csv.bz2
@@ -278,99 +353,55 @@ weights_PATR-B*24:01-8-491d1b4d85da0dc4.npz
 weights_PATR-B*24:01-9-8f295e814502ffa1.npz
 </pre></div>
 </div>
-<p>The <code class="docutils literal"><span class="pre">manifest.csv</span></code> file gives metadata for all the models used in the predictor.
-There will be a <code class="docutils literal"><span class="pre">weights_...</span></code> file for each model giving its weights
-(the parameters for the neural network). The <code class="docutils literal"><span class="pre">percent_ranks.csv</span></code> stores a
+<p>The <code class="docutils literal notranslate"><span class="pre">manifest.csv</span></code> file gives metadata for all the models used in the predictor.
+There will be a <code class="docutils literal notranslate"><span class="pre">weights_...</span></code> file for each model giving its weights
+(the parameters for the neural network). The <code class="docutils literal notranslate"><span class="pre">percent_ranks.csv</span></code> stores a
 histogram of model predictions for each allele over a large number of random
 peptides. It is used for generating the percent ranks at prediction time.</p>
-<p>To call <a class="reference internal" href="commandline_tools.html#mhcflurry-class1-train-allele-specific-models"><span class="std std-ref">mhcflurry-class1-train-allele-specific-models</span></a> you’ll need some
-training data. The data we use for our released predictors can be downloaded with
-<a class="reference internal" href="commandline_tools.html#mhcflurry-downloads"><span class="std std-ref">mhcflurry-downloads</span></a>:</p>
-<div class="highlight-shell"><div class="highlight"><pre><span></span>$ mhcflurry-downloads fetch data_curated
-</pre></div>
 </div>
-<p>It looks like this:</p>
-<div class="highlight-text"><div class="highlight"><pre><span></span>$ bzcat &quot;$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2&quot; | head -n 3
-allele,peptide,measurement_value,measurement_inequality,measurement_type,measurement_source,original_allele
-BoLA-1*21:01,AENDTLVVSV,7817.0,=,quantitative,Barlow - purified MHC/competitive/fluorescence,BoLA-1*02101
-BoLA-1*21:01,NQFNGGCLLV,1086.0,=,quantitative,Barlow - purified MHC/direct/fluorescence,BoLA-1*02101
-</pre></div>
-</div>
-</div>
-<div class="section" id="scanning-protein-sequences-for-predicted-epitopes">
-<h2>Scanning protein sequences for predicted epitopes<a class="headerlink" href="#scanning-protein-sequences-for-predicted-epitopes" title="Permalink to this headline">¶</a></h2>
-<p>The <a class="reference external" href="https://github.com/hammerlab/mhctools">mhctools</a> package
-provides support for scanning protein sequences to find predicted
-epitopes. It supports MHCflurry as well as other binding predictors.
-Here is an example.</p>
-<p>First, install <code class="docutils literal"><span class="pre">mhctools</span></code> if it is not already installed:</p>
-<div class="highlight-shell"><div class="highlight"><pre><span></span>$ pip install mhctools
-</pre></div>
-</div>
-<p>We’ll generate predictions across <code class="docutils literal"><span class="pre">example.fasta</span></code>, a FASTA file with two short
-sequences:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">&gt;</span><span class="n">protein1</span>
-<span class="n">MDSKGSSQKGSRLLLLLVVSNLLLCQGVVSTPVCPNGPGNCQV</span>
-<span class="n">EMFNEFDKRYAQGKGFITMALNSCHTSSLPTPEDKEQAQQTHH</span>
-<span class="o">&gt;</span><span class="n">protein2</span>
-<span class="n">VTEVRGMKGAPDAILSRAIEIEEENKRLLEGMEMIFGQVIPGA</span>
-<span class="n">ARYSAFYNLLHCLRRDSSKIDTYLKLLNCRIIYNNNC</span>
-</pre></div>
-</div>
-<p>Here’s the <code class="docutils literal"><span class="pre">mhctools</span></code> invocation. See <code class="docutils literal"><span class="pre">mhctools</span> <span class="pre">-h</span></code> for more information.</p>
-<div class="highlight-text"><div class="highlight"><pre><span></span>$ mhctools
-    --mhc-predictor mhcflurry
-    --input-fasta-file example.fasta
-    --mhc-alleles A02:01,A03:01
-    --mhc-peptide-lengths 8,9,10,11
-    --extract-subsequences
-    --output-csv /tmp/subsequence_predictions.csv
-2019-09-10 11:31:10,189 - mhctools.cli.args - INFO - Building MHC binding prediction type for alleles [&#39;HLA-A*02:01&#39;, &#39;HLA-A*03:01&#39;] and epitope lengths [8, 9, 10, 11]
-2019-09-10 11:31:16,268 - mhctools.mhcflurry - INFO - BindingPrediction(peptide=&#39;AARYSAFY&#39;, allele=&#39;HLA-A*03:01&#39;, affinity=3270.8757, percentile_rank=None, source_sequence_name=None, offset=0, prediction_method_name=&#39;mhcflurry&#39;)
-...
-
-[1192 rows x 8 columns]
-</pre></div>
-</div>
-<p>This will write a file giving predictions for all subsequences of the specified lengths:</p>
-<div class="highlight-text"><div class="highlight"><pre><span></span>$ head -n 3 /tmp/subsequence_predictions.csv
-,source_sequence_name,offset,peptide,allele,affinity,percentile_rank,prediction_method_name,length
-0,protein2,42,AARYSAFY,HLA-A*03:01,3270.8756533692185,,mhcflurry,8
-1,protein2,42,AARYSAFYN,HLA-A*03:01,9140.186954603147,,mhcflurry,9
-</pre></div>
+<p>To fit pan-allele models like the ones released with MHCflurry, you can use
+a similar tool, <a class="reference internal" href="commandline_tools.html#mhcflurry-class1-train-pan-allele-models"><span class="std std-ref">mhcflurry-class1-train-pan-allele-models</span></a>. You’ll probably
+also want to take a look at the scripts used to generate the production models,
+which are available in the <em>downloads-generation</em> directory in the MHCflurry
+repository. See the scripts in the <em>models_class1_pan</em> subdirectory to see how the
+fitting and model selection was done for models currently distributed with MHCflurry.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The production MHCflurry models were fit using a cluster with several
+dozen GPUs over a period of about two days. If you model select over fewer
+architectures, however, it should be possible to fit a predictor using less
+resources.</p>
 </div>
 </div>
 <div class="section" id="environment-variables">
 <h2>Environment variables<a class="headerlink" href="#environment-variables" title="Permalink to this headline">¶</a></h2>
 <p>MHCflurry behavior can be modified using these environment variables:</p>
-<dl class="docutils">
-<dt><code class="docutils literal"><span class="pre">MHCFLURRY_DEFAULT_CLASS1_MODELS</span></code></dt>
-<dd>Path to models directory. If you call <code class="docutils literal"><span class="pre">Class1AffinityPredictor.load()</span></code>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">MHCFLURRY_DEFAULT_CLASS1_MODELS</span></code></dt><dd><p>Path to models directory. If you call <code class="docutils literal notranslate"><span class="pre">Class1AffinityPredictor.load()</span></code>
 with no arguments, the models specified in this environment variable will be
 used. If this environment variable is undefined, the downloaded models for
-the current MHCflurry release are used.</dd>
-<dt><code class="docutils literal"><span class="pre">MHCFLURRY_OPTIMIZATION_LEVEL</span></code></dt>
-<dd>The pan-allele models can be somewhat slow. As an optimization, when this
+the current MHCflurry release are used.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">MHCFLURRY_OPTIMIZATION_LEVEL</span></code></dt><dd><p>The pan-allele models can be somewhat slow. As an optimization, when this
 variable is greater than 0 (default is 1), we “stitch” the pan-allele models in
 the ensemble into one large tensorflow graph. In our experiments
 it gives about a 30% speed improvement. It has no effect on allele-specific
 models. Set this variable to 0 to disable this behavior. This may be helpful
-if you are running out of memory using the pan-allele models.</dd>
-<dt><code class="docutils literal"><span class="pre">MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE</span></code></dt>
-<dd>For large prediction tasks, it can be helpful to increase the prediction batch
+if you are running out of memory using the pan-allele models.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE</span></code></dt><dd><p>For large prediction tasks, it can be helpful to increase the prediction batch
 size, which is set by this environment variable (default is 4096). This
 affects both allele-specific and pan-allele predictors. It can have large
 effects on performance. Alternatively, if you are running out of memory,
-you can try decreasing the batch size.</dd>
+you can try decreasing the batch size.</p>
+</dd>
 </dl>
 </div>
 </div>
 
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -379,7 +410,7 @@ you can try decreasing the batch size.</dd>
         <a href="python_tutorial.html" class="btn btn-neutral float-right" title="Python library tutorial" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="intro.html" class="btn btn-neutral" title="Introduction and setup" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="intro.html" class="btn btn-neutral float-left" title="Introduction and setup" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -388,12 +419,14 @@ you can try decreasing the batch size.</dd>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2019, Timothy O&#39;Donnell.
-      Last updated on Sep 10, 2019.
+        &copy; Copyright Timothy O&#39;Donnell
+      <span class="lastupdated">
+        Last updated on Mar 23, 2020.
+      </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -406,36 +439,15 @@ you can try decreasing the batch size.</dd>
   
 
 
-  
-
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'1.3.0',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
-
-  
-
-  
-  
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-  
-
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
   </script>
+
+  
+  
+    
    
 
 </body>

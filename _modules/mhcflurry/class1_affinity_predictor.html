@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.class1_affinity_predictor &mdash; MHCflurry 1.3.0 documentation</title>
+  <title>mhcflurry.class1_affinity_predictor &mdash; MHCflurry 1.6.0 documentation</title>
   
 
   
@@ -17,39 +17,33 @@
   
 
   
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
-  
-  
     
 
   
-
-  
-  
-    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="search" title="Search" href="../../search.html"/>
-    <link rel="top" title="MHCflurry 1.3.0 documentation" href="../../index.html"/>
-        <link rel="up" title="Module code" href="../index.html"/> 
-
-  
-  <script src="../../_static/js/modernizr.min.js"></script>
-
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
-
     
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search">
+        <div class="wy-side-nav-search" >
           
 
           
@@ -63,7 +57,7 @@
             
             
               <div class="version">
-                1.3.0
+                1.6.0
               </div>
             
           
@@ -104,7 +98,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../../index.html">MHCflurry</a>
@@ -112,9 +106,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -143,8 +138,6 @@
     
     
       <li class="wy-breadcrumbs-aside">
-        
-            
         
       </li>
     
@@ -185,6 +178,7 @@
 <span class="kn">from</span> <span class="nn">.version</span> <span class="k">import</span> <span class="n">__version__</span>
 <span class="kn">from</span> <span class="nn">.ensemble_centrality</span> <span class="k">import</span> <span class="n">CENTRALITY_MEASURES</span>
 <span class="kn">from</span> <span class="nn">.allele_encoding</span> <span class="k">import</span> <span class="n">AlleleEncoding</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">save_weights</span><span class="p">,</span> <span class="n">load_weights</span>
 
 
 <span class="c1"># Default function for combining predictions across models in an ensemble.</span>
@@ -373,7 +367,7 @@
 
 <div class="viewcode-block" id="Class1AffinityPredictor.merge_in_place"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.merge_in_place">[docs]</a>    <span class="k">def</span> <span class="nf">merge_in_place</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">others</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Add the models present other predictors into the current predictor.</span>
+<span class="sd">        Add the models present in other predictors into the current predictor.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -519,13 +513,23 @@
 
         <span class="n">sub_manifest_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">model_name</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">model_names_to_write</span><span class="p">)</span>
-        <span class="p">]</span>
+        <span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
+        <span class="c1"># Network JSON configs may have changed since the models were added,</span>
+        <span class="c1"># for example due to changes to the allele representation layer.</span>
+        <span class="c1"># So we update the JSON configs here also.</span>
+        <span class="n">updated_network_config_jsons</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">row</span><span class="p">)</span> <span class="ow">in</span> <span class="n">sub_manifest_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">updated_network_config_jsons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">get_config</span><span class="p">()))</span>
             <span class="n">weights_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights_path</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">row</span><span class="o">.</span><span class="n">model_name</span><span class="p">)</span>
-            <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">save_weights</span><span class="p">(</span>
-                <span class="n">row</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">get_weights</span><span class="p">(),</span> <span class="n">weights_path</span><span class="p">)</span>
+            <span class="n">save_weights</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">get_weights</span><span class="p">(),</span> <span class="n">weights_path</span><span class="p">)</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Wrote: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">weights_path</span><span class="p">)</span>
+        <span class="n">sub_manifest_df</span><span class="p">[</span><span class="s2">&quot;config_json&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">updated_network_config_jsons</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+            <span class="n">sub_manifest_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
+            <span class="s2">&quot;config_json&quot;</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="n">updated_network_config_jsons</span>
 
         <span class="n">write_manifest_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">manifest_df</span><span class="p">[[</span>
             <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="o">!=</span> <span class="s2">&quot;model&quot;</span>
@@ -567,8 +571,10 @@
                 <span class="n">series</span> <span class="o">=</span> <span class="n">transform</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
                 <span class="k">if</span> <span class="n">percent_ranks_df</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="n">percent_ranks_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">series</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
-                <span class="n">assert_equal</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">percent_ranks_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
-                <span class="n">percent_ranks_df</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="n">series</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_array_almost_equal</span><span class="p">(</span>
+                    <span class="n">series</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+                    <span class="n">percent_ranks_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+                <span class="n">percent_ranks_df</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">values</span>
             <span class="n">percent_ranks_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;percent_ranks.csv&quot;</span><span class="p">)</span>
             <span class="n">percent_ranks_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span>
                 <span class="n">percent_ranks_path</span><span class="p">,</span>
@@ -617,9 +623,7 @@
             <span class="c1"># We will lazy-load weights when the network is used.</span>
             <span class="n">model</span> <span class="o">=</span> <span class="n">Class1NeuralNetwork</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span>
                 <span class="n">config</span><span class="p">,</span>
-                <span class="n">weights_loader</span><span class="o">=</span><span class="n">partial</span><span class="p">(</span>
-                    <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load_weights</span><span class="p">,</span>
-                    <span class="n">abspath</span><span class="p">(</span><span class="n">weights_filename</span><span class="p">)))</span>
+                <span class="n">weights_loader</span><span class="o">=</span><span class="n">partial</span><span class="p">(</span><span class="n">load_weights</span><span class="p">,</span> <span class="n">abspath</span><span class="p">(</span><span class="n">weights_filename</span><span class="p">)))</span>
             <span class="k">if</span> <span class="n">row</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="s2">&quot;pan-class1&quot;</span><span class="p">:</span>
                 <span class="n">class1_pan_allele_models</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
@@ -669,7 +673,7 @@
                 <span class="s2">&quot;succeeded&quot;</span> <span class="k">if</span> <span class="n">optimized</span> <span class="k">else</span> <span class="s2">&quot;not supported for these models&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">result</span></div>
 
-<div class="viewcode-block" id="Class1AffinityPredictor.optimize"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.optimize">[docs]</a>    <span class="k">def</span> <span class="nf">optimize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Class1AffinityPredictor.optimize"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.optimize">[docs]</a>    <span class="k">def</span> <span class="nf">optimize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">warn</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        EXPERIMENTAL: Optimize the predictor for faster predictions.</span>
 
@@ -693,7 +697,8 @@
                         <span class="n">merge_method</span><span class="o">=</span><span class="s2">&quot;concatenate&quot;</span><span class="p">)</span>
                 <span class="p">]</span>
             <span class="k">except</span> <span class="ne">NotImplementedError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Optimization failed: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">warn</span><span class="p">:</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Optimization failed: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
                 <span class="k">return</span> <span class="kc">False</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_manifest_df</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
@@ -721,7 +726,10 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">random_string</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha1</span><span class="p">(</span>
             <span class="nb">str</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">())</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()[:</span><span class="mi">16</span><span class="p">]</span>
-        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">-</span><span class="si">%d</span><span class="s2">-</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">allele</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="n">num</span><span class="p">,</span> <span class="n">random_string</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">-</span><span class="si">%d</span><span class="s2">-</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">allele</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">),</span>
+            <span class="n">num</span><span class="p">,</span>
+            <span class="n">random_string</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Class1AffinityPredictor.weights_path"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.weights_path">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">weights_path</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">model_name</span><span class="p">):</span>
@@ -1038,11 +1046,29 @@
 <span class="sd">        numpy.array of float</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">allele</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">normalized_allele</span> <span class="o">=</span> <span class="n">mhcnames</span><span class="o">.</span><span class="n">normalize_allele_name</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">transform</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span>
+                <span class="n">transform</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="p">[</span><span class="n">normalized_allele</span><span class="p">]</span>
                 <span class="k">return</span> <span class="n">transform</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">affinities</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-                <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Allele </span><span class="si">%s</span><span class="s2"> has no percentile rank information&quot;</span> <span class="o">%</span> <span class="n">allele</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_sequence</span><span class="p">:</span>
+                    <span class="c1"># See if we have information for an equivalent allele</span>
+                    <span class="n">sequence</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_sequence</span><span class="p">[</span><span class="n">normalized_allele</span><span class="p">]</span>
+                    <span class="n">other_alleles</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">other_allele</span> <span class="k">for</span> <span class="p">(</span><span class="n">other_allele</span><span class="p">,</span> <span class="n">other_sequence</span><span class="p">)</span>
+                        <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_sequence</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                        <span class="k">if</span> <span class="n">other_sequence</span> <span class="o">==</span> <span class="n">sequence</span>
+                    <span class="p">]</span>
+                    <span class="k">for</span> <span class="n">other_allele</span> <span class="ow">in</span> <span class="n">other_alleles</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">other_allele</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="p">:</span>
+                            <span class="n">transform</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="p">[</span>
+                                <span class="n">other_allele</span><span class="p">]</span>
+                            <span class="k">return</span> <span class="n">transform</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">affinities</span><span class="p">)</span>
+
+                <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Allele </span><span class="si">%s</span><span class="s2"> has no percentile rank information&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">allele</span> <span class="o">+</span> <span class="p">(</span>
+                        <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">allele</span> <span class="o">==</span> <span class="n">normalized_allele</span>
+                        <span class="k">else</span> <span class="s2">&quot; (normalized to </span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="n">normalized_allele</span><span class="p">))</span>
                 <span class="k">if</span> <span class="n">throw</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
                 <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
@@ -1266,15 +1292,14 @@
                 <span class="n">masked_allele_encoding</span> <span class="o">=</span> <span class="n">AlleleEncoding</span><span class="p">(</span>
                     <span class="n">df</span><span class="o">.</span><span class="n">normalized_allele</span><span class="p">,</span>
                     <span class="n">borrow_from</span><span class="o">=</span><span class="n">master_allele_encoding</span><span class="p">)</span>
-                <span class="n">masked_peptides</span> <span class="o">=</span> <span class="n">peptides</span>
+                <span class="n">masked_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
             <span class="k">elif</span> <span class="n">mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
                 <span class="n">row_slice</span> <span class="o">=</span> <span class="n">mask</span>
                 <span class="n">masked_allele_encoding</span> <span class="o">=</span> <span class="n">AlleleEncoding</span><span class="p">(</span>
                     <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span><span class="o">.</span><span class="n">normalized_allele</span><span class="p">,</span>
                     <span class="n">borrow_from</span><span class="o">=</span><span class="n">master_allele_encoding</span><span class="p">)</span>
-                <span class="n">masked_peptides</span> <span class="o">=</span> <span class="n">peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
-
-            <span class="n">masked_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">masked_peptides</span><span class="p">)</span>
+                <span class="n">masked_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+                    <span class="n">peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">[</span><span class="n">mask</span><span class="p">])</span>
 
             <span class="k">if</span> <span class="n">row_slice</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="c1"># The following line is a performance optimization that may be</span>
@@ -1378,46 +1403,6 @@
         <span class="k">del</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;supported_peptide_length&quot;</span><span class="p">]</span>
         <span class="k">del</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;normalized_allele&quot;</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">df</span></div>
-
-<div class="viewcode-block" id="Class1AffinityPredictor.save_weights"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.save_weights">[docs]</a>    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">save_weights</span><span class="p">(</span><span class="n">weights_list</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Save the model weights to the given filename using numpy&#39;s &quot;.npz&quot;</span>
-<span class="sd">        format.</span>
-<span class="sd">    </span>
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        weights_list : list of array</span>
-<span class="sd">        </span>
-<span class="sd">        filename : string</span>
-<span class="sd">            Should end in &quot;.npz&quot;.</span>
-<span class="sd">    </span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">numpy</span><span class="o">.</span><span class="n">savez</span><span class="p">(</span>
-            <span class="n">filename</span><span class="p">,</span>
-            <span class="o">**</span><span class="nb">dict</span><span class="p">(((</span><span class="s2">&quot;array_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">),</span> <span class="n">w</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">weights_list</span><span class="p">)))</span></div>
-
-<div class="viewcode-block" id="Class1AffinityPredictor.load_weights"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.load_weights">[docs]</a>    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">load_weights</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Restore model weights from the given filename, which should have been</span>
-<span class="sd">        created with `save_weights`.</span>
-<span class="sd">    </span>
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        filename : string</span>
-<span class="sd">            Should end in &quot;.npz&quot;.</span>
-
-<span class="sd">        Returns</span>
-<span class="sd">        ----------</span>
-<span class="sd">        list of array</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">with</span> <span class="n">numpy</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span> <span class="k">as</span> <span class="n">loaded</span><span class="p">:</span>
-            <span class="n">weights</span> <span class="o">=</span> <span class="p">[</span>
-                <span class="n">loaded</span><span class="p">[</span><span class="s2">&quot;array_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">]</span>
-                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">loaded</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
-            <span class="p">]</span>
-        <span class="k">return</span> <span class="n">weights</span></div>
 
 <div class="viewcode-block" id="Class1AffinityPredictor.calibrate_percentile_ranks"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1AffinityPredictor.calibrate_percentile_ranks">[docs]</a>    <span class="k">def</span> <span class="nf">calibrate_percentile_ranks</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
@@ -1663,9 +1648,7 @@
 </pre></div>
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -1674,12 +1657,14 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2019, Timothy O&#39;Donnell.
-      Last updated on Sep 10, 2019.
+        &copy; Copyright Timothy O&#39;Donnell
+      <span class="lastupdated">
+        Last updated on Mar 23, 2020.
+      </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -1692,36 +1677,15 @@
   
 
 
-  
-
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'../../',
-            VERSION:'1.3.0',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="../../_static/jquery.js"></script>
-      <script type="text/javascript" src="../../_static/underscore.js"></script>
-      <script type="text/javascript" src="../../_static/doctools.js"></script>
-
-  
-
-  
-  
-    <script type="text/javascript" src="../../_static/js/theme.js"></script>
-  
-
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
   </script>
+
+  
+  
+    
    
 
 </body>

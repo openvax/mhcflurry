@@ -1,0 +1,406 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Python library tutorial &mdash; MHCflurry 1.3.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="MHCflurry 1.3.0 documentation" href="index.html"/>
+        <link rel="next" title="Command-line reference" href="commandline_tools.html"/>
+        <link rel="prev" title="Command-line tutorial" href="commandline_tutorial.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.3.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Python library tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#predicting">Predicting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#training">Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#lower-level-interface">Lower level interface</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Python library tutorial</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/python_tutorial.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="python-library-tutorial">
+<h1>Python library tutorial<a class="headerlink" href="#python-library-tutorial" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="predicting">
+<h2>Predicting<a class="headerlink" href="#predicting" title="Permalink to this headline">¶</a></h2>
+<p>The MHCflurry Python API exposes additional options and features beyond those
+supported by the commandline tools. This tutorial gives a basic overview
+of the most important functionality. See the <a class="reference internal" href="api.html#api-documentation"><span class="std std-ref">API Documentation</span></a> for further details.</p>
+<p>The <code class="xref py py-obj docutils literal"><span class="pre">Class1AffinityPredictor</span></code> class is the primary user-facing interface.
+Use the <code class="xref py py-obj docutils literal"><span class="pre">load</span></code> static method to load a
+trained predictor from disk. With no arguments this method will load the predictor
+released with MHCflurry (see <a class="reference internal" href="commandline_tutorial.html#downloading"><span class="std std-ref">Downloading models</span></a>). If you pass a path to a
+models directory, then it will load that predictor instead.</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mhcflurry</span> <span class="kn">import</span> <span class="n">Class1AffinityPredictor</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span><span class="o">.</span><span class="n">supported_alleles</span><span class="p">[:</span><span class="mi">10</span><span class="p">]</span>
+<span class="go">[&#39;BoLA-6*13:01&#39;, &#39;Eqca-1*01:01&#39;, &#39;H-2-Db&#39;, &#39;H-2-Dd&#39;, &#39;H-2-Kb&#39;, &#39;H-2-Kd&#39;, &#39;H-2-Kk&#39;, &#39;H-2-Ld&#39;, &#39;HLA-A*01:01&#39;, &#39;HLA-A*02:01&#39;]</span>
+</pre></div>
+</div>
+<p>With a predictor loaded we can now generate some binding predictions:</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-A0201&quot;</span><span class="p">,</span> <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SIINFEKL&quot;</span><span class="p">,</span> <span class="s2">&quot;SIINFEQL&quot;</span><span class="p">])</span>
+<span class="go">array([4571.98373389, 3583.33113994])</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">MHCflurry normalizes allele names using the <a class="reference external" href="https://github.com/hammerlab/mhcnames">mhcnames</a>
+package. Names like <code class="docutils literal"><span class="pre">HLA-A0201</span></code> or <code class="docutils literal"><span class="pre">A*02:01</span></code> will be
+normalized to <code class="docutils literal"><span class="pre">HLA-A*02:01</span></code>, so most naming conventions can be used
+with methods such as <code class="xref py py-obj docutils literal"><span class="pre">predict</span></code>.</p>
+</div>
+<p>For more detailed results, we can use
+<code class="xref py py-obj docutils literal"><span class="pre">predict_to_dataframe</span></code>.</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span><span class="o">.</span><span class="n">predict_to_dataframe</span><span class="p">(</span><span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-A0201&quot;</span><span class="p">,</span> <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SIINFEKL&quot;</span><span class="p">,</span> <span class="s2">&quot;SIINFEQL&quot;</span><span class="p">])</span>
+<span class="go">    peptide     allele   prediction  prediction_low  prediction_high  \</span>
+<span class="go">0  SIINFEKL  HLA-A0201  4571.983734     2093.541620     11331.827657   </span>
+<span class="go">1  SIINFEQL  HLA-A0201  3583.331140     1388.942403     10621.888497   </span>
+
+<span class="go">   prediction_percentile  </span>
+<span class="go">0               6.381625  </span>
+<span class="go">1               5.284625  </span>
+</pre></div>
+</div>
+<p>Instead of a single allele and multiple peptides, we may need predictions for
+allele/peptide pairs. We can predict across pairs by specifying
+the <code class="xref py py-obj docutils literal"><span class="pre">alleles</span></code> argument instead of <code class="xref py py-obj docutils literal"><span class="pre">allele</span></code>. The list of alleles
+must be the same length as the list of peptides (i.e. it is predicting over pairs,
+<em>not</em> taking the cross product).</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">alleles</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;HLA-A0201&quot;</span><span class="p">,</span> <span class="s2">&quot;HLA-B*57:01&quot;</span><span class="p">],</span> <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SIINFEKL&quot;</span><span class="p">,</span> <span class="s2">&quot;SIINFEQL&quot;</span><span class="p">])</span>
+<span class="go">array([ 4571.98345747, 20648.92075372])</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="training">
+<h2>Training<a class="headerlink" href="#training" title="Permalink to this headline">¶</a></h2>
+<p>Let’s fit our own MHCflurry predictor. First we need some training data. If you
+haven’t already, run this in a shell to download the MHCflurry training data:</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>$ mhcflurry-downloads fetch data_curated
+</pre></div>
+</div>
+<p>We can get the path to this data from Python using <code class="xref py py-obj docutils literal"><span class="pre">mhcflurry.downloads.get_path</span></code>:</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mhcflurry.downloads</span> <span class="kn">import</span> <span class="n">get_path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data_path</span> <span class="o">=</span> <span class="n">get_path</span><span class="p">(</span><span class="s2">&quot;data_curated&quot;</span><span class="p">,</span> <span class="s2">&quot;curated_training_data.no_mass_spec.csv.bz2&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data_path</span>
+<span class="go">&#39;/Users/tim/Library/Application Support/mhcflurry/4/1.3.0/data_curated/curated_training_data.no_mass_spec.csv.bz2&#39;</span>
+</pre></div>
+</div>
+<p>Now let’s load it with pandas and filter to reasonably-sized peptides:</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">pandas</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">data_path</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span> <span class="o">&gt;=</span> <span class="mi">8</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="mi">15</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="go">         allele     peptide  measurement_value measurement_inequality  \</span>
+<span class="go">0  BoLA-1*21:01  AENDTLVVSV             7817.0                      =   </span>
+<span class="go">1  BoLA-1*21:01  NQFNGGCLLV             1086.0                      =   </span>
+<span class="go">2  BoLA-2*08:01   AAHCIHAEW               21.0                      =   </span>
+<span class="go">3  BoLA-2*08:01   AAKHMSNTY             1299.0                      =   </span>
+<span class="go">4  BoLA-2*08:01  DSYAYMRNGW                2.0                      =   </span>
+
+<span class="go">  measurement_type                              measurement_source  \</span>
+<span class="go">0     quantitative  Barlow - purified MHC/competitive/fluorescence   </span>
+<span class="go">1     quantitative       Barlow - purified MHC/direct/fluorescence   </span>
+<span class="go">2     quantitative       Barlow - purified MHC/direct/fluorescence   </span>
+<span class="go">3     quantitative       Barlow - purified MHC/direct/fluorescence   </span>
+<span class="go">4     quantitative       Barlow - purified MHC/direct/fluorescence   </span>
+
+<span class="go">  original_allele  </span>
+<span class="go">0    BoLA-1*02101  </span>
+<span class="go">1    BoLA-1*02101  </span>
+<span class="go">2    BoLA-2*00801  </span>
+<span class="go">3    BoLA-2*00801  </span>
+<span class="go">4    BoLA-2*00801  </span>
+</pre></div>
+</div>
+<p>We’ll make an untrained <code class="xref py py-obj docutils literal"><span class="pre">Class1AffinityPredictor</span></code> and then call
+<code class="xref py py-obj docutils literal"><span class="pre">fit_allele_specific_predictors</span></code> to fit
+some models.</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">new_predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">single_allele_train_data</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="s2">&quot;HLA-B*57:01&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">new_predictor</span><span class="o">.</span><span class="n">fit_allele_specific_predictors</span><span class="p">(</span>
+<span class="gp">... </span>   <span class="n">n_models</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">architecture_hyperparameters_list</span><span class="o">=</span><span class="p">[{</span>
+<span class="gp">... </span>        <span class="s2">&quot;layer_sizes&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">16</span><span class="p">],</span>
+<span class="gp">... </span>        <span class="s2">&quot;max_epochs&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s2">&quot;random_negative_constant&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="p">}],</span>
+<span class="gp">... </span>   <span class="n">peptides</span><span class="o">=</span><span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">affinities</span><span class="o">=</span><span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">measurement_value</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-B*57:01&quot;</span><span class="p">)</span>
+<span class="go">[  100 peptides ]  Epoch   0 /   5 [0.65 sec]: loss=0.339299. Min val loss (None) at epoch None</span>
+<span class="go">[&lt;mhcflurry.class1_neural_network.Class1NeuralNetwork object at 0x133272a50&gt;]</span>
+</pre></div>
+</div>
+<p>The <code class="xref py py-obj docutils literal"><span class="pre">fit_allele_specific_predictors</span></code> method
+can be called any number of times on the same instance to build up ensembles
+of models across alleles. The architecture hyperparameters we specified are
+for demonstration purposes; to fit real models you would usually train for
+more epochs.</p>
+<p>Now we can generate predictions:</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">new_predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">([</span><span class="s2">&quot;SYNPEPII&quot;</span><span class="p">],</span> <span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-B*57:01&quot;</span><span class="p">)</span>
+<span class="go">array([11956.42268456])</span>
+</pre></div>
+</div>
+<p>We can save our predictor to the specified directory on disk by running:</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">new_predictor</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/tmp/new-predictor&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>and restore it:</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">new_predictor2</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;/tmp/new-predictor&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">new_predictor2</span><span class="o">.</span><span class="n">supported_alleles</span>
+<span class="go">[&#39;HLA-B*57:01&#39;]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="lower-level-interface">
+<h2>Lower level interface<a class="headerlink" href="#lower-level-interface" title="Permalink to this headline">¶</a></h2>
+<p>The high-level <code class="xref py py-obj docutils literal"><span class="pre">Class1AffinityPredictor</span></code> delegates to low-level
+<code class="xref py py-obj docutils literal"><span class="pre">Class1NeuralNetwork</span></code> objects, each of which represents
+a single neural network. The purpose of <code class="xref py py-obj docutils literal"><span class="pre">Class1AffinityPredictor</span></code>
+is to implement several important features:</p>
+<dl class="docutils">
+<dt>ensembles</dt>
+<dd>More than one neural network can be used to generate each prediction. The
+predictions returned to the user are the geometric mean of the individual
+model predictions. This gives higher accuracy in most situations</dd>
+<dt>multiple alleles</dt>
+<dd>A <code class="xref py py-obj docutils literal"><span class="pre">Class1NeuralNetwork</span></code> generates predictions for only a single
+allele. The <code class="xref py py-obj docutils literal"><span class="pre">Class1AffinityPredictor</span></code> maps alleles to the
+relevant <code class="xref py py-obj docutils literal"><span class="pre">Class1NeuralNetwork</span></code> instances</dd>
+<dt>serialization</dt>
+<dd>Loading and saving predictors is implemented in <code class="xref py py-obj docutils literal"><span class="pre">Class1AffinityPredictor</span></code>.</dd>
+</dl>
+<p>Sometimes it’s easiest to work directly with <code class="xref py py-obj docutils literal"><span class="pre">Class1NeuralNetwork</span></code>.
+Here is a simple example of doing so:</p>
+<div class="highlight-pycon"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mhcflurry</span> <span class="kn">import</span> <span class="n">Class1NeuralNetwork</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">network</span> <span class="o">=</span> <span class="n">Class1NeuralNetwork</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">network</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+<span class="gp">... </span>   <span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">single_allele_train_data</span><span class="o">.</span><span class="n">measurement_value</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="go">Epoch   0 / 500 [0.81 sec]: loss=0.427436. Min val loss (None) at epoch None</span>
+<span class="go">Stopping at epoch 122 / 500: loss=0.00915791. Min val loss (0.0273014) at epoch 101</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">network</span><span class="o">.</span><span class="n">predict</span><span class="p">([</span><span class="s2">&quot;SIINFEKLL&quot;</span><span class="p">])</span>
+<span class="go">array([18718.93391588])</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="commandline_tools.html" class="btn btn-neutral float-right" title="Command-line reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="commandline_tutorial.html" class="btn btn-neutral" title="Command-line tutorial" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Timothy O&#39;Donnell.
+      Last updated on Sep 10, 2019.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'1.3.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
