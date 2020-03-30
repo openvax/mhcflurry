@@ -22,7 +22,9 @@ MHC ligands.
 
 If you find MHCflurry useful in your research please cite:
 
-> T. J. O’Donnell, A. Rubinsteyn, M. Bonsack, A. B. Riemer, U. Laserson, and J. Hammerbacher, "MHCflurry: Open-Source Class I MHC Binding Affinity Prediction," *Cell Systems*, 2018. https://www.cell.com/cell-systems/fulltext/S2405-4712(18)30232-1.
+> T. O'Donnell, A. Rubinsteyn, U. Laserson. "Improved predictive models of peptide presentation on MHC I". *biorxiv*, 2020. https://www.biorxiv.org/content/10.1101/2020.03.28.013714v1
+
+> T. O’Donnell, A. Rubinsteyn, M. Bonsack, A. B. Riemer, U. Laserson, and J. Hammerbacher, "MHCflurry: Open-Source Class I MHC Binding Affinity Prediction," *Cell Systems*, 2018. https://www.cell.com/cell-systems/fulltext/S2405-4712(18)30232-1.
 
 Please file an issue if you have questions or encounter problems.
 
