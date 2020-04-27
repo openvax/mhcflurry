@@ -56,7 +56,7 @@ parser.add_argument(
 
 QUALITATIVE_TO_AFFINITY_AND_INEQUALITY = {
     "Negative": (5000.0, ">"),
-    "Positive": (50.0, "<"),  # used for mass-spec hits
+    "Positive": (500.0, "<"),  # used for mass-spec hits
     "Positive-High": (100.0, "<"),
     "Positive-Intermediate": (1000.0, "<"),
     "Positive-Low": (5000.0, "<"),
