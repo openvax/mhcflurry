@@ -129,6 +129,7 @@ results_args.add_argument(
     type=int,
     nargs="+",
     default=[8, 9, 10, 11],
+    metavar="L",
     help="Peptide lengths to consider. Default: %(default)s.")
 comparison_quantities = [
     "presentation_score",
@@ -309,12 +310,17 @@ def run(argv=sys.argv[1:]):
 
     df = df.set_index(args.sequence_id_column)
 
-    genotypes = pandas.Series(args.alleles).str.split(r"[,\s]+")
-    genotypes.index = genotypes.index.map(lambda i: "genotype_%02d" % i)
+    if args.alleles:
+        genotypes = pandas.Series(args.alleles).str.split(r"[,\s]+")
+        genotypes.index = genotypes.index.map(lambda i: "genotype_%02d" % i)
+        alleles = genotypes.to_dict()
+    else:
+        print("No alleles specified. Will perform processing prediction only.")
+        alleles = {}
 
     result_df = predictor.predict_sequences(
         sequences=df[args.sequence_column].to_dict(),
-        alleles=genotypes.to_dict(),
+        alleles=alleles,
         result=result,
         comparison_quantity=result_comparison_quantity,
         filter_value=result_filter_value,

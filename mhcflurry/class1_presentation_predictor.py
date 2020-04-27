@@ -441,7 +441,8 @@ class Class1PresentationPredictor(object):
             (up to 6) indicating the genotype. If you are predicting across
             multiple samples, pass a dict where the keys are (arbitrary)
             sample names and the values are the alleles to predict for that
-            sample.
+            sample. Set to an empty list or dict to perform processing
+            prediction only.
         sample_names : list of string [same length as peptides]
             If you are passing a dict for 'alleles', you can use this
             argument to specify which peptides go with which samples. If it is
@@ -505,15 +506,23 @@ class Class1PresentationPredictor(object):
             c_flanks=c_flanks,
             verbose=verbose)
 
-        df = self.predict_affinity(
-            peptides=peptides,
-            alleles=alleles,
-            sample_names=sample_names,  # might be None
-            include_affinity_percentile=include_affinity_percentile,
-            verbose=verbose,
-            throw=throw)
+        if alleles:
+            df = self.predict_affinity(
+                peptides=peptides,
+                alleles=alleles,
+                sample_names=sample_names,  # might be None
+                include_affinity_percentile=include_affinity_percentile,
+                verbose=verbose,
+                throw=throw)
 
-        df["affinity_score"] = from_ic50(df.affinity)
+            df["affinity_score"] = from_ic50(df.affinity)
+        else:
+            # Processing predicion only.
+            df = pandas.DataFrame({
+                "peptide_num": numpy.arange(len(peptides)),
+                "peptide": peptides,
+            })
+
         df["processing_score"] = df.peptide_num.map(
             pandas.Series(processing_scores))
         if c_flanks is not None:
@@ -523,12 +532,13 @@ class Class1PresentationPredictor(object):
 
         model_name = 'with_flanks' if n_flanks is not None else "without_flanks"
         model = self.get_model(model_name)
-        if len(df) > 0:
-            df["presentation_score"] = model.predict_proba(
-                df[self.model_inputs].values)[:,1]
-        else:
-            df["presentation_score"] = []
-        del df["affinity_score"]
+        if "affinity_score" in df.columns:
+            if len(df) > 0:
+                df["presentation_score"] = model.predict_proba(
+                    df[self.model_inputs].values)[:,1]
+            else:
+                df["presentation_score"] = []
+            del df["affinity_score"]
         return df
 
     def predict_sequences(
@@ -536,7 +546,7 @@ class Class1PresentationPredictor(object):
             sequences,
             alleles,
             result="best",
-            comparison_quantity="presentation_score",
+            comparison_quantity=None,
             filter_value=None,
             peptide_lengths=(8, 9, 10, 11),
             use_flanks=True,
@@ -593,7 +603,8 @@ class Class1PresentationPredictor(object):
         comparison_quantity : string
             One of "presentation_score", "processing_score", "affinity", or
             "affinity_percentile". Prediction to use to rank (if result is
-            "best") or filter (if result is "filtered") results.
+            "best") or filter (if result is "filtered") results. Default is
+            "presentation_score".
         filter_value : float
             Threshold value to use, only relevant when result is "filtered".
             If comparison_quantity is "affinity", then all results less than
@@ -618,8 +629,13 @@ class Class1PresentationPredictor(object):
             peptide, n_flank, c_flank, sequence_name, affinity, best_allele,
             processing_score, presentation_score
         """
+        if len(alleles) == 0:
+            alleles = {}
+
         if comparison_quantity is None:
-            comparison_quantity = "presentation_score"
+            comparison_quantity = (
+                "presentation_score"
+                if len(alleles) > 0 else "processing_score")
 
         processing_predictor = self.processing_predictor_with_flanks
         if not use_flanks or processing_predictor is None:
