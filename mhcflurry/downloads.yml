@@ -29,7 +29,7 @@ releases:
               default: true
 
             - name: models_class1_processing
-              url: https://github.com/openvax/mhcflurry/releases/download/1.6.0/models_class1_processing.selected.20200122.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/models_class1_processing.selected.20200429.tar.bz2
               default: false
 
             - name: models_class1_pan_unselected
@@ -50,21 +50,21 @@ releases:
 
             - name: data_mass_spec_benchmark
               part_urls:
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.aa
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.ab
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.ac
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.ad
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.ae
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.af
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.ag
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.ah
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.ai
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.aj
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.ak
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.al
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.am
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.an
-                - https://github.com/openvax/mhcflurry/releases/download/1.6.0/data_mass_spec_benchmark.20200105.tar.bz2.part.ao
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.aa
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.ab
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.ac
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.ad
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.ae
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.af
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.ag
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.ah
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.ai
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.aj
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.ak
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.al
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.am
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.an
+                - https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_mass_spec_benchmark.20200428.tar.bz2.part.ao
               default: false
 
             - name: data_mass_spec_annotated
