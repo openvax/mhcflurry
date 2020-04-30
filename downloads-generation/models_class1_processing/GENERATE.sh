@@ -68,7 +68,7 @@ then
     python generate_hyperparameters.base.py > hyperparameters.base.yaml
     for kind in "${VARIANTS[@]}"
     do
-        python generate_hyperparameters.py hyperparameters.base.yaml $kind > hyperparameters.$kind.yaml
+        python generate_hyperparameters.variants.py hyperparameters.base.yaml $kind > hyperparameters.$kind.yaml
     done
 fi
 
