@@ -14,7 +14,7 @@ parser.add_argument(
     help="Production (i.e. standard) hyperparameters grid.")
 parser.add_argument(
     "kind",
-    choices=('no_n_flank', 'no_c_flank', 'no_flank'),
+    choices=('with_flanks', 'no_n_flank', 'no_c_flank', 'no_flank'),
     help="Hyperameters variant to output")
 
 args = parser.parse_args(argv[1:])

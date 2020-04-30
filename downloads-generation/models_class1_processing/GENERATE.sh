@@ -59,18 +59,17 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
+VARIANTS=( with_flanks no_n_flank no_c_flank no_flank )
+
 if [ "$2" != "continue-incomplete" ]
 then
-    cp $SCRIPT_DIR/generate_hyperparameters.py .
-    python generate_hyperparameters.py > hyperparameters.yaml
-fi
-
-if [ "$2" == "continue-incomplete" ] && [ -f "hyperparameters.yaml" ]
-then
-    echo "Reusing existing hyperparameters"
-else
-    cp $SCRIPT_DIR/generate_hyperparameters.py .
-    python generate_hyperparameters.py > hyperparameters.yaml
+    cp $SCRIPT_DIR/generate_hyperparameters.variants.py .
+    cp $SCRIPT_DIR/generate_hyperparameters.base.py .
+    python generate_hyperparameters.base.py > hyperparameters.base.yaml
+    for kind in "${VARIANTS[@]}"
+    do
+        python generate_hyperparameters.py hyperparameters.base.yaml $kind > hyperparameters.$kind.yaml
+    done
 fi
 
 if [ "$2" == "continue-incomplete" ] && [ -f "hits_with_tpm.csv.bz2" ]
@@ -99,34 +98,42 @@ else
         --out "$(pwd)/train_data.csv"
     bzip2 -f train_data.csv
 fi
+TRAIN_DATA="$(pwd)/train_data.csv.bz2"
 
-CONTINUE_INCOMPLETE_ARGS=""
-if [ "$2" == "continue-incomplete" ] && [ -d "models.unselected" ]
-then
-    echo "Will continue existing run"
-    CONTINUE_INCOMPLETE_ARGS="--continue-incomplete"
-fi
 
-mhcflurry-class1-train-processing-models \
-    --data "$(pwd)/train_data.csv.bz2" \
-    --held-out-samples 10 \
-    --num-folds 4 \
-    --hyperparameters "$(pwd)/hyperparameters.yaml" \
-    --out-models-dir "$(pwd)/models.unselected" \
-    --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
-    $PARALLELISM_ARGS $CONTINUE_INCOMPLETE_ARGS
+for kind in "${VARIANTS[@]}"
+do
+    CONTINUE_INCOMPLETE_ARGS=""
+    if [ "$2" == "continue-incomplete" ] && [ -d "models.unselected.$kind" ]
+    then
+        echo "Will continue existing run: $kind"
+        CONTINUE_INCOMPLETE_ARGS="--continue-incomplete"
+    fi
+
+    mhcflurry-class1-train-processing-models \
+        --data "$TRAIN_DATA" \
+        --held-out-samples 10 \
+        --num-folds 4 \
+        --hyperparameters "$(pwd)/hyperparameters.$kind.yaml" \
+        --out-models-dir "$(pwd)/models.unselected.$kind" \
+        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+        $PARALLELISM_ARGS $CONTINUE_INCOMPLETE_ARGS
+done
 
 echo "Done training. Beginning model selection."
-MODELS_DIR="$(pwd)/models.unselected"
-mhcflurry-class1-select-processing-models \
-    --data "$MODELS_DIR/train_data.csv.bz2" \
-    --models-dir "$MODELS_DIR" \
-    --out-models-dir "$(pwd)/models" \
-    --min-models 1 \
-    --max-models 2 \
-    $PARALLELISM_ARGS
-cp "$MODELS_DIR/train_data.csv.bz2" "models/train_data.csv.bz2"
 
+for kind in "${VARIANTS[@]}"
+do
+    MODELS_DIR="$(pwd)/models.unselected.$kind"
+    mhcflurry-class1-select-processing-models \
+        --data "$MODELS_DIR/train_data.csv.bz2" \
+        --models-dir "$MODELS_DIR" \
+        --out-models-dir "$(pwd)/models.selected.$kind" \
+        --min-models 1 \
+        --max-models 2 \
+        $PARALLELISM_ARGS
+    cp "$MODELS_DIR/train_data.csv.bz2" "models.selected.$kind/train_data.csv.bz2"
+done
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 -f "$LOG"
@@ -151,7 +158,7 @@ ls -lh "${PARTS}"*
 # Write out just the selected models
 # Move unselected into a hidden dir so it is excluded in the glob (*).
 mkdir .ignored
-mv models.unselected hits_with_tpm.csv.bz2 .ignored/
+mv models.unselected.* .ignored/
 RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.selected.$(date +%Y%m%d).tar.bz2"
 tar -cjf "$RESULT" *
 mv .ignored/* . && rmdir .ignored
