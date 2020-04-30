@@ -79,7 +79,7 @@ else
     cp $SCRIPT_DIR/make_benchmark.py .
     time python make_benchmark.py \
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-        --proteome-peptides "$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2" \
+        --proteome-peptides "$(mhcflurry-downloads path data_predictions)/proteome_peptides.all.csv.bz2" \
         --decoys-per-hit 2 \
         --exclude-pmid 31844290 31495665 31154438 \
         --only-format MULTIALLELIC \
@@ -94,14 +94,14 @@ else
     mhcflurry-class1-train-presentation-models \
         --data "$(pwd)/train_data.csv.bz2" \
         --affinity-predictor "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
-        --processing-predictor-with-flanks "$(mhcflurry-downloads path models_class1_processing)/models" \
-        --processing-predictor-without-flanks "$(mhcflurry-downloads path models_class1_processing_variants)/models.selected.no_flank" \
+        --processing-predictor-with-flanks "$(mhcflurry-downloads path models_class1_processing)/models.selected.with_flanks" \
+        --processing-predictor-without-flanks "$(mhcflurry-downloads path models_class1_processing)/models.selected.no_flank" \
         --out-models-dir "$(pwd)/models"
 fi
 
 cp "$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2" models/affinity_predictor_train_data.csv.bz2
-cp "$(mhcflurry-downloads path models_class1_processing)/models/train_data.csv.bz2" models/processing_predictor_train_data.csv.bz2
-cp "$(mhcflurry-downloads path models_class1_processing_variants)/models.selected.no_flank/train_data.csv.bz2" models/processing_predictor_no_flank_train_data.csv.bz2
+cp "$(mhcflurry-downloads path models_class1_processing)/models.selected.with_flanks/train_data.csv.bz2" models/processing_predictor_train_data.csv.bz2
+cp "$(mhcflurry-downloads path models_class1_processing)/models.selected.no_flank/train_data.csv.bz2" models/processing_predictor_no_flank_train_data.csv.bz2
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 -f "$LOG"

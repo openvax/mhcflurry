@@ -91,8 +91,8 @@ else
     cp $SCRIPT_DIR/make_train_data.py .
     time python make_train_data.py \
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-        --predictions "$(mhcflurry-downloads path data_mass_spec_benchmark)/predictions/all.mhcflurry.combined" \
-        --proteome-peptides "$(mhcflurry-downloads path data_mass_spec_benchmark)/proteome_peptides.all.csv.bz2" \
+        --predictions "$(mhcflurry-downloads path data_predictions)/predictions/all.mhcflurry.combined" \
+        --proteome-peptides "$(mhcflurry-downloads path data_predictions)/proteome_peptides.all.csv.bz2" \
         --ppv-multiplier 100 \
         --hit-multiplier-to-take 2 \
         --out "$(pwd)/train_data.csv"

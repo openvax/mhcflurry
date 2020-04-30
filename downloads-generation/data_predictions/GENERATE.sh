@@ -16,7 +16,7 @@
 #
 # SECOND ARGUMENT: whether to reuse predictions from existing downloaded data
 # reuse-all         - reuse predictions and peptide / allele lists from existing
-#                     downloaded data_mass_spec_benchmark.
+#                     downloaded data_predictions.
 # reuse-none        - fully self-contained run; do not reuse anything.
 # reuse-predictions - reuse predictions but not peptide or allele lists. Any
 #                     new peptides not already included will be run.
@@ -26,7 +26,7 @@
 set -e
 set -x
 
-DOWNLOAD_NAME=data_mass_spec_benchmark
+DOWNLOAD_NAME=data_predictions
 SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
