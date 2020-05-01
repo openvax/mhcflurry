@@ -453,7 +453,19 @@ class Class1AffinityPredictor(object):
         `Class1AffinityPredictor` instance
         """
         if models_dir is None:
-            models_dir = get_default_class1_models_dir()
+            try:
+                models_dir = get_default_class1_models_dir()
+            except RuntimeError as e:
+                # Fall back to the affinity predictor included in presentation
+                # predictor if possible.
+                from mhcflurry.class1_presentation_predictor import (
+                    Class1PresentationPredictor)
+                try:
+                    presentation_predictor = Class1PresentationPredictor.load()
+                    return presentation_predictor.affinity_predictor
+                except RuntimeError:
+                    raise e
+
         if optimization_level is None:
             optimization_level = OPTIMIZATION_LEVEL
 
