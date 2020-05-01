@@ -157,12 +157,6 @@ tar -xvf GSE113126_RAW.tar
 rm GSE113126_RAW.tar
 cd ../..
 
-cp $SCRIPT_ABSOLUTE_PATH .
-bzip2 LOG.txt
-RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
-tar -cjf "$RESULT" *
-echo "Created archive: $RESULT"
-
 ############################################
 # T cell epitopes: class I
 ############################################
@@ -176,3 +170,10 @@ cd epitopes/$PMID
 unzip *.zip
 rm -f *.jpg
 cd ../..
+
+cp $SCRIPT_ABSOLUTE_PATH .
+bzip2 LOG.txt
+RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
+tar -cjf "$RESULT" *
+echo "Created archive: $RESULT"
+
