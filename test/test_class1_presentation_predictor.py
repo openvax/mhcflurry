@@ -329,6 +329,28 @@ def test_downloaded_predictor():
     print(scan_results5)
     assert_equal(len(scan_results5), len(scan_results4) * 2)
 
+    scan_results6 = PRESENTATION_PREDICTOR.predict_sequences(
+        result="all",
+        comparison_quantity="affinity",
+        sequences={
+            "seq1": "LVEVEKgVLPQLE",
+            "seq2": "MRELNGGAYTRYVDNNFCGPdg",
+        },
+        alleles={
+            "sample1": [
+                "HLA-A*02:01",
+                "HLA-A*03:01",
+                "HLA-B*57:01",
+                "HLA-B*44:02",
+                "HLA-C*02:01",
+                "HLA-C*07:01",
+            ]
+        })
+    print(scan_results6)
+
+    # Check that c-terminus peptide is included and with the same case as input.
+    assert "DNNFCGPdg" in scan_results6.peptide.values, scan_results6.peptide
+
 
 def test_downloaded_predictor_invalid_peptides():
     global PRESENTATION_PREDICTOR

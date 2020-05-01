@@ -43,9 +43,7 @@ from __future__ import (
 
 import sys
 import argparse
-import itertools
 import logging
-import os
 
 import pandas
 

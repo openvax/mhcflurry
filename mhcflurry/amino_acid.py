@@ -43,6 +43,9 @@ COMMON_AMINO_ACIDS_WITH_UNKNOWN["X"] = "Unknown"
 AMINO_ACID_INDEX = dict(
     (letter, i) for (i, letter) in enumerate(COMMON_AMINO_ACIDS_WITH_UNKNOWN))
 
+for (letter, i) in list(AMINO_ACID_INDEX.items()):
+    AMINO_ACID_INDEX[letter.lower()] = i  # Support lower-case as well.
+
 AMINO_ACIDS = list(COMMON_AMINO_ACIDS_WITH_UNKNOWN.keys())
 
 BLOSUM62_MATRIX = pandas.read_csv(StringIO("""
