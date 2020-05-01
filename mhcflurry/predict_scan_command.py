@@ -43,9 +43,7 @@ from __future__ import (
 
 import sys
 import argparse
-import itertools
 import logging
-import os
 
 import pandas
 
@@ -126,10 +124,11 @@ input_args.add_argument(
 results_args = parser.add_argument_group(title="Result options")
 results_args.add_argument(
     "--peptide-lengths",
-    type=int,
-    nargs="+",
-    default=[8, 9, 10, 11],
-    help="Peptide lengths to consider. Default: %(default)s.")
+    default="8-11",
+    metavar="L",
+    help="Peptide lengths to consider. Pass as START-END (e.g. 8-11) or a "
+    "comma-separated list (8,9,10,11). When using START-END, the range is "
+    "INCLUSIVE on both ends. Default: %(default)s.")
 comparison_quantities = [
     "presentation_score",
     "processing_score",
@@ -203,6 +202,23 @@ model_args.add_argument(
     help="Do not use flanking sequence information in predictions")
 
 
+def parse_peptide_lengths(value):
+    try:
+        if "-" in value:
+            (start, end) = value.split("-", 2)
+            start = int(start.strip())
+            end = int(end.strip())
+            peptide_lengths = list(range(start, end + 1))
+        else:
+            peptide_lengths = [
+                int(length.strip())
+                for length in value.split(",")
+            ]
+    except ValueError:
+        raise ValueError("Couldn't parse peptide lengths: ", value)
+    return peptide_lengths
+
+
 def run(argv=sys.argv[1:]):
     logging.getLogger('tensorflow').disabled = True
 
@@ -215,6 +231,8 @@ def run(argv=sys.argv[1:]):
     # It's hard to pass a tab in a shell, so we correct a common error:
     if args.output_delimiter == "\\t":
         args.output_delimiter = "\t"
+
+    peptide_lengths = parse_peptide_lengths(args.peptide_lengths)
 
     result_args = {
         "all": args.results_all,
@@ -309,16 +327,21 @@ def run(argv=sys.argv[1:]):
 
     df = df.set_index(args.sequence_id_column)
 
-    genotypes = pandas.Series(args.alleles).str.split(r"[,\s]+")
-    genotypes.index = genotypes.index.map(lambda i: "genotype_%02d" % i)
+    if args.alleles:
+        genotypes = pandas.Series(args.alleles).str.split(r"[,\s]+")
+        genotypes.index = genotypes.index.map(lambda i: "genotype_%02d" % i)
+        alleles = genotypes.to_dict()
+    else:
+        print("No alleles specified. Will perform processing prediction only.")
+        alleles = {}
 
     result_df = predictor.predict_sequences(
         sequences=df[args.sequence_column].to_dict(),
-        alleles=genotypes.to_dict(),
+        alleles=alleles,
         result=result,
         comparison_quantity=result_comparison_quantity,
         filter_value=result_filter_value,
-        peptide_lengths=args.peptide_lengths,
+        peptide_lengths=peptide_lengths,
         use_flanks=not args.no_flanking,
         include_affinity_percentile=not args.no_affinity_percentile,
         throw=not args.no_throw)
