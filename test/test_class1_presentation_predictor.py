@@ -300,14 +300,19 @@ def test_downloaded_predictor():
     assert len(scan_results4) > 200, len(scan_results4)
     assert_less(scan_results4.iloc[0].affinity, 100)
 
+    sequences = {
+        "seq1":
+            "MESLVPGFNEKTHVQLSLPVLQVRDVLVRGFGDSVEEVLSEARQHLKDGTCGLVEVEKGVLPQLE",
+        "seq2":
+            "QPYVFIKRSDARTAPHGHVMVELVAELEGIQYGRSGETLGVLVPHVGEIPVAYRKVLLRKNGNKG",
+        "seq3":
+            "AGGHSYGADLKSFDLGDELGTDPYEDFQENWNTKHSSGVTRELMRELNGGAYTRYVDNNFCGPDG",
+    }
+
     scan_results5 = PRESENTATION_PREDICTOR.predict_sequences(
         result="all",
         comparison_quantity="affinity",
-        sequences={
-            "seq1": "MESLVPGFNEKTHVQLSLPVLQVRDVLVRGFGDSVEEVLSEARQHLKDGTCGLVEVEKGVLPQLE",
-            "seq2": "QPYVFIKRSDARTAPHGHVMVELVAELEGIQYGRSGETLGVLVPHVGEIPVAYRKVLLRKNGNKG",
-            "seq3": "AGGHSYGADLKSFDLGDELGTDPYEDFQENWNTKHSSGVTRELMRELNGGAYTRYVDNNFCGPDG",
-        },
+        sequences=sequences,
         alleles={
             "sample1": [
                 "HLA-A*02:01",
@@ -329,7 +334,44 @@ def test_downloaded_predictor():
     print(scan_results5)
     assert_equal(len(scan_results5), len(scan_results4) * 2)
 
+    # Test case-insensitive.
     scan_results6 = PRESENTATION_PREDICTOR.predict_sequences(
+        result="all",
+        comparison_quantity="affinity",
+        sequences=dict((k, v.lower()) for (k, v) in sequences.items()),
+        alleles={
+            "sample1": [
+                "HLA-A*02:01",
+                "HLA-A*03:01",
+                "HLA-B*57:01",
+                "HLA-B*44:02",
+                "HLA-C*02:01",
+                "HLA-C*07:01",
+            ],
+            "sample2": [
+                "HLA-A*01:01",
+                "HLA-A*02:06",
+                "HLA-B*07:02",
+                "HLA-B*44:02",
+                "HLA-C*03:01",
+                "HLA-C*07:02",
+            ],
+        })
+
+    numpy.testing.assert_equal(
+        scan_results6.peptide.values,
+        scan_results5.peptide.str.lower().values,
+    )
+    numpy.testing.assert_almost_equal(
+        scan_results6.affinity.values, scan_results5.affinity.values)
+    numpy.testing.assert_almost_equal(
+        scan_results6.processing_score.values,
+        scan_results5.processing_score.values)
+    numpy.testing.assert_almost_equal(
+        scan_results6.presentation_score.values,
+        scan_results5.presentation_score.values)
+
+    scan_results7 = PRESENTATION_PREDICTOR.predict_sequences(
         result="all",
         comparison_quantity="affinity",
         sequences={
@@ -346,10 +388,10 @@ def test_downloaded_predictor():
                 "HLA-C*07:01",
             ]
         })
-    print(scan_results6)
+    print(scan_results7)
 
     # Check that c-terminus peptide is included and with the same case as input.
-    assert "DNNFCGPdg" in scan_results6.peptide.values, scan_results6.peptide
+    assert "DNNFCGPdg" in scan_results7.peptide.values, scan_results7.peptide
 
 
 def test_downloaded_predictor_invalid_peptides():
