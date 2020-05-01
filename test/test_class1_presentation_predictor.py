@@ -352,7 +352,7 @@ def test_downloaded_predictor_invalid_peptides():
         PRESENTATION_PREDICTOR.predict,
         peptides=peptides,
         alleles=alleles)
-    
+
     results1 = PRESENTATION_PREDICTOR.predict(
         peptides=peptides,
         alleles=alleles,
