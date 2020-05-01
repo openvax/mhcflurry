@@ -24,6 +24,7 @@ date
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
+
 ############################################
 # BINDING AFFINITIES: class I
 ############################################
@@ -161,3 +162,17 @@ bzip2 LOG.txt
 RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
 tar -cjf "$RESULT" *
 echo "Created archive: $RESULT"
+
+############################################
+# T cell epitopes: class I
+############################################
+#
+# Koşaloğlu-Yalçın, ..., Peters. Oncoimmunology 2018 [PMID 30377561]
+#
+PMID=30377561
+mkdir -p epitopes/$PMID
+wget -q https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6204999/bin/koni-07-11-1492508-s001.zip -P epitopes/$PMID
+cd epitopes/$PMID
+unzip *.zip
+rm -f *.jpg
+cd ../..
