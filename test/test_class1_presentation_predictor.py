@@ -328,3 +328,33 @@ def test_downloaded_predictor():
         })
     print(scan_results5)
     assert_equal(len(scan_results5), len(scan_results4) * 2)
+
+
+def test_downloaded_predictor_invalid_peptides():
+    global PRESENTATION_PREDICTOR
+
+    peptides = [
+        "SIINFEKL",
+        "REALLYLNGPEPTIDESSSSS",
+        "SIINFEKLQ",
+    ]
+    alleles = [
+        "HLA-A*02:01",
+        "HLA-A*03:01",
+        "HLA-B*57:01",
+        "HLA-B*44:02",
+        "HLA-C*02:01",
+        "HLA-C*07:01",
+    ]
+
+    numpy.testing.assert_raises(
+        ValueError,
+        PRESENTATION_PREDICTOR.predict,
+        peptides=peptides,
+        alleles=alleles)
+    
+    results1 = PRESENTATION_PREDICTOR.predict(
+        peptides=peptides,
+        alleles=alleles,
+        throw=False).presentation_score.values
+    numpy.testing.assert_equal(numpy.isnan(results1), [False, True, False])

@@ -234,7 +234,7 @@ class Class1PresentationPredictor(object):
         return result_df
 
     def predict_processing(
-            self, peptides, n_flanks=None, c_flanks=None, verbose=1):
+            self, peptides, n_flanks=None, c_flanks=None, throw=True, verbose=1):
         """
         Predict antigen processing scores for individual peptides, optionally
         including flanking sequences for better cleavage prediction.
@@ -244,6 +244,8 @@ class Class1PresentationPredictor(object):
         peptides : list of string
         n_flanks : list of string [same length as peptides]
         c_flanks : list of string [same length as peptides]
+        throw : boolean
+            Whether to raise exception on unsupported peptides
         verbose  : int
 
         Returns
@@ -285,6 +287,7 @@ class Class1PresentationPredictor(object):
                 peptides=peptide_chunk,
                 n_flanks=n_flank_chunk,
                 c_flanks=c_flank_chunk,
+                throw=throw,
                 batch_size=PREDICT_BATCH_SIZE)
             result_chunks.append(result_chunk)
         return numpy.concatenate(result_chunks)
@@ -504,6 +507,7 @@ class Class1PresentationPredictor(object):
             peptides=peptides,
             n_flanks=n_flanks,
             c_flanks=c_flanks,
+            throw=throw,
             verbose=verbose)
 
         if alleles:
@@ -534,8 +538,16 @@ class Class1PresentationPredictor(object):
         model = self.get_model(model_name)
         if "affinity_score" in df.columns:
             if len(df) > 0:
+                input_matrix = df[self.model_inputs]
+                null_mask = None
+                if not throw:
+                    # Invalid peptides will be null.
+                    null_mask = input_matrix.isnull().any(1)
+                    input_matrix = input_matrix.fillna(0.0)
                 df["presentation_score"] = model.predict_proba(
-                    df[self.model_inputs].values)[:,1]
+                    input_matrix.values)[:,1]
+                if null_mask is not None:
+                    df.loc[null_mask, "presentation_score"] = numpy.nan
             else:
                 df["presentation_score"] = []
             del df["affinity_score"]

@@ -176,6 +176,7 @@ class Class1ProcessingPredictor(object):
             peptides,
             n_flanks=None,
             c_flanks=None,
+            throw=True,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
         """
         Predict antigen processing.
@@ -188,6 +189,10 @@ class Class1ProcessingPredictor(object):
             Upstream sequence before each peptide
         c_flanks : list of string
             Downstream sequence after each peptide
+        throw : boolean
+            If True, a ValueError will be raised in the case of unsupported
+            peptides. If False, a warning will be logged and the predictions
+            for those peptides will be NaN.
         batch_size : int
             Prediction keras batch size.
 
@@ -202,6 +207,7 @@ class Class1ProcessingPredictor(object):
             peptides=peptides,
             n_flanks=n_flanks,
             c_flanks=c_flanks,
+            throw=throw,
             batch_size=batch_size).score.values
 
     def predict_to_dataframe(
@@ -209,6 +215,7 @@ class Class1ProcessingPredictor(object):
             peptides,
             n_flanks=None,
             c_flanks=None,
+            throw=True,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
         """
         Predict antigen processing.
@@ -231,10 +238,10 @@ class Class1ProcessingPredictor(object):
         sequences = FlankingEncoding(
             peptides=peptides, n_flanks=n_flanks, c_flanks=c_flanks)
         return self.predict_to_dataframe_encoded(
-            sequences=sequences, batch_size=batch_size)
+            sequences=sequences, throw=throw, batch_size=batch_size)
 
     def predict_to_dataframe_encoded(
-            self, sequences, batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+            self, sequences, throw=True, batch_size=DEFAULT_PREDICT_BATCH_SIZE):
         """
         Predict antigen processing.
 
@@ -244,6 +251,7 @@ class Class1ProcessingPredictor(object):
         ----------
         sequences : FlankingEncoding
         batch_size : int
+        throw : boolean
 
         Returns
         -------
@@ -254,7 +262,7 @@ class Class1ProcessingPredictor(object):
 
         for (i, network) in enumerate(self.models):
             predictions = network.predict_encoded(
-                sequences, batch_size=batch_size)
+                sequences, throw=throw, batch_size=batch_size)
             score_array.append(predictions)
 
         score_array = numpy.array(score_array)

@@ -294,6 +294,7 @@ class Class1ProcessingNeuralNetwork(object):
     def predict_encoded(
             self,
             sequences,
+            throw=True,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE):
         """
         Predict antigen processing.
@@ -302,6 +303,8 @@ class Class1ProcessingNeuralNetwork(object):
         ----------
         sequences : FlankingEncoding
             Peptides and flanking sequences
+        throw : boolean
+            Whether to throw exception on unsupported peptides
         batch_size : int
             Prediction keras batch size.
 
@@ -309,13 +312,13 @@ class Class1ProcessingNeuralNetwork(object):
         -------
         numpy.array
         """
-        x_dict = self.network_input(sequences)
+        x_dict = self.network_input(sequences, throw=throw)
         raw_predictions = self.network().predict(
             x_dict, batch_size=batch_size)
         predictions = numpy.squeeze(raw_predictions).astype("float64")
         return predictions
 
-    def network_input(self, sequences):
+    def network_input(self, sequences, throw=True):
         """
         Encode peptides to the fixed-length encoding expected by the neural
         network (which depends on the architecture).
@@ -324,6 +327,8 @@ class Class1ProcessingNeuralNetwork(object):
         ----------
         sequences : FlankingEncoding
             Peptides and flanking sequences
+        throw : boolean
+            Whether to throw exception on unsupported peptides
 
         Returns
         -------
@@ -334,7 +339,8 @@ class Class1ProcessingNeuralNetwork(object):
             self.hyperparameters['peptide_max_length'],
             n_flank_length=self.hyperparameters['n_flank_length'],
             c_flank_length=self.hyperparameters['c_flank_length'],
-            allow_unsupported_amino_acids=True)
+            allow_unsupported_amino_acids=True,
+            throw=throw)
 
         result = {
             "sequence": encoded.array,

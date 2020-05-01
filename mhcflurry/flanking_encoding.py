@@ -7,6 +7,7 @@ from __future__ import (
 
 from six import string_types
 from collections import namedtuple
+import logging
 
 from .encodable_sequences import EncodingError, EncodableSequences
 
@@ -63,7 +64,8 @@ class FlankingEncoding(object):
             peptide_max_length,
             n_flank_length,
             c_flank_length,
-            allow_unsupported_amino_acids=True):
+            allow_unsupported_amino_acids=True,
+            throw=True):
         """
         Encode variable-length sequences to a fixed-size matrix.
 
@@ -81,6 +83,8 @@ class FlankingEncoding(object):
         allow_unsupported_amino_acids : bool
             If True, non-canonical amino acids will be replaced with the X
             character before encoding.
+        throw : bool
+            Whether to raise exception on unsupported peptides
 
         Returns
         -------
@@ -97,7 +101,8 @@ class FlankingEncoding(object):
             peptide_max_length,
             n_flank_length,
             c_flank_length,
-            allow_unsupported_amino_acids)
+            allow_unsupported_amino_acids,
+            throw)
         if cache_key not in self.encoding_cache:
             result = self.encode(
                 vector_encoding_name=vector_encoding_name,
@@ -105,7 +110,8 @@ class FlankingEncoding(object):
                 peptide_max_length=peptide_max_length,
                 n_flank_length=n_flank_length,
                 c_flank_length=c_flank_length,
-                allow_unsupported_amino_acids=allow_unsupported_amino_acids)
+                allow_unsupported_amino_acids=allow_unsupported_amino_acids,
+                throw=throw)
             self.encoding_cache[cache_key] = result
         return self.encoding_cache[cache_key]
 
@@ -116,7 +122,8 @@ class FlankingEncoding(object):
             peptide_max_length,
             n_flank_length,
             c_flank_length,
-            allow_unsupported_amino_acids=False):
+            allow_unsupported_amino_acids=False,
+            throw=True):
         """
         Encode variable-length sequences to a fixed-size matrix.
 
@@ -130,6 +137,7 @@ class FlankingEncoding(object):
         n_flank_length : int
         c_flank_length : int
         allow_unsupported_amino_acids : bool
+        throw : bool
 
         Returns
         -------
@@ -140,13 +148,21 @@ class FlankingEncoding(object):
             (df.peptide.str.len() < 1)
         ]
         if len(error_df) > 0:
-            raise EncodingError(
+            message = (
                 "Sequence '%s' (length %d) unsupported. There are %d "
                 "total peptides with this length." % (
                     error_df.iloc[0].peptide,
                     len(error_df.iloc[0].peptide),
-                    len(error_df)),
-                supported_peptide_lengths=(1, peptide_max_length + 1))
+                    len(error_df)))
+            if throw:
+                raise EncodingError(
+                    message,
+                    supported_peptide_lengths=(1, peptide_max_length + 1))
+            logging.warning(message)
+
+            # Replace invalid peptides with X's. The encoding will be set to
+            # NaNs for these peptides farther below.
+            df.loc[error_df.index, "peptide"] = "X" * peptide_max_length
 
         if n_flank_length > 0:
             n_flanks = df.n_flank.str.pad(
@@ -170,6 +186,11 @@ class FlankingEncoding(object):
             alignment_method="right_pad",
             max_length=n_flank_length + peptide_max_length + c_flank_length,
             allow_unsupported_amino_acids=allow_unsupported_amino_acids)
+
+        array = array.astype("float32")  # So NaNs can be used.
+
+        if len(error_df) > 0:
+            array[error_df.index] = numpy.nan
 
         result = EncodingResult(
             array, peptide_lengths=peptides.str.len().values)
