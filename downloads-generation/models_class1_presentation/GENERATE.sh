@@ -14,25 +14,6 @@ SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 
-if [ "$1" != "cluster" ]
-then
-    GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
-    echo "Detected GPUS: $GPUS"
-
-    PROCESSORS=$(getconf _NPROCESSORS_ONLN)
-    echo "Detected processors: $PROCESSORS"
-
-    if [ "$GPUS" -eq "0" ]; then
-       NUM_JOBS=${NUM_JOBS-1}
-    else
-        NUM_JOBS=${NUM_JOBS-$GPUS}
-    fi
-    echo "Num jobs: $NUM_JOBS"
-    PARALLELISM_ARGS+=" --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1"
-else
-    PARALLELISM_ARGS+=" --cluster-parallelism --cluster-max-retries 3 --cluster-submit-command bsub --cluster-results-workdir $HOME/mhcflurry-scratch --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf"
-fi
-
 mkdir -p "$SCRATCH_DIR"
 if [ "$2" != "continue-incomplete" ]
 then
@@ -87,16 +68,46 @@ else
     bzip2 -f train_data.csv
 fi
 
+rm -rf commands
+mkdir commands
+
 if [ "$2" == "continue-incomplete" ] && [ -f "models/weights.csv" ]
 then
     echo "Reusing existing trained predictor"
 else
-    mhcflurry-class1-train-presentation-models \
+    echo time mhcflurry-class1-train-presentation-models \
         --data "$(pwd)/train_data.csv.bz2" \
-        --affinity-predictor "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
-        --processing-predictor-with-flanks "$(mhcflurry-downloads path models_class1_processing)/models.selected.with_flanks" \
-        --processing-predictor-without-flanks "$(mhcflurry-downloads path models_class1_processing)/models.selected.no_flank" \
-        --out-models-dir "$(pwd)/models"
+        --affinity-predictor \""$(mhcflurry-downloads path models_class1_pan)/models.combined"\" \
+        --processing-predictor-with-flanks \""$(mhcflurry-downloads path models_class1_processing)/models.selected.with_flanks"\" \
+        --processing-predictor-without-flanks \""$(mhcflurry-downloads path models_class1_processing)/models.selected.no_flank"\" \
+        --out-models-dir "$(pwd)/models" >> commands/train.sh
+fi
+
+ls -lh commands
+
+if [ "$1" != "cluster" ]
+then
+    echo "Running locally"
+    for i in $(ls commands/*.sh)
+    do
+        echo "# *******"
+        echo "# Command $i"
+        cat $i
+        bash $i
+    done
+else
+    echo "Running on cluster"
+    for i in $(ls commands/*.sh)
+    do
+        echo "# *******"
+        echo "# Command $i"
+        cat $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf > ${i}.lsf
+        echo cd "$(pwd)" >> ${i}.lsf
+        cat $i >> ${i}.lsf
+        cat ${i}.lsf
+        bsub -K < "${i}.lsf" &
+    done
+    wait
 fi
 
 cp "$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2" models/affinity_predictor_train_data.csv.bz2
