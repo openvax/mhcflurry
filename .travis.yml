@@ -51,7 +51,6 @@ script:
       $(mhcflurry-downloads url models_class1)
       $(mhcflurry-downloads url models_class1_presentation)
       $(mhcflurry-downloads url models_class1_processing)
-      $(mhcflurry-downloads url models_class1_processing_variants)
       $(mhcflurry-downloads url models_class1_pan)
       $(mhcflurry-downloads url models_class1_pan_variants)
       $(mhcflurry-downloads url allele_sequences)
@@ -64,7 +63,6 @@ script:
       models_class1
       models_class1_presentation
       models_class1_processing
-      models_class1_processing_variants
       models_class1_pan
       models_class1_pan_variants
       allele_sequences

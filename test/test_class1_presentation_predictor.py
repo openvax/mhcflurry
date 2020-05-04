@@ -38,9 +38,10 @@ def setup():
         optimization_level=0,
         max_models=1)
     CLEAVAGE_PREDICTOR = Class1ProcessingPredictor.load(
-        get_path("models_class1_processing", "models"), max_models=1)
+        get_path("models_class1_processing", "models.selected.with_flanks"),
+        max_models=1)
     CLEAVAGE_PREDICTOR_NO_FLANKING = Class1ProcessingPredictor.load(
-        get_path("models_class1_processing_variants", "models.selected.no_flank"),
+        get_path("models_class1_processing", "models.selected.no_flank"),
         max_models=1)
     PRESENTATION_PREDICTOR = Class1PresentationPredictor.load()
 
