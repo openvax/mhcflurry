@@ -56,7 +56,8 @@ class Class1PresentationPredictor(object):
             processing_predictor_with_flanks=None,
             processing_predictor_without_flanks=None,
             weights_dataframe=None,
-            metadata_dataframes=None):
+            metadata_dataframes=None,
+            provenance_string=None):
 
         self.affinity_predictor = affinity_predictor
         self.processing_predictor_with_flanks = processing_predictor_with_flanks
@@ -65,6 +66,7 @@ class Class1PresentationPredictor(object):
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
         self._models_cache = {}
+        self.provenance_string = provenance_string
 
     @property
     def supported_alleles(self):
@@ -884,9 +886,27 @@ class Class1PresentationPredictor(object):
             join(models_dir, "weights.csv"),
             index_col=0)
 
+        provenance_string = None
+        try:
+            info_path = join(models_dir, "info.txt")
+            info = pandas.read_csv(
+                info_path, sep="\t", header=None, index_col=0).iloc[
+                :, 0
+            ].to_dict()
+            provenance_string = "generated on %s" % info["trained on"]
+        except OSError:
+            pass
+
         result = cls(
             affinity_predictor=affinity_predictor,
             processing_predictor_with_flanks=processing_predictor_with_flanks,
             processing_predictor_without_flanks=processing_predictor_without_flanks,
-            weights_dataframe=weights_dataframe)
+            weights_dataframe=weights_dataframe,
+            provenance_string=provenance_string)
         return result
+
+    def __repr__(self):
+        pieces = ["at 0x%0x" % id(self), "[mhcflurry %s]" % __version__]
+        if self.provenance_string:
+            pieces.append(self.provenance_string)
+        return "<Class1PresentationPredictor %s>" % " ".join(pieces)
