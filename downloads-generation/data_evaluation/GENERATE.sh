@@ -144,23 +144,23 @@ do
     fi
 
     #for variant in no_additional_ms compact_peptide affinity_only no_pretrain single_hidden_no_pretrain 500nm
-    for variant in 50nm
-    do
-        if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.${variant}.$kind.csv.bz2" ]
-        then
-            echo "Reusing existing multiallelic predictions: ${variant}"
-        else
-            echo time mhcflurry-predict \
-                "$(pwd)/benchmark.multiallelic.$kind.csv.bz2" \
-                --allele-column hla \
-                --prediction-column-prefix "${variant}_" \
-                --models \""$(mhcflurry-downloads path models_class1_pan_variants)/models.$variant"\" \
-                --affinity-only \
-                --no-affinity-percentile \
-                --out "$(pwd)/benchmark.multiallelic.${variant}.$kind.csv" >> commands/multiallelic.${variant}.$kind.sh
-            echo bzip2 -f "$(pwd)/benchmark.multiallelic.${variant}.$kind.csv" >> commands/multiallelic.${variant}.$kind.sh
-        fi
-    done
+    #for variant in 50nm
+    #do
+    #    if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.${variant}.$kind.csv.bz2" ]
+    #    then
+    #        echo "Reusing existing multiallelic predictions: ${variant}"
+    #    else
+    #        echo time mhcflurry-predict \
+    #            "$(pwd)/benchmark.multiallelic.$kind.csv.bz2" \
+    #            --allele-column hla \
+    #            --prediction-column-prefix "${variant}_" \
+    #            --models \""$(mhcflurry-downloads path models_class1_pan_variants)/models.$variant"\" \
+    #            --affinity-only \
+    #            --no-affinity-percentile \
+    #            --out "$(pwd)/benchmark.multiallelic.${variant}.$kind.csv" >> commands/multiallelic.${variant}.$kind.sh
+    #        echo bzip2 -f "$(pwd)/benchmark.multiallelic.${variant}.$kind.csv" >> commands/multiallelic.${variant}.$kind.sh
+    #    fi
+    #done
 
     ### PRESENTATION: WITH FLANKS
     if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.presentation_with_flanks.$kind.csv.bz2" ]
