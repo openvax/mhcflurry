@@ -604,9 +604,7 @@ class Class1AffinityPredictor(object):
             self.optimization_info["pan_models_merged"] = True
             self.optimization_info["num_pan_models_merged"] = (
                 num_class1_pan_allele_models)
-            self.provenance_string = (
-                "[optimized] " + (
-                    provenance_string if provenance_string else "")).strip()
+            self.provenance_string = provenance_string
         else:
             return False
         return True
