@@ -16,11 +16,11 @@ class PercentRankTransform(object):
 
     def fit(self, values, bins):
         """
-        Fit the transform using the given values (in our case ic50s).
+        Fit the transform using the given values (e.g. ic50s).
 
         Parameters
         ----------
-        values : ic50 values
+        values : predictions (e.g. ic50 values)
         bins : bins for the cumulative distribution function
             Anything that can be passed to numpy.histogram's "bins" argument
             can be used here.
@@ -45,13 +45,17 @@ class PercentRankTransform(object):
         indices = numpy.searchsorted(self.bin_edges, values)
         result = self.cdf[indices]
         assert len(result) == len(values)
+
+        # NaNs in input become NaNs in output
+        result[numpy.isnan(values)] = numpy.nan
+
         return numpy.minimum(result, 100.0)
 
     def to_series(self):
         """
         Serialize the fit to a pandas.Series.
 
-        The index on the series gives the bin edges and the valeus give the CDF.
+        The index on the series gives the bin edges and the values give the CDF.
 
         Returns
         -------

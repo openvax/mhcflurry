@@ -83,6 +83,19 @@ else
         --out-models-dir "$(pwd)/models" >> commands/train.sh
 fi
 
+if [ "$2" == "continue-incomplete" ] && [ -f "models/percent_ranks.csv" ]
+then
+    echo "Reusing existing percentile ranks"
+else
+    echo time mhcflurry-calibrate-percentile-ranks \
+        --models-dir "$(pwd)/models" \
+        --match-amino-acid-distribution-data \""$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2"\" \
+        --alleles-file \""$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2"\" \
+        --predictor-kind class1_presentation \
+        --num-peptides-per-length 100000 \
+        --verbosity 1 >> commands/calibrate_percentile_ranks.sh
+fi
+
 ls -lh commands
 
 if [ "$1" != "cluster" ]

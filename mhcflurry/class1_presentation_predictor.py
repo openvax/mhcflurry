@@ -8,6 +8,7 @@ from getpass import getuser
 import time
 import collections
 import logging
+import warnings
 from six import string_types
 
 import numpy
@@ -26,8 +27,9 @@ from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .encodable_sequences import EncodableSequences
-from .regression_target import from_ic50, to_ic50
+from .regression_target import from_ic50
 from .downloads import get_default_class1_presentation_models_dir
+from .percent_rank_transform import PercentRankTransform
 
 
 MAX_ALLELES_PER_SAMPLE = 6
@@ -57,6 +59,7 @@ class Class1PresentationPredictor(object):
             processing_predictor_without_flanks=None,
             weights_dataframe=None,
             metadata_dataframes=None,
+            percent_rank_transform=None,
             provenance_string=None):
 
         self.affinity_predictor = affinity_predictor
@@ -66,6 +69,7 @@ class Class1PresentationPredictor(object):
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
         self._models_cache = {}
+        self.percent_rank_transform = percent_rank_transform
         self.provenance_string = provenance_string
 
     @property
@@ -523,7 +527,7 @@ class Class1PresentationPredictor(object):
 
             df["affinity_score"] = from_ic50(df.affinity)
         else:
-            # Processing predicion only.
+            # Processing prediction only.
             df = pandas.DataFrame({
                 "peptide_num": numpy.arange(len(peptides)),
                 "peptide": peptides,
@@ -550,8 +554,11 @@ class Class1PresentationPredictor(object):
                     input_matrix.values)[:,1]
                 if null_mask is not None:
                     df.loc[null_mask, "presentation_score"] = numpy.nan
+                df["presentation_percentile"] = self.percentile_ranks(
+                    df["presentation_score"], throw=False)
             else:
                 df["presentation_score"] = []
+                df["presentation_percentile"] = []
             del df["affinity_score"]
         return df
 
@@ -785,7 +792,15 @@ class Class1PresentationPredictor(object):
 
         return result_df
 
-    def save(self, models_dir):
+    def save(
+            self,
+            models_dir,
+            write_affinity_predictor=True,
+            write_processing_predictor=True,
+            write_weights=True,
+            write_percent_ranks=True,
+            write_info=True,
+            write_metdata=True):
         """
         Save the predictor to a directory on disk. If the directory does
         not exist it will be created.
@@ -806,32 +821,53 @@ class Class1PresentationPredictor(object):
             mkdir(models_dir)
 
         # Save underlying predictors
-        self.affinity_predictor.save(join(models_dir, "affinity_predictor"))
-        if self.processing_predictor_with_flanks is not None:
-            self.processing_predictor_with_flanks.save(
-                join(models_dir, "processing_predictor_with_flanks"))
-        if self.processing_predictor_without_flanks is not None:
-            self.processing_predictor_without_flanks.save(
-                join(models_dir, "processing_predictor_without_flanks"))
+        if write_affinity_predictor:
+            self.affinity_predictor.save(join(models_dir, "affinity_predictor"))
+        if write_processing_predictor:
+            if self.processing_predictor_with_flanks is not None:
+                self.processing_predictor_with_flanks.save(
+                    join(models_dir, "processing_predictor_with_flanks"))
+            if self.processing_predictor_without_flanks is not None:
+                self.processing_predictor_without_flanks.save(
+                    join(models_dir, "processing_predictor_without_flanks"))
 
-        # Save model coefficients.
-        self.weights_dataframe.to_csv(join(models_dir, "weights.csv"))
+        if write_weights:
+            # Save model coefficients.
+            self.weights_dataframe.to_csv(join(models_dir, "weights.csv"))
 
-        # Write "info.txt"
-        info_path = join(models_dir, "info.txt")
-        rows = [
-            ("trained on", time.asctime()),
-            ("package   ", "mhcflurry %s" % __version__),
-            ("hostname  ", gethostname()),
-            ("user      ", getuser()),
-        ]
-        pandas.DataFrame(rows).to_csv(
-            info_path, sep="\t", header=False, index=False)
+        if write_percent_ranks:
+            # Percent ranks
+            if self.percent_rank_transform:
+                series = self.percent_rank_transform.to_series()
+                percent_ranks_df = pandas.DataFrame(index=series.index)
+                numpy.testing.assert_array_almost_equal(
+                    series.index.values,
+                    percent_ranks_df.index.values)
+                percent_ranks_df["presentation_score"] = series.values
+                percent_ranks_path = join(models_dir, "percent_ranks.csv")
+                percent_ranks_df.to_csv(
+                    percent_ranks_path,
+                    index=True,
+                    index_label="bin")
+                logging.info("Wrote: %s", percent_ranks_path)
 
-        if self.metadata_dataframes:
-            for (name, df) in self.metadata_dataframes.items():
-                metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
-                df.to_csv(metadata_df_path, index=False, compression="bz2")
+        if write_info:
+            # Write "info.txt"
+            info_path = join(models_dir, "info.txt")
+            rows = [
+                ("trained on", time.asctime()),
+                ("package   ", "mhcflurry %s" % __version__),
+                ("hostname  ", gethostname()),
+                ("user      ", getuser()),
+            ]
+            pandas.DataFrame(rows).to_csv(
+                info_path, sep="\t", header=False, index=False)
+
+        if write_metdata:
+            if self.metadata_dataframes:
+                for (name, df) in self.metadata_dataframes.items():
+                    metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
+                    df.to_csv(metadata_df_path, index=False, compression="bz2")
 
 
     @classmethod
@@ -886,6 +922,14 @@ class Class1PresentationPredictor(object):
             join(models_dir, "weights.csv"),
             index_col=0)
 
+        # Load percent ranks if available
+        percent_rank_transform = None
+        percent_ranks_path = join(models_dir, "percent_ranks.csv")
+        if exists(percent_ranks_path):
+            percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
+            percent_rank_transform = PercentRankTransform.from_series(
+                percent_ranks_df["presentation_score"])
+
         provenance_string = None
         try:
             info_path = join(models_dir, "info.txt")
@@ -902,6 +946,7 @@ class Class1PresentationPredictor(object):
             processing_predictor_with_flanks=processing_predictor_with_flanks,
             processing_predictor_without_flanks=processing_predictor_without_flanks,
             weights_dataframe=weights_dataframe,
+            percent_rank_transform=percent_rank_transform,
             provenance_string=provenance_string)
         return result
 
@@ -910,3 +955,47 @@ class Class1PresentationPredictor(object):
         if self.provenance_string:
             pieces.append(self.provenance_string)
         return "<Class1PresentationPredictor %s>" % " ".join(pieces)
+
+    def percentile_ranks(self, presentation_scores, throw=True):
+        """
+        Return percentile ranks for the given presentation scores.
+
+        Parameters
+        ----------
+        presentation_scores : sequence of float
+
+        Returns
+        -------
+        numpy.array of float
+        """
+
+        if self.percent_rank_transform is None:
+            msg = "No presentation predictor percentile rank information"
+            if throw:
+                raise ValueError(msg)
+            warnings.warn(msg)
+            return numpy.ones(len(presentation_scores)) * numpy.nan
+
+        # We subtract from 100 so that strong binders have low percentile ranks,
+        # making them comparable to affinity percentile ranks.
+        return 100 - self.percent_rank_transform.transform(presentation_scores)
+
+    def calibrate_percentile_ranks(self, scores, bins=None):
+        """
+        Compute the cumulative distribution of scores, to enable taking
+        quantiles of this distribution later.
+
+        Parameters
+        ----------
+        scores : sequence of float
+            Presentation prediction scores
+        bins : object
+            Anything that can be passed to numpy.histogram's "bins" argument
+            can be used here, i.e. either an integer or a sequence giving bin
+            edges.
+        """
+        if bins is None:
+            bins = numpy.linspace(0, 1, 1000)
+
+        self.percent_rank_transform = PercentRankTransform()
+        self.percent_rank_transform.fit(scores, bins=bins)
