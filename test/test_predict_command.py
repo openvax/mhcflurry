@@ -41,7 +41,7 @@ def test_csv():
         for delete in deletes:
             os.unlink(delete)
 
-    assert_equal(result.shape, (3, 7))
+    assert_equal(result.shape, (3, 8))
 
 
 def test_no_csv():
