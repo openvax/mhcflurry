@@ -94,6 +94,7 @@ else
         --predictor-kind class1_presentation \
         --num-peptides-per-length 100000 \
         --alleles-per-genotype 1 \
+        --num-genotypes 50 \
         --verbosity 1 >> commands/calibrate_percentile_ranks.sh
 fi
 
