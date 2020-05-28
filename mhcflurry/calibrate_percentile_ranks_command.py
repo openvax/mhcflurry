@@ -75,8 +75,15 @@ parser.add_argument(
     type=int,
     metavar="N",
     default=25,
-    help="Used on when calibrrating a presentation predictor. Number of genotypes"
+    help="Used when calibrrating a presentation predictor. Number of genotypes"
     "to sample")
+parser.add_argument(
+    "--alleles-per-genotype",
+    type=int,
+    metavar="N",
+    default=6,
+    help="Used when calibrating a presentation predictor. Number of alleles "
+    "per genotype. Use 1 to calibrate for single alleles. Default: %(default)s")
 parser.add_argument(
     "--motif-summary",
     default=False,
@@ -171,18 +178,25 @@ def run_class1_presentation_predictor(args, peptides):
 
     print("Num alleles", len(alleles))
 
-    gene_to_alleles = collections.defaultdict(list)
-    for a in alleles:
-        for gene in ["A", "B", "C"]:
-            if a.startswith("HLA-%s" % gene):
-                gene_to_alleles[gene].append(a)
-
     genotypes = {}
-    for _ in range(args.num_genotypes):
-        genotype = []
-        for gene in ["A", "A", "B", "B", "C", "C"]:
-            genotype.append(numpy.random.choice(gene_to_alleles[gene]))
-        genotypes[",".join(genotype)] = genotype
+    if args.alleles_per_genotype == 6:
+        gene_to_alleles = collections.defaultdict(list)
+        for a in alleles:
+            for gene in ["A", "B", "C"]:
+                if a.startswith("HLA-%s" % gene):
+                    gene_to_alleles[gene].append(a)
+
+        for _ in range(args.num_genotypes):
+            genotype = []
+            for gene in ["A", "A", "B", "B", "C", "C"]:
+                genotype.append(numpy.random.choice(gene_to_alleles[gene]))
+            genotypes[",".join(genotype)] = genotype
+    elif args.alleles_per_genotype == 1:
+        for _ in range(args.num_genotypes):
+            genotype = [numpy.random.choice(alleles)]
+            genotypes[",".join(genotype)] = genotype
+    else:
+        raise ValueError("Alleles per genotype must be 6 or 1")
 
     print("Sampled genotypes: ", list(genotypes))
     print("Num peptides: ", len(peptides))

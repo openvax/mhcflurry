@@ -93,6 +93,7 @@ else
         --alleles-file \""$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2"\" \
         --predictor-kind class1_presentation \
         --num-peptides-per-length 100000 \
+        --alleles-per-genotype 1 \
         --verbosity 1 >> commands/calibrate_percentile_ranks.sh
 fi
 
