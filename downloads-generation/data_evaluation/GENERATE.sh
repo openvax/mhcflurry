@@ -54,30 +54,30 @@ else
     bzip2 -f hits_with_tpm.csv
 fi
 
-### GENERATE BENCHMARK: MONOALLELIC
-#for kind in train_excluded all
-#do
-#    EXCLUDE_TRAIN_DATA=""
-#    if [ "$kind" == "train_excluded" ]
-#    then
-#        EXCLUDE_TRAIN_DATA="$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms/train_data.csv.bz2"
-#    fi
-#
-#    if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.$kind.csv.bz2" ]
-#    then
-#        echo "Reusing existing monoallelic benchmark: benchmark.monoallelic.$kind.csv.bz2"
-#    else
-#        cp $SCRIPT_DIR/make_benchmark.py .
-#        time python make_benchmark.py \
-#            --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-#            --proteome-peptides "$(mhcflurry-downloads path data_predictions)/proteome_peptides.all.csv.bz2" \
-#            --decoys-per-hit 110 \
-#            --exclude-train-data "$EXCLUDE_TRAIN_DATA" \
-#            --only-format MONOALLELIC \
-#            --out "$(pwd)/benchmark.monoallelic.$kind.csv"
-#        bzip2 -f benchmark.monoallelic.$kind.csv
-#    fi
-#done
+## GENERATE BENCHMARK: MONOALLELIC
+for kind in train_excluded all
+do
+    EXCLUDE_TRAIN_DATA=""
+    if [ "$kind" == "train_excluded" ]
+    then
+        EXCLUDE_TRAIN_DATA="$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms/train_data.csv.bz2"
+    fi
+
+    if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.$kind.csv.bz2" ]
+    then
+        echo "Reusing existing monoallelic benchmark: benchmark.monoallelic.$kind.csv.bz2"
+    else
+        cp $SCRIPT_DIR/make_benchmark.py .
+        time python make_benchmark.py \
+            --hits "$(pwd)/hits_with_tpm.csv.bz2" \
+            --proteome-peptides "$(mhcflurry-downloads path data_predictions)/proteome_peptides.all.csv.bz2" \
+            --decoys-per-hit 110 \
+            --exclude-train-data "$EXCLUDE_TRAIN_DATA" \
+            --only-format MONOALLELIC \
+            --out "$(pwd)/benchmark.monoallelic.$kind.csv"
+        bzip2 -f benchmark.monoallelic.$kind.csv
+    fi
+done
 
 ### GENERATE BENCHMARK: MULTIALLELIC
 for kind in train_excluded all
@@ -109,22 +109,22 @@ mkdir commands
 
 for kind in train_excluded all
 do
-    ### AFFINITY PREDICTOR VARIANT: MONOALLELIC
-    #if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.no_additional_ms.$kind.csv.bz2" ]
-    #then
-    #    echo "Reusing existing monoallelic benchmark predictions"
-    #else
-    #    echo time mhcflurry-predict \
-    #        "$(pwd)/benchmark.monoallelic.$kind.csv.bz2" \
-    #        --allele-column hla \
-    #        --prediction-column-prefix no_additional_ms_ \
-    #        --models \""$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms"\" \
-    #        --affinity-only \
-    #        --no-affinity-percentile \
-    #        --out "$(pwd)/benchmark.monoallelic.no_additional_ms.$kind.csv" \
-    #        --no-throw >> commands/monoallelic.$kind.sh
-    #    echo bzip2 -f "$(pwd)/benchmark.monoallelic.no_additional_ms.$kind.csv" >> commands/monoallelic.$kind.sh
-    #fi
+    ## AFFINITY PREDICTOR VARIANT: MONOALLELIC
+    if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.no_additional_ms.$kind.csv.bz2" ]
+    then
+        echo "Reusing existing monoallelic benchmark predictions"
+    else
+        echo time mhcflurry-predict \
+            "$(pwd)/benchmark.monoallelic.$kind.csv.bz2" \
+            --allele-column hla \
+            --prediction-column-prefix no_additional_ms_ \
+            --models \""$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms"\" \
+            --affinity-only \
+            --no-affinity-percentile \
+            --out "$(pwd)/benchmark.monoallelic.no_additional_ms.$kind.csv" \
+            --no-throw >> commands/monoallelic.$kind.sh
+        echo bzip2 -f "$(pwd)/benchmark.monoallelic.no_additional_ms.$kind.csv" >> commands/monoallelic.$kind.sh
+    fi
 
 
     ### AFFINITY PREDICTORS: MULTIALLELIC
@@ -196,17 +196,17 @@ do
     ### PRECOMPUTED ####
     for variant in netmhcpan4.ba netmhcpan4.el mixmhcpred
     do
-        #if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.${variant}.$kind.csv.bz2" ]
-        #then
-        #    echo "Reusing existing monoallelic ${variant}"
-        #else
-        #    cp $SCRIPT_DIR/join_with_precomputed.py .
-        #    echo time python join_with_precomputed.py \
-        #        \""$(pwd)/benchmark.monoallelic.$kind.csv.bz2"\" \
-        #        ${variant} \
-        #        --out "$(pwd)/benchmark.monoallelic.${variant}.$kind.csv" >> commands/monoallelic.${variant}.$kind.sh
-        #    echo bzip2 -f "$(pwd)/benchmark.monoallelic.${variant}.$kind.csv"  >> commands/monoallelic.${variant}.$kind.sh
-        #fi
+        if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.${variant}.$kind.csv.bz2" ]
+        then
+            echo "Reusing existing monoallelic ${variant}"
+        else
+            cp $SCRIPT_DIR/join_with_precomputed.py .
+            echo time python join_with_precomputed.py \
+                \""$(pwd)/benchmark.monoallelic.$kind.csv.bz2"\" \
+                ${variant} \
+                --out "$(pwd)/benchmark.monoallelic.${variant}.$kind.csv" >> commands/monoallelic.${variant}.$kind.sh
+            echo bzip2 -f "$(pwd)/benchmark.monoallelic.${variant}.$kind.csv"  >> commands/monoallelic.${variant}.$kind.sh
+        fi
 
         if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.${variant}.$kind.csv.bz2" ]
         then
