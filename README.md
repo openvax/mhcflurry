@@ -70,6 +70,27 @@ Wrote: /tmp/predictions.csv
 See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
 
 
+## Docker
+You can also try the latest (GitHub master) version of MHCflurry using the Docker
+image hosted on [Dockerhub](https://hub.docker.com/r/openvax/mhcflurry) by
+running:
+
+```
+$ docker run -p 9999:9999 --rm openvax/mhcflurry:latest
+``` 
+
+This will start a [jupyter](https://jupyter.org/) notebook server in an
+environment that has MHCflurry installed. Go to `http://localhost:9999` in a
+browser to use it.
+
+To build the Docker image yourself, from a checkout run:
+
+```
+$ docker build -t mhcflurry:latest .
+$ docker run -p 9999:9999 --rm mhcflurry:latest
+```
+
+
 ## Older allele-specific models
 
 Previous versions of MHCflurry used models trained on affinity measurements, one allele
