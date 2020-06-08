@@ -84,22 +84,65 @@ else
     bzip2 -f hits_with_tpm.csv
 fi
 
+if [ "$2" == "continue-incomplete" ] && [ -f "proteome_peptides.csv.bz2" ]
+then
+    echo "Reusing existing proteome peptide list"
+else
+    cp $SCRIPT_DIR/write_proteome_peptides.py .
+    time python write_proteome_peptides.py \
+        "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+        "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
+        --out "$(pwd)/proteome_peptides.csv"
+    bzip2 -f proteome_peptides.csv
+fi
+
+
+rm -rf commands
+mkdir commands
+
 if [ "$2" == "continue-incomplete" ] && [ -f "train_data.csv.bz2" ]
 then
     echo "Reusing existing training data"
 else
     cp $SCRIPT_DIR/make_train_data.py .
-    time python make_train_data.py \
+    echo time python "$(pwd)/make_train_data.py" \
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-        --predictions "$(mhcflurry-downloads path data_predictions)/predictions/all.mhcflurry.combined" \
-        --proteome-peptides "$(mhcflurry-downloads path data_predictions)/proteome_peptides.all.csv.bz2" \
+        --affinity-predictor \""$(mhcflurry-downloads path models_class1_pan)/models.combined"\" \
+        --proteome-peptides "$(pwd)/proteome_peptides.csv.bz2" \
         --ppv-multiplier 100 \
         --hit-multiplier-to-take 2 \
-        --out "$(pwd)/train_data.csv"
-    bzip2 -f train_data.csv
+        --out "$(pwd)/train_data.csv" >> commands/make_train_data.sh
+    echo bzip2 -f "$(pwd)/train_data.csv" >> commands/make_train_data.sh
 fi
-TRAIN_DATA="$(pwd)/train_data.csv.bz2"
 
+ls -lh commands
+
+if [ "$1" != "cluster" ]
+then
+    echo "Running locally"
+    for i in $(ls commands/*.sh)
+    do
+        echo "# *******"
+        echo "# Command $i"
+        cat $i
+        bash $i
+    done
+else
+    echo "Running on cluster"
+    for i in $(ls commands/*.sh)
+    do
+        echo "# *******"
+        echo "# Command $i"
+        cat $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf > ${i}.lsf
+        echo cd "$(pwd)" >> ${i}.lsf
+        cat $i >> ${i}.lsf
+        cat ${i}.lsf
+        bsub -K < "${i}.lsf" &
+    done
+    wait
+fi
+
+TRAIN_DATA="$(pwd)/train_data.csv.bz2"
 
 for kind in "${VARIANTS[@]}"
 do

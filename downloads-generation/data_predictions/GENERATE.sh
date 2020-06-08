@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# This download includes predictions for MHCflurry and NetMHCpan 4.0 over a
+# This download includes predictions for NetMHCpan 4.0 and MixMHCpred over a
 # large number of peptides encompassing almost the full proteome.
 #
 # Usage:
@@ -159,28 +159,28 @@ do
 
 
     # Run MHCflurry
-    for kind in combined
-    do
-        OUT_DIR=predictions/${subset}.mhcflurry.${kind}
-        REUSE=""
-        if [ "${2:-reuse-none}" != "reuse-none" ] && [ "${2:-reuse-none}" != "reuse-predictions-except-mhcflurry" ]
-        then
-            REUSE="$EXISTING_DATA"/$OUT_DIR
-        fi
-
-        python run_predictors.py \
-            "$(pwd)/proteome_peptides.$subset.csv.bz2" \
-            --result-dtype "float16" \
-            --predictor mhcflurry \
-            --chunk-size 500000 \
-            --mhcflurry-batch-size 65536 \
-            --mhcflurry-models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
-            --allele $(cat alleles.txt) \
-            --out "$OUT_DIR" \
-            --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
-            --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.gpu.lsf \
-            --reuse-predictions "$REUSE" $EXTRA_ARGS
-    done
+    #for kind in combined
+    #do
+    #    OUT_DIR=predictions/${subset}.mhcflurry.${kind}
+    #    REUSE=""
+    #    if [ "${2:-reuse-none}" != "reuse-none" ] && [ "${2:-reuse-none}" != "reuse-predictions-except-mhcflurry" ]
+    #    then
+    #        REUSE="$EXISTING_DATA"/$OUT_DIR
+    #    fi
+    #
+    #    python run_predictors.py \
+    #        "$(pwd)/proteome_peptides.$subset.csv.bz2" \
+    #        --result-dtype "float16" \
+    #        --predictor mhcflurry \
+    #        --chunk-size 500000 \
+    #        --mhcflurry-batch-size 65536 \
+    #        --mhcflurry-models-dir "$(mhcflurry-downloads path models_class1_pan)/models.$kind" \
+    #        --allele $(cat alleles.txt) \
+    #        --out "$OUT_DIR" \
+    #        --worker-log-dir "$SCRATCH_DIR/$DOWNLOAD_NAME" \
+    #        --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.gpu.lsf \
+    #        --reuse-predictions "$REUSE" $EXTRA_ARGS
+    #done
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .

@@ -60,7 +60,7 @@ else
     cp $SCRIPT_DIR/make_benchmark.py .
     time python make_benchmark.py \
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-        --proteome-peptides "$(mhcflurry-downloads path data_predictions)/proteome_peptides.all.csv.bz2" \
+        --proteome-peptides "$(mhcflurry-downloads path models_class1_processing)/proteome_peptides.csv.bz2" \
         --decoys-per-hit 2 \
         --exclude-pmid 31844290 31495665 31154438 \
         --only-format MULTIALLELIC \

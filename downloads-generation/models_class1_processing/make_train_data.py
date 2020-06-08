@@ -24,6 +24,10 @@ parser.add_argument(
     required=True,
     help="Predictions data")
 parser.add_argument(
+    "--affinity-predictor",
+    metavar="CSV",
+    help="Class 1 affinity predictor to use (exclusive with --predictions)")
+parser.add_argument(
     "--proteome-peptides",
     metavar="CSV",
     required=True,
@@ -169,6 +173,13 @@ def run():
         "hit",
     ]
 
+    affinity_predictor = None
+    if args.affinity_predictor:
+        affinity_predictor = mhcflurry.Class1AffinityPredictor.load(args.affinity_predictor)
+        print("Loaded", affinity_predictor)
+    if (args.predictions and affinity_predictor) or not (args.predictions or affinity_predictor):
+        parser.error("Specify one of --affinity-predictor or --predictions")
+
     print("Selecting decoys.")
 
     lengths = [8, 9, 10, 11]
@@ -198,7 +209,12 @@ def run():
         predictions_df = pandas.DataFrame(
             index=merged_df.peptide.unique(),
             columns=[prediction_col])
-        load_predictions(args.predictions, result_df=predictions_df)
+        if affinity_predictor:
+            predictions_df[prediction_col] = affinity_predictor.predict(
+                predictions_df.index,
+                allele=sample_table.loc[sample_id].hla)
+        else:
+            load_predictions(args.predictions, result_df=predictions_df)
 
         merged_df["affinity_prediction"] = merged_df.peptide.map(
             predictions_df[prediction_col])
