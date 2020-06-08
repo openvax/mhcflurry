@@ -59,18 +59,15 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
-VARIANTS=( with_flanks no_n_flank no_c_flank no_flank )
+VARIANTS=( short_flanks with_flanks no_n_flank no_c_flank no_flank )
 
-if [ "$2" != "continue-incomplete" ]
-then
-    cp $SCRIPT_DIR/generate_hyperparameters.variants.py .
-    cp $SCRIPT_DIR/generate_hyperparameters.base.py .
-    python generate_hyperparameters.base.py > hyperparameters.base.yaml
-    for kind in "${VARIANTS[@]}"
-    do
-        python generate_hyperparameters.variants.py hyperparameters.base.yaml $kind > hyperparameters.$kind.yaml
-    done
-fi
+cp $SCRIPT_DIR/generate_hyperparameters.variants.py .
+cp $SCRIPT_DIR/generate_hyperparameters.base.py .
+python generate_hyperparameters.base.py > hyperparameters.base.yaml
+for kind in "${VARIANTS[@]}"
+do
+    python generate_hyperparameters.variants.py hyperparameters.base.yaml $kind > hyperparameters.$kind.yaml
+done
 
 if [ "$2" == "continue-incomplete" ] && [ -f "hits_with_tpm.csv.bz2" ]
 then
