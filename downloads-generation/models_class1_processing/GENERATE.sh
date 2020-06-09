@@ -130,7 +130,7 @@ else
     do
         echo "# *******"
         echo "# Command $i"
-        cat $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf > ${i}.lsf
+        cat $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.no_replacements.lsf > ${i}.lsf
         echo cd "$(pwd)" >> ${i}.lsf
         cat $i >> ${i}.lsf
         cat ${i}.lsf
