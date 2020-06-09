@@ -68,6 +68,14 @@ then
     python generate_hyperparameters.py > hyperparameters.yaml
 fi
 
+cp $SCRIPT_DIR/reassign_mass_spec_training_data.py .
+python reassign_mass_spec_training_data.py \
+    "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2)" \
+    --set-measurement-value 100 \
+    --out-csv "$(pwd)/train_data.csv"
+bzip2 -f "$(pwd)/train_data.csv"
+TRAINING_DATA="$(pwd)/train_data.csv.bz2"
+
 for kind in combined
 do
     CONTINUE_INCOMPLETE_ARGS=""
@@ -78,7 +86,6 @@ do
     fi
 
     ALLELE_SEQUENCES="$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv"
-    TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2"
     HYPERPARAMETERS="hyperparameters.yaml"
 
     mhcflurry-class1-train-pan-allele-models \
