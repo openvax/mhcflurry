@@ -41,25 +41,13 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
-if [ "$2" == "continue-incomplete" ] && [ -f "hits_with_tpm.csv.bz2" ]
-then
-    echo "Reusing existing expression-annotated hits data"
-else
-    cp $SCRIPT_DIR/annotate_hits_with_expression.py .
-    time python annotate_hits_with_expression.py \
-        --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
-        --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
-        --out "$(pwd)/hits_with_tpm.csv"
-    bzip2 -f hits_with_tpm.csv
-fi
-
 if [ "$2" == "continue-incomplete" ] && [ -f "train_data.csv.bz2" ]
 then
     echo "Reusing existing training data"
 else
     cp $SCRIPT_DIR/make_benchmark.py .
     time python make_benchmark.py \
-        --hits "$(pwd)/hits_with_tpm.csv.bz2" \
+        --hits "$(mhcflurry-downloads path models_class1_processing)/hits_with_tpm.csv.bz2" \
         --proteome-peptides "$(mhcflurry-downloads path models_class1_processing)/proteome_peptides.csv.bz2" \
         --decoys-per-hit 2 \
         --exclude-pmid 31844290 31495665 31154438 \
