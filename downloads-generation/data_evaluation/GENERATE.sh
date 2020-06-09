@@ -43,7 +43,8 @@ export PYTHONUNBUFFERED=1
 export MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE=16384
 
 ## GENERATE BENCHMARK: MONOALLELIC
-for kind in train_excluded all
+#for kind in train_excluded all
+for kind in train_excluded
 do
     EXCLUDE_TRAIN_DATA=""
     if [ "$kind" == "train_excluded" ]
@@ -68,7 +69,8 @@ do
 done
 
 ### GENERATE BENCHMARK: MULTIALLELIC
-for kind in train_excluded all
+#for kind in train_excluded all
+for kind in train_excluded
 do
     EXCLUDE_TRAIN_DATA=""
     if [ "$kind" == "train_excluded" ]
