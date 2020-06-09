@@ -21,7 +21,6 @@ parser.add_argument(
 parser.add_argument(
     "--predictions",
     metavar="CSV",
-    required=True,
     help="Predictions data")
 parser.add_argument(
     "--affinity-predictor",
