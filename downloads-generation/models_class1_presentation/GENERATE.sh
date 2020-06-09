@@ -59,6 +59,41 @@ fi
 rm -rf commands
 mkdir commands
 
+run_commands () {
+    ls -lh commands
+
+    if [ "$1" != "cluster" ]
+    then
+        echo "Running locally"
+        for i in $(ls commands/*.sh)
+        do
+            echo "# *******"
+            echo "# Command $i"
+            cat $i
+            bash $i
+        done
+    else
+        echo "Running on cluster"
+        for i in $(ls commands/*.sh)
+        do
+            echo "# *******"
+            echo "# Command $i"
+            cat $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf > ${i}.lsf
+            echo cd "$(pwd)" >> ${i}.lsf
+            cat $i >> ${i}.lsf
+            cat ${i}.lsf
+            bsub -K < "${i}.lsf" &
+        done
+        wait
+    fi
+
+    for i in $(ls commands/*.sh)
+    do
+        mv "$i" "${i}.FINISHED"
+    done
+}
+
+
 if [ "$2" == "continue-incomplete" ] && [ -f "models/weights.csv" ]
 then
     echo "Reusing existing trained predictor"
@@ -70,6 +105,8 @@ else
         --processing-predictor-without-flanks \""$(mhcflurry-downloads path models_class1_processing)/models.selected.no_flank"\" \
         --out-models-dir "$(pwd)/models" >> commands/train.sh
 fi
+
+run_commands
 
 if [ "$2" == "continue-incomplete" ] && [ -f "models/percent_ranks.csv" ]
 then
@@ -86,32 +123,7 @@ else
         --verbosity 1 >> commands/calibrate_percentile_ranks.sh
 fi
 
-ls -lh commands
-
-if [ "$1" != "cluster" ]
-then
-    echo "Running locally"
-    for i in $(ls commands/*.sh)
-    do
-        echo "# *******"
-        echo "# Command $i"
-        cat $i
-        bash $i
-    done
-else
-    echo "Running on cluster"
-    for i in $(ls commands/*.sh)
-    do
-        echo "# *******"
-        echo "# Command $i"
-        cat $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf > ${i}.lsf
-        echo cd "$(pwd)" >> ${i}.lsf
-        cat $i >> ${i}.lsf
-        cat ${i}.lsf
-        bsub -K < "${i}.lsf" &
-    done
-    wait
-fi
+run_commands
 
 cp "$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2" models/affinity_predictor_train_data.csv.bz2
 cp "$(mhcflurry-downloads path models_class1_processing)/models.selected.with_flanks/train_data.csv.bz2" models/processing_predictor_train_data.csv.bz2
