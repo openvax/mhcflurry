@@ -121,8 +121,5 @@ cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 -f "$LOG"
 for i in $(ls LOG-worker.*.txt) ; do bzip2 -f $i ; done
 RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
-mkdir .ignored
-mv hits_with_tpm.csv.bz2 .ignored/
 tar -cjf "$RESULT" *
-mv .ignored/* . && rmdir .ignored
 echo "Created archive: $RESULT"

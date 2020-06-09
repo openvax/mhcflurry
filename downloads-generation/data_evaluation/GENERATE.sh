@@ -42,18 +42,6 @@ export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 export MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE=16384
 
-if [ "$2" == "continue-incomplete" ] && [ -f "hits_with_tpm.csv.bz2" ]
-then
-    echo "Reusing existing expression-annotated hits data"
-else
-    cp $SCRIPT_DIR/annotate_hits_with_expression.py .
-    time python annotate_hits_with_expression.py \
-        --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
-        --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
-        --out "$(pwd)/hits_with_tpm.csv"
-    bzip2 -f hits_with_tpm.csv
-fi
-
 ## GENERATE BENCHMARK: MONOALLELIC
 for kind in train_excluded all
 do
@@ -69,8 +57,8 @@ do
     else
         cp $SCRIPT_DIR/make_benchmark.py .
         time python make_benchmark.py \
-            --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-            --proteome-peptides "$(mhcflurry-downloads path data_predictions)/proteome_peptides.all.csv.bz2" \
+            --hits "$(mhcflurry-downloads path models_class1_processing)/hits_with_tpm.csv.bz2" \
+            --proteome-peptides "$(mhcflurry-downloads path models_class1_processing)/proteome_peptides.csv.bz2" \
             --decoys-per-hit 110 \
             --exclude-train-data "$EXCLUDE_TRAIN_DATA" \
             --only-format MONOALLELIC \
@@ -94,8 +82,8 @@ do
     else
         cp $SCRIPT_DIR/make_benchmark.py .
         time python make_benchmark.py \
-            --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-            --proteome-peptides "$(mhcflurry-downloads path data_predictions)/proteome_peptides.all.csv.bz2" \
+            --hits "$(mhcflurry-downloads path models_class1_processing)/hits_with_tpm.csv.bz2" \
+            --proteome-peptides "$(mhcflurry-downloads path models_class1_processing)/proteome_peptides.csv.bz2" \
             --decoys-per-hit 110 \
             --exclude-train-data "$EXCLUDE_TRAIN_DATA" \
             --only-format MULTIALLELIC \
