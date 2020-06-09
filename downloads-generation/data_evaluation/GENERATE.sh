@@ -107,7 +107,8 @@ done
 rm -rf commands
 mkdir commands
 
-for kind in train_excluded all
+#for kind in train_excluded all
+for kind in train_excluded
 do
     ## AFFINITY PREDICTOR VARIANT: MONOALLELIC
     if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.no_additional_ms.$kind.csv.bz2" ]

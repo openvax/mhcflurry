@@ -29,7 +29,7 @@ releases:
               default: true
 
             - name: models_class1_processing
-              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/models_class1_processing.selected.20200501.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/models_class1_processing.selected.20200609.tar.bz2
               default: false
 
             - name: models_class1_pan_unselected
