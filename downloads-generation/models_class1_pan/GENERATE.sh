@@ -70,7 +70,7 @@ fi
 
 cp $SCRIPT_DIR/reassign_mass_spec_training_data.py .
 python reassign_mass_spec_training_data.py \
-    "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2)" \
+    "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
     --set-measurement-value 100 \
     --out-csv "$(pwd)/train_data.csv"
 bzip2 -f "$(pwd)/train_data.csv"
