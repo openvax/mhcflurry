@@ -5,11 +5,31 @@ import sys
 import argparse
 import os
 import numpy
+import time
+from functools import partial
 
 import pandas
 import tqdm
 
-import mhcflurry
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
+
+from mhcflurry.common import configure_logging
+from mhcflurry.local_parallelism import (
+    add_local_parallelism_args,
+    worker_pool_with_gpu_assignments_from_args,
+    call_wrapped_kwargs)
+from mhcflurry.cluster_parallelism import (
+    add_cluster_parallelism_args,
+    cluster_results_from_args)
+
+
+# To avoid pickling large matrices to send to child processes when running in
+# parallel, we use this global variable as a place to store data. Data that is
+# stored here before creating the thread pool will be inherited to the child
+# processes upon fork() call, allowing us to share large data with the workers
+# via shared memory.
+GLOBAL_DATA = {}
+
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -19,11 +39,8 @@ parser.add_argument(
     required=True,
     help="Multiallelic mass spec")
 parser.add_argument(
-    "--predictions",
-    metavar="CSV",
-    help="Predictions data")
-parser.add_argument(
     "--affinity-predictor",
+    required=True,
     metavar="CSV",
     help="Class 1 affinity predictor to use (exclusive with --predictions)")
 parser.add_argument(
@@ -55,46 +72,103 @@ parser.add_argument(
     nargs="+",
     help="Include only the specified alleles")
 
+add_local_parallelism_args(parser)
+add_cluster_parallelism_args(parser)
 
-def load_predictions(dirname, result_df=None, columns=None):
-    peptides = pandas.read_csv(
-        os.path.join(dirname, "peptides.csv")).peptide
-    manifest_df = pandas.read_csv(os.path.join(dirname, "alleles.csv"))
 
-    print(
-        "Loading results. Existing data has",
-        len(peptides),
-        "peptides and",
-        len(manifest_df),
-        "columns")
+def do_process_samples(samples, constant_data=None):
+    import mhcflurry
 
-    if columns is None:
-        columns = manifest_df.col.values
+    columns_to_keep = [
+        "hit_id",
+        "protein_accession",
+        "n_flank",
+        "c_flank",
+        "peptide",
+        "sample_id",
+        "affinity_prediction",
+        "hit",
+    ]
 
-    if result_df is None:
-        result_df = pandas.DataFrame(
-            index=peptides, columns=columns, dtype="float32")
-        result_df[:] = numpy.nan
-        peptides_to_assign = peptides
-        mask = None
-    else:
-        mask = (peptides.isin(result_df.index)).values
-        peptides_to_assign = peptides[mask]
+    if constant_data is None:
+        constant_data = GLOBAL_DATA
 
-    manifest_df = manifest_df.loc[manifest_df.col.isin(result_df.columns)]
+    args = constant_data['args']
+    lengths = constant_data['lengths']
+    all_peptides_by_length = constant_data['all_peptides_by_length']
+    sample_table = constant_data['sample_table']
 
-    for _, row in manifest_df.iterrows():
-        with open(os.path.join(dirname, row.path), "rb") as fd:
-            value = numpy.load(fd)['arr_0']
-            if mask is not None:
-                value = value[mask]
-            result_df.loc[peptides_to_assign, row.col] = value
+    hit_df = constant_data['hit_df']
+    hit_df = hit_df.loc[
+        hit_df.sample_id.isin(samples)
+    ]
 
+    affinity_predictor = mhcflurry.Class1AffinityPredictor.load(
+        args.affinity_predictor)
+    print("Loaded", affinity_predictor)
+
+    result_df = []
+    for sample_id, sub_hit_df in tqdm.tqdm(
+            hit_df.groupby("sample_id"), total=hit_df.sample_id.nunique()):
+
+        sub_hit_df = sub_hit_df.copy()
+        sub_hit_df["hit"] = 1
+
+        decoys_df = []
+        for length in lengths:
+            universe = all_peptides_by_length[length]
+            decoys_df.append(
+                universe.loc[
+                    (~universe.peptide.isin(sub_hit_df.peptide.unique())) &
+                    (universe.protein_accession.isin(sub_hit_df.protein_accession.unique()))
+                ].sample(
+                    n=int(len(sub_hit_df) * args.ppv_multiplier / len(lengths)))[[
+                        "protein_accession", "peptide", "n_flank", "c_flank"
+                ]].drop_duplicates("peptide"))
+
+        merged_df = pandas.concat(
+            [sub_hit_df] + decoys_df, ignore_index=True, sort=False)
+
+        prediction_col = "%s affinity" % sample_table.loc[sample_id].hla
+        predictions_df = pandas.DataFrame(
+            index=merged_df.peptide.unique(),
+            columns=[prediction_col])
+
+        predictions_df[prediction_col] = affinity_predictor.predict(
+            predictions_df.index,
+            allele=sample_table.loc[sample_id].hla)
+
+        merged_df["affinity_prediction"] = merged_df.peptide.map(
+            predictions_df[prediction_col])
+        merged_df = merged_df.sort_values("affinity_prediction", ascending=True)
+
+        num_to_take = int(len(sub_hit_df) * args.hit_multiplier_to_take)
+        selected_df = merged_df.head(num_to_take)[
+                columns_to_keep
+        ].sample(frac=1.0).copy()
+        selected_df["hit"] = selected_df["hit"].fillna(0)
+        selected_df["sample_id"] = sample_id
+        result_df.append(selected_df)
+
+        print(
+            "Processed sample",
+            sample_id,
+            "with hit and decoys:\n",
+            selected_df.hit.value_counts())
+
+    result_df = pandas.concat(result_df, ignore_index=True, sort=False)
     return result_df
 
 
 def run():
+    import mhcflurry
+
     args = parser.parse_args(sys.argv[1:])
+
+    configure_logging()
+
+    serial_run = not args.cluster_parallelism and args.num_jobs == 0
+
     hit_df = pandas.read_csv(args.hits)
     numpy.testing.assert_equal(hit_df.hit_id.nunique(), len(hit_df))
     hit_df = hit_df.loc[
@@ -161,77 +235,58 @@ def run():
 
     all_peptides_by_length = dict(iter(all_peptides_df.groupby("length")))
 
-    columns_to_keep = [
-        "hit_id",
-        "protein_accession",
-        "n_flank",
-        "c_flank",
-        "peptide",
-        "sample_id",
-        "affinity_prediction",
-        "hit",
-    ]
-
-    affinity_predictor = None
-    if args.affinity_predictor:
-        affinity_predictor = mhcflurry.Class1AffinityPredictor.load(args.affinity_predictor)
-        print("Loaded", affinity_predictor)
-    if (args.predictions and affinity_predictor) or not (args.predictions or affinity_predictor):
-        parser.error("Specify one of --affinity-predictor or --predictions")
-
     print("Selecting decoys.")
 
-    lengths = [8, 9, 10, 11]
+    GLOBAL_DATA['args'] = args
+    GLOBAL_DATA['lengths'] = [8, 9, 10, 11]
+    GLOBAL_DATA['all_peptides_by_length'] = all_peptides_by_length
+    GLOBAL_DATA['sample_table'] = sample_table
+    GLOBAL_DATA['hit_df'] = hit_df
+
+    worker_pool = None
+    start = time.time()
+
+    tasks = [
+        {"samples": [sample]} for sample in hit_df.sample_id.unique()
+    ]
+
+    if serial_run:
+        # Serial run
+        print("Running in serial.")
+        results = [do_process_samples(hit_df.sample_id.unique())]
+    elif args.cluster_parallelism:
+        # Run using separate processes HPC cluster.
+        print("Running on cluster.")
+        results = cluster_results_from_args(
+            args,
+            work_function=do_process_samples,
+            work_items=tasks,
+            constant_data=GLOBAL_DATA,
+            input_serialization_method="dill",
+            result_serialization_method="pickle",
+            clear_constant_data=False)
+    else:
+        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        print("Worker pool", worker_pool)
+        assert worker_pool is not None
+        results = worker_pool.imap_unordered(
+            partial(call_wrapped_kwargs, do_process_samples),
+            tasks,
+            chunksize=1)
+
+    print("Reading results")
+
     result_df = []
-    for sample_id, sub_hit_df in tqdm.tqdm(
-            hit_df.groupby("sample_id"), total=hit_df.sample_id.nunique()):
+    for worker_result in tqdm.tqdm(results, total=len(tasks)):
+        for sample_id, selected_df in worker_result.groupby("sample_id"):
+            print(
+                "Received result for sample",
+                sample_id,
+                "with hit and decoys:\n",
+                selected_df.hit.value_counts())
+        result_df.append(worker_result)
 
-        sub_hit_df = sub_hit_df.copy()
-        sub_hit_df["hit"] = 1
-
-        decoys_df = []
-        for length in lengths:
-            universe = all_peptides_by_length[length]
-            decoys_df.append(
-                universe.loc[
-                    (~universe.peptide.isin(sub_hit_df.peptide.unique())) &
-                    (universe.protein_accession.isin(sub_hit_df.protein_accession.unique()))
-                ].sample(
-                    n=int(len(sub_hit_df) * args.ppv_multiplier / len(lengths)))[[
-                        "protein_accession", "peptide", "n_flank", "c_flank"
-                ]].drop_duplicates("peptide"))
-
-        merged_df = pandas.concat(
-            [sub_hit_df] + decoys_df, ignore_index=True, sort=False)
-
-        prediction_col = "%s affinity" % sample_table.loc[sample_id].hla
-        predictions_df = pandas.DataFrame(
-            index=merged_df.peptide.unique(),
-            columns=[prediction_col])
-        if affinity_predictor:
-            predictions_df[prediction_col] = affinity_predictor.predict(
-                predictions_df.index,
-                allele=sample_table.loc[sample_id].hla)
-        else:
-            load_predictions(args.predictions, result_df=predictions_df)
-
-        merged_df["affinity_prediction"] = merged_df.peptide.map(
-            predictions_df[prediction_col])
-        merged_df = merged_df.sort_values("affinity_prediction", ascending=True)
-
-        num_to_take = int(len(sub_hit_df) * args.hit_multiplier_to_take)
-        selected_df = merged_df.head(num_to_take)[
-                columns_to_keep
-        ].sample(frac=1.0).copy()
-        selected_df["hit"] = selected_df["hit"].fillna(0)
-        selected_df["sample_id"] = sample_id
-        result_df.append(selected_df)
-
-        print(
-            "Processed sample",
-            sample_id,
-            "with hit and decoys:\n",
-            selected_df.hit.value_counts())
+    print("Received all results in %0.2f sec" % (time.time() - start))
 
     result_df = pandas.concat(result_df, ignore_index=True, sort=False)
     result_df["hla"] = result_df.sample_id.map(sample_table.hla)
@@ -251,6 +306,10 @@ def run():
 
     result_df.to_csv(args.out, index=False)
     print("Wrote: ", args.out)
+
+    if worker_pool:
+        worker_pool.close()
+        worker_pool.join()
 
 
 if __name__ == '__main__':

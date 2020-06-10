@@ -94,50 +94,25 @@ else
 fi
 
 
-rm -rf commands
-mkdir commands
-
 if [ "$2" == "continue-incomplete" ] && [ -f "train_data.csv.bz2" ]
 then
     echo "Reusing existing training data"
 else
     cp $SCRIPT_DIR/make_train_data.py .
-    echo time python "$(pwd)/make_train_data.py" \
+    echo "Using affinity predictor:"
+    cat "$(mhcflurry-downloads path models_class1_pan)/models.combined/info.txt"
+
+    time python "$(pwd)/make_train_data.py" \
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-        --affinity-predictor \""$(mhcflurry-downloads path models_class1_pan)/models.combined"\" \
+        --affinity-predictor "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
         --proteome-peptides "$(pwd)/proteome_peptides.csv.bz2" \
         --ppv-multiplier 100 \
         --hit-multiplier-to-take 2 \
-        --out "$(pwd)/train_data.csv" >> commands/make_train_data.sh
-    echo bzip2 -f "$(pwd)/train_data.csv" >> commands/make_train_data.sh
+        --out "$(pwd)/train_data.csv" \
+        $PARALLELISM_ARGS
+    bzip2 -f "$(pwd)/train_data.csv"
 fi
 
-ls -lh commands
-
-if [ "$1" != "cluster" ]
-then
-    echo "Running locally"
-    for i in $(ls commands/*.sh)
-    do
-        echo "# *******"
-        echo "# Command $i"
-        cat $i
-        bash $i
-    done
-else
-    echo "Running on cluster"
-    for i in $(ls commands/*.sh)
-    do
-        echo "# *******"
-        echo "# Command $i"
-        cat $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.no_replacements.lsf > ${i}.lsf
-        echo cd "$(pwd)" >> ${i}.lsf
-        cat $i >> ${i}.lsf
-        cat ${i}.lsf
-        bsub -K < "${i}.lsf" &
-    done
-    wait
-fi
 
 TRAIN_DATA="$(pwd)/train_data.csv.bz2"
 
