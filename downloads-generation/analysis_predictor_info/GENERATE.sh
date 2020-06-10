@@ -96,11 +96,11 @@ then
     echo "Reusing existing model_selection_with_decoys.predictions.unselected data"
 else
     echo "Using affinity predictor:"
-    cat "$(mhcflurry-downloads path models_class1_pan_unselected)/models.combined/info.txt"
+    cat "$(mhcflurry-downloads path models_class1_pan_unselected)/models.unselected.combined/info.txt"
 
     cp $SCRIPT_DIR/predict_on_model_selection_data.py .
     time python predict_on_model_selection_data.py \
-        "$(mhcflurry-downloads path models_class1_pan_unselected)/models.combined" \
+        "$(mhcflurry-downloads path models_class1_pan_unselected)/models.unselected.combined" \
         --data "$(pwd)/model_selection_with_decoys.csv.bz2" \
         --out "$(pwd)/model_selection_with_decoys.predictions.unselected.csv" \
         $PARALLELISM_ARGS
