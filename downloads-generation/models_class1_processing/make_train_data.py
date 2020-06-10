@@ -78,6 +78,9 @@ add_cluster_parallelism_args(parser)
 
 def do_process_samples(samples, constant_data=None):
     import mhcflurry
+    import pandas
+    import tqdm
+    tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
     columns_to_keep = [
         "hit_id",
