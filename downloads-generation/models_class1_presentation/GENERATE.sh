@@ -81,7 +81,7 @@ else
         --match-amino-acid-distribution-data \""$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2"\" \
         --alleles-file \""$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2"\" \
         --predictor-kind class1_presentation \
-        --num-peptides-per-length 100000 \
+        --num-peptides-per-length 10000 \
         --alleles-per-genotype 1 \
         --num-genotypes 50 \
         --verbosity 1 >> commands/train.sh
