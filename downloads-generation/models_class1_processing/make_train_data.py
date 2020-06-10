@@ -42,7 +42,7 @@ parser.add_argument(
     "--affinity-predictor",
     required=True,
     metavar="CSV",
-    help="Class 1 affinity predictor to use (exclusive with --predictions)")
+    help="Class 1 affinity predictor to use")
 parser.add_argument(
     "--proteome-peptides",
     metavar="CSV",
