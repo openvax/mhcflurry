@@ -50,6 +50,10 @@ parser.add_argument(
     choices=("MONOALLELIC", "MULTIALLELIC"),
     help="Include only data of the given format")
 parser.add_argument(
+    "--sample-fraction",
+    type=float,
+    help="Subsample data by specified fraction (e.g. 0.1)")
+parser.add_argument(
     "--out",
     metavar="CSV",
     required=True,
@@ -203,6 +207,14 @@ def run():
 
     print("Hit rates:")
     print(result_df.groupby("sample_id").hit.mean().sort_values())
+
+    if args.sample_fraction:
+        print("Subsampling to ", args.sample_fraction)
+        result_df = result_df.sample(frac=args.sample_fraction)
+        print("Subsampled:")
+        print(result_df)
+        print("Hit rates:")
+        print(result_df.groupby("sample_id").hit.mean().sort_values())
 
     result_df.to_csv(args.out, index=False)
     print("Wrote: ", args.out)

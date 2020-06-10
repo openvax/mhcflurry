@@ -45,54 +45,20 @@ if [ "$2" == "continue-incomplete" ] && [ -f "train_data.csv.bz2" ]
 then
     echo "Reusing existing training data"
 else
-    cp $SCRIPT_DIR/make_benchmark.py .
-    time python make_benchmark.py \
+    cp $SCRIPT_DIR/make_train_data.py .
+    time python make_train_data.py \
         --hits "$(mhcflurry-downloads path models_class1_processing)/hits_with_tpm.csv.bz2" \
         --proteome-peptides "$(mhcflurry-downloads path models_class1_processing)/proteome_peptides.csv.bz2" \
         --decoys-per-hit 2 \
         --exclude-pmid 31844290 31495665 31154438 \
         --only-format MULTIALLELIC \
+        --sample-fraction 0.1 \
         --out "$(pwd)/train_data.csv"
     bzip2 -f train_data.csv
 fi
 
 rm -rf commands
 mkdir commands
-
-run_commands () {
-    ls -lh commands
-
-    if [ "$1" != "cluster" ]
-    then
-        echo "Running locally"
-        for i in $(ls commands/*.sh)
-        do
-            echo "# *******"
-            echo "# Command $i"
-            cat $i
-            bash $i
-        done
-    else
-        echo "Running on cluster"
-        for i in $(ls commands/*.sh)
-        do
-            echo "# *******"
-            echo "# Command $i"
-            cat $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf > ${i}.lsf
-            echo cd "$(pwd)" >> ${i}.lsf
-            cat $i >> ${i}.lsf
-            cat ${i}.lsf
-            bsub -K < "${i}.lsf" &
-        done
-        wait
-    fi
-
-    for i in $(ls commands/*.sh)
-    do
-        mv "$i" "${i}.FINISHED"
-    done
-}
-
 
 if [ "$2" == "continue-incomplete" ] && [ -f "models/weights.csv" ]
 then
@@ -106,8 +72,6 @@ else
         --out-models-dir "$(pwd)/models" >> commands/train.sh
 fi
 
-run_commands
-
 if [ "$2" == "continue-incomplete" ] && [ -f "models/percent_ranks.csv" ]
 then
     echo "Reusing existing percentile ranks"
@@ -120,10 +84,40 @@ else
         --num-peptides-per-length 100000 \
         --alleles-per-genotype 1 \
         --num-genotypes 50 \
-        --verbosity 1 >> commands/calibrate_percentile_ranks.sh
+        --verbosity 1 >> commands/train.sh
 fi
 
-run_commands
+ls -lh commands
+
+if [ "$1" != "cluster" ]
+then
+    echo "Running locally"
+    for i in $(ls commands/*.sh)
+    do
+        echo "# *******"
+        echo "# Command $i"
+        cat $i
+        bash $i
+    done
+else
+    echo "Running on cluster"
+    for i in $(ls commands/*.sh)
+    do
+        echo "# *******"
+        echo "# Command $i"
+        cat $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf > ${i}.lsf
+        echo cd "$(pwd)" >> ${i}.lsf
+        cat $i >> ${i}.lsf
+        cat ${i}.lsf
+        bsub -K < "${i}.lsf" &
+    done
+    wait
+fi
+
+for i in $(ls commands/*.sh)
+do
+    mv "$i" "${i}.FINISHED"
+done
 
 cp "$(mhcflurry-downloads path models_class1_pan)/models.combined/train_data.csv.bz2" models/affinity_predictor_train_data.csv.bz2
 cp "$(mhcflurry-downloads path models_class1_processing)/models.selected.with_flanks/train_data.csv.bz2" models/processing_predictor_train_data.csv.bz2
