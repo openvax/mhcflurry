@@ -814,7 +814,7 @@ class Class1PresentationPredictor(object):
             Path to directory. It will be created if it doesn't exist.
         """
 
-        if self.weights_dataframe is None:
+        if write_weights and self.weights_dataframe is None:
             raise RuntimeError("Can't save before fitting")
 
         if not exists(models_dir):
