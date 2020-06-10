@@ -113,11 +113,22 @@ def main(args):
     processing_predictor_without_flanks = Class1ProcessingPredictor.load(
         args.processing_predictor_without_flanks)
 
+    print("Loaded affinity predictor", affinity_predictor)
+    print(
+        "Loaded processing_predictor_with_flanks",
+        processing_predictor_with_flanks)
+    print("Loaded processing_predictor_without_flanks",
+        processing_predictor_without_flanks)
+
     predictor = Class1PresentationPredictor(
         affinity_predictor=affinity_predictor,
         processing_predictor_with_flanks=processing_predictor_with_flanks,
         processing_predictor_without_flanks=processing_predictor_without_flanks)
 
+    # We want to predict using an optimized Class1AffinityPredictor but
+    # save the presentation models using an un-optimized Class1AffinityPredictor,
+    # since there seems to be issues saving and loading giant tensorflow
+    # graphs (which is what the optimization routine produces).
     print("Before fit: saving affinity and processing predictors.")
     predictor.save(
         args.out_models_dir,
