@@ -95,7 +95,11 @@ do
     TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2"
     if [ "$kind" == "no_additional_ms" ]
     then
-        TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.no_additional_ms.csv.bz2"
+        TRAINING_DATA="train_data.$kind.csv"
+        python reassign_mass_spec_training_data.py \
+            "$(mhcflurry-downloads path data_curated)/curated_training_data.no_additional_ms.csv.bz2" \
+            --set-measurement-value 100 \
+            --out-csv "$TRAINING_DATA"
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
 
