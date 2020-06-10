@@ -246,3 +246,16 @@ for i in $(ls LOG-worker.*.txt) ; do bzip2 -f $i ; done
 RESULT="$SCRATCH_DIR/${DOWNLOAD_NAME}.$(date +%Y%m%d).tar.bz2"
 tar -cjf "$RESULT" *
 echo "Created archive: $RESULT"
+
+# Split into <2GB chunks for GitHub
+PARTS="${RESULT}.part."
+# Check for pre-existing part files and rename them.
+for i in $(ls "${PARTS}"* )
+do
+    DEST="${i}.OLD.$(date +%s)"
+    echo "WARNING: already exists: $i . Moving to $DEST"
+    mv $i $DEST
+done
+split -b 2000m "$RESULT" "$PARTS"
+echo "Split into parts:"
+ls -lh "${PARTS}"*

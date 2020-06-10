@@ -33,7 +33,7 @@ releases:
               default: false
 
             - name: models_class1_pan_unselected
-              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/models_class1_pan.20200428.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/models_class1_pan.20200610.tar.bz2
               default: false
 
             - name: models_class1_pan_variants
