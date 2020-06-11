@@ -137,6 +137,9 @@ mkdir commands
 #for kind in train_excluded all
 for kind in train_excluded
 do
+    echo "MONOALLELIC: Using affinity predictor:"
+    cat "$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms/info.txt"
+
     for sample in $(cat MONOALLELIC_SAMPLES)
     do
         ## AFFINITY PREDICTOR VARIANT: MONOALLELIC
@@ -144,9 +147,6 @@ do
         then
             echo "Reusing existing monoallelic benchmark predictions $sample"
         else
-            echo "Using affinity predictor:"
-            cat "$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms/info.txt"
-
             echo time mhcflurry-predict \
                 "$(pwd)/benchmark.monoallelic.$kind.$sample.csv.bz2" \
                 --allele-column hla \
@@ -160,6 +160,9 @@ do
         fi
     done
 
+    echo "MULTIALLELIC: Using affinity predictor:"
+    cat "$(mhcflurry-downloads path models_class1_pan)/models.combined/info.txt"
+
     for sample in $(cat MULTIALLELIC_SAMPLES)
     do
         ### AFFINITY PREDICTORS: MULTIALLELIC
@@ -167,9 +170,6 @@ do
         then
             echo "Reusing existing multiallelic predictions $sample"
         else
-            echo "Using affinity predictor:"
-            cat "$(mhcflurry-downloads path models_class1_pan)/models.combined/info.txt"
-
             echo time mhcflurry-predict \
                 "$(pwd)/benchmark.multiallelic.$kind.$sample.csv.bz2" \
                 --allele-column hla \
@@ -204,6 +204,9 @@ do
         #done
     #done
 
+    echo "Using presentation predictor:"
+    cat "$(mhcflurry-downloads path models_class1_presentation)/models/info.txt"
+
     for sample in $(cat MULTIALLELIC_SAMPLES)
     do
         ### PRESENTATION: WITH FLANKS
@@ -211,9 +214,6 @@ do
         then
             echo "Reusing existing multiallelic presentation with flanks $sample"
         else
-            echo "Using presentation predictor:"
-            cat "$(mhcflurry-downloads path models_class1_presentation)/models/info.txt"
-
             echo time mhcflurry-predict \
                 "$(pwd)/benchmark.multiallelic.$kind.$sample.csv.bz2" \
                 --allele-column hla \
@@ -232,9 +232,6 @@ do
         then
             echo "Reusing existing multiallelic presentation without flanks $sample"
         else
-            echo "Using presentation predictor:"
-            cat "$(mhcflurry-downloads path models_class1_presentation)/models/info.txt"
-
             echo time mhcflurry-predict \
                 "$(pwd)/benchmark.multiallelic.$kind.$sample.csv.bz2" \
                 --allele-column hla \
