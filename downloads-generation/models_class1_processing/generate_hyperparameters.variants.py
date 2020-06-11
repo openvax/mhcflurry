@@ -30,8 +30,8 @@ def transform(kind, hyperparameters):
     if kind == "no_c_flank" or kind == "no_flank":
         new_hyperparameters["c_flank_length"] = 0
     if kind == "short_flanks":
-        new_hyperparameters["c_flank_length"] = 3
-        new_hyperparameters["n_flank_length"] = 3
+        new_hyperparameters["c_flank_length"] = 5
+        new_hyperparameters["n_flank_length"] = 5
     return [new_hyperparameters]
 
 

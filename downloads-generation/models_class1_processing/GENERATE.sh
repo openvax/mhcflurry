@@ -59,8 +59,8 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
-#VARIANTS=( with_flanks no_flank short_flanks )
-VARIANTS=( with_flanks no_flank )
+VARIANTS=( with_flanks no_flank short_flanks )
+#VARIANTS=( with_flanks no_flank )
 
 cp $SCRIPT_DIR/generate_hyperparameters.variants.py .
 cp $SCRIPT_DIR/generate_hyperparameters.base.py .
