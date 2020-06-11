@@ -106,14 +106,15 @@ do
             "$(pwd)/benchmark.monoallelic.$kind.csv.bz2" \
             --out "$(pwd)/benchmark.monoallelic.$kind.%s.csv" \
             --out-samples MONOALLELIC_SAMPLES
-        for i in $(ls "benchmark.monoallelic.$kind.*.csv")
+
+        for sample in $(cat MONOALLELIC_SAMPLES)
         do
-            bzip2 -f "$i"
+            bzip2 -f "$(pwd)/benchmark.monoallelic.$kind.$sample.csv"
         done
     fi
 
     ### SPLIT BENCHMARK: MULTIALLELIC
-    if [ "$2" == "continue-incomplete" ] && [ -f "c" ]
+    if [ "$2" == "continue-incomplete" ] && [ -f "MULTIALLELIC_SAMPLES" ]
     then
         echo "Reusing existing multiallelic $kind benchmark pieces"
     else
@@ -122,9 +123,10 @@ do
             "$(pwd)/benchmark.multiallelic.$kind.csv.bz2" \
             --out "$(pwd)/benchmark.multiallelic.$kind.%s.csv" \
             --out-samples MULTIALLELIC_SAMPLES
-        for i in $(ls "benchmark.multiallelic.$kind.*.csv")
+
+        for sample in $(cat MULTIALLELIC_SAMPLES)
         do
-            bzip2 -f "$i"
+            bzip2 -f "$(pwd)/benchmark.multiallelic.$kind.$sample.csv"
         done
     fi
 done

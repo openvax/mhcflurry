@@ -3,6 +3,7 @@ Split a big csv by a particular column (sample id)
 """
 import sys
 import argparse
+import re
 
 import pandas
 
@@ -29,13 +30,14 @@ parser.add_argument(
 def run():
     args = parser.parse_args(sys.argv[1:])
     df = pandas.read_csv(args.data)
+    print("Read data with shape", df.shape)
 
     names = []
     for (i, (sample, sub_df)) in enumerate(df.groupby(args.split_column)):
-        name = sample.replace(" ", "") + (".%d" % i)
+        name = re.sub(r'[^\w\d-]', '', sample) + (".%d" % i)
         dest = args.out % name
         sub_df.to_csv(dest, index=False)
-        print("Wrote", dest)
+        print("Wrote [%d rows]" % len(sub_df), dest)
         names.append(name)
 
     if args.out_samples:
