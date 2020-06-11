@@ -140,15 +140,20 @@ echo "Done training. Beginning model selection."
 
 for kind in "${VARIANTS[@]}"
 do
-    MODELS_DIR="$(pwd)/models.unselected.$kind"
-    mhcflurry-class1-select-processing-models \
-        --data "$MODELS_DIR/train_data.csv.bz2" \
-        --models-dir "$MODELS_DIR" \
-        --out-models-dir "$(pwd)/models.selected.$kind" \
-        --min-models 1 \
-        --max-models 2 \
-        $PARALLELISM_ARGS
-    cp "$MODELS_DIR/train_data.csv.bz2" "models.selected.$kind/train_data.csv.bz2"
+    if [ "$2" == "continue-incomplete" ] && [ -f "models.selected.$kind/train_data.csv.bz2" ]
+    then
+        echo "Reusing existing selected models for $kind"
+    else
+        MODELS_DIR="$(pwd)/models.unselected.$kind"
+        mhcflurry-class1-select-processing-models \
+            --data "$MODELS_DIR/train_data.csv.bz2" \
+            --models-dir "$MODELS_DIR" \
+            --out-models-dir "$(pwd)/models.selected.$kind" \
+            --min-models 1 \
+            --max-models 2 \
+            $PARALLELISM_ARGS
+        cp "$MODELS_DIR/train_data.csv.bz2" "models.selected.$kind/train_data.csv.bz2"
+    fi
 done
 
 cp $SCRIPT_ABSOLUTE_PATH .
