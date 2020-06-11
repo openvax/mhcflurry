@@ -137,8 +137,9 @@ mkdir commands
 #for kind in train_excluded all
 for kind in train_excluded
 do
-    echo "MONOALLELIC: Using affinity predictor:"
-    cat "$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms/info.txt"
+    MONOALLELIC_AFFINITY_PREDICTOR="$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms"
+    echo "MONOALLELIC: Using affinity predictor: MONOALLELIC_AFFINITY_PREDICTOR"
+    cat "$MONOALLELIC_AFFINITY_PREDICTOR/info.txt"
 
     for sample in $(cat MONOALLELIC_SAMPLES)
     do
@@ -151,7 +152,7 @@ do
                 "$(pwd)/benchmark.monoallelic.$kind.$sample.csv.bz2" \
                 --allele-column hla \
                 --prediction-column-prefix no_additional_ms_ \
-                --models \""$(mhcflurry-downloads path models_class1_pan_variants)/models.no_additional_ms"\" \
+                --models \""$MONOALLELIC_AFFINITY_PREDICTOR"\" \
                 --affinity-only \
                 --no-affinity-percentile \
                 --out "$(pwd)/benchmark.monoallelic.no_additional_ms.$kind.$sample.csv" \
@@ -160,8 +161,9 @@ do
         fi
     done
 
-    echo "MULTIALLELIC: Using affinity predictor:"
-    cat "$(mhcflurry-downloads path models_class1_pan)/models.combined/info.txt"
+    MULTIALLELIC_AFFINITY_PREDICTOR="$(mhcflurry-downloads path models_class1_pan)/models.combined"
+    echo "MULTIALLELIC: Using affinity predictor: MULTIALLELIC_AFFINITY_PREDICTOR"
+    cat "$MULTIALLELIC_AFFINITY_PREDICTOR/info.txt"
 
     for sample in $(cat MULTIALLELIC_SAMPLES)
     do
@@ -174,7 +176,7 @@ do
                 "$(pwd)/benchmark.multiallelic.$kind.$sample.csv.bz2" \
                 --allele-column hla \
                 --prediction-column-prefix mhcflurry_production_ \
-                --models \""$(mhcflurry-downloads path models_class1_pan)/models.combined"\" \
+                --models \""$MULTIALLELIC_AFFINITY_PREDICTOR"\" \
                 --affinity-only \
                 --no-affinity-percentile \
                 --out "$(pwd)/benchmark.multiallelic.production.$kind.$sample.csv" >> commands/multiallelic.production.$kind.$sample.sh
@@ -204,8 +206,9 @@ do
         #done
     #done
 
-    echo "Using presentation predictor:"
-    cat "$(mhcflurry-downloads path models_class1_presentation)/models/info.txt"
+    PRESENTATION_PREDICTOR="$(mhcflurry-downloads path models_class1_presentation)/models"
+    echo "Using presentation predictor: $PRESENTATION_PREDICTOR"
+    cat "$PRESENTATION_PREDICTOR/info.txt"
 
     for sample in $(cat MULTIALLELIC_SAMPLES)
     do
@@ -218,7 +221,7 @@ do
                 "$(pwd)/benchmark.multiallelic.$kind.$sample.csv.bz2" \
                 --allele-column hla \
                 --prediction-column-prefix presentation_with_flanks_ \
-                --models \""$(mhcflurry-downloads path models_class1_presentation)/models"\" \
+                --models \""$PRESENTATION_PREDICTOR"\" \
                 --no-affinity-percentile \
                 --out "$(pwd)/benchmark.multiallelic.presentation_with_flanks.$kind.$sample.csv" >> commands/multiallelic.presentation_with_flanks.$kind.$sample.sh
             echo bzip2 -f "$(pwd)/benchmark.multiallelic.presentation_with_flanks.$kind.$sample.csv"  >> commands/multiallelic.presentation_with_flanks.$kind.$sample.sh
@@ -236,7 +239,7 @@ do
                 "$(pwd)/benchmark.multiallelic.$kind.$sample.csv.bz2" \
                 --allele-column hla \
                 --prediction-column-prefix presentation_without_flanks_ \
-                --models \""$(mhcflurry-downloads path models_class1_presentation)/models"\" \
+                --models \""$PRESENTATION_PREDICTOR"\" \
                 --no-affinity-percentile \
                 --no-flanking \
                 --out "$(pwd)/benchmark.multiallelic.presentation_without_flanks.$kind.$sample.csv" >> commands/multiallelic.presentation_without_flanks.$kind.$sample.sh
