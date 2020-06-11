@@ -143,6 +143,9 @@ do
     echo "MONOALLELIC: Using affinity predictor: MONOALLELIC_AFFINITY_PREDICTOR"
     cat "$MONOALLELIC_AFFINITY_PREDICTOR/info.txt"
 
+    GROUP=group.monoallelic.no_additional_ms.$kind.csv
+    echo "filename" > $GROUP
+
     for sample in $(cat MONOALLELIC_SAMPLES)
     do
         ## AFFINITY PREDICTOR VARIANT: MONOALLELIC
@@ -162,11 +165,15 @@ do
             echo bzip2 -f "$(pwd)/benchmark.monoallelic.no_additional_ms.$kind.$sample.csv" >> commands/monoallelic.$kind.$sample.sh
         fi
         echo ls -lh "benchmark.monoallelic.no_additional_ms.$kind.$sample.csv.bz2" >> CHECK_FILES
+        echo "benchmark.monoallelic.no_additional_ms.$kind.$sample.csv.bz2" >> $GROUP
     done
 
     MULTIALLELIC_AFFINITY_PREDICTOR="$(mhcflurry-downloads path models_class1_pan)/models.combined"
     echo "MULTIALLELIC: Using affinity predictor: MULTIALLELIC_AFFINITY_PREDICTOR"
     cat "$MULTIALLELIC_AFFINITY_PREDICTOR/info.txt"
+
+    GROUP=group.multiallelic.production.$kind.csv
+    echo "filename" > $GROUP
 
     for sample in $(cat MULTIALLELIC_SAMPLES)
     do
@@ -186,12 +193,14 @@ do
             echo bzip2 -f "$(pwd)/benchmark.multiallelic.production.$kind.$sample.csv" >> commands/multiallelic.production.$kind.$sample.sh
         fi
         echo ls -lh "benchmark.multiallelic.production.$kind.$sample.csv.bz2" >> CHECK_FILES
+        echo "benchmark.multiallelic.production.$kind.$sample.csv.bz2" >> $GROUP
     done
 
     #for sample in $(cat MULTIALLELIC_SAMPLES)
     #do
         #for variant in no_additional_ms compact_peptide affinity_only no_pretrain single_hidden_no_pretrain 500nm
         #for variant in 50nm
+        # TODO: IF this gets enabled, add the $GROUP stuff.
         #do
         #    if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.multiallelic.${variant}.$kind.$sample.csv.bz2" ]
         #    then
@@ -215,6 +224,9 @@ do
     echo "Using presentation predictor: $PRESENTATION_PREDICTOR"
     cat "$PRESENTATION_PREDICTOR/info.txt"
 
+    GROUP=group.multiallelic.presentation_with_flanks.$kind.csv
+    echo "filename" > $GROUP
+
     for sample in $(cat MULTIALLELIC_SAMPLES)
     do
         ### PRESENTATION: WITH FLANKS
@@ -232,7 +244,11 @@ do
             echo bzip2 -f "$(pwd)/benchmark.multiallelic.presentation_with_flanks.$kind.$sample.csv"  >> commands/multiallelic.presentation_with_flanks.$kind.$sample.sh
         fi
         echo ls -lh "benchmark.multiallelic.presentation_with_flanks.$kind.$sample.csv.bz2" >> CHECK_FILES
+        echo "benchmark.multiallelic.presentation_with_flanks.$kind.$sample.csv.bz2" >> $GROUP
     done
+
+    GROUP=group.multiallelic.presentation_without_flanks.$kind.csv
+    echo "filename" > $GROUP
 
     for sample in $(cat MULTIALLELIC_SAMPLES)
     do
@@ -252,11 +268,15 @@ do
             echo bzip2 -f "$(pwd)/benchmark.multiallelic.presentation_without_flanks.$kind.$sample.csv"  >> commands/multiallelic.presentation_without_flanks.$kind.$sample.sh
         fi
         echo ls -lh "benchmark.multiallelic.presentation_without_flanks.$kind.$sample.csv.bz2" >> CHECK_FILES
+        echo "benchmark.multiallelic.presentation_without_flanks.$kind.$sample.csv.bz2" >> $GROUP
     done
 
     ### PRECOMPUTED ####
     for variant in netmhcpan4.ba netmhcpan4.el mixmhcpred
     do
+        GROUP=group.monoallelic.${variant}.$kind.csv
+        echo "filename" > $GROUP
+
         for sample in $(cat MONOALLELIC_SAMPLES)
         do
             if [ "$2" == "continue-incomplete" ] && [ -f "benchmark.monoallelic.${variant}.$kind.$sample.csv.bz2" ]
@@ -271,7 +291,11 @@ do
                 echo bzip2 -f "$(pwd)/benchmark.monoallelic.${variant}.$kind.$sample.csv"  >> commands/monoallelic.${variant}.$kind.$sample.sh
             fi
             echo ls -lh "benchmark.monoallelic.${variant}.$kind.$sample.csv.bz2" >> CHECK_FILES
+            echo "benchmark.monoallelic.${variant}.$kind.$sample.csv.bz2" >> $GROUP
         done
+
+        GROUP=group.multiallelic.${variant}.$kind.csv
+        echo "filename" > $GROUP
 
         for sample in $(cat MULTIALLELIC_SAMPLES)
         do
@@ -287,6 +311,7 @@ do
                 echo bzip2 -f "$(pwd)/benchmark.multiallelic.${variant}.$kind.$sample.csv"  >> commands/multiallelic.${variant}.$kind.$sample.sh
             fi
             echo ls -lh "benchmark.multiallelic.${variant}.$kind.$sample.csv.bz2" >> CHECK_FILES
+            echo "benchmark.multiallelic.${variant}.$kind.$sample.csv.bz2" >> $GROUP
         done
     done
 done
