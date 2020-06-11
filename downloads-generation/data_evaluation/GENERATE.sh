@@ -134,6 +134,8 @@ done
 rm -rf commands
 mkdir commands
 
+rm CHECK_FILES
+
 #for kind in train_excluded all
 for kind in train_excluded
 do
@@ -159,6 +161,7 @@ do
                 --no-throw >> commands/monoallelic.$kind.$sample.sh
             echo bzip2 -f "$(pwd)/benchmark.monoallelic.no_additional_ms.$kind.$sample.csv" >> commands/monoallelic.$kind.$sample.sh
         fi
+        echo ls -lh "benchmark.monoallelic.no_additional_ms.$kind.$sample.csv.bz2" >> CHECK_FILES
     done
 
     MULTIALLELIC_AFFINITY_PREDICTOR="$(mhcflurry-downloads path models_class1_pan)/models.combined"
@@ -182,6 +185,7 @@ do
                 --out "$(pwd)/benchmark.multiallelic.production.$kind.$sample.csv" >> commands/multiallelic.production.$kind.$sample.sh
             echo bzip2 -f "$(pwd)/benchmark.multiallelic.production.$kind.$sample.csv" >> commands/multiallelic.production.$kind.$sample.sh
         fi
+        echo ls -lh "benchmark.multiallelic.production.$kind.$sample.csv.bz2" >> CHECK_FILES
     done
 
     #for sample in $(cat MULTIALLELIC_SAMPLES)
@@ -203,6 +207,7 @@ do
         #            --out "$(pwd)/benchmark.multiallelic.${variant}.$kind.$sample.csv" >> commands/multiallelic.${variant}.$kind.$sample.sh
         #        echo bzip2 -f "$(pwd)/benchmark.multiallelic.${variant}.$kind.$sample.csv" >> commands/multiallelic.${variant}.$kind.$sample.sh
         #    fi
+        #    echo ls -lh "benchmark.multiallelic.${variant}.$kind.$sample.csv.bz2" >> CHECK_FILES
         #done
     #done
 
@@ -226,6 +231,7 @@ do
                 --out "$(pwd)/benchmark.multiallelic.presentation_with_flanks.$kind.$sample.csv" >> commands/multiallelic.presentation_with_flanks.$kind.$sample.sh
             echo bzip2 -f "$(pwd)/benchmark.multiallelic.presentation_with_flanks.$kind.$sample.csv"  >> commands/multiallelic.presentation_with_flanks.$kind.$sample.sh
         fi
+        echo ls -lh "benchmark.multiallelic.presentation_with_flanks.$kind.$sample.csv.bz2" >> CHECK_FILES
     done
 
     for sample in $(cat MULTIALLELIC_SAMPLES)
@@ -245,6 +251,7 @@ do
                 --out "$(pwd)/benchmark.multiallelic.presentation_without_flanks.$kind.$sample.csv" >> commands/multiallelic.presentation_without_flanks.$kind.$sample.sh
             echo bzip2 -f "$(pwd)/benchmark.multiallelic.presentation_without_flanks.$kind.$sample.csv"  >> commands/multiallelic.presentation_without_flanks.$kind.$sample.sh
         fi
+        echo ls -lh "benchmark.multiallelic.presentation_without_flanks.$kind.$sample.csv.bz2" >> CHECK_FILES
     done
 
     ### PRECOMPUTED ####
@@ -263,6 +270,7 @@ do
                     --out "$(pwd)/benchmark.monoallelic.${variant}.$kind.$sample.csv" >> commands/monoallelic.${variant}.$kind.$sample.sh
                 echo bzip2 -f "$(pwd)/benchmark.monoallelic.${variant}.$kind.$sample.csv"  >> commands/monoallelic.${variant}.$kind.$sample.sh
             fi
+            echo ls -lh "benchmark.monoallelic.${variant}.$kind.$sample.csv.bz2" >> CHECK_FILES
         done
 
         for sample in $(cat MULTIALLELIC_SAMPLES)
@@ -278,6 +286,7 @@ do
                     --out "$(pwd)/benchmark.multiallelic.${variant}.$kind.$sample.csv" >> commands/multiallelic.${variant}.$kind.$sample.sh
                 echo bzip2 -f "$(pwd)/benchmark.multiallelic.${variant}.$kind.$sample.csv"  >> commands/multiallelic.${variant}.$kind.$sample.sh
             fi
+            echo ls -lh "benchmark.multiallelic.${variant}.$kind.$sample.csv.bz2" >> CHECK_FILES
         done
     done
 done
@@ -309,6 +318,8 @@ else
     done
     wait
 fi
+
+bash CHECK_FILES
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 -f "$LOG"
