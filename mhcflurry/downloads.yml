@@ -45,7 +45,10 @@ releases:
               default: false
 
             - name: data_evaluation
-              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_evaluation.20200610.tar.bz2
+              part_urls:
+                - https://github.com/openvax/mhcflurry/releases/download/pre-2.0/data_evaluation.20200611.tar.bz2.part.aa
+                - https://github.com/openvax/mhcflurry/releases/download/pre-2.0/data_evaluation.20200611.tar.bz2.part.ab
+                - https://github.com/openvax/mhcflurry/releases/download/pre-2.0/data_evaluation.20200611.tar.bz2.part.ac
               default: false
 
             - name: analysis_predictor_info
