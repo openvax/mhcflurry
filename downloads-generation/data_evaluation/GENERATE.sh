@@ -134,7 +134,7 @@ done
 rm -rf commands
 mkdir commands
 
-rm CHECK_FILES
+rm -f CHECK_FILES
 
 #for kind in train_excluded all
 for kind in train_excluded
