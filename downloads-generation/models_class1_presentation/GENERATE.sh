@@ -67,7 +67,7 @@ else
     echo time mhcflurry-class1-train-presentation-models \
         --data "$(pwd)/train_data.csv.bz2" \
         --affinity-predictor \""$(mhcflurry-downloads path models_class1_pan)/models.combined"\" \
-        --processing-predictor-with-flanks \""$(mhcflurry-downloads path models_class1_processing)/models.selected.with_flanks"\" \
+        --processing-predictor-with-flanks \""$(mhcflurry-downloads path models_class1_processing)/models.selected.short_flanks"\" \
         --processing-predictor-without-flanks \""$(mhcflurry-downloads path models_class1_processing)/models.selected.no_flank"\" \
         --out-models-dir "$(pwd)/models" >> commands/train.sh
 fi
