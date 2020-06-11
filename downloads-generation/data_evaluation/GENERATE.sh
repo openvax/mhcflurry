@@ -182,8 +182,8 @@ do
         fi
     done
 
-    for sample in $(cat MULTIALLELIC_SAMPLES)
-    do
+    #for sample in $(cat MULTIALLELIC_SAMPLES)
+    #do
         #for variant in no_additional_ms compact_peptide affinity_only no_pretrain single_hidden_no_pretrain 500nm
         #for variant in 50nm
         #do
@@ -202,7 +202,7 @@ do
         #        echo bzip2 -f "$(pwd)/benchmark.multiallelic.${variant}.$kind.$sample.csv" >> commands/multiallelic.${variant}.$kind.$sample.sh
         #    fi
         #done
-    done
+    #done
 
     for sample in $(cat MULTIALLELIC_SAMPLES)
     do
