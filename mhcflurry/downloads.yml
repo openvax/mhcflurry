@@ -25,7 +25,7 @@ releases:
               default: false
 
             - name: models_class1_presentation
-              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/models_class1_presentation.20200610.tar.bz2
+              url: https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/models_class1_presentation.20200611.tar.bz2
               default: true
 
             - name: models_class1_processing
