@@ -339,7 +339,7 @@ else
         cat $i >> ${i}.lsf
         cat ${i}.lsf
         bsub -K < "${i}.lsf" &
-        sleep 0.5
+        sleep 1
     done
     wait
 fi
