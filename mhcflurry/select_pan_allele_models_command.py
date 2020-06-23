@@ -246,6 +246,9 @@ def run(argv=sys.argv[1:]):
         print("Processing %d work items in parallel." % len(work_items))
         assert not serial_run
 
+        for item in work_items:
+            item['constant_data'] = GLOBAL_DATA
+
         # Parallel run
         results = worker_pool.imap_unordered(
             do_model_select_task,
@@ -290,6 +293,8 @@ def run(argv=sys.argv[1:]):
 
 
 def do_model_select_task(item, constant_data=GLOBAL_DATA):
+    if 'constant_data' in item:
+        constant_data = item.pop('constant_data')
     return model_select(constant_data=constant_data, **item)
 
 

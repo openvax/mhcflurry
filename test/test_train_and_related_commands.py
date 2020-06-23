@@ -1,6 +1,9 @@
 """
 Test train, calibrate percentile ranks, and model selection commands.
 """
+import logging
+logging.getLogger('matplotlib').disabled = True
+logging.getLogger('tensorflow').disabled = True
 
 import json
 import os

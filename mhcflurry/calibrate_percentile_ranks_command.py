@@ -226,6 +226,8 @@ def run_class1_presentation_predictor(args, peptides):
 
 
 def run_class1_affinity_predictor(args, peptides):
+    global GLOBAL_DATA
+
     # It's important that we don't trigger a Keras import here since that breaks
     # local parallelism (tensorflow backend). So we set optimization_level=0.
     predictor = Class1AffinityPredictor.load(
@@ -319,6 +321,10 @@ def run_class1_affinity_predictor(args, peptides):
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
         assert worker_pool is not None
+
+        for item in work_items:
+            item['constant_data'] = GLOBAL_DATA
+
         results = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, do_class1_affinity_calibrate_percentile_ranks),
             work_items,
@@ -354,6 +360,10 @@ def run_class1_affinity_predictor(args, peptides):
 
 def do_class1_affinity_calibrate_percentile_ranks(
         alleles, constant_data=GLOBAL_DATA):
+
+    if 'predictor' not in constant_data:
+        raise ValueError("No predictor provided: " + str(constant_data))
+
     result_list = []
     for (i, allele) in enumerate(alleles):
         print("Processing allele", i + 1, "of", len(alleles))

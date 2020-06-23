@@ -336,6 +336,9 @@ def train_models(args):
         print("Processing %d work items in parallel." % len(work_items))
         assert not serial_run
 
+        for item in work_items:
+            item['constant_data'] = GLOBAL_DATA
+
         results_generator = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, train_model),
             work_items,

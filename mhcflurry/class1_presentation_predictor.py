@@ -115,11 +115,11 @@ class Class1PresentationPredictor(object):
         ...        "sample2": ["A0101", "C0202"],
         ...    },
         ...    verbose=0)
-            peptide  peptide_num sample_name      affinity best_allele
-        0  SIINFEKL            0     sample1  12906.787792       A0201
-        1   PEPTIDE            1     sample1  36827.681130       B0702
-        2  SIINFEKL            0     sample2   3588.413748       C0202
-        3   PEPTIDE            1     sample2  34362.109211       C0202
+            peptide  peptide_num sample_name   affinity best_allele  affinity_percentile
+        0  SIINFEKL            0     sample1  11927.161       A0201                6.296
+        1   PEPTIDE            1     sample1  32507.083       A0201               71.249
+        2  SIINFEKL            0     sample2   2725.593       C0202                6.662
+        3   PEPTIDE            1     sample2  28304.330       C0202               54.652
 
         In contrast, here we specify sample_names, so peptide is evaluated for
         binding the alleles in the corresponding sample, for a result size equal
@@ -133,10 +133,9 @@ class Class1PresentationPredictor(object):
         ...    },
         ...    sample_names=["sample2", "sample1"],
         ...    verbose=0)
-            peptide  peptide_num sample_name      affinity best_allele
-        0  SIINFEKL            0     sample2   3588.412141       C0202
-        1   PEPTIDE            1     sample1  36827.682779       B0702
-
+            peptide  peptide_num sample_name   affinity best_allele  affinity_percentile
+        0  SIINFEKL            0     sample2   2725.592       C0202                6.662
+        1   PEPTIDE            1     sample1  32507.079       A0201               71.249
 
         Parameters
         ----------
@@ -431,11 +430,11 @@ class Class1PresentationPredictor(object):
         ...        "sample2": ["A0101", "C0202"],
         ...    },
         ...    verbose=0)
-            peptide n_flank c_flank  peptide_num sample_name      affinity best_allele  processing_score  presentation_score
-        0  SIINFEKL     NNN     CCC            0     sample1  12906.787792       A0201          0.802466            0.140365
-        1   PEPTIDE     SNS     CNC            1     sample1  36827.681130       B0702          0.105260            0.004059
-        2  SIINFEKL     NNN     CCC            0     sample2   3588.413748       C0202          0.802466            0.338647
-        3   PEPTIDE     SNS     CNC            1     sample2  34362.109211       C0202          0.105260            0.004317
+            peptide n_flank c_flank  peptide_num sample_name   affinity best_allele  processing_score  presentation_score  presentation_percentile
+        0  SIINFEKL     NNN     CCC            0     sample1  11927.161       A0201             0.838               0.145                    2.282
+        1   PEPTIDE     SNS     CNC            1     sample1  32507.083       A0201             0.025               0.003                  100.000
+        2  SIINFEKL     NNN     CCC            0     sample2   2725.593       C0202             0.838               0.416                    1.017
+        3   PEPTIDE     SNS     CNC            1     sample2  28304.330       C0202             0.025               0.003                   99.287
 
         You can also specify sample_names, in which case peptide is evaluated
         for binding the alleles in the corresponding sample only. See
@@ -593,17 +592,17 @@ class Class1PresentationPredictor(object):
         ...    comparison_quantity="affinity",
         ...    filter_value=500,
         ...    verbose=0)
-          sequence_name  pos     peptide         n_flank     c_flank sample_name    affinity best_allele  affinity_percentile  processing_score  presentation_score
-        0      protein1   13   LLLLVVSNL   MDSKGSSQKGSRL           L     sample1   38.206225       A0201             0.380125          0.017644            0.571060
-        1      protein1   14   LLLVVSNLL  MDSKGSSQKGSRLL                 sample1   42.243472       A0201             0.420250          0.090984            0.619213
-        2      protein1    5   SSQKGSRLL           MDSKG   LLLVVSNLL     sample2   66.749223       C0202             0.803375          0.383608            0.774468
-        3      protein1    6   SQKGSRLLL          MDSKGS    LLVVSNLL     sample2  178.033474       C0202             1.820000          0.275019            0.482206
-        4      protein1   13  LLLLVVSNLL   MDSKGSSQKGSRL                 sample1  202.208167       A0201             1.112500          0.058782            0.261320
-        5      protein1   12  LLLLLVVSNL    MDSKGSSQKGSR           L     sample1  202.506582       A0201             1.112500          0.010025            0.225648
-        6      protein2    0   SSLPTPEDK                    EQAQQTHH     sample1  335.529377       A0301             1.011750          0.010443            0.156798
-        7      protein2    0   SSLPTPEDK                    EQAQQTHH     sample2  353.451759       C0202             2.674250          0.010443            0.150753
-        8      protein1    8   KGSRLLLLL        MDSKGSSQ      VVSNLL     sample2  410.327286       C0202             2.887000          0.121374            0.194081
-        9      protein1    5    SSQKGSRL           MDSKG  LLLLVVSNLL     sample2  477.285954       C0202             3.107375          0.111982            0.168572
+          sequence_name  pos     peptide n_flank c_flank sample_name  affinity best_allele  affinity_percentile  processing_score  presentation_score  presentation_percentile
+        0      protein1   14   LLLVVSNLL   GSRLL             sample1    57.180       A0201                0.398             0.233               0.754                    0.351
+        1      protein1   13   LLLLVVSNL   KGSRL       L     sample1    57.339       A0201                0.398             0.031               0.586                    0.643
+        2      protein1    5   SSQKGSRLL   MDSKG   LLLVV     sample2   110.779       C0202                0.782             0.061               0.456                    0.920
+        3      protein1    6   SQKGSRLLL   DSKGS   LLVVS     sample2   254.480       C0202                1.735             0.102               0.303                    1.356
+        4      protein1   13  LLLLVVSNLL   KGSRL             sample1   260.390       A0201                1.012             0.158               0.345                    1.215
+        5      protein1   12  LLLLLVVSNL   QKGSR       L     sample1   308.150       A0201                1.094             0.015               0.206                    1.802
+        6      protein2    0   SSLPTPEDK           EQAQQ     sample2   410.354       C0202                2.398             0.003               0.158                    2.155
+        7      protein1    5    SSQKGSRL   MDSKG   LLLLV     sample2   444.321       C0202                2.512             0.026               0.159                    2.138
+        8      protein2    0   SSLPTPEDK           EQAQQ     sample1   459.296       A0301                0.971             0.003               0.144                    2.292
+        9      protein1    4   GSSQKGSRL    MDSK   LLLLV     sample2   469.052       C0202                2.595             0.014               0.146                    2.261
 
         Parameters
         ----------

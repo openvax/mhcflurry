@@ -11,7 +11,7 @@ numpy.random.seed(0)
 import logging
 logging.getLogger('tensorflow').disabled = True
 
-import keras.backend as K
+import tensorflow.keras.backend as K
 
 from mhcflurry.custom_loss import CUSTOM_LOSSES, MultiallelicMassSpecLoss
 
@@ -31,19 +31,15 @@ def evaluate_loss(loss, y_true, y_pred):
     assert y_true.ndim == 2
     assert y_pred.ndim == 2
 
-    if K.backend() == "tensorflow":
-        session = K.get_session()
-        y_true_var = K.constant(y_true, name="y_true")
-        y_pred_var = K.constant(y_pred, name="y_pred")
-        result = loss(y_true_var, y_pred_var)
-        return result.eval(session=session)
-    elif K.backend() == "theano":
-        y_true_var = K.constant(y_true, name="y_true")
-        y_pred_var = K.constant(y_pred, name="y_pred")
-        result = loss(y_true_var, y_pred_var)
-        return result.eval()
-    else:
-        raise ValueError("Unsupported backend: %s" % K.backend())
+    assert K.backend() == "tensorflow"
+
+    import tensorflow.compat.v1 as v1
+    v1.disable_eager_execution()
+    session = v1.keras.backend.get_session()
+    y_true_var = K.constant(y_true, name="y_true")
+    y_pred_var = K.constant(y_pred, name="y_pred")
+    result = loss(y_true_var, y_pred_var)
+    return result.eval(session=session)
 
 
 def test_mse_with_inequalities(loss_obj=CUSTOM_LOSSES['mse_with_inequalities']):

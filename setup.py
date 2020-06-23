@@ -49,11 +49,9 @@ with open('mhcflurry/version.py', 'r') as f:
 if __name__ == '__main__':
     required_packages = [
         'six',
-        'numpy>=1.11',
         'pandas>=0.20.3',
-        'Keras>=2.3.0',
         'appdirs',
-        'tensorflow>=1.15.0,<2.0.0',
+        'tensorflow>=2.2.0',
         'scikit-learn',
         'mhcnames',
         'pyyaml',

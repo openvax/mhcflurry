@@ -56,7 +56,7 @@ def svd_orthonormal(shape):
 
 
 def get_activations(model, layer, X_batch):
-    from keras.models import Model
+    from tensorflow.keras.models import Model
     intermediate_layer_model = Model(
         inputs=model.get_input_at(0),
         outputs=layer.get_output_at(0)

@@ -5,8 +5,8 @@ logging.getLogger('matplotlib').disabled = True
 import numpy
 from numpy import testing
 numpy.random.seed(0)
-from tensorflow import set_random_seed
-set_random_seed(2)
+from tensorflow.random import set_seed
+set_seed(2)
 
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
@@ -98,7 +98,7 @@ def test_inequalities():
         peptide_amino_acid_encoding="one-hot",
         activation="tanh",
         layer_sizes=[64],
-        max_epochs=200,
+        max_epochs=500,
         minibatch_size=32,
         random_negative_rate=0.0,
         random_negative_constant=0,
@@ -120,7 +120,7 @@ def test_inequalities():
     # Weak binders
     df = pandas.DataFrame()
     df["peptide"] = random_peptides(100, length=9)
-    df["value"] = 100
+    df["value"] = 200
     df["inequality1"] = "="
     df["inequality2"] = "<"
     dfs.append(df)

@@ -8,7 +8,7 @@ prediction package with competitive accuracy and a fast and
 MHCflurry implements class I peptide/MHC binding affinity prediction. 
 The current version provides pan-MHC I predictors supporting any MHC
 allele of known sequence. MHCflurry runs on Python 3.4+ using the
-[keras](https://keras.io) neural network library.
+[tensorflow](https://www.tensorflow.org/) neural network library.
 It exposes [command-line](http://openvax.github.io/mhcflurry/commandline_tutorial.html)
 and [Python library](http://openvax.github.io/mhcflurry/python_tutorial.html)
 interfaces.
@@ -144,22 +144,6 @@ Now call `mhcflurry-downloads fetch` with the `--already-downloaded-dir` option 
 
 ```
 $ mhcflurry-downloads fetch models_class1_presentation --already-downloaded-dir downloads
-```
-
-### Problems deserializing models
-If you encounter errors loading the MHCflurry models, such as:
-
-```
-...
-  File "/usr/local/lib/python3.6/site-packages/keras/engine/topology.py", line 293, in __init__
-    raise TypeError('Keyword argument not understood:', kwarg)
-TypeError: ('Keyword argument not understood:', 'data_format')
-```
-
-You may need to upgrade Keras:
-
-```
-pip install --upgrade Keras
 ```
 
 

@@ -296,7 +296,7 @@ def test_downloaded_predictor():
         ])
     print(scan_results3)
 
-    assert len(scan_results3) > 5, len(scan_results3)
+    assert len(scan_results3) >= 5, len(scan_results3)
     assert (scan_results3.presentation_score >= 0.9).all()
 
     scan_results4 = PRESENTATION_PREDICTOR.predict_sequences(
