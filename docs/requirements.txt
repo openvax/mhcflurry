@@ -4,7 +4,6 @@ sphinxcontrib-autoprogram
 sphinx-rtd-theme
 numpydoc
 pypandoc
-mhctools
 pydot
 tabulate
 logomaker

@@ -15,7 +15,7 @@ from .hyperparameters import HyperparameterDefaults
 from .encodable_sequences import EncodableSequences, EncodingError
 from .allele_encoding import AlleleEncoding
 from .regression_target import to_ic50, from_ic50
-from .common import random_peptides, amino_acid_distribution
+from .common import configure_tensorflow
 from .custom_loss import get_loss
 from .data_dependent_weights_initialization import lsuv_init
 from .random_negative_peptides import RandomNegativePeptides
@@ -219,6 +219,7 @@ class Class1NeuralNetwork(object):
         key = klass.keras_network_cache_key(network_json)
         if key not in klass.KERAS_MODELS_CACHE:
             # Cache miss.
+            configure_tensorflow()
             from tensorflow.keras.models import model_from_json
             network = model_from_json(network_json)
             existing_weights = None
@@ -258,6 +259,7 @@ class Class1NeuralNetwork(object):
                     self.network_json,
                     self.network_weights)
             else:
+                configure_tensorflow()
                 from tensorflow import keras
                 self._network = keras.models.model_from_json(self.network_json)
                 if self.network_weights is not None:
@@ -526,6 +528,7 @@ class Class1NeuralNetwork(object):
         progress_preamble : string
         progress_print_interval : float
         """
+        configure_tensorflow()
         from tensorflow.keras import backend as K
 
         fit_info = collections.defaultdict(list)
@@ -579,6 +582,7 @@ class Class1NeuralNetwork(object):
         }
 
         def wrapped_generator():
+            configure_tensorflow()
             import tensorflow as tf
             for (alleles, peptides, affinities) in generator:
                 (allele_encoding_input, _) = (
@@ -731,6 +735,7 @@ class Class1NeuralNetwork(object):
             How often (in seconds) to print progress update. Set to None to
             disable.
         """
+        configure_tensorflow()
         from tensorflow.keras import backend as K
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
@@ -1101,6 +1106,7 @@ class Class1NeuralNetwork(object):
             The merged neural network
 
         """
+        configure_tensorflow()
         from tensorflow.keras import backend as K
         from tensorflow.keras.layers import Input, average, add, concatenate
         from tensorflow.keras.models import Model
@@ -1250,7 +1256,7 @@ class Class1NeuralNetwork(object):
 
         # We import keras here to avoid tensorflow debug output, etc. unless we
         # are actually about to use Keras.
-
+        configure_tensorflow()
         from tensorflow import keras
         from tensorflow.keras.layers import (
             Input, Dense, Flatten, Dropout, Embedding, BatchNormalization)
@@ -1409,6 +1415,7 @@ class Class1NeuralNetwork(object):
                   l is the allele sequence length,
                   m is the length of the vectors used to represent amino acids
         """
+        configure_tensorflow()
         from tensorflow.keras.models import clone_model
 
         reshaped = allele_representations.reshape((

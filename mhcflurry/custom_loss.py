@@ -10,6 +10,9 @@ import pandas
 import numpy
 from numpy import isnan, array
 
+from .common import configure_tensorflow
+
+
 CUSTOM_LOSSES = {}
 
 
@@ -61,6 +64,7 @@ class Loss(object):
         raise NotImplementedError()
 
     def get_keras_loss(self, reduction="sum_over_batch_size"):
+        configure_tensorflow()
         from tensorflow.keras.losses import LossFunctionWrapper
         return LossFunctionWrapper(
             self.loss, reduction=reduction, name=self.name)
@@ -163,6 +167,7 @@ class MSEWithInequalities(Loss):
     def loss(self, y_true, y_pred):
         # We always delay import of Keras so that mhcflurry can be imported
         # initially without tensorflow debug output, etc.
+        configure_tensorflow()
         from tensorflow.keras import backend as K
         y_true = K.flatten(y_true)
         y_pred = K.flatten(y_pred)
@@ -244,6 +249,7 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
         return encoded
 
     def loss(self, y_true, y_pred):
+        configure_tensorflow()
         import tensorflow as tf
         y_true = tf.reshape(y_true, [-1])
 
@@ -291,6 +297,7 @@ class MultiallelicMassSpecLoss(Loss):
         return encoded.values
 
     def loss(self, y_true, y_pred):
+        configure_tensorflow()
         import tensorflow as tf
         y_true = tf.reshape(y_true, (-1,))
         pos = tf.boolean_mask(y_pred, tf.math.equal(y_true, 1.0))

@@ -11,6 +11,7 @@ import numpy
 from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
+from .common import configure_tensorflow
 
 
 class Class1ProcessingNeuralNetwork(object):
@@ -377,7 +378,7 @@ class Class1ProcessingNeuralNetwork(object):
 
         # We import keras here to avoid tensorflow debug output, etc. unless we
         # are actually about to use Keras.
-
+        configure_tensorflow()
         from tensorflow.keras.layers import (
             Input, Dense, Dropout, Concatenate, Conv1D, Lambda)
         from tensorflow.keras.models import Model
