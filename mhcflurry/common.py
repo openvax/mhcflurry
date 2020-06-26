@@ -68,7 +68,7 @@ def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
         config.inter_op_parallelism_threads = num_threads
         config.intra_op_parallelism_threads = num_threads
     session = tensorflow.compat.v1.Session(config=config)
-    tensorflow.compat.v1.tf.disable_v2_behavior()
+    tensorflow.compat.v1.disable_v2_behavior()
     tensorflow.compat.v1.keras.backend.set_session(session)
 
 
