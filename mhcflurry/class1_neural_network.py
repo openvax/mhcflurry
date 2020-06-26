@@ -546,7 +546,7 @@ class Class1NeuralNetwork(object):
 
         network.compile(
             loss=loss.loss, optimizer=self.hyperparameters['optimizer'])
-        network._make_predict_function()
+        network.make_predict_function()
         self.set_allele_representations(allele_representations)
 
         if self.hyperparameters['learning_rate'] is not None:
@@ -579,15 +579,16 @@ class Class1NeuralNetwork(object):
         }
 
         def wrapped_generator():
+            import tensorflow as tf
             for (alleles, peptides, affinities) in generator:
                 (allele_encoding_input, _) = (
                     self.allele_encoding_to_network_input(alleles))
                 x_dict = {
-                    'peptide': self.peptides_to_network_input(peptides),
-                    'allele': allele_encoding_input,
+                    'peptide': tf.convert_to_tensor(self.peptides_to_network_input(peptides)),
+                    'allele': tf.convert_to_tensor(allele_encoding_input),
                 }
                 y_dict = {
-                    'output': from_ic50(affinities)
+                    'output': tf.convert_to_tensor(from_ic50(affinities))
                 }
                 yield (x_dict, y_dict)
                 mutable_generator_state['yielded_values'] += len(affinities)
@@ -616,7 +617,7 @@ class Class1NeuralNetwork(object):
         epoch = 1
         while True:
             epoch_start_time = time.time()
-            fit_history = network.fit_generator(
+            fit_history = network.fit(
                 iterator,
                 steps_per_epoch=steps_per_epoch,
                 initial_epoch=epoch - 1,
@@ -1384,7 +1385,7 @@ class Class1NeuralNetwork(object):
         layer = original_model.get_layer("allele_representation")
         existing_weights_shape = (layer.input_dim, layer.output_dim)
         self.set_allele_representations(
-            numpy.zeros(shape=(0,) + existing_weights_shape[1:]),
+            numpy.zeros(shape=(1,) + existing_weights_shape[1:]),
             force_surgery=True)
 
     def set_allele_representations(self, allele_representations, force_surgery=False):
