@@ -582,17 +582,15 @@ class Class1NeuralNetwork(object):
         }
 
         def wrapped_generator():
-            configure_tensorflow()
-            import tensorflow as tf
             for (alleles, peptides, affinities) in generator:
                 (allele_encoding_input, _) = (
                     self.allele_encoding_to_network_input(alleles))
                 x_dict = {
-                    'peptide': tf.convert_to_tensor(self.peptides_to_network_input(peptides)),
-                    'allele': tf.convert_to_tensor(allele_encoding_input),
+                    'peptide': self.peptides_to_network_input(peptides),
+                    'allele': allele_encoding_input,
                 }
                 y_dict = {
-                    'output': tf.convert_to_tensor(from_ic50(affinities))
+                    'output': from_ic50(affinities)
                 }
                 yield (x_dict, y_dict)
                 mutable_generator_state['yielded_values'] += len(affinities)
