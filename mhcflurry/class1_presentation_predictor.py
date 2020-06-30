@@ -86,6 +86,27 @@ class Class1PresentationPredictor(object):
         """
         return self.affinity_predictor.supported_peptide_lengths
 
+    @property
+    def supports_affinity_prediction(self):
+        """Is there an affinity predictor associated with this instance?"""
+        return self.affinity_predictor is not None
+
+    @property
+    def supports_processing_prediction(self):
+        """Is there a processing predictor associated with this instance?"""
+        return (
+            self.processing_predictor_with_flanks is not None or
+            self.processing_predictor_without_flanks is not None)
+
+    @property
+    def supports_presentation_prediction(self):
+        """Can this instance predict presentation?"""
+        return (
+            self.supports_affinity_prediction and
+            self.supports_processing_prediction and
+            self.weights_dataframe is not None)
+
+
     def predict_affinity(
             self,
             peptides,
@@ -508,12 +529,15 @@ class Class1PresentationPredictor(object):
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
 
-        processing_scores = self.predict_processing(
-            peptides=peptides,
-            n_flanks=n_flanks,
-            c_flanks=c_flanks,
-            throw=throw,
-            verbose=verbose)
+        if self.supports_processing_prediction:
+            processing_scores = self.predict_processing(
+                peptides=peptides,
+                n_flanks=n_flanks,
+                c_flanks=c_flanks,
+                throw=throw,
+                verbose=verbose)
+        else:
+            processing_scores = None
 
         if alleles:
             df = self.predict_affinity(
@@ -531,18 +555,25 @@ class Class1PresentationPredictor(object):
                 "peptide_num": numpy.arange(len(peptides)),
                 "peptide": peptides,
             })
+            df["sample_name"] = "sample1"
 
-        df["processing_score"] = df.peptide_num.map(
-            pandas.Series(processing_scores))
-        if c_flanks is not None:
-            df.insert(1, "c_flank", df.peptide_num.map(pandas.Series(c_flanks)))
-        if n_flanks is not None:
-            df.insert(1, "n_flank", df.peptide_num.map(pandas.Series(n_flanks)))
+        if processing_scores is not None:
+            df["processing_score"] = df.peptide_num.map(
+                pandas.Series(processing_scores))
+            if c_flanks is not None:
+                df.insert(1, "c_flank", df.peptide_num.map(pandas.Series(c_flanks)))
+            if n_flanks is not None:
+                df.insert(1, "n_flank", df.peptide_num.map(pandas.Series(n_flanks)))
 
-        model_name = 'with_flanks' if n_flanks is not None else "without_flanks"
-        model = self.get_model(model_name)
-        if "affinity_score" in df.columns:
+        predict_presentation = (
+                "affinity_score" in df.columns and
+                "processing_score" in df.columns and
+                self.supports_presentation_prediction)
+        if predict_presentation:
             if len(df) > 0:
+                model_name = 'with_flanks' if n_flanks is not None else \
+                    "without_flanks"
+                model = self.get_model(model_name)
                 input_matrix = df[self.model_inputs]
                 null_mask = None
                 if not throw:
@@ -652,18 +683,46 @@ class Class1PresentationPredictor(object):
         if len(alleles) == 0:
             alleles = {}
 
+        if len(alleles) > 0 and not self.supports_affinity_prediction:
+            raise ValueError(
+                "Affinity prediction not supported by this predictor")
+
         if comparison_quantity is None:
-            comparison_quantity = (
-                "presentation_score"
-                if len(alleles) > 0 else "processing_score")
+            if len(alleles) > 0:
+                if self.supports_presentation_prediction:
+                    comparison_quantity = "presentation_score"
+                else:
+                    comparison_quantity = "affinity"
+            else:
+                comparison_quantity = "processing_score"
+
+        if comparison_quantity == "presentation_score":
+            if not self.supports_presentation_prediction:
+                raise ValueError(
+                    "Presentation prediction not supported by this predictor")
+        elif comparison_quantity == "processing_score":
+            if not self.supports_processing_prediction:
+                raise ValueError(
+                    "Processing prediction not supported by this predictor")
+        elif comparison_quantity in ("affinity", "affinity_percentile"):
+            if not self.supports_affinity_prediction:
+                raise ValueError(
+                    "Affinity prediction not supported by this predictor")
+        else:
+            raise ValueError(
+                "Unknown comparison quantity: %s" % comparison_quantity)
 
         processing_predictor = self.processing_predictor_with_flanks
         if not use_flanks or processing_predictor is None:
             processing_predictor = self.processing_predictor_without_flanks
 
-        supported_sequence_lengths = processing_predictor.sequence_lengths
-        n_flank_length = supported_sequence_lengths["n_flank"]
-        c_flank_length = supported_sequence_lengths["c_flank"]
+        if processing_predictor is not None:
+            supported_sequence_lengths = processing_predictor.sequence_lengths
+            n_flank_length = supported_sequence_lengths["n_flank"]
+            c_flank_length = supported_sequence_lengths["c_flank"]
+        else:
+            n_flank_length = 0
+            c_flank_length = 0
 
         sequence_names = []
         n_flanks = [] if use_flanks else None
