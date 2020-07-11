@@ -252,7 +252,7 @@ def run():
 def do_job(tasks, constant_data=GLOBAL_DATA):
     # Nested functions are so that the do_job function can be pickled for
     # running on an HPC cluster.
-    global GLOBAL_DATA
+    GLOBAL_DATA = constant_data
 
     def do_task(task_num, allele, out_dir, constant_data=GLOBAL_DATA):
         args = constant_data['args']
