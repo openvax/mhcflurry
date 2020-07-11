@@ -250,168 +250,167 @@ def run():
 
 
 def do_job(tasks, constant_data=GLOBAL_DATA):
-    return [
-        do_task(constant_data=constant_data, **task) for task in tasks
-    ]
+    # Nested functions are so that the do_job function can be pickled for
+    # running on an HPC cluster.
+    global GLOBAL_DATA
 
+    def do_task(task_num, allele, out_dir, constant_data=GLOBAL_DATA):
+        args = constant_data['args']
+        normalized_frequency_matrices = constant_data[
+            'normalized_frequency_matrices'
+        ]
+        length_distributions = constant_data[
+            'length_distributions'
+        ]
+        train_data = constant_data[
+            'train_data'
+        ]
 
-def do_task(task_num, allele, out_dir, constant_data=GLOBAL_DATA):
-    args = constant_data['args']
-    normalized_frequency_matrices = constant_data[
-        'normalized_frequency_matrices'
-    ]
-    length_distributions = constant_data[
-        'length_distributions'
-    ]
-    train_data = constant_data[
-        'train_data'
-    ]
-
-    logo_filename = write_logo(
-        normalized_frequency_matrices,
-        allele=allele,
-        lengths=args.logo_lengths,
-        cutoff=args.logo_cutoff,
-        models_label="standard",
-        out_dir=out_dir,
-    )
-
-    length_distribution_filename = write_length_distribution(
-        length_distributions,
-        allele=allele,
-        lengths=args.length_distribution_lengths,
-        cutoff=args.length_cutoff,
-        models_label="standard",
-        out_dir=out_dir)
-
-    train_data_filename = write_train_data(
-        train_data,
-        allele=allele,
-        models_label="standard",
-        out_dir=out_dir)
-
-
-    return {
-        'task_num': task_num,
-        'allele': allele,
-        'logo_filename': logo_filename,
-        'length_distribution_filename': length_distribution_filename,
-        'train_data_filename': train_data_filename,
-    }
-
-
-def write_logo(
-        normalized_frequency_matrices,
-        allele,
-        lengths,
-        cutoff,
-        models_label,
-        out_dir):
-
-    import seaborn
-    from matplotlib import pyplot
-    import logomaker
-    import os
-    from mhcflurry.amino_acid import COMMON_AMINO_ACIDS
-
-    amino_acids = sorted(COMMON_AMINO_ACIDS)
-
-    fig = pyplot.figure(figsize=(8,10))
-
-    for (i, length) in enumerate(lengths):
-        ax = pyplot.subplot(len(lengths), 1, i + 1)
-        matrix = normalized_frequency_matrices.loc[
-            (normalized_frequency_matrices.allele == allele) &
-            (normalized_frequency_matrices.length == length) &
-            (normalized_frequency_matrices.cutoff_fraction == cutoff)
-        ].set_index("position")[amino_acids]
-        if matrix.shape[0] == 0:
-            return None
-
-        matrix = (matrix.T / matrix.sum(1)).T  # row normalize
-
-        ss_logo = logomaker.Logo(
-            matrix,
-            color_scheme="NajafabadiEtAl2017",
-            font_name="Arial",
-            width=.8,
-            vpad=.05,
-            fade_probabilities=True,
-            stack_order='small_on_top',
-            ax=ax,
+        logo_filename = write_logo(
+            normalized_frequency_matrices,
+            allele=allele,
+            lengths=args.logo_lengths,
+            cutoff=args.logo_cutoff,
+            models_label="standard",
+            out_dir=out_dir,
         )
-        pyplot.title(
-            "%s %d-mer" % (allele, length), y=0.85)
-        pyplot.xticks(matrix.index.values)
-        seaborn.despine()
 
-    pyplot.tight_layout()
-    name = "%s.motifs.%s.png" % (
-        allele.replace("*", "-").replace(":", "-"), models_label)
-    filename = os.path.abspath(os.path.join(out_dir, name))
-    pyplot.savefig(filename)
-    print("Wrote: ", filename)
-    fig.clear()
-    pyplot.close(fig)
-    return name
+        length_distribution_filename = write_length_distribution(
+            length_distributions,
+            allele=allele,
+            lengths=args.length_distribution_lengths,
+            cutoff=args.length_cutoff,
+            models_label="standard",
+            out_dir=out_dir)
 
-
-def write_length_distribution(
-        length_distributions_df, allele, lengths, cutoff, models_label, out_dir):
-
-    from matplotlib import pyplot
-    import seaborn
-    import os
-
-    length_distribution = length_distributions_df.loc[
-        (length_distributions_df.allele == allele) &
-        (length_distributions_df.cutoff_fraction == cutoff)
-    ]
-    if length_distribution.shape[0] == 0:
-        return None
-
-    length_distribution = length_distribution.set_index(
-        "length").reindex(lengths).fillna(0.0).reset_index()
-
-    length_distribution.plot(
-        x="length", y="fraction", kind="bar", figsize=(5, 3))
-    fig = pyplot.gcf()
-    pyplot.title("%s" % allele, fontsize=10)
-    pyplot.xlabel("Peptide length", fontsize=10)
-    pyplot.xticks(rotation=0)
-    pyplot.ylim(ymin=0, ymax=1.0)
-    pyplot.ylabel("Fraction of top %0.1f%%" % (cutoff * 100.0), fontsize=10)
-    pyplot.gca().get_legend().remove()
-    pyplot.tight_layout()
-
-    seaborn.despine()
-
-    name = "%s.lengths.%s.png" % (
-        allele.replace("*", "-").replace(":", "-"), models_label)
-
-    filename = os.path.abspath(os.path.join(out_dir, name))
-    pyplot.savefig(filename)
-    print("Wrote: ", filename)
-    fig.clear()
-    pyplot.close(fig)
-    return name
+        train_data_filename = write_train_data(
+            train_data,
+            allele=allele,
+            models_label="standard",
+            out_dir=out_dir)
 
 
-def write_train_data(train_data, allele, models_label, out_dir):
-    import os
-    sub_train = train_data.loc[
-        train_data.allele == allele
-    ]
+        return {
+            'task_num': task_num,
+            'allele': allele,
+            'logo_filename': logo_filename,
+            'length_distribution_filename': length_distribution_filename,
+            'train_data_filename': train_data_filename,
+        }
 
-    filename = None
-    if sub_train.shape[0] > 0:
-        name = "%s.train_data.%s.csv" % (
+
+    def write_logo(
+            normalized_frequency_matrices,
+            allele,
+            lengths,
+            cutoff,
+            models_label,
+            out_dir):
+
+        import seaborn
+        from matplotlib import pyplot
+        import logomaker
+        import os
+        from mhcflurry.amino_acid import COMMON_AMINO_ACIDS
+
+        amino_acids = sorted(COMMON_AMINO_ACIDS)
+
+        fig = pyplot.figure(figsize=(8,10))
+
+        for (i, length) in enumerate(lengths):
+            ax = pyplot.subplot(len(lengths), 1, i + 1)
+            matrix = normalized_frequency_matrices.loc[
+                (normalized_frequency_matrices.allele == allele) &
+                (normalized_frequency_matrices.length == length) &
+                (normalized_frequency_matrices.cutoff_fraction == cutoff)
+            ].set_index("position")[amino_acids]
+            if matrix.shape[0] == 0:
+                return None
+
+            matrix = (matrix.T / matrix.sum(1)).T  # row normalize
+
+            ss_logo = logomaker.Logo(
+                matrix,
+                color_scheme="NajafabadiEtAl2017",
+                font_name="Arial",
+                width=.8,
+                vpad=.05,
+                fade_probabilities=True,
+                stack_order='small_on_top',
+                ax=ax,
+            )
+            pyplot.title(
+                "%s %d-mer" % (allele, length), y=0.85)
+            pyplot.xticks(matrix.index.values)
+            seaborn.despine()
+
+        pyplot.tight_layout()
+        name = "%s.motifs.%s.png" % (
             allele.replace("*", "-").replace(":", "-"), models_label)
         filename = os.path.abspath(os.path.join(out_dir, name))
-        sub_train.to_csv(filename, index=False)
+        pyplot.savefig(filename)
         print("Wrote: ", filename)
-    return filename
+        fig.clear()
+        pyplot.close(fig)
+        return name
 
+
+    def write_length_distribution(
+            length_distributions_df, allele, lengths, cutoff, models_label, out_dir):
+
+        from matplotlib import pyplot
+        import seaborn
+        import os
+
+        length_distribution = length_distributions_df.loc[
+            (length_distributions_df.allele == allele) &
+            (length_distributions_df.cutoff_fraction == cutoff)
+        ]
+        if length_distribution.shape[0] == 0:
+            return None
+
+        length_distribution = length_distribution.set_index(
+            "length").reindex(lengths).fillna(0.0).reset_index()
+
+        length_distribution.plot(
+            x="length", y="fraction", kind="bar", figsize=(5, 3))
+        fig = pyplot.gcf()
+        pyplot.title("%s" % allele, fontsize=10)
+        pyplot.xlabel("Peptide length", fontsize=10)
+        pyplot.xticks(rotation=0)
+        pyplot.ylim(ymin=0, ymax=1.0)
+        pyplot.ylabel("Fraction of top %0.1f%%" % (cutoff * 100.0), fontsize=10)
+        pyplot.gca().get_legend().remove()
+        pyplot.tight_layout()
+
+        seaborn.despine()
+
+        name = "%s.lengths.%s.png" % (
+            allele.replace("*", "-").replace(":", "-"), models_label)
+
+        filename = os.path.abspath(os.path.join(out_dir, name))
+        pyplot.savefig(filename)
+        print("Wrote: ", filename)
+        fig.clear()
+        pyplot.close(fig)
+        return name
+
+    def write_train_data(train_data, allele, models_label, out_dir):
+        import os
+        sub_train = train_data.loc[
+            train_data.allele == allele
+        ]
+
+        filename = None
+        if sub_train.shape[0] > 0:
+            name = "%s.train_data.%s.csv" % (
+                allele.replace("*", "-").replace(":", "-"), models_label)
+            filename = os.path.abspath(os.path.join(out_dir, name))
+            sub_train.to_csv(filename, index=False)
+            print("Wrote: ", filename)
+        return filename
+
+    return [do_task(constant_data=constant_data, **task) for task in tasks]
 
 if __name__ == '__main__':
     run()
