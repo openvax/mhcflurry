@@ -59,6 +59,26 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
+####### GENERATION OF BINDING MOTIFS AND OTHER ARTIFACTS #######
+
+if [ "$2" == "continue-incomplete" ] && [ -f "motifs/artifacts.csv" ]
+then
+    echo "Reusing existing artifacts"
+else
+    echo "Using affinity predictor:"
+    cat "$(mhcflurry-downloads path models_class1_pan)/models.combined/info.txt"
+
+    mkdir motifs
+    cp "$(mhcflurry-downloads path models_class1_pan)/models.combined/info.txt" motifs/
+
+    cp $SCRIPT_DIR/generate_artifacts.py .
+    time python generate_artifacts.py \
+        --affinity-predictor "$(mhcflurry-downloads path models_class1_pan)/models.combined" \
+        --out "$(pwd)/motifs" \
+        $PARALLELISM_ARGS
+fi
+
+####### EVALUATION ON MODEL SELECTION DATA #######
 
 if [ "$2" == "continue-incomplete" ] && [ -f "model_selection_with_decoys.csv.bz2" ]
 then
@@ -106,6 +126,7 @@ else
         $PARALLELISM_ARGS
     bzip2 -f model_selection_with_decoys.predictions.unselected.csv
 fi
+
 
 cp $SCRIPT_ABSOLUTE_PATH .
 bzip2 -f "$LOG"
