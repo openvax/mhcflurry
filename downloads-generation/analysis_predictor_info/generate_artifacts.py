@@ -283,12 +283,11 @@ def do_job(tasks, constant_data=GLOBAL_DATA):
             models_label="standard",
             out_dir=out_dir)
 
-        train_data_filename = write_train_data(
+        (train_data_filename, num_train_points) = write_train_data(
             train_data,
             allele=allele,
             models_label="standard",
             out_dir=out_dir)
-
 
         return {
             'task_num': task_num,
@@ -296,6 +295,7 @@ def do_job(tasks, constant_data=GLOBAL_DATA):
             'logo_filename': logo_filename,
             'length_distribution_filename': length_distribution_filename,
             'train_data_filename': train_data_filename,
+            'num_train_points': num_train_points,
         }
 
 
@@ -401,14 +401,14 @@ def do_job(tasks, constant_data=GLOBAL_DATA):
             train_data.allele == allele
         ]
 
-        filename = None
+        name = None
         if sub_train.shape[0] > 0:
             name = "%s.train_data.%s.csv" % (
                 allele.replace("*", "-").replace(":", "-"), models_label)
             filename = os.path.abspath(os.path.join(out_dir, name))
             sub_train.to_csv(filename, index=False)
             print("Wrote: ", filename)
-        return filename
+        return (name, len(sub_train))
 
     return [do_task(constant_data=constant_data, **task) for task in tasks]
 
