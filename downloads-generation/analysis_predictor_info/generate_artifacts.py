@@ -228,12 +228,6 @@ def run():
 
     artifacts_df = pandas.DataFrame(task_results).T.set_index("task_num")
 
-    normalized_frequency_matrices_out = os.path.join(
-        args.out, "normalized_frequency_matrices.csv")
-    normalized_frequency_matrices.to_csv(
-        normalized_frequency_matrices_out, index=False)
-    print("Wrote: ", normalized_frequency_matrices_out)
-
     length_distributions_out = os.path.join(args.out,
         "length_distributions.csv")
     length_distributions.to_csv(length_distributions_out,
