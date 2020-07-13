@@ -49,7 +49,7 @@ releases:
 
           - name: analysis_predictor_info
             url: https://github.com/openvax/mhcflurry/releases/download/pre-2.0/analysis_predictor_info.20200711.tar.bz2
-            defaultl: false
+            default: false
 
           - name: data_predictions
             part_urls:
