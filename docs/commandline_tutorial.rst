@@ -87,6 +87,33 @@ processing or presentation scores, you may also want to pass the upstream and
 downstream sequences of the peptides from their source proteins for potentially more
 accurate cleavage prediction. See the :ref:`mhcflurry-predict` docs.
 
+
+Using the older, allele-specific models
+-------------------------------------------
+
+Previous versions of MHCflurry (described in the 2018 paper) used models
+trained on affinity measurements, one allele per model (i.e. allele-specific).
+Mass spec datasets were incorporated in the model selection step.
+
+These models are still available to use with the latest version of MHCflurry.
+To download these predictors, run:
+
+.. code-block:: shell
+
+    $ mhcflurry-downloads fetch models_class1
+
+and specify ``--models`` when you call ``mhcflurry-predict``:
+
+
+.. code-block:: shell
+
+    $ mhcflurry-predict \
+        --alleles HLA-A0201 HLA-A0301 \
+        --peptides SIINFEKL SIINFEKD SIINFEKQ \
+        --models "$(mhcflurry-downloads path models_class1)/models"
+        --out /tmp/predictions.csv
+
+
 Scanning protein sequences for predicted MHC I ligands
 -------------------------------------------------
 
