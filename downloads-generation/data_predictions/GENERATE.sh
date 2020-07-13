@@ -21,8 +21,10 @@
 # reuse-predictions - reuse predictions but not peptide or allele lists. Any
 #                     new peptides not already included will be run.
 # reuse-predictions-except-mhcflurry
-#                   - Reuse predictions except for mhcflurry.
-#
+#                   - Reuse predictions except for mhcflurry [1].
+# 
+# [1] In an earlier version, this download also included predictions for MHCflurry. This is
+# no longer the case.
 set -e
 set -x
 
