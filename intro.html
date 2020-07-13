@@ -1,15 +1,18 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Introduction and setup &mdash; MHCflurry 1.6.0 documentation</title>
+  <title>Introduction and setup &mdash; MHCflurry 2.0.0 documentation</title>
   
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
 
   
   
@@ -17,7 +20,9 @@
   
 
   
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -29,10 +34,6 @@
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Command-line tutorial" href="commandline_tutorial.html" />
     <link rel="prev" title="MHCflurry documentation" href="index.html" /> 
@@ -49,7 +50,7 @@
           
 
           
-            <a href="index.html" class="icon icon-home"> MHCflurry
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> MHCflurry
           
 
           
@@ -59,7 +60,7 @@
             
             
               <div class="version">
-                1.6.0
+                2.0.0
               </div>
             
           
@@ -76,6 +77,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -98,6 +100,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -136,7 +139,7 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="index.html">Docs</a> &raquo;</li>
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
         
       <li>Introduction and setup</li>
     
@@ -175,11 +178,13 @@ models are trained on mass spec-identified MHC ligands.</p>
 <p>MHCflurry supports Python 3.4+. It uses the <a class="reference external" href="https://keras.io">keras</a>
 neural network library via either the Tensorflow or Theano backends. GPUs may
 optionally be used for a modest speed improvement.</p>
-<p>If you find MHCflurry useful in your research please cite:</p>
+<p>If you find MHCflurry useful in your research, please cite:</p>
 <blockquote>
-<div><p>T. J. O’Donnell, et al., “MHCflurry: Open-Source Class I MHC Binding Affinity
-Prediction,” <em>Cell Systems</em>, 2018.
-<a class="reference external" href="https://www.cell.com/cell-systems/fulltext/S2405-4712(18)30232-1">https://www.cell.com/cell-systems/fulltext/S2405-4712(18)30232-1</a>.</p>
+<div><p>T. J. O’Donnell, et al. “MHCflurry 2.0: Improved pan-allele prediction of MHC
+I-presented peptides by incorporating antigen processing,”
+<em>Cell Systems</em>, 2020. <a class="reference external" href="https://doi.org/10.1016/j.cels.2020.06.010">https://doi.org/10.1016/j.cels.2020.06.010</a></p>
+<p>T. J. O’Donnell, et al., “MHCflurry: Open-Source Class I MHC Binding Affinity
+Prediction,” <em>Cell Systems</em>, 2018. <a class="reference external" href="https://doi.org/10.1016/j.cels.2018.05.014">https://doi.org/10.1016/j.cels.2018.05.014</a></p>
 </div></blockquote>
 <p>If you have questions or encounter problems, please file an issue at the
 MHCflurry github repo: <a class="reference external" href="https://github.com/openvax/mhcflurry">https://github.com/openvax/mhcflurry</a></p>
@@ -204,7 +209,7 @@ $ nosetests .
 <p>You can alternatively get up and running with a <a class="reference external" href="https://conda.io/docs/">conda</a>
 environment as follows. Some users have reported that this can avoid problems installing
 tensorflow.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ conda create -q -n mhcflurry-env <span class="nv">python</span><span class="o">=</span><span class="m">3</span>.6 <span class="s1">&#39;tensorflow&lt;2.0.0&#39;</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ conda create -q -n mhcflurry-env <span class="nv">python</span><span class="o">=</span><span class="m">3</span>.8 tensorflow
 $ <span class="nb">source</span> activate mhcflurry-env
 </pre></div>
 </div>
@@ -236,14 +241,22 @@ $ mhcflurry-downloads fetch
 
   <div role="contentinfo">
     <p>
+        
         &copy; Copyright Timothy O&#39;Donnell
       <span class="lastupdated">
-        Last updated on Mar 23, 2020.
+        Last updated on Jul 13, 2020.
       </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -254,7 +267,6 @@ $ mhcflurry-downloads fetch
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

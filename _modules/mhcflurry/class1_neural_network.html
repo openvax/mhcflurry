@@ -1,15 +1,18 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.class1_neural_network &mdash; MHCflurry 1.6.0 documentation</title>
+  <title>mhcflurry.class1_neural_network &mdash; MHCflurry 2.0.0 documentation</title>
   
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
 
   
   
@@ -17,7 +20,9 @@
   
 
   
-  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -29,10 +34,6 @@
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
@@ -47,7 +48,7 @@
           
 
           
-            <a href="../../index.html" class="icon icon-home"> MHCflurry
+            <a href="../../index.html" class="icon icon-home" alt="Documentation Home"> MHCflurry
           
 
           
@@ -57,7 +58,7 @@
             
             
               <div class="version">
-                1.6.0
+                2.0.0
               </div>
             
           
@@ -74,6 +75,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -92,6 +94,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -130,7 +133,7 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="../../index.html">Docs</a> &raquo;</li>
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
         
           <li><a href="../index.html">Module code</a> &raquo;</li>
         
@@ -163,14 +166,14 @@
 <span class="kn">import</span> <span class="nn">numpy</span>
 <span class="kn">import</span> <span class="nn">pandas</span>
 
-<span class="kn">from</span> <span class="nn">.hyperparameters</span> <span class="k">import</span> <span class="n">HyperparameterDefaults</span>
-<span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span><span class="p">,</span> <span class="n">EncodingError</span>
-<span class="kn">from</span> <span class="nn">.allele_encoding</span> <span class="k">import</span> <span class="n">AlleleEncoding</span>
-<span class="kn">from</span> <span class="nn">.regression_target</span> <span class="k">import</span> <span class="n">to_ic50</span><span class="p">,</span> <span class="n">from_ic50</span>
-<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">random_peptides</span><span class="p">,</span> <span class="n">amino_acid_distribution</span>
-<span class="kn">from</span> <span class="nn">.custom_loss</span> <span class="k">import</span> <span class="n">get_loss</span>
-<span class="kn">from</span> <span class="nn">.data_dependent_weights_initialization</span> <span class="k">import</span> <span class="n">lsuv_init</span>
-<span class="kn">from</span> <span class="nn">.random_negative_peptides</span> <span class="k">import</span> <span class="n">RandomNegativePeptides</span>
+<span class="kn">from</span> <span class="nn">.hyperparameters</span> <span class="kn">import</span> <span class="n">HyperparameterDefaults</span>
+<span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="kn">import</span> <span class="n">EncodableSequences</span><span class="p">,</span> <span class="n">EncodingError</span>
+<span class="kn">from</span> <span class="nn">.allele_encoding</span> <span class="kn">import</span> <span class="n">AlleleEncoding</span>
+<span class="kn">from</span> <span class="nn">.regression_target</span> <span class="kn">import</span> <span class="n">to_ic50</span><span class="p">,</span> <span class="n">from_ic50</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="kn">import</span> <span class="n">configure_tensorflow</span>
+<span class="kn">from</span> <span class="nn">.custom_loss</span> <span class="kn">import</span> <span class="n">get_loss</span>
+<span class="kn">from</span> <span class="nn">.data_dependent_weights_initialization</span> <span class="kn">import</span> <span class="n">lsuv_init</span>
+<span class="kn">from</span> <span class="nn">.random_negative_peptides</span> <span class="kn">import</span> <span class="n">RandomNegativePeptides</span>
 
 
 <span class="n">DEFAULT_PREDICT_BATCH_SIZE</span> <span class="o">=</span> <span class="mi">4096</span>
@@ -320,7 +323,7 @@
                     <span class="n">hyperparameters</span><span class="p">[</span><span class="n">to_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
         <span class="k">return</span> <span class="n">hyperparameters</span></div>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">hyperparameters</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">hyperparameters</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameter_defaults</span><span class="o">.</span><span class="n">with_defaults</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">apply_hyperparameter_renames</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">))</span>
 
@@ -371,8 +374,9 @@
         <span class="n">key</span> <span class="o">=</span> <span class="n">klass</span><span class="o">.</span><span class="n">keras_network_cache_key</span><span class="p">(</span><span class="n">network_json</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">klass</span><span class="o">.</span><span class="n">KERAS_MODELS_CACHE</span><span class="p">:</span>
             <span class="c1"># Cache miss.</span>
-            <span class="kn">import</span> <span class="nn">keras.models</span>
-            <span class="n">network</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">model_from_json</span><span class="p">(</span><span class="n">network_json</span><span class="p">)</span>
+            <span class="n">configure_tensorflow</span><span class="p">()</span>
+            <span class="kn">from</span> <span class="nn">tensorflow.keras.models</span> <span class="kn">import</span> <span class="n">model_from_json</span>
+            <span class="n">network</span> <span class="o">=</span> <span class="n">model_from_json</span><span class="p">(</span><span class="n">network_json</span><span class="p">)</span>
             <span class="n">existing_weights</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Cache hit.</span>
@@ -410,7 +414,8 @@
                     <span class="bp">self</span><span class="o">.</span><span class="n">network_json</span><span class="p">,</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="kn">import</span> <span class="nn">keras.models</span>
+                <span class="n">configure_tensorflow</span><span class="p">()</span>
+                <span class="kn">from</span> <span class="nn">tensorflow</span> <span class="kn">import</span> <span class="n">keras</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_network</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">model_from_json</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">network_json</span><span class="p">)</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">_network</span><span class="o">.</span><span class="n">set_weights</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">network_weights</span><span class="p">)</span>
@@ -678,7 +683,8 @@
 <span class="sd">        progress_preamble : string</span>
 <span class="sd">        progress_print_interval : float</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="kn">from</span> <span class="nn">keras</span> <span class="k">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
+        <span class="n">configure_tensorflow</span><span class="p">()</span>
+        <span class="kn">from</span> <span class="nn">tensorflow.keras</span> <span class="kn">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
 
         <span class="n">fit_info</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
 
@@ -698,7 +704,7 @@
 
         <span class="n">network</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
             <span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="o">.</span><span class="n">loss</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;optimizer&#39;</span><span class="p">])</span>
-        <span class="n">network</span><span class="o">.</span><span class="n">_make_predict_function</span><span class="p">()</span>
+        <span class="n">network</span><span class="o">.</span><span class="n">make_predict_function</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">set_allele_representations</span><span class="p">(</span><span class="n">allele_representations</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;learning_rate&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -768,7 +774,7 @@
         <span class="n">epoch</span> <span class="o">=</span> <span class="mi">1</span>
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
             <span class="n">epoch_start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-            <span class="n">fit_history</span> <span class="o">=</span> <span class="n">network</span><span class="o">.</span><span class="n">fit_generator</span><span class="p">(</span>
+            <span class="n">fit_history</span> <span class="o">=</span> <span class="n">network</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
                 <span class="n">iterator</span><span class="p">,</span>
                 <span class="n">steps_per_epoch</span><span class="o">=</span><span class="n">steps_per_epoch</span><span class="p">,</span>
                 <span class="n">initial_epoch</span><span class="o">=</span><span class="n">epoch</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
@@ -882,7 +888,8 @@
 <span class="sd">            How often (in seconds) to print progress update. Set to None to</span>
 <span class="sd">            disable.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="kn">from</span> <span class="nn">keras</span> <span class="k">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
+        <span class="n">configure_tensorflow</span><span class="p">()</span>
+        <span class="kn">from</span> <span class="nn">tensorflow.keras</span> <span class="kn">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
         <span class="n">encodable_peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
         <span class="n">peptide_encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">encodable_peptides</span><span class="p">)</span>
         <span class="n">fit_info</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
@@ -1252,10 +1259,10 @@
 <span class="sd">            The merged neural network</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="kn">import</span> <span class="nn">keras</span>
-        <span class="kn">import</span> <span class="nn">keras.backend</span> <span class="k">as</span> <span class="nn">K</span>
-        <span class="kn">from</span> <span class="nn">keras.layers</span> <span class="k">import</span> <span class="n">Input</span>
-        <span class="kn">from</span> <span class="nn">keras.models</span> <span class="k">import</span> <span class="n">Model</span>
+        <span class="n">configure_tensorflow</span><span class="p">()</span>
+        <span class="kn">from</span> <span class="nn">tensorflow.keras</span> <span class="kn">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
+        <span class="kn">from</span> <span class="nn">tensorflow.keras.layers</span> <span class="kn">import</span> <span class="n">Input</span><span class="p">,</span> <span class="n">average</span><span class="p">,</span> <span class="n">add</span><span class="p">,</span> <span class="n">concatenate</span>
+        <span class="kn">from</span> <span class="nn">tensorflow.keras.models</span> <span class="kn">import</span> <span class="n">Model</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">models</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">models</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -1325,7 +1332,9 @@
                         <span class="s2">&quot;allele_peptide_merged&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
                 <span class="p">]</span>
                 <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">layers</span><span class="p">:</span>
-                    <span class="n">layer</span><span class="o">.</span><span class="n">name</span> <span class="o">+=</span> <span class="s2">&quot;_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span>
+                    <span class="n">new_name</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">&quot;_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span>
+                    <span class="n">layer</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="n">new_name</span>
+                    <span class="k">assert</span> <span class="n">layer</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">new_name</span><span class="p">,</span> <span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">new_name</span><span class="p">)</span>
 
                 <span class="n">node</span> <span class="o">=</span> <span class="n">allele_peptide_merged</span>
                 <span class="n">layer_name_to_new_node</span> <span class="o">=</span> <span class="p">{</span>
@@ -1335,7 +1344,11 @@
                     <span class="k">assert</span> <span class="n">layer</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">layer_name_to_new_node</span>
                     <span class="n">input_layer_names</span> <span class="o">=</span> <span class="p">[]</span>
                     <span class="k">for</span> <span class="n">inbound_node</span> <span class="ow">in</span> <span class="n">layer</span><span class="o">.</span><span class="n">_inbound_nodes</span><span class="p">:</span>
-                        <span class="k">for</span> <span class="n">inbound_layer</span> <span class="ow">in</span> <span class="n">inbound_node</span><span class="o">.</span><span class="n">inbound_layers</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">inbound_layers</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">inbound_node</span><span class="o">.</span><span class="n">inbound_layers</span><span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+                            <span class="n">inbound_layers</span> <span class="o">=</span> <span class="p">[</span><span class="n">inbound_node</span><span class="o">.</span><span class="n">inbound_layers</span><span class="p">]</span>
+                        <span class="k">for</span> <span class="n">inbound_layer</span> <span class="ow">in</span> <span class="n">inbound_layers</span><span class="p">:</span>
                             <span class="n">input_layer_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">inbound_layer</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
                     <span class="n">input_nodes</span> <span class="o">=</span> <span class="p">[</span>
                         <span class="n">layer_name_to_new_node</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
@@ -1349,11 +1362,11 @@
                 <span class="n">sub_networks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">merge_method</span> <span class="o">==</span> <span class="s1">&#39;average&#39;</span><span class="p">:</span>
-                <span class="n">output</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">average</span><span class="p">(</span><span class="n">sub_networks</span><span class="p">)</span>
+                <span class="n">output</span> <span class="o">=</span> <span class="n">average</span><span class="p">(</span><span class="n">sub_networks</span><span class="p">)</span>
             <span class="k">elif</span> <span class="n">merge_method</span> <span class="o">==</span> <span class="s1">&#39;sum&#39;</span><span class="p">:</span>
-                <span class="n">output</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sub_networks</span><span class="p">)</span>
+                <span class="n">output</span> <span class="o">=</span> <span class="n">add</span><span class="p">(</span><span class="n">sub_networks</span><span class="p">)</span>
             <span class="k">elif</span> <span class="n">merge_method</span> <span class="o">==</span> <span class="s1">&#39;concatenate&#39;</span><span class="p">:</span>
-                <span class="n">output</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">layers</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">sub_networks</span><span class="p">)</span>
+                <span class="n">output</span> <span class="o">=</span> <span class="n">concatenate</span><span class="p">(</span><span class="n">sub_networks</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
                     <span class="s2">&quot;Unsupported merge method&quot;</span><span class="p">,</span> <span class="n">merge_method</span><span class="p">)</span>
@@ -1396,12 +1409,10 @@
 
         <span class="c1"># We import keras here to avoid tensorflow debug output, etc. unless we</span>
         <span class="c1"># are actually about to use Keras.</span>
-
-        <span class="kn">from</span> <span class="nn">keras.layers</span> <span class="k">import</span> <span class="n">Input</span>
-        <span class="kn">import</span> <span class="nn">keras.layers</span>
-        <span class="kn">from</span> <span class="nn">keras.layers.core</span> <span class="k">import</span> <span class="n">Dense</span><span class="p">,</span> <span class="n">Flatten</span><span class="p">,</span> <span class="n">Dropout</span>
-        <span class="kn">from</span> <span class="nn">keras.layers.embeddings</span> <span class="k">import</span> <span class="n">Embedding</span>
-        <span class="kn">from</span> <span class="nn">keras.layers.normalization</span> <span class="k">import</span> <span class="n">BatchNormalization</span>
+        <span class="n">configure_tensorflow</span><span class="p">()</span>
+        <span class="kn">from</span> <span class="nn">tensorflow</span> <span class="kn">import</span> <span class="n">keras</span>
+        <span class="kn">from</span> <span class="nn">tensorflow.keras.layers</span> <span class="kn">import</span> <span class="p">(</span>
+            <span class="n">Input</span><span class="p">,</span> <span class="n">Dense</span><span class="p">,</span> <span class="n">Flatten</span><span class="p">,</span> <span class="n">Dropout</span><span class="p">,</span> <span class="n">Embedding</span><span class="p">,</span> <span class="n">BatchNormalization</span><span class="p">)</span>
 
         <span class="n">peptide_encoding_shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">([])</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
         <span class="n">peptide_input</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span>
@@ -1533,7 +1544,7 @@
         <span class="n">layer</span> <span class="o">=</span> <span class="n">original_model</span><span class="o">.</span><span class="n">get_layer</span><span class="p">(</span><span class="s2">&quot;allele_representation&quot;</span><span class="p">)</span>
         <span class="n">existing_weights_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">input_dim</span><span class="p">,</span> <span class="n">layer</span><span class="o">.</span><span class="n">output_dim</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">set_allele_representations</span><span class="p">(</span>
-            <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">+</span> <span class="n">existing_weights_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,)</span> <span class="o">+</span> <span class="n">existing_weights_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span>
             <span class="n">force_surgery</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Class1NeuralNetwork.set_allele_representations"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1NeuralNetwork.set_allele_representations">[docs]</a>    <span class="k">def</span> <span class="nf">set_allele_representations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele_representations</span><span class="p">,</span> <span class="n">force_surgery</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
@@ -1557,9 +1568,8 @@
 <span class="sd">                  l is the allele sequence length,</span>
 <span class="sd">                  m is the length of the vectors used to represent amino acids</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="kn">from</span> <span class="nn">keras.models</span> <span class="k">import</span> <span class="n">clone_model</span>
-        <span class="kn">import</span> <span class="nn">keras.backend</span> <span class="k">as</span> <span class="nn">K</span>
-        <span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+        <span class="n">configure_tensorflow</span><span class="p">()</span>
+        <span class="kn">from</span> <span class="nn">tensorflow.keras.models</span> <span class="kn">import</span> <span class="n">clone_model</span>
 
         <span class="n">reshaped</span> <span class="o">=</span> <span class="n">allele_representations</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span>
             <span class="n">allele_representations</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
@@ -1624,14 +1634,22 @@
 
   <div role="contentinfo">
     <p>
+        
         &copy; Copyright Timothy O&#39;Donnell
       <span class="lastupdated">
-        Last updated on Mar 23, 2020.
+        Last updated on Jul 13, 2020.
       </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -1642,7 +1660,6 @@
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

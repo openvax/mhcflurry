@@ -1,15 +1,18 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.local_parallelism &mdash; MHCflurry 1.6.0 documentation</title>
+  <title>mhcflurry.local_parallelism &mdash; MHCflurry 2.0.0 documentation</title>
   
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
 
   
   
@@ -17,7 +20,9 @@
   
 
   
-  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -29,10 +34,6 @@
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
@@ -47,7 +48,7 @@
           
 
           
-            <a href="../../index.html" class="icon icon-home"> MHCflurry
+            <a href="../../index.html" class="icon icon-home" alt="Documentation Home"> MHCflurry
           
 
           
@@ -57,7 +58,7 @@
             
             
               <div class="version">
-                1.6.0
+                2.0.0
               </div>
             
           
@@ -74,6 +75,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -92,6 +94,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -130,7 +133,7 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="../../index.html">Docs</a> &raquo;</li>
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
         
           <li><a href="../index.html">Module code</a> &raquo;</li>
         
@@ -159,15 +162,15 @@
 <span class="kn">import</span> <span class="nn">sys</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">time</span>
-<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="k">import</span> <span class="n">Pool</span><span class="p">,</span> <span class="n">Queue</span><span class="p">,</span> <span class="n">cpu_count</span>
-<span class="kn">from</span> <span class="nn">six.moves</span> <span class="k">import</span> <span class="n">queue</span>
-<span class="kn">from</span> <span class="nn">multiprocessing.util</span> <span class="k">import</span> <span class="n">Finalize</span>
-<span class="kn">from</span> <span class="nn">pprint</span> <span class="k">import</span> <span class="n">pprint</span>
+<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="kn">import</span> <span class="n">Pool</span><span class="p">,</span> <span class="n">Queue</span><span class="p">,</span> <span class="n">cpu_count</span>
+<span class="kn">from</span> <span class="nn">six.moves</span> <span class="kn">import</span> <span class="n">queue</span>
+<span class="kn">from</span> <span class="nn">multiprocessing.util</span> <span class="kn">import</span> <span class="n">Finalize</span>
+<span class="kn">from</span> <span class="nn">pprint</span> <span class="kn">import</span> <span class="n">pprint</span>
 <span class="kn">import</span> <span class="nn">random</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span>
 
-<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">set_keras_backend</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="kn">import</span> <span class="n">configure_tensorflow</span>
 
 
 <div class="viewcode-block" id="add_local_parallelism_args"><a class="viewcode-back" href="../../api.html#mhcflurry.local_parallelism.add_local_parallelism_args">[docs]</a><span class="k">def</span> <span class="nf">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">):</span>
@@ -269,7 +272,7 @@
 
     <span class="k">if</span> <span class="n">num_jobs</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">backend</span><span class="p">:</span>
-            <span class="n">set_keras_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+            <span class="n">configure_tensorflow</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="n">worker_init_kwargs</span> <span class="o">=</span> <span class="p">[{}</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)]</span>
@@ -423,7 +426,7 @@
     <span class="k">if</span> <span class="n">keras_backend</span> <span class="ow">or</span> <span class="n">gpu_device_nums</span><span class="p">:</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;WORKER pid=</span><span class="si">%d</span><span class="s2"> assigned GPU devices: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
             <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">(),</span> <span class="n">gpu_device_nums</span><span class="p">))</span>
-        <span class="n">set_keras_backend</span><span class="p">(</span>
+        <span class="n">configure_tensorflow</span><span class="p">(</span>
             <span class="n">keras_backend</span><span class="p">,</span> <span class="n">gpu_device_nums</span><span class="o">=</span><span class="n">gpu_device_nums</span><span class="p">)</span></div>
 
 
@@ -433,11 +436,11 @@
 <span class="sd">    Add traceback info to exception so exceptions raised in worker processes</span>
 <span class="sd">    can still show traceback info when re-raised in the parent.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">exc_tb</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">exception</span> <span class="o">=</span> <span class="n">exc_value</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exception</span><span class="p">(</span><span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">))</span>
-    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="se">\n</span><span class="s1">Original traceback:</span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="ne">Exception</span><span class="o">.</span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span><span class="p">)</span></div>
 
 
@@ -492,14 +495,22 @@
 
   <div role="contentinfo">
     <p>
+        
         &copy; Copyright Timothy O&#39;Donnell
       <span class="lastupdated">
-        Last updated on Mar 23, 2020.
+        Last updated on Jul 13, 2020.
       </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -510,7 +521,6 @@
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

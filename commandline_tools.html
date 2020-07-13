@@ -1,15 +1,18 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Command-line reference &mdash; MHCflurry 1.6.0 documentation</title>
+  <title>Command-line reference &mdash; MHCflurry 2.0.0 documentation</title>
   
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
 
   
   
@@ -17,7 +20,9 @@
   
 
   
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -29,10 +34,6 @@
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="API Documentation" href="api.html" />
     <link rel="prev" title="Python library tutorial" href="python_tutorial.html" /> 
@@ -49,7 +50,7 @@
           
 
           
-            <a href="index.html" class="icon icon-home"> MHCflurry
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> MHCflurry
           
 
           
@@ -59,7 +60,7 @@
             
             
               <div class="version">
-                1.6.0
+                2.0.0
               </div>
             
           
@@ -76,6 +77,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -112,6 +114,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -150,7 +153,7 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="index.html">Docs</a> &raquo;</li>
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
         
       <li>Command-line reference</li>
     
@@ -199,135 +202,128 @@ returned. For example:</p>
 <p>$ mhcflurry-predict –peptides SIINFEKL DENDREKLLL     –alleles         HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:01,HLA-C*07:02         HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:01,HLA-C*03:01</p>
 <p>will give the tightest predicted affinities across alleles for each of the two
 genotypes specified for each peptide.</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-predict [-h] [--list-supported-alleles]</span>
-<span class="go">                         [--list-supported-peptide-lengths] [--version]</span>
-<span class="go">                         [--alleles ALLELE [ALLELE ...]]</span>
-<span class="go">                         [--peptides PEPTIDE [PEPTIDE ...]]</span>
-<span class="go">                         [--allele-column NAME] [--peptide-column NAME]</span>
-<span class="go">                         [--n-flank-column NAME] [--c-flank-column NAME]</span>
-<span class="go">                         [--no-throw] [--out OUTPUT.csv]</span>
-<span class="go">                         [--prediction-column-prefix NAME]</span>
-<span class="go">                         [--output-delimiter CHAR] [--no-affinity-percentile]</span>
-<span class="go">                         [--always-include-best-allele] [--models DIR]</span>
-<span class="go">                         [--affinity-only] [--no-flanking]</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-predict [-h] [--list-supported-alleles] [--list-supported-peptide-lengths] [--version] [--alleles ALLELE [ALLELE ...]]</span>
+<span class="go">                         [--peptides PEPTIDE [PEPTIDE ...]] [--allele-column NAME] [--peptide-column NAME] [--n-flank-column NAME] [--c-flank-column NAME]</span>
+<span class="go">                         [--no-throw] [--out OUTPUT.csv] [--prediction-column-prefix NAME] [--output-delimiter CHAR] [--no-affinity-percentile]</span>
+<span class="go">                         [--always-include-best-allele] [--models DIR] [--affinity-only] [--no-flanking]</span>
 <span class="go">                         [INPUT.csv]</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-arg-input">
 <code class="sig-name descname">input</code><code class="sig-prename descclassname">.csv</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-arg-input" title="Permalink to this definition">¶</a></dt>
 <dd><p>Input CSV</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-predict-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>Show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-list-supported-alleles">
 <code class="sig-name descname">--list-supported-alleles</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-list-supported-alleles" title="Permalink to this definition">¶</a></dt>
 <dd><p>Prints the list of supported alleles and exits</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-list-supported-peptide-lengths">
 <code class="sig-name descname">--list-supported-peptide-lengths</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-list-supported-peptide-lengths" title="Permalink to this definition">¶</a></dt>
 <dd><p>Prints the list of supported peptide lengths and exits</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-version">
 <code class="sig-name descname">--version</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-version" title="Permalink to this definition">¶</a></dt>
 <dd><p>show program’s version number and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-alleles">
 <code class="sig-name descname">--alleles</code><code class="sig-prename descclassname"> &lt;allele&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-alleles" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alleles to predict (exclusive with passing an input CSV)</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-peptides">
 <code class="sig-name descname">--peptides</code><code class="sig-prename descclassname"> &lt;peptide&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-peptides" title="Permalink to this definition">¶</a></dt>
 <dd><p>Peptides to predict (exclusive with passing an input CSV)</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-allele-column">
 <code class="sig-name descname">--allele-column</code><code class="sig-prename descclassname"> &lt;name&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-allele-column" title="Permalink to this definition">¶</a></dt>
 <dd><p>Input column name for alleles. Default: ‘allele’</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-peptide-column">
 <code class="sig-name descname">--peptide-column</code><code class="sig-prename descclassname"> &lt;name&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-peptide-column" title="Permalink to this definition">¶</a></dt>
 <dd><p>Input column name for peptides. Default: ‘peptide’</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-n-flank-column">
 <code class="sig-name descname">--n-flank-column</code><code class="sig-prename descclassname"> &lt;name&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-n-flank-column" title="Permalink to this definition">¶</a></dt>
 <dd><p>Column giving N-terminal flanking sequence. Default: ‘n_flank’</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-c-flank-column">
 <code class="sig-name descname">--c-flank-column</code><code class="sig-prename descclassname"> &lt;name&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-c-flank-column" title="Permalink to this definition">¶</a></dt>
 <dd><p>Column giving C-terminal flanking sequence. Default: ‘c_flank’</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-no-throw">
 <code class="sig-name descname">--no-throw</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-no-throw" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return NaNs for unsupported alleles or peptides instead of raising</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-out">
 <code class="sig-name descname">--out</code><code class="sig-prename descclassname"> &lt;output.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-out" title="Permalink to this definition">¶</a></dt>
 <dd><p>Output CSV</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-prediction-column-prefix">
 <code class="sig-name descname">--prediction-column-prefix</code><code class="sig-prename descclassname"> &lt;name&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-prediction-column-prefix" title="Permalink to this definition">¶</a></dt>
 <dd><p>Prefix for output column names. Default: ‘<a href="#id11"><span class="problematic" id="id12">mhcflurry_</span></a>’</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-output-delimiter">
 <code class="sig-name descname">--output-delimiter</code><code class="sig-prename descclassname"> &lt;char&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-output-delimiter" title="Permalink to this definition">¶</a></dt>
 <dd><p>Delimiter character for results. Default: ‘,’</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-no-affinity-percentile">
 <code class="sig-name descname">--no-affinity-percentile</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-no-affinity-percentile" title="Permalink to this definition">¶</a></dt>
 <dd><p>Do not include affinity percentile rank</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-always-include-best-allele">
 <code class="sig-name descname">--always-include-best-allele</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-always-include-best-allele" title="Permalink to this definition">¶</a></dt>
 <dd><p>Always include the best_allele column even when it is identical to the allele column (i.e. all queries are monoallelic).</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-models">
 <code class="sig-name descname">--models</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-models" title="Permalink to this definition">¶</a></dt>
-<dd><p>Directory containing models. Either a binding affinity predictor or a presentation predictor can be used. Default: /Users/tim/Library/Application Support/mhcflurry/4/1.6.0/models_class1_presentation/models</p>
+<dd><p>Directory containing models. Either a binding affinity predictor or a presentation predictor can be used. Default: /Users/tim/Library/Application Support/mhcflurry/4/2.0.0/models_class1_presentation/models</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-affinity-only">
 <code class="sig-name descname">--affinity-only</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-affinity-only" title="Permalink to this definition">¶</a></dt>
 <dd><p>Affinity prediction only (no antigen processing or presentation)</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-no-flanking">
 <code class="sig-name descname">--no-flanking</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-no-flanking" title="Permalink to this definition">¶</a></dt>
 <dd><p>Do not use flanking sequence information even when available</p>
@@ -352,166 +348,155 @@ arguments to the –alleles option:</p>
 <p>If <code class="xref py py-obj docutils literal notranslate"><span class="pre">--out</span></code> is not specified, results are written to standard out.</p>
 <p>You can also specify sequences on the commandline:</p>
 <p>mhcflurry-predict-scan     –sequences MGYINVFAFPFTIYSLLLCRMNSRNYIAQVDVVNFNLT     –alleles HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-predict-scan [-h] [--list-supported-alleles]</span>
-<span class="go">                              [--list-supported-peptide-lengths] [--version]</span>
-<span class="go">                              [--input-format {guess,csv,fasta}]</span>
-<span class="go">                              [--alleles ALLELE [ALLELE ...]]</span>
-<span class="go">                              [--sequences SEQ [SEQ ...]]</span>
-<span class="go">                              [--sequence-id-column NAME]</span>
-<span class="go">                              [--sequence-column NAME] [--no-throw]</span>
-<span class="go">                              [--peptide-lengths PEPTIDE_LENGTHS [PEPTIDE_LENGTHS ...]]</span>
-<span class="go">                              [--results-all]</span>
-<span class="go">                              [--results-best {presentation_score,processing_score,affinity,affinity_percentile}]</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-predict-scan [-h] [--list-supported-alleles] [--list-supported-peptide-lengths] [--version] [--input-format {guess,csv,fasta}]</span>
+<span class="go">                              [--alleles ALLELE [ALLELE ...]] [--sequences SEQ [SEQ ...]] [--sequence-id-column NAME] [--sequence-column NAME] [--no-throw]</span>
+<span class="go">                              [--peptide-lengths L] [--results-all] [--results-best {presentation_score,processing_score,affinity,affinity_percentile}]</span>
 <span class="go">                              [--results-filtered {presentation_score,processing_score,affinity,affinity_percentile}]</span>
-<span class="go">                              [--threshold-presentation-score THRESHOLD_PRESENTATION_SCORE]</span>
-<span class="go">                              [--threshold-processing-score THRESHOLD_PROCESSING_SCORE]</span>
-<span class="go">                              [--threshold-affinity THRESHOLD_AFFINITY]</span>
-<span class="go">                              [--threshold-affinity-percentile THRESHOLD_AFFINITY_PERCENTILE]</span>
-<span class="go">                              [--out OUTPUT.csv] [--output-delimiter CHAR]</span>
-<span class="go">                              [--no-affinity-percentile] [--models DIR]</span>
-<span class="go">                              [--no-flanking]</span>
+<span class="go">                              [--threshold-presentation-score THRESHOLD_PRESENTATION_SCORE] [--threshold-processing-score THRESHOLD_PROCESSING_SCORE]</span>
+<span class="go">                              [--threshold-affinity THRESHOLD_AFFINITY] [--threshold-affinity-percentile THRESHOLD_AFFINITY_PERCENTILE] [--out OUTPUT.csv]</span>
+<span class="go">                              [--output-delimiter CHAR] [--no-affinity-percentile] [--models DIR] [--no-flanking]</span>
 <span class="go">                              [INPUT]</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-arg-input">
 <code class="sig-name descname">input</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-arg-input" title="Permalink to this definition">¶</a></dt>
 <dd><p>Input CSV or FASTA</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-predict-scan-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>Show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-list-supported-alleles">
 <code class="sig-name descname">--list-supported-alleles</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-list-supported-alleles" title="Permalink to this definition">¶</a></dt>
 <dd><p>Print the list of supported alleles and exits</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-list-supported-peptide-lengths">
 <code class="sig-name descname">--list-supported-peptide-lengths</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-list-supported-peptide-lengths" title="Permalink to this definition">¶</a></dt>
 <dd><p>Print the list of supported peptide lengths and exits</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-version">
 <code class="sig-name descname">--version</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-version" title="Permalink to this definition">¶</a></dt>
 <dd><p>show program’s version number and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-input-format">
 <code class="sig-name descname">--input-format</code><code class="sig-prename descclassname"> {guess,csv,fasta}</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-input-format" title="Permalink to this definition">¶</a></dt>
 <dd><p>Format of input file. By default, it is guessed from the file extension.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-alleles">
 <code class="sig-name descname">--alleles</code><code class="sig-prename descclassname"> &lt;allele&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-alleles" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alleles to predict</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-sequences">
 <code class="sig-name descname">--sequences</code><code class="sig-prename descclassname"> &lt;seq&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-sequences" title="Permalink to this definition">¶</a></dt>
 <dd><p>Sequences to predict (exclusive with passing an input file)</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-sequence-id-column">
 <code class="sig-name descname">--sequence-id-column</code><code class="sig-prename descclassname"> &lt;name&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-sequence-id-column" title="Permalink to this definition">¶</a></dt>
 <dd><p>Input CSV column name for sequence IDs. Default: ‘sequence_id’</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-sequence-column">
 <code class="sig-name descname">--sequence-column</code><code class="sig-prename descclassname"> &lt;name&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-sequence-column" title="Permalink to this definition">¶</a></dt>
 <dd><p>Input CSV column name for sequences. Default: ‘sequence’</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-no-throw">
 <code class="sig-name descname">--no-throw</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-no-throw" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return NaNs for unsupported alleles or peptides instead of raising</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-peptide-lengths">
-<code class="sig-name descname">--peptide-lengths</code><code class="sig-prename descclassname"> &lt;peptide_lengths&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-peptide-lengths" title="Permalink to this definition">¶</a></dt>
-<dd><p>Peptide lengths to consider. Default: [8, 9, 10, 11].</p>
+<code class="sig-name descname">--peptide-lengths</code><code class="sig-prename descclassname"> &lt;l&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-peptide-lengths" title="Permalink to this definition">¶</a></dt>
+<dd><p>Peptide lengths to consider. Pass as START-END (e.g. 8-11) or a comma-separated list (8,9,10,11). When using START-END, the range is INCLUSIVE on both ends. Default: 8-11.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-results-all">
 <code class="sig-name descname">--results-all</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-results-all" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return results for all peptides regardless of affinity, etc.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-results-best">
 <code class="sig-name descname">--results-best</code><code class="sig-prename descclassname"> {presentation_score,processing_score,affinity,affinity_percentile}</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-results-best" title="Permalink to this definition">¶</a></dt>
 <dd><p>Take the top result for each sequence according to the specified predicted quantity</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-results-filtered">
 <code class="sig-name descname">--results-filtered</code><code class="sig-prename descclassname"> {presentation_score,processing_score,affinity,affinity_percentile}</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-results-filtered" title="Permalink to this definition">¶</a></dt>
 <dd><p>Filter results by the specified quantity.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-threshold-presentation-score">
 <code class="sig-name descname">--threshold-presentation-score</code><code class="sig-prename descclassname"> &lt;threshold_presentation_score&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-threshold-presentation-score" title="Permalink to this definition">¶</a></dt>
 <dd><p>Threshold if filtering by presentation score. Default: 0.7</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-threshold-processing-score">
 <code class="sig-name descname">--threshold-processing-score</code><code class="sig-prename descclassname"> &lt;threshold_processing_score&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-threshold-processing-score" title="Permalink to this definition">¶</a></dt>
 <dd><p>Threshold if filtering by processing score. Default: 0.5</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-threshold-affinity">
 <code class="sig-name descname">--threshold-affinity</code><code class="sig-prename descclassname"> &lt;threshold_affinity&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-threshold-affinity" title="Permalink to this definition">¶</a></dt>
 <dd><p>Threshold if filtering by affinity. Default: 500</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-threshold-affinity-percentile">
 <code class="sig-name descname">--threshold-affinity-percentile</code><code class="sig-prename descclassname"> &lt;threshold_affinity_percentile&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-threshold-affinity-percentile" title="Permalink to this definition">¶</a></dt>
 <dd><p>Threshold if filtering by affinity percentile. Default: 2.0</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-out">
 <code class="sig-name descname">--out</code><code class="sig-prename descclassname"> &lt;output.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-out" title="Permalink to this definition">¶</a></dt>
 <dd><p>Output CSV</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-output-delimiter">
 <code class="sig-name descname">--output-delimiter</code><code class="sig-prename descclassname"> &lt;char&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-output-delimiter" title="Permalink to this definition">¶</a></dt>
 <dd><p>Delimiter character for results. Default: ‘,’</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-no-affinity-percentile">
 <code class="sig-name descname">--no-affinity-percentile</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-no-affinity-percentile" title="Permalink to this definition">¶</a></dt>
 <dd><p>Do not include affinity percentile rank</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-models">
 <code class="sig-name descname">--models</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-models" title="Permalink to this definition">¶</a></dt>
-<dd><p>Directory containing presentation models.Default: /Users/tim/Library/Application Support/mhcflurry/4/1.6.0/models_class1_presentation/models</p>
+<dd><p>Directory containing presentation models.Default: /Users/tim/Library/Application Support/mhcflurry/4/2.0.0/models_class1_presentation/models</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-predict-scan-no-flanking">
 <code class="sig-name descname">--no-flanking</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-predict-scan-no-flanking" title="Permalink to this definition">¶</a></dt>
 <dd><p>Do not use flanking sequence information in predictions</p>
@@ -534,60 +519,57 @@ arguments to the –alleles option:</p>
 <dt>Summarize available and fetched downloads:</dt><dd><p>$ mhcflurry-downloads info</p>
 </dd>
 </dl>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-downloads [-h] [--quiet] [--verbose]</span>
-<span class="go">                           {fetch,info,path,url} ...</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-downloads [-h] [--quiet] [--verbose] {fetch,info,path,url} ...</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-downloads-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-quiet">
 <code class="sig-name descname">--quiet</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-quiet" title="Permalink to this definition">¶</a></dt>
 <dd><p>Output less</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-verbose">
-<code class="sig-name descname">--verbose</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">-v</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-verbose" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-downloads-v"></span><code class="sig-name descname">--verbose</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">-v</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-verbose" title="Permalink to this definition">¶</a></dt>
 <dd><p>Output more</p>
 </dd></dl>
 
 <div class="section" id="mhcflurry-downloads-fetch">
 <h3>mhcflurry-downloads fetch<a class="headerlink" href="#mhcflurry-downloads-fetch" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-downloads fetch [-h] [--keep] [--release RELEASE]</span>
-<span class="go">                                 [--already-downloaded-dir DIR]</span>
-<span class="go">                                 [DOWNLOAD [DOWNLOAD ...]]</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-downloads fetch [-h] [--keep] [--release RELEASE] [--already-downloaded-dir DIR] [DOWNLOAD [DOWNLOAD ...]]</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-fetch-arg-download">
 <code class="sig-name descname">download</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-fetch-arg-download" title="Permalink to this definition">¶</a></dt>
 <dd><p>Items to download</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-fetch-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-fetch-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-downloads-fetch-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-fetch-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-fetch-keep">
 <code class="sig-name descname">--keep</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-fetch-keep" title="Permalink to this definition">¶</a></dt>
 <dd><p>Don’t delete archives after they are extracted</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-fetch-release">
 <code class="sig-name descname">--release</code><code class="sig-prename descclassname"> &lt;release&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-fetch-release" title="Permalink to this definition">¶</a></dt>
-<dd><p>Release to download. Default: 1.6.0</p>
+<dd><p>Release to download. Default: 2.0.0</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-fetch-already-downloaded-dir">
 <code class="sig-name descname">--already-downloaded-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-fetch-already-downloaded-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Don’t download files, get them from DIR</p>
@@ -599,9 +581,9 @@ arguments to the –alleles option:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-downloads info [-h]</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-info-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-info-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-downloads-info-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-info-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
@@ -611,14 +593,14 @@ arguments to the –alleles option:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-downloads path [-h] [download_name]</span>
 </pre></div>
 </div>
-<dl class="option">
-<dt id="cmdoption-mhcflurry-downloads-path-arg-download-name">
-<code class="sig-name descname">download_name</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-path-arg-download-name" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt id="cmdoption-mhcflurry-downloads-path-arg-download_name">
+<code class="sig-name descname">download_name</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-path-arg-download_name" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-path-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-path-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-downloads-path-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-path-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
@@ -628,14 +610,14 @@ arguments to the –alleles option:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: mhcflurry-downloads url [-h] [download_name]</span>
 </pre></div>
 </div>
-<dl class="option">
-<dt id="cmdoption-mhcflurry-downloads-url-arg-download-name">
-<code class="sig-name descname">download_name</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-url-arg-download-name" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt id="cmdoption-mhcflurry-downloads-url-arg-download_name">
+<code class="sig-name descname">download_name</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-url-arg-download_name" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-downloads-url-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-url-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-downloads-url-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-downloads-url-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
@@ -647,121 +629,121 @@ arguments to the –alleles option:</p>
 <span class="go">Train Class1 single allele models.</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-class1-train-allele-specific-models-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-data">
 <code class="sig-name descname">--data</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-data" title="Permalink to this definition">¶</a></dt>
 <dd><p>Training data CSV. Expected columns: allele, peptide, measurement_value</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-out-models-dir">
 <code class="sig-name descname">--out-models-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-out-models-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Directory to write models and manifest</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-hyperparameters">
 <code class="sig-name descname">--hyperparameters</code><code class="sig-prename descclassname"> &lt;file.json&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-hyperparameters" title="Permalink to this definition">¶</a></dt>
 <dd><p>JSON or YAML of hyperparameters</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-allele">
 <code class="sig-name descname">--allele</code><code class="sig-prename descclassname"> &lt;allele&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-allele" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alleles to train models for. If not specified, all alleles with enough measurements will be used.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-min-measurements-per-allele">
 <code class="sig-name descname">--min-measurements-per-allele</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-min-measurements-per-allele" title="Permalink to this definition">¶</a></dt>
 <dd><p>Train models for alleles with &gt;=N measurements.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-held-out-fraction-reciprocal">
 <code class="sig-name descname">--held-out-fraction-reciprocal</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-held-out-fraction-reciprocal" title="Permalink to this definition">¶</a></dt>
 <dd><p>Hold out 1/N fraction of data (for e.g. subsequent model selection. For example, specify 5 to hold out 20 percent of the data.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-held-out-fraction-seed">
 <code class="sig-name descname">--held-out-fraction-seed</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-held-out-fraction-seed" title="Permalink to this definition">¶</a></dt>
 <dd><p>Seed for randomizing which measurements are held out. Only matters when –held-out-fraction is specified. Default: 0.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-ignore-inequalities">
 <code class="sig-name descname">--ignore-inequalities</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-ignore-inequalities" title="Permalink to this definition">¶</a></dt>
 <dd><p>Do not use affinity value inequalities even when present in data</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-n-models">
 <code class="sig-name descname">--n-models</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-n-models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Ensemble size, i.e. how many models to train for each architecture. If specified here it overrides any ‘n_models’ specified in the hyperparameters.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-max-epochs">
 <code class="sig-name descname">--max-epochs</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-max-epochs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Max training epochs. If specified here it overrides any ‘max_epochs’ specified in the hyperparameters.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-allele-sequences">
 <code class="sig-name descname">--allele-sequences</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-allele-sequences" title="Permalink to this definition">¶</a></dt>
 <dd><p>Allele sequences file. Used for computing allele similarity matrix.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-save-interval">
 <code class="sig-name descname">--save-interval</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-save-interval" title="Permalink to this definition">¶</a></dt>
 <dd><p>Write models to disk every N seconds. Only affects parallel runs; serial runs write each model to disk as it is trained.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-verbosity">
 <code class="sig-name descname">--verbosity</code><code class="sig-prename descclassname"> &lt;verbosity&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-verbosity" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras verbosity. Default: 0</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-num-jobs">
 <code class="sig-name descname">--num-jobs</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-num-jobs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of local processes to parallelize training over. Set to 0 for serial run. Default: 0.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-backend">
 <code class="sig-name descname">--backend</code><code class="sig-prename descclassname"> {tensorflow-gpu,tensorflow-cpu,tensorflow-default}</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-backend" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras backend. If not specified will use system default.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-gpus">
 <code class="sig-name descname">--gpus</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-gpus" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of GPUs to attempt to parallelize across. Requires running in parallel.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-max-workers-per-gpu">
 <code class="sig-name descname">--max-workers-per-gpu</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-max-workers-per-gpu" title="Permalink to this definition">¶</a></dt>
 <dd><p>Maximum number of workers to assign to a GPU. Additional tasks will run on CPU.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-max-tasks-per-worker">
 <code class="sig-name descname">--max-tasks-per-worker</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-max-tasks-per-worker" title="Permalink to this definition">¶</a></dt>
 <dd><p>Restart workers after N tasks. Workaround for tensorflow memory leaks. Requires Python &gt;=3.2.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-allele-specific-models-worker-log-dir">
 <code class="sig-name descname">--worker-log-dir</code><code class="sig-prename descclassname"> &lt;worker_log_dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-allele-specific-models-worker-log-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Write worker stdout and stderr logs to given directory.</p>
@@ -774,184 +756,184 @@ arguments to the –alleles option:</p>
 <span class="go">Model select class1 single allele models.</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-class1-select-allele-specific-models-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-data">
 <code class="sig-name descname">--data</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-data" title="Permalink to this definition">¶</a></dt>
 <dd><p>Model selection data CSV. Expected columns: allele, peptide, measurement_value</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-exclude-data">
 <code class="sig-name descname">--exclude-data</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-exclude-data" title="Permalink to this definition">¶</a></dt>
 <dd><p>Data to EXCLUDE from model selection. Useful to specify the original training data used</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-models-dir">
 <code class="sig-name descname">--models-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-models-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Directory to read models</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-out-models-dir">
 <code class="sig-name descname">--out-models-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-out-models-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Directory to write selected models</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-out-unselected-predictions">
 <code class="sig-name descname">--out-unselected-predictions</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-out-unselected-predictions" title="Permalink to this definition">¶</a></dt>
 <dd><p>Write predictions for validation data using unselected predictor to FILE.csv</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-unselected-accuracy-scorer">
 <code class="sig-name descname">--unselected-accuracy-scorer</code><code class="sig-prename descclassname"> &lt;scorer&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-unselected-accuracy-scorer" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-unselected-accuracy-scorer-num-samples">
 <code class="sig-name descname">--unselected-accuracy-scorer-num-samples</code><code class="sig-prename descclassname"> &lt;unselected_accuracy_scorer_num_samples&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-unselected-accuracy-scorer-num-samples" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-unselected-accuracy-percentile-threshold">
 <code class="sig-name descname">--unselected-accuracy-percentile-threshold</code><code class="sig-prename descclassname"> &lt;x&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-unselected-accuracy-percentile-threshold" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-allele">
 <code class="sig-name descname">--allele</code><code class="sig-prename descclassname"> &lt;allele&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-allele" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alleles to select models for. If not specified, all alleles with enough measurements will be used.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-combined-min-models">
 <code class="sig-name descname">--combined-min-models</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-combined-min-models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Min number of models to select per allele when using combined selector</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-combined-max-models">
 <code class="sig-name descname">--combined-max-models</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-combined-max-models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Max number of models to select per allele when using combined selector</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-combined-min-contribution-percent">
 <code class="sig-name descname">--combined-min-contribution-percent</code><code class="sig-prename descclassname"> &lt;x&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-combined-min-contribution-percent" title="Permalink to this definition">¶</a></dt>
 <dd><p>Use only model selectors that can contribute at least X % to the total score. Default: 1.0</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-mass-spec-min-measurements">
 <code class="sig-name descname">--mass-spec-min-measurements</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-mass-spec-min-measurements" title="Permalink to this definition">¶</a></dt>
 <dd><p>Min number of measurements required for an allele to use mass-spec model selection</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-mass-spec-min-models">
 <code class="sig-name descname">--mass-spec-min-models</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-mass-spec-min-models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Min number of models to select per allele when using mass-spec selector</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-mass-spec-max-models">
 <code class="sig-name descname">--mass-spec-max-models</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-mass-spec-max-models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Max number of models to select per allele when using mass-spec selector</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-mse-min-measurements">
 <code class="sig-name descname">--mse-min-measurements</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-mse-min-measurements" title="Permalink to this definition">¶</a></dt>
 <dd><p>Min number of measurements required for an allele to use MSE model selection</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-mse-min-models">
 <code class="sig-name descname">--mse-min-models</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-mse-min-models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Min number of models to select per allele when using MSE selector</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-mse-max-models">
 <code class="sig-name descname">--mse-max-models</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-mse-max-models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Max number of models to select per allele when using MSE selector</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-scoring">
 <code class="sig-name descname">--scoring</code><code class="sig-prename descclassname"> &lt;scoring&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-scoring" title="Permalink to this definition">¶</a></dt>
 <dd><p>Scoring procedures to use in order</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-consensus-min-models">
 <code class="sig-name descname">--consensus-min-models</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-consensus-min-models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Min number of models to select per allele when using consensus selector</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-consensus-max-models">
 <code class="sig-name descname">--consensus-max-models</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-consensus-max-models" title="Permalink to this definition">¶</a></dt>
 <dd><p>Max number of models to select per allele when using consensus selector</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-consensus-num-peptides-per-length">
 <code class="sig-name descname">--consensus-num-peptides-per-length</code><code class="sig-prename descclassname"> &lt;consensus_num_peptides_per_length&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-consensus-num-peptides-per-length" title="Permalink to this definition">¶</a></dt>
 <dd><p>Num peptides per length to use for consensus scoring</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-mass-spec-regex">
 <code class="sig-name descname">--mass-spec-regex</code><code class="sig-prename descclassname"> &lt;regex&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-mass-spec-regex" title="Permalink to this definition">¶</a></dt>
 <dd><p>Regular expression for mass-spec data. Runs on measurement_source col.Default: mass[- ]spec.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-verbosity">
 <code class="sig-name descname">--verbosity</code><code class="sig-prename descclassname"> &lt;verbosity&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-verbosity" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras verbosity. Default: 0</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-num-jobs">
 <code class="sig-name descname">--num-jobs</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-num-jobs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of local processes to parallelize training over. Set to 0 for serial run. Default: 0.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-backend">
 <code class="sig-name descname">--backend</code><code class="sig-prename descclassname"> {tensorflow-gpu,tensorflow-cpu,tensorflow-default}</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-backend" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras backend. If not specified will use system default.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-gpus">
 <code class="sig-name descname">--gpus</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-gpus" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of GPUs to attempt to parallelize across. Requires running in parallel.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-max-workers-per-gpu">
 <code class="sig-name descname">--max-workers-per-gpu</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-max-workers-per-gpu" title="Permalink to this definition">¶</a></dt>
 <dd><p>Maximum number of workers to assign to a GPU. Additional tasks will run on CPU.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-max-tasks-per-worker">
 <code class="sig-name descname">--max-tasks-per-worker</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-max-tasks-per-worker" title="Permalink to this definition">¶</a></dt>
 <dd><p>Restart workers after N tasks. Workaround for tensorflow memory leaks. Requires Python &gt;=3.2.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-allele-specific-models-worker-log-dir">
 <code class="sig-name descname">--worker-log-dir</code><code class="sig-prename descclassname"> &lt;worker_log_dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-allele-specific-models-worker-log-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Write worker stdout and stderr logs to given directory.</p>
@@ -964,161 +946,161 @@ arguments to the –alleles option:</p>
 <span class="go">Train Class1 pan-allele models.</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-class1-train-pan-allele-models-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-data">
 <code class="sig-name descname">--data</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-data" title="Permalink to this definition">¶</a></dt>
 <dd><p>Training data CSV. Expected columns: allele, peptide, measurement_value</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-pretrain-data">
 <code class="sig-name descname">--pretrain-data</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-pretrain-data" title="Permalink to this definition">¶</a></dt>
 <dd><p>Pre-training data CSV. Expected columns: allele, peptide, measurement_value</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-out-models-dir">
 <code class="sig-name descname">--out-models-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-out-models-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Directory to write models and manifest</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-hyperparameters">
 <code class="sig-name descname">--hyperparameters</code><code class="sig-prename descclassname"> &lt;file.json&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-hyperparameters" title="Permalink to this definition">¶</a></dt>
 <dd><p>JSON or YAML of hyperparameters</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-held-out-measurements-per-allele-fraction-and-max">
 <code class="sig-name descname">--held-out-measurements-per-allele-fraction-and-max</code><code class="sig-prename descclassname"> &lt;x&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-held-out-measurements-per-allele-fraction-and-max" title="Permalink to this definition">¶</a></dt>
 <dd><p>Fraction of measurements per allele to hold out, and maximum number</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-ignore-inequalities">
 <code class="sig-name descname">--ignore-inequalities</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-ignore-inequalities" title="Permalink to this definition">¶</a></dt>
 <dd><p>Do not use affinity value inequalities even when present in data</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-num-folds">
 <code class="sig-name descname">--num-folds</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-num-folds" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of training folds.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-num-replicates">
 <code class="sig-name descname">--num-replicates</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-num-replicates" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of replicates per (architecture, fold) pair to train.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-max-epochs">
 <code class="sig-name descname">--max-epochs</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-max-epochs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Max training epochs. If specified here it overrides any ‘max_epochs’ specified in the hyperparameters.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-allele-sequences">
 <code class="sig-name descname">--allele-sequences</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-allele-sequences" title="Permalink to this definition">¶</a></dt>
 <dd><p>Allele sequences file.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-verbosity">
 <code class="sig-name descname">--verbosity</code><code class="sig-prename descclassname"> &lt;verbosity&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-verbosity" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras verbosity. Default: 0</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-debug">
 <code class="sig-name descname">--debug</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-debug" title="Permalink to this definition">¶</a></dt>
 <dd><p>Launch python debugger on error</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-continue-incomplete">
 <code class="sig-name descname">--continue-incomplete</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-continue-incomplete" title="Permalink to this definition">¶</a></dt>
 <dd><p>Continue training models from an incomplete training run. If this is specified then the only required argument is –out-models-dir</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-only-initialize">
 <code class="sig-name descname">--only-initialize</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-only-initialize" title="Permalink to this definition">¶</a></dt>
 <dd><p>Do not actually train models. The initialized run can be continued later with –continue-incomplete.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-num-jobs">
 <code class="sig-name descname">--num-jobs</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-num-jobs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of local processes to parallelize training over. Set to 0 for serial run. Default: 0.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-backend">
 <code class="sig-name descname">--backend</code><code class="sig-prename descclassname"> {tensorflow-gpu,tensorflow-cpu,tensorflow-default}</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-backend" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras backend. If not specified will use system default.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-gpus">
 <code class="sig-name descname">--gpus</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-gpus" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of GPUs to attempt to parallelize across. Requires running in parallel.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-max-workers-per-gpu">
 <code class="sig-name descname">--max-workers-per-gpu</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-max-workers-per-gpu" title="Permalink to this definition">¶</a></dt>
 <dd><p>Maximum number of workers to assign to a GPU. Additional tasks will run on CPU.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-max-tasks-per-worker">
 <code class="sig-name descname">--max-tasks-per-worker</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-max-tasks-per-worker" title="Permalink to this definition">¶</a></dt>
 <dd><p>Restart workers after N tasks. Workaround for tensorflow memory leaks. Requires Python &gt;=3.2.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-worker-log-dir">
 <code class="sig-name descname">--worker-log-dir</code><code class="sig-prename descclassname"> &lt;worker_log_dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-worker-log-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Write worker stdout and stderr logs to given directory.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-cluster-parallelism">
 <code class="sig-name descname">--cluster-parallelism</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-cluster-parallelism" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-cluster-submit-command">
 <code class="sig-name descname">--cluster-submit-command</code><code class="sig-prename descclassname"> &lt;cluster_submit_command&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-cluster-submit-command" title="Permalink to this definition">¶</a></dt>
 <dd><p>Default: sh</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-cluster-results-workdir">
 <code class="sig-name descname">--cluster-results-workdir</code><code class="sig-prename descclassname"> &lt;cluster_results_workdir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-cluster-results-workdir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Default: ./cluster-workdir</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-additional-complete-file">
 <code class="sig-name descname">--additional-complete-file</code><code class="sig-prename descclassname"> &lt;additional_complete_file&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-additional-complete-file" title="Permalink to this definition">¶</a></dt>
 <dd><p>Additional file to monitor for job completion. Default: STDERR</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-cluster-script-prefix-path">
 <code class="sig-name descname">--cluster-script-prefix-path</code><code class="sig-prename descclassname"> &lt;cluster_script_prefix_path&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-cluster-script-prefix-path" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-pan-allele-models-cluster-max-retries">
 <code class="sig-name descname">--cluster-max-retries</code><code class="sig-prename descclassname"> &lt;cluster_max_retries&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-pan-allele-models-cluster-max-retries" title="Permalink to this definition">¶</a></dt>
 <dd><p>How many times to rerun failing jobs. Default: 3</p>
@@ -1131,124 +1113,124 @@ arguments to the –alleles option:</p>
 <span class="go">Model select class1 pan-allele models.</span>
 
 <span class="go">APPROACH: For each training fold, we select at least min and at most max models</span>
-<span class="go">(where min and max are set by the --{min/max}-models-per-fold argument) using a</span>
+<span class="gp gp-VirtualEnv">(where min and max are set by the --{min/max}-models-per-fold argument)</span> <span class="go">using a</span>
 <span class="go">step-up (forward) selection procedure. The final ensemble is the union of all</span>
 <span class="go">selected models across all folds.</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-class1-select-pan-allele-models-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-data">
 <code class="sig-name descname">--data</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-data" title="Permalink to this definition">¶</a></dt>
 <dd><p>Model selection data CSV. Expected columns: allele, peptide, measurement_value</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-models-dir">
 <code class="sig-name descname">--models-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-models-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Directory to read models</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-out-models-dir">
 <code class="sig-name descname">--out-models-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-out-models-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Directory to write selected models</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-min-models-per-fold">
 <code class="sig-name descname">--min-models-per-fold</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-min-models-per-fold" title="Permalink to this definition">¶</a></dt>
 <dd><p>Min number of models to select per fold</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-max-models-per-fold">
 <code class="sig-name descname">--max-models-per-fold</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-max-models-per-fold" title="Permalink to this definition">¶</a></dt>
 <dd><p>Max number of models to select per fold</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-mass-spec-regex">
 <code class="sig-name descname">--mass-spec-regex</code><code class="sig-prename descclassname"> &lt;regex&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-mass-spec-regex" title="Permalink to this definition">¶</a></dt>
 <dd><p>Regular expression for mass-spec data. Runs on measurement_source col.Default: mass[- ]spec.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-verbosity">
 <code class="sig-name descname">--verbosity</code><code class="sig-prename descclassname"> &lt;verbosity&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-verbosity" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras verbosity. Default: 0</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-num-jobs">
 <code class="sig-name descname">--num-jobs</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-num-jobs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of local processes to parallelize training over. Set to 0 for serial run. Default: 0.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-backend">
 <code class="sig-name descname">--backend</code><code class="sig-prename descclassname"> {tensorflow-gpu,tensorflow-cpu,tensorflow-default}</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-backend" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras backend. If not specified will use system default.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-gpus">
 <code class="sig-name descname">--gpus</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-gpus" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of GPUs to attempt to parallelize across. Requires running in parallel.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-max-workers-per-gpu">
 <code class="sig-name descname">--max-workers-per-gpu</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-max-workers-per-gpu" title="Permalink to this definition">¶</a></dt>
 <dd><p>Maximum number of workers to assign to a GPU. Additional tasks will run on CPU.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-max-tasks-per-worker">
 <code class="sig-name descname">--max-tasks-per-worker</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-max-tasks-per-worker" title="Permalink to this definition">¶</a></dt>
 <dd><p>Restart workers after N tasks. Workaround for tensorflow memory leaks. Requires Python &gt;=3.2.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-worker-log-dir">
 <code class="sig-name descname">--worker-log-dir</code><code class="sig-prename descclassname"> &lt;worker_log_dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-worker-log-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Write worker stdout and stderr logs to given directory.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-cluster-parallelism">
 <code class="sig-name descname">--cluster-parallelism</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-cluster-parallelism" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-cluster-submit-command">
 <code class="sig-name descname">--cluster-submit-command</code><code class="sig-prename descclassname"> &lt;cluster_submit_command&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-cluster-submit-command" title="Permalink to this definition">¶</a></dt>
 <dd><p>Default: sh</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-cluster-results-workdir">
 <code class="sig-name descname">--cluster-results-workdir</code><code class="sig-prename descclassname"> &lt;cluster_results_workdir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-cluster-results-workdir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Default: ./cluster-workdir</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-additional-complete-file">
 <code class="sig-name descname">--additional-complete-file</code><code class="sig-prename descclassname"> &lt;additional_complete_file&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-additional-complete-file" title="Permalink to this definition">¶</a></dt>
 <dd><p>Additional file to monitor for job completion. Default: STDERR</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-cluster-script-prefix-path">
 <code class="sig-name descname">--cluster-script-prefix-path</code><code class="sig-prename descclassname"> &lt;cluster_script_prefix_path&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-cluster-script-prefix-path" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-pan-allele-models-cluster-max-retries">
 <code class="sig-name descname">--cluster-max-retries</code><code class="sig-prename descclassname"> &lt;cluster_max_retries&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-pan-allele-models-cluster-max-retries" title="Permalink to this definition">¶</a></dt>
 <dd><p>How many times to rerun failing jobs. Default: 3</p>
@@ -1261,143 +1243,143 @@ arguments to the –alleles option:</p>
 <span class="go">Train Class1 processing models.</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-class1-train-processing-models-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-data">
 <code class="sig-name descname">--data</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-data" title="Permalink to this definition">¶</a></dt>
 <dd><p>Training data CSV. Expected columns: peptide, n_flank, c_flank, hit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-out-models-dir">
 <code class="sig-name descname">--out-models-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-out-models-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Directory to write models and manifest</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-hyperparameters">
 <code class="sig-name descname">--hyperparameters</code><code class="sig-prename descclassname"> &lt;file.json&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-hyperparameters" title="Permalink to this definition">¶</a></dt>
 <dd><p>JSON or YAML of hyperparameters</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-held-out-samples">
 <code class="sig-name descname">--held-out-samples</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-held-out-samples" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of experiments to hold out per fold</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-num-folds">
 <code class="sig-name descname">--num-folds</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-num-folds" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of training folds.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-num-replicates">
 <code class="sig-name descname">--num-replicates</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-num-replicates" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of replicates per (architecture, fold) pair to train.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-max-epochs">
 <code class="sig-name descname">--max-epochs</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-max-epochs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Max training epochs. If specified here it overrides any ‘max_epochs’ specified in the hyperparameters.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-verbosity">
 <code class="sig-name descname">--verbosity</code><code class="sig-prename descclassname"> &lt;verbosity&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-verbosity" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras verbosity. Default: 0</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-debug">
 <code class="sig-name descname">--debug</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-debug" title="Permalink to this definition">¶</a></dt>
 <dd><p>Launch python debugger on error</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-continue-incomplete">
 <code class="sig-name descname">--continue-incomplete</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-continue-incomplete" title="Permalink to this definition">¶</a></dt>
 <dd><p>Continue training models from an incomplete training run. If this is specified then the only required argument is –out-models-dir</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-only-initialize">
 <code class="sig-name descname">--only-initialize</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-only-initialize" title="Permalink to this definition">¶</a></dt>
 <dd><p>Do not actually train models. The initialized run can be continued later with –continue-incomplete.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-num-jobs">
 <code class="sig-name descname">--num-jobs</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-num-jobs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of local processes to parallelize training over. Set to 0 for serial run. Default: 0.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-backend">
 <code class="sig-name descname">--backend</code><code class="sig-prename descclassname"> {tensorflow-gpu,tensorflow-cpu,tensorflow-default}</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-backend" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras backend. If not specified will use system default.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-gpus">
 <code class="sig-name descname">--gpus</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-gpus" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of GPUs to attempt to parallelize across. Requires running in parallel.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-max-workers-per-gpu">
 <code class="sig-name descname">--max-workers-per-gpu</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-max-workers-per-gpu" title="Permalink to this definition">¶</a></dt>
 <dd><p>Maximum number of workers to assign to a GPU. Additional tasks will run on CPU.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-max-tasks-per-worker">
 <code class="sig-name descname">--max-tasks-per-worker</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-max-tasks-per-worker" title="Permalink to this definition">¶</a></dt>
 <dd><p>Restart workers after N tasks. Workaround for tensorflow memory leaks. Requires Python &gt;=3.2.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-worker-log-dir">
 <code class="sig-name descname">--worker-log-dir</code><code class="sig-prename descclassname"> &lt;worker_log_dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-worker-log-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Write worker stdout and stderr logs to given directory.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-cluster-parallelism">
 <code class="sig-name descname">--cluster-parallelism</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-cluster-parallelism" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-cluster-submit-command">
 <code class="sig-name descname">--cluster-submit-command</code><code class="sig-prename descclassname"> &lt;cluster_submit_command&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-cluster-submit-command" title="Permalink to this definition">¶</a></dt>
 <dd><p>Default: sh</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-cluster-results-workdir">
 <code class="sig-name descname">--cluster-results-workdir</code><code class="sig-prename descclassname"> &lt;cluster_results_workdir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-cluster-results-workdir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Default: ./cluster-workdir</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-additional-complete-file">
 <code class="sig-name descname">--additional-complete-file</code><code class="sig-prename descclassname"> &lt;additional_complete_file&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-additional-complete-file" title="Permalink to this definition">¶</a></dt>
 <dd><p>Additional file to monitor for job completion. Default: STDERR</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-cluster-script-prefix-path">
 <code class="sig-name descname">--cluster-script-prefix-path</code><code class="sig-prename descclassname"> &lt;cluster_script_prefix_path&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-cluster-script-prefix-path" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-processing-models-cluster-max-retries">
 <code class="sig-name descname">--cluster-max-retries</code><code class="sig-prename descclassname"> &lt;cluster_max_retries&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-processing-models-cluster-max-retries" title="Permalink to this definition">¶</a></dt>
 <dd><p>How many times to rerun failing jobs. Default: 3</p>
@@ -1410,118 +1392,118 @@ arguments to the –alleles option:</p>
 <span class="go">Model select antigen processing models.</span>
 
 <span class="go">APPROACH: For each training fold, we select at least min and at most max models</span>
-<span class="go">(where min and max are set by the --{min/max}-models-per-fold argument) using a</span>
+<span class="gp gp-VirtualEnv">(where min and max are set by the --{min/max}-models-per-fold argument)</span> <span class="go">using a</span>
 <span class="go">step-up (forward) selection procedure. The final ensemble is the union of all</span>
 <span class="go">selected models across all folds. AUC is used as the metric.</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-class1-select-processing-models-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-data">
 <code class="sig-name descname">--data</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-data" title="Permalink to this definition">¶</a></dt>
 <dd><p>Model selection data CSV. Expected columns: peptide, hit, fold_0, …, fold_N</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-models-dir">
 <code class="sig-name descname">--models-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-models-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Directory to read models</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-out-models-dir">
 <code class="sig-name descname">--out-models-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-out-models-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Directory to write selected models</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-min-models-per-fold">
 <code class="sig-name descname">--min-models-per-fold</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-min-models-per-fold" title="Permalink to this definition">¶</a></dt>
 <dd><p>Min number of models to select per fold</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-max-models-per-fold">
 <code class="sig-name descname">--max-models-per-fold</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-max-models-per-fold" title="Permalink to this definition">¶</a></dt>
 <dd><p>Max number of models to select per fold</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-verbosity">
 <code class="sig-name descname">--verbosity</code><code class="sig-prename descclassname"> &lt;verbosity&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-verbosity" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras verbosity. Default: 0</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-num-jobs">
 <code class="sig-name descname">--num-jobs</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-num-jobs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of local processes to parallelize training over. Set to 0 for serial run. Default: 0.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-backend">
 <code class="sig-name descname">--backend</code><code class="sig-prename descclassname"> {tensorflow-gpu,tensorflow-cpu,tensorflow-default}</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-backend" title="Permalink to this definition">¶</a></dt>
 <dd><p>Keras backend. If not specified will use system default.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-gpus">
 <code class="sig-name descname">--gpus</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-gpus" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of GPUs to attempt to parallelize across. Requires running in parallel.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-max-workers-per-gpu">
 <code class="sig-name descname">--max-workers-per-gpu</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-max-workers-per-gpu" title="Permalink to this definition">¶</a></dt>
 <dd><p>Maximum number of workers to assign to a GPU. Additional tasks will run on CPU.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-max-tasks-per-worker">
 <code class="sig-name descname">--max-tasks-per-worker</code><code class="sig-prename descclassname"> &lt;n&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-max-tasks-per-worker" title="Permalink to this definition">¶</a></dt>
 <dd><p>Restart workers after N tasks. Workaround for tensorflow memory leaks. Requires Python &gt;=3.2.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-worker-log-dir">
 <code class="sig-name descname">--worker-log-dir</code><code class="sig-prename descclassname"> &lt;worker_log_dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-worker-log-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Write worker stdout and stderr logs to given directory.</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-cluster-parallelism">
 <code class="sig-name descname">--cluster-parallelism</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-cluster-parallelism" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-cluster-submit-command">
 <code class="sig-name descname">--cluster-submit-command</code><code class="sig-prename descclassname"> &lt;cluster_submit_command&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-cluster-submit-command" title="Permalink to this definition">¶</a></dt>
 <dd><p>Default: sh</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-cluster-results-workdir">
 <code class="sig-name descname">--cluster-results-workdir</code><code class="sig-prename descclassname"> &lt;cluster_results_workdir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-cluster-results-workdir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Default: ./cluster-workdir</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-additional-complete-file">
 <code class="sig-name descname">--additional-complete-file</code><code class="sig-prename descclassname"> &lt;additional_complete_file&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-additional-complete-file" title="Permalink to this definition">¶</a></dt>
 <dd><p>Additional file to monitor for job completion. Default: STDERR</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-cluster-script-prefix-path">
 <code class="sig-name descname">--cluster-script-prefix-path</code><code class="sig-prename descclassname"> &lt;cluster_script_prefix_path&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-cluster-script-prefix-path" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-select-processing-models-cluster-max-retries">
 <code class="sig-name descname">--cluster-max-retries</code><code class="sig-prename descclassname"> &lt;cluster_max_retries&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-select-processing-models-cluster-max-retries" title="Permalink to this definition">¶</a></dt>
 <dd><p>How many times to rerun failing jobs. Default: 3</p>
@@ -1534,61 +1516,61 @@ arguments to the –alleles option:</p>
 <span class="go">Train Class1 presentation models.</span>
 </pre></div>
 </div>
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-presentation-models-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-h" title="Permalink to this definition">¶</a></dt>
+<span id="cmdoption-mhcflurry-class1-train-presentation-models-help"></span><code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-presentation-models-data">
 <code class="sig-name descname">--data</code><code class="sig-prename descclassname"> &lt;file.csv&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-data" title="Permalink to this definition">¶</a></dt>
 <dd><p>Training data CSV. Expected columns: peptide, n_flank, c_flank, hit</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-presentation-models-out-models-dir">
 <code class="sig-name descname">--out-models-dir</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-out-models-dir" title="Permalink to this definition">¶</a></dt>
 <dd><p>Directory to write models and manifest</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-presentation-models-affinity-predictor">
 <code class="sig-name descname">--affinity-predictor</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-affinity-predictor" title="Permalink to this definition">¶</a></dt>
 <dd><p>Affinity predictor models dir</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-presentation-models-processing-predictor-with-flanks">
 <code class="sig-name descname">--processing-predictor-with-flanks</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-processing-predictor-with-flanks" title="Permalink to this definition">¶</a></dt>
 <dd><p>Processing predictor with flanks</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-presentation-models-processing-predictor-without-flanks">
 <code class="sig-name descname">--processing-predictor-without-flanks</code><code class="sig-prename descclassname"> &lt;dir&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-processing-predictor-without-flanks" title="Permalink to this definition">¶</a></dt>
 <dd><p>Processing predictor without flanks</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-presentation-models-verbosity">
 <code class="sig-name descname">--verbosity</code><code class="sig-prename descclassname"> &lt;verbosity&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-verbosity" title="Permalink to this definition">¶</a></dt>
 <dd><p>Default: 1</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-presentation-models-debug">
 <code class="sig-name descname">--debug</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-debug" title="Permalink to this definition">¶</a></dt>
 <dd><p>Launch python debugger on error</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-presentation-models-hla-column">
 <code class="sig-name descname">--hla-column</code><code class="sig-prename descclassname"> &lt;hla_column&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-hla-column" title="Permalink to this definition">¶</a></dt>
 <dd><p>Column in data giving space-separated MHC I alleles</p>
 </dd></dl>
 
-<dl class="option">
+<dl class="std option">
 <dt id="cmdoption-mhcflurry-class1-train-presentation-models-target-column">
 <code class="sig-name descname">--target-column</code><code class="sig-prename descclassname"> &lt;target_column&gt;</code><a class="headerlink" href="#cmdoption-mhcflurry-class1-train-presentation-models-target-column" title="Permalink to this definition">¶</a></dt>
 <dd><p>Column in data giving hit (1) vs decoy (0)</p>
@@ -1617,14 +1599,22 @@ arguments to the –alleles option:</p>
 
   <div role="contentinfo">
     <p>
+        
         &copy; Copyright Timothy O&#39;Donnell
       <span class="lastupdated">
-        Last updated on Mar 23, 2020.
+        Last updated on Jul 13, 2020.
       </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -1635,7 +1625,6 @@ arguments to the –alleles option:</p>
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

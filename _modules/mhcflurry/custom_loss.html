@@ -1,15 +1,18 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.custom_loss &mdash; MHCflurry 1.6.0 documentation</title>
+  <title>mhcflurry.custom_loss &mdash; MHCflurry 2.0.0 documentation</title>
   
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
 
   
   
@@ -17,7 +20,9 @@
   
 
   
-  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -29,10 +34,6 @@
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
@@ -47,7 +48,7 @@
           
 
           
-            <a href="../../index.html" class="icon icon-home"> MHCflurry
+            <a href="../../index.html" class="icon icon-home" alt="Documentation Home"> MHCflurry
           
 
           
@@ -57,7 +58,7 @@
             
             
               <div class="version">
-                1.6.0
+                2.0.0
               </div>
             
           
@@ -74,6 +75,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -92,6 +94,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -130,7 +133,7 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="../../index.html">Docs</a> &raquo;</li>
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
         
           <li><a href="../index.html">Module code</a> &raquo;</li>
         
@@ -157,10 +160,13 @@
 <span class="sd">one of (=), (&lt;), or (&gt;). For e.g. (&gt;) inequalities, penalization is applied only</span>
 <span class="sd">if the prediction is less than the given value.</span>
 <span class="sd">&quot;&quot;&quot;</span>
-<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">division</span>
 <span class="kn">import</span> <span class="nn">pandas</span>
 <span class="kn">import</span> <span class="nn">numpy</span>
-<span class="kn">from</span> <span class="nn">numpy</span> <span class="k">import</span> <span class="n">isnan</span><span class="p">,</span> <span class="n">array</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="kn">import</span> <span class="n">isnan</span><span class="p">,</span> <span class="n">array</span>
+
+<span class="kn">from</span> <span class="nn">.common</span> <span class="kn">import</span> <span class="n">configure_tensorflow</span>
+
 
 <span class="n">CUSTOM_LOSSES</span> <span class="o">=</span> <span class="p">{}</span>
 
@@ -203,17 +209,18 @@
 <span class="sd">    - encode_y : numpy.ndarray -&gt; numpy.ndarray</span>
 <span class="sd">        Transformation to apply to regression target before fitting</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span> <span class="k">if</span> <span class="n">name</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>  <span class="c1"># use name from class instance</span>
 
-    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="s2">&quot;&lt;Loss: </span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
 
 <div class="viewcode-block" id="Loss.loss"><a class="viewcode-back" href="../../api.html#mhcflurry.custom_loss.Loss.loss">[docs]</a>    <span class="k">def</span> <span class="nf">loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="Loss.get_keras_loss"><a class="viewcode-back" href="../../api.html#mhcflurry.custom_loss.Loss.get_keras_loss">[docs]</a>    <span class="k">def</span> <span class="nf">get_keras_loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="s2">&quot;sum_over_batch_size&quot;</span><span class="p">):</span>
-        <span class="kn">from</span> <span class="nn">keras.losses</span> <span class="k">import</span> <span class="n">LossFunctionWrapper</span>
+        <span class="n">configure_tensorflow</span><span class="p">()</span>
+        <span class="kn">from</span> <span class="nn">tensorflow.keras.losses</span> <span class="kn">import</span> <span class="n">LossFunctionWrapper</span>
         <span class="k">return</span> <span class="n">LossFunctionWrapper</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">loss</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="n">reduction</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span></div></div>
 
@@ -225,7 +232,7 @@
     <span class="n">supports_inequalities</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">supports_multiple_outputs</span> <span class="o">=</span> <span class="kc">False</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loss_name</span><span class="o">=</span><span class="s2">&quot;mse&quot;</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loss_name</span><span class="o">=</span><span class="s2">&quot;mse&quot;</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">loss</span> <span class="o">=</span> <span class="n">loss_name</span>
         <span class="n">Loss</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loss_name</span><span class="p">)</span>
 
@@ -241,7 +248,7 @@
 
 <span class="sd">    The y_pred_transform function should be a tensor -&gt; tensor function.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">loss</span><span class="p">,</span>
             <span class="n">y_pred_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -315,7 +322,8 @@
 <div class="viewcode-block" id="MSEWithInequalities.loss"><a class="viewcode-back" href="../../api.html#mhcflurry.custom_loss.MSEWithInequalities.loss">[docs]</a>    <span class="k">def</span> <span class="nf">loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">):</span>
         <span class="c1"># We always delay import of Keras so that mhcflurry can be imported</span>
         <span class="c1"># initially without tensorflow debug output, etc.</span>
-        <span class="kn">from</span> <span class="nn">keras</span> <span class="k">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
+        <span class="n">configure_tensorflow</span><span class="p">()</span>
+        <span class="kn">from</span> <span class="nn">tensorflow.keras</span> <span class="kn">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
         <span class="n">y_true</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">y_true</span><span class="p">)</span>
         <span class="n">y_pred</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">y_pred</span><span class="p">)</span>
 
@@ -396,27 +404,29 @@
         <span class="k">return</span> <span class="n">encoded</span></div>
 
 <div class="viewcode-block" id="MSEWithInequalitiesAndMultipleOutputs.loss"><a class="viewcode-back" href="../../api.html#mhcflurry.custom_loss.MSEWithInequalitiesAndMultipleOutputs.loss">[docs]</a>    <span class="k">def</span> <span class="nf">loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">):</span>
-        <span class="kn">from</span> <span class="nn">keras</span> <span class="k">import</span> <span class="n">backend</span> <span class="k">as</span> <span class="n">K</span>
-        <span class="n">y_true</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">y_true</span><span class="p">)</span>
+        <span class="n">configure_tensorflow</span><span class="p">()</span>
+        <span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+        <span class="n">y_true</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
 
         <span class="n">output_indices</span> <span class="o">=</span> <span class="n">y_true</span> <span class="o">//</span> <span class="mi">10</span>
         <span class="n">updated_y_true</span> <span class="o">=</span> <span class="n">y_true</span> <span class="o">-</span> <span class="p">(</span><span class="mi">10</span> <span class="o">*</span> <span class="n">output_indices</span><span class="p">)</span>
 
         <span class="c1"># We index into y_pred using flattened indices since Keras backend</span>
         <span class="c1"># supports gather but has no equivalent of tf.gather_nd:</span>
-        <span class="n">ordinals</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">y_true</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
-        <span class="n">flattened_indices</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">ordinals</span> <span class="o">*</span> <span class="n">y_pred</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">K</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">output_indices</span><span class="p">,</span> <span class="s2">&quot;int32&quot;</span><span class="p">))</span>
-        <span class="n">updated_y_pred</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">y_pred</span><span class="p">),</span> <span class="n">flattened_indices</span><span class="p">)</span>
+        <span class="c1">#ordinals = K.arange(K.shape(y_true)[0])</span>
+        <span class="c1">#flattened_indices = (</span>
+        <span class="c1">#    ordinals * y_pred.shape[1] + K.cast(output_indices, &quot;int32&quot;))</span>
+        <span class="c1">#updated_y_pred = K.gather(K.flatten(y_pred), flattened_indices)</span>
 
         <span class="c1"># Alternative implementation using tensorflow, which could be used if</span>
         <span class="c1"># we drop support for other backends:</span>
-        <span class="c1"># import tensorflow as tf</span>
-        <span class="c1"># indexer = K.stack([</span>
-        <span class="c1">#     ordinals,</span>
-        <span class="c1">#     K.cast(output_indices, &quot;int32&quot;)</span>
-        <span class="c1"># ], axis=-1)</span>
-        <span class="c1">#updated_y_pred = tf.gather_nd(y_pred, indexer)</span>
+        <span class="c1">#ordinals = K.arange(K.shape(y_true)[0])</span>
+        <span class="n">ordinals</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">range</span><span class="p">(</span><span class="n">tf</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">y_true</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">indexer</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span>
+            <span class="n">ordinals</span><span class="p">,</span>
+            <span class="n">tf</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">output_indices</span><span class="p">,</span> <span class="s2">&quot;int32&quot;</span><span class="p">)</span>
+        <span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">updated_y_pred</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">gather_nd</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">indexer</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">MSEWithInequalities</span><span class="p">()</span><span class="o">.</span><span class="n">loss</span><span class="p">(</span><span class="n">updated_y_true</span><span class="p">,</span> <span class="n">updated_y_pred</span><span class="p">)</span></div></div>
 
@@ -428,7 +438,7 @@
     <span class="n">supports_inequalities</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="n">supports_multiple_outputs</span> <span class="o">=</span> <span class="kc">False</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">delta</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">multiplier</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">delta</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">multiplier</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="o">=</span> <span class="n">delta</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">multiplier</span> <span class="o">=</span> <span class="n">multiplier</span>
 
@@ -442,6 +452,7 @@
         <span class="k">return</span> <span class="n">encoded</span><span class="o">.</span><span class="n">values</span></div>
 
 <div class="viewcode-block" id="MultiallelicMassSpecLoss.loss"><a class="viewcode-back" href="../../api.html#mhcflurry.custom_loss.MultiallelicMassSpecLoss.loss">[docs]</a>    <span class="k">def</span> <span class="nf">loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">):</span>
+        <span class="n">configure_tensorflow</span><span class="p">()</span>
         <span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
         <span class="n">y_true</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,))</span>
         <span class="n">pos</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">boolean_mask</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">tf</span><span class="o">.</span><span class="n">math</span><span class="o">.</span><span class="n">equal</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
@@ -490,14 +501,22 @@
 
   <div role="contentinfo">
     <p>
+        
         &copy; Copyright Timothy O&#39;Donnell
       <span class="lastupdated">
-        Last updated on Mar 23, 2020.
+        Last updated on Jul 13, 2020.
       </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -508,7 +527,6 @@
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

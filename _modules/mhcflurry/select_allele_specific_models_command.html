@@ -1,15 +1,18 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.select_allele_specific_models_command &mdash; MHCflurry 1.6.0 documentation</title>
+  <title>mhcflurry.select_allele_specific_models_command &mdash; MHCflurry 2.0.0 documentation</title>
   
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
 
   
   
@@ -17,7 +20,9 @@
   
 
   
-  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -29,10 +34,6 @@
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
@@ -47,7 +48,7 @@
           
 
           
-            <a href="../../index.html" class="icon icon-home"> MHCflurry
+            <a href="../../index.html" class="icon icon-home" alt="Documentation Home"> MHCflurry
           
 
           
@@ -57,7 +58,7 @@
             
             
               <div class="version">
-                1.6.0
+                2.0.0
               </div>
             
           
@@ -74,6 +75,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -92,6 +94,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -130,7 +133,7 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="../../index.html">Docs</a> &raquo;</li>
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
         
           <li><a href="../index.html">Module code</a> &raquo;</li>
         
@@ -160,22 +163,23 @@
 <span class="kn">import</span> <span class="nn">time</span>
 <span class="kn">import</span> <span class="nn">traceback</span>
 <span class="kn">import</span> <span class="nn">random</span>
-<span class="kn">from</span> <span class="nn">pprint</span> <span class="k">import</span> <span class="n">pprint</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">pprint</span> <span class="kn">import</span> <span class="n">pprint</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span>
 <span class="kn">import</span> <span class="nn">pandas</span>
-<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="k">import</span> <span class="n">kendalltau</span><span class="p">,</span> <span class="n">percentileofscore</span><span class="p">,</span> <span class="n">pearsonr</span>
-<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="k">import</span> <span class="n">roc_auc_score</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">kendalltau</span><span class="p">,</span> <span class="n">percentileofscore</span><span class="p">,</span> <span class="n">pearsonr</span>
+<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">roc_auc_score</span>
 
-<span class="kn">from</span> <span class="nn">mhcnames</span> <span class="k">import</span> <span class="n">normalize_allele_name</span>
+<span class="kn">from</span> <span class="nn">mhcnames</span> <span class="kn">import</span> <span class="n">normalize_allele_name</span>
 <span class="kn">import</span> <span class="nn">tqdm</span>  <span class="c1"># progress bar</span>
 <span class="n">tqdm</span><span class="o">.</span><span class="n">monitor_interval</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># see https://github.com/tqdm/tqdm/issues/481</span>
 
-<span class="kn">from</span> <span class="nn">.class1_affinity_predictor</span> <span class="k">import</span> <span class="n">Class1AffinityPredictor</span>
-<span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span>
-<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">configure_logging</span><span class="p">,</span> <span class="n">random_peptides</span>
-<span class="kn">from</span> <span class="nn">.local_parallelism</span> <span class="k">import</span> <span class="n">worker_pool_with_gpu_assignments_from_args</span><span class="p">,</span> <span class="n">add_local_parallelism_args</span>
-<span class="kn">from</span> <span class="nn">.regression_target</span> <span class="k">import</span> <span class="n">from_ic50</span>
+<span class="kn">from</span> <span class="nn">.class1_affinity_predictor</span> <span class="kn">import</span> <span class="n">Class1AffinityPredictor</span>
+<span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="kn">import</span> <span class="n">EncodableSequences</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="kn">import</span> <span class="n">configure_logging</span><span class="p">,</span> <span class="n">random_peptides</span>
+<span class="kn">from</span> <span class="nn">.local_parallelism</span> <span class="kn">import</span> <span class="n">worker_pool_with_gpu_assignments_from_args</span><span class="p">,</span> <span class="n">add_local_parallelism_args</span>
+<span class="kn">from</span> <span class="nn">.regression_target</span> <span class="kn">import</span> <span class="n">from_ic50</span>
 
 
 <span class="c1"># To avoid pickling large matrices to send to child processes when running in</span>
@@ -514,7 +518,7 @@
         <span class="c1"># Parallel run</span>
         <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">alleles</span><span class="p">)</span>
         <span class="n">results</span> <span class="o">=</span> <span class="n">worker_pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span>
-            <span class="n">model_select</span><span class="p">,</span>
+            <span class="n">partial</span><span class="p">(</span><span class="n">model_select</span><span class="p">,</span> <span class="n">constant_data</span><span class="o">=</span><span class="n">GLOBAL_DATA</span><span class="p">),</span>
             <span class="n">alleles</span><span class="p">,</span>
             <span class="n">chunksize</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
@@ -558,7 +562,7 @@
 
 
 <div class="viewcode-block" id="ScrambledPredictor"><a class="viewcode-back" href="../../api.html#mhcflurry.select_allele_specific_models_command.ScrambledPredictor">[docs]</a><span class="k">class</span> <span class="nc">ScrambledPredictor</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">predictor</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">predictor</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span> <span class="o">=</span> <span class="n">predictor</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_predictions</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_allele</span> <span class="o">=</span> <span class="kc">None</span>
@@ -572,16 +576,15 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_predictions</span><span class="p">[</span><span class="n">peptides</span><span class="p">]</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">frac</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span><span class="o">.</span><span class="n">values</span></div></div>
 
 
-<div class="viewcode-block" id="model_select"><a class="viewcode-back" href="../../api.html#mhcflurry.select_allele_specific_models_command.model_select">[docs]</a><span class="k">def</span> <span class="nf">model_select</span><span class="p">(</span><span class="n">allele</span><span class="p">):</span>
-    <span class="k">global</span> <span class="n">GLOBAL_DATA</span>
-    <span class="n">unselected_accuracy_scorer</span> <span class="o">=</span> <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;unselected_accuracy_scorer&quot;</span><span class="p">]</span>
-    <span class="n">selector</span> <span class="o">=</span> <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;allele_to_selector&quot;</span><span class="p">][</span><span class="n">allele</span><span class="p">]</span>
-    <span class="n">model_selection_kwargs</span> <span class="o">=</span> <span class="n">GLOBAL_DATA</span><span class="p">[</span>
+<div class="viewcode-block" id="model_select"><a class="viewcode-back" href="../../api.html#mhcflurry.select_allele_specific_models_command.model_select">[docs]</a><span class="k">def</span> <span class="nf">model_select</span><span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">constant_data</span><span class="o">=</span><span class="n">GLOBAL_DATA</span><span class="p">):</span>
+    <span class="n">unselected_accuracy_scorer</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span><span class="s2">&quot;unselected_accuracy_scorer&quot;</span><span class="p">]</span>
+    <span class="n">selector</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span><span class="s2">&quot;allele_to_selector&quot;</span><span class="p">][</span><span class="n">allele</span><span class="p">]</span>
+    <span class="n">model_selection_kwargs</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span>
         <span class="s2">&quot;allele_to_model_selection_kwargs&quot;</span>
     <span class="p">][</span><span class="n">allele</span><span class="p">]</span>
-    <span class="n">predictor</span> <span class="o">=</span> <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;input_predictor&quot;</span><span class="p">]</span>
-    <span class="n">args</span> <span class="o">=</span> <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;args&quot;</span><span class="p">]</span>
-    <span class="n">unselected_accuracy_scorer_samples</span> <span class="o">=</span> <span class="n">GLOBAL_DATA</span><span class="p">[</span><span class="s2">&quot;args&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">unselected_accuracy_scorer_num_samples</span>
+    <span class="n">predictor</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span><span class="s2">&quot;input_predictor&quot;</span><span class="p">]</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span><span class="s2">&quot;args&quot;</span><span class="p">]</span>
+    <span class="n">unselected_accuracy_scorer_samples</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span><span class="s2">&quot;args&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">unselected_accuracy_scorer_num_samples</span>
 
     <span class="n">result_dict</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">&quot;allele&quot;</span><span class="p">:</span> <span class="n">allele</span>
@@ -649,11 +652,11 @@
 <span class="sd">    Thin wrapper over a score function (Class1AffinityPredictor -&gt; float).</span>
 <span class="sd">    Used to keep a summary string associated with the function.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">function</span> <span class="o">=</span> <span class="n">function</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">summary</span> <span class="o">=</span> <span class="n">summary</span> <span class="k">if</span> <span class="n">summary</span> <span class="k">else</span> <span class="s2">&quot;(n/a)&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">function</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
 
@@ -661,7 +664,7 @@
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Model selector that computes a weighted average over other model selectors.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_selectors</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">min_contribution_percent</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_selectors</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">min_contribution_percent</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">weights</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">model_selectors</span><span class="p">),))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">model_selectors</span> <span class="o">=</span> <span class="n">model_selectors</span>
@@ -732,7 +735,7 @@
 <span class="sd">    Model selector that scores sub-ensembles based on their Kendall tau</span>
 <span class="sd">    consistency with the full ensemble over a set of random peptides.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">predictor</span><span class="p">,</span>
             <span class="n">num_peptides_per_length</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
@@ -782,7 +785,7 @@
 <span class="sd">    Model selector that uses mean-squared error to score models. Inequalities</span>
 <span class="sd">    are supported.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">df</span><span class="p">,</span>
             <span class="n">predictor</span><span class="p">,</span>
@@ -863,7 +866,7 @@
 <span class="sd">    Model selector that uses PPV of differentiating decoys from hits from</span>
 <span class="sd">    mass-spec experiments.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">df</span><span class="p">,</span>
             <span class="n">predictor</span><span class="p">,</span>
@@ -957,14 +960,22 @@
 
   <div role="contentinfo">
     <p>
+        
         &copy; Copyright Timothy O&#39;Donnell
       <span class="lastupdated">
-        Last updated on Mar 23, 2020.
+        Last updated on Jul 13, 2020.
       </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -975,7 +986,6 @@
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

@@ -1,15 +1,18 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Command-line tutorial &mdash; MHCflurry 1.6.0 documentation</title>
+  <title>Command-line tutorial &mdash; MHCflurry 2.0.0 documentation</title>
   
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
 
   
   
@@ -17,7 +20,9 @@
   
 
   
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -29,10 +34,6 @@
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Python library tutorial" href="python_tutorial.html" />
     <link rel="prev" title="Introduction and setup" href="intro.html" /> 
@@ -49,7 +50,7 @@
           
 
           
-            <a href="index.html" class="icon icon-home"> MHCflurry
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> MHCflurry
           
 
           
@@ -59,7 +60,7 @@
             
             
               <div class="version">
-                1.6.0
+                2.0.0
               </div>
             
           
@@ -76,6 +77,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -88,6 +90,7 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Command-line tutorial</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#downloading-models">Downloading models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#generating-predictions">Generating predictions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#using-the-older-allele-specific-models">Using the older, allele-specific models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#scanning-protein-sequences-for-predicted-mhc-i-ligands">Scanning protein sequences for predicted MHC I ligands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#fitting-your-own-models">Fitting your own models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment variables</a></li>
@@ -101,6 +104,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -139,7 +143,7 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="index.html">Docs</a> &raquo;</li>
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
         
       <li>Command-line tutorial</li>
     
@@ -173,7 +177,7 @@ are distributed separately from the pip package and may be downloaded with the
 <p>Files downloaded with <a class="reference internal" href="commandline_tools.html#mhcflurry-downloads"><span class="std std-ref">mhcflurry-downloads</span></a> are stored in a platform-specific
 directory. To get the path to downloaded data, you can use:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ mhcflurry-downloads path models_class1_presentation
-/Users/tim/Library/Application Support/mhcflurry/4/1.6.0/models_class1_presentation/
+/Users/tim/Library/Application Support/mhcflurry/4/2.0.0/models_class1_presentation/
 </pre></div>
 </div>
 <p>We also release a number of other “downloads,” such as curated training data and some
@@ -199,6 +203,7 @@ models can be used by specifying the <code class="docutils literal notranslate">
     --alleles HLA-A0201 HLA-A0301
     --peptides SIINFEKL SIINFEKD SIINFEKQ
     --out /tmp/predictions.csv
+Forcing tensorflow backend.
 Predicting processing.
 Predicting affinities.
 Wrote: /tmp/predictions.csv
@@ -206,13 +211,13 @@ Wrote: /tmp/predictions.csv
 </div>
 <p>results in a file like this:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ cat /tmp/predictions.csv
-allele,peptide,mhcflurry_affinity,mhcflurry_affinity_percentile,mhcflurry_processing_score,mhcflurry_presentation_score
-HLA-A0201,SIINFEKL,12906.786866783777,6.566374999999997,0.10147304146084934,0.012502709574418581
-HLA-A0201,SIINFEKD,34491.778276696794,44.61275000000001,0.015448467253008857,0.00387464531700359
-HLA-A0201,SIINFEKQ,31476.142209308568,30.217625,0.0359264743165113,0.004518140004135804
-HLA-A0301,SIINFEKL,32253.5874797359,20.37875,0.10147304146084934,0.0055786327707357695
-HLA-A0301,SIINFEKD,37075.86269121571,58.8585,0.015448467253008857,0.0036345557828772576
-HLA-A0301,SIINFEKQ,33258.4276356094,24.029125,0.0359264743165113,0.004303226784859033
+allele,peptide,mhcflurry_affinity,mhcflurry_affinity_percentile,mhcflurry_processing_score,mhcflurry_presentation_score,mhcflurry_presentation_percentile
+HLA-A0201,SIINFEKL,11927.158941532069,6.296000000000002,0.26470961794257164,0.020690210604074,11.6303260869565
+HLA-A0201,SIINFEKD,30039.79614570185,41.398,0.024963302072137594,0.0036743984764636087,99.28660326086957
+HLA-A0201,SIINFEKQ,28026.90550690346,30.226250000000004,0.06154933862853795,0.00447008680074548,62.74467391304348
+HLA-A0301,SIINFEKL,29871.585202288912,23.19225,0.26470961794257164,0.008586191856042273,27.617391304347805
+HLA-A0301,SIINFEKD,33158.802891745494,62.27625,0.024963302072137594,0.0033393306217936363,99.28660326086957
+HLA-A0301,SIINFEKQ,29705.412189610724,21.8915,0.06154933862853795,0.004225574919955567,62.74467391304348
 </pre></div>
 </div>
 <p>The binding affinity predictions are given as affinities (KD) in nM in the
@@ -241,6 +246,25 @@ processing or presentation scores, you may also want to pass the upstream and
 downstream sequences of the peptides from their source proteins for potentially more
 accurate cleavage prediction. See the <a class="reference internal" href="commandline_tools.html#mhcflurry-predict"><span class="std std-ref">mhcflurry-predict</span></a> docs.</p>
 </div>
+<div class="section" id="using-the-older-allele-specific-models">
+<h2>Using the older, allele-specific models<a class="headerlink" href="#using-the-older-allele-specific-models" title="Permalink to this headline">¶</a></h2>
+<p>Previous versions of MHCflurry (described in the 2018 paper) used models
+trained on affinity measurements, one allele per model (i.e. allele-specific).
+Mass spec datasets were incorporated in the model selection step.</p>
+<p>These models are still available to use with the latest version of MHCflurry.
+To download these predictors, run:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ mhcflurry-downloads fetch models_class1
+</pre></div>
+</div>
+<p>and specify <code class="docutils literal notranslate"><span class="pre">--models</span></code> when you call <code class="docutils literal notranslate"><span class="pre">mhcflurry-predict</span></code>:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ mhcflurry-predict <span class="se">\</span>
+    --alleles HLA-A0201 HLA-A0301 <span class="se">\</span>
+    --peptides SIINFEKL SIINFEKD SIINFEKQ <span class="se">\</span>
+    --models <span class="s2">&quot;</span><span class="k">$(</span>mhcflurry-downloads path models_class1<span class="k">)</span><span class="s2">/models&quot;</span>
+    --out /tmp/predictions.csv
+</pre></div>
+</div>
+</div>
 <div class="section" id="scanning-protein-sequences-for-predicted-mhc-i-ligands">
 <h2>Scanning protein sequences for predicted MHC I ligands<a class="headerlink" href="#scanning-protein-sequences-for-predicted-mhc-i-ligands" title="Permalink to this headline">¶</a></h2>
 <p>Starting in version 1.6.0, MHCflurry supports scanning proteins for MHC-binding
@@ -262,6 +286,7 @@ binders to either of two MHC I genotypes (using a 100 nM threshold):</p>
         HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:02,HLA-C*03:01
     --results-filtered affinity
     --threshold-affinity 100
+Forcing tensorflow backend.
 Guessed input file format: fasta
 Read input fasta with 2 sequences
   sequence_id                sequence
@@ -269,16 +294,14 @@ Read input fasta with 2 sequences
 1    protein2  MVENKRLLEGMEMIFGQVIPGA
 Predicting processing.
 Predicting affinities.
-sequence_name,pos,peptide,n_flank,c_flank,sample_name,affinity,best_allele,affinity_percentile,processing_score,presentation_score
-protein2,5,RLLEGMEMI,MVENK,FGQVIPGA,genotype_00,15.506647240532306,HLA-A*02:01,0.06800000000000002,0.9045842811465263,0.9899999181261543
-protein2,5,RLLEGMEMI,MVENK,FGQVIPGA,genotype_01,17.618050003789662,HLA-A*02:06,0.09587500000000006,0.9045842811465263,0.9888061128232571
-protein2,12,MIFGQVIPGA,MVENKRLLEGME,,genotype_01,27.74054476375278,HLA-A*02:06,0.2527499999999999,0.9025756493210793,0.9831738588268119
-protein2,4,KRLLEGMEM,MVEN,IFGQVIPGA,genotype_00,29.368389637130125,HLA-C*07:02,0.09150000000000004,0.49434878677129745,0.9171519649768841
-protein2,12,MIFGQVIPGA,MVENKRLLEGME,,genotype_00,35.083004993507345,HLA-A*02:01,0.34662499999999985,0.9025756493210793,0.9793299707138564
-protein1,8,CPNGPGNCQV,MSSSSTPV,,genotype_01,44.167261275374614,HLA-B*07:02,0.236125,0.16842720657587051,0.6796971953334389
-protein2,10,MEMIFGQVI,MVENKRLLEG,PGA,genotype_00,48.90184726168596,HLA-B*45:01,0.180375,0.40690354630351067,0.8325127154379427
-protein2,10,MEMIFGQVI,MVENKRLLEG,PGA,genotype_01,77.43363203601268,HLA-B*44:02,0.3624999999999998,0.40690354630351067,0.7673069170016388
-protein2,4,KRLLEGMEMIF,MVEN,GQVIPGA,genotype_00,88.06509237659311,HLA-C*07:02,0.8623749999999999,0.46066924184560776,0.7842639917310846
+sequence_name,pos,peptide,n_flank,c_flank,sample_name,affinity,best_allele,affinity_percentile,processing_score,presentation_score,presentation_percentile
+protein2,5,RLLEGMEMI,MVENK,FGQVI,genotype_00,20.48976379349174,HLA-A*02:01,0.10225000000000008,0.6447581760585308,0.975528093093756,0.013097826086976738
+protein2,5,RLLEGMEMI,MVENK,FGQVI,genotype_01,23.010403529711986,HLA-A*02:06,0.1372500000000001,0.6447581760585308,0.972681225756668,0.016576086956561653
+protein2,12,MIFGQVIPGA,LEGME,,genotype_01,40.981431478935065,HLA-A*02:06,0.3232499999999999,0.8904485031962395,0.9810106587410801,0.0061684782608750766
+protein2,4,KRLLEGMEM,MVEN,IFGQV,genotype_00,49.677106614054956,HLA-C*07:02,0.09350000000000007,0.12594258785247803,0.7006409502993601,0.43820652173911867
+protein2,12,MIFGQVIPGA,LEGME,,genotype_00,62.967656603774884,HLA-A*02:01,0.4323749999999997,0.8904485031962395,0.9714322924052166,0.017663043478293616
+protein2,10,MEMIFGQVI,RLLEG,PGA,genotype_00,82.40893767472276,HLA-B*45:01,0.18000000000000002,0.3939148336648941,0.7984213046411495,0.2809510869564775
+protein1,8,CPNGPGNCQV,SSTPV,,genotype_01,87.84821064140868,HLA-B*07:02,0.297,0.057573866099119186,0.5088251513715745,0.8024184782607335
 </pre></div>
 </div>
 <p>See the <a class="reference internal" href="commandline_tools.html#mhcflurry-predict-scan"><span class="std std-ref">mhcflurry-predict-scan</span></a> docs for more options.</p>
@@ -314,24 +337,24 @@ BoLA-1*21:01,NQFNGGCLLV,1086.0,=,quantitative,affinity,Barlow - purified MHC/dir
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">hyperparameters.yaml</span></code> file gives the list of neural network architectures
 to train models for. Here’s an example specifying a single architecture:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">activation</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">tanh</span>
-  <span class="l l-Scalar l-Scalar-Plain">dense_layer_l1_regularization</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">0.0</span>
-  <span class="l l-Scalar l-Scalar-Plain">dropout_probability</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">0.0</span>
-  <span class="l l-Scalar l-Scalar-Plain">early_stopping</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
-  <span class="l l-Scalar l-Scalar-Plain">layer_sizes</span><span class="p p-Indicator">:</span> <span class="p p-Indicator">[</span><span class="nv">8</span><span class="p p-Indicator">]</span>
-  <span class="l l-Scalar l-Scalar-Plain">locally_connected_layers</span><span class="p p-Indicator">:</span> <span class="p p-Indicator">[]</span>
-  <span class="l l-Scalar l-Scalar-Plain">loss</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">custom:mse_with_inequalities</span>
-  <span class="l l-Scalar l-Scalar-Plain">max_epochs</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">500</span>
-  <span class="l l-Scalar l-Scalar-Plain">minibatch_size</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">128</span>
-  <span class="l l-Scalar l-Scalar-Plain">n_models</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">4</span>
-  <span class="l l-Scalar l-Scalar-Plain">output_activation</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">sigmoid</span>
-  <span class="l l-Scalar l-Scalar-Plain">patience</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">20</span>
-  <span class="l l-Scalar l-Scalar-Plain">peptide_amino_acid_encoding</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">BLOSUM62</span>
-  <span class="l l-Scalar l-Scalar-Plain">random_negative_affinity_max</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">50000.0</span>
-  <span class="l l-Scalar l-Scalar-Plain">random_negative_affinity_min</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">20000.0</span>
-  <span class="l l-Scalar l-Scalar-Plain">random_negative_constant</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">25</span>
-  <span class="l l-Scalar l-Scalar-Plain">random_negative_rate</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">0.0</span>
-  <span class="l l-Scalar l-Scalar-Plain">validation_split</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span> <span class="nt">activation</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">tanh</span>
+  <span class="nt">dense_layer_l1_regularization</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0.0</span>
+  <span class="nt">dropout_probability</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0.0</span>
+  <span class="nt">early_stopping</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+  <span class="nt">layer_sizes</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">8</span><span class="p p-Indicator">]</span>
+  <span class="nt">locally_connected_layers</span><span class="p">:</span> <span class="p p-Indicator">[]</span>
+  <span class="nt">loss</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">custom:mse_with_inequalities</span>
+  <span class="nt">max_epochs</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">500</span>
+  <span class="nt">minibatch_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">128</span>
+  <span class="nt">n_models</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">4</span>
+  <span class="nt">output_activation</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">sigmoid</span>
+  <span class="nt">patience</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20</span>
+  <span class="nt">peptide_amino_acid_encoding</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">BLOSUM62</span>
+  <span class="nt">random_negative_affinity_max</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">50000.0</span>
+  <span class="nt">random_negative_affinity_min</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000.0</span>
+  <span class="nt">random_negative_constant</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">25</span>
+  <span class="nt">random_negative_rate</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0.0</span>
+  <span class="nt">validation_split</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0.1</span>
 </pre></div>
 </div>
 <p>The available hyperparameters for binding predictors are defined in
@@ -419,14 +442,22 @@ you can try decreasing the batch size.</p>
 
   <div role="contentinfo">
     <p>
+        
         &copy; Copyright Timothy O&#39;Donnell
       <span class="lastupdated">
-        Last updated on Mar 23, 2020.
+        Last updated on Jul 13, 2020.
       </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -437,7 +468,6 @@ you can try decreasing the batch size.</p>
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

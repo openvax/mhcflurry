@@ -1,0 +1,498 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mhcflurry.predict_command &mdash; MHCflurry 1.6.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.6.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>mhcflurry.predict_command</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mhcflurry.predict_command</h1><div class="highlight"><pre>
+<span></span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Run MHCflurry predictor on specified peptides.</span>
+
+<span class="sd">By default, the presentation predictor is used, and predictions for</span>
+<span class="sd">MHC I binding affinity, antigen processing, and the composite presentation score</span>
+<span class="sd">are returned. If you just want binding affinity predictions, pass</span>
+<span class="sd">--affinity-only.</span>
+
+<span class="sd">Examples:</span>
+
+<span class="sd">Write a CSV file containing the contents of INPUT.csv plus additional columns</span>
+<span class="sd">giving MHCflurry predictions:</span>
+
+<span class="sd">$ mhcflurry-predict INPUT.csv --out RESULT.csv</span>
+
+<span class="sd">The input CSV file is expected to contain columns &quot;allele&quot;, &quot;peptide&quot;, and,</span>
+<span class="sd">optionally, &quot;n_flank&quot;, and &quot;c_flank&quot;.</span>
+
+<span class="sd">If `--out` is not specified, results are written to stdout.</span>
+
+<span class="sd">You can also run on alleles and peptides specified on the commandline, in</span>
+<span class="sd">which case predictions are written for *all combinations* of alleles and</span>
+<span class="sd">peptides:</span>
+
+<span class="sd">$ mhcflurry-predict --alleles HLA-A0201 H-2Kb --peptides SIINFEKL DENDREKLLL</span>
+
+<span class="sd">Instead of individual alleles (in a CSV or on the command line), you can also</span>
+<span class="sd">give a comma separated list of alleles giving a sample genotype. In this case,</span>
+<span class="sd">the tightest binding affinity across the alleles for the sample will be</span>
+<span class="sd">returned. For example:</span>
+
+<span class="sd">$ mhcflurry-predict --peptides SIINFEKL DENDREKLLL \</span>
+<span class="sd">    --alleles \</span>
+<span class="sd">        HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:01,HLA-C*07:02 \</span>
+<span class="sd">        HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:01,HLA-C*03:01</span>
+
+<span class="sd">will give the tightest predicted affinities across alleles for each of the two</span>
+<span class="sd">genotypes specified for each peptide.</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="p">(</span>
+    <span class="n">print_function</span><span class="p">,</span>
+    <span class="n">division</span><span class="p">,</span>
+    <span class="n">absolute_import</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">import</span> <span class="nn">pandas</span>
+
+<span class="kn">from</span> <span class="nn">.downloads</span> <span class="k">import</span> <span class="n">get_default_class1_presentation_models_dir</span>
+<span class="kn">from</span> <span class="nn">.class1_affinity_predictor</span> <span class="k">import</span> <span class="n">Class1AffinityPredictor</span>
+<span class="kn">from</span> <span class="nn">.class1_presentation_predictor</span> <span class="k">import</span> <span class="n">Class1PresentationPredictor</span>
+<span class="kn">from</span> <span class="nn">.version</span> <span class="k">import</span> <span class="n">__version__</span>
+
+
+<span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+    <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">,</span>
+    <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">RawDescriptionHelpFormatter</span><span class="p">,</span>
+    <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+
+<span class="n">helper_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Help&quot;</span><span class="p">)</span>
+<span class="n">helper_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;-h&quot;</span><span class="p">,</span> <span class="s2">&quot;--help&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;help&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Show this help message and exit&quot;</span>
+<span class="p">)</span>
+<span class="n">helper_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--list-supported-alleles&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Prints the list of supported alleles and exits&quot;</span>
+<span class="p">)</span>
+<span class="n">helper_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--list-supported-peptide-lengths&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Prints the list of supported peptide lengths and exits&quot;</span>
+<span class="p">)</span>
+<span class="n">helper_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--version&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;version&quot;</span><span class="p">,</span>
+    <span class="n">version</span><span class="o">=</span><span class="s2">&quot;mhcflurry </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">__version__</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">input_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Input (required)&quot;</span><span class="p">)</span>
+<span class="n">input_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;input&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;INPUT.csv&quot;</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;?&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Input CSV&quot;</span><span class="p">)</span>
+<span class="n">input_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--alleles&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;ALLELE&quot;</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;+&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Alleles to predict (exclusive with passing an input CSV)&quot;</span><span class="p">)</span>
+<span class="n">input_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--peptides&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;PEPTIDE&quot;</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;+&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Peptides to predict (exclusive with passing an input CSV)&quot;</span><span class="p">)</span>
+
+<span class="n">input_mod_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Input options&quot;</span><span class="p">)</span>
+<span class="n">input_mod_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--allele-column&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;allele&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Input column name for alleles. Default: &#39;</span><span class="si">%(default)s</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+<span class="n">input_mod_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--peptide-column&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;peptide&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Input column name for peptides. Default: &#39;</span><span class="si">%(default)s</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+<span class="n">input_mod_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--n-flank-column&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;n_flank&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Column giving N-terminal flanking sequence. Default: &#39;</span><span class="si">%(default)s</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+<span class="n">input_mod_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--c-flank-column&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;c_flank&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Column giving C-terminal flanking sequence. Default: &#39;</span><span class="si">%(default)s</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+<span class="n">input_mod_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--no-throw&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Return NaNs for unsupported alleles or peptides instead of raising&quot;</span><span class="p">)</span>
+
+<span class="n">output_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Output options&quot;</span><span class="p">)</span>
+<span class="n">output_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--out&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;OUTPUT.csv&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Output CSV&quot;</span><span class="p">)</span>
+<span class="n">output_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--prediction-column-prefix&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;mhcflurry_&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Prefix for output column names. Default: &#39;</span><span class="si">%(default)s</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+<span class="n">output_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--output-delimiter&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;CHAR&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;,&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Delimiter character for results. Default: &#39;</span><span class="si">%(default)s</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+<span class="n">output_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--no-affinity-percentile&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Do not include affinity percentile rank&quot;</span><span class="p">)</span>
+<span class="n">output_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--always-include-best-allele&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Always include the best_allele column even when it is identical &quot;</span>
+    <span class="s2">&quot;to the allele column (i.e. all queries are monoallelic).&quot;</span><span class="p">)</span>
+
+<span class="n">model_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Model options&quot;</span><span class="p">)</span>
+<span class="n">model_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--models&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;DIR&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Directory containing models. Either a binding affinity predictor or &quot;</span>
+    <span class="s2">&quot;a presentation predictor can be used. &quot;</span>
+    <span class="s2">&quot;Default: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">get_default_class1_presentation_models_dir</span><span class="p">(</span>
+        <span class="n">test_exists</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+<span class="n">model_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--affinity-only&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Affinity prediction only (no antigen processing or presentation)&quot;</span><span class="p">)</span>
+<span class="n">model_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--no-flanking&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Do not use flanking sequence information even when available&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="run"><a class="viewcode-back" href="../../api.html#mhcflurry.predict_command.run">[docs]</a><span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;tensorflow&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">disabled</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">argv</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+
+    <span class="c1"># It&#39;s hard to pass a tab in a shell, so we correct a common error:</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">output_delimiter</span> <span class="o">==</span> <span class="s2">&quot;</span><span class="se">\\</span><span class="s2">t&quot;</span><span class="p">:</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">output_delimiter</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span>
+
+    <span class="n">models_dir</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">models</span>
+    <span class="k">if</span> <span class="n">models_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># The reason we set the default here instead of in the argument parser</span>
+        <span class="c1"># is that we want to test_exists at this point, so the user gets a</span>
+        <span class="c1"># message instructing them to download the models if needed.</span>
+        <span class="n">models_dir</span> <span class="o">=</span> <span class="n">get_default_class1_presentation_models_dir</span><span class="p">(</span><span class="n">test_exists</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;weights.csv&quot;</span><span class="p">)):</span>
+        <span class="c1"># Using a presentation predictor.</span>
+        <span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1PresentationPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Using just an affinity predictor.</span>
+        <span class="n">affinity_predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+        <span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1PresentationPredictor</span><span class="p">(</span>
+            <span class="n">affinity_predictor</span><span class="o">=</span><span class="n">affinity_predictor</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">affinity_only</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Specified models are an affinity predictor, which implies &quot;</span>
+                <span class="s2">&quot;--affinity-only. Specify this argument to silence this warning.&quot;</span><span class="p">)</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">affinity_only</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">list_supported_alleles</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">predictor</span><span class="o">.</span><span class="n">supported_alleles</span><span class="p">))</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">list_supported_peptide_lengths</span><span class="p">:</span>
+        <span class="n">min_len</span><span class="p">,</span> <span class="n">max_len</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">supported_peptide_lengths</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">min_len</span><span class="p">,</span> <span class="n">max_len</span><span class="o">+</span><span class="mi">1</span><span class="p">)]))</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">alleles</span> <span class="ow">or</span> <span class="n">args</span><span class="o">.</span><span class="n">peptides</span><span class="p">:</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;If an input file is specified, do not specify --alleles &quot;</span>
+                <span class="s2">&quot;or --peptides&quot;</span><span class="p">)</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Read input CSV with </span><span class="si">%d</span><span class="s2"> rows, columns are: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">),</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)))</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">allele_column</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">peptide_column</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;No such column &#39;</span><span class="si">%s</span><span class="s2">&#39; in CSV. Columns are: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">col</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">])))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">alleles</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">peptides</span><span class="p">:</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Specify either an input CSV file or both the &quot;</span>
+                <span class="s2">&quot;--alleles and --peptides arguments&quot;</span><span class="p">)</span>
+
+        <span class="n">pairs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">alleles</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">peptides</span><span class="p">))</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="s2">&quot;allele&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">],</span>
+            <span class="s2">&quot;peptide&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">],</span>
+        <span class="p">})</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Predicting for </span><span class="si">%d</span><span class="s2"> alleles and </span><span class="si">%d</span><span class="s2"> peptides = </span><span class="si">%d</span><span class="s2"> predictions&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">alleles</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">peptides</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)))</span>
+
+    <span class="n">allele_string_to_alleles</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">allele_column</span><span class="p">)</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">allele_column</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="kc">False</span><span class="p">)[</span>
+                <span class="n">args</span><span class="o">.</span><span class="n">allele_column</span>
+        <span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[,\s]+&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">affinity_only</span><span class="p">:</span>
+        <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict_affinity</span><span class="p">(</span>
+            <span class="n">peptides</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">peptide_column</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+            <span class="n">alleles</span><span class="o">=</span><span class="n">allele_string_to_alleles</span><span class="p">,</span>
+            <span class="n">sample_names</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">allele_column</span><span class="p">],</span>
+            <span class="n">throw</span><span class="o">=</span><span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_throw</span><span class="p">,</span>
+            <span class="n">include_affinity_percentile</span><span class="o">=</span><span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_affinity_percentile</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">n_flanks</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">c_flanks</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_flanking</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">n_flank_column</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">c_flank_column</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">n_flanks</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">n_flank_column</span><span class="p">]</span>
+                <span class="n">c_flanks</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">c_flank_column</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;No flanking information provided. Specify --no-flanking &quot;</span>
+                    <span class="s2">&quot;to silence this warning&quot;</span><span class="p">)</span>
+
+        <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+            <span class="n">peptides</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">peptide_column</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+            <span class="n">n_flanks</span><span class="o">=</span><span class="n">n_flanks</span><span class="p">,</span>
+            <span class="n">c_flanks</span><span class="o">=</span><span class="n">c_flanks</span><span class="p">,</span>
+            <span class="n">alleles</span><span class="o">=</span><span class="n">allele_string_to_alleles</span><span class="p">,</span>
+            <span class="n">sample_names</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">allele_column</span><span class="p">],</span>
+            <span class="n">throw</span><span class="o">=</span><span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_throw</span><span class="p">,</span>
+            <span class="n">include_affinity_percentile</span><span class="o">=</span><span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_affinity_percentile</span><span class="p">)</span>
+
+    <span class="c1"># If each query is just for a single allele, the &quot;best_allele&quot; column</span>
+    <span class="c1"># is redundant so we remove it.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">always_include_best_allele</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">allele_string_to_alleles</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+            <span class="k">del</span> <span class="n">predictions</span><span class="p">[</span><span class="s2">&quot;best_allele&quot;</span><span class="p">]</span>
+
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">predictions</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;allele&quot;</span><span class="p">,</span> <span class="s2">&quot;peptide&quot;</span><span class="p">,</span> <span class="s2">&quot;sample_name&quot;</span><span class="p">,</span> <span class="s2">&quot;peptide_num&quot;</span><span class="p">):</span>
+            <span class="n">df</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">prediction_column_prefix</span> <span class="o">+</span> <span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[</span><span class="n">col</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">:</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">output_delimiter</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Wrote: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">output_delimiter</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright Timothy O&#39;Donnell
+      <span class="lastupdated">
+        Last updated on Mar 23, 2020.
+      </span>
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

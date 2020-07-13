@@ -1,15 +1,18 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.select_pan_allele_models_command &mdash; MHCflurry 1.6.0 documentation</title>
+  <title>mhcflurry.select_pan_allele_models_command &mdash; MHCflurry 2.0.0 documentation</title>
   
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
 
   
   
@@ -17,7 +20,9 @@
   
 
   
-  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -29,10 +34,6 @@
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
@@ -47,7 +48,7 @@
           
 
           
-            <a href="../../index.html" class="icon icon-home"> MHCflurry
+            <a href="../../index.html" class="icon icon-home" alt="Documentation Home"> MHCflurry
           
 
           
@@ -57,7 +58,7 @@
             
             
               <div class="version">
-                1.6.0
+                2.0.0
               </div>
             
           
@@ -74,6 +75,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -92,6 +94,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -130,7 +133,7 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="../../index.html">Docs</a> &raquo;</li>
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
         
           <li><a href="../index.html">Module code</a> &raquo;</li>
         
@@ -165,7 +168,7 @@
 <span class="kn">import</span> <span class="nn">time</span>
 <span class="kn">import</span> <span class="nn">traceback</span>
 <span class="kn">import</span> <span class="nn">hashlib</span>
-<span class="kn">from</span> <span class="nn">pprint</span> <span class="k">import</span> <span class="n">pprint</span>
+<span class="kn">from</span> <span class="nn">pprint</span> <span class="kn">import</span> <span class="n">pprint</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span>
 <span class="kn">import</span> <span class="nn">pandas</span>
@@ -173,17 +176,17 @@
 <span class="kn">import</span> <span class="nn">tqdm</span>  <span class="c1"># progress bar</span>
 <span class="n">tqdm</span><span class="o">.</span><span class="n">monitor_interval</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># see https://github.com/tqdm/tqdm/issues/481</span>
 
-<span class="kn">from</span> <span class="nn">.class1_affinity_predictor</span> <span class="k">import</span> <span class="n">Class1AffinityPredictor</span>
-<span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="k">import</span> <span class="n">EncodableSequences</span>
-<span class="kn">from</span> <span class="nn">.allele_encoding</span> <span class="k">import</span> <span class="n">AlleleEncoding</span>
-<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">configure_logging</span>
-<span class="kn">from</span> <span class="nn">.local_parallelism</span> <span class="k">import</span> <span class="p">(</span>
+<span class="kn">from</span> <span class="nn">.class1_affinity_predictor</span> <span class="kn">import</span> <span class="n">Class1AffinityPredictor</span>
+<span class="kn">from</span> <span class="nn">.encodable_sequences</span> <span class="kn">import</span> <span class="n">EncodableSequences</span>
+<span class="kn">from</span> <span class="nn">.allele_encoding</span> <span class="kn">import</span> <span class="n">AlleleEncoding</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="kn">import</span> <span class="n">configure_logging</span>
+<span class="kn">from</span> <span class="nn">.local_parallelism</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">worker_pool_with_gpu_assignments_from_args</span><span class="p">,</span>
     <span class="n">add_local_parallelism_args</span><span class="p">)</span>
-<span class="kn">from</span> <span class="nn">.cluster_parallelism</span> <span class="k">import</span> <span class="p">(</span>
+<span class="kn">from</span> <span class="nn">.cluster_parallelism</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">add_cluster_parallelism_args</span><span class="p">,</span>
     <span class="n">cluster_results_from_args</span><span class="p">)</span>
-<span class="kn">from</span> <span class="nn">.regression_target</span> <span class="k">import</span> <span class="n">from_ic50</span>
+<span class="kn">from</span> <span class="nn">.regression_target</span> <span class="kn">import</span> <span class="n">from_ic50</span>
 
 
 <span class="c1"># To avoid pickling large matrices to send to child processes when running in</span>
@@ -398,6 +401,9 @@
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Processing </span><span class="si">%d</span><span class="s2"> work items in parallel.&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">))</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">serial_run</span>
 
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">work_items</span><span class="p">:</span>
+            <span class="n">item</span><span class="p">[</span><span class="s1">&#39;constant_data&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">GLOBAL_DATA</span>
+
         <span class="c1"># Parallel run</span>
         <span class="n">results</span> <span class="o">=</span> <span class="n">worker_pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span>
             <span class="n">do_model_select_task</span><span class="p">,</span>
@@ -442,6 +448,8 @@
 
 
 <div class="viewcode-block" id="do_model_select_task"><a class="viewcode-back" href="../../api.html#mhcflurry.select_pan_allele_models_command.do_model_select_task">[docs]</a><span class="k">def</span> <span class="nf">do_model_select_task</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">constant_data</span><span class="o">=</span><span class="n">GLOBAL_DATA</span><span class="p">):</span>
+    <span class="k">if</span> <span class="s1">&#39;constant_data&#39;</span> <span class="ow">in</span> <span class="n">item</span><span class="p">:</span>
+        <span class="n">constant_data</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;constant_data&#39;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">model_select</span><span class="p">(</span><span class="n">constant_data</span><span class="o">=</span><span class="n">constant_data</span><span class="p">,</span> <span class="o">**</span><span class="n">item</span><span class="p">)</span></div>
 
 
@@ -542,14 +550,22 @@
 
   <div role="contentinfo">
     <p>
+        
         &copy; Copyright Timothy O&#39;Donnell
       <span class="lastupdated">
-        Last updated on Mar 23, 2020.
+        Last updated on Jul 13, 2020.
       </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -560,7 +576,6 @@
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

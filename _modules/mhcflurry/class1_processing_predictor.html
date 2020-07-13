@@ -1,15 +1,18 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>mhcflurry.class1_processing_predictor &mdash; MHCflurry 1.6.0 documentation</title>
+  <title>mhcflurry.class1_processing_predictor &mdash; MHCflurry 2.0.0 documentation</title>
   
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
 
   
   
@@ -17,7 +20,9 @@
   
 
   
-  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -29,10 +34,6 @@
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
@@ -47,7 +48,7 @@
           
 
           
-            <a href="../../index.html" class="icon icon-home"> MHCflurry
+            <a href="../../index.html" class="icon icon-home" alt="Documentation Home"> MHCflurry
           
 
           
@@ -57,7 +58,7 @@
             
             
               <div class="version">
-                1.6.0
+                2.0.0
               </div>
             
           
@@ -74,6 +75,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -92,6 +94,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -130,7 +133,7 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="../../index.html">Docs</a> &raquo;</li>
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
         
           <li><a href="../index.html">Module code</a> &raquo;</li>
         
@@ -150,12 +153,12 @@
            <div itemprop="articleBody">
             
   <h1>Source code for mhcflurry.class1_processing_predictor</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">print_function</span>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
 
-<span class="kn">from</span> <span class="nn">os.path</span> <span class="k">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">exists</span><span class="p">,</span> <span class="n">abspath</span>
-<span class="kn">from</span> <span class="nn">os</span> <span class="k">import</span> <span class="n">mkdir</span>
-<span class="kn">from</span> <span class="nn">socket</span> <span class="k">import</span> <span class="n">gethostname</span>
-<span class="kn">from</span> <span class="nn">getpass</span> <span class="k">import</span> <span class="n">getuser</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">exists</span><span class="p">,</span> <span class="n">abspath</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">mkdir</span>
+<span class="kn">from</span> <span class="nn">socket</span> <span class="kn">import</span> <span class="n">gethostname</span>
+<span class="kn">from</span> <span class="nn">getpass</span> <span class="kn">import</span> <span class="n">getuser</span>
 
 <span class="kn">import</span> <span class="nn">time</span>
 <span class="kn">import</span> <span class="nn">json</span>
@@ -166,12 +169,12 @@
 <span class="kn">import</span> <span class="nn">numpy</span>
 <span class="kn">import</span> <span class="nn">pandas</span>
 
-<span class="kn">from</span> <span class="nn">.version</span> <span class="k">import</span> <span class="n">__version__</span>
-<span class="kn">from</span> <span class="nn">.class1_neural_network</span> <span class="k">import</span> <span class="n">DEFAULT_PREDICT_BATCH_SIZE</span>
-<span class="kn">from</span> <span class="nn">.flanking_encoding</span> <span class="k">import</span> <span class="n">FlankingEncoding</span>
-<span class="kn">from</span> <span class="nn">.downloads</span> <span class="k">import</span> <span class="n">get_default_class1_processing_models_dir</span>
-<span class="kn">from</span> <span class="nn">.class1_processing_neural_network</span> <span class="k">import</span> <span class="n">Class1ProcessingNeuralNetwork</span>
-<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">save_weights</span><span class="p">,</span> <span class="n">load_weights</span><span class="p">,</span> <span class="n">NumpyJSONEncoder</span>
+<span class="kn">from</span> <span class="nn">.version</span> <span class="kn">import</span> <span class="n">__version__</span>
+<span class="kn">from</span> <span class="nn">.class1_neural_network</span> <span class="kn">import</span> <span class="n">DEFAULT_PREDICT_BATCH_SIZE</span>
+<span class="kn">from</span> <span class="nn">.flanking_encoding</span> <span class="kn">import</span> <span class="n">FlankingEncoding</span>
+<span class="kn">from</span> <span class="nn">.downloads</span> <span class="kn">import</span> <span class="n">get_default_class1_processing_models_dir</span>
+<span class="kn">from</span> <span class="nn">.class1_processing_neural_network</span> <span class="kn">import</span> <span class="n">Class1ProcessingNeuralNetwork</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="kn">import</span> <span class="n">save_weights</span><span class="p">,</span> <span class="n">load_weights</span><span class="p">,</span> <span class="n">NumpyJSONEncoder</span>
 
 
 <div class="viewcode-block" id="Class1ProcessingPredictor"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1ProcessingPredictor">[docs]</a><span class="k">class</span> <span class="nc">Class1ProcessingPredictor</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
@@ -180,11 +183,12 @@
 
 <span class="sd">    Delegates to an ensemble of Class1ProcessingNeuralNetwork instances.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">models</span><span class="p">,</span>
             <span class="n">manifest_df</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-            <span class="n">metadata_dataframes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="n">metadata_dataframes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">provenance_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Instantiate a new Class1ProcessingPredictor</span>
 
@@ -200,11 +204,14 @@
 <span class="sd">            needed.</span>
 <span class="sd">        metadata_dataframes : dict of string -&gt; pandas.DataFrame</span>
 <span class="sd">            Arbitrary metadata associated with this predictor</span>
+<span class="sd">        provenance_string : string, optional</span>
+<span class="sd">            Optional info string to use in __str__.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">models</span> <span class="o">=</span> <span class="n">models</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_manifest_df</span> <span class="o">=</span> <span class="n">manifest_df</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">metadata_dataframes</span> <span class="o">=</span> <span class="p">(</span>
             <span class="nb">dict</span><span class="p">(</span><span class="n">metadata_dataframes</span><span class="p">)</span> <span class="k">if</span> <span class="n">metadata_dataframes</span> <span class="k">else</span> <span class="p">{})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">provenance_string</span> <span class="o">=</span> <span class="n">provenance_string</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">sequence_lengths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -328,6 +335,7 @@
             <span class="n">peptides</span><span class="p">,</span>
             <span class="n">n_flanks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">c_flanks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="n">batch_size</span><span class="o">=</span><span class="n">DEFAULT_PREDICT_BATCH_SIZE</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict antigen processing.</span>
@@ -340,6 +348,10 @@
 <span class="sd">            Upstream sequence before each peptide</span>
 <span class="sd">        c_flanks : list of string</span>
 <span class="sd">            Downstream sequence after each peptide</span>
+<span class="sd">        throw : boolean</span>
+<span class="sd">            If True, a ValueError will be raised in the case of unsupported</span>
+<span class="sd">            peptides. If False, a warning will be logged and the predictions</span>
+<span class="sd">            for those peptides will be NaN.</span>
 <span class="sd">        batch_size : int</span>
 <span class="sd">            Prediction keras batch size.</span>
 
@@ -354,6 +366,7 @@
             <span class="n">peptides</span><span class="o">=</span><span class="n">peptides</span><span class="p">,</span>
             <span class="n">n_flanks</span><span class="o">=</span><span class="n">n_flanks</span><span class="p">,</span>
             <span class="n">c_flanks</span><span class="o">=</span><span class="n">c_flanks</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="n">throw</span><span class="p">,</span>
             <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span><span class="o">.</span><span class="n">score</span><span class="o">.</span><span class="n">values</span></div>
 
 <div class="viewcode-block" id="Class1ProcessingPredictor.predict_to_dataframe"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1ProcessingPredictor.predict_to_dataframe">[docs]</a>    <span class="k">def</span> <span class="nf">predict_to_dataframe</span><span class="p">(</span>
@@ -361,6 +374,7 @@
             <span class="n">peptides</span><span class="p">,</span>
             <span class="n">n_flanks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">c_flanks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="n">batch_size</span><span class="o">=</span><span class="n">DEFAULT_PREDICT_BATCH_SIZE</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict antigen processing.</span>
@@ -383,10 +397,10 @@
         <span class="n">sequences</span> <span class="o">=</span> <span class="n">FlankingEncoding</span><span class="p">(</span>
             <span class="n">peptides</span><span class="o">=</span><span class="n">peptides</span><span class="p">,</span> <span class="n">n_flanks</span><span class="o">=</span><span class="n">n_flanks</span><span class="p">,</span> <span class="n">c_flanks</span><span class="o">=</span><span class="n">c_flanks</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict_to_dataframe_encoded</span><span class="p">(</span>
-            <span class="n">sequences</span><span class="o">=</span><span class="n">sequences</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span></div>
+            <span class="n">sequences</span><span class="o">=</span><span class="n">sequences</span><span class="p">,</span> <span class="n">throw</span><span class="o">=</span><span class="n">throw</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Class1ProcessingPredictor.predict_to_dataframe_encoded"><a class="viewcode-back" href="../../api.html#mhcflurry.Class1ProcessingPredictor.predict_to_dataframe_encoded">[docs]</a>    <span class="k">def</span> <span class="nf">predict_to_dataframe_encoded</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="n">sequences</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">DEFAULT_PREDICT_BATCH_SIZE</span><span class="p">):</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">sequences</span><span class="p">,</span> <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">DEFAULT_PREDICT_BATCH_SIZE</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict antigen processing.</span>
 
@@ -396,6 +410,7 @@
 <span class="sd">        ----------</span>
 <span class="sd">        sequences : FlankingEncoding</span>
 <span class="sd">        batch_size : int</span>
+<span class="sd">        throw : boolean</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
@@ -406,7 +421,7 @@
 
         <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">network</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">):</span>
             <span class="n">predictions</span> <span class="o">=</span> <span class="n">network</span><span class="o">.</span><span class="n">predict_encoded</span><span class="p">(</span>
-                <span class="n">sequences</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span>
+                <span class="n">sequences</span><span class="p">,</span> <span class="n">throw</span><span class="o">=</span><span class="n">throw</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span>
             <span class="n">score_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span>
 
         <span class="n">score_array</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">score_array</span><span class="p">)</span>
@@ -535,10 +550,29 @@
         <span class="n">manifest_df</span><span class="p">[</span><span class="s2">&quot;model&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">models</span>
 
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Loaded </span><span class="si">%d</span><span class="s2"> class1 processing models&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">models</span><span class="p">))</span>
+
+        <span class="n">provenance_string</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">info_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">&quot;info.txt&quot;</span><span class="p">)</span>
+            <span class="n">info</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+                <span class="n">info_path</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span>
+                <span class="p">:,</span> <span class="mi">0</span>
+            <span class="p">]</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+            <span class="n">provenance_string</span> <span class="o">=</span> <span class="s2">&quot;generated on </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">info</span><span class="p">[</span><span class="s2">&quot;trained on&quot;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">pass</span>
+
         <span class="n">result</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
             <span class="n">models</span><span class="o">=</span><span class="n">models</span><span class="p">,</span>
-            <span class="n">manifest_df</span><span class="o">=</span><span class="n">manifest_df</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">result</span></div></div>
+            <span class="n">manifest_df</span><span class="o">=</span><span class="n">manifest_df</span><span class="p">,</span>
+            <span class="n">provenance_string</span><span class="o">=</span><span class="n">provenance_string</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">pieces</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;at 0x</span><span class="si">%0x</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="s2">&quot;[mhcflurry </span><span class="si">%s</span><span class="s2">]&quot;</span> <span class="o">%</span> <span class="n">__version__</span><span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">provenance_string</span><span class="p">:</span>
+            <span class="n">pieces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">provenance_string</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&lt;Class1ProcessingPredictor </span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pieces</span><span class="p">)</span></div>
 </pre></div>
 
            </div>
@@ -551,14 +585,22 @@
 
   <div role="contentinfo">
     <p>
+        
         &copy; Copyright Timothy O&#39;Donnell
       <span class="lastupdated">
-        Last updated on Mar 23, 2020.
+        Last updated on Jul 13, 2020.
       </span>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -569,7 +611,6 @@
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {
