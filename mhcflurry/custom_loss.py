@@ -10,6 +10,9 @@ import pandas
 import numpy
 from numpy import isnan, array
 
+from .common import configure_tensorflow
+
+
 CUSTOM_LOSSES = {}
 
 
@@ -61,7 +64,8 @@ class Loss(object):
         raise NotImplementedError()
 
     def get_keras_loss(self, reduction="sum_over_batch_size"):
-        from keras.losses import LossFunctionWrapper
+        configure_tensorflow()
+        from tensorflow.keras.losses import LossFunctionWrapper
         return LossFunctionWrapper(
             self.loss, reduction=reduction, name=self.name)
 
@@ -163,7 +167,8 @@ class MSEWithInequalities(Loss):
     def loss(self, y_true, y_pred):
         # We always delay import of Keras so that mhcflurry can be imported
         # initially without tensorflow debug output, etc.
-        from keras import backend as K
+        configure_tensorflow()
+        from tensorflow.keras import backend as K
         y_true = K.flatten(y_true)
         y_pred = K.flatten(y_pred)
 
@@ -244,27 +249,29 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
         return encoded
 
     def loss(self, y_true, y_pred):
-        from keras import backend as K
-        y_true = K.flatten(y_true)
+        configure_tensorflow()
+        import tensorflow as tf
+        y_true = tf.reshape(y_true, [-1])
 
         output_indices = y_true // 10
         updated_y_true = y_true - (10 * output_indices)
 
         # We index into y_pred using flattened indices since Keras backend
         # supports gather but has no equivalent of tf.gather_nd:
-        ordinals = K.arange(K.shape(y_true)[0])
-        flattened_indices = (
-            ordinals * y_pred.shape[1] + K.cast(output_indices, "int32"))
-        updated_y_pred = K.gather(K.flatten(y_pred), flattened_indices)
+        #ordinals = K.arange(K.shape(y_true)[0])
+        #flattened_indices = (
+        #    ordinals * y_pred.shape[1] + K.cast(output_indices, "int32"))
+        #updated_y_pred = K.gather(K.flatten(y_pred), flattened_indices)
 
         # Alternative implementation using tensorflow, which could be used if
         # we drop support for other backends:
-        # import tensorflow as tf
-        # indexer = K.stack([
-        #     ordinals,
-        #     K.cast(output_indices, "int32")
-        # ], axis=-1)
-        #updated_y_pred = tf.gather_nd(y_pred, indexer)
+        #ordinals = K.arange(K.shape(y_true)[0])
+        ordinals = tf.range(tf.shape(y_true)[0])
+        indexer = tf.stack([
+            ordinals,
+            tf.cast(output_indices, "int32")
+        ], axis=-1)
+        updated_y_pred = tf.gather_nd(y_pred, indexer)
 
         return MSEWithInequalities().loss(updated_y_true, updated_y_pred)
 
@@ -290,6 +297,7 @@ class MultiallelicMassSpecLoss(Loss):
         return encoded.values
 
     def loss(self, y_true, y_pred):
+        configure_tensorflow()
         import tensorflow as tf
         y_true = tf.reshape(y_true, (-1,))
         pos = tf.boolean_mask(y_pred, tf.math.equal(y_true, 1.0))

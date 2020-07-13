@@ -15,7 +15,7 @@ import random
 
 import numpy
 
-from .common import set_keras_backend
+from .common import configure_tensorflow
 
 
 def add_local_parallelism_args(parser):
@@ -117,7 +117,7 @@ def worker_pool_with_gpu_assignments(
 
     if num_jobs == 0:
         if backend:
-            set_keras_backend(backend)
+            configure_tensorflow(backend)
         return None
 
     worker_init_kwargs = [{} for _ in range(num_jobs)]
@@ -271,7 +271,7 @@ def worker_init(keras_backend=None, gpu_device_nums=None, worker_log_dir=None):
     if keras_backend or gpu_device_nums:
         print("WORKER pid=%d assigned GPU devices: %s" % (
             os.getpid(), gpu_device_nums))
-        set_keras_backend(
+        configure_tensorflow(
             keras_backend, gpu_device_nums=gpu_device_nums)
 
 

@@ -41,6 +41,8 @@ See:
 from __future__ import print_function
 import numpy
 
+from .common import configure_tensorflow
+
 
 def svd_orthonormal(shape):
     # Orthonormal init code is from Lasagne
@@ -56,7 +58,8 @@ def svd_orthonormal(shape):
 
 
 def get_activations(model, layer, X_batch):
-    from keras.models import Model
+    configure_tensorflow()
+    from tensorflow.keras.models import Model
     intermediate_layer_model = Model(
         inputs=model.get_input_at(0),
         outputs=layer.get_output_at(0)
@@ -89,7 +92,8 @@ def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
     keras.Model
         Same as what was passed in.
     """
-    from keras.layers import Dense, Convolution2D
+    configure_tensorflow()
+    from tensorflow.keras.layers import Dense, Convolution2D
     needed_variance = 1.0
     layers_inintialized = 0
     for layer in model.layers:

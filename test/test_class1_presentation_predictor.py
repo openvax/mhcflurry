@@ -38,9 +38,10 @@ def setup():
         optimization_level=0,
         max_models=1)
     CLEAVAGE_PREDICTOR = Class1ProcessingPredictor.load(
-        get_path("models_class1_processing", "models"), max_models=1)
+        get_path("models_class1_processing", "models.selected.with_flanks"),
+        max_models=1)
     CLEAVAGE_PREDICTOR_NO_FLANKING = Class1ProcessingPredictor.load(
-        get_path("models_class1_processing_variants", "models.selected.no_flank"),
+        get_path("models_class1_processing", "models.selected.no_flank"),
         max_models=1)
     PRESENTATION_PREDICTOR = Class1PresentationPredictor.load()
 
@@ -84,20 +85,30 @@ def test_basic():
         c_flanks=train_df.c_flank.values,
         verbose=2)
 
+    # Calibrate with fake data.
+    predictor.calibrate_percentile_ranks(numpy.random.rand(100)**2)
+
     def add_prediction_cols(test_df, predictor):
-        test_df["prediction1"] = predictor.predict(
+        prediction1_df = predictor.predict(
             peptides=test_df.peptide.values,
             sample_names=test_df.sample_id.values,
             alleles=experiment_to_alleles,
             n_flanks=test_df.n_flank.values,
             c_flanks=test_df.c_flank.values,
-            verbose=2).presentation_score.values
+            verbose=2)
+        print(prediction1_df)
 
-        test_df["prediction2"] = predictor.predict(
+        prediction2_df = predictor.predict(
             peptides=test_df.peptide.values,
             sample_names=test_df.sample_id.values,
             alleles=experiment_to_alleles,
-            verbose=2).presentation_score.values
+            verbose=2)
+        print(prediction2_df)
+
+        test_df["prediction1"] = prediction1_df.presentation_score.values
+        test_df["prediction2"] = prediction2_df.presentation_score.values
+        test_df["prediction1_percentile"] = prediction1_df.presentation_percentile.values
+        test_df["prediction2_percentile"] = prediction2_df.presentation_percentile.values
 
     add_prediction_cols(test_df, predictor)
 
@@ -105,6 +116,15 @@ def test_basic():
     score2 = roc_auc_score(test_df.hit.values, test_df.prediction2.values)
 
     print("AUC", score1, score2)
+
+    assert_greater(score1, 0.8)
+    assert_greater(score2, 0.8)
+
+    score1 = roc_auc_score(
+        test_df.hit.values, -test_df.prediction1_percentile.values)
+    score2 = roc_auc_score(
+        test_df.hit.values, -test_df.prediction2_percentile.values)
+    print("AUC (using percentiles)", score1, score2)
 
     assert_greater(score1, 0.8)
     assert_greater(score2, 0.8)
@@ -276,7 +296,7 @@ def test_downloaded_predictor():
         ])
     print(scan_results3)
 
-    assert len(scan_results3) > 5, len(scan_results3)
+    assert len(scan_results3) >= 5, len(scan_results3)
     assert (scan_results3.presentation_score >= 0.9).all()
 
     scan_results4 = PRESENTATION_PREDICTOR.predict_sequences(

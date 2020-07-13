@@ -1,6 +1,9 @@
 """
 Tests for calibrate percentile ranks command
 """
+import logging
+logging.getLogger('matplotlib').disabled = True
+logging.getLogger('tensorflow').disabled = True
 
 import os
 import shutil

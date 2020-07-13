@@ -8,6 +8,7 @@ from getpass import getuser
 import time
 import collections
 import logging
+import warnings
 from six import string_types
 
 import numpy
@@ -26,8 +27,9 @@ from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .encodable_sequences import EncodableSequences
-from .regression_target import from_ic50, to_ic50
+from .regression_target import from_ic50
 from .downloads import get_default_class1_presentation_models_dir
+from .percent_rank_transform import PercentRankTransform
 
 
 MAX_ALLELES_PER_SAMPLE = 6
@@ -56,7 +58,9 @@ class Class1PresentationPredictor(object):
             processing_predictor_with_flanks=None,
             processing_predictor_without_flanks=None,
             weights_dataframe=None,
-            metadata_dataframes=None):
+            metadata_dataframes=None,
+            percent_rank_transform=None,
+            provenance_string=None):
 
         self.affinity_predictor = affinity_predictor
         self.processing_predictor_with_flanks = processing_predictor_with_flanks
@@ -65,6 +69,8 @@ class Class1PresentationPredictor(object):
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
         self._models_cache = {}
+        self.percent_rank_transform = percent_rank_transform
+        self.provenance_string = provenance_string
 
     @property
     def supported_alleles(self):
@@ -79,6 +85,27 @@ class Class1PresentationPredictor(object):
         (min, max) of supported peptide lengths, inclusive.
         """
         return self.affinity_predictor.supported_peptide_lengths
+
+    @property
+    def supports_affinity_prediction(self):
+        """Is there an affinity predictor associated with this instance?"""
+        return self.affinity_predictor is not None
+
+    @property
+    def supports_processing_prediction(self):
+        """Is there a processing predictor associated with this instance?"""
+        return (
+            self.processing_predictor_with_flanks is not None or
+            self.processing_predictor_without_flanks is not None)
+
+    @property
+    def supports_presentation_prediction(self):
+        """Can this instance predict presentation?"""
+        return (
+            self.supports_affinity_prediction and
+            self.supports_processing_prediction and
+            self.weights_dataframe is not None)
+
 
     def predict_affinity(
             self,
@@ -109,11 +136,11 @@ class Class1PresentationPredictor(object):
         ...        "sample2": ["A0101", "C0202"],
         ...    },
         ...    verbose=0)
-            peptide  peptide_num sample_name      affinity best_allele
-        0  SIINFEKL            0     sample1  12906.787792       A0201
-        1   PEPTIDE            1     sample1  36827.681130       B0702
-        2  SIINFEKL            0     sample2   3588.413748       C0202
-        3   PEPTIDE            1     sample2  34362.109211       C0202
+            peptide  peptide_num sample_name   affinity best_allele  affinity_percentile
+        0  SIINFEKL            0     sample1  11927.161       A0201                6.296
+        1   PEPTIDE            1     sample1  32507.083       A0201               71.249
+        2  SIINFEKL            0     sample2   2725.593       C0202                6.662
+        3   PEPTIDE            1     sample2  28304.330       C0202               54.652
 
         In contrast, here we specify sample_names, so peptide is evaluated for
         binding the alleles in the corresponding sample, for a result size equal
@@ -127,10 +154,9 @@ class Class1PresentationPredictor(object):
         ...    },
         ...    sample_names=["sample2", "sample1"],
         ...    verbose=0)
-            peptide  peptide_num sample_name      affinity best_allele
-        0  SIINFEKL            0     sample2   3588.412141       C0202
-        1   PEPTIDE            1     sample1  36827.682779       B0702
-
+            peptide  peptide_num sample_name   affinity best_allele  affinity_percentile
+        0  SIINFEKL            0     sample2   2725.592       C0202                6.662
+        1   PEPTIDE            1     sample1  32507.079       A0201               71.249
 
         Parameters
         ----------
@@ -425,11 +451,11 @@ class Class1PresentationPredictor(object):
         ...        "sample2": ["A0101", "C0202"],
         ...    },
         ...    verbose=0)
-            peptide n_flank c_flank  peptide_num sample_name      affinity best_allele  processing_score  presentation_score
-        0  SIINFEKL     NNN     CCC            0     sample1  12906.787792       A0201          0.802466            0.140365
-        1   PEPTIDE     SNS     CNC            1     sample1  36827.681130       B0702          0.105260            0.004059
-        2  SIINFEKL     NNN     CCC            0     sample2   3588.413748       C0202          0.802466            0.338647
-        3   PEPTIDE     SNS     CNC            1     sample2  34362.109211       C0202          0.105260            0.004317
+            peptide n_flank c_flank  peptide_num sample_name   affinity best_allele  processing_score  presentation_score  presentation_percentile
+        0  SIINFEKL     NNN     CCC            0     sample1  11927.161       A0201             0.838               0.145                    2.282
+        1   PEPTIDE     SNS     CNC            1     sample1  32507.083       A0201             0.025               0.003                  100.000
+        2  SIINFEKL     NNN     CCC            0     sample2   2725.593       C0202             0.838               0.416                    1.017
+        3   PEPTIDE     SNS     CNC            1     sample2  28304.330       C0202             0.025               0.003                   99.287
 
         You can also specify sample_names, in which case peptide is evaluated
         for binding the alleles in the corresponding sample only. See
@@ -503,12 +529,15 @@ class Class1PresentationPredictor(object):
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
 
-        processing_scores = self.predict_processing(
-            peptides=peptides,
-            n_flanks=n_flanks,
-            c_flanks=c_flanks,
-            throw=throw,
-            verbose=verbose)
+        if self.supports_processing_prediction:
+            processing_scores = self.predict_processing(
+                peptides=peptides,
+                n_flanks=n_flanks,
+                c_flanks=c_flanks,
+                throw=throw,
+                verbose=verbose)
+        else:
+            processing_scores = None
 
         if alleles:
             df = self.predict_affinity(
@@ -521,23 +550,30 @@ class Class1PresentationPredictor(object):
 
             df["affinity_score"] = from_ic50(df.affinity)
         else:
-            # Processing predicion only.
+            # Processing prediction only.
             df = pandas.DataFrame({
                 "peptide_num": numpy.arange(len(peptides)),
                 "peptide": peptides,
             })
+            df["sample_name"] = "sample1"
 
-        df["processing_score"] = df.peptide_num.map(
-            pandas.Series(processing_scores))
-        if c_flanks is not None:
-            df.insert(1, "c_flank", df.peptide_num.map(pandas.Series(c_flanks)))
-        if n_flanks is not None:
-            df.insert(1, "n_flank", df.peptide_num.map(pandas.Series(n_flanks)))
+        if processing_scores is not None:
+            df["processing_score"] = df.peptide_num.map(
+                pandas.Series(processing_scores))
+            if c_flanks is not None:
+                df.insert(1, "c_flank", df.peptide_num.map(pandas.Series(c_flanks)))
+            if n_flanks is not None:
+                df.insert(1, "n_flank", df.peptide_num.map(pandas.Series(n_flanks)))
 
-        model_name = 'with_flanks' if n_flanks is not None else "without_flanks"
-        model = self.get_model(model_name)
-        if "affinity_score" in df.columns:
+        predict_presentation = (
+                "affinity_score" in df.columns and
+                "processing_score" in df.columns and
+                self.supports_presentation_prediction)
+        if predict_presentation:
             if len(df) > 0:
+                model_name = 'with_flanks' if n_flanks is not None else \
+                    "without_flanks"
+                model = self.get_model(model_name)
                 input_matrix = df[self.model_inputs]
                 null_mask = None
                 if not throw:
@@ -548,8 +584,11 @@ class Class1PresentationPredictor(object):
                     input_matrix.values)[:,1]
                 if null_mask is not None:
                     df.loc[null_mask, "presentation_score"] = numpy.nan
+                df["presentation_percentile"] = self.percentile_ranks(
+                    df["presentation_score"], throw=False)
             else:
                 df["presentation_score"] = []
+                df["presentation_percentile"] = []
             del df["affinity_score"]
         return df
 
@@ -584,17 +623,17 @@ class Class1PresentationPredictor(object):
         ...    comparison_quantity="affinity",
         ...    filter_value=500,
         ...    verbose=0)
-          sequence_name  pos     peptide         n_flank     c_flank sample_name    affinity best_allele  affinity_percentile  processing_score  presentation_score
-        0      protein1   13   LLLLVVSNL   MDSKGSSQKGSRL           L     sample1   38.206225       A0201             0.380125          0.017644            0.571060
-        1      protein1   14   LLLVVSNLL  MDSKGSSQKGSRLL                 sample1   42.243472       A0201             0.420250          0.090984            0.619213
-        2      protein1    5   SSQKGSRLL           MDSKG   LLLVVSNLL     sample2   66.749223       C0202             0.803375          0.383608            0.774468
-        3      protein1    6   SQKGSRLLL          MDSKGS    LLVVSNLL     sample2  178.033474       C0202             1.820000          0.275019            0.482206
-        4      protein1   13  LLLLVVSNLL   MDSKGSSQKGSRL                 sample1  202.208167       A0201             1.112500          0.058782            0.261320
-        5      protein1   12  LLLLLVVSNL    MDSKGSSQKGSR           L     sample1  202.506582       A0201             1.112500          0.010025            0.225648
-        6      protein2    0   SSLPTPEDK                    EQAQQTHH     sample1  335.529377       A0301             1.011750          0.010443            0.156798
-        7      protein2    0   SSLPTPEDK                    EQAQQTHH     sample2  353.451759       C0202             2.674250          0.010443            0.150753
-        8      protein1    8   KGSRLLLLL        MDSKGSSQ      VVSNLL     sample2  410.327286       C0202             2.887000          0.121374            0.194081
-        9      protein1    5    SSQKGSRL           MDSKG  LLLLVVSNLL     sample2  477.285954       C0202             3.107375          0.111982            0.168572
+          sequence_name  pos     peptide n_flank c_flank sample_name  affinity best_allele  affinity_percentile  processing_score  presentation_score  presentation_percentile
+        0      protein1   14   LLLVVSNLL   GSRLL             sample1    57.180       A0201                0.398             0.233               0.754                    0.351
+        1      protein1   13   LLLLVVSNL   KGSRL       L     sample1    57.339       A0201                0.398             0.031               0.586                    0.643
+        2      protein1    5   SSQKGSRLL   MDSKG   LLLVV     sample2   110.779       C0202                0.782             0.061               0.456                    0.920
+        3      protein1    6   SQKGSRLLL   DSKGS   LLVVS     sample2   254.480       C0202                1.735             0.102               0.303                    1.356
+        4      protein1   13  LLLLVVSNLL   KGSRL             sample1   260.390       A0201                1.012             0.158               0.345                    1.215
+        5      protein1   12  LLLLLVVSNL   QKGSR       L     sample1   308.150       A0201                1.094             0.015               0.206                    1.802
+        6      protein2    0   SSLPTPEDK           EQAQQ     sample2   410.354       C0202                2.398             0.003               0.158                    2.155
+        7      protein1    5    SSQKGSRL   MDSKG   LLLLV     sample2   444.321       C0202                2.512             0.026               0.159                    2.138
+        8      protein2    0   SSLPTPEDK           EQAQQ     sample1   459.296       A0301                0.971             0.003               0.144                    2.292
+        9      protein1    4   GSSQKGSRL    MDSK   LLLLV     sample2   469.052       C0202                2.595             0.014               0.146                    2.261
 
         Parameters
         ----------
@@ -644,18 +683,46 @@ class Class1PresentationPredictor(object):
         if len(alleles) == 0:
             alleles = {}
 
+        if len(alleles) > 0 and not self.supports_affinity_prediction:
+            raise ValueError(
+                "Affinity prediction not supported by this predictor")
+
         if comparison_quantity is None:
-            comparison_quantity = (
-                "presentation_score"
-                if len(alleles) > 0 else "processing_score")
+            if len(alleles) > 0:
+                if self.supports_presentation_prediction:
+                    comparison_quantity = "presentation_score"
+                else:
+                    comparison_quantity = "affinity"
+            else:
+                comparison_quantity = "processing_score"
+
+        if comparison_quantity == "presentation_score":
+            if not self.supports_presentation_prediction:
+                raise ValueError(
+                    "Presentation prediction not supported by this predictor")
+        elif comparison_quantity == "processing_score":
+            if not self.supports_processing_prediction:
+                raise ValueError(
+                    "Processing prediction not supported by this predictor")
+        elif comparison_quantity in ("affinity", "affinity_percentile"):
+            if not self.supports_affinity_prediction:
+                raise ValueError(
+                    "Affinity prediction not supported by this predictor")
+        else:
+            raise ValueError(
+                "Unknown comparison quantity: %s" % comparison_quantity)
 
         processing_predictor = self.processing_predictor_with_flanks
         if not use_flanks or processing_predictor is None:
             processing_predictor = self.processing_predictor_without_flanks
 
-        supported_sequence_lengths = processing_predictor.sequence_lengths
-        n_flank_length = supported_sequence_lengths["n_flank"]
-        c_flank_length = supported_sequence_lengths["c_flank"]
+        if processing_predictor is not None:
+            supported_sequence_lengths = processing_predictor.sequence_lengths
+            n_flank_length = supported_sequence_lengths["n_flank"]
+            c_flank_length = supported_sequence_lengths["c_flank"]
+        else:
+            n_flank_length = 0
+            c_flank_length = 0
 
         sequence_names = []
         n_flanks = [] if use_flanks else None
@@ -783,7 +850,15 @@ class Class1PresentationPredictor(object):
 
         return result_df
 
-    def save(self, models_dir):
+    def save(
+            self,
+            models_dir,
+            write_affinity_predictor=True,
+            write_processing_predictor=True,
+            write_weights=True,
+            write_percent_ranks=True,
+            write_info=True,
+            write_metdata=True):
         """
         Save the predictor to a directory on disk. If the directory does
         not exist it will be created.
@@ -797,39 +872,60 @@ class Class1PresentationPredictor(object):
             Path to directory. It will be created if it doesn't exist.
         """
 
-        if self.weights_dataframe is None:
+        if write_weights and self.weights_dataframe is None:
             raise RuntimeError("Can't save before fitting")
 
         if not exists(models_dir):
             mkdir(models_dir)
 
         # Save underlying predictors
-        self.affinity_predictor.save(join(models_dir, "affinity_predictor"))
-        if self.processing_predictor_with_flanks is not None:
-            self.processing_predictor_with_flanks.save(
-                join(models_dir, "processing_predictor_with_flanks"))
-        if self.processing_predictor_without_flanks is not None:
-            self.processing_predictor_without_flanks.save(
-                join(models_dir, "processing_predictor_without_flanks"))
+        if write_affinity_predictor:
+            self.affinity_predictor.save(join(models_dir, "affinity_predictor"))
+        if write_processing_predictor:
+            if self.processing_predictor_with_flanks is not None:
+                self.processing_predictor_with_flanks.save(
+                    join(models_dir, "processing_predictor_with_flanks"))
+            if self.processing_predictor_without_flanks is not None:
+                self.processing_predictor_without_flanks.save(
+                    join(models_dir, "processing_predictor_without_flanks"))
 
-        # Save model coefficients.
-        self.weights_dataframe.to_csv(join(models_dir, "weights.csv"))
+        if write_weights:
+            # Save model coefficients.
+            self.weights_dataframe.to_csv(join(models_dir, "weights.csv"))
 
-        # Write "info.txt"
-        info_path = join(models_dir, "info.txt")
-        rows = [
-            ("trained on", time.asctime()),
-            ("package   ", "mhcflurry %s" % __version__),
-            ("hostname  ", gethostname()),
-            ("user      ", getuser()),
-        ]
-        pandas.DataFrame(rows).to_csv(
-            info_path, sep="\t", header=False, index=False)
+        if write_percent_ranks:
+            # Percent ranks
+            if self.percent_rank_transform:
+                series = self.percent_rank_transform.to_series()
+                percent_ranks_df = pandas.DataFrame(index=series.index)
+                numpy.testing.assert_array_almost_equal(
+                    series.index.values,
+                    percent_ranks_df.index.values)
+                percent_ranks_df["presentation_score"] = series.values
+                percent_ranks_path = join(models_dir, "percent_ranks.csv")
+                percent_ranks_df.to_csv(
+                    percent_ranks_path,
+                    index=True,
+                    index_label="bin")
+                logging.info("Wrote: %s", percent_ranks_path)
 
-        if self.metadata_dataframes:
-            for (name, df) in self.metadata_dataframes.items():
-                metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
-                df.to_csv(metadata_df_path, index=False, compression="bz2")
+        if write_info:
+            # Write "info.txt"
+            info_path = join(models_dir, "info.txt")
+            rows = [
+                ("trained on", time.asctime()),
+                ("package   ", "mhcflurry %s" % __version__),
+                ("hostname  ", gethostname()),
+                ("user      ", getuser()),
+            ]
+            pandas.DataFrame(rows).to_csv(
+                info_path, sep="\t", header=False, index=False)
+
+        if write_metdata:
+            if self.metadata_dataframes:
+                for (name, df) in self.metadata_dataframes.items():
+                    metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
+                    df.to_csv(metadata_df_path, index=False, compression="bz2")
 
 
     @classmethod
@@ -884,9 +980,80 @@ class Class1PresentationPredictor(object):
             join(models_dir, "weights.csv"),
             index_col=0)
 
+        # Load percent ranks if available
+        percent_rank_transform = None
+        percent_ranks_path = join(models_dir, "percent_ranks.csv")
+        if exists(percent_ranks_path):
+            percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
+            percent_rank_transform = PercentRankTransform.from_series(
+                percent_ranks_df["presentation_score"])
+
+        provenance_string = None
+        try:
+            info_path = join(models_dir, "info.txt")
+            info = pandas.read_csv(
+                info_path, sep="\t", header=None, index_col=0).iloc[
+                :, 0
+            ].to_dict()
+            provenance_string = "generated on %s" % info["trained on"]
+        except OSError:
+            pass
+
         result = cls(
             affinity_predictor=affinity_predictor,
             processing_predictor_with_flanks=processing_predictor_with_flanks,
             processing_predictor_without_flanks=processing_predictor_without_flanks,
-            weights_dataframe=weights_dataframe)
+            weights_dataframe=weights_dataframe,
+            percent_rank_transform=percent_rank_transform,
+            provenance_string=provenance_string)
         return result
+
+    def __repr__(self):
+        pieces = ["at 0x%0x" % id(self), "[mhcflurry %s]" % __version__]
+        if self.provenance_string:
+            pieces.append(self.provenance_string)
+        return "<Class1PresentationPredictor %s>" % " ".join(pieces)
+
+    def percentile_ranks(self, presentation_scores, throw=True):
+        """
+        Return percentile ranks for the given presentation scores.
+
+        Parameters
+        ----------
+        presentation_scores : sequence of float
+
+        Returns
+        -------
+        numpy.array of float
+        """
+
+        if self.percent_rank_transform is None:
+            msg = "No presentation predictor percentile rank information"
+            if throw:
+                raise ValueError(msg)
+            warnings.warn(msg)
+            return numpy.ones(len(presentation_scores)) * numpy.nan
+
+        # We subtract from 100 so that strong binders have low percentile ranks,
+        # making them comparable to affinity percentile ranks.
+        return 100 - self.percent_rank_transform.transform(presentation_scores)
+
+    def calibrate_percentile_ranks(self, scores, bins=None):
+        """
+        Compute the cumulative distribution of scores, to enable taking
+        quantiles of this distribution later.
+
+        Parameters
+        ----------
+        scores : sequence of float
+            Presentation prediction scores
+        bins : object
+            Anything that can be passed to numpy.histogram's "bins" argument
+            can be used here, i.e. either an integer or a sequence giving bin
+            edges.
+        """
+        if bins is None:
+            bins = numpy.linspace(0, 1, 1000)
+
+        self.percent_rank_transform = PercentRankTransform()
+        self.percent_rank_transform.fit(scores, bins=bins)

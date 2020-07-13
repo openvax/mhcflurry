@@ -3,7 +3,6 @@ import collections
 import logging
 import sys
 import os
-import warnings
 import json
 
 import numpy
@@ -12,7 +11,10 @@ import pandas
 from . import amino_acid
 
 
-def set_keras_backend(backend=None, gpu_device_nums=None, num_threads=None):
+TENSORFLOW_CONFIGURED = False
+
+
+def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
     """
     Configure Keras backend to use GPU or CPU. Only tensorflow is supported.
 
@@ -28,9 +30,14 @@ def set_keras_backend(backend=None, gpu_device_nums=None, num_threads=None):
         Tensorflow threads to use
 
     """
-    os.environ["KERAS_BACKEND"] = "tensorflow"
+    global TENSORFLOW_CONFIGURED
 
-    original_backend = backend
+    if TENSORFLOW_CONFIGURED:
+        return
+
+    TENSORFLOW_CONFIGURED = True
+
+    os.environ["KERAS_BACKEND"] = "tensorflow"
 
     if not backend:
         backend = "tensorflow-default"
@@ -53,20 +60,16 @@ def set_keras_backend(backend=None, gpu_device_nums=None, num_threads=None):
         raise ValueError("Unsupported backend: %s" % backend)
 
     import tensorflow
-    from keras import backend as K
-    if K.backend() == 'tensorflow':
-        config = tensorflow.ConfigProto(device_count=device_count)
-        config.gpu_options.allow_growth = True
-        if num_threads:
-            config.inter_op_parallelism_threads = num_threads
-            config.intra_op_parallelism_threads = num_threads
-        session = tensorflow.Session(config=config)
-        K.set_session(session)
-    else:
-        if original_backend or gpu_device_nums or num_threads:
-            warnings.warn(
-                "Only tensorflow backend can be customized. Ignoring "
-                " customization. Backend: %s" % K.backend())
+    assert tensorflow.compat.v1.keras.backend.backend() == "tensorflow"
+
+    config = tensorflow.compat.v1.ConfigProto(device_count=device_count)
+    config.gpu_options.allow_growth = True
+    if num_threads:
+        config.inter_op_parallelism_threads = num_threads
+        config.intra_op_parallelism_threads = num_threads
+    session = tensorflow.compat.v1.Session(config=config)
+    tensorflow.compat.v1.disable_v2_behavior()
+    tensorflow.compat.v1.keras.backend.set_session(session)
 
 
 def configure_logging(verbose=False):

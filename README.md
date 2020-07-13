@@ -8,7 +8,7 @@ prediction package with competitive accuracy and a fast and
 MHCflurry implements class I peptide/MHC binding affinity prediction. 
 The current version provides pan-MHC I predictors supporting any MHC
 allele of known sequence. MHCflurry runs on Python 3.4+ using the
-[keras](https://keras.io) neural network library.
+[tensorflow](https://www.tensorflow.org/) neural network library.
 It exposes [command-line](http://openvax.github.io/mhcflurry/commandline_tutorial.html)
 and [Python library](http://openvax.github.io/mhcflurry/python_tutorial.html)
 interfaces.
@@ -18,13 +18,14 @@ an "antigen processing" predictor that attempts to model MHC allele-independent
 effects such as proteosomal cleavage and a "presentation" predictor that
 integrates processing predictions with binding affinity predictions to give a
 composite "presentation score." Both models are trained on mass spec-identified
-MHC ligands.
+MHC ligands. These models were updated to incorporate minor improvements
+for the MHCflurry 2.0 release.
 
 If you find MHCflurry useful in your research please cite:
 
-> T. O'Donnell, A. Rubinsteyn, U. Laserson. "A model of antigen processing improves prediction of MHC I-presented peptides". *biorxiv*, 2020. https://www.biorxiv.org/content/10.1101/2020.03.28.013714v2
+> T. O'Donnell, A. Rubinsteyn, U. Laserson. "MHCflurry 2.0: Improved pan-allele prediction of MHC I-presented peptides by incorporating antigen processing," *Cell Systems*, 2020. https://doi.org/10.1016/j.cels.2020.06.010
 
-> T. O’Donnell, A. Rubinsteyn, M. Bonsack, A. B. Riemer, U. Laserson, and J. Hammerbacher, "MHCflurry: Open-Source Class I MHC Binding Affinity Prediction," *Cell Systems*, 2018. https://www.cell.com/cell-systems/fulltext/S2405-4712(18)30232-1.
+> T. O’Donnell, A. Rubinsteyn, M. Bonsack, A. B. Riemer, U. Laserson, and J. Hammerbacher, "MHCflurry: Open-Source Class I MHC Binding Affinity Prediction," *Cell Systems*, 2018. https://doi.org/10.1016/j.cels.2018.05.014
 
 Please file an issue if you have questions or encounter problems.
 
@@ -70,29 +71,24 @@ Wrote: /tmp/predictions.csv
 See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
 
 
-## Older allele-specific models
-
-Previous versions of MHCflurry used models trained on affinity measurements, one allele
-per model (i.e. allele-specific). Mass spec datasets were incorporated in the
-model selection step.
-
-These models are still available to use with the latest version of MHCflurry.
-To download these predictors, run:
+## Docker
+You can also try the latest (GitHub master) version of MHCflurry using the Docker
+image hosted on [Dockerhub](https://hub.docker.com/r/openvax/mhcflurry) by
+running:
 
 ```
-$ mhcflurry-downloads fetch models_class1
-```
+$ docker run -p 9999:9999 --rm openvax/mhcflurry:latest
+``` 
 
-and specify `--models` when you call `mhcflurry-predict`:
+This will start a [jupyter](https://jupyter.org/) notebook server in an
+environment that has MHCflurry installed. Go to `http://localhost:9999` in a
+browser to use it.
+
+To build the Docker image yourself, from a checkout run:
 
 ```
-$ mhcflurry-predict \
-       --alleles HLA-A0201 HLA-A0301 \
-       --peptides SIINFEKL SIINFEKD SIINFEKQ \
-       --models "$(mhcflurry-downloads path models_class1)/models"
-       --out /tmp/predictions.csv
-       
-Wrote: /tmp/predictions.csv
+$ docker build -t mhcflurry:latest .
+$ docker run -p 9999:9999 --rm mhcflurry:latest
 ```
 
 
@@ -123,22 +119,6 @@ Now call `mhcflurry-downloads fetch` with the `--already-downloaded-dir` option 
 
 ```
 $ mhcflurry-downloads fetch models_class1_presentation --already-downloaded-dir downloads
-```
-
-### Problems deserializing models
-If you encounter errors loading the MHCflurry models, such as:
-
-```
-...
-  File "/usr/local/lib/python3.6/site-packages/keras/engine/topology.py", line 293, in __init__
-    raise TypeError('Keyword argument not understood:', kwarg)
-TypeError: ('Keyword argument not understood:', 'data_format')
-```
-
-You may need to upgrade Keras:
-
-```
-pip install --upgrade Keras
 ```
 
 

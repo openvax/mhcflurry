@@ -269,6 +269,9 @@ def run(argv=sys.argv[1:]):
         # the order of the work.
         random.shuffle(work_items)
 
+        for item in work_items:
+            item['constant_data'] = GLOBAL_DATA
+
         results_generator = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, train_model),
             work_items,
@@ -351,14 +354,15 @@ def train_model(
         verbose,
         progress_print_interval,
         predictor,
-        save_to):
+        save_to,
+        constant_data=GLOBAL_DATA):
 
     if predictor is None:
         predictor = Class1AffinityPredictor()
 
     pretrain_min_points = hyperparameters['train_data']['pretrain_min_points']
 
-    data = GLOBAL_DATA["train_data"]
+    data = constant_data["train_data"]
 
     subset = hyperparameters.get("train_data", {}).get("subset", "all")
     if subset == "quantitative":

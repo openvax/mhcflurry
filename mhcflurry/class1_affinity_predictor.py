@@ -54,7 +54,8 @@ class Class1AffinityPredictor(object):
             allele_to_sequence=None,
             manifest_df=None,
             allele_to_percent_rank_transform=None,
-            metadata_dataframes=None):
+            metadata_dataframes=None,
+            provenance_string=None):
         """
         Parameters
         ----------
@@ -81,6 +82,9 @@ class Class1AffinityPredictor(object):
         metadata_dataframes : dict of string -> pandas.DataFrame, optional
             Optional additional dataframes to write to the models dir when
             save() is called. Useful for tracking provenance.
+
+        provenance_string : string, optional
+            Optional info string to use in __str__.
         """
 
         if allele_to_allele_specific_models is None:
@@ -110,6 +114,8 @@ class Class1AffinityPredictor(object):
 
         assert isinstance(self.allele_to_allele_specific_models, dict)
         assert isinstance(self.class1_pan_allele_models, list)
+
+        self.provenance_string = provenance_string
 
     @property
     def manifest_df(self):
@@ -159,6 +165,7 @@ class Class1AffinityPredictor(object):
         their own if needed.
         """
         self._cache.clear()
+        self.provenance_string = None
 
     @property
     def neural_networks(self):
@@ -519,12 +526,24 @@ class Class1AffinityPredictor(object):
                 for (allele, v)
                 in sorted(allele_to_allele_specific_models.items())))
 
+        provenance_string = None
+        try:
+            info_path = join(models_dir, "info.txt")
+            info = pandas.read_csv(
+                info_path, sep="\t", header=None, index_col=0).iloc[
+                :, 0
+            ].to_dict()
+            provenance_string = "generated on %s" % info["trained on"]
+        except OSError:
+            pass
+
         result = Class1AffinityPredictor(
             allele_to_allele_specific_models=allele_to_allele_specific_models,
             class1_pan_allele_models=class1_pan_allele_models,
             allele_to_sequence=allele_to_sequence,
             manifest_df=manifest_df,
             allele_to_percent_rank_transform=allele_to_percent_rank_transform,
+            provenance_string=provenance_string
         )
         if optimization_level >= 1:
             optimized = result.optimize()
@@ -532,6 +551,25 @@ class Class1AffinityPredictor(object):
                 "Model optimization %s",
                 "succeeded" if optimized else "not supported for these models")
         return result
+
+    def __repr__(self):
+        pieces = ["at 0x%0x" % id(self), "[mhcflurry %s]" % __version__]
+
+        pan_models = len(self.class1_pan_allele_models)
+        total_models = len(self.neural_networks)
+        if total_models == 0:
+            pieces.append("[empty]")
+        elif pan_models == total_models:
+            pieces.append("[pan]")
+        elif pan_models == 0:
+            pieces.append("[allele-specific]")
+        else:
+            pieces.append("[pan+allele-specific]")
+
+        if self.provenance_string:
+            pieces.append(self.provenance_string)
+
+        return "<Class1AffinityPredictor %s>" % " ".join(pieces)
 
     def optimize(self, warn=True):
         """
@@ -550,6 +588,7 @@ class Class1AffinityPredictor(object):
         """
         num_class1_pan_allele_models = len(self.class1_pan_allele_models)
         if num_class1_pan_allele_models > 1:
+            provenance_string = self.provenance_string
             try:
                 self.class1_pan_allele_models = [
                     Class1NeuralNetwork.merge(
@@ -565,6 +604,7 @@ class Class1AffinityPredictor(object):
             self.optimization_info["pan_models_merged"] = True
             self.optimization_info["num_pan_models_merged"] = (
                 num_class1_pan_allele_models)
+            self.provenance_string = provenance_string
         else:
             return False
         return True

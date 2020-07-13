@@ -11,12 +11,14 @@ import collections
 from functools import partial
 
 import pandas
+import numpy
 
 from mhcnames import normalize_allele_name
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
+from .class1_presentation_predictor import Class1PresentationPredictor
 from .encodable_sequences import EncodableSequences
 from .common import configure_logging, random_peptides, amino_acid_distribution
 from .local_parallelism import (
@@ -36,7 +38,11 @@ from .cluster_parallelism import (
 GLOBAL_DATA = {}
 
 parser = argparse.ArgumentParser(usage=__doc__)
-
+parser.add_argument(
+    "--predictor-kind",
+    choices=("class1_affinity", "class1_presentation"),
+    default="class1_affinity",
+    help="Type of predictor to calibrate")
 parser.add_argument(
     "--models-dir",
     metavar="DIR",
@@ -54,12 +60,30 @@ parser.add_argument(
     "peptides listed in the supplied CSV file, which must have a 'peptide' "
     "column. If not specified a uniform distribution is used.")
 parser.add_argument(
+    "--alleles-file",
+    default=None,
+    help="Use alleles in supplied CSV file, which must have an 'allele' column.")
+parser.add_argument(
     "--num-peptides-per-length",
     type=int,
     metavar="N",
     default=int(1e5),
     help="Number of peptides per length to use to calibrate percent ranks. "
     "Default: %(default)s.")
+parser.add_argument(
+    "--num-genotypes",
+    type=int,
+    metavar="N",
+    default=25,
+    help="Used when calibrrating a presentation predictor. Number of genotypes"
+    "to sample")
+parser.add_argument(
+    "--alleles-per-genotype",
+    type=int,
+    metavar="N",
+    default=6,
+    help="Used when calibrating a presentation predictor. Number of alleles "
+    "per genotype. Use 1 to calibrate for single alleles. Default: %(default)s")
 parser.add_argument(
     "--motif-summary",
     default=False,
@@ -114,6 +138,96 @@ def run(argv=sys.argv[1:]):
 
     configure_logging(verbose=args.verbosity > 1)
 
+    aa_distribution = None
+    if args.match_amino_acid_distribution_data:
+        distribution_peptides = pandas.read_csv(
+            args.match_amino_acid_distribution_data).peptide.unique()
+        aa_distribution = amino_acid_distribution(distribution_peptides)
+        print("Using amino acid distribution:")
+        print(aa_distribution)
+
+    start = time.time()
+    peptides = []
+    lengths = range(args.length_range[0], args.length_range[1] + 1)
+    for length in lengths:
+        peptides.extend(
+            random_peptides(
+                args.num_peptides_per_length,
+                length,
+                distribution=aa_distribution))
+    print("Done generating peptides in %0.2f sec." % (time.time() - start))
+
+    if args.predictor_kind == "class1_affinity":
+        return run_class1_affinity_predictor(args, peptides)
+    elif args.predictor_kind == "class1_presentation":
+        return run_class1_presentation_predictor(args, peptides)
+    else:
+        raise ValueError("Unsupported kind %s" % args.predictor_kind)
+
+
+def run_class1_presentation_predictor(args, peptides):
+    # This will trigger a Keras import - will break local parallelism.
+    predictor = Class1PresentationPredictor.load(args.models_dir)
+
+    if args.allele:
+        alleles = [normalize_allele_name(a) for a in args.allele]
+    elif args.alleles_file:
+        alleles = pandas.read_csv(args.alleles_file).allele.unique()
+    else:
+        alleles = predictor.supported_alleles
+
+    print("Num alleles", len(alleles))
+
+    genotypes = {}
+    if args.alleles_per_genotype == 6:
+        gene_to_alleles = collections.defaultdict(list)
+        for a in alleles:
+            for gene in ["A", "B", "C"]:
+                if a.startswith("HLA-%s" % gene):
+                    gene_to_alleles[gene].append(a)
+
+        for _ in range(args.num_genotypes):
+            genotype = []
+            for gene in ["A", "A", "B", "B", "C", "C"]:
+                genotype.append(numpy.random.choice(gene_to_alleles[gene]))
+            genotypes[",".join(genotype)] = genotype
+    elif args.alleles_per_genotype == 1:
+        for _ in range(args.num_genotypes):
+            genotype = [numpy.random.choice(alleles)]
+            genotypes[",".join(genotype)] = genotype
+    else:
+        raise ValueError("Alleles per genotype must be 6 or 1")
+
+    print("Sampled genotypes: ", list(genotypes))
+    print("Num peptides: ", len(peptides))
+
+    start = time.time()
+    print("Generating predictions")
+    predictions_df = predictor.predict(
+        peptides=peptides,
+        alleles=genotypes)
+    print("Finished in %0.2f sec." % (time.time() - start))
+    print(predictions_df)
+
+    print("Calibrating ranks")
+    scores = predictions_df.presentation_score.values
+    predictor.calibrate_percentile_ranks(scores)
+    print("Done. Saving.")
+
+    predictor.save(
+        args.models_dir,
+        write_affinity_predictor=False,
+        write_processing_predictor=False,
+        write_weights=False,
+        write_percent_ranks=True,
+        write_info=False,
+        write_metdata=False)
+    print("Wrote predictor to: %s" % args.models_dir)
+
+
+def run_class1_affinity_predictor(args, peptides):
+    global GLOBAL_DATA
+
     # It's important that we don't trigger a Keras import here since that breaks
     # local parallelism (tensorflow backend). So we set optimization_level=0.
     predictor = Class1AffinityPredictor.load(
@@ -123,6 +237,8 @@ def run(argv=sys.argv[1:]):
 
     if args.allele:
         alleles = [normalize_allele_name(a) for a in args.allele]
+    elif args.alleles_file:
+        alleles = pandas.read_csv(args.alleles_file).allele.unique()
     else:
         alleles = predictor.supported_alleles
 
@@ -147,28 +263,10 @@ def run(argv=sys.argv[1:]):
 
     alleles = sorted(allele_set)
 
-    distribution = None
-    if args.match_amino_acid_distribution_data:
-        distribution_peptides = pandas.read_csv(
-            args.match_amino_acid_distribution_data).peptide.unique()
-        distribution = amino_acid_distribution(distribution_peptides)
-        print("Using amino acid distribution:")
-        print(distribution)
+    print("Percent rank calibration for %d alleles. " % (len(alleles)))
 
-    start = time.time()
-
-    print("Percent rank calibration for %d alleles. Generating peptides." % (
-        len(alleles)))
-    peptides = []
-    lengths = range(args.length_range[0], args.length_range[1] + 1)
-    for length in lengths:
-        peptides.extend(
-            random_peptides(
-                args.num_peptides_per_length, length, distribution=distribution))
-    print("Done generating peptides in %0.2f sec." % (time.time() - start))
     print("Encoding %d peptides." % len(peptides))
     start = time.time()
-
     encoded_peptides = EncodableSequences.create(peptides)
     del peptides
 
@@ -208,13 +306,13 @@ def run(argv=sys.argv[1:]):
         # Serial run
         print("Running in serial.")
         results = (
-            do_calibrate_percentile_ranks(**item) for item in work_items)
+            do_class1_affinity_calibrate_percentile_ranks(**item) for item in work_items)
     elif args.cluster_parallelism:
         # Run using separate processes HPC cluster.
         print("Running on cluster.")
         results = cluster_results_from_args(
             args,
-            work_function=do_calibrate_percentile_ranks,
+            work_function=do_class1_affinity_calibrate_percentile_ranks,
             work_items=work_items,
             constant_data=GLOBAL_DATA,
             result_serialization_method="pickle",
@@ -223,8 +321,12 @@ def run(argv=sys.argv[1:]):
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
         assert worker_pool is not None
+
+        for item in work_items:
+            item['constant_data'] = GLOBAL_DATA
+
         results = worker_pool.imap_unordered(
-            partial(call_wrapped_kwargs, do_calibrate_percentile_ranks),
+            partial(call_wrapped_kwargs, do_class1_affinity_calibrate_percentile_ranks),
             work_items,
             chunksize=1)
 
@@ -256,11 +358,16 @@ def run(argv=sys.argv[1:]):
     print("Predictor written to: %s" % args.models_dir)
 
 
-def do_calibrate_percentile_ranks(alleles, constant_data=GLOBAL_DATA):
+def do_class1_affinity_calibrate_percentile_ranks(
+        alleles, constant_data=GLOBAL_DATA):
+
+    if 'predictor' not in constant_data:
+        raise ValueError("No predictor provided: " + str(constant_data))
+
     result_list = []
     for (i, allele) in enumerate(alleles):
         print("Processing allele", i + 1, "of", len(alleles))
-        result_item = calibrate_percentile_ranks(
+        result_item = class1_affinity_calibrate_percentile_ranks(
             allele,
             constant_data['predictor'],
             peptides=constant_data['calibration_peptides'],
@@ -269,7 +376,7 @@ def do_calibrate_percentile_ranks(alleles, constant_data=GLOBAL_DATA):
     return result_list
 
 
-def calibrate_percentile_ranks(
+def class1_affinity_calibrate_percentile_ranks(
         allele,
         predictor,
         peptides=None,

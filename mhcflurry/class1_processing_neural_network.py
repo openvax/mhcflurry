@@ -11,6 +11,7 @@ import numpy
 from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
+from .common import configure_tensorflow
 
 
 class Class1ProcessingNeuralNetwork(object):
@@ -105,8 +106,18 @@ class Class1ProcessingNeuralNetwork(object):
         Return the keras model associated with this network.
         """
         if self._network is None and self.network_json is not None:
-            import keras.models
-            self._network = keras.models.model_from_json(self.network_json)
+            # NOTE
+            # Instead of calling:
+            #   from tensorflow.keras.models import model_from_json
+            #   self._network = model_from_json(self.network_json)
+            # We are re-creating the network here using the hyperparameters.
+            # This is because the network uses Lambda layers, which break
+            # when serialized between python versions. The disadvantage is
+            # that we can more easily lose backward compatability.
+            self._network = self.make_network(
+                **self.network_hyperparameter_defaults.subselect(
+                    self.hyperparameters))
+
             if self.network_weights is not None:
                 self._network.set_weights(self.network_weights)
         return self._network
@@ -367,11 +378,11 @@ class Class1ProcessingNeuralNetwork(object):
 
         # We import keras here to avoid tensorflow debug output, etc. unless we
         # are actually about to use Keras.
-
-        from keras.layers import Input
-        import keras.initializers
-        from keras.layers.core import Dense, Flatten, Dropout
-        from keras.layers.merge import Concatenate
+        configure_tensorflow()
+        from tensorflow.keras.layers import (
+            Input, Dense, Dropout, Concatenate, Conv1D, Lambda)
+        from tensorflow.keras.models import Model
+        from tensorflow.keras import regularizers, initializers
 
         model_inputs = {}
 
@@ -392,16 +403,16 @@ class Class1ProcessingNeuralNetwork(object):
             name='peptide_length')
 
         current_layer = model_inputs['sequence']
-        current_layer = keras.layers.Conv1D(
+        current_layer = Conv1D(
             filters=convolutional_filters,
             kernel_size=convolutional_kernel_size,
-            kernel_regularizer=keras.regularizers.l1_l2(
+            kernel_regularizer=regularizers.l1_l2(
                 *convolutional_kernel_l1_l2),
             padding="same",
             activation=convolutional_activation,
             name="conv1")(current_layer)
         if dropout_rate > 0:
-            current_layer = keras.layers.Dropout(
+            current_layer = Dropout(
                 name="conv1_dropout",
                 rate=dropout_rate,
                 noise_shape=(
@@ -416,11 +427,11 @@ class Class1ProcessingNeuralNetwork(object):
             current_layer = convolutional_result
             for (i, size) in enumerate(
                     list(post_convolutional_dense_layer_sizes) + [1]):
-                current_layer = keras.layers.Conv1D(
+                current_layer = Conv1D(
                     name="%s_post_%d" % (flank, i),
                     filters=size,
                     kernel_size=1,
-                    kernel_regularizer=keras.regularizers.l1_l2(
+                    kernel_regularizer=regularizers.l1_l2(
                         *convolutional_kernel_l1_l2),
                     activation=(
                         "tanh" if size == 1 else convolutional_activation
@@ -432,7 +443,7 @@ class Class1ProcessingNeuralNetwork(object):
                 def cleavage_extractor(x):
                     return x[:, n_flank_length]
 
-                single_output_at_cleavage_position = keras.layers.Lambda(
+                single_output_at_cleavage_position = Lambda(
                     cleavage_extractor, name="%s_cleaved" % flank)(
                     single_output_result)
 
@@ -463,7 +474,7 @@ class Class1ProcessingNeuralNetwork(object):
                     # layer weights to 1s is reasonable.
                     return -1 * max_value
 
-                max_over_peptide = keras.layers.Lambda(
+                max_over_peptide = Lambda(
                     max_pool_over_peptide_extractor,
                     name="%s_internal_cleaved" % flank)([
                         single_output_result,
@@ -493,7 +504,7 @@ class Class1ProcessingNeuralNetwork(object):
 
                 if flanking_averages and n_flank_length > 0:
                     # Also include average pooled of flanking sequences
-                    pooled_flank = keras.layers.Lambda(
+                    pooled_flank = Lambda(
                         flanking_extractor, name="%s_extracted" % flank)([
                             convolutional_result,
                             model_inputs['peptide_length']
@@ -513,7 +524,7 @@ class Class1ProcessingNeuralNetwork(object):
                         -1)
                     return result
 
-                single_output_at_cleavage_position = keras.layers.Lambda(
+                single_output_at_cleavage_position = Lambda(
                     cleavage_extractor, name="%s_cleaved" % flank)([
                         single_output_result,
                         model_inputs['peptide_length']
@@ -546,7 +557,7 @@ class Class1ProcessingNeuralNetwork(object):
                     # layer weights to 1s is reasonable.
                     return -1 * max_value
 
-                max_over_peptide = keras.layers.Lambda(
+                max_over_peptide = Lambda(
                     max_pool_over_peptide_extractor,
                     name="%s_internal_cleaved" % flank)([
                         single_output_result,
@@ -576,7 +587,7 @@ class Class1ProcessingNeuralNetwork(object):
 
                 if flanking_averages and c_flank_length > 0:
                     # Also include average pooled of flanking sequences
-                    pooled_flank = keras.layers.Lambda(
+                    pooled_flank = Lambda(
                         flanking_extractor, name="%s_extracted" % flank)([
                             convolutional_result,
                             model_inputs['peptide_length']
@@ -598,9 +609,9 @@ class Class1ProcessingNeuralNetwork(object):
             1,
             activation="sigmoid",
             name="output",
-            kernel_initializer=keras.initializers.Ones(),
+            kernel_initializer=initializers.Ones(),
         )(current_layer)
-        model = keras.models.Model(
+        model = Model(
             inputs=[model_inputs[name] for name in sorted(model_inputs)],
             outputs=[output],
             name="predictor")

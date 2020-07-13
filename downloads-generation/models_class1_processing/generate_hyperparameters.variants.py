@@ -14,7 +14,7 @@ parser.add_argument(
     help="Production (i.e. standard) hyperparameters grid.")
 parser.add_argument(
     "kind",
-    choices=('no_n_flank', 'no_c_flank', 'no_flank'),
+    choices=('with_flanks', 'no_n_flank', 'no_c_flank', 'no_flank', 'short_flanks'),
     help="Hyperameters variant to output")
 
 args = parser.parse_args(argv[1:])
@@ -29,6 +29,9 @@ def transform(kind, hyperparameters):
         new_hyperparameters["n_flank_length"] = 0
     if kind == "no_c_flank" or kind == "no_flank":
         new_hyperparameters["c_flank_length"] = 0
+    if kind == "short_flanks":
+        new_hyperparameters["c_flank_length"] = 5
+        new_hyperparameters["n_flank_length"] = 5
     return [new_hyperparameters]
 
 

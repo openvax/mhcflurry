@@ -1,12 +1,13 @@
 import logging
 logging.getLogger('tensorflow').disabled = True
 logging.getLogger('matplotlib').disabled = True
+
 import re
 import numpy
 from numpy import testing
 numpy.random.seed(0)
-from tensorflow import set_random_seed
-set_random_seed(2)
+from tensorflow.random import set_seed
+set_seed(2)
 
 from sklearn.metrics import roc_auc_score
 

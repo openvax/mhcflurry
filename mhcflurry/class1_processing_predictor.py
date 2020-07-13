@@ -32,7 +32,8 @@ class Class1ProcessingPredictor(object):
             self,
             models,
             manifest_df=None,
-            metadata_dataframes=None):
+            metadata_dataframes=None,
+            provenance_string=None):
         """
         Instantiate a new Class1ProcessingPredictor
 
@@ -48,11 +49,14 @@ class Class1ProcessingPredictor(object):
             needed.
         metadata_dataframes : dict of string -> pandas.DataFrame
             Arbitrary metadata associated with this predictor
+        provenance_string : string, optional
+            Optional info string to use in __str__.
         """
         self.models = models
         self._manifest_df = manifest_df
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
+        self.provenance_string = provenance_string
 
     @property
     def sequence_lengths(self):
@@ -391,7 +395,26 @@ class Class1ProcessingPredictor(object):
         manifest_df["model"] = models
 
         logging.info("Loaded %d class1 processing models", len(models))
+
+        provenance_string = None
+        try:
+            info_path = join(models_dir, "info.txt")
+            info = pandas.read_csv(
+                info_path, sep="\t", header=None, index_col=0).iloc[
+                :, 0
+            ].to_dict()
+            provenance_string = "generated on %s" % info["trained on"]
+        except OSError:
+            pass
+
         result = cls(
             models=models,
-            manifest_df=manifest_df)
+            manifest_df=manifest_df,
+            provenance_string=provenance_string)
         return result
+
+    def __repr__(self):
+        pieces = ["at 0x%0x" % id(self), "[mhcflurry %s]" % __version__]
+        if self.provenance_string:
+            pieces.append(self.provenance_string)
+        return "<Class1ProcessingPredictor %s>" % " ".join(pieces)

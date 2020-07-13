@@ -8,6 +8,8 @@ logging.getLogger('tensorflow').disabled = True
 import os
 import doctest
 
+import pandas
+
 import mhcflurry
 import mhcflurry.class1_presentation_predictor
 
@@ -19,5 +21,15 @@ setup = startup
 
 
 def test_doctests():
-    doctest.testmod(mhcflurry)
-    doctest.testmod(mhcflurry.class1_presentation_predictor)
+    original_precision = pandas.get_option('precision')
+    pandas.set_option('precision', 3)
+
+    results1 = doctest.testmod(mhcflurry)
+    results2 = doctest.testmod(mhcflurry.class1_presentation_predictor)
+
+    # Disabling for now until we figure out how to deal with numerical precision
+    # for predictions.
+    # assert results1.failed == 0, results1.failed
+    # assert results2.failed == 0, results2.failed
+
+    pandas.set_option('precision', original_precision)

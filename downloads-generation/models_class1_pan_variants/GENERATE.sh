@@ -63,13 +63,17 @@ then
     cp $SCRIPT_DIR/generate_hyperparameters.production.py .
     cp $SCRIPT_DIR/generate_hyperparameters.py .
     cp $SCRIPT_DIR/reassign_mass_spec_training_data.py .
+    cp $SCRIPT_DIR/exclude_data_from_training.py .
     python generate_hyperparameters.production.py > hyperparameters.production.yaml
     python generate_hyperparameters.py hyperparameters.production.yaml no_pretrain > hyperparameters.no_pretrain.yaml
     python generate_hyperparameters.py hyperparameters.no_pretrain.yaml single_hidden > hyperparameters.single_hidden_no_pretrain.yaml
     python generate_hyperparameters.py hyperparameters.production.yaml compact_peptide > hyperparameters.compact_peptide.yaml
 fi
 
-VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm 500nm no_additional_ms no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only )
+#VARIANTS=( no_additional_ms_ms_only_0nm ms_only_0nm no_additional_ms_0nm 0nm 500nm no_additional_ms no_pretrain compact_peptide 34mer_sequence single_hidden_no_pretrain affinity_only )
+VARIANTS=( no_additional_ms )
+
+
 
 for kind in "${VARIANTS[@]}"
 do
@@ -91,7 +95,11 @@ do
     TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2"
     if [ "$kind" == "no_additional_ms" ]
     then
-        TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.no_additional_ms.csv.bz2"
+        TRAINING_DATA="train_data.$kind.csv"
+        python reassign_mass_spec_training_data.py \
+            "$(mhcflurry-downloads path data_curated)/curated_training_data.no_additional_ms.csv.bz2" \
+            --set-measurement-value 100 \
+            --out-csv "$TRAINING_DATA"
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
 
@@ -137,6 +145,16 @@ do
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
 
+    if [ "$kind" == "50nm" ]
+    then
+        TRAINING_DATA="train_data.$kind.csv"
+        python reassign_mass_spec_training_data.py \
+            "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+            --set-measurement-value 50 \
+            --out-csv "$TRAINING_DATA"
+        HYPERPARAMETERS=hyperparameters.production.yaml
+    fi
+
     if [ "$kind" == "ms_only_0nm" ]
     then
         TRAINING_DATA="train_data.$kind.csv"
@@ -151,6 +169,34 @@ do
     if [ "$kind" == "affinity_only" ]
     then
         TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.affinity.csv.bz2"
+        HYPERPARAMETERS=hyperparameters.production.yaml
+    fi
+
+    if [ "$kind" == "exclude_epitopes" ]
+    then
+        TRAINING_DATA="train_data.$kind.csv"
+        python exclude_data_from_training.py \
+            "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+            --remove-filename "$(mhcflurry-downloads path data_published)/epitopes/30377561/2018ONCOIMM0037R-file002.xlsx" \
+            --remove-kind 30377561 \
+            --out "$TRAINING_DATA" \
+            --out-removed "removed_train_data.$kind.csv"
+        HYPERPARAMETERS=hyperparameters.production.yaml
+    fi
+
+    if [ "$kind" == "exclude_epitopes_50nm" ]
+    then
+        TRAINING_DATA="train_data.$kind.csv"
+        python exclude_data_from_training.py \
+            "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+            --remove-filename "$(mhcflurry-downloads path data_published)/epitopes/30377561/2018ONCOIMM0037R-file002.xlsx" \
+            --remove-kind 30377561 \
+            --out "$TRAINING_DATA" \
+            --out-removed "removed_train_data.$kind.csv"
+        python reassign_mass_spec_training_data.py \
+            "$TRAINING_DATA" \
+            --set-measurement-value 50 \
+            --out-csv "$TRAINING_DATA"
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
 

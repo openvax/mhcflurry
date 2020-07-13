@@ -8,6 +8,7 @@ import sys
 import time
 import traceback
 import random
+from functools import partial
 from pprint import pprint
 
 import numpy
@@ -362,7 +363,7 @@ def run(argv=sys.argv[1:]):
         # Parallel run
         random.shuffle(alleles)
         results = worker_pool.imap_unordered(
-            model_select,
+            partial(model_select, constant_data=GLOBAL_DATA),
             alleles,
             chunksize=1)
 
@@ -420,16 +421,15 @@ class ScrambledPredictor(object):
         return self._predictions[peptides].sample(frac=1.0).values
 
 
-def model_select(allele):
-    global GLOBAL_DATA
-    unselected_accuracy_scorer = GLOBAL_DATA["unselected_accuracy_scorer"]
-    selector = GLOBAL_DATA["allele_to_selector"][allele]
-    model_selection_kwargs = GLOBAL_DATA[
+def model_select(allele, constant_data=GLOBAL_DATA):
+    unselected_accuracy_scorer = constant_data["unselected_accuracy_scorer"]
+    selector = constant_data["allele_to_selector"][allele]
+    model_selection_kwargs = constant_data[
         "allele_to_model_selection_kwargs"
     ][allele]
-    predictor = GLOBAL_DATA["input_predictor"]
-    args = GLOBAL_DATA["args"]
-    unselected_accuracy_scorer_samples = GLOBAL_DATA["args"].unselected_accuracy_scorer_num_samples
+    predictor = constant_data["input_predictor"]
+    args = constant_data["args"]
+    unselected_accuracy_scorer_samples = constant_data["args"].unselected_accuracy_scorer_num_samples
 
     result_dict = {
         "allele": allele

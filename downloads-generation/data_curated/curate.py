@@ -54,9 +54,16 @@ parser.add_argument(
     required=False,
     help="Result file")
 
+# Note: the value assigned to "Positive" entries in the dict below is the
+# default that will be used for mass spec hits when training the predictor.
+# However, as of version 2.0.0 we are reassigning MS entries in the training
+# script for the pan-allele predictor (see
+# downloads-generation/models_class1_pan/GENERATE.sh where
+# reassign_mass_spec_training_data.py is called). So you should look there to
+# see what the current setting for this value is.
 QUALITATIVE_TO_AFFINITY_AND_INEQUALITY = {
     "Negative": (5000.0, ">"),
-    "Positive": (50.0, "<"),  # used for mass-spec hits
+    "Positive": (100.0, "<"),  # used for mass-spec hits but see note above
     "Positive-High": (100.0, "<"),
     "Positive-Intermediate": (1000.0, "<"),
     "Positive-Low": (5000.0, "<"),

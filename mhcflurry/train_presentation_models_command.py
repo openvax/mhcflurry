@@ -113,10 +113,36 @@ def main(args):
     processing_predictor_without_flanks = Class1ProcessingPredictor.load(
         args.processing_predictor_without_flanks)
 
+    print("Loaded affinity predictor", affinity_predictor)
+    print(
+        "Loaded processing_predictor_with_flanks",
+        processing_predictor_with_flanks)
+    print("Loaded processing_predictor_without_flanks",
+        processing_predictor_without_flanks)
+
     predictor = Class1PresentationPredictor(
         affinity_predictor=affinity_predictor,
         processing_predictor_with_flanks=processing_predictor_with_flanks,
         processing_predictor_without_flanks=processing_predictor_without_flanks)
+
+    # We want to predict using an optimized Class1AffinityPredictor but
+    # save the presentation models using an un-optimized Class1AffinityPredictor,
+    # since there seems to be issues saving and loading giant tensorflow
+    # graphs (which is what the optimization routine produces).
+    print("Before fit: saving affinity and processing predictors.")
+    predictor.save(
+        args.out_models_dir,
+        write_affinity_predictor = True,
+        write_processing_predictor = True,
+        write_weights = False,
+        write_percent_ranks = False,
+        write_info = False,
+        write_metdata = False)
+    print("Done writing: ", args.out_models_dir)
+
+    print("Optimizing affinity predictor.")
+    optimized = affinity_predictor.optimize()
+    print("Optimization performed: ", optimized)
 
     print("Fitting.")
     start = time.time()
@@ -130,8 +156,15 @@ def main(args):
         verbose=args.verbosity)
     print("Done fitting in", time.time() - start, "seconds")
 
-    print("Saving")
-    predictor.save(args.out_models_dir)
+    print("Saving weights and metadata.")
+    predictor.save(
+        args.out_models_dir,
+        write_affinity_predictor = False,
+        write_processing_predictor = False,
+        write_weights = True,
+        write_percent_ranks = True,
+        write_info = True,
+        write_metdata = True)
     print("Wrote", args.out_models_dir)
 
 

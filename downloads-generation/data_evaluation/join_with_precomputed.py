@@ -77,7 +77,7 @@ def run():
 
     if 'netmhcpan4.ba' in args.predictors:
         precomputed_dfs['netmhcpan4.ba'] = load_results(
-            get_path("data_mass_spec_benchmark", "predictions/all.netmhcpan4.ba"),
+            get_path("data_predictions", "predictions/all.netmhcpan4.ba"),
             result_df=pandas.DataFrame(
                 dtype=numpy.float32,
                 index=peptides,
@@ -87,7 +87,7 @@ def run():
 
     if 'netmhcpan4.el' in args.predictors:
         precomputed_dfs['netmhcpan4.el'] = load_results(
-            get_path("data_mass_spec_benchmark", "predictions/all.netmhcpan4.el"),
+            get_path("data_predictions", "predictions/all.netmhcpan4.el"),
             result_df=pandas.DataFrame(
                 dtype=numpy.float32,
                 index=peptides,
@@ -96,7 +96,7 @@ def run():
 
     if 'mixmhcpred' in args.predictors:
         precomputed_dfs['mixmhcpred'] = load_results(
-            get_path("data_mass_spec_benchmark", "predictions/all.mixmhcpred"),
+            get_path("data_predictions", "predictions/all.mixmhcpred"),
             result_df=pandas.DataFrame(
                 dtype=numpy.float32,
                 index=peptides,

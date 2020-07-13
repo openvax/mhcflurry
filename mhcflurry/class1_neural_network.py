@@ -15,7 +15,7 @@ from .hyperparameters import HyperparameterDefaults
 from .encodable_sequences import EncodableSequences, EncodingError
 from .allele_encoding import AlleleEncoding
 from .regression_target import to_ic50, from_ic50
-from .common import random_peptides, amino_acid_distribution
+from .common import configure_tensorflow
 from .custom_loss import get_loss
 from .data_dependent_weights_initialization import lsuv_init
 from .random_negative_peptides import RandomNegativePeptides
@@ -219,8 +219,9 @@ class Class1NeuralNetwork(object):
         key = klass.keras_network_cache_key(network_json)
         if key not in klass.KERAS_MODELS_CACHE:
             # Cache miss.
-            import keras.models
-            network = keras.models.model_from_json(network_json)
+            configure_tensorflow()
+            from tensorflow.keras.models import model_from_json
+            network = model_from_json(network_json)
             existing_weights = None
         else:
             # Cache hit.
@@ -258,7 +259,8 @@ class Class1NeuralNetwork(object):
                     self.network_json,
                     self.network_weights)
             else:
-                import keras.models
+                configure_tensorflow()
+                from tensorflow import keras
                 self._network = keras.models.model_from_json(self.network_json)
                 if self.network_weights is not None:
                     self._network.set_weights(self.network_weights)
@@ -526,7 +528,8 @@ class Class1NeuralNetwork(object):
         progress_preamble : string
         progress_print_interval : float
         """
-        from keras import backend as K
+        configure_tensorflow()
+        from tensorflow.keras import backend as K
 
         fit_info = collections.defaultdict(list)
 
@@ -546,7 +549,7 @@ class Class1NeuralNetwork(object):
 
         network.compile(
             loss=loss.loss, optimizer=self.hyperparameters['optimizer'])
-        network._make_predict_function()
+        network.make_predict_function()
         self.set_allele_representations(allele_representations)
 
         if self.hyperparameters['learning_rate'] is not None:
@@ -616,7 +619,7 @@ class Class1NeuralNetwork(object):
         epoch = 1
         while True:
             epoch_start_time = time.time()
-            fit_history = network.fit_generator(
+            fit_history = network.fit(
                 iterator,
                 steps_per_epoch=steps_per_epoch,
                 initial_epoch=epoch - 1,
@@ -730,7 +733,8 @@ class Class1NeuralNetwork(object):
             How often (in seconds) to print progress update. Set to None to
             disable.
         """
-        from keras import backend as K
+        configure_tensorflow()
+        from tensorflow.keras import backend as K
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
         fit_info = collections.defaultdict(list)
@@ -1100,10 +1104,10 @@ class Class1NeuralNetwork(object):
             The merged neural network
 
         """
-        import keras
-        import keras.backend as K
-        from keras.layers import Input
-        from keras.models import Model
+        configure_tensorflow()
+        from tensorflow.keras import backend as K
+        from tensorflow.keras.layers import Input, average, add, concatenate
+        from tensorflow.keras.models import Model
 
         if len(models) == 1:
             return models[0]
@@ -1173,7 +1177,9 @@ class Class1NeuralNetwork(object):
                         "allele_peptide_merged") + 1:
                 ]
                 for layer in layers:
-                    layer.name += "_%d" % i
+                    new_name = layer.name + "_%d" % i
+                    layer._name = new_name
+                    assert layer.name == new_name, (layer.name, new_name)
 
                 node = allele_peptide_merged
                 layer_name_to_new_node = {
@@ -1183,7 +1189,11 @@ class Class1NeuralNetwork(object):
                     assert layer.name not in layer_name_to_new_node
                     input_layer_names = []
                     for inbound_node in layer._inbound_nodes:
-                        for inbound_layer in inbound_node.inbound_layers:
+                        try:
+                            inbound_layers = list(inbound_node.inbound_layers)
+                        except TypeError:
+                            inbound_layers = [inbound_node.inbound_layers]
+                        for inbound_layer in inbound_layers:
                             input_layer_names.append(inbound_layer.name)
                     input_nodes = [
                         layer_name_to_new_node[name]
@@ -1197,11 +1207,11 @@ class Class1NeuralNetwork(object):
                 sub_networks.append(node)
 
             if merge_method == 'average':
-                output = keras.layers.average(sub_networks)
+                output = average(sub_networks)
             elif merge_method == 'sum':
-                output = keras.layers.add(sub_networks)
+                output = add(sub_networks)
             elif merge_method == 'concatenate':
-                output = keras.layers.concatenate(sub_networks)
+                output = concatenate(sub_networks)
             else:
                 raise NotImplementedError(
                     "Unsupported merge method", merge_method)
@@ -1244,12 +1254,10 @@ class Class1NeuralNetwork(object):
 
         # We import keras here to avoid tensorflow debug output, etc. unless we
         # are actually about to use Keras.
-
-        from keras.layers import Input
-        import keras.layers
-        from keras.layers.core import Dense, Flatten, Dropout
-        from keras.layers.embeddings import Embedding
-        from keras.layers.normalization import BatchNormalization
+        configure_tensorflow()
+        from tensorflow import keras
+        from tensorflow.keras.layers import (
+            Input, Dense, Flatten, Dropout, Embedding, BatchNormalization)
 
         peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
         peptide_input = Input(
@@ -1381,7 +1389,7 @@ class Class1NeuralNetwork(object):
         layer = original_model.get_layer("allele_representation")
         existing_weights_shape = (layer.input_dim, layer.output_dim)
         self.set_allele_representations(
-            numpy.zeros(shape=(0,) + existing_weights_shape[1:]),
+            numpy.zeros(shape=(1,) + existing_weights_shape[1:]),
             force_surgery=True)
 
     def set_allele_representations(self, allele_representations, force_surgery=False):
@@ -1405,9 +1413,8 @@ class Class1NeuralNetwork(object):
                   l is the allele sequence length,
                   m is the length of the vectors used to represent amino acids
         """
-        from keras.models import clone_model
-        import keras.backend as K
-        import tensorflow as tf
+        configure_tensorflow()
+        from tensorflow.keras.models import clone_model
 
         reshaped = allele_representations.reshape((
             allele_representations.shape[0],

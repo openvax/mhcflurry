@@ -21,11 +21,14 @@ MHCflurry supports Python 3.4+. It uses the `keras <https://keras.io>`__
 neural network library via either the Tensorflow or Theano backends. GPUs may
 optionally be used for a modest speed improvement.
 
-If you find MHCflurry useful in your research please cite:
+If you find MHCflurry useful in your research, please cite:
+
+    T. J. O'Donnell, et al. "MHCflurry 2.0: Improved pan-allele prediction of MHC
+    I-presented peptides by incorporating antigen processing,"
+    *Cell Systems*, 2020. https://doi.org/10.1016/j.cels.2020.06.010
 
     T. J. O’Donnell, et al., "MHCflurry: Open-Source Class I MHC Binding Affinity
-    Prediction," *Cell Systems*, 2018.
-    https://www.cell.com/cell-systems/fulltext/S2405-4712(18)30232-1.
+    Prediction," *Cell Systems*, 2018. https://doi.org/10.1016/j.cels.2018.05.014
 
 If you have questions or encounter problems, please file an issue at the
 MHCflurry github repo: https://github.com/openvax/mhcflurry
@@ -63,7 +66,7 @@ tensorflow.
 
 .. code-block:: shell
 
-    $ conda create -q -n mhcflurry-env python=3.6 'tensorflow<2.0.0'
+    $ conda create -q -n mhcflurry-env python=3.8 tensorflow
     $ source activate mhcflurry-env
 
 Then continue as above:
