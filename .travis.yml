@@ -65,5 +65,6 @@ script:
       models_class1_pan
       allele_sequences
       --already-downloaded-dir /tmp/downloads
-  - mhcflurry-downloads info  # just to test this command works
+  - mhcflurry-downloads fetch  # Won't download anything, just checking it runs
+  - mhcflurry-downloads info   # Also just to test this command works
   - nosetests --with-timer -sv test
