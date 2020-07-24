@@ -90,7 +90,8 @@ To build the Docker image yourself, from a checkout run:
 $ docker build -t mhcflurry:latest .
 $ docker run -p 9999:9999 --rm mhcflurry:latest
 ```
-
+## Predicted sequence motifs
+Sequence logos for the binding motifs learned by MHCflurry BA are available [here](https://openvax.github.io/mhcflurry-motifs/).
 
 ## Common issues and fixes
 
