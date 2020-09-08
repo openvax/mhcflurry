@@ -16,12 +16,27 @@ from six import binary_type, PY3
 import pandas
 
 
-def read_fasta_to_dataframe(filename):
+def read_fasta_to_dataframe(filename, full_descriptions=False):
+    """
+    Parse a fasta file to a pandas DataFrame.
+
+    Parameters
+    ----------
+    filename : string
+    full_descriptions : bool
+        If true, instead of returning sequence IDs (the first space-separated
+        token), return the full description associated with each record.
+    Returns
+    -------
+    pandas.DataFrame with columns "sequence_id" and "sequence".
+    """
     reader = FastaParser()
-    rows = reader.iterate_over_file(filename)
+    rows = reader.iterate_over_file(
+        filename, full_descriptions=full_descriptions)
     return pandas.DataFrame(
         rows,
         columns=["sequence_id", "sequence"])
+
 
 class FastaParser(object):
     """
@@ -31,7 +46,7 @@ class FastaParser(object):
         self.current_id = None
         self.current_lines = []
 
-    def iterate_over_file(self, fasta_path):
+    def iterate_over_file(self, fasta_path, full_descriptions=False):
         """
         Generator that yields identifiers paired with sequences.
         """
@@ -47,7 +62,8 @@ class FastaParser(object):
 
                 if first_char == b">":
                     previous_entry = self._current_entry()
-                    self.current_id = self._parse_header_id(line)
+                    self.current_id = self._parse_header_id(
+                        line, full_description=full_descriptions)
 
                     if len(self.current_id) == 0:
                         logging.warning(
@@ -97,7 +113,7 @@ class FastaParser(object):
             return open(fasta_path, 'rb')
 
     @staticmethod
-    def _parse_header_id(line):
+    def _parse_header_id(line, full_description=False):
         """
         Pull the transcript or protein identifier from the header line
         which starts with '>'
@@ -112,7 +128,7 @@ class FastaParser(object):
         # split line at first space to get the unique identifier for
         # this sequence
         space_index = line.find(b" ")
-        if space_index >= 0:
+        if space_index >= 0 and not full_description:
             identifier = line[1:space_index]
         else:
             identifier = line[1:]
