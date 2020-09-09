@@ -26,8 +26,8 @@ teardown = cleanup
 setup = startup
 
 table = dict([
-    (encoding, amino_acid)
-    for (amino_acid, encoding) in BLOSUM62_MATRIX.apply(tuple).items()
+    (tuple(encoding), amino_acid)
+    for amino_acid, encoding in BLOSUM62_MATRIX.iterrows()
 ])
 
 
