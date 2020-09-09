@@ -25,9 +25,10 @@ from mhcflurry.testing_utils import cleanup, startup
 teardown = cleanup
 setup = startup
 
-
-table = BLOSUM62_MATRIX.apply(
-    tuple).reset_index().set_index(0).to_dict()['index']
+table = dict([
+    (encoding, amino_acid)
+    for (amino_acid, encoding) in BLOSUM62_MATRIX.apply(tuple).items()
+])
 
 
 def decode_matrix(array):
