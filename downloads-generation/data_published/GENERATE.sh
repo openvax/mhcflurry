@@ -119,12 +119,12 @@ wget -q "https://static-content.springer.com/esm/art%3A10.1038%2Fs41587-019-0322
 # Note: contains phospho-peptides
 PMID=31848261
 mkdir -p ms/$PMID
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/2/153742_2_supp_440008_q23fmw.xlsx" -P ms/$PMID
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/3/153742_2_supp_440009_q23fmw.xlsx" -P ms/$PMID
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/4/153742_2_supp_440010_q23fmy.xlsx" -P ms/$PMID
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/1/153742_2_supp_440007_q23fmw.xlsx" -P ms/$PMID
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/1/153742_2_supp_440007_q23fmw.xlsx" -P ms/$PMID
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/6/153742_2_supp_440012_q23fmy.txt" -P ms/$PMID
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/2/153742_2_supp_440008_q23fmw.xlsx" -P ms/$PMID  # S1
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/3/153742_2_supp_440009_q23fmw.xlsx" -P ms/$PMID  # S2
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/4/153742_2_supp_440010_q23fmy.xlsx" -P ms/$PMID  # S3
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/1/153742_2_supp_440007_q23fmw.xlsx" -P ms/$PMID  # S4
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/5/153742_2_supp_440011_q23fmy.xlsx" -P ms/$PMID  # S5
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/6/153742_2_supp_440012_q23fmy.txt" -P ms/$PMID   # S6
 
 
 ############################################
