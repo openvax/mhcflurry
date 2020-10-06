@@ -11,7 +11,7 @@ import mhcnames
 import Bio.SeqIO  # pylint: disable=import-error
 
 
-def normalize(s, disallowed=["MIC", "HFE"]):
+def normalize(s, disallowed=["MIC", "HFE", "TAP", "SLA09762"]):
     if any(item in s for item in disallowed):
         return None
     try:
@@ -75,9 +75,11 @@ def run():
                         record.description.split()[1].replace("-", "") +
                         "-" +
                         record.description.split(",")[-1].split()[0].replace("-",""))
-                normalized = normalize(name)
             if not normalized:
                 print("Couldn't parse: ", name)
+                continue
+            if ":" in name and name.endswith("N"):
+                print("Skipping null allele", name)
                 continue
             if normalized in seen:
                 continue
