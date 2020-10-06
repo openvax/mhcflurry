@@ -115,8 +115,16 @@ wget -q "https://static-content.springer.com/esm/art%3A10.1038%2Fs41587-019-0322
 # Multiallelic:
 wget -q "https://static-content.springer.com/esm/art%3A10.1038%2Fs41587-019-0322-9/MediaObjects/41587_2019_322_MOESM4_ESM.xlsx" -P ms/$PMID
 
-
-
+# Solleder, ..., Gfeller Mol Cell Proteomics 2020 [PMID 31848261]
+# Note: contains phospho-peptides
+PMID=31848261
+mkdir -p ms/$PMID
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/2/153742_2_supp_440008_q23fmw.xlsx" -P ms/$PMID
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/3/153742_2_supp_440009_q23fmw.xlsx" -P ms/$PMID
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/4/153742_2_supp_440010_q23fmy.xlsx" -P ms/$PMID
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/1/153742_2_supp_440007_q23fmw.xlsx" -P ms/$PMID
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/1/153742_2_supp_440007_q23fmw.xlsx" -P ms/$PMID
+wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/6/153742_2_supp_440012_q23fmy.txt" -P ms/$PMID
 
 
 ############################################
