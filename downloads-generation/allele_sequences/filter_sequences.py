@@ -72,7 +72,6 @@ def run():
                 order.append(name)
                 name_to_record[name] = record
 
-
     records = [name_to_record[name] for name in order]
 
     with open(args.out, "w") as fd:
