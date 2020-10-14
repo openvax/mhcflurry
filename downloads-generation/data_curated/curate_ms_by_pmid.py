@@ -431,6 +431,249 @@ def handle_pmid_28832583(*filenames):
     return result_df
 
 
+def handle_pmid_31848261(*filenames):
+    """Solleder, ..., Gfeller Mol Cell Proteomics 2020 [PMID 31848261]"""
+    # Phospho-peptides (serine, threonine, tyrosine)
+    #
+    # For now, we are just including the monoallelic samples reanalyzed from
+    # here, originally generated in:
+    #       Di Marco, ..., Stevanovic J Immunol 2017 [PMID 28904123]
+    #
+    # Later we should add the rest though.
+    #
+    # Data S4 has all identified phosphorylated peptides (2585 across 72 alleles)
+    # However, data S4 is after multiallelic deconvolution, which is why we're
+    # currently not using it.
+    #
+    (s1,) = [f for f in filenames if '440008' in f]
+    (s2,) = [f for f in filenames if '440009' in f]
+    (s3,) = [f for f in filenames if '440010' in f]
+    (s4,) = [f for f in filenames if '440007' in f]
+    (s5,) = [f for f in filenames if '440011' in f]
+    (s6,) = [f for f in filenames if '440012' in f]
+
+    # S1 has HLA types
+    s1_df = pandas.read_excel(s1, header=[2, 3], index_col=0)
+    s1_df.columns = [
+        a if "Unnamed" in b else b for (a, b) in s1_df.columns.tolist()
+    ]
+    s1_df.columns = s1_df.columns.str.lower()
+
+    def parse_hla(hla):
+        # Weirdly some entries have a unicode byte order mark (BOM),
+        # which we remove
+        result = " ".join([mhcnames.normalize_allele_name(a.replace("\ufeff", "")) for a in hla.split(",")])
+        return result
+
+    s1_df["hla"] = s1_df['hla typing'].map(parse_hla)
+    s1_df["samples"] = s1_df["samples"].astype(str).map(
+        lambda s: s.replace("\ufeff", ""))
+    s1_df["samples"] = s1_df["samples"].map(
+        lambda x: {
+            "3830NJF": "3830-NJF",
+            "3849BR": "3849-BR",
+            "3865DM": "3865-DM",
+            "3912BAM": "3912-BAM",
+            "Apher1": "Apher-1",
+            "Apher6": "Apher-6",
+            "UWB.1 289": "UWB1289",
+        }.get(x, x))
+    s1_df["samples"] = s1_df["samples"].str.strip()
+    s1_df.index = s1_df.samples
+
+    extra_df = pandas.DataFrame([
+        # HLA for HepG2 from https://web.expasy.org/cellosaurus/CVCL_0027
+        # which cites pubmed 25960936 and 9178645.
+        ("HepG2", "HLA-A*02:01 HLA-A*24:02 HLA-B*35:14 HLA-B*51:01 HLA-C*04:01 HLA-C*16:02", "hepatoblastoma"),
+        ("UWB1289_ctrl", s1_df.loc["UWB1289", "hla"], s1_df.loc["UWB1289", "diagnosis"]),
+        ("UWB1289_IFNg", s1_df.loc["UWB1289", "hla"], s1_df.loc["UWB1289", "diagnosis"]),
+    ], columns=["samples", "hla", "diagnosis"])
+
+    sample_info_df = pandas.concat(
+        [s1_df, extra_df], ignore_index=True).set_index("samples")
+
+    sample_info_df["diagnosis"] = sample_info_df.diagnosis.str.strip().replace(
+        "-", "")
+
+    sample_info_df["sample_type"] = sample_info_df["diagnosis"]
+
+    force_cell_lines = [
+        "CD165",
+        "HCT116",
+        "HCC1143",
+        "HCC1937",
+        "UWB1289",
+        "HepG2",
+    ]
+    sample_info_df["cell_line"] = [
+        "" if row.diagnosis and name not in force_cell_lines else name
+        for name, row in sample_info_df.iterrows()
+    ]
+    sample_info_df.loc[
+        sample_info_df.index.str.contains("C1R"),
+        "cell_line"
+    ] = "C1R"
+    sample_info_df.loc[
+        sample_info_df.index.str.contains("C1R"),
+        "sample_type"
+    ] = "B-LCL"
+    sample_info_df.loc[
+        sample_info_df.index.str.contains("B721"),
+        "cell_line"
+    ] = "B721"
+    sample_info_df.loc[
+        sample_info_df.index.str.contains("B721"),
+        "sample_type"
+    ] = "B-CELL"
+    sample_info_df.loc[
+        ["JY", "CD165", "PD42", "RA957", "MD155", "CM647", "GD149"],
+        "sample_type"
+    ] = "B-CELL"
+    sample_info_df.loc[
+        sample_info_df.index.str.contains("UWB1289"),
+        "cell_line"
+    ] = "UWB1289"
+    sample_info_df.loc[
+        sample_info_df.index.str.contains("TIL"),
+        "sample_type"
+    ] = "TIL"
+    sample_info_df.loc[
+        sample_info_df.index.str.upper().str.contains("APHER"),
+        "sample_type"
+    ] = "Leukapheresis"
+    sample_info_df.loc[
+        sample_info_df.index.str.upper() == "FIB",
+        "sample_type"
+    ] = "fibroblast"
+
+    sample_info_df["pulldown_antibody"] = ""
+    sample_info_df.loc[
+        sample_info_df.index.str.contains("C1R"),
+        "pulldown_antibody"
+    ] = "W6/32"
+    sample_info_df.loc[
+        (
+            sample_info_df.index.str.contains("C1R") &
+            sample_info_df.hla.str.contains("HLA-E")
+        ),
+        "pulldown_antibody"
+    ] = "3D-12"
+
+    sample_info_df["format"] = sample_info_df.hla.str.split().str.len().map(
+        lambda count: "monoallelic" if count == 1 else "multiallelic")
+
+    print("Samples", sample_info_df.index.tolist())
+    print(sample_info_df)
+
+    def fix_modifications(description):
+        return (
+            description
+                .replace("_", "")
+                .replace("S(ph)", "{pSer}")
+                .replace("T(ph)", "{pThr}")
+                .replace("Y(ph)", "{pTyr}"))
+
+    ################################## Data S2 ################################
+    # S2 has most of the data
+    s2_sheets = pandas.read_excel(s2, header=2, sheet_name=None)
+    s2_sheet1_df, s2_sheet2_df = s2_sheets.values()
+    s2_sheet2_df["Experiment"] = s2_sheet2_df.Experiment.astype(str)
+    s2_sheet2_df["Experiment"] = s2_sheet2_df["Experiment"].map(
+        lambda x: {
+            "UWB.1 289": "UWB1289",
+        }.get(x, x))
+
+    # Unmodified peptides
+    s2_unmodified = s2_sheet1_df.loc[
+        s2_sheet1_df.Modifications == "Unmodified",
+        ["Sequence"] + [c for c in s2_sheet1_df if "Intensity" in c]
+    ].set_index("Sequence")
+    s2_unmodified.columns = s2_unmodified.columns.str.replace("Intensity", "").str.strip()
+    s2_unmodified = s2_unmodified.stack().reset_index()
+    s2_unmodified.columns = ['peptide', 'sample_id', 'intensity']
+
+    # Modified peptides
+    s2_modified = s2_sheet2_df.loc[
+        s2_sheet2_df.Modifications.isin(
+            ["Phospho (STY)", "2 Phospho (STY)"])  # ignoring oxidation
+    ].copy()
+    s2_modified["peptide"] = s2_modified[
+        "Modified sequence"
+    ].map(fix_modifications)
+    s2_modified["sample_id"] = s2_modified.Experiment
+    s2_modified["sample_id"] = s2_modified["sample_id"].map(
+        lambda x: {
+            "UWB.1 289": "UWB1289",
+        }.get(x, x))
+
+    s2_results_df = pandas.concat(
+        [
+            s2_unmodified[["sample_id", "peptide"]],
+            s2_modified[["sample_id", "peptide"]]
+        ],
+        ignore_index=True)
+
+    to_discard = [
+        s for s in s2_results_df.sample_id.unique() if s not in sample_info_df.index
+    ]
+    print("Discarding Data S2 samples with no metadata: ", to_discard)
+    s2_results_df = s2_results_df.loc[
+        ~s2_results_df.sample_id.isin(to_discard)
+    ].copy()
+
+    ################################## Data S3 ################################
+    # S3 is a reanalysis of:
+    #   Di Marco, ..., Stevanovic J Immunol 2017 [PMID 28904123]
+    # These are all in C1R cells.
+    s3_sheets = pandas.read_excel(s3, header=2, sheet_name=None)
+    s3_sheet1_df, s3_sheet2_df = s3_sheets.values()
+
+    # Unmodified peptides
+    s3_unmodified = s3_sheet1_df.loc[
+        s3_sheet1_df.Modifications == "Unmodified",
+        ["Sequence"] + [c for c in s3_sheet1_df if "Intensity" in c]
+    ].set_index("Sequence")
+    s3_unmodified.columns = "C1R-" + s3_unmodified.columns.str.replace("Intensity", "").str.strip()
+    s3_unmodified = s3_unmodified.stack().reset_index()
+    s3_unmodified.columns = ['peptide', 'sample_id', 'intensity']
+
+    # Modified peptides
+    s3_modified = s3_sheet2_df.loc[
+        s3_sheet2_df.Modifications.isin(
+            ["Phospho (STY)", "2 Phospho (STY)"])  # ignoring oxidation
+    ].copy()
+    s3_modified["peptide"] = s3_modified[
+        "Modified sequence"
+    ].map(fix_modifications)
+
+    s3_modified["sample_id"] = s3_modified.Experiment
+
+    s3_results_df = pandas.concat(
+        [
+            s3_unmodified[["peptide", "sample_id"]],
+            s3_modified[["peptide", "sample_id"]]
+        ],
+        ignore_index=True)
+
+    to_discard = [
+        s for s in s3_results_df.sample_id.unique() if s not in sample_info_df.index
+    ]
+    print("Discarding Data S3 samples with no metadata: ", to_discard)
+    s3_results_df = s3_results_df.loc[
+        ~s3_results_df.sample_id.isin(to_discard)
+    ].copy()
+
+    results_df = pandas.concat([s2_results_df, s3_results_df], ignore_index=True)
+
+    for col in ["hla", "cell_line", "sample_type", "pulldown_antibody", "format"]:
+        results_df[col] = results_df.sample_id.map(sample_info_df[col])
+
+    results_df["mhc_class"] = "I"
+    results_df["sample_id"] = "WITH-MOD." + results_df.sample_id
+
+    return results_df
+
+
 PMID_31495665_SAMPLE_TYPES = {
         "HLA-DR_Lung": "lung",
         "HLA-DR_PBMC_HDSC": "pbmc",
@@ -911,6 +1154,7 @@ def handle_expression_expression_atlas_22460905(filename):
         "sample_type:MELANOMA": matches("melanoma"),
         "sample_type:A375-LIKE": matches("melanoma"),
         "sample_type:KG1-LIKE": matches("myeloid leukemia"),
+        "sample_type:ALL": matches("b acute lymphoblastic"),
 
         # Using a fibrosarcoma cell line for our fibroblast sample.
         "sample_type:FIBROBLAST": ['fibrosarcoma, ht-1080'],
@@ -971,6 +1215,7 @@ def handle_expression_human_protein_atlas(*filenames):
             cell_line_df,
             groups={
                 "cell_line:HELA": ['HeLa'],
+                "cell_line:HEPG2": ['Hep G2'],
                 "cell_line:K562": ["K-562"],
                 "cell_line:HEK293": ['HEK 293'],
                 "cell_line:RPMI8226": ['RPMI-8226'],
@@ -984,6 +1229,21 @@ def handle_expression_human_protein_atlas(*filenames):
                 "sample_type:SPLEEN": ["spleen"],
                 "sample_type:OVARY": ["ovary"],
                 "sample_type:KIDNEY": ["kidney"],
+
+                # This is bad! I just can't find anything better currently.
+                # We should find some meningioma RNA-seq and switch to that.
+                "sample_type:MENINGIOMA": [
+                    "amygdala", "basal ganglia", "cerebellum", "cerebral cortex",
+                    "midbrain", "spinal cord",
+                ],
+                "sample_type:SCHWANNOMA": [
+                    "spinal cord",
+                ],
+                "sample_type:ADENOCARCINOMA OF CECUM": ["colon"],
+                "sample_type:UTERUS TUMOR": ['cervix, uterine'],
+                "sample_type:SEROUS OVARIAN CARCINOMA": ["ovary"],
+                "sample_type:OVARIAN CANCER": ["ovary"],
+
             }),
     ]
 

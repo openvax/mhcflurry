@@ -92,11 +92,11 @@ releases:
             default: false
 
           - name: data_published
-            url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/data_published.20201006.tar.bz2
+            url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/data_published.20201012.tar.bz2
             default: false
 
           - name: data_curated
-            url: https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_curated.20200427.tar.bz2
+            url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/data_curated.20201013.tar.bz2
             default: true
 
           # Older downloads
