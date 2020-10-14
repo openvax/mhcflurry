@@ -117,6 +117,8 @@ wget -q "https://static-content.springer.com/esm/art%3A10.1038%2Fs41587-019-0322
 
 # Solleder, ..., Gfeller Mol Cell Proteomics 2020 [PMID 31848261]
 # Note: contains phospho-peptides
+# Note: reanalyzes a number of studies, including:
+#    Di Marco, ..., Stevanovic J Immunol 2017 [PMID 28904123]
 PMID=31848261
 mkdir -p ms/$PMID
 wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/2/153742_2_supp_440008_q23fmw.xlsx" -P ms/$PMID  # S1
