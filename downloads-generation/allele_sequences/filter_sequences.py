@@ -49,7 +49,7 @@ def run():
         for record in reader:
             total += 1
             name = record.description.split()[1]
-            result = parse(s, raise_on_error=False)
+            result = parse(name, raise_on_error=False)
             if not result:
                 # TODO: are there other entries that require this?
 
