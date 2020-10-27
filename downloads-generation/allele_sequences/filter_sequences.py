@@ -6,24 +6,9 @@ from __future__ import print_function
 import sys
 import argparse
 
-import mhcnames
+from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene
 
 import Bio.SeqIO  # pylint: disable=import-error
-
-
-def normalize(s, disallowed=["MIC", "HFE"]):
-    if any(item in s for item in disallowed):
-        return None
-    try:
-        return mhcnames.normalize_allele_name(s)
-    except:
-        while s:
-            s = ":".join(s.split(":")[:-1])
-            try:
-                return mhcnames.normalize_allele_name(s)
-            except:
-                pass
-        return None
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -64,28 +49,46 @@ def run():
         for record in reader:
             total += 1
             name = record.description.split()[1]
-            normalized = normalize(name)
-            if not normalized and "," in record.description:
+            result = parse(s, raise_on_error=False)
+            if not result:
+                # TODO: are there other entries that require this?
+
                 # Try parsing uniprot-style sequence description
                 if "MOUSE MHC class I L-q alpha-chain" in record.description:
                     # Special case.
                     name = "H2-Lq"
-                else: 
-                    name = (
-                        record.description.split()[1].replace("-", "") +
-                        "-" +
-                        record.description.split(",")[-1].split()[0].replace("-",""))
-                normalized = normalize(name)
-            if not normalized:
-                print("Couldn't parse: ", name)
+                else:
+                    print("Unable to parse: %s" % name)
+                    continue
+            else:
+                if type(result) not in (Allele, AlleleWithoutGene, Gene):
+                    print("Skpping %s, unexpected parsed type: %s" % (
+                        name,
+                        result))
+                    continue
+                if result.mhc_class not in {"I", "Ia", "Ib"}:
+                    print(
+                        "Skpping %s, wrong MHC class: %s" % (
+                        name,
+                        result.mhc_class))
+                    continue
+                if any(item in name.upper() for item in {"MIC", "HFE"}):
+                    print("Skipping %s, gene too different from Class Ia" % (
+                        name,))
+                    continue
+                if type(result) is Allele and (
+                        result.annotation_pseudogene or
+                        result.annotation_null or
+                        result.annotation_questionable):
+                    print("Skipping %s, due to annotation(s): %s" % (
+                        name,
+                        result.annotations))
+                name = result.to_string()
+
+            if name in seen:
                 continue
-            if normalized in seen:
-                continue
-            if any(n in name for n in class_ii_names):
-                print("Dropping", name)
-                continue
-            seen.add(normalized)
-            record.description = normalized + " " + record.description
+            seen.add(name)
+            record.description = name + " " + record.description
             records.append(record)
 
     with open(args.out, "w") as fd:
