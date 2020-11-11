@@ -11,9 +11,9 @@ def normalize_allele_name(raw_name):
         return None
     result = parse(
         raw_name,
-        preferred_result_types={Allele},
+        preferred_result_types=(Allele,),
         infer_class2_pairing=True,
-        required_result_types={Allele, AlleleWithoutGene, Gene},
+        required_result_types=(Allele, AlleleWithoutGene, Gene),
         raise_on_error=False)
     if result is None:
         print("Unable to parse as Class I allele or gene: %s" % raw_name)
@@ -32,4 +32,6 @@ def normalize_allele_name(raw_name):
             raw_name,
             result.annotations))
         return None
-    return result.to_string()
+    name = result.to_string()
+    print("Parsed '%s' as %s" % (raw_name, name))
+    return name
