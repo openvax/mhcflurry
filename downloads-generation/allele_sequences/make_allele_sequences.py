@@ -11,28 +11,8 @@ import argparse
 import numpy
 import pandas
 
-import mhcnames
-
 import Bio.SeqIO  # pylint: disable=import-error
 
-
-def normalize_simple(s):
-    return mhcnames.normalize_allele_name(s)
-
-
-def normalize_complex(s, disallowed=["MIC", "HFE"]):
-    if any(item in s for item in disallowed):
-        return None
-    try:
-        return normalize_simple(s)
-    except:
-        while s:
-            s = ":".join(s.split(":")[:-1])
-            try:
-                return normalize_simple(s)
-            except:
-                pass
-        return None
 
 
 parser = argparse.ArgumentParser(usage=__doc__)

@@ -1,5 +1,3 @@
-# Copyright (c) 2015. Mount Sinai School of Medicine
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -15,13 +13,9 @@
 import os
 import logging
 import re
-import sys
 
 from setuptools import setup
 
-# normally we would import six.PY2 but can't yet assume that six
-# is installed here
-PY2 = (sys.version_info.major == 2)
 
 readme_dir = os.path.dirname(__file__)
 readme_filename = os.path.join(readme_dir, 'README.md')
@@ -33,12 +27,6 @@ except:
     logging.warning("Failed to load %s" % readme_filename)
     readme = ""
 
-try:
-    import pypandoc
-    readme = pypandoc.convert(readme, to='rst', format='md')
-except:
-    logging.warning("Conversion of long_description from MD to RST failed")
-    pass
 
 with open('mhcflurry/version.py', 'r') as f:
     version = re.search(
@@ -53,7 +41,7 @@ if __name__ == '__main__':
         'appdirs',
         'tensorflow>=2.2.0,<2.3.0',
         'scikit-learn',
-        'mhcnames',
+        'mhcgnomes',
         'pyyaml',
         'tqdm',
         'np_utils',
@@ -65,7 +53,7 @@ if __name__ == '__main__':
         description="MHC Binding Predictor",
         author="Tim O'Donnell and Alex Rubinsteyn",
         author_email="timodonnell@gmail.com",
-        url="https://github.com/hammerlab/mhcflurry",
+        url="https://github.com/openvax/mhcflurry",
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         entry_points={
             'console_scripts': [
@@ -106,6 +94,7 @@ if __name__ == '__main__':
         },
         install_requires=required_packages,
         long_description=readme,
+        long_description_content_type="text/markdown",
         packages=[
             'mhcflurry',
         ],
