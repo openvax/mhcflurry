@@ -12,7 +12,7 @@ import numpy
 import pandas
 
 import Bio.SeqIO  # pylint: disable=import-error
-
+from mhcflurry.common import normalize_allele_name
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -53,14 +53,13 @@ def run():
     allele_sequences['aligned'] = allele_sequences['aligned'].str.replace(
         "-", "X")
 
-    allele_sequences['normalized_allele'] = allele_sequences.index.map(normalize_complex)
+    allele_sequences['normalized_allele'] = allele_sequences.index.map(normalize_allele_name)
     allele_sequences = allele_sequences.set_index("normalized_allele", drop=True)
 
     selected_positions = []
 
     recapitulate_df = pandas.read_csv(args.recapitulate_sequences)
-    recapitulate_df["normalized_allele"] = recapitulate_df.allele.map(
-        normalize_complex)
+    recapitulate_df["normalized_allele"] = recapitulate_df.allele.map(normalize_allele_name)
     recapitulate_df = (
         recapitulate_df
             .dropna()

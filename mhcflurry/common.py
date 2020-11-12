@@ -7,8 +7,37 @@ import json
 
 import numpy
 import pandas
+from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene, Class2Pair
 
 from . import amino_acid
+
+
+def normalize_allele_name(
+        raw_name,
+        forbidden_substrings=("MIC", "HFE")):
+    for forbidden_substring in forbidden_substrings:
+        if forbidden_substring in raw_name:
+            return None
+    result = parse(
+        raw_name,
+        preferred_result_types=[Allele],
+        infer_class2_pairing=False,
+        collapse_singleton_hapltypes=True,
+        collapse_singleton_serotypes=True,
+        required_result_types=[Allele, AlleleWithoutGene, Gene],
+        raise_on_error=False)
+    if result is None:
+        return None
+    if not result.is_class1:
+        return None
+    if (result.annotation_pseudogene or
+            result.annotation_null or
+            result.annotation_questionable):
+        return None
+
+    if type(result) is Allele:
+        result = result.restrict_num_allele_fields(2)
+    return result.to_string()
 
 
 TENSORFLOW_CONFIGURED = False
