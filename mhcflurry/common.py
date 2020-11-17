@@ -22,7 +22,7 @@ def normalize_allele_name(
         raw_name,
         preferred_result_types=[Allele],
         infer_class2_pairing=False,
-        collapse_singleton_hapltypes=True,
+        collapse_singleton_haplotypes=True,
         collapse_singleton_serotypes=True,
         required_result_types=[Allele, AlleleWithoutGene, Gene],
         raise_on_error=False)

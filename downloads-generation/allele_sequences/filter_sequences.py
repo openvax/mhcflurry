@@ -34,6 +34,11 @@ def run():
         reader = Bio.SeqIO.parse(fasta, "fasta")
         for record in reader:
             total += 1
+            if len(record.seq) < 50:
+                print("-- Skipping '%s', sequence too short" % (
+                    record.description,))
+                continue
+
             parts = record.description.split()
             candidate_strings = [
                 record.description,
@@ -48,6 +53,7 @@ def run():
             if name is None:
                 print("Skipping '%s'" % (record.description,))
                 continue
+
             print("Parsed '%s' as %s" % (record.description, name))
             record.description = name + " " + record.description
 
@@ -55,6 +61,9 @@ def run():
                 old_record = name_to_record[name]
                 old_sequence = old_record.seq
                 if len(old_sequence) < len(record.seq):
+                    print("-- Replacing old record (%d aa) with new (%d aa)" % (
+                        len(old_record.seq),
+                        len(record.seq)))
                     name_to_record[name] = record
                 else:
                     print("-- Skipping, already seen")
