@@ -20,21 +20,20 @@ def normalize_allele_name(
             return None
     result = parse(
         raw_name,
+        only_class1=True,
+        required_result_types=[Allele, AlleleWithoutGene, Gene],
         preferred_result_types=[Allele],
+        use_allele_aliases=True,
         infer_class2_pairing=False,
         collapse_singleton_haplotypes=True,
         collapse_singleton_serotypes=True,
-        required_result_types=[Allele, AlleleWithoutGene, Gene],
         raise_on_error=False)
     if result is None:
-        return None
-    if not result.is_class1:
         return None
     if (result.annotation_pseudogene or
             result.annotation_null or
             result.annotation_questionable):
         return None
-
     if type(result) is Allele:
         result = result.restrict_num_allele_fields(2)
     return result.to_string()
