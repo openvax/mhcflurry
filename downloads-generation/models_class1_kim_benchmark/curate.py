@@ -7,17 +7,12 @@ import argparse
 
 import pandas
 
-from mhcflurry.common import (
-    normalize_allele_name as maybe_normalize_allele_name
-)
+from mhcflurry.common import normalize_allele_name
 
 
-def normalize_allele_name(s):
-    result = maybe_normalize_allele_name(s)
-    if result is None:
-        return "UNKNOWN"
-    else:
-        return result
+def normalize_allele_name_or_return_unknown(s):
+    result = normalize_allele_name(
+        s, raise_on_error=False, default_value="UNKNOWN")
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -85,7 +80,7 @@ def load_data_kim2014(filename):
     df["measurement_inequality"] = df.inequality
     df["original_allele"] = df.mhc
     df["peptide"] = df.sequence
-    df["allele"] = df.mhc.map(normalize_allele_name)
+    df["allele"] = df.mhc.map(normalize_allele_name_or_return_unknown)
     print("Dropping un-parseable alleles: %s" % ", ".join(
         df.ix[df.allele == "UNKNOWN"]["mhc"].unique()))
     df = df.ix[df.allele != "UNKNOWN"]
@@ -104,7 +99,7 @@ def load_data_systemhc_atlas(filename, min_probability=0.99):
     df["measurement_type"] = "qualitative"
     df["original_allele"] = df.top_allele
     df["peptide"] = df.search_hit
-    df["allele"] = df.top_allele.map(normalize_allele_name)
+    df["allele"] = df.top_allele.map(normalize_allele_name_or_return_unknown)
 
     print("Dropping un-parseable alleles: %s" % ", ".join(
         str(x) for x in df.ix[df.allele == "UNKNOWN"]["top_allele"].unique()))
@@ -131,7 +126,7 @@ def load_data_abelin_mass_spec(filename):
     df["measurement_inequality"] = "<"
     df["measurement_type"] = "qualitative"
     df["original_allele"] = df.allele
-    df["allele"] = df.original_allele.map(normalize_allele_name)
+    df["allele"] = df.original_allele.map(normalize_allele_name_or_return_unknown)
 
     print("Dropping un-parseable alleles: %s" % ", ".join(
         str(x) for x in df.ix[df.allele == "UNKNOWN"]["allele"].unique()))
@@ -164,7 +159,7 @@ def load_data_iedb(iedb_csv, include_qualitative=True, include_mass_spec=False):
         (~iedb_df["Allele Name"].str.contains("CD1"))
     ]
 
-    iedb_df["allele"] = iedb_df["Allele Name"].map(normalize_allele_name)
+    iedb_df["allele"] = iedb_df["Allele Name"].map(normalize_allele_name_or_return_unknown)
     print("Dropping un-parseable alleles: %s" % ", ".join(
         iedb_df.ix[iedb_df.allele == "UNKNOWN"]["Allele Name"].unique()))
     iedb_df = iedb_df.ix[iedb_df.allele != "UNKNOWN"]
