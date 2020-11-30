@@ -509,6 +509,19 @@ class Class1AffinityPredictor(object):
                 join(models_dir, "allele_sequences.csv"),
                 index_col=0).iloc[:, 0].to_dict()
 
+            # This can be removed at a later point for a speed boost. We are
+            # re-normalizing allele names here because in late 2020 we switched
+            # from mhcnames to mhcgnomes, and the normalization of some alleles
+            # changed. We want to continue to support previous versions of the
+            # models, which have pseudosequence files with allele names
+            # normalized in the old way, so we re-normalize them here.
+            renormalized_allele_to_sequence = {}
+            for (name, value) in allele_to_sequence.items():
+                normalized = normalize_allele_name(name, raise_on_error=False)
+                if normalized is not None:
+                    renormalized_allele_to_sequence[normalized] = value
+            allele_to_sequence = renormalized_allele_to_sequence
+
         allele_to_percent_rank_transform = {}
         percent_ranks_path = join(models_dir, "percent_ranks.csv")
         if exists(percent_ranks_path):
