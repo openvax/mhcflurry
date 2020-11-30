@@ -5,15 +5,10 @@ gene for each peptide.
 import sys
 import argparse
 import os
-import numpy
-import json
-import collections
-from six.moves import StringIO
+
 
 import pandas
 import tqdm
-
-import mhcnames
 
 
 parser = argparse.ArgumentParser(usage=__doc__)

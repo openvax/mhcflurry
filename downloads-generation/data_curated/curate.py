@@ -8,14 +8,14 @@ import argparse
 
 import pandas
 
-import mhcnames
+from mhcflurry.common import normalize_allele_name
 
 
-def normalize_allele_name(s):
-    try:
-        return mhcnames.normalize_allele_name(s)
-    except Exception:
-        return "UNKNOWN"
+def normalize_allele_name_or_return_unknown(s):
+    return normalize_allele_name(
+        s,
+        raise_on_error=False,
+        default_value="UNKNOWN")
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -95,7 +95,7 @@ def load_data_kim2014(filename):
     df["measurement_inequality"] = df.inequality
     df["original_allele"] = df.mhc
     df["peptide"] = df.sequence
-    df["allele"] = df.mhc.map(normalize_allele_name)
+    df["allele"] = df.mhc.map(normalize_allele_name_or_return_unknown)
     print("Dropping un-parseable alleles: %s" % ", ".join(
         df.loc[df.allele == "UNKNOWN"]["mhc"].unique()))
     df = df.loc[df.allele != "UNKNOWN"]
@@ -115,7 +115,7 @@ def load_data_systemhc_atlas(filename, min_probability=0.99):
     df["measurement_type"] = "qualitative"
     df["original_allele"] = df.top_allele
     df["peptide"] = df.search_hit
-    df["allele"] = df.top_allele.map(normalize_allele_name)
+    df["allele"] = df.top_allele.map(normalize_allele_name_or_return_unknown)
 
     print("Dropping un-parseable alleles: %s" % ", ".join(
         str(x) for x in df.loc[df.allele == "UNKNOWN"]["top_allele"].unique()))
@@ -164,7 +164,8 @@ def load_data_iedb(iedb_csv, include_qualitative=True):
     print(iedb_df.loc[insuffient_mask]["Allele Name"].value_counts())
     iedb_df = iedb_df.loc[~insuffient_mask]
 
-    iedb_df["allele"] = iedb_df["Allele Name"].map(normalize_allele_name)
+    iedb_df["allele"] = iedb_df["Allele Name"].map(
+        normalize_allele_name_or_return_unknown)
     print("Dropping un-parseable alleles: %s" % ", ".join(
         iedb_df.loc[iedb_df.allele == "UNKNOWN"]["Allele Name"].unique()))
     iedb_df = iedb_df.loc[iedb_df.allele != "UNKNOWN"]
@@ -252,7 +253,7 @@ def load_data_additional_ms(filename):
     ].copy()
     print("Now", len(df))
 
-    df["allele"] = df["hla"].map(normalize_allele_name)
+    df["allele"] = df["hla"].map(normalize_allele_name_or_return_unknown)
     assert not (df.allele == "UNKNOWN").any()
     df["measurement_value"] = QUALITATIVE_TO_AFFINITY["Positive"]
     df["measurement_inequality"] = "<"

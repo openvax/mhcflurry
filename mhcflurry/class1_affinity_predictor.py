@@ -15,10 +15,13 @@ import numpy
 from numpy.testing import assert_equal
 import pandas
 
-import mhcnames
 
 from .class1_neural_network import Class1NeuralNetwork
-from .common import random_peptides, positional_frequency_matrix
+from .common import (
+    random_peptides,
+    positional_frequency_matrix,
+    normalize_allele_name
+)
 from .downloads import get_default_class1_models_dir
 from .encodable_sequences import EncodableSequences
 from .percent_rank_transform import PercentRankTransform
@@ -724,7 +727,7 @@ class Class1AffinityPredictor(object):
         list of `Class1NeuralNetwork`
         """
 
-        allele = mhcnames.normalize_allele_name(allele)
+        allele = normalize_allele_name(allele)
         if allele not in self.allele_to_allele_specific_models:
             self.allele_to_allele_specific_models[allele] = []
 
@@ -859,7 +862,7 @@ class Class1AffinityPredictor(object):
         list of `Class1NeuralNetwork`
         """
 
-        alleles = pandas.Series(alleles).map(mhcnames.normalize_allele_name)
+        alleles = pandas.Series(alleles).map(normalize_allele_name)
         allele_encoding = AlleleEncoding(
             alleles,
             borrow_from=self.master_allele_encoding)
@@ -946,7 +949,7 @@ class Class1AffinityPredictor(object):
         numpy.array of float
         """
         if allele is not None:
-            normalized_allele = mhcnames.normalize_allele_name(allele)
+            normalized_allele = normalize_allele_name(allele)
             try:
                 transform = self.allele_to_percent_rank_transform[normalized_allele]
                 return transform.transform(affinities)
@@ -1100,13 +1103,12 @@ class Class1AffinityPredictor(object):
             if alleles is not None:
                 raise ValueError("Specify exactly one of allele or alleles")
             df["allele"] = allele
-            normalized_allele = mhcnames.normalize_allele_name(allele)
+            normalized_allele = normalize_allele_name(allele)
             df["normalized_allele"] = normalized_allele
             unique_alleles = [normalized_allele]
         else:
             df["allele"] = numpy.array(alleles)
-            df["normalized_allele"] = df.allele.map(
-                mhcnames.normalize_allele_name)
+            df["normalized_allele"] = df.allele.map(normalize_allele_name)
             unique_alleles = df.normalized_allele.unique()
 
         if len(df) == 0:

@@ -47,7 +47,8 @@ def run():
             ]
             name = None
             for candidate_string in candidate_strings:
-                name = normalize_allele_name(candidate_string)
+                name = normalize_allele_name(
+                    candidate_string, raise_on_error=False)
                 if name is not None:
                     break
             if name is None:

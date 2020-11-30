@@ -57,7 +57,7 @@ reported.
 
 .. note::
 
-    MHCflurry normalizes allele names using the `mhcnames <https://github.com/openvax/mhcnames>`__
+    MHCflurry normalizes allele names using the `mhcgnomes <https://github.com/til-unc/mhcgnomes>`__
     package. Names like ``HLA-A0201`` or ``A*02:01`` will be
     normalized to ``HLA-A*02:01``, so most naming conventions can be used
     with methods such as `~mhcflurry.Class1PresentationPredictor.predict`.

@@ -14,10 +14,15 @@ from . import amino_acid
 
 def normalize_allele_name(
         raw_name,
-        forbidden_substrings=("MIC", "HFE")):
+        forbidden_substrings=("MIC", "HFE"),
+        raise_on_error=True,
+        default_value=None):
     for forbidden_substring in forbidden_substrings:
         if forbidden_substring in raw_name:
-            return None
+            if raise_on_error:
+                raise ValueError("Unsupported gene in MHC allele name: %s" % raw_name)
+            else:
+                return default_value
     result = parse(
         raw_name,
         only_class1=True,
@@ -29,11 +34,18 @@ def normalize_allele_name(
         collapse_singleton_serotypes=True,
         raise_on_error=False)
     if result is None:
-        return None
+        if raise_on_error:
+            raise ValueError("Invalid MHC allele name: %s" % raw_name)
+        else:
+            return default_value
     if (result.annotation_pseudogene or
             result.annotation_null or
             result.annotation_questionable):
-        return None
+        if raise_on_error:
+            raise ValueError(
+                "Unsupported annotation on MHC allele: %s" % raw_name)
+        else:
+            return default_value
     if type(result) is Allele:
         result = result.restrict_num_allele_fields(2)
     return result.to_string()

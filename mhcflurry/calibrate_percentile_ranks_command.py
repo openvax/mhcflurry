@@ -13,12 +13,13 @@ from functools import partial
 import pandas
 import numpy
 
-from mhcnames import normalize_allele_name
+
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
+from .common import normalize_allele_name
 from .encodable_sequences import EncodableSequences
 from .common import configure_logging, random_peptides, amino_acid_distribution
 from .local_parallelism import (

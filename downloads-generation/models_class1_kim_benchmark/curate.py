@@ -7,20 +7,17 @@ import argparse
 
 import pandas
 
-import mhcnames
+from mhcflurry.common import (
+    normalize_allele_name as maybe_normalize_allele_name
+)
 
 
 def normalize_allele_name(s):
-    try:
-        return mhcnames.normalize_allele_name(s)
-    except Exception:
-        try:
-            (a,b,c) = s.split("-")
-            return mhcnames.normalize_allele_name(
-                "%s-%s*%s" % (a,b,c))
-        except Exception:
-            return "UNKNOWN"
-
+    result = maybe_normalize_allele_name(s)
+    if result is None:
+        return "UNKNOWN"
+    else:
+        return result
 
 parser = argparse.ArgumentParser(usage=__doc__)
 

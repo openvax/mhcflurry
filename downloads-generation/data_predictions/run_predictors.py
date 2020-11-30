@@ -13,7 +13,7 @@ from functools import partial
 import numpy
 import pandas
 
-from mhcnames import normalize_allele_name
+from mhcflurry.common import normalize_allele_name
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -150,8 +150,14 @@ def run(argv=sys.argv[1:]):
 
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
 
-    alleles = [normalize_allele_name(a) for a in args.allele]
-    alleles = numpy.array(sorted(set(alleles)))
+    alleles = [
+        normalize_allele_name(a, raise_on_error=False) for a in args.allele
+    ]
+    n_bad_alleles = sum([a is None for a in alleles])
+    if n_bad_alleles > 0:
+        print("Dropping %d bad alleles" % n_bad_alleles)
+
+    alleles = numpy.array(sorted({a for a in alleles if a}))
 
     peptides = pandas.read_csv(
         args.input_peptides, nrows=args.max_peptides).peptide.drop_duplicates()
