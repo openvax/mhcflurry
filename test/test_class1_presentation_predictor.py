@@ -251,9 +251,9 @@ def test_downloaded_predictor():
         ])
     print(scan_results1)
 
-    assert_equal(len(scan_results1), 3)
-    assert (scan_results1.affinity < 200).all()
-    assert (scan_results1.presentation_score > 0.7).all()
+    assert_equal(len(scan_results1), 3), str(scan_results1)
+    assert (scan_results1.affinity < 200).all(), str(scan_results1)
+    assert (scan_results1.presentation_score > 0.7).all(), str(scan_results1)
 
     scan_results2 = PRESENTATION_PREDICTOR.predict_sequences(
         result="filtered",
