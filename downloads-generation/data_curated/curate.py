@@ -7,11 +7,14 @@ import os
 import argparse
 
 import pandas
+import numpy
 
 from mhcflurry.common import normalize_allele_name
 
 
 def normalize_allele_name_or_return_unknown(s):
+    if s is numpy.nan:
+        return "UNKNOWN"
     return normalize_allele_name(
         s,
         raise_on_error=False,
@@ -254,7 +257,8 @@ def load_data_additional_ms(filename):
     print("Now", len(df))
 
     df["allele"] = df["hla"].map(normalize_allele_name_or_return_unknown)
-    assert not (df.allele == "UNKNOWN").any()
+    assert not (df.allele == "UNKNOWN").any(), (
+        list(df.loc[df.allele == "UNKNOWN"].hla.unique()))
     df["measurement_value"] = QUALITATIVE_TO_AFFINITY["Positive"]
     df["measurement_inequality"] = "<"
     df["measurement_type"] = "qualitative"

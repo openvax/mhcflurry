@@ -647,6 +647,9 @@ def handle_pmid_31495665(filename):
         result_df["cell_line"] = cell_line[sample_id]
         results.append(result_df)
     result_df = pandas.concat(results, ignore_index=True)
+
+    # Remove class II for now
+    result_df = result_df.loc[result_df.mhc_class == "I"]
     return result_df
 
 

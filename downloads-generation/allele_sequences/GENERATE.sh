@@ -47,7 +47,7 @@ TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.cs
 
 python3 select_alleles_to_disambiguate.py \
     "$TRAINING_DATA" \
-    --min-count 50 \
+    --min-count 1000 \
     --out training_data.alleles.txt
 
 # Human
