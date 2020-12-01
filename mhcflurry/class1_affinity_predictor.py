@@ -515,12 +515,19 @@ class Class1AffinityPredictor(object):
             # changed. We want to continue to support previous versions of the
             # models, which have pseudosequence files with allele names
             # normalized in the old way, so we re-normalize them here.
-            renormalized_allele_to_sequence = {}
+            renormalized = {}
             for (name, value) in allele_to_sequence.items():
                 normalized = normalize_allele_name(name, raise_on_error=False)
-                if normalized is not None:
-                    renormalized_allele_to_sequence[normalized] = value
-            allele_to_sequence = renormalized_allele_to_sequence
+                if normalized is None:
+                    continue
+                if normalized in renormalized and name != normalized:
+                    # If it's already here, only replace it if the new
+                    # normalization was a no-op. This is so that B*44:01, which
+                    # now parses to B*44:02, does not override the actual
+                    # B*44:02 pseudosequence.
+                    continue
+                renormalized[normalized] = value
+            allele_to_sequence = renormalized
 
         allele_to_percent_rank_transform = {}
         percent_ranks_path = join(models_dir, "percent_ranks.csv")
