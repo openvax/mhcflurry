@@ -28,7 +28,7 @@ def test_fasta():
     args = [
         data_path("example.fasta"),
         "--alleles",
-        "HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02",
+        "HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:03,HLA-C*07:02",
     ]
     deletes = []
     try:
@@ -44,7 +44,10 @@ def test_fasta():
         for delete in deletes:
             os.unlink(delete)
 
-    assert_equal(result.best_allele.nunique(), 6)
+    assert_equal(
+        result.best_allele.nunique(),
+        6,
+        err_msg=str(list(result.best_allele.unique())))
     assert_equal(result.sequence_name.nunique(), 3)
     assert_array_less(result.affinity_percentile, 2.0)
 
