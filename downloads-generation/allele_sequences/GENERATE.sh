@@ -45,7 +45,7 @@ cp $SCRIPT_ABSOLUTE_PATH .
 # pseudosequences but have associated training data
 TRAINING_DATA="$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2"
 
-python3 select_alleles_to_disambiguate.py \
+python select_alleles_to_disambiguate.py \
     "$TRAINING_DATA" \
     --min-count 1000 \
     --out training_data.alleles.txt
@@ -76,17 +76,17 @@ wget -q https://www.uniprot.org/uniprot/Q31151.fasta  # H-2 Lq
 # Various
 wget -q ftp://ftp.ebi.ac.uk/pub/databases/ipd/mhc/MHC_prot.fasta
 
-python3 filter_sequences.py *.fasta --out class1.fasta
+python filter_sequences.py *.fasta --out class1.fasta
 
 time clustalo -i class1.fasta -o class1.aligned.fasta
 
-time python3 make_allele_sequences.py \
+time python make_allele_sequences.py \
     class1.aligned.fasta \
     --recapitulate-sequences class1_pseudosequences.csv \
     --differentiate-alleles training_data.alleles.txt \
     --out-csv allele_sequences.csv
 
-time python3 make_allele_sequences.py \
+time python make_allele_sequences.py \
     class1.aligned.fasta \
     --recapitulate-sequences class1_pseudosequences.csv \
     --out-csv allele_sequences.no_differentiation.csv
