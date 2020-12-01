@@ -14,7 +14,7 @@ import pandas
 import yaml
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import StratifiedKFold
-from mhcnames import normalize_allele_name
+from .common import normalize_allele_name
 import tqdm  # progress bar
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
