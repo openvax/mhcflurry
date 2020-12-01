@@ -17,6 +17,27 @@ def normalize_allele_name(
         forbidden_substrings=("MIC", "HFE"),
         raise_on_error=True,
         default_value=None):
+    """
+    Parses a string into a normalized allele representation.
+
+    Parameters
+    ----------
+    raw_name : str
+        Input string to normalize
+
+    forbidden_substrings : tuple of str
+        Fail on inputs which contain any of these strings
+
+    raise_on_error : bool
+        If an allele fails to parse raise an exception if this argument is True
+
+    default_value : str or None
+        If raise_on_error is False and allele fails to parse, return this value
+
+    Returns
+    -------
+    str or None
+    """
     for forbidden_substring in forbidden_substrings:
         if forbidden_substring in raw_name:
             if raise_on_error:
