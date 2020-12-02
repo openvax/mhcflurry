@@ -11,28 +11,8 @@ import argparse
 import numpy
 import pandas
 
-import mhcnames
-
 import Bio.SeqIO  # pylint: disable=import-error
-
-
-def normalize_simple(s):
-    return mhcnames.normalize_allele_name(s)
-
-
-def normalize_complex(s, disallowed=["MIC", "HFE"]):
-    if any(item in s for item in disallowed):
-        return None
-    try:
-        return normalize_simple(s)
-    except:
-        while s:
-            s = ":".join(s.split(":")[:-1])
-            try:
-                return normalize_simple(s)
-            except:
-                pass
-        return None
+from mhcflurry.common import normalize_allele_name
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -54,6 +34,8 @@ parser.add_argument(
     "--out-csv",
     help="Result file")
 
+def normalize_allele_name_optional(s):
+    return normalize_allele_name(s, raise_on_error=False)
 
 def run():
     args = parser.parse_args(sys.argv[1:])
@@ -73,14 +55,14 @@ def run():
     allele_sequences['aligned'] = allele_sequences['aligned'].str.replace(
         "-", "X")
 
-    allele_sequences['normalized_allele'] = allele_sequences.index.map(normalize_complex)
-    allele_sequences = allele_sequences.set_index("normalized_allele", drop=True)
+    allele_sequences['normalized_allele'] = allele_sequences.index.map(
+        normalize_allele_name_optional)
+    allele_sequences = allele_sequences.dropna().set_index("normalized_allele", drop=True)
 
     selected_positions = []
 
     recapitulate_df = pandas.read_csv(args.recapitulate_sequences)
-    recapitulate_df["normalized_allele"] = recapitulate_df.allele.map(
-        normalize_complex)
+    recapitulate_df["normalized_allele"] = recapitulate_df.allele.map(normalize_allele_name_optional)
     recapitulate_df = (
         recapitulate_df
             .dropna()

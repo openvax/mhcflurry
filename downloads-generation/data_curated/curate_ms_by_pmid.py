@@ -11,14 +11,14 @@ from six.moves import StringIO
 
 import pandas
 
-import mhcnames
+from mhcflurry.common import normalize_allele_name
 
 
-def normalize_allele_name(s):
-    try:
-        return mhcnames.normalize_allele_name(s)
-    except Exception:
-        return "UNKNOWN"
+def normalize_allele_name_or_return_unknown(s):
+    return normalize_allele_name(
+        s,
+        raise_on_error=False,
+        default_value="UNKNOWN")
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -647,6 +647,9 @@ def handle_pmid_31495665(filename):
         result_df["cell_line"] = cell_line[sample_id]
         results.append(result_df)
     result_df = pandas.concat(results, ignore_index=True)
+
+    # Remove class II for now
+    result_df = result_df.loc[result_df.mhc_class == "I"]
     return result_df
 
 
@@ -731,10 +734,8 @@ def handle_pmid_31154438(*filenames):
             else:
                 lst = [a]
             for a in lst:
-                normalized = normalize_allele_name(a)
-                # Ignore class II
-                if normalized[4] in ("A", "B", "C"):
-                    result.append(normalized)
+                normalized = normalize_allele_name_or_return_unknown(a)
+                result.append(normalized)
         return " ".join(result)
 
     hla_df["hla"] = hla_df["HLA typing"].map(fix_hla)
@@ -773,7 +774,10 @@ def handle_pmid_31844290(*filenames):
     for (key, value) in mono.items():
         if key == 'Sheet1':
             continue
-        allele = normalize_allele_name("HLA-" + key)
+        allele_before_normalization = key
+        if not allele_before_normalization.startswith("HLA-"):
+            allele_before_normalization = "HLA-" + allele_before_normalization
+        allele = normalize_allele_name(allele_before_normalization)
         assert allele != "UNKNOWN"
         df = pandas.DataFrame({"peptide": value.sequence.values})
         df["sample_id"] = "keskin_%s" % key
@@ -798,7 +802,7 @@ def handle_pmid_31844290(*filenames):
         lambda s: s[1:] if s.startswith("-") else s)
     allele_table = allele_table.applymap(
         lambda s: "B5101" if s == "B51" else s)
-    allele_table = allele_table.applymap(normalize_allele_name)
+    allele_table = allele_table.applymap(normalize_allele_name_or_return_unknown)
 
     sample_info = metadata.drop_duplicates(
         "Clinical ID").set_index("Clinical ID")[['Cancer type', 'IP Ab']]

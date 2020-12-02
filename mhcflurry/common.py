@@ -7,8 +7,69 @@ import json
 
 import numpy
 import pandas
+from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene, Class2Pair
 
 from . import amino_acid
+
+
+def normalize_allele_name(
+        raw_name,
+        forbidden_substrings=("MIC", "HFE"),
+        raise_on_error=True,
+        default_value=None):
+    """
+    Parses a string into a normalized allele representation.
+
+    Parameters
+    ----------
+    raw_name : str
+        Input string to normalize
+
+    forbidden_substrings : tuple of str
+        Fail on inputs which contain any of these strings
+
+    raise_on_error : bool
+        If an allele fails to parse raise an exception if this argument is True
+
+    default_value : str or None
+        If raise_on_error is False and allele fails to parse, return this value
+
+    Returns
+    -------
+    str or None
+    """
+    for forbidden_substring in forbidden_substrings:
+        if forbidden_substring in raw_name:
+            if raise_on_error:
+                raise ValueError("Unsupported gene in MHC allele name: %s" % raw_name)
+            else:
+                return default_value
+    result = parse(
+        raw_name,
+        only_class1=True,
+        required_result_types=[Allele, AlleleWithoutGene, Gene],
+        preferred_result_types=[Allele],
+        use_allele_aliases=True,
+        infer_class2_pairing=False,
+        collapse_singleton_haplotypes=True,
+        collapse_singleton_serotypes=True,
+        raise_on_error=False)
+    if result is None:
+        if raise_on_error:
+            raise ValueError("Invalid MHC allele name: %s" % raw_name)
+        else:
+            return default_value
+    if (result.annotation_pseudogene or
+            result.annotation_null or
+            result.annotation_questionable):
+        if raise_on_error:
+            raise ValueError(
+                "Unsupported annotation on MHC allele: %s" % raw_name)
+        else:
+            return default_value
+    if type(result) is Allele:
+        result = result.restrict_num_allele_fields(2)
+    return result.to_string()
 
 
 TENSORFLOW_CONFIGURED = False

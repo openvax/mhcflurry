@@ -7,15 +7,12 @@ import argparse
 
 import pandas
 
-import mhcnames
+from mhcflurry.common import normalize_allele_name
 
 
-def normalize_allele_name(s):
-    try:
-        return mhcnames.normalize_allele_name(s)
-    except Exception:
-        return "UNKNOWN"
-
+def normalize_allele_name_or_return_unknown(s):
+    return normalize_allele_name(
+        s, raise_on_error=False, default_value="UNKNOWN")
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -108,7 +105,7 @@ def go(args):
         print("Remove data contains %d entries" % len(to_remove))
 
         to_remove["normalized_allele"] = to_remove.allele.map(
-            normalize_allele_name)
+            normalize_allele_name_or_return_unknown)
 
         remove_allele_peptides = set(
             to_remove.normalized_allele + "~" + to_remove.peptide)
