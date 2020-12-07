@@ -18,7 +18,7 @@ base_hyperparameters = {
     'layer_sizes': [1024, 512],
     'learning_rate': 0.001,
     'locally_connected_layers': [],
-    'topology': 'feedfoward',
+    'topology': 'feedforward',
     'loss': 'custom:mse_with_inequalities',
     'max_epochs': 5000,
     'minibatch_size': 128,
