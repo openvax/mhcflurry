@@ -39,7 +39,7 @@ if __name__ == '__main__':
         'six',
         'pandas>=0.20.3',
         'appdirs',
-        'tensorflow>=2.2.0',
+        'tensorflow>=2.2.0,<2.3.0',
         'scikit-learn',
         'mhcgnomes',
         'pyyaml',
