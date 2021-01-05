@@ -151,8 +151,10 @@ def get_default_class1_processing_models_dir(test_exists=True):
         if test_exists and not exists(result):
             raise IOError("No such directory: %s" % result)
         return result
+
+    # Default to the 'with flanks' model variant.
     return get_path(
-        "models_class1_processing", "models", test_exists=test_exists)
+        "models_class1_processing", "models.selected.with_flanks", test_exists=test_exists)
 
 
 def get_current_release_downloads():
