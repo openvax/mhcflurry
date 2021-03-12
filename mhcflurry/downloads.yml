@@ -183,7 +183,7 @@ releases:
             default: false
 
           - name: data_iedb
-            url: https://github.com/openvax/mhcflurry/releases/download/pre-1.7.0/data_iedb.20200427.tar.bz2
+            url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/data_iedb.20210312.tar.bz2
             default: false
 
           - name: data_systemhcatlas
