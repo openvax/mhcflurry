@@ -23,6 +23,7 @@ parser.add_argument(
     required=True,
     help="Fasta output")
 
+
 def run():
     args = parser.parse_args(sys.argv[1:])
     print(args)

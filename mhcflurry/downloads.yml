@@ -76,7 +76,7 @@ releases:
             default: false
 
           - name: data_iedb
-            url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1.0/data_iedb.20201006.tar.bz2
+            url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/data_iedb.20210312.tar.bz2
             default: false
 
           - name: data_systemhcatlas
@@ -84,7 +84,7 @@ releases:
             default: false
 
           - name: allele_sequences
-            url: https://github.com/openvax/mhcflurry/releases/download/1.4.0/allele_sequences.20191231.tar.bz2
+            url: https://github.com/openvax/mhcflurry/releases/download/1.4.0/allele_sequences.20210312.tar.bz2
             default: false
 
           - name: random_peptide_predictions
@@ -92,11 +92,11 @@ releases:
             default: false
 
           - name: data_published
-            url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/data_published.20201012.tar.bz2
+            url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/data_published.20210312.tar.bz2
             default: false
 
           - name: data_curated
-            url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/data_curated.20201013.tar.bz2
+            url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/data_curated.20210312.tar.bz2
             default: true
 
           # Older downloads

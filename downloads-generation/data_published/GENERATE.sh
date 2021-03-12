@@ -60,7 +60,13 @@ cd ../..
 # Bassani-Sternberg, ..., Mann Mol Cell Proteomics 2015 [PMID 25576301]
 PMID=25576301
 mkdir -p ms/$PMID
-wget -q https://www.mcponline.org/highwire/filestream/35026/field_highwire_adjunct_files/7/mcp.M114.042812-4.xlsx -P ms/$PMID
+wget -q https://ars.els-cdn.com/content/image/1-s2.0-S1535947620332308-mmc1.zip -P ms/$PMID
+pushd ms/$PMID
+unzip *.zip
+mv M114.042812.DC1/mcp.M114.042812-4.xlsx .
+rm *.zip
+rm -rf M114.042812.DC1
+popd
 
 # Mommen, ..., Heck PNAS 2014 [PMID 24616531]
 PMID=24616531
@@ -85,7 +91,7 @@ cd ../..
 # Shraibman, ..., Admon Mol Cell Proteomics	2016 [PMID 27412690]
 PMID=27412690
 mkdir -p ms/$PMID
-wget -q https://www.mcponline.org/lookup/suppl/doi:10.1074/mcp.M116.060350/-/DC1/mcp.M116.060350-2.xlsx -P ms/$PMID
+wget -q https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5013317/bin/10.1074_M116.060350_mcp.M116.060350-2.xlsx -P ms/$PMID
 
 # Pearson, ..., Perreault J Clin Invest 2016 [PMID 27841757]
 # Note: we do not use the original data from this publicaton, we use 28832583's reanalysis of it.
@@ -94,13 +100,13 @@ wget -q https://www.mcponline.org/lookup/suppl/doi:10.1074/mcp.M116.060350/-/DC1
 # Hassan, ..., van Veelen Mol Cell Proteomics 2015 [PMID 23481700]
 PMID=23481700
 mkdir -p ms/$PMID
-wget -q https://www.mcponline.org/highwire/filestream/34681/field_highwire_adjunct_files/1/mcp.M112.024810-2.xls -P ms/$PMID
+wget -q https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3708169/bin/supp_M112.024810_mcp.M112.024810-2.xls -P ms/$PMID
 
 # Shraibman, ..., Admon Mol Cell Proteomics 2019 [PMID 31154438]
 PMID=31154438
 mkdir -p ms/$PMID
-wget -q https://www.mcponline.org/highwire/filestream/51948/field_highwire_adjunct_files/3/zjw006195963st2.txt -P ms/$PMID
-wget -q https://www.mcponline.org/highwire/filestream/51948/field_highwire_adjunct_files/1/zjw006195963st1.xlsx -P ms/$PMID
+wget -q https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6553928/bin/zjw006195963st2.txt -P ms/$PMID
+wget -q https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6553928/bin/zjw006195963st1.xlsx -P ms/$PMID
 
 # Bassani-Sternberg, ..., Krackhardt Nature Comm. 2016 [PMID 27869121]
 PMID=27869121
@@ -121,12 +127,14 @@ wget -q "https://static-content.springer.com/esm/art%3A10.1038%2Fs41587-019-0322
 #    Di Marco, ..., Stevanovic J Immunol 2017 [PMID 28904123]
 PMID=31848261
 mkdir -p ms/$PMID
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/2/153742_2_supp_440008_q23fmw.xlsx" -P ms/$PMID  # S1
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/3/153742_2_supp_440009_q23fmw.xlsx" -P ms/$PMID  # S2
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/4/153742_2_supp_440010_q23fmy.xlsx" -P ms/$PMID  # S3
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/1/153742_2_supp_440007_q23fmw.xlsx" -P ms/$PMID  # S4
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/5/153742_2_supp_440011_q23fmy.xlsx" -P ms/$PMID  # S5
-wget -q "https://www.mcponline.org/highwire/filestream/53817/field_highwire_adjunct_files/6/153742_2_supp_440012_q23fmy.txt" -P ms/$PMID   # S6
+wget -q "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7000122/bin/153742_2_supp_440008_q23fmw.xlsx" 
+
+wget -q "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7000122/bin/153742_2_supp_440008_q23fmw.xlsx" -P ms/$PMID  # S1
+wget -q "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7000122/bin/153742_2_supp_440009_q23fmw.xlsx" -P ms/$PMID  # S2
+wget -q "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7000122/bin/153742_2_supp_440010_q23fmy.xlsx" -P ms/$PMID  # S3
+wget -q "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7000122/bin/153742_2_supp_440007_q23fmw.xlsx" -P ms/$PMID  # S4
+wget -q "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7000122/bin/153742_2_supp_440011_q23fmy.xlsx" -P ms/$PMID  # S5
+wget -q "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7000122/bin/153742_2_supp_440012_q23fmy.txt" -P ms/$PMID   # S6
 
 
 ############################################

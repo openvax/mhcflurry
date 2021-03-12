@@ -462,7 +462,9 @@ def handle_pmid_31848261(*filenames):
     def parse_hla(hla):
         # Weirdly some entries have a unicode byte order mark (BOM),
         # which we remove
-        result = " ".join([mhcnames.normalize_allele_name(a.replace("\ufeff", "")) for a in hla.split(",")])
+        result = " ".join([
+            normalize_allele_name(a.replace("\ufeff", ""))
+            for a in hla.split(",")])
         return result
 
     s1_df["hla"] = s1_df['hla typing'].map(parse_hla)

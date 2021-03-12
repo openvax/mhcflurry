@@ -55,6 +55,11 @@ date
 pip freeze
 git status
 
+mhcflurry-downloads info
+mhcflurry-downloads path data_curated
+mhcflurry-downloads path allele_sequences
+mhcflurry-downloads path random_peptide_predictions
+
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 export OMP_NUM_THREADS=1
