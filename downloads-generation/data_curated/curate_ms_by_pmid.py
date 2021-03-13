@@ -445,6 +445,8 @@ def handle_pmid_31848261(*filenames):
     # However, data S4 is after multiallelic deconvolution, which is why we're
     # currently not using it.
     #
+    # Skip for now.
+    return None
     (s1,) = [f for f in filenames if '440008' in f]
     (s2,) = [f for f in filenames if '440009' in f]
     (s3,) = [f for f in filenames if '440010' in f]
