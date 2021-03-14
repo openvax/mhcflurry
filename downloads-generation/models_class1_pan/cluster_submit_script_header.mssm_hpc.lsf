@@ -25,10 +25,12 @@ export KMP_SETTINGS=1
 
 free -m
 
-module add cuda/10.1.105 cudnn/7.6.5
+# For tensorflow 2.4.0:
+module add cudnn/8.0.5 cuda/11.0.2
 module list
 
-python -c 'import tensorflow as tf ; print("GPU AVAILABLE" if tf.test.is_gpu_available() else "GPU NOT AVAILABLE")'
+# python -c 'import tensorflow as tf ; print("GPU AVAILABLE" if tf.test.is_gpu_available() else "GPU NOT AVAILABLE")'
+python -c 'import tensorflow as tf ; assert tf.test.is_gpu_available()'
 
 env
 

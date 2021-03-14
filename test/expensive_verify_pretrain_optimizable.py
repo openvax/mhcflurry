@@ -13,7 +13,7 @@ PRETRAIN_DATA_PATH = get_path(
 FULL_TRAIN_DF = pandas.read_csv(
         get_path(
             "data_curated",
-            "curated_training_data.no_mass_spec.csv.bz2"))
+            "curated_training_data.no_additional_ms.csv.bz2"))
 TRAIN_DF = FULL_TRAIN_DF.loc[
     (FULL_TRAIN_DF.peptide.str.len() >= 8) &
     (FULL_TRAIN_DF.peptide.str.len() <= 15)
