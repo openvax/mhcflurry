@@ -56,7 +56,7 @@ HYPERPARAMTERS = {
                    'pretrain_peptides_per_step': 8,
                    'pretrain_steps_per_epoch': 256},
     'validation_split': 0.1,
-    'data_dependent_initialization_method': "lsuv",
+    'data_dependent_initialization_method': None,
 }
 
 

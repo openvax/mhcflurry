@@ -54,7 +54,7 @@ base_hyperparameters = {
         'pretrain_min_epochs': 5,
     },
     'validation_split': 0.1,
-    'data_dependent_initialization_method': "lsuv",
+    'data_dependent_initialization_method': None,
 }
 
 grid = []
