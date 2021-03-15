@@ -272,10 +272,18 @@ class EncodableSequences(object):
         if allow_unsupported_amino_acids:
             fill_value = amino_acid.AMINO_ACID_INDEX['X']
 
-            def get_amino_acid_index(a):
+            def get_amino_acid_index(a, peptide):
                 return amino_acid.AMINO_ACID_INDEX.get(a, fill_value)
         else:
-            get_amino_acid_index = amino_acid.AMINO_ACID_INDEX.__getitem__
+            def get_amino_acid_index(a, peptide):
+                """
+                The peptide argument is used only for the debug message
+                """
+                try:
+                    return amino_acid.AMINO_ACID_INDEX[a]
+                except KeyError:
+                    raise ValueError(
+                        "Invalid amino acid '%s' in peptide '%s'" % (a, peptide))
 
         result = None
         if alignment_method == 'pad_middle':
@@ -311,7 +319,7 @@ class EncodableSequences(object):
                 fixed_length_sequences = numpy.stack(
                     sub_df.peptide.map(
                         lambda s: numpy.array([
-                            get_amino_acid_index(char) for char in s
+                            get_amino_acid_index(char, s) for char in s
                         ])).values)
 
                 num_null = max_length - length
