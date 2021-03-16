@@ -10,6 +10,7 @@ from collections import namedtuple
 import logging
 
 from .encodable_sequences import EncodingError, EncodableSequences
+from .common import peptide_length_series
 
 import numpy
 import pandas
@@ -143,9 +144,10 @@ class FlankingEncoding(object):
         -------
         numpy.array
         """
+        lengths = peptide_length_series(df.peptide)
         error_df = df.loc[
-            (df.peptide.str.len() > peptide_max_length) |
-            (df.peptide.str.len() < 1)
+            (lengths > peptide_max_length) |
+            (lengths < 1)
         ]
         if len(error_df) > 0:
             message = (
@@ -193,6 +195,7 @@ class FlankingEncoding(object):
             array[error_df.index] = numpy.nan
 
         result = EncodingResult(
-            array, peptide_lengths=peptides.str.len().values)
+            array,
+            peptide_lengths=peptide_length_series(peptides).values)
 
         return result

@@ -24,7 +24,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
-from .common import configure_logging
+from .common import configure_logging, peptide_length_series
 from .local_parallelism import (
     add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
@@ -211,9 +211,10 @@ def initialize_training(args):
 
     df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
-    df = df.loc[
-        (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
-    ]
+
+    lengths = peptide_length_series(df.peptide)
+    df = df.loc[(lengths >= 8) & (lengths <= 15)]
+
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
     folds_df = assign_folds(
         df=df,

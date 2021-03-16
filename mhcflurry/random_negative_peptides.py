@@ -5,7 +5,7 @@ import numpy
 import pandas
 
 from .hyperparameters import HyperparameterDefaults
-from .common import amino_acid_distribution, random_peptides
+from .common import amino_acid_distribution, random_peptides, tokenize_peptide_series, peptide_length_series
 
 
 class RandomNegativePeptides(object):
@@ -77,7 +77,7 @@ class RandomNegativePeptides(object):
             numpy.testing.assert_equal(len(peptides), len(inequalities))
 
         peptides = pandas.Series(peptides, copy=False)
-        peptide_lengths = peptides.str.len()
+        peptide_lengths = peptide_length_series(peptides)
 
         if self.hyperparameters['random_negative_match_distribution']:
             self.aa_distribution = amino_acid_distribution(

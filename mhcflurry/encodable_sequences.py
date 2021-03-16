@@ -16,9 +16,7 @@ import numpy
 import pandas
 
 from . import amino_acid
-
-
-TOKENIZE_REGEX = re.compile("{[A-z]+}|.")
+from .common import PEPTIDE_TOKENIZE_REGEX, peptide_length_series
 
 
 class EncodingError(ValueError):
@@ -290,12 +288,6 @@ class EncodableSequences(object):
                         "Invalid amino acid '%s' in peptide '%s'" % (
                             token, "".join(tokens)))
 
-
-        # Note on tokenizing. We are tokenizing peptides like
-        # "SIIN{PTYR}FEKL{PSER}" into:
-        # ['S', 'I', 'I', 'N', '{PTYR}', 'F', 'E', 'K', 'L', '{PSER}']
-        # So that we can handle PTMs (currently just phosphorylation).
-
         result = None
         if alignment_method == 'pad_middle':
             if trim:
@@ -308,7 +300,7 @@ class EncodableSequences(object):
                 dtype="int32")
 
             df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
-            df["tokens"] = df.peptide.str.findall(TOKENIZE_REGEX)
+            df["tokens"] = df.peptide.str.findall(PEPTIDE_TOKENIZE_REGEX)
             df["length"] = df.tokens.str.len()
 
             middle_length = max_length - left_edge - right_edge
@@ -372,7 +364,7 @@ class EncodableSequences(object):
                 dtype="int32")
 
             df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
-            df["tokens"] = df.peptide.str.findall(TOKENIZE_REGEX)
+            df["tokens"] = df.peptide.str.findall(PEPTIDE_TOKENIZE_REGEX)
             df["length"] = df.tokens.str.len()
 
             # For efficiency we handle each supported peptide length using bulk
@@ -414,7 +406,7 @@ class EncodableSequences(object):
                 dtype="int32")
 
             df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
-            df["tokens"] = df.peptide.str.findall(TOKENIZE_REGEX)
+            df["tokens"] = df.peptide.str.findall(PEPTIDE_TOKENIZE_REGEX)
             df["length"] = df.tokens.str.len()
 
             # For efficiency we handle each supported peptide length using bulk
@@ -460,7 +452,7 @@ class EncodableSequences(object):
                 dtype="int32")
 
             df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
-            df["tokens"] = df.peptide.str.findall(TOKENIZE_REGEX)
+            df["tokens"] = df.peptide.str.findall(PEPTIDE_TOKENIZE_REGEX)
             df["length"] = df.tokens.str.len()
 
             # For efficiency we handle each supported peptide length using bulk

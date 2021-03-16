@@ -4,6 +4,7 @@ import logging
 import sys
 import os
 import json
+import re
 
 import numpy
 import pandas
@@ -70,6 +71,24 @@ def normalize_allele_name(
     if type(result) is Allele:
         result = result.restrict_num_allele_fields(2)
     return result.to_string()
+
+# Note on tokenizing. We are tokenizing peptides like
+# "SIIN{PTYR}FEKL{PSER}" into:
+# ['S', 'I', 'I', 'N', '{PTYR}', 'F', 'E', 'K', 'L', '{PSER}']
+# So that we can handle PTMs (currently just phosphorylation).
+PEPTIDE_TOKENIZE_REGEX = re.compile("{[A-z]+}|.")
+
+
+def peptide_length(peptide):
+    return len(re.findall(PEPTIDE_TOKENIZE_REGEX, peptide))
+
+
+def peptide_length_series(peptide_series):
+    return peptide_series.str.findall(PEPTIDE_TOKENIZE_REGEX).str.len()
+
+
+def tokenize_peptide_series(peptide_series):
+    return peptide_series.str.findall(PEPTIDE_TOKENIZE_REGEX)
 
 
 TENSORFLOW_CONFIGURED = False
@@ -167,7 +186,8 @@ def amino_acid_distribution(peptides, smoothing=0.0):
     pandas.Series indexed by amino acids
     """
     peptides = pandas.Series(peptides)
-    aa_counts = pandas.Series(peptides.map(collections.Counter).sum())
+    aa_counts = pandas.Series(
+        tokenize_peptide_series(peptides).map(collections.Counter).sum())
     normalized = aa_counts / aa_counts.sum()
     if smoothing:
         normalized += smoothing

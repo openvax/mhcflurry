@@ -15,7 +15,7 @@ from sklearn.metrics import roc_auc_score
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.downloads import get_path
-from mhcflurry.common import random_peptides, normalize_allele_name
+from mhcflurry.common import random_peptides, normalize_allele_name, peptide_length_series
 
 from mhcflurry.testing_utils import cleanup, startup
 teardown = cleanup
@@ -45,15 +45,18 @@ def test_allele_specific_network_with_phosphopeptides():
     df = pandas.read_csv(
         get_path(
             "data_curated", "curated_training_data.csv.bz2"))
-    df = df.loc[
+    df_allele = df.loc[
         df.allele == allele
     ]
-    df = df.loc[
-        df.peptide.str.len() == 9
-    ]
-    df = df.loc[df.measurement_inequality.isin(["<", "="])]
-    df = df.copy()
-    df["phospho"] = False
+    df_allele = df_allele.loc[df_allele.measurement_inequality.isin(["<", "="])]
+    df_allele = df_allele.copy()
+    df_allele["phospho"] = False
+
+    df_negative = df.loc[
+        df.allele == "HLA-A*02:01"
+    ].sample(n=len(df_allele)).copy()
+    df_negative["measurement_value"] = 40000
+    df_negative["phospho"] = False
 
     phospho_df = pandas.read_csv("test/data/phospho.csv")
     phospho_df["measurement_value"] = 20000
@@ -66,8 +69,14 @@ def test_allele_specific_network_with_phosphopeptides():
     print(phospho_df.groupby("allele").measurement_value.count())
     print(phospho_df.groupby("allele").measurement_value.mean())
 
-    train_df = pandas.concat([df, phospho_df], ignore_index=True)
+    train_df = pandas.concat(
+        [df_allele, df_negative, phospho_df], ignore_index=True)
     train_df["binder"] = train_df.measurement_value <= 500
+
+    train_df = train_df.loc[
+        (peptide_length_series(train_df.peptide) >= 8) &
+        (peptide_length_series(train_df.peptide) <= 15)
+    ]
     print(train_df)
 
     model1 = Class1NeuralNetwork(**hyperparameters)
@@ -77,30 +86,31 @@ def test_allele_specific_network_with_phosphopeptides():
     train_df["model1_prediction"] = model1.predict(train_df.peptide.values)
 
     overall_auc = roc_auc_score(train_df.binder, -train_df.model1_prediction)
-    print("Train including phospho, overall AUC: ", overall_auc)
 
     phospho_auc = roc_auc_score(
         train_df.loc[train_df.phospho].binder,
         -train_df.loc[train_df.phospho].model1_prediction)
-    print("Train including phospho, phospho AUC: ", phospho_auc)
 
     model2 = Class1NeuralNetwork(**hyperparameters)
     model2.fit(
         train_df.loc[~train_df.phospho].peptide.values,
-        train_df.loc[~train_df.phospho].values)
-    train_df["model2_prediction"] = model1.predict(train_df.peptide.values)
+        train_df.loc[~train_df.phospho].measurement_value.values)
+    train_df["model2_prediction"] = model2.predict(train_df.peptide.values)
 
     exclude_phospho_overall_auc = roc_auc_score(
         train_df.binder, -train_df.model2_prediction)
-    print("Train excluding phospho, overall AUC: ", exclude_phospho_overall_auc)
 
     excluding_phospho_phospho_auc = roc_auc_score(
         train_df.loc[train_df.phospho].binder,
         -train_df.loc[train_df.phospho].model2_prediction)
+
+    print("Train including phospho, overall AUC: ", overall_auc)
+    print("Train including phospho, phospho AUC: ", phospho_auc)
+    print("Train excluding phospho, overall AUC: ", exclude_phospho_overall_auc)
     print("Train excluding phospho, phospho AUC: ", excluding_phospho_phospho_auc)
 
     assert_greater(phospho_auc, excluding_phospho_phospho_auc)
     assert_greater(overall_auc, 0.8)
-    assert_greater(exclude_phospho_overall_auc, 0.8)
     assert_greater(phospho_auc, 0.8)
+    assert_greater(exclude_phospho_overall_auc, 0.8)
 

@@ -98,8 +98,6 @@ X       0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0   0  0       0     
 """), sep='\\s+', index_col=0).loc[AMINO_ACIDS, AMINO_ACIDS].astype("int8")
 assert (BLOSUM62_MATRIX == BLOSUM62_MATRIX.T).all().all()
 
-print(BLOSUM62_MATRIX)
-
 ENCODING_DATA_FRAMES = {
     "BLOSUM62": BLOSUM62_MATRIX,
     "one-hot": pandas.DataFrame([

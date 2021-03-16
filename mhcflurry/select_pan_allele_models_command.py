@@ -24,7 +24,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .encodable_sequences import EncodableSequences
 from .allele_encoding import AlleleEncoding
-from .common import configure_logging
+from .common import configure_logging, peptide_length_series
 from .local_parallelism import (
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)
@@ -161,9 +161,10 @@ def run(argv=sys.argv[1:]):
     if num_folds <= 1:
         raise ValueError("Too few folds: ", num_folds)
 
+    lengths = peptide_length_series(df.peptide)
     df = df.loc[
-        (df.peptide.str.len() >= min_peptide_length) &
-        (df.peptide.str.len() <= max_peptide_length)
+        (lengths >= min_peptide_length) &
+        (lengths <= max_peptide_length)
     ]
     print("Subselected to %d-%dmers: %s" % (
         min_peptide_length, max_peptide_length, str(df.shape)))

@@ -23,7 +23,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import Class1NeuralNetwork
-from .common import configure_logging
+from .common import configure_logging, peptide_length_series
 from .local_parallelism import (
     add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
@@ -313,8 +313,9 @@ def initialize_training(args):
 
     df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
+    lengths = peptide_length_series(df.peptide)
     df = df.loc[
-        (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
+        (lengths >= 8) & (lengths <= 15)
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
     

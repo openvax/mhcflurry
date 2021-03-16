@@ -20,7 +20,8 @@ from .class1_neural_network import Class1NeuralNetwork
 from .common import (
     random_peptides,
     positional_frequency_matrix,
-    normalize_allele_name
+    normalize_allele_name,
+    peptide_length_series,
 )
 from .downloads import get_default_class1_models_dir
 from .encodable_sequences import EncodableSequences
@@ -1151,7 +1152,7 @@ class Class1AffinityPredictor(object):
                 peptides.max_length > max_peptide_length):
             # Only compute this if needed
             all_peptide_lengths_supported = False
-            sequence_length = df.peptide.str.len()
+            sequence_length = peptide_length_series(df.peptide)
             df["supported_peptide_length"] = (
                 (sequence_length >= min_peptide_length) &
                 (sequence_length <= max_peptide_length))
@@ -1421,7 +1422,8 @@ class Class1AffinityPredictor(object):
                     'peptide': encoded_peptides.sequences,
                     'prediction': predictions
                 }).drop_duplicates('peptide').set_index("peptide")
-                predictions_df["length"] = predictions_df.index.str.len()
+                predictions_df["length"] = peptide_length_series(
+                    predictions_df.index)
                 for (length, sub_df) in predictions_df.groupby("length"):
                     for cutoff_fraction in summary_top_peptide_fractions:
                         selected = sub_df.prediction.nsmallest(
@@ -1444,8 +1446,9 @@ class Class1AffinityPredictor(object):
                 for cutoff_fraction in summary_top_peptide_fractions:
                     cutoff_count = max(
                         int(len(predictions_df) * cutoff_fraction), 1)
-                    length_distribution = predictions_df.prediction.nsmallest(
-                        cutoff_count).index.str.len().value_counts()
+                    length_distribution = peptide_length_series(
+                        predictions_df.prediction.nsmallest(
+                            cutoff_count)).value_counts()
                     length_distribution.index.name = "length"
                     length_distribution /= length_distribution.sum()
                     length_distribution = length_distribution.to_frame()

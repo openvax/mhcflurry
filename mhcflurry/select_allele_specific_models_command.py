@@ -23,7 +23,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import normalize_allele_name
 from .encodable_sequences import EncodableSequences
-from .common import configure_logging, random_peptides
+from .common import configure_logging, random_peptides, peptide_length_series
 from .local_parallelism import worker_pool_with_gpu_assignments_from_args, add_local_parallelism_args
 from .regression_target import from_ic50
 
@@ -207,8 +207,9 @@ def run(argv=sys.argv[1:]):
         df = pandas.read_csv(args.data)
         print("Loaded data: %s" % (str(df.shape)))
 
+        lengths = peptide_length_series(df.peptide)
         df = df.loc[
-            (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
+            (lengths >= 8) & (lengths <= 15)
         ]
         print("Subselected to 8-15mers: %s" % (str(df.shape)))
 
