@@ -8,6 +8,7 @@ from __future__ import (
 )
 
 import math
+import re
 from six import string_types
 from functools import partial
 
@@ -15,6 +16,9 @@ import numpy
 import pandas
 
 from . import amino_acid
+
+
+TOKENIZE_REGEX = re.compile("{[A-z]+}|.")
 
 
 class EncodingError(ValueError):
@@ -272,18 +276,25 @@ class EncodableSequences(object):
         if allow_unsupported_amino_acids:
             fill_value = amino_acid.AMINO_ACID_INDEX['X']
 
-            def get_amino_acid_index(a, peptide):
-                return amino_acid.AMINO_ACID_INDEX.get(a, fill_value)
+            def get_amino_acid_index(token, tokens):
+                return amino_acid.AMINO_ACID_INDEX.get(token, fill_value)
         else:
-            def get_amino_acid_index(a, peptide):
+            def get_amino_acid_index(token, tokens):
                 """
-                The peptide argument is used only for the debug message
+                The tokens argument is used only for the debug message
                 """
                 try:
-                    return amino_acid.AMINO_ACID_INDEX[a]
+                    return amino_acid.AMINO_ACID_INDEX[token]
                 except KeyError:
                     raise ValueError(
-                        "Invalid amino acid '%s' in peptide '%s'" % (a, peptide))
+                        "Invalid amino acid '%s' in peptide '%s'" % (
+                            token, "".join(tokens)))
+
+
+        # Note on tokenizing. We are tokenizing peptides like
+        # "SIIN{PTYR}FEKL{PSER}" into:
+        # ['S', 'I', 'I', 'N', '{PTYR}', 'F', 'E', 'K', 'L', '{PSER}']
+        # So that we can handle PTMs (currently just phosphorylation).
 
         result = None
         if alignment_method == 'pad_middle':
@@ -297,7 +308,8 @@ class EncodableSequences(object):
                 dtype="int32")
 
             df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
-            df["length"] = df.peptide.str.len()
+            df["tokens"] = df.peptide.str.findall(TOKENIZE_REGEX)
+            df["length"] = df.tokens.str.len()
 
             middle_length = max_length - left_edge - right_edge
             min_length = left_edge + right_edge
@@ -317,9 +329,9 @@ class EncodableSequences(object):
                 # Array of shape (num peptides, length) giving fixed-length
                 # amino acid encoding each peptide of the current length.
                 fixed_length_sequences = numpy.stack(
-                    sub_df.peptide.map(
-                        lambda s: numpy.array([
-                            get_amino_acid_index(char, s) for char in s
+                    sub_df.tokens.map(
+                        lambda tokens: numpy.array([
+                            get_amino_acid_index(token, tokens) for token in tokens
                         ])).values)
 
                 num_null = max_length - length
@@ -360,10 +372,12 @@ class EncodableSequences(object):
                 dtype="int32")
 
             df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
+            df["tokens"] = df.peptide.str.findall(TOKENIZE_REGEX)
+            df["length"] = df.tokens.str.len()
 
             # For efficiency we handle each supported peptide length using bulk
             # array operations.
-            for (length, sub_df) in df.groupby(df.peptide.str.len()):
+            for (length, sub_df) in df.groupby("length"):
                 if length < min_length or length > max_length:
                     raise EncodingError(
                         "Sequence '%s' (length %d) unsupported. There are %d "
@@ -375,9 +389,9 @@ class EncodableSequences(object):
 
                 # Array of shape (num peptides, length) giving fixed-length
                 # amino acid encoding each peptide of the current length.
-                fixed_length_sequences = numpy.stack(sub_df.peptide.map(
-                    lambda s: numpy.array([
-                        get_amino_acid_index(char) for char in s
+                fixed_length_sequences = numpy.stack(sub_df.tokens.map(
+                    lambda tokens: numpy.array([
+                        get_amino_acid_index(token, tokens) for token in tokens
                     ])).values)
 
                 # Set left edge
@@ -400,10 +414,12 @@ class EncodableSequences(object):
                 dtype="int32")
 
             df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
+            df["tokens"] = df.peptide.str.findall(TOKENIZE_REGEX)
+            df["length"] = df.tokens.str.len()
 
             # For efficiency we handle each supported peptide length using bulk
             # array operations.
-            for (length, sub_df) in df.groupby(df.peptide.str.len()):
+            for (length, sub_df) in df.groupby("length"):
                 if length < min_length or length > max_length:
                     raise EncodingError(
                         "Sequence '%s' (length %d) unsupported. There are %d "
@@ -415,9 +431,9 @@ class EncodableSequences(object):
 
                 # Array of shape (num peptides, length) giving fixed-length
                 # amino acid encoding each peptide of the current length.
-                fixed_length_sequences = numpy.stack(sub_df.peptide.map(
-                    lambda s: numpy.array([
-                        get_amino_acid_index(char) for char in s
+                fixed_length_sequences = numpy.stack(sub_df.tokens.map(
+                    lambda tokens: numpy.array([
+                        get_amino_acid_index(token, tokens) for token in tokens
                     ])).values)
 
                 # Set left edge
@@ -444,10 +460,12 @@ class EncodableSequences(object):
                 dtype="int32")
 
             df = pandas.DataFrame({"peptide": sequences}, dtype=numpy.object_)
+            df["tokens"] = df.peptide.str.findall(TOKENIZE_REGEX)
+            df["length"] = df.tokens.str.len()
 
             # For efficiency we handle each supported peptide length using bulk
             # array operations.
-            for (length, sub_df) in df.groupby(df.peptide.str.len()):
+            for (length, sub_df) in df.groupby("length"):
                 if length < min_length or (not trim and length > max_length):
                     raise EncodingError(
                         "Sequence '%s' (length %d) unsupported. There are %d "
@@ -457,19 +475,19 @@ class EncodableSequences(object):
                             len(sub_df)), supported_peptide_lengths=(
                                 min_length, max_length))
 
-                peptides = sub_df.peptide
+                tokens = sub_df.tokens
                 if length > max_length:
                     # Trim.
                     if alignment_method == "right_pad":
-                        peptides = peptides.str.slice(0, max_length)
+                        tokens = tokens.str.slice(0, max_length)
                     else:
-                        peptides = peptides.str.slice(length - max_length)
+                        tokens = tokens.str.slice(length - max_length)
 
                 # Array of shape (num peptides, length) giving fixed-length
                 # amino acid encoding each peptide of the current length.
-                fixed_length_sequences = numpy.stack(peptides.map(
+                fixed_length_sequences = numpy.stack(tokens.map(
                     lambda s: numpy.array([
-                        get_amino_acid_index(char) for char in s
+                        get_amino_acid_index(token, s) for token in s
                     ])).values)
 
                 if alignment_method == "right_pad":
@@ -482,6 +500,5 @@ class EncodableSequences(object):
         else:
             raise NotImplementedError(
                 "Unsupported alignment method: %s" % alignment_method)
-
 
         return result

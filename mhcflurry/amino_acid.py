@@ -36,7 +36,10 @@ COMMON_AMINO_ACIDS = collections.OrderedDict(sorted({
     "W": "Tryptophan",
     "Y": "Tyrosine",
     "V": "Valine",
-}.items()))
+    "{PSER}": "Phosphoserine",
+    "{PTHR}": "Phosphothreonine",
+    "{PTYR}": "Phosphotyrosine",
+}.items(), key=lambda pair: (len(pair[0]), pair[0])))
 COMMON_AMINO_ACIDS_WITH_UNKNOWN = copy(COMMON_AMINO_ACIDS)
 COMMON_AMINO_ACIDS_WITH_UNKNOWN["X"] = "Unknown"
 
@@ -48,31 +51,54 @@ for (letter, i) in list(AMINO_ACID_INDEX.items()):
 
 AMINO_ACIDS = list(COMMON_AMINO_ACIDS_WITH_UNKNOWN.keys())
 
+
+# We extend the BLOSUM62 matrix with:
+# - X (unknown amino acid), defined as distance 1 to itself and 0 to all else.
+# - PSER (phosphoserine). Based on adjustments to the ASP (D) amino acid.
+#   We are using ASP rather than SER as the baseline for PSER because PSER is
+#   negatively charged, making it more similar to ASP than SER.
+# - PTHR (phospothreanine). Based on GLU (E).
+# - PTYR (phosphotyrosine). Based on TYR.
+#
+# The following adjustments to the above were made:
+#   similarity(PSER, SER) = 3 instead of 0
+#   similarity(PSER, PTYR) = 2 instead of -3
+#   similarity(PTHR, THR) =  3 instead of -1
+#   similarity(PTHR, PTYR) =  2 instead of -2
+#   similarity(PTYR, TYR) = 5 instead of 7
+#   similarity(PTYR, ASP) = 1 instead of -3
+#   similarity(PTYR, GLU) = 1 instead of -2
+#
 BLOSUM62_MATRIX = pandas.read_csv(StringIO("""
-   A  R  N  D  C  Q  E  G  H  I  L  K  M  F  P  S  T  W  Y  V  X
-A  4 -1 -2 -2  0 -1 -1  0 -2 -1 -1 -1 -1 -2 -1  1  0 -3 -2  0  0
-R -1  5  0 -2 -3  1  0 -2  0 -3 -2  2 -1 -3 -2 -1 -1 -3 -2 -3  0
-N -2  0  6  1 -3  0  0  0  1 -3 -3  0 -2 -3 -2  1  0 -4 -2 -3  0
-D -2 -2  1  6 -3  0  2 -1 -1 -3 -4 -1 -3 -3 -1  0 -1 -4 -3 -3  0
-C  0 -3 -3 -3  9 -3 -4 -3 -3 -1 -1 -3 -1 -2 -3 -1 -1 -2 -2 -1  0
-Q -1  1  0  0 -3  5  2 -2  0 -3 -2  1  0 -3 -1  0 -1 -2 -1 -2  0
-E -1  0  0  2 -4  2  5 -2  0 -3 -3  1 -2 -3 -1  0 -1 -3 -2 -2  0
-G  0 -2  0 -1 -3 -2 -2  6 -2 -4 -4 -2 -3 -3 -2  0 -2 -2 -3 -3  0
-H -2  0  1 -1 -3  0  0 -2  8 -3 -3 -1 -2 -1 -2 -1 -2 -2  2 -3  0
-I -1 -3 -3 -3 -1 -3 -3 -4 -3  4  2 -3  1  0 -3 -2 -1 -3 -1  3  0
-L -1 -2 -3 -4 -1 -2 -3 -4 -3  2  4 -2  2  0 -3 -2 -1 -2 -1  1  0
-K -1  2  0 -1 -3  1  1 -2 -1 -3 -2  5 -1 -3 -1  0 -1 -3 -2 -2  0
-M -1 -1 -2 -3 -1  0 -2 -3 -2  1  2 -1  5  0 -2 -1 -1 -1 -1  1  0
-F -2 -3 -3 -3 -2 -3 -3 -3 -1  0  0 -3  0  6 -4 -2 -2  1  3 -1  0
-P -1 -2 -2 -1 -3 -1 -1 -2 -2 -3 -3 -1 -2 -4  7 -1 -1 -4 -3 -2  0
-S  1 -1  1  0 -1  0  0  0 -1 -2 -2  0 -1 -2 -1  4  1 -3 -2 -2  0
-T  0 -1  0 -1 -1 -1 -1 -2 -2 -1 -1 -1 -1 -2 -1  1  5 -2 -2  0  0 
-W -3 -3 -4 -4 -2 -2 -3 -2 -2 -3 -2 -3 -1  1 -4 -3 -2 11  2 -3  0
-Y -2 -2 -2 -3 -2 -1 -2 -3  2 -1 -1 -2 -1  3 -3 -2 -2  2  7 -1  0
-V  0 -3 -3 -3 -1 -2 -2 -3 -3  3  1 -2  1 -1 -2 -2  0 -3 -1  4  0
-X  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  1
-"""), sep='\s+').loc[AMINO_ACIDS, AMINO_ACIDS].astype("int8")
+        A  C  D  E  F  G  H  I  K  L  M  N  P  Q  R  S  T  V   W  Y  {PSER}  {PTHR}  {PTYR}  X
+A       4  0 -2 -1 -2  0 -2 -1 -1 -1 -1 -2 -1 -1 -1  1  0  0  -3 -2      -2      -1      -2  0
+C       0  9 -3 -4 -2 -3 -3 -1 -3 -1 -1 -3 -3 -3 -3 -1 -1 -1  -2 -2      -3      -4      -2  0
+D      -2 -3  6  2 -3 -1 -1 -3 -1 -4 -3  1 -1  0 -2  0 -1 -3  -4 -3       6       2       1  0
+E      -1 -4  2  5 -3 -2  0 -3  1 -3 -2  0 -1  2  0  0 -1 -2  -3 -2       2       5       1  0
+F      -2 -2 -3 -3  6 -3 -1  0 -3  0  0 -3 -4 -3 -3 -2 -2 -1   1  3      -3      -3       3  0
+G       0 -3 -1 -2 -3  6 -2 -4 -2 -4 -3  0 -2 -2 -2  0 -2 -3  -2 -3      -1      -2      -3  0
+H      -2 -3 -1  0 -1 -2  8 -3 -1 -3 -2  1 -2  0  0 -1 -2 -3  -2  2      -1       0       2  0
+I      -1 -1 -3 -3  0 -4 -3  4 -3  2  1 -3 -3 -3 -3 -2 -1  3  -3 -1      -3      -3      -1  0
+K      -1 -3 -1  1 -3 -2 -1 -3  5 -2 -1  0 -1  1  2  0 -1 -2  -3 -2      -1       1      -2  0
+L      -1 -1 -4 -3  0 -4 -3  2 -2  4  2 -3 -3 -2 -2 -2 -1  1  -2 -1      -4      -3      -1  0
+M      -1 -1 -3 -2  0 -3 -2  1 -1  2  5 -2 -2  0 -1 -1 -1  1  -1 -1      -3      -2      -1  0
+N      -2 -3  1  0 -3  0  1 -3  0 -3 -2  6 -2  0  0  1  0 -3  -4 -2       1       0      -2  0
+P      -1 -3 -1 -1 -4 -2 -2 -3 -1 -3 -2 -2  7 -1 -2 -1 -1 -2  -4 -3      -1      -1      -3  0
+Q      -1 -3  0  2 -3 -2  0 -3  1 -2  0  0 -1  5  1  0 -1 -2  -2 -1       0       2      -1  0
+R      -1 -3 -2  0 -3 -2  0 -3  2 -2 -1  0 -2  1  5 -1 -1 -3  -3 -2      -2       0      -2  0
+S       1 -1  0  0 -2  0 -1 -2  0 -2 -1  1 -1  0 -1  4  1 -2  -3 -2       3       0      -2  0
+T       0 -1 -1 -1 -2 -2 -2 -1 -1 -1 -1  0 -1 -1 -1  1  5  0  -2 -2      -1       3      -2  0
+V       0 -1 -3 -2 -1 -3 -3  3 -2  1  1 -3 -2 -2 -3 -2  0  4  -3 -1      -3      -2      -1  0
+W      -3 -2 -4 -3  1 -2 -2 -3 -3 -2 -1 -4 -4 -2 -3 -3 -2 -3  11  2      -4      -3       2  0
+Y      -2 -2 -3 -2  3 -3  2 -1 -2 -1 -1 -2 -3 -1 -2 -2 -2 -1   2  7      -3      -2       5  0
+{PSER} -2 -3  6  2 -3 -1 -1 -3 -1 -4 -3  1 -1  0 -2  3 -1 -3  -4 -3       6       2       2  0
+{PTHR} -1 -4  2  5 -3 -2  0 -3  1 -3 -2  0 -1  2  0  0  3 -2  -3 -2       2       5       2  0
+{PTYR} -2 -2  1  1  3 -3  2 -1 -2 -1 -1 -2 -3 -1 -2 -2 -2 -1   2  5       2       2       7  0
+X       0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0   0  0       0       0       0  1
+"""), sep='\\s+', index_col=0).loc[AMINO_ACIDS, AMINO_ACIDS].astype("int8")
 assert (BLOSUM62_MATRIX == BLOSUM62_MATRIX.T).all().all()
+
+print(BLOSUM62_MATRIX)
 
 ENCODING_DATA_FRAMES = {
     "BLOSUM62": BLOSUM62_MATRIX,
