@@ -1112,9 +1112,6 @@ class Class1NeuralNetwork(object):
                 self.allele_encoding_to_network_input(allele_encoding))
             x_dict['allele'] = allele_encoding_input
             self.set_allele_representations(allele_representations)
-            print("x_dict", x_dict)
-            print("allele representations:")
-            print(self.network().get_layer("allele_representation").get_weights())
             network = self.network()
         else:
             network = self.network(borrow=True)

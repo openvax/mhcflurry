@@ -97,16 +97,6 @@ def test_downloaded_predictor_is_savable():
     predictor_copy = Class1AffinityPredictor.load(models_dir)
 
     numpy.testing.assert_equal(
-        DOWNLOADED_PREDICTOR.class1_pan_allele_models[0].network().get_weights(),
-        predictor_copy.class1_pan_allele_models[0].network().get_weights())
-
-    numpy.testing.assert_equal(
-        DOWNLOADED_PREDICTOR.class1_pan_allele_models[0].network().to_json(),
-        predictor_copy.class1_pan_allele_models[0].network().to_json())
-
-    #import ipdb ; ipdb.set_trace()
-
-    numpy.testing.assert_equal(
         DOWNLOADED_PREDICTOR.predict(
             ["RSKERAVVVAW"], allele="HLA-A*01:01")[0],
         predictor_copy.predict(
