@@ -58,7 +58,8 @@ class Class1AffinityPredictor(object):
             manifest_df=None,
             allele_to_percent_rank_transform=None,
             metadata_dataframes=None,
-            provenance_string=None):
+            provenance_string=None,
+            optimization_info=None):
         """
         Parameters
         ----------
@@ -88,6 +89,11 @@ class Class1AffinityPredictor(object):
 
         provenance_string : string, optional
             Optional info string to use in __str__.
+
+        optimization_info : dict, optional
+            Dict describing any optimizations already performed on the model.
+            The only currently supported optimization is to merge ensembles
+            together into one tensorflow graph.
         """
 
         if allele_to_allele_specific_models is None:
@@ -113,7 +119,7 @@ class Class1AffinityPredictor(object):
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
         self._cache = {}
-        self.optimization_info = {}
+        self.optimization_info = optimization_info if optimization_info else {}
 
         assert isinstance(self.allele_to_allele_specific_models, dict)
         assert isinstance(self.class1_pan_allele_models, list)
@@ -440,6 +446,15 @@ class Class1AffinityPredictor(object):
                 index_label="bin")
             logging.info("Wrote: %s", percent_ranks_path)
 
+        if self.optimization_info:
+            # If the model being saved was optimized, we need to save that
+            # information since it can affect how predictions are performed
+            # (e.g. stitched-together ensembles output concatenated results,
+            # which then need to be averaged outside the model).
+            optimization_info_path = join(models_dir, "optimization_info.json")
+            with open(optimization_info_path, "w") as fd:
+                json.dump(self.optimization_info, fd, indent=4)
+
     @staticmethod
     def load(models_dir=None, max_models=None, optimization_level=None):
         """
@@ -560,13 +575,22 @@ class Class1AffinityPredictor(object):
         except OSError:
             pass
 
+        optimization_info = None
+        try:
+            optimization_info_path = join(models_dir, "optimization_info.json")
+            with open(optimization_info_path) as fd:
+                optimization_info = json.load(fd)
+        except OSError:
+            pass
+
         result = Class1AffinityPredictor(
             allele_to_allele_specific_models=allele_to_allele_specific_models,
             class1_pan_allele_models=class1_pan_allele_models,
             allele_to_sequence=allele_to_sequence,
             manifest_df=manifest_df,
             allele_to_percent_rank_transform=allele_to_percent_rank_transform,
-            provenance_string=provenance_string
+            provenance_string=provenance_string,
+            optimization_info=optimization_info,
         )
         if optimization_level >= 1:
             optimized = result.optimize()
