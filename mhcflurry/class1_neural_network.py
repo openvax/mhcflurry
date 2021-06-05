@@ -261,6 +261,47 @@ class Class1NeuralNetwork(object):
             else:
                 configure_tensorflow()
                 from tensorflow import keras
+
+                # Hack to fix an issue caused by a change introduced in
+                # tensorflow 2.3.0, in which our models fit using tensorflow 2.2
+                # can't be loaded in tensorflow >=2.3 because the allele
+                # representation input dim of 0 is no longer valid. We had
+                # originally set an input dim of 0 here to avoid saving any
+                # allele representations with the model, since they are loaded
+                # dynamically based on the particular alleles being predicted.
+                # Here we edit the json to set the input_dim value to 1 and
+                # also edit the weights accordingly.
+                # Set this environment variable to disable this hack.
+                if not os.environ.get("MHCFLURRY_NO_TF_23_FIX"):
+                    parsed_json = json.loads(self.network_json)
+                    nodes_to_change = [
+                        node for node in parsed_json['config']['layers']
+                        if (
+                                node["name"] == 'allele_representation' and
+                                node["config"]["input_dim"] == 0
+                        )
+                    ]
+                    if len(nodes_to_change) > 1:
+                        logging.warning(
+                            "Unexpected: multiple allele_representation nodes")
+                    for node in nodes_to_change:
+                        node["config"]["input_dim"] = 1
+
+                    if len(nodes_to_change) > 0:
+                        self.network_json = json.dumps(parsed_json)
+
+                        # Also fix network weights.
+                        fixed = 0
+                        if self.network_weights is not None:
+                            for idx in range(len(self.network_weights)):
+                                arr = self.network_weights[idx]
+                                if arr.shape[0] == 0:
+                                    self.network_weights[idx] = numpy.zeros(
+                                        shape=(1,) + arr.shape[1:],
+                                        dtype=arr.dtype)
+                                    fixed += 1
+                        numpy.testing.assert_equal(len(nodes_to_change), fixed)
+
                 self._network = keras.models.model_from_json(self.network_json)
                 if self.network_weights is not None:
                     self._network.set_weights(self.network_weights)
@@ -1071,11 +1112,14 @@ class Class1NeuralNetwork(object):
                 self.allele_encoding_to_network_input(allele_encoding))
             x_dict['allele'] = allele_encoding_input
             self.set_allele_representations(allele_representations)
+            print("x_dict", x_dict)
+            print("allele representations:")
+            print(self.network().get_layer("allele_representation").get_weights())
             network = self.network()
         else:
             network = self.network(borrow=True)
         raw_predictions = network.predict(x_dict, batch_size=batch_size)
-        predictions = numpy.array(raw_predictions, dtype = "float64")
+        predictions = numpy.array(raw_predictions, dtype="float64")
         if output_index is not None:
             predictions = predictions[:,output_index]
         result = to_ic50(predictions)

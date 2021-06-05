@@ -1,5 +1,13 @@
+import logging
+logging.getLogger('tensorflow').disabled = True
+logging.getLogger('matplotlib').disabled = True
+
+
 import numpy
 numpy.random.seed(0)
+
+import pickle
+import tempfile
 
 from numpy.testing import assert_equal
 
@@ -71,3 +79,35 @@ def test_caching():
             allele="HLA-A*02:01")
         num_cached = len(Class1NeuralNetwork.KERAS_MODELS_CACHE)
         assert num_cached > 0
+
+
+def test_downloaded_predictor_is_serializable():
+    predictor_copy = pickle.loads(pickle.dumps(DOWNLOADED_PREDICTOR))
+    numpy.testing.assert_equal(
+        DOWNLOADED_PREDICTOR.predict(
+            ["RSKERAVVVAW"], allele="HLA-A*01:01")[0],
+        predictor_copy.predict(
+            ["RSKERAVVVAW"], allele="HLA-A*01:01")[0])
+
+
+def test_downloaded_predictor_is_savable():
+    models_dir = tempfile.mkdtemp("_models")
+    print(models_dir)
+    DOWNLOADED_PREDICTOR.save(models_dir)
+    predictor_copy = Class1AffinityPredictor.load(models_dir)
+
+    numpy.testing.assert_equal(
+        DOWNLOADED_PREDICTOR.class1_pan_allele_models[0].network().get_weights(),
+        predictor_copy.class1_pan_allele_models[0].network().get_weights())
+
+    numpy.testing.assert_equal(
+        DOWNLOADED_PREDICTOR.class1_pan_allele_models[0].network().to_json(),
+        predictor_copy.class1_pan_allele_models[0].network().to_json())
+
+    #import ipdb ; ipdb.set_trace()
+
+    numpy.testing.assert_equal(
+        DOWNLOADED_PREDICTOR.predict(
+            ["RSKERAVVVAW"], allele="HLA-A*01:01")[0],
+        predictor_copy.predict(
+            ["RSKERAVVVAW"], allele="HLA-A*01:01")[0])
