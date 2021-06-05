@@ -154,8 +154,6 @@ def test_basic():
         del other_test_df["prediction2"]
         add_prediction_cols(other_test_df, other_predictor)
 
-        import ipdb ; ipdb.set_trace()
-
         numpy.testing.assert_array_almost_equal(
             test_df["prediction1"], other_test_df["prediction1"], decimal=6)
         numpy.testing.assert_array_almost_equal(
