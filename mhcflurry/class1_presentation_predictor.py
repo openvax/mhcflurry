@@ -138,9 +138,9 @@ class Class1PresentationPredictor(object):
         ...    verbose=0)
             peptide  peptide_num sample_name   affinity best_allele  affinity_percentile
         0  SIINFEKL            0     sample1  11927.161       A0201                6.296
-        1   PEPTIDE            1     sample1  32507.083       A0201               71.249
+        1   PEPTIDE            1     sample1  32507.082       A0201               71.249
         2  SIINFEKL            0     sample2   2725.593       C0202                6.662
-        3   PEPTIDE            1     sample2  28304.330       C0202               54.652
+        3   PEPTIDE            1     sample2  28304.336       C0202               54.652
 
         In contrast, here we specify sample_names, so peptide is evaluated for
         binding the alleles in the corresponding sample, for a result size equal
@@ -156,7 +156,7 @@ class Class1PresentationPredictor(object):
         ...    verbose=0)
             peptide  peptide_num sample_name   affinity best_allele  affinity_percentile
         0  SIINFEKL            0     sample2   2725.592       C0202                6.662
-        1   PEPTIDE            1     sample1  32507.079       A0201               71.249
+        1   PEPTIDE            1     sample1  32507.078       A0201               71.249
 
         Parameters
         ----------
@@ -453,9 +453,9 @@ class Class1PresentationPredictor(object):
         ...    verbose=0)
             peptide n_flank c_flank  peptide_num sample_name   affinity best_allele  processing_score  presentation_score  presentation_percentile
         0  SIINFEKL     NNN     CCC            0     sample1  11927.161       A0201             0.838               0.145                    2.282
-        1   PEPTIDE     SNS     CNC            1     sample1  32507.083       A0201             0.025               0.003                  100.000
+        1   PEPTIDE     SNS     CNC            1     sample1  32507.082       A0201             0.025               0.003                  100.000
         2  SIINFEKL     NNN     CCC            0     sample2   2725.593       C0202             0.838               0.416                    1.017
-        3   PEPTIDE     SNS     CNC            1     sample2  28304.330       C0202             0.025               0.003                   99.287
+        3   PEPTIDE     SNS     CNC            1     sample2  28304.338       C0202             0.025               0.003                   99.287
 
         You can also specify sample_names, in which case peptide is evaluated
         for binding the alleles in the corresponding sample only. See

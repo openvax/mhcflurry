@@ -110,6 +110,13 @@ def test_basic():
         test_df["prediction1_percentile"] = prediction1_df.presentation_percentile.values
         test_df["prediction2_percentile"] = prediction2_df.presentation_percentile.values
 
+        test_df["processing_score1"] = prediction1_df.processing_score.values
+        test_df["processing_score2"] = prediction2_df.processing_score.values
+
+        test_df["affinity1"] = prediction1_df.affinity.values
+        test_df["affinity2"] = prediction2_df.affinity.values
+
+
     add_prediction_cols(test_df, predictor)
 
     score1 = roc_auc_score(test_df.hit.values, test_df.prediction1.values)
@@ -142,9 +149,11 @@ def test_basic():
     for (i, other_predictor) in enumerate([predictor2, predictor3, predictor4]):
         print("Testing identity", i + 1)
         other_test_df = test_df.copy()
+
         del other_test_df["prediction1"]
         del other_test_df["prediction2"]
         add_prediction_cols(other_test_df, other_predictor)
+
         numpy.testing.assert_array_almost_equal(
             test_df["prediction1"], other_test_df["prediction1"], decimal=6)
         numpy.testing.assert_array_almost_equal(
