@@ -549,7 +549,11 @@ class Class1AffinityPredictor(object):
         if exists(percent_ranks_path):
             percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
             for allele in percent_ranks_df.columns:
-                allele_to_percent_rank_transform[allele] = (
+                # Similar to the above, we renormalize the allele name here.
+                normalized = normalize_allele_name(allele, raise_on_error=False)
+                if normalized is None:
+                    continue
+                allele_to_percent_rank_transform[normalized] = (
                     PercentRankTransform.from_series(percent_ranks_df[allele]))
 
         logging.info(
