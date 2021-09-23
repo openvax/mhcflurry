@@ -33,19 +33,17 @@ def teardown():
 def predict_and_check(
         allele,
         peptide,
-        predictor=DOWNLOADED_PREDICTOR,
         expected_range=(0, 500)):
 
-    def debug():
-        print("\n%s" % (
-            predictor.predict_to_dataframe(
-                peptides=[peptide],
-                allele=allele,
-                include_individual_model_predictions=True)))
+    print("\n%s" % (
+        DOWNLOADED_PREDICTOR.predict_to_dataframe(
+            peptides=[peptide],
+            allele=allele,
+            include_individual_model_predictions=True)))
 
-        (prediction,) = predictor.predict(allele=allele, peptides=[peptide])
-        assert prediction >= expected_range[0], (predictor, prediction, debug())
-        assert prediction <= expected_range[1], (predictor, prediction, debug())
+    (prediction,) = DOWNLOADED_PREDICTOR.predict(allele=allele, peptides=[peptide])
+    assert prediction >= expected_range[0], (DOWNLOADED_PREDICTOR, prediction)
+    assert prediction <= expected_range[1], (DOWNLOADED_PREDICTOR, prediction)
 
 
 def test_a1_titin_epitope_downloaded_models():
@@ -101,3 +99,15 @@ def test_downloaded_predictor_is_savable():
             ["RSKERAVVVAW"], allele="HLA-A*01:01")[0],
         predictor_copy.predict(
             ["RSKERAVVVAW"], allele="HLA-A*01:01")[0])
+
+
+def test_downloaded_predictor_gives_percentile_ranks():
+    predictions = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+        peptides=["SAQGQFSAV", "SAQGQFSAV"],
+        alleles=["HLA-A*03:01", "HLA-C*01:02"])
+
+    print(predictions)
+    assert not predictions.prediction.isnull().any()
+    assert not predictions.prediction_percentile.isnull().any()
+
+
