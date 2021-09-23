@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/openvax/mhcflurry.svg?branch=master)](https://travis-ci.org/openvax/mhcflurry)
+[![Build Status](https://app.travis-ci.com/openvax/mhcflurry.svg?branch=master)](https://app.travis-ci.com/openvax/mhcflurry)
 
 # mhcflurry
 [MHC I](https://en.wikipedia.org/wiki/MHC_class_I) ligand
