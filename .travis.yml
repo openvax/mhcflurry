@@ -25,7 +25,7 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib mkl-service 'tensorflow>=2.2.0,<2.3.0'
+      numpy scipy nose pandas matplotlib mkl-service 'tensorflow>=2.2.0'
       pypandoc sphinx numpydoc
   - source activate test-environment
   - pip install nose-timer
@@ -68,3 +68,14 @@ script:
   - mhcflurry-downloads fetch  # Won't download anything, just checking it runs
   - mhcflurry-downloads info   # Also just to test this command works
   - nosetests --with-timer -sv test
+
+deploy:
+  provider: pypi
+  skip_existing: true
+  distributions: sdist bdist_wheel
+  username: __token__
+  on:
+    tags: true
+  password:
+    secure: DJ7cDl2mjR5KBDze0y3MG/tApgFrE2H/H6HBX3DzNZl6AK+KCrXJIMZkPLEFuccjxXec8k+eWsD4N0cn2Y37oGxePm70cFS4u8bcbzYZEkCCCUwyRFy2/EIcbllENpTfjrAxyRJM/kruDUSjh37v82Xbvana8nIDK0Vu3KjzcJAJzOG8vX09+ZgCmre/h6jiILxaCHnLLk/ziAECVfnQXI/EcM+nXUWIVINOaAeDdaO03CAmCYZK7+ZbKy8NOyW1xGPOrwxF5rFJK9+o6mLKBrPw0Wa2BzZZNo0xonW9ov6bGxpo2B5QQVPD5+8cZAm+fYxzlv+76UjOPkXRVsHCxMB8E6Goz6E3TS7oj69oB1iLt4FIlbOvNRo4keiFKGsvh+x8zAwxk+24YatClUsiB43AstVF3AEDijmdfbzSfsWeemXZ3If5DxCcod0VQPsnyTAplZL7I1WZvvqYYNsi0sRUtlLPJvFlfC1LSwCZ+vax2oL8WHho8I91syF9oWZD7ujTa2YT/d3W3FA02a/JkKp0Qml/hfByOxAtxk0giWf6SbT/eikIzsMpC3vDVchQ2ZPfFUcIpHMUOX5PlX9IquLHFvzRSIh+47NcEOrxyhE2zujqbiqwy+Msgp/Px6myro2voh+SO8fEjhA6Q3d8rILSLoowID6wnhyAKdBOARw=
+

@@ -553,6 +553,10 @@ class Class1AffinityPredictor(object):
                 normalized = normalize_allele_name(allele, raise_on_error=False)
                 if normalized is None:
                     continue
+                if (normalized in allele_to_percent_rank_transform and
+                        allele != normalized):
+                    # See comment 20 lines above for the rationale here.
+                    continue
                 allele_to_percent_rank_transform[normalized] = (
                     PercentRankTransform.from_series(percent_ranks_df[allele]))
 
