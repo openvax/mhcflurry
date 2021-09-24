@@ -106,7 +106,6 @@ class Class1PresentationPredictor(object):
             self.supports_processing_prediction and
             self.weights_dataframe is not None)
 
-
     def predict_affinity(
             self,
             peptides,
@@ -387,7 +386,8 @@ class Class1PresentationPredictor(object):
                 X=df[self.model_inputs].values,
                 y=df.target.astype(float))
 
-            self.weights_dataframe.loc[model_name, "intercept"] = model.intercept_
+            (intercept,) = model.intercept_.flatten()
+            self.weights_dataframe.loc[model_name, "intercept"] = intercept
             for (name, value) in zip(self.model_inputs, numpy.squeeze(model.coef_)):
                 self.weights_dataframe.loc[model_name, name] = value
             self._models_cache[model_name] = model
