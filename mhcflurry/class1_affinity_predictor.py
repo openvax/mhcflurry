@@ -1182,26 +1182,43 @@ class Class1AffinityPredictor(object):
         if (peptides.min_length < min_peptide_length or
                 peptides.max_length > max_peptide_length):
             # Only compute this if needed
-            all_peptide_lengths_supported = False
+            all_peptides_supported = False
             sequence_length = df.peptide.str.len()
-            df["supported_peptide_length"] = (
+            df["supported_peptide"] = (
                 (sequence_length >= min_peptide_length) &
                 (sequence_length <= max_peptide_length))
-            if (~df.supported_peptide_length).any():
+            if (~df.supported_peptide).any():
                 msg = (
                     "%d peptides have lengths outside of supported range [%d, %d]: "
                     "%s" % (
-                        (~df.supported_peptide_length).sum(),
+                        (~df.supported_peptide).sum(),
                         min_peptide_length,
                         max_peptide_length,
-                        str(df.loc[~df.supported_peptide_length].peptide.unique())))
+                        str(df.loc[~df.supported_peptide].peptide.unique())))
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
         else:
             # Handle common case efficiently.
-            df["supported_peptide_length"] = True
-            all_peptide_lengths_supported = True
+            df["supported_peptide"] = True
+            all_peptides_supported = True
+
+        peptide_has_valid_amino_acids = (
+            (~df.supported_peptide) |
+            df.peptide.str.upper().str.match("^[ACDEFGHIKLMNPQRSTVWY]+$"))
+        df["supported_peptide"] = (
+                df["supported_peptide"] & peptide_has_valid_amino_acids)
+
+        if (~peptide_has_valid_amino_acids).any():
+            all_peptides_supported = False
+            msg = (
+                "%d peptides have nonstandard amino acids: "
+                "%s" % (
+                    (~peptide_has_valid_amino_acids).sum(),
+                    str(df.loc[~peptide_has_valid_amino_acids].peptide.unique())))
+            logging.warning(msg)
+            if throw:
+                raise ValueError(msg)
 
         num_pan_models = (
             len(self.class1_pan_allele_models)
@@ -1237,7 +1254,7 @@ class Class1AffinityPredictor(object):
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
-            mask = df.supported_peptide_length & (
+            mask = df.supported_peptide & (
                 ~df.normalized_allele.isin(unsupported_alleles))
 
             row_slice = None
@@ -1298,12 +1315,12 @@ class Class1AffinityPredictor(object):
 
             for allele in unique_alleles:
                 models = self.allele_to_allele_specific_models.get(allele, [])
-                if len(unique_alleles) == 1 and all_peptide_lengths_supported:
+                if len(unique_alleles) == 1 and all_peptides_supported:
                     mask = None
                 else:
                     mask = (
                         (df.normalized_allele == allele) &
-                        df.supported_peptide_length).values
+                        df.supported_peptide).values
 
                 row_slice = None
                 if mask is None or mask.all():
@@ -1354,7 +1371,7 @@ class Class1AffinityPredictor(object):
             else:
                 warnings.warn("No percentile rank information available.")
 
-        del df["supported_peptide_length"]
+        del df["supported_peptide"]
         del df["normalized_allele"]
         return df
 
