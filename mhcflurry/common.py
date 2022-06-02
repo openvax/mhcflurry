@@ -7,7 +7,7 @@ import json
 
 import numpy
 import pandas
-from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene, Class2Pair
+from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene, Pair
 
 from . import amino_acid
 
@@ -47,7 +47,7 @@ def normalize_allele_name(
     result = parse(
         raw_name,
         only_class1=True,
-        required_result_types=[Allele, AlleleWithoutGene, Gene],
+        required_result_types=[Allele, AlleleWithoutGene, Gene, Pair],
         preferred_result_types=[Allele],
         use_allele_aliases=True,
         infer_class2_pairing=False,
@@ -67,9 +67,7 @@ def normalize_allele_name(
                 "Unsupported annotation on MHC allele: %s" % raw_name)
         else:
             return default_value
-    if type(result) is Allele:
-        result = result.restrict_num_allele_fields(2)
-    return result.to_string()
+    return result.restrict_allele_fields(2).to_string()
 
 
 TENSORFLOW_CONFIGURED = False
