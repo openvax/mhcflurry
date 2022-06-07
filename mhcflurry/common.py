@@ -7,7 +7,7 @@ import json
 
 import numpy
 import pandas
-from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene, Pair
+from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene
 
 from . import amino_acid
 
@@ -47,7 +47,7 @@ def normalize_allele_name(
     result = parse(
         raw_name,
         only_class1=True,
-        required_result_types=[Allele, AlleleWithoutGene, Gene, Pair],
+        required_result_types=[Allele, AlleleWithoutGene, Gene],
         preferred_result_types=[Allele],
         use_allele_aliases=True,
         infer_class2_pairing=False,
