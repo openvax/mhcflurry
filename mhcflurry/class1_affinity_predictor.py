@@ -434,11 +434,15 @@ class Class1AffinityPredictor(object):
             for (allele, transform) in self.allele_to_percent_rank_transform.items():
                 series = transform.to_series()
                 if percent_ranks_df is None:
-                    percent_ranks_df = pandas.DataFrame(index=series.index)
+                    percent_ranks_df = {}
+                    percent_ranks_df_index = series.index
                 numpy.testing.assert_array_almost_equal(
                     series.index.values,
-                    percent_ranks_df.index.values)
+                    percent_ranks_df_index.values)
                 percent_ranks_df[allele] = series.values
+            percent_ranks_df = pandas.DataFrame(
+                percent_ranks_df,
+                index=percent_ranks_df_index)
             percent_ranks_path = join(models_dir, "percent_ranks.csv")
             percent_ranks_df.to_csv(
                 percent_ranks_path,

@@ -39,12 +39,16 @@ if __name__ == '__main__':
         'six',
         'pandas>=0.20.3',
         'appdirs',
-        'tensorflow>=2.2.0',
         'scikit-learn',
-        'mhcgnomes',
+        'mhcgnomes>=0.8.4',
         'pyyaml',
         'tqdm',
         'np_utils',
+
+        # Note: tensorflow dependency is commented out here because there are
+        # multiple packages that can provide tensorflow (e.g. tensorflow-macos)
+        # and I'm not sure how to specify a "this or that" dependency.
+        # 'tensorflow>=2.2.0',
     ]
 
     setup(

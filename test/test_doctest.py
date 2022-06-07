@@ -21,8 +21,8 @@ setup = startup
 
 
 def test_doctests():
-    original_precision = pandas.get_option('precision')
-    pandas.set_option('precision', 3)
+    original_precision = pandas.get_option('display.precision')
+    pandas.set_option('display.precision', 3)
 
     results1 = doctest.testmod(mhcflurry)
     results2 = doctest.testmod(mhcflurry.class1_presentation_predictor)
@@ -32,4 +32,4 @@ def test_doctests():
     # assert results1.failed == 0, results1.failed
     # assert results2.failed == 0, results2.failed
 
-    pandas.set_option('precision', original_precision)
+    pandas.set_option('display.precision', original_precision)

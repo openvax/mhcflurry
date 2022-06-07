@@ -45,7 +45,7 @@ script:
   - mkdir -p /tmp/downloads
   # We download using wget to avoid sporadic SSL error on travis from Python.
   -
-    wget
+    wget -nv
       $(mhcflurry-downloads url data_curated)
       $(mhcflurry-downloads url data_mass_spec_annotated)
       $(mhcflurry-downloads url models_class1)
