@@ -1,8 +1,8 @@
 dist: bionic
 language: python
 python:
-  - "3.6"
   - "3.8"
+  - "3.9"
 before_install:
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
       wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
