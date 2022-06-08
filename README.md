@@ -1,4 +1,5 @@
 [![Build Status](https://app.travis-ci.com/openvax/mhcflurry.svg?branch=master)](https://app.travis-ci.com/openvax/mhcflurry)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openvax/mhcflurry/blob/master/notebooks/mhcflurry-colab.ipynb)
 
 # mhcflurry
 [MHC I](https://en.wikipedia.org/wiki/MHC_class_I) ligand
@@ -29,6 +30,10 @@ If you find MHCflurry useful in your research please cite:
 Please file an issue if you have questions or encounter problems.
 
 Have a bugfix or other contribution? We would love your help. See our [contributing guidelines](CONTRIBUTING.md).
+
+## Try it now
+
+You can generate MHCflurry predictions without any setup by running our Google colaboratory [notebook](https://colab.research.google.com/github/openvax/mhcflurry/blob/master/notebooks/mhcflurry-colab.ipynb).
 
 ## Installation (pip)
 
