@@ -13,13 +13,12 @@ It exposes [command-line](http://openvax.github.io/mhcflurry/commandline_tutoria
 and [Python library](http://openvax.github.io/mhcflurry/python_tutorial.html)
 interfaces.
 
-Starting in version 1.6.0, MHCflurry also includes two expermental predictors,
+MHCflurry also includes two expermental predictors,
 an "antigen processing" predictor that attempts to model MHC allele-independent
 effects such as proteosomal cleavage and a "presentation" predictor that
 integrates processing predictions with binding affinity predictions to give a
 composite "presentation score." Both models are trained on mass spec-identified
-MHC ligands. These models were updated to incorporate minor improvements
-for the MHCflurry 2.0 release.
+MHC ligands.
 
 If you find MHCflurry useful in your research please cite:
 
