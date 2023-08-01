@@ -1,4 +1,3 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -43,7 +42,6 @@ if __name__ == '__main__':
         'mhcgnomes>=0.8.4',
         'pyyaml',
         'tqdm',
-        'np_utils',
 
         # Note: tensorflow dependency is commented out here because there are
         # multiple packages that can provide tensorflow (e.g. tensorflow-macos)
