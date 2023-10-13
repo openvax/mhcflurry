@@ -18,6 +18,7 @@ class Class1ProcessingNeuralNetwork(object):
     """
     A neural network for antigen processing prediction
     """
+
     network_hyperparameter_defaults = HyperparameterDefaults(
         amino_acid_encoding="BLOSUM62",
         peptide_max_length=15,
@@ -63,21 +64,22 @@ class Class1ProcessingNeuralNetwork(object):
     used.
     """
 
-    auxiliary_input_hyperparameter_defaults = HyperparameterDefaults(
-    )
+    auxiliary_input_hyperparameter_defaults = HyperparameterDefaults()
     """
     Allele feature hyperparameters.
     """
 
-    hyperparameter_defaults = network_hyperparameter_defaults.extend(
-        fit_hyperparameter_defaults).extend(
-        early_stopping_hyperparameter_defaults).extend(
-        compile_hyperparameter_defaults).extend(
-        auxiliary_input_hyperparameter_defaults)
+    hyperparameter_defaults = (
+        network_hyperparameter_defaults.extend(fit_hyperparameter_defaults)
+        .extend(early_stopping_hyperparameter_defaults)
+        .extend(compile_hyperparameter_defaults)
+        .extend(auxiliary_input_hyperparameter_defaults)
+    )
 
     def __init__(self, **hyperparameters):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
-            hyperparameters)
+            hyperparameters
+        )
         self._network = None
         self.network_json = None
         self.network_weights = None
@@ -96,9 +98,9 @@ class Class1ProcessingNeuralNetwork(object):
         supported sequence length.
         """
         return {
-            "peptide": self.hyperparameters['peptide_max_length'],
-            "n_flank": self.hyperparameters['n_flank_length'],
-            "c_flank": self.hyperparameters['c_flank_length'],
+            "peptide": self.hyperparameters["peptide_max_length"],
+            "n_flank": self.hyperparameters["n_flank_length"],
+            "c_flank": self.hyperparameters["c_flank_length"],
         }
 
     def network(self):
@@ -115,8 +117,8 @@ class Class1ProcessingNeuralNetwork(object):
             # when serialized between python versions. The disadvantage is
             # that we can more easily lose backward compatability.
             self._network = self.make_network(
-                **self.network_hyperparameter_defaults.subselect(
-                    self.hyperparameters))
+                **self.network_hyperparameter_defaults.subselect(self.hyperparameters)
+            )
 
             if self.network_weights is not None:
                 self._network.set_weights(self.network_weights)
@@ -132,15 +134,16 @@ class Class1ProcessingNeuralNetwork(object):
             self.network_weights = self._network.get_weights()
 
     def fit(
-            self,
-            sequences,
-            targets,
-            sample_weights=None,
-            shuffle_permutation=None,
-            verbose=1,
-            progress_callback=None,
-            progress_preamble="",
-            progress_print_interval=5.0):
+        self,
+        sequences,
+        targets,
+        sample_weights=None,
+        shuffle_permutation=None,
+        verbose=1,
+        progress_callback=None,
+        progress_preamble="",
+        progress_print_interval=5.0,
+    ):
         """
         Fit the neural network.
 
@@ -181,75 +184,93 @@ class Class1ProcessingNeuralNetwork(object):
 
         if self._network is None:
             self._network = self.make_network(
-                **self.network_hyperparameter_defaults.subselect(
-                    self.hyperparameters))
+                **self.network_hyperparameter_defaults.subselect(self.hyperparameters)
+            )
             if verbose > -1:
                 self._network.summary()
 
         self.network().compile(
-            loss="binary_crossentropy",
-            optimizer=self.hyperparameters['optimizer'])
+            loss="binary_crossentropy", optimizer=self.hyperparameters["optimizer"]
+        )
 
         last_progress_print = None
         min_val_loss_iteration = None
         min_val_loss = None
         start = time.time()
-        for i in range(self.hyperparameters['max_epochs']):
+        for i in range(self.hyperparameters["max_epochs"]):
             epoch_start = time.time()
             fit_history = self.network().fit(
                 x_dict,
                 targets,
-                validation_split=self.hyperparameters['validation_split'],
-                batch_size=self.hyperparameters['minibatch_size'],
+                validation_split=self.hyperparameters["validation_split"],
+                batch_size=self.hyperparameters["minibatch_size"],
                 epochs=i + 1,
                 sample_weight=sample_weights,
                 initial_epoch=i,
-                verbose=verbose)
+                verbose=verbose,
+            )
             epoch_time = time.time() - epoch_start
 
-            for (key, value) in fit_history.history.items():
+            for key, value in fit_history.history.items():
                 fit_info[key].extend(value)
 
             # Print progress no more often than once every few seconds.
             if progress_print_interval is not None and (
-                    not last_progress_print or (
-                        time.time() - last_progress_print
-                        > progress_print_interval)):
-                print((progress_preamble + " " +
-                       "Epoch %3d / %3d [%0.2f sec]: loss=%g. "
-                       "Min val loss (%s) at epoch %s" % (
-                           i,
-                           self.hyperparameters['max_epochs'],
-                           epoch_time,
-                           fit_info['loss'][-1],
-                           str(min_val_loss),
-                           min_val_loss_iteration)).strip())
+                not last_progress_print
+                or (time.time() - last_progress_print > progress_print_interval)
+            ):
+                print(
+                    (
+                        progress_preamble
+                        + " "
+                        + "Epoch %3d / %3d [%0.2f sec]: loss=%g. "
+                        "Min val loss (%s) at epoch %s"
+                        % (
+                            i,
+                            self.hyperparameters["max_epochs"],
+                            epoch_time,
+                            fit_info["loss"][-1],
+                            str(min_val_loss),
+                            min_val_loss_iteration,
+                        )
+                    ).strip()
+                )
                 last_progress_print = time.time()
 
-            if self.hyperparameters['validation_split']:
-                val_loss = fit_info['val_loss'][-1]
+            if self.hyperparameters["validation_split"]:
+                val_loss = fit_info["val_loss"][-1]
 
                 if min_val_loss is None or (
-                        val_loss < min_val_loss - self.hyperparameters['min_delta']):
+                    val_loss < min_val_loss - self.hyperparameters["min_delta"]
+                ):
                     min_val_loss = val_loss
                     min_val_loss_iteration = i
 
-                if self.hyperparameters['early_stopping']:
+                if self.hyperparameters["early_stopping"]:
                     threshold = (
-                        min_val_loss_iteration +
-                        self.hyperparameters['patience'])
+                        min_val_loss_iteration + self.hyperparameters["patience"]
+                    )
                     if i > threshold:
                         if progress_print_interval is not None:
-                            print((progress_preamble + " " +
-                                "Stopping at epoch %3d / %3d: loss=%g. "
-                                "Min val loss (%g) at epoch %s" % (
-                                    i,
-                                    self.hyperparameters['max_epochs'],
-                                    fit_info['loss'][-1],
-                                    (
-                                        min_val_loss if min_val_loss is not None
-                                        else numpy.nan),
-                                    min_val_loss_iteration)).strip())
+                            print(
+                                (
+                                    progress_preamble
+                                    + " "
+                                    + "Stopping at epoch %3d / %3d: loss=%g. "
+                                    "Min val loss (%g) at epoch %s"
+                                    % (
+                                        i,
+                                        self.hyperparameters["max_epochs"],
+                                        fit_info["loss"][-1],
+                                        (
+                                            min_val_loss
+                                            if min_val_loss is not None
+                                            else numpy.nan
+                                        ),
+                                        min_val_loss_iteration,
+                                    )
+                                ).strip()
+                            )
                         break
 
             if progress_callback:
@@ -260,18 +281,15 @@ class Class1ProcessingNeuralNetwork(object):
         self.fit_info.append(dict(fit_info))
 
         if verbose > -1:
-            print(
-                "Output weights",
-                *numpy.array(
-                    self.network().get_layer(
-                        "output").get_weights()).flatten())
+            print("Output weights", self.network().get_layer("output").get_weights())
 
     def predict(
-            self,
-            peptides,
-            n_flanks=None,
-            c_flanks=None,
-            batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+        self,
+        peptides,
+        n_flanks=None,
+        c_flanks=None,
+        batch_size=DEFAULT_PREDICT_BATCH_SIZE,
+    ):
         """
         Predict antigen processing.
 
@@ -299,14 +317,13 @@ class Class1ProcessingNeuralNetwork(object):
             c_flanks = [""] * len(peptides)
 
         sequences = FlankingEncoding(
-            peptides=peptides, n_flanks=n_flanks, c_flanks=c_flanks)
+            peptides=peptides, n_flanks=n_flanks, c_flanks=c_flanks
+        )
         return self.predict_encoded(sequences=sequences, batch_size=batch_size)
 
     def predict_encoded(
-            self,
-            sequences,
-            throw=True,
-            batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+        self, sequences, throw=True, batch_size=DEFAULT_PREDICT_BATCH_SIZE
+    ):
         """
         Predict antigen processing.
 
@@ -324,8 +341,7 @@ class Class1ProcessingNeuralNetwork(object):
         numpy.array
         """
         x_dict = self.network_input(sequences, throw=throw)
-        raw_predictions = self.network().predict(
-            x_dict, batch_size=batch_size)
+        raw_predictions = self.network().predict(x_dict, batch_size=batch_size)
         predictions = numpy.squeeze(raw_predictions).astype("float64")
         return predictions
 
@@ -346,12 +362,13 @@ class Class1ProcessingNeuralNetwork(object):
         numpy.array
         """
         encoded = sequences.vector_encode(
-            self.hyperparameters['amino_acid_encoding'],
-            self.hyperparameters['peptide_max_length'],
-            n_flank_length=self.hyperparameters['n_flank_length'],
-            c_flank_length=self.hyperparameters['c_flank_length'],
+            self.hyperparameters["amino_acid_encoding"],
+            self.hyperparameters["peptide_max_length"],
+            n_flank_length=self.hyperparameters["n_flank_length"],
+            c_flank_length=self.hyperparameters["c_flank_length"],
             allow_unsupported_amino_acids=True,
-            throw=throw)
+            throw=throw,
+        )
 
         result = {
             "sequence": encoded.array,
@@ -360,18 +377,19 @@ class Class1ProcessingNeuralNetwork(object):
         return result
 
     def make_network(
-            self,
-            amino_acid_encoding,
-            peptide_max_length,
-            n_flank_length,
-            c_flank_length,
-            flanking_averages,
-            convolutional_filters,
-            convolutional_kernel_size,
-            convolutional_activation,
-            convolutional_kernel_l1_l2,
-            dropout_rate,
-            post_convolutional_dense_layer_sizes):
+        self,
+        amino_acid_encoding,
+        peptide_max_length,
+        n_flank_length,
+        c_flank_length,
+        flanking_averages,
+        convolutional_filters,
+        convolutional_kernel_size,
+        convolutional_activation,
+        convolutional_kernel_l1_l2,
+        dropout_rate,
+        post_convolutional_dense_layer_sizes,
+    ):
         """
         Helper function to make a keras network given hyperparameters.
         """
@@ -379,45 +397,49 @@ class Class1ProcessingNeuralNetwork(object):
         # We import keras here to avoid tensorflow debug output, etc. unless we
         # are actually about to use Keras.
         configure_tensorflow()
-        from tensorflow.keras.layers import (
-            Input, Dense, Dropout, Concatenate, Conv1D, Lambda)
-        from tensorflow.keras.models import Model
-        from tensorflow.keras import regularizers, initializers
+        from tensorflow import keras
+        from keras.layers import (
+            Input,
+            Dense,
+            Dropout,
+            Concatenate,
+            Conv1D,
+            Lambda,
+        )
+        from keras.models import Model
+        from keras import regularizers, initializers
 
         model_inputs = {}
 
         empty_x_dict = self.network_input(FlankingEncoding([], [], []))
-        sequence_dims = empty_x_dict['sequence'].shape[1:]
+        sequence_dims = empty_x_dict["sequence"].shape[1:]
 
         numpy.testing.assert_equal(
-            sequence_dims[0],
-            peptide_max_length + n_flank_length + c_flank_length)
+            sequence_dims[0], peptide_max_length + n_flank_length + c_flank_length
+        )
 
-        model_inputs['sequence'] = Input(
-            shape=sequence_dims,
-            dtype='float32',
-            name='sequence')
-        model_inputs['peptide_length'] = Input(
-            shape=(1,),
-            dtype='int32',
-            name='peptide_length')
+        model_inputs["sequence"] = Input(
+            shape=sequence_dims, dtype="float32", name="sequence"
+        )
+        model_inputs["peptide_length"] = Input(
+            shape=(1,), dtype="int32", name="peptide_length"
+        )
 
-        current_layer = model_inputs['sequence']
+        current_layer = model_inputs["sequence"]
         current_layer = Conv1D(
             filters=convolutional_filters,
             kernel_size=convolutional_kernel_size,
-            kernel_regularizer=regularizers.l1_l2(
-                *convolutional_kernel_l1_l2),
+            kernel_regularizer=regularizers.l1_l2(*convolutional_kernel_l1_l2),
             padding="same",
             activation=convolutional_activation,
-            name="conv1")(current_layer)
+            name="conv1",
+        )(current_layer)
         if dropout_rate > 0:
             current_layer = Dropout(
                 name="conv1_dropout",
                 rate=dropout_rate,
-                noise_shape=(
-                    None, 1, int(current_layer.get_shape()[-1])))(
-                current_layer)
+                noise_shape=(None, 1, int(current_layer.get_shape()[-1])),
+            )(current_layer)
 
         convolutional_result = current_layer
 
@@ -425,30 +447,29 @@ class Class1ProcessingNeuralNetwork(object):
 
         for flank in ["n_flank", "c_flank"]:
             current_layer = convolutional_result
-            for (i, size) in enumerate(
-                    list(post_convolutional_dense_layer_sizes) + [1]):
+            for i, size in enumerate(list(post_convolutional_dense_layer_sizes) + [1]):
                 current_layer = Conv1D(
                     name="%s_post_%d" % (flank, i),
                     filters=size,
                     kernel_size=1,
-                    kernel_regularizer=regularizers.l1_l2(
-                        *convolutional_kernel_l1_l2),
-                    activation=(
-                        "tanh" if size == 1 else convolutional_activation
-                    ))(current_layer)
+                    kernel_regularizer=regularizers.l1_l2(*convolutional_kernel_l1_l2),
+                    activation=("tanh" if size == 1 else convolutional_activation),
+                )(current_layer)
             single_output_result = current_layer
 
             dense_flank = None
             if flank == "n_flank":
+
                 def cleavage_extractor(x):
                     return x[:, n_flank_length]
 
                 single_output_at_cleavage_position = Lambda(
-                    cleavage_extractor, name="%s_cleaved" % flank)(
-                    single_output_result)
+                    cleavage_extractor, name="%s_cleaved" % flank
+                )(single_output_result)
 
                 def max_pool_over_peptide_extractor(lst):
                     import tensorflow as tf
+
                     (x, peptide_length) = lst
 
                     # We generate a per-sample mask that is 1 for all peptide
@@ -459,30 +480,32 @@ class Class1ProcessingNeuralNetwork(object):
                     limits = n_flank_length + peptide_length
                     row = tf.expand_dims(tf.range(0, x.shape[1]), axis=0)
                     mask = tf.logical_and(
-                        tf.greater_equal(row, starts),
-                        tf.less(row, limits))
+                        tf.greater_equal(row, starts), tf.less(row, limits)
+                    )
 
                     # We are assuming that x >= -1. The final activation in the
                     # previous layer should be a function that satisfies this
                     # (e.g. sigmoid, tanh, relu).
-                    max_value = tf.reduce_max(
-                        (x + 1) * tf.expand_dims(
-                            tf.cast(mask, tf.float32), axis=-1),
-                        axis=1) - 1
+                    max_value = (
+                        tf.reduce_max(
+                            (x + 1)
+                            * tf.expand_dims(tf.cast(mask, tf.float32), axis=-1),
+                            axis=1,
+                        )
+                        - 1
+                    )
 
                     # We flip the sign so that initializing the final dense
                     # layer weights to 1s is reasonable.
                     return -1 * max_value
 
                 max_over_peptide = Lambda(
-                    max_pool_over_peptide_extractor,
-                    name="%s_internal_cleaved" % flank)([
-                        single_output_result,
-                        model_inputs['peptide_length']
-                    ])
+                    max_pool_over_peptide_extractor, name="%s_internal_cleaved" % flank
+                )([single_output_result, model_inputs["peptide_length"]])
 
                 def flanking_extractor(lst):
                     import tensorflow as tf
+
                     (x, peptide_length) = lst
 
                     # mask is 1 for n_flank positions and 0 elsewhere.
@@ -490,48 +513,48 @@ class Class1ProcessingNeuralNetwork(object):
                     limits = n_flank_length
                     row = tf.expand_dims(tf.range(0, x.shape[1]), axis=0)
                     mask = tf.logical_and(
-                        tf.greater_equal(row, starts),
-                        tf.less(row, limits))
+                        tf.greater_equal(row, starts), tf.less(row, limits)
+                    )
 
                     # We are assuming that x >= -1. The final activation in the
                     # previous layer should be a function that satisfies this
                     # (e.g. sigmoid, tanh, relu).
-                    average_value = tf.reduce_mean(
-                        (x + 1) * tf.expand_dims(
-                            tf.cast(mask, tf.float32), axis=-1),
-                        axis=1) - 1
+                    average_value = (
+                        tf.reduce_mean(
+                            (x + 1)
+                            * tf.expand_dims(tf.cast(mask, tf.float32), axis=-1),
+                            axis=1,
+                        )
+                        - 1
+                    )
                     return average_value
 
                 if flanking_averages and n_flank_length > 0:
                     # Also include average pooled of flanking sequences
                     pooled_flank = Lambda(
-                        flanking_extractor, name="%s_extracted" % flank)([
-                            convolutional_result,
-                            model_inputs['peptide_length']
-                    ])
+                        flanking_extractor, name="%s_extracted" % flank
+                    )([convolutional_result, model_inputs["peptide_length"]])
                     dense_flank = Dense(
-                        1, activation="tanh", name="%s_avg_dense" % flank)(
-                        pooled_flank)
+                        1, activation="tanh", name="%s_avg_dense" % flank
+                    )(pooled_flank)
             else:
                 assert flank == "c_flank"
 
                 def cleavage_extractor(lst):
                     import tensorflow as tf
+
                     (x, peptide_length) = lst
                     indexer = peptide_length + n_flank_length - 1
-                    result = tf.squeeze(
-                        tf.gather(x, indexer, batch_dims=1, axis=1),
-                        -1)
+                    result = tf.squeeze(tf.gather(x, indexer, batch_dims=1, axis=1), -1)
                     return result
 
                 single_output_at_cleavage_position = Lambda(
-                    cleavage_extractor, name="%s_cleaved" % flank)([
-                        single_output_result,
-                        model_inputs['peptide_length']
-                    ])
+                    cleavage_extractor, name="%s_cleaved" % flank
+                )([single_output_result, model_inputs["peptide_length"]])
 
                 def max_pool_over_peptide_extractor(lst):
                     import tensorflow as tf
+
                     (x, peptide_length) = lst
 
                     # We generate a per-sample mask that is 1 for all peptide
@@ -542,30 +565,32 @@ class Class1ProcessingNeuralNetwork(object):
                     limits = n_flank_length + peptide_length - 1
                     row = tf.expand_dims(tf.range(0, x.shape[1]), axis=0)
                     mask = tf.logical_and(
-                        tf.greater_equal(row, starts),
-                        tf.less(row, limits))
+                        tf.greater_equal(row, starts), tf.less(row, limits)
+                    )
 
                     # We are assuming that x >= -1. The final activation in the
                     # previous layer should be a function that satisfies this
                     # (e.g. sigmoid, tanh, relu).
-                    max_value = tf.reduce_max(
-                        (x + 1) * tf.expand_dims(
-                            tf.cast(mask, tf.float32), axis=-1),
-                        axis=1) - 1
+                    max_value = (
+                        tf.reduce_max(
+                            (x + 1)
+                            * tf.expand_dims(tf.cast(mask, tf.float32), axis=-1),
+                            axis=1,
+                        )
+                        - 1
+                    )
 
                     # We flip the sign so that initializing the final dense
                     # layer weights to 1s is reasonable.
                     return -1 * max_value
 
                 max_over_peptide = Lambda(
-                    max_pool_over_peptide_extractor,
-                    name="%s_internal_cleaved" % flank)([
-                        single_output_result,
-                        model_inputs['peptide_length']
-                    ])
+                    max_pool_over_peptide_extractor, name="%s_internal_cleaved" % flank
+                )([single_output_result, model_inputs["peptide_length"]])
 
                 def flanking_extractor(lst):
                     import tensorflow as tf
+
                     (x, peptide_length) = lst
 
                     # mask is 1 for c_flank positions and 0 elsewhere.
@@ -573,28 +598,30 @@ class Class1ProcessingNeuralNetwork(object):
                     limits = n_flank_length + peptide_length + c_flank_length
                     row = tf.expand_dims(tf.range(0, x.shape[1]), axis=0)
                     mask = tf.logical_and(
-                        tf.greater_equal(row, starts),
-                        tf.less(row, limits))
+                        tf.greater_equal(row, starts), tf.less(row, limits)
+                    )
 
                     # We are assuming that x >= -1. The final activation in the
                     # previous layer should be a function that satisfies this
                     # (e.g. sigmoid, tanh, relu).
-                    average_value = tf.reduce_mean(
-                        (x + 1) * tf.expand_dims(
-                            tf.cast(mask, tf.float32), axis=-1),
-                        axis=1) - 1
+                    average_value = (
+                        tf.reduce_mean(
+                            (x + 1)
+                            * tf.expand_dims(tf.cast(mask, tf.float32), axis=-1),
+                            axis=1,
+                        )
+                        - 1
+                    )
                     return average_value
 
                 if flanking_averages and c_flank_length > 0:
                     # Also include average pooled of flanking sequences
                     pooled_flank = Lambda(
-                        flanking_extractor, name="%s_extracted" % flank)([
-                            convolutional_result,
-                            model_inputs['peptide_length']
-                    ])
+                        flanking_extractor, name="%s_extracted" % flank
+                    )([convolutional_result, model_inputs["peptide_length"]])
                     dense_flank = Dense(
-                        1, activation="tanh", name="%s_avg_dense" % flank)(
-                        pooled_flank)
+                        1, activation="tanh", name="%s_avg_dense" % flank
+                    )(pooled_flank)
 
             outputs_for_final_dense.append(single_output_at_cleavage_position)
             outputs_for_final_dense.append(max_over_peptide)
@@ -614,7 +641,8 @@ class Class1ProcessingNeuralNetwork(object):
         model = Model(
             inputs=[model_inputs[name] for name in sorted(model_inputs)],
             outputs=[output],
-            name="predictor")
+            name="predictor",
+        )
 
         return model
 
@@ -629,7 +657,7 @@ class Class1ProcessingNeuralNetwork(object):
         """
         self.update_network_description()
         result = dict(self.__dict__)
-        result['_network'] = None
+        result["_network"] = None
         return result
 
     def __setstate__(self, state):
@@ -660,8 +688,8 @@ class Class1ProcessingNeuralNetwork(object):
         """
         self.update_network_description()
         result = dict(self.__dict__)
-        del result['_network']
-        result['network_weights'] = None
+        del result["_network"]
+        result["network_weights"] = None
         return result
 
     @classmethod
@@ -680,7 +708,7 @@ class Class1ProcessingNeuralNetwork(object):
         Class1ProcessingNeuralNetwork
         """
         config = dict(config)
-        instance = cls(**config.pop('hyperparameters'))
+        instance = cls(**config.pop("hyperparameters"))
         instance.__dict__.update(config)
         instance.network_weights = weights
         assert instance._network is None
