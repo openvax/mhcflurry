@@ -8,7 +8,7 @@ request that any work based on the HPV dataset cite this paper.
 import os
 import pandas
 from sklearn.metrics import roc_auc_score
-from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
+from nose.tools import assert_greater
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path

@@ -6,8 +6,11 @@ import re
 import numpy
 from numpy import testing
 numpy.random.seed(0)
-from tensorflow.random import set_seed
-set_seed(2)
+
+import tensorflow as tf
+
+tf.keras.utils.set_random_seed(1)
+tf.config.experimental.enable_op_determinism()
 
 from sklearn.metrics import roc_auc_score
 

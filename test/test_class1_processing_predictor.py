@@ -6,9 +6,7 @@ import pandas
 import tempfile
 import pickle
 
-from numpy.testing import assert_, assert_equal, assert_allclose, assert_array_equal
-from nose.tools import assert_greater, assert_less
-import numpy
+from numpy.testing import assert_array_equal
 
 from mhcflurry.class1_processing_predictor import Class1ProcessingPredictor
 

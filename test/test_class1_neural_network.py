@@ -6,11 +6,10 @@ logging.getLogger("matplotlib").disabled = True
 import numpy
 from numpy import testing
 
-numpy.random.seed(0)
 import tensorflow as tf
 
-tf.config.experimental.enable_op_determinism()
 tf.keras.utils.set_random_seed(1)
+tf.config.experimental.enable_op_determinism()
 
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 

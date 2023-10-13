@@ -9,8 +9,6 @@ numpy.random.seed(0)
 import pickle
 import tempfile
 
-from numpy.testing import assert_equal
-
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 
 from mhcflurry.testing_utils import cleanup, startup

@@ -8,6 +8,11 @@ import os
 import pandas
 from numpy.testing import assert_equal
 
+import tensorflow as tf
+
+tf.config.experimental.enable_op_determinism()
+tf.keras.utils.set_random_seed(1)
+
 from mhcflurry import predict_command
 
 from mhcflurry.testing_utils import cleanup, startup
