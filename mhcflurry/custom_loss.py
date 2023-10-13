@@ -172,7 +172,7 @@ class MSEWithInequalities(Loss):
         configure_tensorflow()
         # from tensorflow.keras import backend as K
         y_true = tf.reshape(y_true, [-1])
-        y_pred = tf.flatten(y_pred, [-1])
+        y_pred = tf.reshape(y_pred, [-1])
 
         # Handle (=) inequalities
         diff1 = y_pred - y_true
@@ -190,12 +190,12 @@ class MSEWithInequalities(Loss):
         diff3 *= tf.cast(y_true >= 4.0, "float32")
         diff3 *= tf.cast(diff3 > 0.0, "float32")
 
-        denominator = tf.reduce_max(
+        denominator = tf.maximum(
             tf.reduce_sum(tf.cast(tf.not_equal(y_true, 2.0), "float32"), 0),
             1.0)
 
         result = (
-            tf.reduce_sum.sum(tf.math.square(diff1)) +
+            tf.reduce_sum(tf.math.square(diff1)) +
             tf.reduce_sum(tf.math.square(diff2)) +
             tf.reduce_sum(tf.math.square(diff3))) / denominator
 
