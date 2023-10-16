@@ -42,7 +42,6 @@ jobs:
     - name: Install python dependencies
       run: |
         conda info
-        pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r docs/requirements.txt
         pip install .
@@ -70,9 +69,9 @@ jobs:
       run: |
         conda info
         # stop the build if there are Python syntax errors or undefined names
-        python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
         conda info
