@@ -3,20 +3,13 @@ initialize()
 
 import re
 import numpy
-from numpy import testing
 numpy.random.seed(0)
-
-import tensorflow as tf
-
-tf.keras.utils.set_random_seed(1)
-tf.config.experimental.enable_op_determinism()
 
 from sklearn.metrics import roc_auc_score
 
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
 import pandas
-import pprint
 
 from mhcflurry.class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from mhcflurry.common import random_peptides
