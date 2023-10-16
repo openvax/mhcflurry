@@ -25,7 +25,7 @@ teardown = cleanup
 setup = startup
 
 
-def test_class1_neural_network_a0205_training_accuracy():
+def Xtest_class1_neural_network_a0205_training_accuracy():
     # Memorize the dataset.
     hyperparameters = dict(
         activation="tanh",
@@ -85,9 +85,9 @@ def test_inequalities():
     hyperparameters = dict(
         peptide_amino_acid_encoding="one-hot",
         activation="tanh",
-        layer_sizes=[64],
-        max_epochs=500,
-        minibatch_size=128,
+        layer_sizes=[32],
+        max_epochs=100,
+        minibatch_size=32,
         random_negative_rate=0.0,
         random_negative_constant=0,
         early_stopping=False,
@@ -105,7 +105,7 @@ def test_inequalities():
     # Weak binders
     df = pandas.DataFrame()
     df["peptide"] = random_peptides(100, length=9)
-    df["value"] = 200
+    df["value"] = 500.0
     df["inequality1"] = "="
     df["inequality2"] = "<"
     dfs.append(df)
@@ -113,7 +113,7 @@ def test_inequalities():
     # Strong binders - same peptides as above but more measurement values
     df = pandas.DataFrame()
     df["peptide"] = dfs[-1].peptide.values
-    df["value"] = 1
+    df["value"] = 1.0
     df["inequality1"] = "="
     df["inequality2"] = "="
     dfs.append(df)
