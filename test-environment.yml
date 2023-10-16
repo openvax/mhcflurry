@@ -4,10 +4,3 @@ channels:
   - defaults
 dependencies:
   - pip
-  - pip:
-    - flake8
-    - nose-py3
-    - numpydoc
-    - pypandoc
-    - pytest
-    - sphinx
