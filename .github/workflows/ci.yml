@@ -48,6 +48,7 @@ jobs:
       run: |
         conda create -q -n test-environment python=${{ matrix.python-version }}
         conda install -n test-environment -c conda-forge pypandoc sphinx numpydoc
+        conda init --all
         conda activate test-environment
         pip install nose-py3
         pip install nose-timer
