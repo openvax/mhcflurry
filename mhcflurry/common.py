@@ -9,6 +9,8 @@ import numpy
 import pandas
 from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene
 
+from warnings import warn
+
 from . import amino_acid
 
 
@@ -53,18 +55,20 @@ def normalize_allele_name(
         infer_class2_pairing=False,
         collapse_singleton_haplotypes=True,
         collapse_singleton_serotypes=True,
-        raise_on_error=False)
+        raise_on_error=False,
+    )
     if result is None:
         if raise_on_error:
             raise ValueError("Invalid MHC allele name: %s" % raw_name)
         else:
             return default_value
-    if (result.annotation_pseudogene or
-            result.annotation_null or
-            result.annotation_questionable):
+    if (
+        result.annotation_pseudogene
+        or result.annotation_null
+        or result.annotation_questionable
+    ):
         if raise_on_error:
-            raise ValueError(
-                "Unsupported annotation on MHC allele: %s" % raw_name)
+            raise ValueError("Unsupported annotation on MHC allele: %s" % raw_name)
         else:
             return default_value
     return result.restrict_allele_fields(2).to_string()
@@ -89,46 +93,30 @@ def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
         Tensorflow threads to use
 
     """
+    import tensorflow as tf
+
     global TENSORFLOW_CONFIGURED
 
     if TENSORFLOW_CONFIGURED:
         return
+    
+    if backend is not None:
+        warn("Using the `backend` argument is now unused and will be deprecated; tensorflow defaults are being used.", DeprecationWarning)
 
     TENSORFLOW_CONFIGURED = True
 
-    os.environ["KERAS_BACKEND"] = "tensorflow"
-
-    if not backend:
-        backend = "tensorflow-default"
-
+    # turn on selected GPUs with memory growth enabled
     if gpu_device_nums is not None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(
-            [str(i) for i in gpu_device_nums])
+        physical_devices = tf.config.list_physical_devices("GPU")
+        tf.config.set_visible_devices(
+            [physical_devices[idx] for idx in gpu_device_nums], "GPU"
+        )
+        for gpu in physical_devices:
+            tf.config.experimental.set_memory_growth(gpu, True)
 
-    if backend == "tensorflow-cpu" or gpu_device_nums == []:
-        print("Forcing tensorflow/CPU backend.")
-        os.environ["CUDA_VISIBLE_DEVICES"] = ""
-        device_count = {'CPU': 1, 'GPU': 0}
-    elif backend == "tensorflow-gpu":
-        print("Forcing tensorflow/GPU backend.")
-        device_count = {'CPU': 0, 'GPU': 1}
-    elif backend == "tensorflow-default":
-        print("Forcing tensorflow backend.")
-        device_count = None
-    else:
-        raise ValueError("Unsupported backend: %s" % backend)
-
-    import tensorflow
-    assert tensorflow.compat.v1.keras.backend.backend() == "tensorflow"
-
-    config = tensorflow.compat.v1.ConfigProto(device_count=device_count)
-    config.gpu_options.allow_growth = True
     if num_threads:
-        config.inter_op_parallelism_threads = num_threads
-        config.intra_op_parallelism_threads = num_threads
-    session = tensorflow.compat.v1.Session(config=config)
-    tensorflow.compat.v1.disable_v2_behavior()
-    tensorflow.compat.v1.keras.backend.set_session(session)
+        tf.config.threading.set_inter_op_parallelism_threads(num_threads)
+        tf.config.threading.set_intra_op_parallelism_threads(num_threads)
 
 
 def configure_logging(verbose=False):
@@ -146,13 +134,14 @@ def configure_logging(verbose=False):
         " %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         stream=sys.stderr,
-        level=level)
+        level=level,
+    )
 
 
 def amino_acid_distribution(peptides, smoothing=0.0):
     """
     Compute the fraction of each amino acid across a collection of peptides.
-    
+
     Parameters
     ----------
     peptides : list of string
@@ -198,17 +187,14 @@ def random_peptides(num, length=9, distribution=None):
     if num == 0:
         return []
     if distribution is None:
-        distribution = pandas.Series(
-            1, index=sorted(amino_acid.COMMON_AMINO_ACIDS))
+        distribution = pandas.Series(1, index=sorted(amino_acid.COMMON_AMINO_ACIDS))
         distribution /= distribution.sum()
 
     return [
-        ''.join(peptide_sequence)
-        for peptide_sequence in
-        numpy.random.choice(
-            distribution.index,
-            p=distribution.values,
-            size=(int(num), int(length)))
+        "".join(peptide_sequence)
+        for peptide_sequence in numpy.random.choice(
+            distribution.index, p=distribution.values, size=(int(num), int(length))
+        )
     ]
 
 
@@ -229,13 +215,13 @@ def positional_frequency_matrix(peptides):
     length = len(peptides[0])
     assert all(len(peptide) == length for peptide in peptides)
     counts = pandas.DataFrame(
-        index=[a for a in amino_acid.BLOSUM62_MATRIX.index if a != 'X'],
+        index=[a for a in amino_acid.BLOSUM62_MATRIX.index if a != "X"],
         columns=numpy.arange(1, length + 1),
     )
     for i in range(length):
         counts[i + 1] = pandas.Series([p[i] for p in peptides]).value_counts()
     result = (counts / len(peptides)).fillna(0.0).T
-    result.index.name = 'position'
+    result.index.name = "position"
     return result
 
 
@@ -249,8 +235,9 @@ def save_weights(weights_list, filename):
 
     filename : string
     """
-    numpy.savez(filename,
-        **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list)))
+    numpy.savez(
+        filename, **dict((("array_%d" % i), w) for (i, w) in enumerate(weights_list))
+    )
 
 
 def load_weights(filename):
@@ -275,15 +262,28 @@ class NumpyJSONEncoder(json.JSONEncoder):
     """
     JSON encoder (used with json module) that can handle numpy arrays.
     """
+
     def default(self, obj):
-        if isinstance(obj, (
-                numpy.int_, numpy.intc, numpy.intp, numpy.int8,
-                numpy.int16, numpy.int32, numpy.int64, numpy.uint8,
-                numpy.uint16, numpy.uint32, numpy.uint64)):
+        if isinstance(
+            obj,
+            (
+                numpy.int_,
+                numpy.intc,
+                numpy.intp,
+                numpy.int8,
+                numpy.int16,
+                numpy.int32,
+                numpy.int64,
+                numpy.uint8,
+                numpy.uint16,
+                numpy.uint32,
+                numpy.uint64,
+            ),
+        ):
             return int(obj)
-        elif isinstance(obj, (
-                numpy.float_, numpy.float16, numpy.float32,
-                numpy.float64)):
+        elif isinstance(
+            obj, (numpy.float_, numpy.float16, numpy.float32, numpy.float64)
+        ):
             return float(obj)
         if isinstance(obj, numpy.ndarray):
             return obj.tolist()

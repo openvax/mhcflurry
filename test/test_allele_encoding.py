@@ -1,3 +1,6 @@
+from . import initialize
+initialize()
+
 import time
 
 from mhcflurry.allele_encoding import AlleleEncoding

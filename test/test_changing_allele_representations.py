@@ -1,16 +1,11 @@
-import logging
-logging.getLogger('matplotlib').disabled = True
-logging.getLogger('tensorflow').disabled = True
+from . import initialize
+initialize()
 
-import time
 import pandas
 
-from mhcflurry.allele_encoding import AlleleEncoding
-from mhcflurry.amino_acid import BLOSUM62_MATRIX
 from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 
-from numpy.testing import assert_equal
 
 from mhcflurry.testing_utils import cleanup, startup
 teardown = cleanup

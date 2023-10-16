@@ -1,11 +1,8 @@
 """
 Tests for training and predicting using Class1 pan-allele models.
 """
-
-import logging
-logging.getLogger('tensorflow').disabled = True
-logging.getLogger('matplotlib').disabled = True
-
+from . import initialize
+initialize()
 
 import json
 import os
@@ -17,7 +14,7 @@ import pandas
 
 from numpy.testing import assert_equal, assert_array_less
 
-from mhcflurry import Class1AffinityPredictor,Class1NeuralNetwork
+from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import cleanup, startup

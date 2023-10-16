@@ -4,6 +4,9 @@ LABEL maintainer="Tim O'Donnell timodonnell@gmail.com"
 
 WORKDIR /root
 
+# Install system dependencies
+RUN apt-get update -y && apt-get install -y gcc
+
 # Install / upgrade packages
 RUN pip install --upgrade pip && pip install jupyter seaborn
 

@@ -1,3 +1,6 @@
+from . import initialize
+initialize()
+
 from numpy.testing import assert_equal
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork

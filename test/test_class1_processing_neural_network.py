@@ -1,20 +1,15 @@
-import logging
-logging.getLogger('tensorflow').disabled = True
-logging.getLogger('matplotlib').disabled = True
+from . import initialize
+initialize()
 
 import re
 import numpy
-from numpy import testing
 numpy.random.seed(0)
-from tensorflow.random import set_seed
-set_seed(2)
 
 from sklearn.metrics import roc_auc_score
 
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
 import pandas
-import pprint
 
 from mhcflurry.class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from mhcflurry.common import random_peptides

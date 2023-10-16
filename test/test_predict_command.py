@@ -1,12 +1,16 @@
-import logging
-logging.getLogger('matplotlib').disabled = True
-logging.getLogger('tensorflow').disabled = True
+from . import initialize
+initialize()
 
 import tempfile
 import os
 
 import pandas
 from numpy.testing import assert_equal
+
+import tensorflow as tf
+
+tf.config.experimental.enable_op_determinism()
+tf.keras.utils.set_random_seed(1)
 
 from mhcflurry import predict_command
 

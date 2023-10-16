@@ -578,7 +578,7 @@ class Class1PresentationPredictor(object):
                 null_mask = None
                 if not throw:
                     # Invalid peptides will be null.
-                    null_mask = input_matrix.isnull().any(1)
+                    null_mask = input_matrix.isnull().any(axis=1)
                     input_matrix = input_matrix.fillna(0.0)
                 df["presentation_score"] = model.predict_proba(
                     input_matrix.values)[:,1]

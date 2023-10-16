@@ -1,9 +1,8 @@
 """
 Tests for training and predicting using Class1 pan-allele models.
 """
-import logging
-logging.getLogger('tensorflow').disabled = True
-logging.getLogger('matplotlib').disabled = True
+from . import initialize
+initialize()
 
 from sklearn.metrics import roc_auc_score
 import pandas

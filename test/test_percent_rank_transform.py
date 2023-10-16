@@ -1,3 +1,6 @@
+from . import initialize
+initialize()
+
 import numpy
 
 from mhcflurry.percent_rank_transform import PercentRankTransform

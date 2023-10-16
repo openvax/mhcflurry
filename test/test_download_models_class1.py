@@ -1,15 +1,11 @@
-import logging
-logging.getLogger('tensorflow').disabled = True
-logging.getLogger('matplotlib').disabled = True
-
+from . import initialize
+initialize()
 
 import numpy
 numpy.random.seed(0)
 
 import pickle
 import tempfile
-
-from numpy.testing import assert_equal
 
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 

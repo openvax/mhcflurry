@@ -1,18 +1,10 @@
-import logging
-logging.getLogger('tensorflow').disabled = True
-logging.getLogger('matplotlib').disabled = True
+from . import initialize
+initialize()
 
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
 import numpy
-
-numpy.random.seed(0)
-
-import logging
-logging.getLogger('tensorflow').disabled = True
-
-import tensorflow.keras.backend as K
-
+import tensorflow as tf
 from mhcflurry.custom_loss import CUSTOM_LOSSES, MultiallelicMassSpecLoss
 
 from mhcflurry.testing_utils import cleanup, startup
@@ -21,25 +13,20 @@ setup = startup
 
 
 def evaluate_loss(loss, y_true, y_pred):
-    y_true = numpy.array(y_true)
-    y_pred = numpy.array(y_pred)
+    y_true = tf.convert_to_tensor(y_true, dtype='float32', name='y_true')
+    y_pred = tf.convert_to_tensor(y_pred, dtype='float32', name='y_pred')
     if y_pred.ndim == 1:
-        y_pred = y_pred.reshape((len(y_pred), 1))
+        y_pred = tf.reshape(y_pred, (len(y_pred), 1))
     if y_true.ndim == 1:
-        y_true = y_true.reshape((len(y_true), 1))
+        y_true = tf.reshape(y_true, (len(y_true), 1))
+
+    print("y_pred, y_true:", y_pred, y_true)
 
     assert y_true.ndim == 2
     assert y_pred.ndim == 2
 
-    assert K.backend() == "tensorflow"
-
-    import tensorflow.compat.v1 as v1
-    v1.disable_eager_execution()
-    session = v1.keras.backend.get_session()
-    y_true_var = K.constant(y_true, name="y_true")
-    y_pred_var = K.constant(y_pred, name="y_pred")
-    result = loss(y_true_var, y_pred_var)
-    return result.eval(session=session)
+    result = loss(y_true, y_pred)
+    return result.numpy()
 
 
 def test_mse_with_inequalities(loss_obj=CUSTOM_LOSSES['mse_with_inequalities']):

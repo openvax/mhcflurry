@@ -5,10 +5,13 @@ The study that generated this dataset has now been published
 (Bonsack et al 2019, DOI: 10.1158/2326-6066.CIR-18-0584), and the authors
 request that any work based on the HPV dataset cite this paper.
 """
+from . import initialize
+initialize()
+
 import os
 import pandas
 from sklearn.metrics import roc_auc_score
-from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
+from nose.tools import assert_greater
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path

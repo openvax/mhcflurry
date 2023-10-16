@@ -1,7 +1,9 @@
+from . import initialize
+initialize()
+
 from mhcflurry import amino_acid
 from nose.tools import eq_
 from numpy.testing import assert_equal
-import numpy
 import pandas
 
 letter_to_index_dict = {
