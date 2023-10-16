@@ -43,15 +43,7 @@ Install the package:
 $ pip install mhcflurry
 ```
 
-If you don't already have it, you will also need to install tensorflow version 2.2.0 or later. On most platforms you can do this with:
-
-```
-$ pip install tensorflow
-```
-
-If you are on Apple silicon (M1 processor), then you'll need to run `pip install tensorflow-macos` instead. See these [instructions](https://caffeinedev.medium.com/how-to-install-tensorflow-on-m1-mac-8e9b91d93706) for more info.
-
-Next download our datasets and trained models:
+Download our datasets and trained models:
 
 ```
 $ mhcflurry-downloads fetch
