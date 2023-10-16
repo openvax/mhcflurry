@@ -25,6 +25,7 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
+
     - name: Install system dependencies
       run: |
         sudo apt-get update
@@ -36,9 +37,9 @@ jobs:
         environment-file: test-environment.yml
         python-version: ${{ matrix.python-version }}
         auto-activate-base: false
+
     - name: Install python dependencies
       run: |
-        conda info
         pip install --upgrade pip
         pip install flake8 nose-py3 pytest
         pip install -r requirements.txt
@@ -46,25 +47,16 @@ jobs:
         pip install .
     - name: Lint with flake8
       run: |
-        conda info
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
     - name: Download data and models
       run: |
-        mkdir -p /tmp/downloads
-        wget -nv $(mhcflurry-downloads url data_curated) -P /tmp/downloads
-        wget -nv $(mhcflurry-downloads url data_mass_spec_annotated) -P /tmp/downloads
-        wget -nv $(mhcflurry-downloads url models_class1) -P /tmp/downloads
-        wget -nv $(mhcflurry-downloads url models_class1_presentation) -P /tmp/downloads
-        wget -nv $(mhcflurry-downloads url models_class1_processing) -P /tmp/downloads
-        wget -nv $(mhcflurry-downloads url models_class1_pan) -P /tmp/downloads
-        wget -nv $(mhcflurry-downloads url allele_sequences) -P /tmp/downloads
         mhcflurry-downloads fetch data_curated data_mass_spec_annotated models_class1 models_class1_presentation models_class1_processing models_class1_pan allele_sequences --already-downloaded-dir /tmp/downloads
 
     - name: Test with pytest
       run: |
-        conda info
         pytest ./test
     
