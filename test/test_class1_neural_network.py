@@ -25,7 +25,7 @@ teardown = cleanup
 setup = startup
 
 
-def Xtest_class1_neural_network_a0205_training_accuracy():
+def test_class1_neural_network_a0205_training_accuracy():
     # Memorize the dataset.
     hyperparameters = dict(
         activation="tanh",
@@ -85,16 +85,14 @@ def test_inequalities():
     hyperparameters = dict(
         peptide_amino_acid_encoding="one-hot",
         activation="tanh",
-        layer_sizes=[32],
-        max_epochs=100,
+        layer_sizes=[4],
+        max_epochs=200,
         minibatch_size=32,
         random_negative_rate=0.0,
         random_negative_constant=0,
         early_stopping=False,
         validation_split=0.0,
-        locally_connected_layers=[
-            {"filters": 8, "activation": "tanh", "kernel_size": 3}
-        ],
+        locally_connected_layers=[],
         dense_layer_l1_regularization=0.0,
         dropout_probability=0.0,
         loss="custom:mse_with_inequalities_and_multiple_outputs",
@@ -104,8 +102,8 @@ def test_inequalities():
 
     # Weak binders
     df = pandas.DataFrame()
-    df["peptide"] = random_peptides(100, length=9)
-    df["value"] = 500.0
+    df["peptide"] = random_peptides(500, length=9)
+    df["value"] = 400.0
     df["inequality1"] = "="
     df["inequality2"] = "<"
     dfs.append(df)
@@ -120,7 +118,7 @@ def test_inequalities():
 
     # Non-binders
     df = pandas.DataFrame()
-    df["peptide"] = random_peptides(100, length=10)
+    df["peptide"] = random_peptides(500, length=10)
     df["value"] = 1000
     df["inequality1"] = ">"
     df["inequality2"] = ">"
@@ -157,8 +155,7 @@ def test_inequalities():
     # inequality1 should make the prediction weaker, whereas for inequality2
     # this measurement is a "<" so it should allow the strong-binder measurement
     # to dominate.
-    numpy.testing.assert_allclose(
-        df.loc[df.value == 1].prediction2.values, 1.0, atol=0.5
-    )
     numpy.testing.assert_array_less(5.0, df.loc[df.value == 1].prediction1.values)
+    numpy.testing.assert_array_less(df.loc[df.value == 1].prediction2.values, 2.0)
+    numpy.testing.assert_allclose( df.loc[df.value == 1].prediction2.values, 1.0, atol=0.5)
     print(df.groupby("value")[["prediction1", "prediction2"]].mean())
