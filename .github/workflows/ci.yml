@@ -36,7 +36,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         activate-environment: test-environment
-        environment-file: 
+        environment-file: test-environment.yml
         python-version: ${{ matrix.python-version }}
         auto-activate-base: false
     - name: Install python dependencies
