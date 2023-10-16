@@ -13,11 +13,10 @@ from . import amino_acid
 
 
 def normalize_allele_name(
-    raw_name,
-    forbidden_substrings=("MIC", "HFE"),
-    raise_on_error=True,
-    default_value=None,
-):
+        raw_name,
+        forbidden_substrings=("MIC", "HFE"),
+        raise_on_error=True,
+        default_value=None):
     """
     Parses a string into a normalized allele representation.
 
