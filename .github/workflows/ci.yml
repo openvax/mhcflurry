@@ -42,6 +42,7 @@ jobs:
     - name: Install python dependencies
       run: |
         conda info
+        conda activate test-environment
         pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r docs/requirements.txt
