@@ -1,3 +1,6 @@
+from . import initialize
+initialize()
+
 import tempfile
 import shutil
 import logging

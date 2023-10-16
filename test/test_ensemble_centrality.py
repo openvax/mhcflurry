@@ -1,3 +1,6 @@
+from . import initialize
+initialize()
+
 import numpy
 
 from numpy.testing import assert_equal

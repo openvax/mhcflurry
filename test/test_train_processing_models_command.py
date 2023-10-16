@@ -1,9 +1,9 @@
 """
 Test processing train and model selection commands.
 """
-import logging
-logging.getLogger('tensorflow').disabled = True
-logging.getLogger('matplotlib').disabled = True
+from . import initialize
+initialize()
+
 import json
 import os
 import shutil

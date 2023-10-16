@@ -1,7 +1,5 @@
-import logging
-logging.getLogger('tensorflow').disabled = True
-logging.getLogger('matplotlib').disabled = True
-
+from . import initialize
+initialize()
 
 import numpy
 numpy.random.seed(0)

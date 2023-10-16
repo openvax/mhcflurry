@@ -1,6 +1,5 @@
-import logging
-logging.getLogger('matplotlib').disabled = True
-logging.getLogger('tensorflow').disabled = True
+from . import initialize
+initialize()
 
 import tempfile
 import os

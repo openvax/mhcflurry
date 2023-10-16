@@ -1,3 +1,6 @@
+from . import initialize
+initialize()
+
 from mhcflurry.regression_target import (
     from_ic50,
     to_ic50,

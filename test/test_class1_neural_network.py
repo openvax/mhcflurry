@@ -1,15 +1,8 @@
-import logging
-
-logging.getLogger("tensorflow").disabled = True
-logging.getLogger("matplotlib").disabled = True
+from . import initialize
+initialize()
 
 import numpy
 from numpy import testing
-
-import tensorflow as tf
-
-tf.keras.utils.set_random_seed(1)
-tf.config.experimental.enable_op_determinism()
 
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
@@ -20,7 +13,6 @@ from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
 from mhcflurry.testing_utils import cleanup, startup
-
 teardown = cleanup
 setup = startup
 

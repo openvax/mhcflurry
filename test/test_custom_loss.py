@@ -1,17 +1,10 @@
-import logging
-logging.getLogger('tensorflow').disabled = True
-logging.getLogger('matplotlib').disabled = True
+from . import initialize
+initialize()
 
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
 import numpy
-
-numpy.random.seed(0)
 import tensorflow as tf
-
-import logging
-logging.getLogger('tensorflow').disabled = True
-
 from mhcflurry.custom_loss import CUSTOM_LOSSES, MultiallelicMassSpecLoss
 
 from mhcflurry.testing_utils import cleanup, startup

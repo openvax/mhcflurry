@@ -5,6 +5,9 @@ The study that generated this dataset has now been published
 (Bonsack et al 2019, DOI: 10.1158/2326-6066.CIR-18-0584), and the authors
 request that any work based on the HPV dataset cite this paper.
 """
+from . import initialize
+initialize()
+
 import os
 import pandas
 from sklearn.metrics import roc_auc_score

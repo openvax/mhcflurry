@@ -1,13 +1,11 @@
-from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
+from . import initialize
+initialize()
 
 import numpy
 import pandas
 from numpy import testing
 
 numpy.random.seed(0)
-
-import logging
-logging.getLogger('tensorflow').disabled = True
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import random_peptides

@@ -1,11 +1,8 @@
 """
 Tests for training and predicting using Class1 pan-allele models.
 """
-
-import logging
-logging.getLogger('tensorflow').disabled = True
-logging.getLogger('matplotlib').disabled = True
-
+from . import initialize
+initialize()
 
 import json
 import os
