@@ -30,20 +30,19 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y pandoc
     - name: Build Conda environment
-      defaults:
-        - uses: conda-incubator/setup-miniconda@v2
-          with:
-            activate-environment: test-environment
-            environment-file: 
-            python-version: ${{ matrix.python-version }}
-            auto-activate-base: false
-        - run: |
-            conda info
-            pip install nose-py3
-            pip install nose-timer
-            pip install -r requirements.txt
-            pip install -r docs/requirements.txt
-            pip install .
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        activate-environment: test-environment
+        environment-file: 
+        python-version: ${{ matrix.python-version }}
+        auto-activate-base: false
+      run: |
+        conda info
+        pip install nose-py3
+        pip install nose-timer
+        pip install -r requirements.txt
+        pip install -r docs/requirements.txt
+        pip install .
     # - name: Install Miniconda
     #   run: |
     #     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
