@@ -9,6 +9,8 @@ import numpy
 import pandas
 from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene
 
+from warnings import warn
+
 from . import amino_acid
 
 
@@ -97,6 +99,9 @@ def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
 
     if TENSORFLOW_CONFIGURED:
         return
+    
+    if backend is not None:
+        warn("Using the `backend` argument is now unused and will be deprecated; tensorflow defaults are being used.", DeprecationWarning)
 
     TENSORFLOW_CONFIGURED = True
 
