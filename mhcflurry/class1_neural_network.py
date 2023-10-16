@@ -497,9 +497,7 @@ class Class1NeuralNetwork(object):
         )
 
     @staticmethod
-    def data_dependent_weights_initialization(
-        network, x_dict=None, method="lsuv", verbose=1
-    ):
+    def data_dependent_weights_initialization(network, x_dict=None, method="lsuv", verbose=1):
         """
         Data dependent weights initialization.
 
@@ -522,23 +520,22 @@ class Class1NeuralNetwork(object):
             raise RuntimeError("Unsupported init method: ", method)
 
     def fit_generator(
-        self,
-        generator,
-        validation_peptide_encoding,
-        validation_affinities,
-        validation_allele_encoding=None,
-        validation_inequalities=None,
-        validation_output_indices=None,
-        steps_per_epoch=10,
-        epochs=1000,
-        min_epochs=0,
-        patience=10,
-        min_delta=0.0,
-        verbose=1,
-        progress_callback=None,
-        progress_preamble="",
-        progress_print_interval=5.0,
-    ):
+            self,
+            generator,
+            validation_peptide_encoding,
+            validation_affinities,
+            validation_allele_encoding=None,
+            validation_inequalities=None,
+            validation_output_indices=None,
+            steps_per_epoch=10,
+            epochs=1000,
+            min_epochs=0,
+            patience=10,
+            min_delta=0.0,
+            verbose=1,
+            progress_callback=None,
+            progress_preamble="",
+            progress_print_interval=5.0):
         """
         Fit using a generator. Does not support many of the features of fit(),
         such as random negative peptides.
@@ -718,19 +715,18 @@ class Class1NeuralNetwork(object):
         self.fit_info.append(dict(fit_info))
 
     def fit(
-        self,
-        peptides,
-        affinities,
-        allele_encoding=None,
-        inequalities=None,
-        output_indices=None,
-        sample_weights=None,
-        shuffle_permutation=None,
-        verbose=1,
-        progress_callback=None,
-        progress_preamble="",
-        progress_print_interval=5.0,
-    ):
+            self,
+            peptides,
+            affinities,
+            allele_encoding=None,
+            inequalities=None,
+            output_indices=None,
+            sample_weights=None,
+            shuffle_permutation=None,
+            verbose=1,
+            progress_callback=None,
+            progress_preamble="",
+            progress_print_interval=5.0):
         """
         Fit the neural network.
 
@@ -1113,12 +1109,11 @@ class Class1NeuralNetwork(object):
         self.fit_info.append(dict(fit_info))
 
     def predict(
-        self,
-        peptides,
-        allele_encoding=None,
-        batch_size=DEFAULT_PREDICT_BATCH_SIZE,
-        output_index=0,
-    ):
+            self,
+            peptides,
+            allele_encoding=None,
+            batch_size=DEFAULT_PREDICT_BATCH_SIZE,
+            output_index=0):
         """
         Predict affinities.
 
@@ -1313,26 +1308,25 @@ class Class1NeuralNetwork(object):
         return result
 
     def make_network(
-        self,
-        peptide_encoding,
-        allele_amino_acid_encoding,
-        allele_dense_layer_sizes,
-        peptide_dense_layer_sizes,
-        peptide_allele_merge_method,
-        peptide_allele_merge_activation,
-        layer_sizes,
-        dense_layer_l1_regularization,
-        dense_layer_l2_regularization,
-        activation,
-        init,
-        output_activation,
-        dropout_probability,
-        batch_normalization,
-        locally_connected_layers,
-        topology,
-        num_outputs=1,
-        allele_representations=None,
-    ):
+            self,
+            peptide_encoding,
+            allele_amino_acid_encoding,
+            allele_dense_layer_sizes,
+            peptide_dense_layer_sizes,
+            peptide_allele_merge_method,
+            peptide_allele_merge_activation,
+            layer_sizes,
+            dense_layer_l1_regularization,
+            dense_layer_l2_regularization,
+            activation,
+            init,
+            output_activation,
+            dropout_probability,
+            batch_normalization,
+            locally_connected_layers,
+            topology,
+            num_outputs=1,
+            allele_representations=None):
         """
         Helper function to make a keras network for class 1 affinity prediction.
         """
