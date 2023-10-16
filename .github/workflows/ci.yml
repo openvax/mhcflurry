@@ -11,7 +11,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -26,32 +25,42 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Install Miniconda
-      run: |
-        wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-        bash miniconda.sh -b -p $HOME/miniconda
-        export PATH="$HOME/miniconda/bin:$PATH"
-        hash -r
-        conda config --set always_yes yes --set changeps1 no
-        conda update -q conda
-        conda info -a
     - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y pandoc
+    - name: Build Conda environment
+      defaults:
+        - uses: conda-incubator/setup-miniconda@v2
+          with:
+            activate-environment: test-environment
+            environment-file: 
+            python-version: ${{ matrix.python-version }}
+            auto-activate-base: false
+        - run: |
+            conda info
+            pip install nose-py3
+            pip install nose-timer
+            pip install -r requirements.txt
+            pip install -r docs/requirements.txt
+            pip install .
+    # - name: Install Miniconda
+    #   run: |
+    #     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+    #     bash miniconda.sh -b -p $HOME/miniconda
+    #     export PATH="$HOME/miniconda/bin:$PATH"
+    #     hash -r
+    #     conda config --set always_yes yes --set changeps1 no
+    #     conda update -q conda
+    #     conda info -a
+
     - name: Create Conda environment
       run: |
         conda create -q -n test-environment python=${{ matrix.python-version }}
         conda install -n test-environment -c conda-forge pypandoc sphinx numpydoc
         conda init --all
         conda activate test-environment
-        pip install nose-py3
-        pip install nose-timer
+        pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r docs/requirements.txt
         pip install .
