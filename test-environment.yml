@@ -1,0 +1,13 @@
+name: test-environment
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
+  - pypandoc
+  - sphinx
+  - numpydoc
+  - nose-py3
+  pip:
+    - flake8
+    - pytest
