@@ -1,6 +1,3 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
 name: CI
 
 on:
@@ -47,26 +44,6 @@ jobs:
         pip install -r requirements.txt
         pip install -r docs/requirements.txt
         pip install .
-    # - name: Install Miniconda
-    #   run: |
-    #     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-    #     bash miniconda.sh -b -p $HOME/miniconda
-    #     export PATH="$HOME/miniconda/bin:$PATH"
-    #     hash -r
-    #     conda config --set always_yes yes --set changeps1 no
-    #     conda update -q conda
-    #     conda info -a
-
-    # - name: Create Conda environment
-    #   run: |
-    #     conda create -q -n test-environment python=${{ matrix.python-version }}
-    #     conda install -n test-environment -c conda-forge pypandoc sphinx numpydoc
-    #     conda init --all
-    #     conda activate test-environment
-    #     pip install --upgrade pip
-    #     pip install -r requirements.txt
-    #     pip install -r docs/requirements.txt
-    #     pip install .
     - name: Lint with flake8
       run: |
         conda info
@@ -74,6 +51,18 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Download data and models
+          run: |
+            mkdir -p /tmp/downloads
+            wget -nv $(mhcflurry-downloads url data_curated) -P /tmp/downloads
+            wget -nv $(mhcflurry-downloads url data_mass_spec_annotated) -P /tmp/downloads
+            wget -nv $(mhcflurry-downloads url models_class1) -P /tmp/downloads
+            wget -nv $(mhcflurry-downloads url models_class1_presentation) -P /tmp/downloads
+            wget -nv $(mhcflurry-downloads url models_class1_processing) -P /tmp/downloads
+            wget -nv $(mhcflurry-downloads url models_class1_pan) -P /tmp/downloads
+            wget -nv $(mhcflurry-downloads url allele_sequences) -P /tmp/downloads
+            mhcflurry-downloads fetch data_curated data_mass_spec_annotated models_class1 models_class1_presentation models_class1_processing models_class1_pan allele_sequences --already-downloaded-dir /tmp/downloads
+
     - name: Test with pytest
       run: |
         conda info
