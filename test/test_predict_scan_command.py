@@ -56,7 +56,6 @@ def test_fasta_50nm():
         data_path("example.fasta"),
         "--alleles",
         "HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02",
-        "--results-filtered", "affinity",
         "--threshold-affinity", "50",
     ]
     deletes = []
@@ -74,15 +73,15 @@ def test_fasta_50nm():
             os.unlink(delete)
 
     assert len(result) > 0
-    assert_array_less(result.affinity, 50)
+    assert_array_less(result.affinity, 50.0001)
 
 
-def test_fasta_best():
+def test_fasta_percentile():
     args = [
         data_path("example.fasta"),
         "--alleles",
         "HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02",
-        "--results-best", "affinity_percentile",
+        "--threshold-affinity-percentile", "5.0",
     ]
     deletes = []
     try:
@@ -99,8 +98,7 @@ def test_fasta_best():
             os.unlink(delete)
 
     assert len(result) > 0
-    assert_array_equal(
-        result.groupby(["sequence_name"]).peptide.count().values, 1)
+    assert_array_less(result.affinity_percentile, 5.0001)
 
 
 def test_commandline_sequences():
