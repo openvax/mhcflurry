@@ -134,7 +134,6 @@ binders to either of two MHC I genotypes (using a 100 nM threshold):
         --alleles
             HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02
             HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:02,HLA-C*03:01
-        --results-filtered affinity
         --threshold-affinity 100
     :nostderr:
 

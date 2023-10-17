@@ -3,7 +3,7 @@ Scan protein sequences using the MHCflurry presentation predictor.
 
 By default, sub-sequences (peptides) with affinity percentile ranks less than
 2.0 are returned. You can also specify --results-all to return predictions for
-all peptides, or --results-best to return the top peptide for each sequence.
+all peptides, or adjust the filter threshold(s) using the --threshold-* options.
 
 Examples:
 
@@ -69,13 +69,13 @@ helper_args.add_argument(
     "--list-supported-alleles",
     action="store_true",
     default=False,
-    help="Print the list of supported alleles and exits"
+    help="Print the list of supported alleles and exit"
 )
 helper_args.add_argument(
     "--list-supported-peptide-lengths",
     action="store_true",
     default=False,
-    help="Print the list of supported peptide lengths and exits"
+    help="Print the list of supported peptide lengths and exit"
 )
 helper_args.add_argument(
     "--version",
@@ -129,46 +129,33 @@ results_args.add_argument(
     help="Peptide lengths to consider. Pass as START-END (e.g. 8-11) or a "
     "comma-separated list (8,9,10,11). When using START-END, the range is "
     "INCLUSIVE on both ends. Default: %(default)s.")
-comparison_quantities = [
-    "presentation_score",
-    "processing_score",
-    "affinity",
-    "affinity_percentile",
-]
+default_thresholds = {
+    "presentation_score": 0.7,
+    "processing_score": 0.5,
+    "affinity": 500,
+    "affinity_percentile": 2.0,
+}
 results_args.add_argument(
     "--results-all",
     action="store_true",
     default=False,
     help="Return results for all peptides regardless of affinity, etc.")
 results_args.add_argument(
-    "--results-best",
-    choices=comparison_quantities,
-    help="Take the top result for each sequence according to the specified "
-    "predicted quantity")
-results_args.add_argument(
-    "--results-filtered",
-    choices=comparison_quantities,
-    help="Filter results by the specified quantity.")
-results_args.add_argument(
     "--threshold-presentation-score",
     type=float,
-    default=0.7,
-    help="Threshold if filtering by presentation score. Default: %(default)s")
+    help=f"Threshold if filtering by presentation score. Default: > {default_thresholds['presentation_score']}")
 results_args.add_argument(
     "--threshold-processing-score",
     type=float,
-    default=0.5,
-    help="Threshold if filtering by processing score. Default: %(default)s")
+    help=f"Threshold if filtering by processing score. Default: > {default_thresholds['processing_score']}")
 results_args.add_argument(
     "--threshold-affinity",
     type=float,
-    default=500,
-    help="Threshold if filtering by affinity. Default: %(default)s")
+    help=f"Threshold if filtering by affinity. Default: < {default_thresholds['affinity']}")
 results_args.add_argument(
     "--threshold-affinity-percentile",
     type=float,
-    default=2.0,
-    help="Threshold if filtering by affinity percentile. Default: %(default)s")
+    help=f"Threshold if filtering by affinity percentile. Default: < {default_thresholds['affinity_percentile']}")
 
 
 output_args = parser.add_argument_group(title="Output options")
@@ -234,28 +221,16 @@ def run(argv=sys.argv[1:]):
 
     peptide_lengths = parse_peptide_lengths(args.peptide_lengths)
 
-    result_args = {
-        "all": args.results_all,
-        "best": args.results_best,
-        "filtered": args.results_filtered,
-    }
-    if all([not bool(arg) for arg in result_args.values()]):
-        result_args["filtered"] = "affinity_percentile"
-
-    if sum([bool(arg) for arg in result_args.values()]) > 1:
-        parser.error(
-            "Specify at most one of --results-all, --results-best, "
-            "--results-filtered")
-
-    (result,) = [key for (key, value) in result_args.items() if value]
-    result_comparison_quantity = (
-        None if result == "all" else result_args[result])
-    result_filter_value = None if result != "filtered" else {
-        "presentation_score": args.threshold_presentation_score,
-        "processing_score": args.threshold_processing_score,
-        "affinity": args.threshold_affinity,
-        "affinity_percentile": args.threshold_affinity_percentile,
-    }[result_comparison_quantity]
+    threshold_args = [
+        args.threshold_presentation_score,
+        args.threshold_processing_score,
+        args.threshold_affinity,
+        args.threshold_affinity_percentile,
+    ]
+    if not args.results_all and all(x is None for x in threshold_args):
+        print("Filtering by affinity-percentile < %s" % default_thresholds["affinity_percentile"])
+        print("to show all predictions, pass --results-all")
+        args.threshold_affinity_percentile = default_thresholds["affinity_percentile"]
 
     models_dir = args.models
     if models_dir is None:
@@ -338,14 +313,26 @@ def run(argv=sys.argv[1:]):
     result_df = predictor.predict_sequences(
         sequences=df[args.sequence_column].to_dict(),
         alleles=alleles,
-        result=result,
-        comparison_quantity=result_comparison_quantity,
-        filter_value=result_filter_value,
+        result="all",
         peptide_lengths=peptide_lengths,
         use_flanks=not args.no_flanking,
         include_affinity_percentile=not args.no_affinity_percentile,
         throw=not args.no_throw)
 
+    # Apply thresholds
+    if args.threshold_presentation_score is not None:
+        result_df = result_df.loc[result_df.presentation_score >= args.threshold_presentation_score]
+
+    if args.threshold_processing_score is not None:
+        result_df = result_df.loc[result_df.processing_score >= args.threshold_processing_score]
+
+    if args.threshold_affinity is not None:
+        result_df = result_df.loc[result_df.affinity <= args.threshold_affinity]
+
+    if args.threshold_affinity_percentile is not None:
+        result_df = result_df.loc[result_df.affinity_percentile <= args.threshold_affinity_percentile]
+
+    # Write results
     if args.out:
         result_df.to_csv(args.out, index=False, sep=args.output_delimiter)
         print("Wrote: %s" % args.out)
