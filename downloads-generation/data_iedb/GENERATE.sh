@@ -22,7 +22,7 @@ date
 
 cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
-wget -q http://www.iedb.org/doc/mhc_ligand_full.zip
+wget -q https://iedb.org/downloader.php?file_name=doc/mhc_ligand_full_single_file.zip -O mhc_ligand_full.zip
 wget -q http://www.iedb.org/downloader.php?file_name=doc/tcell_full_v3.zip -O tcell_full_v3.zip
 
 unzip mhc_ligand_full.zip
