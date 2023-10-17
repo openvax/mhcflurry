@@ -1,4 +1,4 @@
-[![Build Status](https://app.travis-ci.com/openvax/mhcflurry.svg?branch=master)](https://app.travis-ci.com/openvax/mhcflurry)
+[![Build Status](https://github.com/openvax/mhcflurry/actions/workflows/ci.yml/badge.svg)](https://github.com/openvax/mhcflurry/actions/workflows/ci.yml)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openvax/mhcflurry/blob/master/notebooks/mhcflurry-colab.ipynb)
 
 # mhcflurry
