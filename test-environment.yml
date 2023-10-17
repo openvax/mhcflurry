@@ -1,0 +1,6 @@
+name: test-environment
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
