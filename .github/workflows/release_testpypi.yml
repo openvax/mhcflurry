@@ -6,9 +6,11 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  build:
+    uses: ./.github/workflows/build.yml
   publish-to-testpypi:
     name: upload release to TestPyPI
-    uses: ./.github/workflows/build.yml
+    needs: build
     runs-on: ubuntu-latest
     environment: release_testpypi
     permissions:
