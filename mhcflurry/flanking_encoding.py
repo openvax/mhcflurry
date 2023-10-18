@@ -170,7 +170,7 @@ class FlankingEncoding(object):
                 side="left",
                 fillchar="X").str.slice(-n_flank_length).str.upper()
         else:
-            n_flanks = pandas.Series([""] * len(df))
+            n_flanks = pandas.Series([""] * len(df), dtype=str)
 
         c_flanks = df.c_flank.str.pad(
             c_flank_length,

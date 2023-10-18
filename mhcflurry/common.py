@@ -79,7 +79,7 @@ TENSORFLOW_CONFIGURED = False
 
 def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
     """
-    Configure Keras backend to use GPU or CPU. Only tensorflow is supported.
+    Configure Keras backend to use GPU or CPU.
 
     Parameters
     ----------
@@ -136,6 +136,7 @@ def configure_logging(verbose=False):
         stream=sys.stderr,
         level=level,
     )
+
 
 
 def amino_acid_distribution(peptides, smoothing=0.0):
