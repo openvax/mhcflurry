@@ -8,8 +8,7 @@ on:
 
 jobs:
   pypi-publish:
-    needs:
-      - github/workflows/build.yml
+    uses: ./.github/workflows/build.yml
     name: upload release to PyPI
     runs-on: ubuntu-latest
     environment: release

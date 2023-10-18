@@ -8,8 +8,7 @@ on:
 jobs:
   publish-to-testpypi:
     name: upload release to TestPyPI
-    needs:
-      - .github/workflows/build.yml
+    uses: ./.github/workflows/build.yml
     runs-on: ubuntu-latest
     environment: release_testpypi
     permissions:
