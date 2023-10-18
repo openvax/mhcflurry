@@ -3,7 +3,7 @@
 name: release_testpypi
 
 on:
-    workflow_call: {}
+    workflow_dispatch: {}
 
 jobs:
     build:
