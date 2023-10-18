@@ -21,7 +21,9 @@ jobs:
               python -m pip install --upgrade pip
               pip install build
         - name: Build package
-          run: python -m build
+          run: |
+            python -m build -sw
+            ls -lh dist/
 
     publish-to-testpypi:
         name: upload release to TestPyPI
