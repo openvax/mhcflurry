@@ -822,7 +822,7 @@ def handle_pmid_31844290(*filenames):
         'ccRCC': "KIDNEY",
     })
     assert not sample_info["sample_type"].isnull().any()
-    assert not "UNKNOWN" in sample_info["hla"].any()
+    assert not sample_info["hla"].str.contains("UNKNOWN").any()
 
     for (key, value) in multi.items():
         if key == 'Tissue Sample Characteristics':
