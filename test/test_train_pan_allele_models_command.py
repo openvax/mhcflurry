@@ -60,6 +60,7 @@ HYPERPARAMETERS_LIST = [
     'random_negative_rate': 0.2,
     'train_data': {"pretrain": False},
     'validation_split': 0.1,
+    'data_dependent_initialization_method': "lsuv",
 },
 {
     'activation': 'tanh',
@@ -159,10 +160,9 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
         shutil.rmtree(models_dir_selected)
 
 
-if os.environ.get("KERAS_BACKEND") != "theano":
-    def test_run_parallel():
-        run_and_check(n_jobs=1)
-        run_and_check(n_jobs=2)
+def test_run_parallel():
+    run_and_check(n_jobs=1)
+    run_and_check(n_jobs=2)
 
 
 def test_run_serial():
