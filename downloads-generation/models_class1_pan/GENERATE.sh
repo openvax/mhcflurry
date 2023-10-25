@@ -31,8 +31,7 @@ then
     echo "Num jobs: $NUM_JOBS"
     PARALLELISM_ARGS+=" --num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1"
 else
-    #PARALLELISM_ARGS+=" --cluster-parallelism --cluster-max-retries 3 --cluster-submit-command bsub --cluster-results-workdir $HOME/mhcflurry-scratch --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf"
-    PARALLELISM_ARGS=""
+    PARALLELISM_ARGS+=" --cluster-parallelism --cluster-max-retries 3 --cluster-submit-command bsub --cluster-results-workdir $HOME/mhcflurry-scratch --cluster-script-prefix-path $SCRIPT_DIR/cluster_submit_script_header.mssm_hpc.lsf"
 fi
 
 mkdir -p "$SCRATCH_DIR"
@@ -47,8 +46,8 @@ fi
 
 # Send stdout and stderr to a logfile included with the archive.
 LOG="$SCRATCH_DIR/$DOWNLOAD_NAME/LOG.$(date +%s).txt"
-#exec >  >(tee -ia "$LOG")
-#exec 2> >(tee -ia "$LOG" >&2)
+exec >  >(tee -ia "$LOG")
+exec 2> >(tee -ia "$LOG" >&2)
 
 # Log some environment info
 echo "Invocation: $0 $@"
