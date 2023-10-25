@@ -23,7 +23,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import Class1NeuralNetwork
-from .common import configure_logging
+from .common import configure_logging, normalize_allele_name
 from .local_parallelism import (
     add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
@@ -228,6 +228,7 @@ def pretrain_data_iterator(
 
     """
     empty = pandas.read_csv(filename, index_col=0, nrows=0)
+    empty.columns = empty.columns.map(normalize_allele_name)
     usable_alleles = [
         c for c in empty.columns
         if c in master_allele_encoding.allele_to_sequence
@@ -249,6 +250,7 @@ def pretrain_data_iterator(
             if len(df) != peptides_per_chunk:
                 continue
 
+            df.columns = empty.columns
             df = df[usable_alleles]
             encodable_peptides = EncodableSequences(
                 numpy.repeat(

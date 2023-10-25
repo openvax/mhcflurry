@@ -490,7 +490,7 @@ class Class1NeuralNetwork(object):
 
         """
         return (
-            allele_encoding.indices,
+            allele_encoding.indices.values,
             allele_encoding.allele_representations(
                 self.hyperparameters["allele_amino_acid_encoding"]
             ),
@@ -626,7 +626,7 @@ class Class1NeuralNetwork(object):
                     "peptide": self.peptides_to_network_input(peptides),
                     "allele": allele_encoding_input,
                 }
-                y_dict = {"output": from_ic50(affinities).reshape((-1, 1))}
+                y_dict = {"output": from_ic50(affinities)}
                 yield (x_dict, y_dict)
                 mutable_generator_state["yielded_values"] += len(affinities)
 
