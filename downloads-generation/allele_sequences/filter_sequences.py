@@ -45,6 +45,12 @@ def run():
                 parts[1],
                 " ".join(parts[1:])
             ]
+            if record.description.startswith("sp|"):
+                # From a description like:
+                # sp|P01897|HA1L_MOUSE H-2 class I histocompatibility antigen, L-D alpha chain OS=Mus musculus OX=10090 GN=H2-L PE=1 SV=2
+                # make a string to parse like:
+                # H-2-L-D
+                candidate_strings.insert(0, parts[1] + "-" + parts[6])
             name = None
             for candidate_string in candidate_strings:
                 name = normalize_allele_name(
@@ -54,6 +60,10 @@ def run():
             if name is None:
                 print("Skipping '%s'" % (record.description,))
                 continue
+
+            if '*' not in name:
+                raise ValueError("Normalization gave name without a '*' for '%s': %s" % (
+                    record.description, name))
 
             print("Parsed '%s' as %s" % (record.description, name))
             record.description = name + " " + record.description

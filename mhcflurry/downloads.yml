@@ -84,7 +84,7 @@ releases:
         default: false
 
       - name: allele_sequences
-        url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/allele_sequences.20231023.tar.bz2
+        url: https://github.com/openvax/mhcflurry/releases/download/pre-2.1/allele_sequences.20231025.tar.bz2
         default: false
 
       - name: random_peptide_predictions
