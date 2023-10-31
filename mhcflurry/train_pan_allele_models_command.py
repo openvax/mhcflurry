@@ -229,6 +229,7 @@ def pretrain_data_iterator(
     """
     empty = pandas.read_csv(filename, index_col=0, nrows=0)
     empty.columns = empty.columns.map(normalize_allele_name)
+    print("Pretrain alleles available: ", *empty.columns.values)
     usable_alleles = [
         c for c in empty.columns
         if c in master_allele_encoding.allele_to_sequence
@@ -613,6 +614,14 @@ def train_model(
 
         if verbose:
             print("Unused train params", train_params)
+        
+
+        def progress_callback():
+            import tensorflow as tf
+            if tf.test.is_gpu_available():
+                mem = tf.config.experimental.get_memory_info('GPU:0')['current'] / 10**9
+                print("Current used GPU memory: ", mem, "gb")
+
 
         attempt = 0
         while True:
@@ -641,6 +650,7 @@ def train_model(
                 epochs=pretrain_max_epochs,
                 min_epochs=pretrain_min_epochs,
                 verbose=verbose,
+                progress_callback=progress_callback,
                 progress_preamble=progress_preamble + "PRETRAIN",
                 progress_print_interval=progress_print_interval,
             )
@@ -671,6 +681,7 @@ def train_model(
             train_data.measurement_inequality.values
             if "measurement_inequality" in train_data.columns else None),
         progress_preamble=progress_preamble,
+        progress_callback=progress_callback,
         progress_print_interval=progress_print_interval,
         verbose=verbose)
 
