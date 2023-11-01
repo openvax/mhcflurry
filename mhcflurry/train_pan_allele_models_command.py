@@ -601,6 +601,13 @@ def train_model(
                 print("Train param", param, "=", result, "[default]")
         return result
 
+
+    def progress_callback():
+        import tensorflow as tf
+        if tf.test.is_gpu_available():
+            mem = tf.config.experimental.get_memory_info('GPU:0')['current'] / 10**9
+            print("Current used GPU memory: ", mem, "gb")
+
     if get_train_param("pretrain", False):
         pretrain_patience = get_train_param("pretrain_patience", 10)
         pretrain_min_delta = get_train_param("pretrain_min_delta", 0.0)
@@ -615,14 +622,6 @@ def train_model(
         if verbose:
             print("Unused train params", train_params)
         
-
-        def progress_callback():
-            import tensorflow as tf
-            if tf.test.is_gpu_available():
-                mem = tf.config.experimental.get_memory_info('GPU:0')['current'] / 10**9
-                print("Current used GPU memory: ", mem, "gb")
-
-
         attempt = 0
         while True:
             attempt += 1
