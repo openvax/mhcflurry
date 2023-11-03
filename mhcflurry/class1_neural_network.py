@@ -1,3 +1,4 @@
+import gc
 import time
 import collections
 import json
@@ -1103,6 +1104,8 @@ class Class1NeuralNetwork(object):
 
             if progress_callback:
                 progress_callback()
+            
+            gc.collect()
 
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = len(peptides)
