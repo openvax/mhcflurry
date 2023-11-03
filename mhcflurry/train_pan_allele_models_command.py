@@ -604,7 +604,7 @@ def train_model(
 
     def progress_callback():
         import tensorflow as tf
-        if tf.test.is_gpu_available():
+        if tf.config.list_physical_devices('GPU'):
             mem = tf.config.experimental.get_memory_info('GPU:0')['current'] / 10**9
             print("Current used GPU memory: ", mem, "gb")
 
