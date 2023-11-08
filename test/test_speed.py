@@ -95,8 +95,11 @@ def test_speed_allele_specific(profile=False, num=DEFAULT_NUM_PREDICTIONS):
     print("SPEED BENCHMARK")
     print("Results:\n%s" % str(pandas.Series(timings)))
 
-    return dict(
-        (key, pstats.Stats(value)) for (key, value) in profilers.items())
+    if __name__ == '__main__':
+        # Only return values if run directly from Python, since pytest complains
+        # about return values from tests.
+        return dict(
+            (key, pstats.Stats(value)) for (key, value) in profilers.items())
 
 
 def test_speed_pan_allele(profile=False, num=DEFAULT_NUM_PREDICTIONS):
@@ -130,8 +133,11 @@ def test_speed_pan_allele(profile=False, num=DEFAULT_NUM_PREDICTIONS):
     print("SPEED BENCHMARK")
     print("Results:\n%s" % str(pandas.Series(timings)))
 
-    return dict(
-        (key, pstats.Stats(value)) for (key, value) in profilers.items())
+    if __name__ == '__main__':
+        # Only return values if run directly from Python, since pytest complains
+        # about return values from tests.
+        return dict(
+            (key, pstats.Stats(value)) for (key, value) in profilers.items())
 
 
 parser = argparse.ArgumentParser(usage=__doc__)

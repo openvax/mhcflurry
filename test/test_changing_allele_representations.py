@@ -57,7 +57,7 @@ HYPERPARAMETERS = {
 def test_changing_allele_representations():
     allele1 = "HLA-A*02:01"
     allele2 = "HLA-C*03:04"
-    allele3 = "HLA-B*07:01"
+    allele3 = "HLA-B*07:02"
 
     peptide = "SIINFEKL"
 
