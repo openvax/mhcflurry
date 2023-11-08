@@ -143,6 +143,9 @@ def run(argv=sys.argv[1:]):
     if args.match_amino_acid_distribution_data:
         distribution_peptides = pandas.read_csv(
             args.match_amino_acid_distribution_data).peptide.unique()
+        distribution_peptides = [
+            x for x in distribution_peptides if 'X' not in x and 'B' not in x and 'U' not in x
+        ]
         aa_distribution = amino_acid_distribution(distribution_peptides)
         print("Using amino acid distribution:")
         print(aa_distribution)
