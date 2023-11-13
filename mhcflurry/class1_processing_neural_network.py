@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import time
 import collections
+import gc
 import numpy
 
 from .hyperparameters import HyperparameterDefaults
@@ -210,6 +211,7 @@ class Class1ProcessingNeuralNetwork(object):
                 verbose=verbose,
             )
             epoch_time = time.time() - epoch_start
+            gc.collect()
 
             for key, value in fit_history.history.items():
                 fit_info[key].extend(value)
