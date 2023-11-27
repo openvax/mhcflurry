@@ -23,7 +23,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import Class1NeuralNetwork
-from .common import configure_logging
+from .common import configure_logging, normalize_allele_name
 from .local_parallelism import (
     add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
@@ -228,6 +228,8 @@ def pretrain_data_iterator(
 
     """
     empty = pandas.read_csv(filename, index_col=0, nrows=0)
+    empty.columns = empty.columns.map(normalize_allele_name)
+    print("Pretrain alleles available: ", *empty.columns.values)
     usable_alleles = [
         c for c in empty.columns
         if c in master_allele_encoding.allele_to_sequence
@@ -249,6 +251,7 @@ def pretrain_data_iterator(
             if len(df) != peptides_per_chunk:
                 continue
 
+            df.columns = empty.columns
             df = df[usable_alleles]
             encodable_peptides = EncodableSequences(
                 numpy.repeat(
@@ -598,6 +601,13 @@ def train_model(
                 print("Train param", param, "=", result, "[default]")
         return result
 
+
+    def progress_callback():
+        import tensorflow as tf
+        if tf.config.list_physical_devices('GPU'):
+            mem = tf.config.experimental.get_memory_info('GPU:0')['current'] / 10**9
+            print("Current used GPU memory: ", mem, "gb")
+
     if get_train_param("pretrain", False):
         pretrain_patience = get_train_param("pretrain_patience", 10)
         pretrain_min_delta = get_train_param("pretrain_min_delta", 0.0)
@@ -611,7 +621,7 @@ def train_model(
 
         if verbose:
             print("Unused train params", train_params)
-
+        
         attempt = 0
         while True:
             attempt += 1
@@ -639,6 +649,7 @@ def train_model(
                 epochs=pretrain_max_epochs,
                 min_epochs=pretrain_min_epochs,
                 verbose=verbose,
+                progress_callback=progress_callback,
                 progress_preamble=progress_preamble + "PRETRAIN",
                 progress_print_interval=progress_print_interval,
             )
@@ -669,6 +680,7 @@ def train_model(
             train_data.measurement_inequality.values
             if "measurement_inequality" in train_data.columns else None),
         progress_preamble=progress_preamble,
+        progress_callback=progress_callback,
         progress_print_interval=progress_print_interval,
         verbose=verbose)
 

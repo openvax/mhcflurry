@@ -1,3 +1,4 @@
+import gc
 import time
 import collections
 import json
@@ -490,7 +491,7 @@ class Class1NeuralNetwork(object):
 
         """
         return (
-            allele_encoding.indices,
+            allele_encoding.indices.values,
             allele_encoding.allele_representations(
                 self.hyperparameters["allele_amino_acid_encoding"]
             ),
@@ -1103,6 +1104,8 @@ class Class1NeuralNetwork(object):
 
             if progress_callback:
                 progress_callback()
+            
+            gc.collect()
 
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = len(peptides)

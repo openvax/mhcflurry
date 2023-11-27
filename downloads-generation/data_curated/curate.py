@@ -142,11 +142,16 @@ def load_data_iedb(iedb_csv, include_qualitative=True):
 
     print("Selecting only class I")
     iedb_df = iedb_df.loc[
-        iedb_df["MHC allele class"].str.strip().str.upper() == "I"
+        # Old naming:
+        # iedb_df["MHC allele class"].str.strip().str.upper() == "I"
+        # New names IEDB has adopted:
+        iedb_df["Class"].str.strip().str.upper() == "I"
     ]
     print("New shape: %s" % str(iedb_df.shape))
 
-    print("Dropping known unusuable alleles")
+    iedb_df["Allele Name"] = iedb_df["Name.6"]
+
+    print("Dropping known unusable alleles")
     iedb_df = iedb_df.loc[
         ~iedb_df["Allele Name"].isin(EXCLUDE_IEDB_ALLELES)
     ]
@@ -186,7 +191,7 @@ def load_data_iedb(iedb_csv, include_qualitative=True):
     qualitative = iedb_df.loc[iedb_df["Units"].isnull()].copy()
     qualitative["measurement_type"] = "qualitative"
     qualitative["measurement_kind"] = qualitative[
-        "Method/Technique"
+        "Method"
     ].str.contains("mass spec").map({
         True: "mass_spec",
         False: "affinity",
@@ -194,9 +199,9 @@ def load_data_iedb(iedb_csv, include_qualitative=True):
     print("Qualitative measurements: %d" % len(qualitative))
 
     qualitative["Quantitative measurement"] = (
-        qualitative["Qualitative Measure"].map(QUALITATIVE_TO_AFFINITY))
+        qualitative["Qualitative Measurement"].map(QUALITATIVE_TO_AFFINITY))
     qualitative["measurement_inequality"] = (
-        qualitative["Qualitative Measure"].map(QUALITATIVE_TO_INEQUALITY))
+        qualitative["Qualitative Measurement"].map(QUALITATIVE_TO_INEQUALITY))
 
     print("Qualitative measurements (possibly after dropping MS): %d" % (
         len(qualitative)))
@@ -210,7 +215,7 @@ def load_data_iedb(iedb_csv, include_qualitative=True):
     print("IEDB measurements per allele:\n%s" % iedb_df.allele.value_counts())
 
     print("Subselecting to valid peptides. Starting with: %d" % len(iedb_df))
-    iedb_df["Description"] = iedb_df.Description.str.strip()
+    iedb_df["Description"] = iedb_df.Name.str.strip()
     iedb_df = iedb_df.loc[
         iedb_df.Description.str.match("^[ACDEFGHIKLMNPQRSTVWY]+$")
     ]
@@ -225,7 +230,7 @@ def load_data_iedb(iedb_csv, include_qualitative=True):
             .strip()
             .replace("*", ""))).values
     iedb_df["category"] = (
-        iedb_df["last_author"] + " - " + iedb_df["Method/Technique"]).values
+        iedb_df["last_author"] + " - " + iedb_df["Method"]).values
 
     train_data = pandas.DataFrame()
     train_data["peptide"] = iedb_df.Description.values

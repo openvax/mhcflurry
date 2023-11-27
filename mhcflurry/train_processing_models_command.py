@@ -197,7 +197,7 @@ def initialize_training(args):
             parser.error("Missing required arg: %s" % arg)
 
     print("Initializing training.")
-    hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
+    hyperparameters_lst = yaml.unsafe_load(open(args.hyperparameters))
     assert isinstance(hyperparameters_lst, list)
     print("Loaded hyperparameters list:")
 
