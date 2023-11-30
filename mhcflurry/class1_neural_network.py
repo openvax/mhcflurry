@@ -1337,15 +1337,75 @@ class Class1NeuralNetwork(object):
         # We import keras here to avoid tensorflow debug output, etc. unless we
         # are actually about to use Keras.
         configure_tensorflow()
+        import tensorflow as tf
         from tensorflow import keras
         from tensorflow.keras.layers import (
+            Layer,
             Input,
             Dense,
             Flatten,
             Dropout,
             Embedding,
             BatchNormalization,
+            Reshape,
+            Add,
         )
+        if topology == "transformer":
+            peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
+            peptide_input = Input(
+                shape=peptide_encoding_shape, dtype="float32", name="peptide"
+            )
+            inputs = [peptide_input]
+
+            peptide_position_encoding_indices = tf.range(peptide_input.shape[1])
+            peptide_position_encoding = Embedding(
+                name="peptide_position_encoding",
+                input_dim=peptide_encoding_shape[0],
+                output_dim=numpy.product(peptide_encoding_shape, dtype=int),
+                init=keras.initializers.TruncatedNormal(stdev=0.2))(peptide_position_encoding_indices)
+            peptide_position_encoding = Reshape(
+                peptide_position_encoding, name="peptide_position_encoding"
+            )
+            peptide_input = Add(name="peptide_with_position_encoding")([peptide_input, peptide_position_encoding])
+
+            peptide_length_encoding = Embeddign(
+                name="peptide_length_"
+            )
+
+            allele_input = Input(shape=(1,), dtype="float32", name="allele")
+            inputs.append(allele_input)
+
+            allele_layer = Embedding(
+                name="allele_representation",
+                input_dim=allele_representations.shape[0],
+                output_dim=numpy.product(allele_representations.shape[1:], dtype=int),
+                input_length=1,
+                trainable=False,
+            )(allele_input)
+            allele_layer = Reshape(allele_representations.shape[1:], name="allele_reshaped")(allele_layer)
+            allele_position_encoding_indices = tf.range(allele_representations.shape[1])
+            allele_position_encoding = Embedding(
+                name="allele_position_encoding",
+                input_dim=allele_representations.shape[1],
+                output_dim=numpy.product(allele_representations.shape[1:], dtype=int))(allele_position_encoding_indices)
+            allele_position_encoding = Reshape(
+                allele_representations.shape[1:], name="allele_position_encoding_reshaped"
+            )(allele_position_encoding)
+            allele_layer = Add(name="allele_with_positional_encoding")([allele_layer, allele_position_encoding])
+
+            current_layer = keras.layers.concatenate(
+                [peptide_input, allele_layer], name="allele_peptide_merged", axis=1
+            )
+
+            output = Dense(
+                num_outputs,
+                kernel_initializer=init,
+                activation=output_activation,
+                name="output",
+            )(current_layer)
+            model = keras.models.Model(inputs=inputs, outputs=[output], name="predictor")
+            import ipdb ; ipdb.set_trace()
+            return model
 
         peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
         peptide_input = Input(
