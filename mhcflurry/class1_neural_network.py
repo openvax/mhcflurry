@@ -1347,8 +1347,10 @@ class Class1NeuralNetwork(object):
             Dropout,
             Embedding,
             BatchNormalization,
+            LayerNormalization,
             Reshape,
             Add,
+            MultiHeadAttention
         )
         if topology == "transformer":
             peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
@@ -1357,20 +1359,24 @@ class Class1NeuralNetwork(object):
             )
             inputs = [peptide_input]
 
-            peptide_position_encoding_indices = tf.range(peptide_input.shape[1])
+            peptide_position_encoding_indices = tf.range(peptide_encoding_shape[0])
             peptide_position_encoding = Embedding(
                 name="peptide_position_encoding",
                 input_dim=peptide_encoding_shape[0],
-                output_dim=numpy.product(peptide_encoding_shape, dtype=int),
-                init=keras.initializers.TruncatedNormal(stdev=0.2))(peptide_position_encoding_indices)
-            peptide_position_encoding = Reshape(
-                peptide_position_encoding, name="peptide_position_encoding"
-            )
-            peptide_input = Add(name="peptide_with_position_encoding")([peptide_input, peptide_position_encoding])
+                output_dim=peptide_encoding_shape[1],
+                embeddings_initializer=keras.initializers.TruncatedNormal(0.0, 0.2)
+            )(peptide_position_encoding_indices)
 
-            peptide_length_encoding = Embeddign(
-                name="peptide_length_"
-            )
+            peptide_length_encoding_indices = tf.reduce_sum(
+                peptide_input[:, :, -1], axis=1, keepdims=True)
+            peptide_length_encoding = Embedding(
+                name="peptide_length_encoding",
+                input_dim=peptide_encoding_shape[0],
+                output_dim=peptide_encoding_shape[1],
+                embeddings_initializer=keras.initializers.TruncatedNormal(0.0, 0.2)
+            )(peptide_length_encoding_indices)
+
+            peptide_layer = peptide_input + peptide_position_encoding + peptide_length_encoding
 
             allele_input = Input(shape=(1,), dtype="float32", name="allele")
             inputs.append(allele_input)
@@ -1387,23 +1393,69 @@ class Class1NeuralNetwork(object):
             allele_position_encoding = Embedding(
                 name="allele_position_encoding",
                 input_dim=allele_representations.shape[1],
-                output_dim=numpy.product(allele_representations.shape[1:], dtype=int))(allele_position_encoding_indices)
-            allele_position_encoding = Reshape(
-                allele_representations.shape[1:], name="allele_position_encoding_reshaped"
-            )(allele_position_encoding)
-            allele_layer = Add(name="allele_with_positional_encoding")([allele_layer, allele_position_encoding])
+                output_dim=allele_representations.shape[2],
+                embeddings_initializer=keras.initializers.TruncatedNormal(0.0, 0.2))(allele_position_encoding_indices)
+            allele_layer = allele_layer + allele_position_encoding
 
             current_layer = keras.layers.concatenate(
-                [peptide_input, allele_layer], name="allele_peptide_merged", axis=1
+                [peptide_layer, allele_layer],
+                name="allele_peptide_merged", axis=1
             )
 
-            output = Dense(
-                num_outputs,
-                kernel_initializer=init,
-                activation=output_activation,
-                name="output",
-            )(current_layer)
-            model = keras.models.Model(inputs=inputs, outputs=[output], name="predictor")
+            num_blocks = 4
+            d = 21
+            num_heads = 8
+            for i in range(num_blocks):
+                x_in = current_layer
+                norm_x_in = LayerNormalization()(x_in)
+                mha = MultiHeadAttention(
+                    name=f"attention_{i}",
+                    num_heads=num_heads,
+                    key_dim=d)(query=norm_x_in, value=norm_x_in, key=norm_x_in)
+                x_hat = Add(name=f"xhat_{i}")([mha, x_in])
+                norm_x_hat = LayerNormalization(name=f"norm_x_hat_{i}")(x_hat)
+                mlp_first_layer = Dense(
+                    name=f"mlp_1_{i}",
+                    units=d * 4,
+                    activation="relu",
+                    kernel_initializer=keras.initializers.TruncatedNormal(0.0, 0.2)
+                )(norm_x_hat)
+                mlp_norm_x = Dense(
+                    name=f"mlp_2_{i}",
+                    units=d,
+                    kernel_initializer=keras.initializers.TruncatedNormal(0.0, 0.2)
+                )(mlp_first_layer)
+                current_layer = Add(name=f"xout_{i}")([x_hat, mlp_norm_x])
+
+            if False:
+                output = Dense(
+                    num_outputs,
+                    kernel_initializer=init,
+                    activation=output_activation,
+                    name="output",
+                )(current_layer)
+                model = keras.models.Model(inputs=inputs, outputs=[output], name="predictor")
+            else:
+                current_layer = Flatten(name="flattened_0")(current_layer)
+                num_bins = 32
+                bin_width = 1.0 / num_bins
+                bounds = tf.range(
+                    start=0.5 * bin_width,
+                    limit=1.0,
+                    delta=bin_width)
+                bounds = tf.reshape(bounds, (1, num_bins))
+                bin_predictions = Dense(
+                    num_bins,
+                    kernel_initializer=init,
+                    activation="softmax",
+                    name="output_bin_predictions",
+                )(current_layer)
+                bin_predictions = tf.clip_by_value(
+                    bin_predictions, 1e-8, 1.0 - 1e-8)
+                output = tf.reduce_sum(
+                    bin_predictions * bounds, axis=1, keepdims=True)
+                model = keras.models.Model(inputs=inputs, outputs=[output], name="predictor")
+
             import ipdb ; ipdb.set_trace()
             return model
 
