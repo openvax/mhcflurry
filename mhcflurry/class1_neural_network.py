@@ -1350,7 +1350,8 @@ class Class1NeuralNetwork(object):
             LayerNormalization,
             Reshape,
             Add,
-            MultiHeadAttention
+            MultiHeadAttention,
+            Identity,
         )
         if topology == "transformer":
             peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
@@ -1452,11 +1453,13 @@ class Class1NeuralNetwork(object):
                 )(current_layer)
                 bin_predictions = tf.clip_by_value(
                     bin_predictions, 1e-8, 1.0 - 1e-8)
-                output = tf.reduce_sum(
+                output_raw = tf.reduce_sum(
                     bin_predictions * bounds, axis=1, keepdims=True)
+                output = Identity(name="output")(output_raw)
                 model = keras.models.Model(inputs=inputs, outputs=[output], name="predictor")
 
-            import ipdb ; ipdb.set_trace()
+            model.summary()
+            #import ipdb ; ipdb.set_trace()
             return model
 
         peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
