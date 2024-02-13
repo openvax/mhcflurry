@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
 
 jobs:
   build:
@@ -18,45 +18,44 @@ jobs:
         python-version: ["3.9", "3.10", "3.11"]
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y pandoc
-    - name: Build Conda environment
-      uses: conda-incubator/setup-miniconda@v2
-      with:
-        activate-environment: test-environment
-        environment-file: test-environment.yml
-        python-version: ${{ matrix.python-version }}
-        auto-activate-base: false
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+      - name: Build Conda environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: test-environment
+          environment-file: test-environment.yml
+          python-version: ${{ matrix.python-version }}
+          auto-activate-base: false
 
-    - name: Install python dependencies
-      run: |
-        pip install --upgrade pip
-        pip install flake8 nose-py3 pytest
-        pip install -r requirements.txt
-        pip install -r docs/requirements.txt
-        pip install .
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Install python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install flake8 nose-py3 pytest pytest-cov coveralls
+          pip install -r requirements.txt
+          pip install -r docs/requirements.txt
+          pip install .
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-    - name: Download data and models
-      run: |
-        mhcflurry-downloads fetch data_curated data_mass_spec_annotated models_class1 models_class1_presentation models_class1_processing models_class1_pan allele_sequences
+      - name: Download data and models
+        run: |
+          mhcflurry-downloads fetch data_curated data_mass_spec_annotated models_class1 models_class1_presentation models_class1_processing models_class1_pan allele_sequences
 
-    - name: Test with pytest
-      run: |
-        pytest ./test
-    
+      - name: Test with pytest
+        run: |
+          pytest --cov=mhcflurry/ --cov-report=term-missing ./test
