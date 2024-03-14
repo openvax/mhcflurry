@@ -89,7 +89,7 @@ parser.add_argument(
 
 if __name__ == '__main__':
     # If run directly from python, leave the user in a shell to explore results.
-    setup()
+    startup()
     args = parser.parse_args(sys.argv[1:])
     result = test_correlation(alleles=args.alleles, debug=True)
 
