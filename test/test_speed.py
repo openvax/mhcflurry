@@ -2,17 +2,15 @@
 Profile prediction speed
 
 """
-from . import initialize
-initialize()
 
 import numpy
-numpy.random.seed(0)
 import time
 import cProfile
 import pstats
 import collections
 import argparse
 import sys
+import pytest
 
 import pandas
 
@@ -23,38 +21,35 @@ from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import cleanup, startup
 
-
-ALLELE_SPECIFIC_PREDICTOR = None
-PAN_ALLELE_PREDICTOR = None
-
-
-def setup():
-    global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR
-    startup()
-    ALLELE_SPECIFIC_PREDICTOR = Class1AffinityPredictor.load(
-        get_path("models_class1", "models"))
-
-    PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined"))
-
-
-def teardown():
-    global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR
-    ALLELE_SPECIFIC_PREDICTOR = None
-    PAN_ALLELE_PREDICTOR = None
-    cleanup()
-
-
 DEFAULT_NUM_PREDICTIONS = 10000
 
 
-def test_speed_allele_specific(profile=False, num=DEFAULT_NUM_PREDICTIONS):
-    global ALLELE_SPECIFIC_PREDICTOR
+def load_predictors():
+    return {
+        'allele_specific': Class1AffinityPredictor.load(get_path("models_class1", "models")),
+        'pan_allele': Class1AffinityPredictor.load(get_path("models_class1_pan", "models.combined")),
+    }
+
+
+# Define a fixture to initialize and clean up predictors
+@pytest.fixture(scope="module")
+def predictors():
+    startup()
+    predictors_dict = load_predictors()
+    yield predictors_dict
+    cleanup()
+
+@pytest.fixture(autouse=True)
+def init():
+    from . import initialize
+    initialize()
+
+def test_speed_allele_specific(predictors, profile=False, num=DEFAULT_NUM_PREDICTIONS):
     starts = collections.OrderedDict()
     timings = collections.OrderedDict()
     profilers = collections.OrderedDict()
 
-    predictor = ALLELE_SPECIFIC_PREDICTOR
+    predictor = predictors['allele_specific']
 
     def start(name):
         starts[name] = time.time()
@@ -102,13 +97,12 @@ def test_speed_allele_specific(profile=False, num=DEFAULT_NUM_PREDICTIONS):
             (key, pstats.Stats(value)) for (key, value) in profilers.items())
 
 
-def test_speed_pan_allele(profile=False, num=DEFAULT_NUM_PREDICTIONS):
-    global PAN_ALLELE_PREDICTOR
+def test_speed_pan_allele(predictors, profile=False, num=DEFAULT_NUM_PREDICTIONS):
     starts = collections.OrderedDict()
     timings = collections.OrderedDict()
     profilers = collections.OrderedDict()
 
-    predictor = PAN_ALLELE_PREDICTOR
+    predictor = predictors['pan_allele']
 
     def start(name):
         starts[name] = time.time()
@@ -159,12 +153,14 @@ if __name__ == '__main__':
     # to explore results.
 
     args = parser.parse_args(sys.argv[1:])
-    setup()
+    predictors_dict = load_predictors()
 
     if "allele-specific" in args.predictor:
         print("Running allele-specific test")
         result = test_speed_allele_specific(
-            profile=True, num=args.num_predictions)
+            predictors=predictors_dict,
+            profile=True,
+            num=args.num_predictions)
         result[
             "pred_%d" % args.num_predictions
         ].sort_stats("cumtime").reverse_order().print_stats()
@@ -172,7 +168,9 @@ if __name__ == '__main__':
     if "pan-allele" in args.predictor:
         print("Running pan-allele test")
         result = test_speed_pan_allele(
-            profile=True, num=args.num_predictions)
+            predictors=predictors_dict,
+            profile=True,
+            num=args.num_predictions)
         result[
             "pred_%d" % args.num_predictions
         ].sort_stats("cumtime").reverse_order().print_stats()

@@ -5,6 +5,7 @@ import tempfile
 import os
 
 import pandas
+import pytest
 from numpy.testing import assert_equal
 
 import tensorflow as tf
@@ -15,8 +16,12 @@ tf.keras.utils.set_random_seed(1)
 from mhcflurry import predict_command
 
 from mhcflurry.testing_utils import cleanup, startup
-teardown = cleanup
-setup = startup
+
+pytest.fixture(autouse=True, scope="module")
+def setup_module():
+    startup()
+    yield
+    cleanup()
 
 TEST_CSV = '''
 Allele,Peptide,Experiment

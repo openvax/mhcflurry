@@ -10,6 +10,7 @@ from sklearn.metrics import roc_auc_score
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
 import pandas
+import pytest
 
 from mhcflurry.class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from mhcflurry.common import random_peptides
@@ -17,8 +18,12 @@ from mhcflurry.amino_acid import BLOSUM62_MATRIX
 from mhcflurry.flanking_encoding import FlankingEncoding
 
 from mhcflurry.testing_utils import cleanup, startup
-teardown = cleanup
-setup = startup
+
+@pytest.fixture(autouse=True, scope="module")
+def setup_module():
+    startup()
+    yield
+    cleanup()
 
 table = dict([
     (tuple(encoding), amino_acid)

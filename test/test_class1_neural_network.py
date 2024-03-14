@@ -4,6 +4,8 @@ initialize()
 import numpy
 from numpy import testing
 
+import pytest
+
 from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
 import pandas
@@ -13,11 +15,15 @@ from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
 from mhcflurry.testing_utils import cleanup, startup
-teardown = cleanup
-setup = startup
+
+@pytest.fixture(scope="module")
+def setup_module():
+    startup()
+    yield
+    cleanup()
 
 
-def test_class1_neural_network_a0205_training_accuracy():
+def test_class1_neural_network_a0205_training_accuracy(setup_module):
     # Memorize the dataset.
     hyperparameters = dict(
         activation="tanh",
@@ -72,7 +78,7 @@ def test_class1_neural_network_a0205_training_accuracy():
     eq_(predictor.network().to_json(), predictor2.network().to_json())
 
 
-def test_inequalities():
+def test_inequalities(setup_module):
     # Memorize the dataset.
     hyperparameters = dict(
         peptide_amino_acid_encoding="one-hot",

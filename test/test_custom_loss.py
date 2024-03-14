@@ -5,12 +5,16 @@ from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
 
 import numpy
 import tensorflow as tf
+import pytest
 from mhcflurry.custom_loss import CUSTOM_LOSSES, MultiallelicMassSpecLoss
 
 from mhcflurry.testing_utils import cleanup, startup
-teardown = cleanup
-setup = startup
 
+pytest.fixture(autouse=True, scope="module")
+def setup_module():
+    startup()
+    yield
+    cleanup()
 
 def evaluate_loss(loss, y_true, y_pred):
     y_true = tf.convert_to_tensor(y_true, dtype='float32', name='y_true')

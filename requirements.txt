@@ -1,6 +1,6 @@
 six
 pandas>=0.20.3
-tensorflow>=2.12.0
+tensorflow>=2.12.0,<2.16.0
 appdirs
 scikit-learn
 mhcgnomes
