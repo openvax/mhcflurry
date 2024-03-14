@@ -10,6 +10,7 @@ initialize()
 
 import os
 import pandas
+import pytest
 from sklearn.metrics import roc_auc_score
 from nose.tools import assert_greater
 
@@ -27,29 +28,23 @@ def data_path(name):
 
 
 DF = pandas.read_csv(data_path("hpv_predictions.csv"))
-PREDICTORS = None
 
 
-def setup():
-    global PREDICTORS
+# Define a fixture to initialize and clean up predictors
+@pytest.fixture(scope="module")
+def predictors():
     startup()
-    PREDICTORS = {
-        'allele-specific': Class1AffinityPredictor.load(
-            get_path("models_class1", "models")),
-        'pan-allele': Class1AffinityPredictor.load(
-            get_path("models_class1_pan", "models.combined"))
-}
-
-
-def teardown():
-    global PREDICTORS
-    PREDICTORS = None
+    predictors_dict = {
+        'allele-specific': Class1AffinityPredictor.load(get_path("models_class1", "models")),
+        'pan-allele': Class1AffinityPredictor.load(get_path("models_class1_pan", "models.combined")),
+    }
+    yield predictors_dict
     cleanup()
 
 
-def test_on_hpv(df=DF):
+def test_on_hpv(predictors, df=DF):
     scores_df = []
-    for (name, predictor) in PREDICTORS.items():
+    for (name, predictor) in predictors.items():
         print("Running", name)
         df[name] = predictor.predict(df.peptide, alleles=df.allele)
 
@@ -74,13 +69,3 @@ def test_on_hpv(df=DF):
     assert_greater(mean_scores["allele-specific"], mean_scores["netmhcpan4"])
     assert_greater(mean_scores["pan-allele"], mean_scores["netmhcpan4"])
     return scores_df
-
-
-if __name__ == '__main__':
-    # If run directly from python, leave the user in a shell to explore results.
-    setup()
-    result = test_on_hpv()
-
-    # Leave in ipython
-    import ipdb  # pylint: disable=import-error
-    ipdb.set_trace()

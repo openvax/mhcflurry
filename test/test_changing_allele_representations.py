@@ -2,14 +2,19 @@ from . import initialize
 initialize()
 
 import pandas
+import pytest
 
 from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 
 
 from mhcflurry.testing_utils import cleanup, startup
-teardown = cleanup
-setup = startup
+
+pytest.fixture(autouse=True, scope="module")
+def setup_module():
+    startup()
+    yield
+    cleanup()
 
 ALLELE_TO_SEQUENCE = pandas.read_csv(
     get_path(

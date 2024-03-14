@@ -6,6 +6,7 @@ initialize()
 
 from sklearn.metrics import roc_auc_score
 import pandas
+import pytest
 
 from numpy.testing import assert_, assert_equal
 
@@ -14,8 +15,12 @@ from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import cleanup, startup
-teardown = cleanup
-setup = startup
+
+pytest.fixture(autouse=True, scope="module")
+def setup_module():
+    startup()
+    yield
+    cleanup()
 
 
 HYPERPARAMETERS = {

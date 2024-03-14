@@ -3,19 +3,22 @@ initialize()
 
 import numpy
 import pandas
-from numpy import testing
-
+import pytest
 numpy.random.seed(0)
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import random_peptides
 
 from mhcflurry.testing_utils import cleanup, startup
-teardown = cleanup
-setup = startup
+
+@pytest.fixture(scope="module")
+def setup_module():
+    startup()
+    yield
+    cleanup()
 
 
-def test_multi_output():
+def test_multi_output(setup_module):
     hyperparameters = dict(
         loss="custom:mse_with_inequalities_and_multiple_outputs",
         activation="tanh",

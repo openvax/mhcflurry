@@ -5,16 +5,21 @@ import tempfile
 import os
 
 import pandas
+import pytest
 from numpy.testing import assert_equal, assert_array_less, assert_array_equal
 
 from mhcflurry import predict_scan_command
 
+from . import data_path
 
 from mhcflurry.testing_utils import cleanup, startup
-teardown = cleanup
-setup = startup
 
-from . import data_path
+pytest.fixture(autouse=True, scope="module")
+def setup_module():
+    startup()
+    yield
+    cleanup()
+
 
 
 def read_output_csv(filename):

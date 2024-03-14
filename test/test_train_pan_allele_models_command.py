@@ -11,6 +11,7 @@ import tempfile
 import subprocess
 
 import pandas
+import pytest
 
 from numpy.testing import assert_equal, assert_array_less
 
@@ -18,8 +19,12 @@ from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import cleanup, startup
-teardown = cleanup
-setup = startup
+
+pytest.fixture(autouse=True, scope="module")
+def setup_module():
+    startup()
+    yield
+    cleanup()
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
