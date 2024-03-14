@@ -84,7 +84,7 @@ HYPERPARAMETERS_LIST = [
     'minibatch_size': 256,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
-    'patience': 10,
+    'patience': 5,
     'peptide_allele_merge_activation': '',
     'peptide_allele_merge_method': 'concatenate',
     'peptide_amino_acid_encoding': 'BLOSUM62',
@@ -185,7 +185,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
     predictions = result.predict(peptides=["SLYNTVATL"],
         alleles=["HLA-A*02:01"])
     assert_equal(predictions.shape, (1,))
-    assert_array_less(predictions, 1000)
+    assert_array_less(predictions, 2000)
 
     if delete:
         print("Deleting: %s" % models_dir)

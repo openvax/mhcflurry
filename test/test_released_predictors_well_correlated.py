@@ -38,7 +38,8 @@ def test_correlation(
         alleles=None,
         num_peptides_per_length=1000,
         lengths=[8, 9, 10],
-        debug=False):
+        debug=False,
+        return_result=False):
     peptides = []
     for length in lengths:
         peptides.extend(random_peptides(num_peptides_per_length, length))
@@ -77,7 +78,8 @@ def test_correlation(
     print("Mean correlation", results_df.correlation.mean())
     assert_greater(results_df.correlation.mean(), 0.65)
 
-    return results_df
+    if return_result:
+        return results_df
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -91,7 +93,7 @@ if __name__ == '__main__':
     # If run directly from python, leave the user in a shell to explore results.
     startup()
     args = parser.parse_args(sys.argv[1:])
-    result = test_correlation(alleles=args.alleles, debug=True)
+    result = test_correlation(alleles=args.alleles, debug=True, return_result=True)
 
     # Leave in ipython
     import ipdb  # pylint: disable=import-error
