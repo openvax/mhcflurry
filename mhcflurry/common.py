@@ -95,7 +95,7 @@ def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
     """
     import tensorflow as tf
     
-    # mhcflurry models use keras 2. Tensorflow, now defaults to keras 3, so to load these
+    # mhcflurry models use keras 2. Tensorflow now defaults to keras 3, so to load these
     # old models, we need to set the environment variable to use legacy keras. Ideally,
     # these models such be regenerated with keras 3.
     os.environ["TF_USE_LEGACY_KERAS"] = "1"
