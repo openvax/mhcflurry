@@ -111,7 +111,7 @@ class Class1ProcessingNeuralNetwork(object):
         if self._network is None and self.network_json is not None:
             # NOTE
             # Instead of calling:
-            #   from tensorflow.keras.models import model_from_json
+            #   from tf_keras.models import model_from_json
             #   self._network = model_from_json(self.network_json)
             # We are re-creating the network here using the hyperparameters.
             # This is because the network uses Lambda layers, which break
@@ -399,8 +399,7 @@ class Class1ProcessingNeuralNetwork(object):
         # We import keras here to avoid tensorflow debug output, etc. unless we
         # are actually about to use Keras.
         configure_tensorflow()
-        from tensorflow import keras
-        from keras.layers import (
+        from tf_keras.layers import (
             Input,
             Dense,
             Dropout,
@@ -408,8 +407,8 @@ class Class1ProcessingNeuralNetwork(object):
             Conv1D,
             Lambda,
         )
-        from keras.models import Model
-        from keras import regularizers, initializers
+        from tf_keras.models import Model
+        from tf_keras import regularizers, initializers
 
         model_inputs = {}
 

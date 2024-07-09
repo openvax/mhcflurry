@@ -1,6 +1,7 @@
 six
 pandas>=0.20.3
-tensorflow>=2.12.0,<2.16.0
+tensorflow>=2.15.0,<2.17.0
+tf-keras
 appdirs
 scikit-learn
 mhcgnomes
