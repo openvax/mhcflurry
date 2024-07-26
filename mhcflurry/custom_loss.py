@@ -64,7 +64,7 @@ class Loss(object):
 
     def get_keras_loss(self, reduction="sum_over_batch_size"):
         configure_tensorflow()
-        from tensorflow.keras.losses import LossFunctionWrapper
+        from tf_keras.losses import LossFunctionWrapper
         return LossFunctionWrapper(
             self.loss, reduction=reduction, name=self.name)
 
@@ -169,7 +169,7 @@ class MSEWithInequalities(Loss):
         configure_tensorflow()
         import tensorflow as tf
 
-        # from tensorflow.keras import backend as K
+        # from tf_keras import backend as K
         y_true = tf.reshape(y_true, [-1])
         y_pred = tf.reshape(y_pred, [-1])
 

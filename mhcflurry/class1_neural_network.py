@@ -217,7 +217,7 @@ class Class1NeuralNetwork(object):
         if key not in klass.KERAS_MODELS_CACHE:
             # Cache miss.
             configure_tensorflow()
-            from tensorflow.keras.models import model_from_json
+            from tf_keras.models import model_from_json
 
             network = model_from_json(network_json)
             existing_weights = None
@@ -258,7 +258,7 @@ class Class1NeuralNetwork(object):
                 )
             else:
                 configure_tensorflow()
-                from tensorflow import keras
+                import tf_keras as keras
 
                 # Hack to fix an issue caused by a change introduced in
                 # tensorflow 2.3.0, in which our models fit using tensorflow 2.2
@@ -568,7 +568,7 @@ class Class1NeuralNetwork(object):
         progress_print_interval : float
         """
         configure_tensorflow()
-        from tensorflow.keras import backend as K
+        from tf_keras import backend as K
 
         fit_info = collections.defaultdict(list)
 
@@ -775,7 +775,7 @@ class Class1NeuralNetwork(object):
             disable.
         """
         configure_tensorflow()
-        from tensorflow.keras import backend as K
+        from tf_keras import backend as K
 
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
@@ -1192,9 +1192,9 @@ class Class1NeuralNetwork(object):
 
         """
         configure_tensorflow()
-        from tensorflow.keras import backend as K
-        from tensorflow.keras.layers import Input, average, add, concatenate
-        from tensorflow.keras.models import Model
+        from tf_keras import backend as K
+        from tf_keras.layers import Input, add, average, concatenate
+        from tf_keras.models import Model
 
         if len(models) == 1:
             return models[0]
@@ -1337,8 +1337,8 @@ class Class1NeuralNetwork(object):
         # We import keras here to avoid tensorflow debug output, etc. unless we
         # are actually about to use Keras.
         configure_tensorflow()
-        from tensorflow import keras
-        from tensorflow.keras.layers import (
+        import tf_keras as keras
+        from tf_keras.layers import (
             Input,
             Dense,
             Flatten,
@@ -1500,7 +1500,7 @@ class Class1NeuralNetwork(object):
                   m is the length of the vectors used to represent amino acids
         """
         configure_tensorflow()
-        from tensorflow.keras.models import clone_model
+        from tf_keras.models import clone_model
 
         reshaped = allele_representations.reshape(
             (

@@ -59,7 +59,7 @@ def svd_orthonormal(shape):
 
 def get_activations(model, layer, X_batch):
     configure_tensorflow()
-    from tensorflow.keras.models import Model
+    from tf_keras.models import Model
     intermediate_layer_model = Model(
         inputs=model.input,
         outputs=layer.get_output_at(0)
@@ -93,7 +93,7 @@ def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
         Same as what was passed in.
     """
     configure_tensorflow()
-    from tensorflow.keras.layers import Dense, Convolution2D
+    from tf_keras.layers import Dense, Convolution2D
     needed_variance = 1.0
     layers_inintialized = 0
     for layer in model.layers:

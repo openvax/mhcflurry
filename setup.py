@@ -41,7 +41,8 @@ if __name__ == "__main__":
         "mhcgnomes>=0.8.4",
         "pyyaml",
         "tqdm",
-        "tensorflow>=2.12.0,<2.16.0",
+        "tensorflow>=2.15.0,<2.17.0",
+        "tf-keras"
     ]
 
     setup(
