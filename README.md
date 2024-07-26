@@ -9,7 +9,7 @@ prediction package with competitive accuracy and a fast and
 
 MHCflurry implements class I peptide/MHC binding affinity prediction. 
 The current version provides pan-MHC I predictors supporting any MHC
-allele of known sequence. MHCflurry runs on Python 3.4+ using the
+allele of known sequence. MHCflurry runs on Python 3.9+ using the
 [tensorflow](https://www.tensorflow.org/) neural network library.
 It exposes [command-line](http://openvax.github.io/mhcflurry/commandline_tutorial.html)
 and [Python library](http://openvax.github.io/mhcflurry/python_tutorial.html)
