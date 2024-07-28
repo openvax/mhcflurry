@@ -60,7 +60,7 @@ jobs:
         run: |
           pytest --cov=mhcflurry/ --cov-report=term-missing ./test
 
-      - name: Publish coverage to Coveralls
-        uses: coverallsapp/github-action@v2.2.3
-        with:
-          parallel: true
+      # - name: Publish coverage to Coveralls
+      #  uses: coverallsapp/github-action@v2.2.3
+      #  with:
+      #    parallel: true
