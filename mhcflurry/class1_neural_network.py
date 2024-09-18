@@ -662,7 +662,6 @@ class Class1NeuralNetwork(object):
                 initial_epoch=epoch - 1,
                 epochs=epoch,
                 use_multiprocessing=False,
-                workers=0,
                 validation_data=(validation_x_dict, validation_y_dict),
                 verbose=verbose,
             )
