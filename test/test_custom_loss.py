@@ -1,8 +1,6 @@
 from . import initialize
 initialize()
 
-from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
-
 import numpy
 import tensorflow as tf
 import pytest

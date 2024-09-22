@@ -13,7 +13,6 @@ import pandas
 
 from mhcflurry import Class1AffinityPredictor
 
-from nose.tools import eq_, assert_raises
 from numpy import testing
 
 from mhcflurry.downloads import get_path
@@ -188,13 +187,13 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
     ic50_pred = predictor.predict(df.peptide.values, allele="HLA-A*02:01", throw=False)
     assert numpy.isnan(ic50_pred).all()
 
-    assert_raises(
+    testing.assert_raises(
         ValueError, predictor.predict, df.peptide.values, allele="HLA-A*02:01"
     )
 
     assert predictor.supported_alleles == [allele]
-    assert_raises(ValueError, predictor.predict, ["AAAAA"], allele=allele)  # too short
-    assert_raises(
+    testing.assert_raises(ValueError, predictor.predict, ["AAAAA"], allele=allele)  # too short
+    testing.assert_raises(
         ValueError,
         predictor.predict,
         ["AAAAAAAAAAAAAAAAAAAA"],  # too long

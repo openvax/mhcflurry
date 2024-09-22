@@ -11,7 +11,6 @@ import sys
 import argparse
 import pandas
 import numpy
-from nose.tools import assert_greater
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.encodable_sequences import EncodableSequences

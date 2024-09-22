@@ -6,8 +6,6 @@ from numpy import testing
 
 import pytest
 
-from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
-
 import pandas
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork

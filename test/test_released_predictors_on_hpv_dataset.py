@@ -12,7 +12,6 @@ import os
 import pandas
 import pytest
 from sklearn.metrics import roc_auc_score
-from nose.tools import assert_greater
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
