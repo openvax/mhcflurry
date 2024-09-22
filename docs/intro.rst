@@ -53,8 +53,8 @@ From a checkout you can run the unit tests with:
 
 .. code-block:: shell
 
-    $ pip install nose
-    $ nosetests .
+    $ pip install pytest
+    $ pytest
 
 
 Using conda
