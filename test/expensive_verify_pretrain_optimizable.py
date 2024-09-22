@@ -1,4 +1,4 @@
-# Expensive test - not run by nose.
+# Expensive test - not run by pytest.
 
 from mhcflurry import train_pan_allele_models_command
 from mhcflurry.downloads import get_path
