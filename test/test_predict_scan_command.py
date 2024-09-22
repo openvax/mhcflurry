@@ -48,11 +48,10 @@ def test_fasta():
         for delete in deletes:
             os.unlink(delete)
 
-    assert_equal(
-        result.best_allele.nunique(),
-        6,
-        err_msg=str(list(result.best_allele.unique())))
-    assert_equal(result.sequence_name.nunique(), 3)
+    assert (
+        result.best_allele.nunique() ==
+        6), err_msg=str(list(result.best_allele.unique()))
+    assert result.sequence_name.nunique() == 3
     assert_array_less(result.affinity_percentile, 2.0)
 
 
@@ -129,8 +128,8 @@ def test_commandline_sequences():
 
     print(result)
 
-    assert_equal(result.sequence_name.nunique(), 2)
-    assert_equal(result.best_allele.nunique(), 3)
-    assert_equal(result.sample_name.nunique(), 2)
-    assert_equal((result.peptide == "ASDFGHKL").sum(), 2)
-    assert_equal((result.peptide != "ASDFGHKL").sum(), 10)
+    assert result.sequence_name.nunique() == 2
+    assert result.best_allele.nunique() == 3
+    assert result.sample_name.nunique() == 2
+    assert (result.peptide == "ASDFGHKL").sum() == 2
+    assert (result.peptide != "ASDFGHKL").sum() == 10

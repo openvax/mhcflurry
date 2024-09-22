@@ -66,5 +66,5 @@ def test_on_hpv(predictors, df=DF):
     print(scores_df)
 
     mean_scores = scores_df.mean()
-    assert_greater(mean_scores["allele-specific"], mean_scores["netmhcpan4"])
-    assert_greater(mean_scores["pan-allele"], mean_scores["netmhcpan4"])
+    assert mean_scores["allele-specific"] > mean_scores["netmhcpan4"]
+    assert mean_scores["pan-allele"] > mean_scores["netmhcpan4"]

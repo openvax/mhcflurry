@@ -110,7 +110,7 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
 
     full_predictor = Class1ProcessingPredictor.load(models_dir)
     print("Loaded models", len(full_predictor.models))
-    assert_equal(len(full_predictor.models), 4)
+    assert len(full_predictor.models) == 4
 
     test_df["full_predictor"] = full_predictor.predict(
         test_df.peptide.values,
@@ -137,7 +137,7 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
     subprocess.check_call(args)
 
     selected_predictor = Class1ProcessingPredictor.load(models_dir_selected)
-    assert_equal(len(selected_predictor.models), 2)
+    assert len(selected_predictor.models) == 2
 
     test_df["selected_predictor"] = selected_predictor.predict(
         test_df.peptide.values,

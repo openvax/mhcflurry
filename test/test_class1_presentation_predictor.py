@@ -108,8 +108,8 @@ def test_basic(predictors):
 
     print("AUC", score1, score2)
 
-    assert_greater(score1, 0.8)
-    assert_greater(score2, 0.8)
+    assert score1 > 0.8
+    assert score2 > 0.8
 
     score1 = roc_auc_score(
         test_df.hit.values, -test_df.prediction1_percentile.values)
@@ -117,8 +117,8 @@ def test_basic(predictors):
         test_df.hit.values, -test_df.prediction2_percentile.values)
     print("AUC (using percentiles)", score1, score2)
 
-    assert_greater(score1, 0.8)
-    assert_greater(score2, 0.8)
+    assert score1 > 0.8
+    assert score2 > 0.8
 
     # Test saving, loading, pickling
     models_dir = tempfile.mkdtemp("_models")
@@ -161,7 +161,7 @@ def test_downloaded_predictor_small(predictors):
         peptide_lengths=[9],
         result="best")
     print(scan_results)
-    assert_equal(len(scan_results), 6)
+    assert len(scan_results) == 6
 
     scan_results = presentation_predictor.predict_sequences(
         sequences=[
@@ -176,7 +176,7 @@ def test_downloaded_predictor_small(predictors):
         peptide_lengths=[8, 9],
         result="best")
     print(scan_results)
-    assert_equal(len(scan_results), 6)
+    assert len(scan_results) == 6
 
     scan_results = presentation_predictor.predict_sequences(
         sequences=[
@@ -191,7 +191,7 @@ def test_downloaded_predictor_small(predictors):
         peptide_lengths=[9],
         result="all")
     print(scan_results)
-    assert_equal(len(scan_results), 6)
+    assert len(scan_results) == 6
 
     scan_results = presentation_predictor.predict_sequences(
         sequences=[
@@ -206,7 +206,7 @@ def test_downloaded_predictor_small(predictors):
         peptide_lengths=[8, 9],
         result="all")
     print(scan_results)
-    assert_equal(len(scan_results), 18)
+    assert len(scan_results) == 18
 
     scan_results = presentation_predictor.predict_sequences(
         sequences=[
@@ -221,7 +221,7 @@ def test_downloaded_predictor_small(predictors):
         peptide_lengths=[10],
         result="all")
     print(scan_results)
-    assert_equal(len(scan_results), 0)
+    assert len(scan_results) == 0
 
 
 def test_downloaded_predictor(predictors):
@@ -244,7 +244,7 @@ def test_downloaded_predictor(predictors):
         ])
     print(scan_results1)
 
-    assert_equal(len(scan_results1), 3), str(scan_results1)
+    assert len(scan_results1) == 3, str(scan_results1)
     assert (scan_results1.affinity < 200).all(), str(scan_results1)
     assert (scan_results1.presentation_score > 0.7).all(), str(scan_results1)
 
@@ -311,7 +311,7 @@ def test_downloaded_predictor(predictors):
     print(scan_results4)
 
     assert len(scan_results4) > 200, len(scan_results4)
-    assert_less(scan_results4.iloc[0].affinity, 100)
+    assert scan_results4.iloc[0].affinity < 100
 
     sequences = {
         "seq1":
@@ -345,7 +345,7 @@ def test_downloaded_predictor(predictors):
             ],
         })
     print(scan_results5)
-    assert_equal(len(scan_results5), len(scan_results4) * 2)
+    assert len(scan_results5) == len(scan_results4) * 2
 
     # Test case-insensitive.
     scan_results6 = presentation_predictor.predict_sequences(

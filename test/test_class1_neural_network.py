@@ -53,7 +53,7 @@ def test_class1_neural_network_a0205_training_accuracy(setup_module):
     predictor.fit(df.peptide.values, df.measurement_value.values)
     ic50_pred = predictor.predict(df.peptide.values)
     ic50_true = df.measurement_value.values
-    eq_(len(ic50_pred), len(ic50_true))
+    assert len(ic50_pred) == len(ic50_true)
     testing.assert_allclose(
         numpy.log(ic50_pred), numpy.log(ic50_true), rtol=0.2, atol=0.2
     )
@@ -75,7 +75,7 @@ def test_class1_neural_network_a0205_training_accuracy(setup_module):
     )
     predictor2 = Class1NeuralNetwork(**hyperparameters2)
     predictor2.fit(df.peptide.values, df.measurement_value.values, verbose=0)
-    eq_(predictor.network().to_json(), predictor2.network().to_json())
+    assert predictor.network().to_json() == predictor2.network().to_json()
 
 
 def test_inequalities(setup_module):
@@ -146,8 +146,8 @@ def test_inequalities(setup_module):
 
     # Binders should be stronger
     for pred in ["prediction1", "prediction2"]:
-        assert_less(df.loc[df.value < 1000, pred].mean(), 500)
-        assert_greater(df.loc[df.value >= 1000, pred].mean(), 500)
+        assert df.loc[df.value < 1000, pred].mean() < 500
+        assert df.loc[df.value >= 1000, pred].mean() > 500
 
     # For the binders, the (=) on the weak-binding measurement (100) in
     # inequality1 should make the prediction weaker, whereas for inequality2

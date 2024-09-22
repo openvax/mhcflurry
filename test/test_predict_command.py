@@ -50,7 +50,7 @@ def test_csv():
         for delete in deletes:
             os.unlink(delete)
 
-    assert_equal(result.shape, (3, 8))
+    assert result.shape == (3, 8)
 
 
 def test_no_csv():
@@ -75,7 +75,7 @@ def test_no_csv():
             os.unlink(delete)
 
     print(result)
-    assert_equal(len(result), 6)
+    assert len(result) == 6
     sub_result1 = result.loc[result.peptide == "SIINFEKL"].set_index("allele")
     print(sub_result1)
     assert (

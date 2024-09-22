@@ -233,8 +233,8 @@ def train_basic_network(num, do_assertions=True, is_hit=None, **hyperparameters)
     print("Test auc", test_auc)
 
     if do_assertions:
-        assert_greater(train_auc, 0.9)
-        assert_greater(test_auc, 0.85)
+        assert train_auc > 0.9
+        assert test_auc > 0.85
 
     return network
 

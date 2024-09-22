@@ -181,10 +181,10 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
 
     result = Class1AffinityPredictor.load(
         models_dir_selected, optimization_level=0)
-    assert_equal(len(result.neural_networks), 2)
+    assert len(result.neural_networks) == 2
     predictions = result.predict(peptides=["SLYNTVATL"],
         alleles=["HLA-A*02:01"])
-    assert_equal(predictions.shape, (1,))
+    assert predictions.shape == (1,)
     assert_array_less(predictions, 2000)
 
     if delete:

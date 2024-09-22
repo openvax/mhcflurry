@@ -18,12 +18,12 @@ def test_allele_encoding_speed():
     )
     start = time.time()
     encoding1 = encoding.fixed_length_vector_encoded_sequences("BLOSUM62")
-    assert_equal(
+    assert (
         [
             [BLOSUM62_MATRIX["A"], BLOSUM62_MATRIX["C"]],
             [BLOSUM62_MATRIX["A"], BLOSUM62_MATRIX["E"]],
             [BLOSUM62_MATRIX["A"], BLOSUM62_MATRIX["C"]],
-        ], encoding1)
+        ] == encoding1)
     print("Simple encoding in %0.2f sec." % (time.time() - start))
     print(encoding1)
 

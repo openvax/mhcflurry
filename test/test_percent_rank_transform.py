@@ -22,6 +22,6 @@ def test_percent_rank_transform():
         [0.0, 0.0, 5.0, 10.0, 100.0],
         err_msg=str(model.__dict__))
 
-    assert_equal(model.cdf, model2.cdf)
-    assert_equal(model.bin_edges, model2.bin_edges)
+    assert model.cdf == model2.cdf
+    assert model.bin_edges == model2.bin_edges
 
