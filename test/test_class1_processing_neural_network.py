@@ -7,8 +7,6 @@ numpy.random.seed(0)
 
 from sklearn.metrics import roc_auc_score
 
-from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
-
 import pandas
 import pytest
 
