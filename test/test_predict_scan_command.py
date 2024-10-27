@@ -50,7 +50,7 @@ def test_fasta():
 
     assert (
         result.best_allele.nunique() ==
-        6), err_msg=str(list(result.best_allele.unique()))
+        6), str(list(result.best_allele.unique()))
     assert result.sequence_name.nunique() == 3
     assert_array_less(result.affinity_percentile, 2.0)
 
