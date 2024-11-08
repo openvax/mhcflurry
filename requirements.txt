@@ -1,6 +1,6 @@
 six
 pandas>=0.20.3
-tensorflow>=2.15.0
+tensorflow>=2.15.0,<2.18.0
 tf-keras
 appdirs
 scikit-learn
