@@ -14,7 +14,7 @@ def test_all_combinations_of_hyperparameters():
         Class1NeuralNetwork
         .hyperparameter_defaults
         .models_grid(**combinations_dict))
-    assert_equal(len(results), 4)
+    assert len(results) == 4
 
 if __name__ == "__main__":
     test_all_combinations_of_hyperparameters()

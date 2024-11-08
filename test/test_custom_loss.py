@@ -1,8 +1,6 @@
 from . import initialize
 initialize()
 
-from nose.tools import eq_, assert_less, assert_greater, assert_almost_equal
-
 import numpy
 import tensorflow as tf
 import pytest
@@ -40,39 +38,39 @@ def test_mse_with_inequalities(loss_obj=CUSTOM_LOSSES['mse_with_inequalities']):
     print(adjusted_y)
     loss0 = evaluate_loss(loss_obj.loss, adjusted_y, y_values)
     print(loss0)
-    eq_(loss0, 0.0)
+    assert loss0 == 0.0
 
     adjusted_y = loss_obj.encode_y(y_values, [">", ">", ">", ">"])
     loss0 = evaluate_loss(loss_obj.loss, adjusted_y, y_values)
-    eq_(loss0, 0.0)
+    assert loss0 == 0.0
 
     adjusted_y = loss_obj.encode_y(y_values, ["<", "<", "<", "<"])
     loss0 = evaluate_loss(loss_obj.loss, adjusted_y, y_values)
-    eq_(loss0, 0.0)
+    assert loss0 == 0.0
 
     adjusted_y = loss_obj.encode_y(y_values, ["=", "<", "=", ">"])
     loss0 = evaluate_loss(loss_obj.loss, adjusted_y, y_values)
-    eq_(loss0, 0.0)
+    assert loss0 == 0.0
 
     adjusted_y = loss_obj.encode_y(y_values, ["=", "<", "=", ">"])
     loss0 = evaluate_loss(loss_obj.loss, adjusted_y, [0.0, 0.4, 0.8, 1.0])
-    eq_(loss0, 0.0)
+    assert loss0 == 0.0
 
     adjusted_y = loss_obj.encode_y(y_values, [">", "<", ">", ">"])
     loss0 = evaluate_loss(loss_obj.loss, adjusted_y, [0.1, 0.4, 0.9, 1.0])
-    eq_(loss0, 0.0)
+    assert loss0 == 0.0
 
     adjusted_y = loss_obj.encode_y(y_values, [">", "<", ">", ">"])
     loss0 = evaluate_loss(loss_obj.loss, adjusted_y, [0.1, 0.6, 0.9, 1.0])
-    assert_greater(loss0, 0.0)
+    assert loss0 > 0.0
 
     adjusted_y = loss_obj.encode_y(y_values, ["=", "<", ">", ">"])
     loss0 = evaluate_loss(loss_obj.loss, adjusted_y, [0.1, 0.6, 0.9, 1.0])
-    assert_almost_equal(loss0, 0.02 / 4)
+    assert loss0 == pytest.approx(0.02 / 4, abs=1e-7)
 
     adjusted_y = loss_obj.encode_y(y_values, ["=", "<", "=", ">"])
     loss0 = evaluate_loss(loss_obj.loss, adjusted_y, [0.1, 0.6, 0.9, 1.0])
-    assert_almost_equal(loss0, 0.03 / 4)
+    assert loss0 == pytest.approx(0.03 / 4, abs=1e-7)
 
 
 def test_mse_with_inequalities_and_multiple_outputs():
@@ -91,7 +89,7 @@ def test_mse_with_inequalities_and_multiple_outputs():
             [3000, 0.8],
             [4000, 1.0],
         ])
-    assert_almost_equal(loss0, 0.0)
+    assert loss0 == pytest.approx(0.0, abs=1e-7)
 
     y_values = [0.0, 0.5, 0.8, 1.0]
     adjusted_y = loss_obj.encode_y(
@@ -105,7 +103,7 @@ def test_mse_with_inequalities_and_multiple_outputs():
             [3000, 0.8],
             [1.0, 4000],
         ])
-    assert_almost_equal(loss0, 0.02 / 4)
+    assert loss0 == pytest.approx(0.02 / 4, abs=1e-7)
 
     y_values = [0.0, 0.5, 0.8, 1.0]
     adjusted_y = loss_obj.encode_y(
@@ -119,7 +117,7 @@ def test_mse_with_inequalities_and_multiple_outputs():
             [3000, 0.8],
             [1.0, 4000],
         ])
-    assert_almost_equal(loss0, 0.01 / 4)
+    assert loss0 == pytest.approx(0.01 / 4, abs=1e-7)
 
     y_values = [0.0, 0.5, 0.8, 1.0]
     adjusted_y = loss_obj.encode_y(
@@ -133,7 +131,7 @@ def test_mse_with_inequalities_and_multiple_outputs():
             [3000, 0.8],
             [1.0, 4000],
         ])
-    assert_almost_equal(loss0, 0.02 / 4)
+    assert loss0 == pytest.approx(0.02 / 4, abs=1e-7)
 
 
 def test_multiallelic_mass_spec_loss():

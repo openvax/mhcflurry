@@ -13,7 +13,6 @@ import pandas
 
 from mhcflurry import Class1AffinityPredictor
 
-from nose.tools import eq_, assert_raises
 from numpy import testing
 
 from mhcflurry.downloads import get_path
@@ -167,7 +166,7 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
     predictor.calibrate_percentile_ranks(num_peptides_per_length=1000)
     ic50_pred = predictor.predict(df.peptide.values, allele=allele)
     ic50_true = df.measurement_value.values
-    eq_(len(ic50_pred), len(ic50_true))
+    assert len(ic50_pred) == len(ic50_true)
     testing.assert_allclose(
         numpy.log(ic50_pred), numpy.log(ic50_true), rtol=0.2, atol=0.2
     )
@@ -184,17 +183,17 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
 
     # Test an unknown allele
     print("Starting unknown allele check")
-    eq_(predictor.supported_alleles, [allele])
+    assert predictor.supported_alleles == [allele]
     ic50_pred = predictor.predict(df.peptide.values, allele="HLA-A*02:01", throw=False)
     assert numpy.isnan(ic50_pred).all()
 
-    assert_raises(
+    testing.assert_raises(
         ValueError, predictor.predict, df.peptide.values, allele="HLA-A*02:01"
     )
 
-    eq_(predictor.supported_alleles, [allele])
-    assert_raises(ValueError, predictor.predict, ["AAAAA"], allele=allele)  # too short
-    assert_raises(
+    assert predictor.supported_alleles == [allele]
+    testing.assert_raises(ValueError, predictor.predict, ["AAAAA"], allele=allele)  # too short
+    testing.assert_raises(
         ValueError,
         predictor.predict,
         ["AAAAAAAAAAAAAAAAAAAA"],  # too long

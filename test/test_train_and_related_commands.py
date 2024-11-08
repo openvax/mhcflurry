@@ -95,7 +95,7 @@ def run_and_check(n_jobs=0):
     predictions = result.predict(
         peptides=["SLYNTVATL"],
         alleles=["HLA-A*02:01"])
-    assert_equal(predictions.shape, (1,))
+    assert predictions.shape == (1,)
     assert_array_less(predictions, 1000)
     df = result.predict_to_dataframe(
             peptides=["SLYNTVATL"],
@@ -136,7 +136,7 @@ def run_and_check_with_model_selection(n_jobs=1):
     subprocess.check_call(args)
 
     result = Class1AffinityPredictor.load(models_dir1)
-    assert_equal(len(result.neural_networks), 4)
+    assert len(result.neural_networks) == 4
 
     models_dir2 = tempfile.mkdtemp(prefix="mhcflurry-test-models")
     args = [
@@ -155,16 +155,16 @@ def run_and_check_with_model_selection(n_jobs=1):
     subprocess.check_call(args)
 
     result = Class1AffinityPredictor.load(models_dir2)
-    assert_equal(len(result.neural_networks), 2)
-    assert_equal(
-        len(result.allele_to_allele_specific_models["HLA-A*02:01"]), 1)
-    assert_equal(
-        len(result.allele_to_allele_specific_models["HLA-A*03:01"]), 1)
-    assert_equal(
-        result.allele_to_allele_specific_models["HLA-A*02:01"][0].hyperparameters["max_epochs"], 500)
-    assert_equal(
+    assert len(result.neural_networks) == 2
+    assert (
+        len(result.allele_to_allele_specific_models["HLA-A*02:01"]) == 1)
+    assert (
+        len(result.allele_to_allele_specific_models["HLA-A*03:01"]) == 1)
+    assert (
+        result.allele_to_allele_specific_models["HLA-A*02:01"][0].hyperparameters["max_epochs"] == 500)
+    assert (
         result.allele_to_allele_specific_models["HLA-A*03:01"][
-            0].hyperparameters["max_epochs"], 500)
+            0].hyperparameters["max_epochs"] == 500)
 
     print("Deleting: %s" % models_dir1)
     print("Deleting: %s" % models_dir2)
