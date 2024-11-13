@@ -15,7 +15,7 @@ def test_robust_mean():
     ])
 
     results = ensemble_centrality.robust_mean(arr1)
-    assert results == [3, 3]
+    assert_equal(results, [3, 3])
 
     # Should ignore nans.
     arr2 = numpy.array([
@@ -25,7 +25,7 @@ def test_robust_mean():
     ])
 
     results = ensemble_centrality.CENTRALITY_MEASURES["robust_mean"](arr2)
-    assert results == [3, 2, numpy.nan]
+    assert_equal(results, [3, 2, numpy.nan])
 
     results = ensemble_centrality.CENTRALITY_MEASURES["mean"](arr2)
-    assert results == [3, 2, numpy.nan]
+    assert_equal(results, [3, 2, numpy.nan])
