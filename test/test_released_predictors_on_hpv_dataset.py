@@ -12,7 +12,6 @@ import os
 import pandas
 import pytest
 from sklearn.metrics import roc_auc_score
-from nose.tools import assert_greater
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
@@ -66,5 +65,5 @@ def test_on_hpv(predictors, df=DF):
     print(scores_df)
 
     mean_scores = scores_df.mean()
-    assert_greater(mean_scores["allele-specific"], mean_scores["netmhcpan4"])
-    assert_greater(mean_scores["pan-allele"], mean_scores["netmhcpan4"])
+    assert mean_scores["allele-specific"] > mean_scores["netmhcpan4"]
+    assert mean_scores["pan-allele"] > mean_scores["netmhcpan4"]

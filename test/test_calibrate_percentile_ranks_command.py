@@ -41,7 +41,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
     print("Saved predictor to", dest_models_dir)
 
     new_predictor = Class1AffinityPredictor.load(dest_models_dir)
-    assert_equal(len(new_predictor.allele_to_percent_rank_transform), 0)
+    assert len(new_predictor.allele_to_percent_rank_transform) == 0
 
     args = [
         "mhcflurry-calibrate-percentile-ranks",
@@ -58,7 +58,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
     subprocess.check_call(args)
 
     new_predictor = Class1AffinityPredictor.load(dest_models_dir)
-    assert_equal(len(new_predictor.allele_to_percent_rank_transform), 2)
+    assert len(new_predictor.allele_to_percent_rank_transform) == 2
 
     if delete:
         print("Deleting: %s" % dest_models_dir)

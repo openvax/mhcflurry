@@ -11,7 +11,6 @@ import sys
 import argparse
 import pandas
 import numpy
-from nose.tools import assert_greater
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.encodable_sequences import EncodableSequences
@@ -76,7 +75,7 @@ def test_correlation(
     print(results_df)
 
     print("Mean correlation", results_df.correlation.mean())
-    assert_greater(results_df.correlation.mean(), 0.65)
+    assert results_df.correlation.mean() > 0.65
 
     if return_result:
         return results_df
