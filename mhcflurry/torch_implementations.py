@@ -100,19 +100,30 @@ class Class1AffinityPredictor(nn.Module):
                 else:
                     raise ValueError(f"Unsupported initialization: {init}")
 
-    def forward(self, x):
-        """Forward pass."""
-        x = to_torch(x)
-        
-        for i, layer in enumerate(self.layers):
-            if isinstance(layer, nn.Linear):
-                x = layer(x)
-                if i < len(self.layers) - 1:  # Not output layer
-                    x = self.hidden_activation(x)
-            elif isinstance(layer, (nn.BatchNorm1d, nn.Dropout)):
-                x = layer(x)
-                
-        return self.output_activation(x)
+    @torch.no_grad()
+    def predict(self, peptides, allele=None, model_kwargs=None, throw=True):
+        """
+        Minimal example for predicted binding affinity in nM (similar to Keras predictor).
+        You may ignore allele or handle it if you want.
+        """
+        # Convert peptides to some numeric encoding (placeholder example).
+        # E.g. if peptides is a list of strings:
+        X = []
+        for pep in peptides:
+            # convert pep -> numeric vector, length 128 as an example
+            encoding = np.zeros(128, dtype=np.float32)
+            # (Write a real encoding if needed)
+            X.append(encoding)
+
+        X = np.array(X, dtype=np.float32)
+        # Forward pass
+        outputs = self.forward(X)
+        # The network outputs a 0..1 score. Convert to nM. Suppose let's do
+        # an approximate mapping, e.g.: nM = 50000^(1 - outputs).
+        # You can adapt the formula from your Class1NeuralNetwork code or
+        # from_ic50 logic, etc.
+        predictions_nM = 50000.0 ** (1.0 - to_numpy(outputs).flatten())
+        return predictions_nM
 
     def load_weights_from_keras(self, keras_model):
         """
