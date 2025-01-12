@@ -37,8 +37,7 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
             
         if name not in self._torch_models:
             model = nn.Sequential(
-                nn.Linear(len(self.model_inputs), 1),
-                nn.Sigmoid()
+                nn.Linear(len(self.model_inputs), 1)
             )
             row = self.weights_dataframe.loc[name]
             
@@ -79,7 +78,8 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
                 # Get predictions
                 with torch.no_grad():
                     model.eval()
-                    probs = model(inputs)  # Model now includes sigmoid in Sequential
+                    logits = model[0](inputs)  # Get raw logits from first layer
+                    probs = torch.sigmoid(logits)  # Apply sigmoid manually
                     df["presentation_score"] = probs.squeeze().cpu().numpy()
                 
                 if null_mask is not None:
