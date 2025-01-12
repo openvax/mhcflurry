@@ -286,12 +286,29 @@ class TorchNeuralNetwork(nn.Module):
         return x
 
     def predict(self, peptides, batch_size=32):
+        """
+        Predict output for a list of peptides or an EncodableSequences object.
+
+        Parameters
+        ----------
+        peptides : list of str or EncodableSequences
+            Peptides to predict
+        batch_size : int
+            Number of items per batch
+
+        Returns
+        -------
+        numpy.ndarray
+            Predictions as a 1D or 2D array depending on self.hyperparameters["num_outputs"]
+        """
         from .encodable_sequences import EncodableSequences
         from .common import to_numpy
 
-        print("[DEBUG] TorchNeuralNetwork.predict called with", len(peptides), "peptides")
+        # Convert list of peptides to EncodableSequences if necessary
         if not isinstance(peptides, EncodableSequences):
             peptides = EncodableSequences.create(peptides)
+
+        # Encode peptides as a 2D array [N x encoded_length]
         encoded = peptides.variable_length_to_fixed_length_vector_encoding(
             "BLOSUM62",
             alignment_method="pad_middle",
@@ -299,37 +316,19 @@ class TorchNeuralNetwork(nn.Module):
         )
         encoded = encoded.reshape(encoded.shape[0], -1)
 
+        # Run the network in evaluation mode, possibly in batches
         self.eval()
+        outputs_list = []
         with torch.no_grad():
-            outputs = self(to_torch(encoded))
-        return to_numpy(outputs)
-        """
-        Load weights from a Keras model into this PyTorch model.
-        
-        Parameters
-        ----------
-        keras_model : keras.Model
-            Keras model with matching architecture
-        """
-        from tf_keras.layers import Dense, BatchNormalization
-        keras_layers = [l for l in keras_model.layers if isinstance(l, (Dense, BatchNormalization))]
-        torch_layers = []
-        torch_layers.extend([l for l in self.peptide_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
-        torch_layers.extend([l for l in self.dense_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
-        if hasattr(self, 'output_layer'):
-            torch_layers.append(self.output_layer)
+            for start in range(0, len(encoded), batch_size):
+                batch = encoded[start : start + batch_size]
+                batch_tensor = to_torch(batch).to(self.device)
+                batch_output = self(batch_tensor)
+                outputs_list.append(batch_output.cpu())
 
-        print("[DEBUG] Checking that layer list lengths match...")
-        if len(keras_layers) != len(torch_layers):
-            print("[DEBUG] Keras layers:")
-            for idx, k_layer in enumerate(keras_layers):
-                print(f"  {idx}: {k_layer.name} -> weights: {[w.shape for w in k_layer.get_weights()]}")
-            print("[DEBUG] Torch layers:")
-            for idx, t_layer in enumerate(torch_layers):
-                shape_msg = (f"weight: {list(t_layer.weight.shape)}" 
-                             if hasattr(t_layer, 'weight') else "no weight")
-                print(f"  {idx}: {t_layer} -> {shape_msg}")
-            raise AssertionError("Model architectures do not match")
+        # Concatenate all batches and return as numpy
+        final_outputs = torch.cat(outputs_list, dim=0)
+        return to_numpy(final_outputs)
 
 class Class1AffinityPredictor(object):
     """
