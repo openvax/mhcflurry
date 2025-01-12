@@ -5,6 +5,7 @@ import logging
 from mhcflurry.predict_command import run as predict_run
 from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
 from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
+from mhcflurry.downloads import get_default_class1_models_dir
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,10 +16,14 @@ def compare_layer_outputs():
         alleles = ["HLA-A0201", "HLA-A0301"]
         peptides = ["SIINFEKL", "SIINFEKD", "SIINFEKQ"]
 
+        # Get the default models directory
+        models_dir = get_default_class1_models_dir()
+        logging.info(f"Using models directory: {models_dir}")
+
         logging.info("Loading predictors...")
-        # Load both predictors
-        tf_predictor = Class1AffinityPredictor.load()
-        torch_predictor = TorchPredictor.load()
+        # Load both predictors with the models directory
+        tf_predictor = Class1AffinityPredictor.load(models_dir)
+        torch_predictor = TorchPredictor.load(models_dir)
         logging.info("Predictors loaded successfully")
 
     # Add hooks to capture intermediate outputs in PyTorch
