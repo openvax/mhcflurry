@@ -242,15 +242,20 @@ class TorchNeuralNetwork(nn.Module):
             layer = layer.to(self.device)
             x = x.to(self.device)
             if isinstance(layer, nn.Linear):
+                x = x.to(self.device, dtype=torch.float32)  # Ensure float32
                 x_pre = x
                 x = layer(x)  # Linear transformation
                 print(f"PyTorch After Linear {i}:", x.mean().item(), x.std().item())
                 x = self.hidden_activation(x)  # Activation immediately after linear
                 print(f"PyTorch After Activation {i}:", x.mean().item(), x.std().item())
             elif isinstance(layer, nn.BatchNorm1d):
+                x = x.to(self.device, dtype=torch.float32)  # Ensure float32
                 x_pre = x
+                print(f"Before BN {i}:", x.mean().item(), x.std().item())
+                print(f"BN {i} running_mean:", layer.running_mean.mean().item())
+                print(f"BN {i} running_var:", layer.running_var.mean().item())
                 x = layer(x)  # Then batch norm
-                print(f"PyTorch After BN {i}:", x.mean().item(), x.std().item())
+                print(f"After BN {i}:", x.mean().item(), x.std().item())
         
         # Output layer with sigmoid activation
         self.output_layer = self.output_layer.to(self.device)
@@ -663,8 +668,9 @@ class Class1AffinityPredictor(object):
                         
                     # Configure batch norm settings to exactly match Keras
                     t_layer.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum (0.99)
-                    t_layer.eps = 0.001  # Match Keras epsilon
+                    t_layer.eps = 1e-3  # Keras default
                     t_layer.track_running_stats = True
+                    t_layer.affine = True  # Enable learnable affine parameters
                     t_layer.training = False  # Ensure eval mode
                     t_layer.eval()  # Double ensure eval mode
 
