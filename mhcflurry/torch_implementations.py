@@ -35,6 +35,9 @@ class Class1AffinityPredictor(nn.Module):
             num_outputs=1):
         super().__init__()
         
+        # Initialize device
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
         self.input_size = input_size
         self.dropout_prob = dropout_probability
         self.use_batch_norm = batch_normalization
@@ -90,6 +93,7 @@ class Class1AffinityPredictor(nn.Module):
             peptide_dense_layer_sizes=[],
             layer_sizes=[],
         )
+        instance = instance.to(instance.device)  # Move model to appropriate device
         return instance
     def init_weights(self, init):
         for layer in self.layers:
