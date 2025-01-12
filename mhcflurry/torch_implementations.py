@@ -24,9 +24,9 @@ class Class1AffinityPredictor(nn.Module):
     """
     def __init__(
             self,
-            input_size=315,
             peptide_dense_layer_sizes,
             layer_sizes,
+            input_size=315,
             dropout_probability=0.0,
             batch_normalization=False,
             activation="tanh",
