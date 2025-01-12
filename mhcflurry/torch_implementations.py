@@ -100,12 +100,31 @@ class Class1AffinityPredictor(nn.Module):
                 else:
                     raise ValueError(f"Unsupported initialization: {init}")
 
-    @torch.no_grad()
+    def forward(self, x):
+        """
+        Run a forward pass on input x (shape: (batch_size, input_size)).
+        Applies hidden_activation on each Linear layer (except the last),
+        and applies self.output_activation at the end.
+        """
+        # Pass through all but final Linear
+        for layer in self.layers[:-1]:
+            x = layer(x)
+            if isinstance(layer, nn.Linear):
+                x = self.hidden_activation(x)
+
+        # Final layer
+        x = self.layers[-1](x)
+        x = self.output_activation(x)
+        return x
     def predict(self, peptides, allele=None, model_kwargs=None, throw=True):
         """
         Minimal example for predicted binding affinity in nM (similar to Keras predictor).
         You may ignore allele or handle it if you want.
         """
+        # If EncodableSequences, extract raw strings
+        if hasattr(peptides, "sequences"):
+            peptides = peptides.sequences
+
         # Convert peptides to some numeric encoding (placeholder example).
         # E.g. if peptides is a list of strings:
         X = []
