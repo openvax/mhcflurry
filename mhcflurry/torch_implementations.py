@@ -234,24 +234,25 @@ class TorchNeuralNetwork(nn.Module):
         torch.Tensor
             Output predictions
         """
-        # Ensure input is on correct device
         x = x.to(self.device)
 
-        # Process dense layers with correct activation order
+        # Process dense layers with Keras-matching activation order
         for layer in self.dense_layers:
             layer = layer.to(self.device)
-            x = x.to(self.device)  # Ensure intermediate tensors stay on device
+            x = x.to(self.device)
             if isinstance(layer, nn.Linear):
-                x = layer(x)
-                x = self.hidden_activation(x)
-            else:  # BatchNorm
-                x = layer(x)
+                x = layer(x)  # Just linear transformation
+            elif isinstance(layer, nn.BatchNorm1d):
+                x = self.hidden_activation(x)  # Activation before batch norm
+                x = layer(x)  # Then batch norm
+        
+        # Final activation for last dense layer before output
+        x = self.hidden_activation(x)
 
         # Output layer with sigmoid activation
-        self.output_layer = self.output_layer.to(self.device)  # Ensure output layer is on device
-        x = x.to(self.device)  # Ensure final tensor is on device
+        self.output_layer = self.output_layer.to(self.device)
         x = self.output_layer(x)
-        x = self.output_activation(x)  # This ensures final sigmoid is applied
+        x = self.output_activation(x)
 
         return x
 
@@ -655,13 +656,12 @@ class Class1AffinityPredictor(object):
                     t_layer.running_mean.data = torch.from_numpy(weights[2]).float()
                     t_layer.running_var.data = torch.from_numpy(weights[3]).float()
                         
-                    # Configure batch norm settings to match Keras
-                    # PyTorch momentum = 1 - Keras momentum
-                    # Keras default momentum is 0.99, so PyTorch should be 0.01
-                    t_layer.momentum = 0.01
-                    t_layer.eps = 0.001  # Match Keras epsilon of 0.001
-                    t_layer.track_running_stats = True  # Enable running stats tracking
-                    t_layer.eval()  # Set to eval mode to use running stats
+                    # Configure batch norm settings to exactly match Keras
+                    t_layer.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum (0.99)
+                    t_layer.eps = 0.001  # Match Keras epsilon
+                    t_layer.track_running_stats = True
+                    t_layer.training = False  # Ensure eval mode
+                    t_layer.eval()  # Double ensure eval mode
 
                     print(f"[DEBUG] BN layer => gamma min/max/mean: "
                           f"{t_layer.weight.data.min().item()}/{t_layer.weight.data.max().item()}/{t_layer.weight.data.mean().item()}, "
