@@ -42,6 +42,7 @@ from __future__ import (
 )
 
 import sys
+import pandas as pd
 import os
 import argparse
 import logging
@@ -290,7 +291,7 @@ def run(argv=sys.argv[1:]):
             print("Guessed input file format:", input_format)
 
         if input_format == "csv":
-            df = pandas.read_csv(args.input)
+            df = pd.read_csv(args.input)
             print("Read input CSV with %d rows, columns are: %s" % (
                 len(df), ", ".join(df.columns)))
             for col in [args.sequence_column,]:
@@ -320,7 +321,7 @@ def run(argv=sys.argv[1:]):
     df = df.set_index(args.sequence_id_column)
 
     if args.alleles:
-        genotypes = pandas.Series(args.alleles).str.split(r"[,\s]+")
+        genotypes = pd.Series(args.alleles).str.split(r"[,\s]+")
         genotypes.index = genotypes.index.map(lambda i: "genotype_%02d" % i)
         alleles = genotypes.to_dict()
     else:
