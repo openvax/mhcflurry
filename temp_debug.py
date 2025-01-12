@@ -48,8 +48,13 @@ def compare_layer_outputs():
         import tensorflow as tf
         tf_model = tf_predictor.neural_networks[0]  # Get first model in ensemble
         network = tf_model.network()
+
+        # Create intermediate model with both inputs properly connected
+        peptide_input = network.get_layer('peptide').input
+        allele_input = network.get_layer('allele').input
+        
         tf_intermediate_model = tf.keras.Model(
-            inputs=network.inputs,
+            inputs={'peptide': peptide_input, 'allele': allele_input},
             outputs=[layer.output for layer in network.layers]
         )
         logging.info("TensorFlow model ready")
