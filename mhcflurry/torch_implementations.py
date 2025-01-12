@@ -91,7 +91,7 @@ class Class1AffinityPredictor(nn.Module):
         Parameters
         ----------
         models_dir : str
-            Directory containing model files including manifest.csv
+            Directory containing model files including weights.csv
             
         Returns
         -------
@@ -99,38 +99,27 @@ class Class1AffinityPredictor(nn.Module):
             Initialized predictor with loaded weights
         """
         import os
-        import json
         import pandas as pd
         
-        manifest_path = os.path.join(models_dir, "manifest.csv")
-        if not os.path.exists(manifest_path):
-            raise ValueError(f"No manifest.csv found in {models_dir}")
-            
-        # Load manifest
-        manifest_df = pd.read_csv(manifest_path)
-        
-        # Get network config from first model
-        config = json.loads(manifest_df.iloc[0].config_json)
-        
-        # Create instance with architecture from config
+        # Create instance with default architecture matching Keras model
         instance = cls(
-            input_size=config.get('input_size', 315),
-            peptide_dense_layer_sizes=config.get('peptide_dense_layer_sizes', []),
-            layer_sizes=config.get('layer_sizes', []),
-            dropout_probability=config.get('dropout_probability', 0.0),
-            batch_normalization=config.get('batch_normalization', False),
-            activation=config.get('activation', 'tanh'),
-            init=config.get('init', 'glorot_uniform'),
-            output_activation=config.get('output_activation', 'sigmoid'),
-            num_outputs=config.get('num_outputs', 1)
+            input_size=315,
+            peptide_dense_layer_sizes=[],
+            layer_sizes=[],
+            dropout_probability=0.0,
+            batch_normalization=False,
+            activation='tanh',
+            init='glorot_uniform',
+            output_activation='sigmoid',
+            num_outputs=1
         )
         
-        # Load weights
-        weights_path = os.path.join(models_dir, "weights.csv") 
+        # Load weights if available
+        weights_path = os.path.join(models_dir, "weights.csv")
         if os.path.exists(weights_path):
             weights_df = pd.read_csv(weights_path)
             instance.load_weights(weights_df)
-            
+        
         instance = instance.to(instance.device)
         return instance
     def init_weights(self, init):
