@@ -66,11 +66,11 @@ def compare_layer_outputs():
             
             # Process all layers
             for layer in network.layers:
-            # Skip input layers since we handle them separately
-            if layer.name in ['peptide', 'allele']:
-                continue
-                
-            # Get layer inputs
+                # Skip input layers since we handle them separately
+                if layer.name in ['peptide', 'allele']:
+                    continue
+                    
+                # Get layer inputs
             layer_inputs = []
             for node in layer._inbound_nodes:
                 try:
