@@ -220,7 +220,7 @@ def run(argv=sys.argv[1:]):
             ))
         if not args.affinity_only and not os.path.exists(os.path.join(models_dir, "weights.csv")):
             logging.warning(
-                "No weights.csv => skipping logistic regression. "
+                "No weights.csv => skipping logistic regression.")
     else:
         if os.path.exists(os.path.join(models_dir, "weights.csv")):
             # Using a presentation predictor.
