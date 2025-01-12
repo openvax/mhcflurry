@@ -645,12 +645,20 @@ class Class1AffinityPredictor(object):
             Keras model with matching architecture
         """
         from tf_keras.layers import Dense, BatchNormalization
+        
+        # Get all dense and batch norm layers from both models
         keras_layers = [l for l in keras_model.layers 
                        if isinstance(l, (Dense, BatchNormalization))]
-        torch_layers = [l for l in self.layers 
-                       if isinstance(l, (nn.Linear, nn.BatchNorm1d))]
         
-        assert len(keras_layers) == len(torch_layers), "Model architectures do not match"
+        # Get corresponding PyTorch layers
+        torch_layers = []
+        torch_layers.extend([l for l in self.dense_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
+        if hasattr(self, 'output_layer'):
+            torch_layers.append(self.output_layer)
+        
+        assert len(keras_layers) == len(torch_layers), (
+            f"Model architectures do not match: Keras has {len(keras_layers)} layers, "
+            f"PyTorch has {len(torch_layers)} layers")
         
         for k_layer, t_layer in zip(keras_layers, torch_layers):
             weights = k_layer.get_weights()
@@ -660,31 +668,27 @@ class Class1AffinityPredictor(object):
                 # PyTorch stores as (output_dim, input_dim)
                 t_layer.weight.data = torch.from_numpy(weights[0].T).float()
                 t_layer.bias.data = torch.from_numpy(weights[1]).float()
-                
+
+                print(f"[DEBUG] LINEAR layer => weight min/max/mean: "
+                      f"{t_layer.weight.data.min().item()}/{t_layer.weight.data.max().item()}/{t_layer.weight.data.mean().item()}, "
+                      f"bias: {t_layer.bias.data.min().item()}/{t_layer.bias.data.max().item()}/{t_layer.bias.data.mean().item()}")
+                    
             elif isinstance(t_layer, nn.BatchNorm1d):
                 if len(weights) == 4:  # Has learned parameters
                     # In Keras: [gamma, beta, moving_mean, moving_variance]
                     # In PyTorch: weight=gamma, bias=beta
-                    t_layer.weight.data = torch.from_numpy(weights[0]).float()
-                    t_layer.bias.data = torch.from_numpy(weights[1]).float()
-                        
-                    # Set running statistics
-                    t_layer.running_mean.data = torch.from_numpy(weights[2]).float()
-                    t_layer.running_var.data = torch.from_numpy(weights[3]).float()
-                        
-                    # Configure batch norm settings to exactly match Keras
+                    with torch.no_grad():
+                        t_layer.weight.data.copy_(torch.from_numpy(weights[0]).float())
+                        t_layer.bias.data.copy_(torch.from_numpy(weights[1]).float())
+                        t_layer.running_mean.data.copy_(torch.from_numpy(weights[2]).float())
+                        t_layer.running_var.data.copy_(torch.from_numpy(weights[3]).float())
+                    
+                    # Configure batch norm settings to match Keras
                     t_layer.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum (0.99)
                     t_layer.eps = 1e-3  # Keras default
                     t_layer.track_running_stats = True
-                    t_layer.affine = True  # Enable learnable affine parameters
-                    t_layer.training = False  # Ensure eval mode
+                    t_layer.training = False
                     t_layer.eval()  # Double ensure eval mode
-
-                    print(f"[DEBUG] BN layer => gamma min/max/mean: "
-                          f"{t_layer.weight.data.min().item()}/{t_layer.weight.data.max().item()}/{t_layer.weight.data.mean().item()}, "
-                          f"beta: {t_layer.bias.data.min().item()}/{t_layer.bias.data.max().item()}/{t_layer.bias.data.mean().item()}, "
-                          f"running_mean avg: {t_layer.running_mean.data.mean().item()}, "
-                          f"running_var avg: {t_layer.running_var.data.mean().item()}")
 
     def export_weights_to_keras(self, keras_model):
         """
