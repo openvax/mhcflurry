@@ -37,7 +37,7 @@ def create_test_networks() -> Tuple[any, Class1AffinityPredictor]:
     from tf_keras.layers import Dense, BatchNormalization
 
     keras_model = Sequential([
-        Dense(64, activation="tanh", input_shape=(128,)),
+        Dense(64, activation="tanh", input_shape=(315,)),
         BatchNormalization(),
         Dense(32, activation="tanh"),
         BatchNormalization(),
@@ -45,7 +45,7 @@ def create_test_networks() -> Tuple[any, Class1AffinityPredictor]:
     ])
 
     torch_model = Class1AffinityPredictor(
-        input_size=128,
+        input_size=315,
         peptide_dense_layer_sizes=[],
         layer_sizes=[64, 32],
         activation="tanh",
