@@ -134,18 +134,13 @@ class Class1AffinityPredictor(nn.Module):
                     # In PyTorch: weight=gamma, bias=beta
                     t_layer.weight.data = torch.from_numpy(weights[0]).float()
                     t_layer.bias.data = torch.from_numpy(weights[1]).float()
+                        
+                    # Set running statistics
                     t_layer.running_mean.data = torch.from_numpy(weights[2]).float()
-                    # Keras uses moving_variance, PyTorch expects running_var
                     t_layer.running_var.data = torch.from_numpy(weights[3]).float()
-                    # Set momentum to match Keras default of 0.99
-                    # PyTorch momentum = 1 - Keras momentum
-                    # Keras default momentum is 0.99, so PyTorch needs 0.01
-                    t_layer.momentum = 0.01
-                    t_layer.eps = 0.001  # Match Keras default epsilon
+                        
+                    # Configure batch norm settings to match Keras
+                    t_layer.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum (0.99)
+                    t_layer.eps = 0.001  # Match Keras epsilon
                     t_layer.track_running_stats = True
-                    # PyTorch uses running_var while Keras uses moving_variance
-                    # Need to convert between the two formats
-                    t_layer.running_mean.data = torch.from_numpy(weights[2]).float()
-                    t_layer.running_var.data = torch.from_numpy(weights[3]).float()
-                    # Set training mode to False to match Keras inference behavior
-                    t_layer.eval()
+                    t_layer.training = False  # Set to eval mode
