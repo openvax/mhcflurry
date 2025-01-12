@@ -3,6 +3,7 @@ PyTorch implementations of MHCflurry neural networks.
 """
 import collections
 import logging
+import weakref
 import numpy
 import torch
 import torch.nn as nn
