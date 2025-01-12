@@ -71,11 +71,16 @@ def analyze_network_architectures():
             logging.info(f"Weight shapes - Keras: {k['weight_shape']}, PyTorch: {t['weight_shape']}")
             logging.info(f"Bias shapes - Keras: {k['bias_shape']}, PyTorch: {t['bias_shape']}")
             
-            # Compare actual weights
-            weight_diff = np.abs(k['weights'] - t['weights'].T).mean()
-            bias_diff = np.abs(k['bias'] - t['bias']).mean()
-            logging.info(f"Mean weight difference: {weight_diff:.6f}")
-            logging.info(f"Mean bias difference: {bias_diff:.6f}")
+            # Log shapes and stats separately since architectures differ
+            logging.info(f"\nKeras weights shape: {k['weight_shape']}")
+            logging.info(f"Keras weights stats - min: {k['weights'].min():.4f}, max: {k['weights'].max():.4f}, mean: {k['weights'].mean():.4f}")
+            logging.info(f"Keras bias shape: {k['bias_shape']}")
+            logging.info(f"Keras bias stats - min: {k['bias'].min():.4f}, max: {k['bias'].max():.4f}, mean: {k['bias'].mean():.4f}")
+            
+            logging.info(f"\nPyTorch weights shape: {t['weight_shape']}")
+            logging.info(f"PyTorch weights stats - min: {t['weights'].min():.4f}, max: {t['weights'].max():.4f}, mean: {t['weights'].mean():.4f}")
+            logging.info(f"PyTorch bias shape: {t['bias_shape']}")
+            logging.info(f"PyTorch bias stats - min: {t['bias'].min():.4f}, max: {t['bias'].max():.4f}, mean: {t['bias'].mean():.4f}")
 
         # Test predictions
         test_peptides = ["SIINFEKL", "SIINFEKD"]
