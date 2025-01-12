@@ -86,7 +86,7 @@ class Class1AffinityPredictor(nn.Module):
         """
         # For example, return a default instance:
         instance = cls(
-            input_size=128,
+            input_size=315,
             peptide_dense_layer_sizes=[],
             layer_sizes=[],
         )
