@@ -28,58 +28,68 @@ def analyze_network_architectures():
         tf_model = tf_predictor.neural_networks[0]
         network = tf_model.network()
         
-        logging.info("\n=== Keras Model Architecture ===")
+        logging.info("\n=== Model Architecture Comparison ===")
         network.summary()
         
-        logging.info("\n=== PyTorch Model Architecture ===")
+        logging.info("\n=== PyTorch Model ===")
         logging.info(str(torch_predictor))
         
-        # Analyze layer dimensions
-        logging.info("\n=== Layer-by-layer Analysis ===")
+        # Compare architectures layer by layer
+        logging.info("\n=== Detailed Layer Comparison ===")
         
+        keras_layers = []
         for layer in network.layers:
-            logging.info(f"\nKeras layer: {layer.name}")
-            logging.info(f"Type: {type(layer).__name__}")
-            logging.info(f"Input shape: {layer.input_shape}")
-            logging.info(f"Output shape: {layer.output_shape}")
-            
             if isinstance(layer, tf.keras.layers.Dense):
                 weights = layer.get_weights()
-                logging.info(f"Weight shape: {weights[0].shape}")
-                logging.info(f"Bias shape: {weights[1].shape}")
-                logging.info(f"Weight stats - min: {weights[0].min():.4f}, max: {weights[0].max():.4f}, mean: {weights[0].mean():.4f}")
-                logging.info(f"Bias stats - min: {weights[1].min():.4f}, max: {weights[1].max():.4f}, mean: {weights[1].mean():.4f}")
-
-        logging.info("\n=== PyTorch Layer Analysis ===")
-        for name, module in torch_predictor.named_modules():
-            if len(name) > 0:  # Skip the root module
-                logging.info(f"\nPyTorch layer: {name}")
-                logging.info(f"Type: {type(module).__name__}")
+                keras_layers.append({
+                    'name': layer.name,
+                    'type': type(layer).__name__,
+                    'weight_shape': weights[0].shape,
+                    'bias_shape': weights[1].shape,
+                    'weights': weights[0],
+                    'bias': weights[1]
+                })
                 
-                if isinstance(module, torch.nn.Linear):
-                    logging.info(f"Weight shape: {module.weight.shape}")
-                    logging.info(f"Bias shape: {module.bias.shape}")
-                    weight = module.weight.detach().cpu().numpy()
-                    bias = module.bias.detach().cpu().numpy()
-                    logging.info(f"Weight stats - min: {weight.min():.4f}, max: {weight.max():.4f}, mean: {weight.mean():.4f}")
-                    logging.info(f"Bias stats - min: {bias.min():.4f}, max: {bias.max():.4f}, mean: {bias.mean():.4f}")
+        torch_layers = []
+        for name, module in torch_predictor.named_modules():
+            if isinstance(module, torch.nn.Linear):
+                weight = module.weight.detach().cpu().numpy()
+                bias = module.bias.detach().cpu().numpy()
+                torch_layers.append({
+                    'name': name,
+                    'type': type(module).__name__,
+                    'weight_shape': weight.shape,
+                    'bias_shape': bias.shape,
+                    'weights': weight,
+                    'bias': bias
+                })
 
-        # Compare input/output dimensions
+        # Compare layer shapes and weights
+        logging.info("\nLayer shape comparison:")
+        for k, t in zip(keras_layers, torch_layers):
+            logging.info(f"\nKeras layer: {k['name']}, PyTorch layer: {t['name']}")
+            logging.info(f"Weight shapes - Keras: {k['weight_shape']}, PyTorch: {t['weight_shape']}")
+            logging.info(f"Bias shapes - Keras: {k['bias_shape']}, PyTorch: {t['bias_shape']}")
+            
+            # Compare actual weights
+            weight_diff = np.abs(k['weights'] - t['weights'].T).mean()
+            bias_diff = np.abs(k['bias'] - t['bias']).mean()
+            logging.info(f"Mean weight difference: {weight_diff:.6f}")
+            logging.info(f"Mean bias difference: {bias_diff:.6f}")
+
+        # Test predictions
         test_peptides = ["SIINFEKL", "SIINFEKD"]
         test_alleles = ["HLA-A0201", "HLA-A0301"]
         
-        from mhcflurry.encodable_sequences import EncodableSequences
-        peptides_obj = EncodableSequences.create(test_peptides)
+        logging.info("\n=== Prediction Comparison ===")
         
-        logging.info("\n=== Input/Output Dimension Analysis ===")
+        keras_pred = tf_predictor.predict(test_peptides, alleles=test_alleles)
+        torch_pred = torch_predictor.predict(test_peptides, alleles=test_alleles)
         
-        # Analyze Keras input dimensions
-        encoded_peptides_keras = tf_predictor.predict(test_peptides, alleles=test_alleles)
-        logging.info(f"Keras prediction shape: {encoded_peptides_keras.shape}")
-        
-        # Analyze PyTorch input dimensions  
-        encoded_peptides_torch = torch_predictor.predict(test_peptides, alleles=test_alleles)
-        logging.info(f"PyTorch prediction shape: {encoded_peptides_torch.shape}")
+        logging.info("\nPrediction comparison:")
+        for i, (k, t) in enumerate(zip(keras_pred, torch_pred)):
+            logging.info(f"Peptide {test_peptides[i]}, Allele {test_alleles[i]}")
+            logging.info(f"Keras: {k:.4f}, PyTorch: {t:.4f}, Diff: {abs(k-t):.4f}")
 
     except Exception as e:
         logging.error(f"Error during analysis: {str(e)}", exc_info=True)
