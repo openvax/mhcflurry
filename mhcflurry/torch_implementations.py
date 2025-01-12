@@ -1,15 +1,23 @@
 """
 PyTorch implementations of MHCflurry neural networks.
 """
+import collections
+import logging
+import numpy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy
-import numpy as np
+import pandas
+
+from .class1_neural_network import Class1NeuralNetwork
+from .encodable_sequences import EncodableSequences
+from .allele_encoding import AlleleEncoding
+from .common import normalize_allele_name
+from .percent_rank_transform import PercentRankTransform
 
 def to_torch(x):
     """Convert numpy array to torch tensor."""
-    if isinstance(x, np.ndarray):
+    if isinstance(x, numpy.ndarray):
         return torch.from_numpy(x).float()
     return x
 
@@ -19,41 +27,28 @@ def to_numpy(x):
         return x.detach().cpu().numpy()
     return x
 
-class Class1AffinityPredictor(nn.Module):
+class TorchNeuralNetwork(nn.Module):
     """
-    PyTorch implementation of the Class1NeuralNetwork affinity predictor.
+    PyTorch implementation of Class1NeuralNetwork
     """
     def __init__(
             self,
-            peptide_dense_layer_sizes,
-            layer_sizes,
             input_size=315,
+            peptide_dense_layer_sizes=[],
+            layer_sizes=[],
             dropout_probability=0.0,
             batch_normalization=False,
             activation="tanh",
-            init="glorot_uniform", 
+            init="glorot_uniform",
             output_activation="sigmoid",
             num_outputs=1):
         super().__init__()
-        
-        # Initialize device
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
         self.input_size = input_size
         self.dropout_prob = dropout_probability
         self.use_batch_norm = batch_normalization
         
-        # Activation functions
-        self.hidden_activation = {
-            "tanh": torch.tanh,
-            "relu": F.relu,
-        }[activation]
-        
-        self.output_activation = {
-            "sigmoid": torch.sigmoid,
-            "linear": lambda x: x,
-        }[output_activation]
-
         # Build parallel paths
         self.paths = nn.ModuleList()
         for i in range(10):  # Match Keras model's 10 parallel paths
@@ -80,8 +75,64 @@ class Class1AffinityPredictor(nn.Module):
             
             self.paths.append(nn.ModuleList(path_layers))
 
+        # Activation functions
+        self.hidden_activation = {
+            "tanh": torch.tanh,
+            "relu": F.relu,
+        }[activation]
+        
+        self.output_activation = {
+            "sigmoid": torch.sigmoid,
+            "linear": lambda x: x,
+        }[output_activation]
+
         # Initialize weights
         self.init_weights(init)
+
+class Class1AffinityPredictor(object):
+    """
+    PyTorch implementation of Class1AffinityPredictor.
+    """
+    def __init__(
+            self,
+            allele_to_allele_specific_models=None,
+            class1_pan_allele_models=None,
+            allele_to_sequence=None,
+            manifest_df=None,
+            allele_to_percent_rank_transform=None,
+            metadata_dataframes=None,
+            provenance_string=None,
+            optimization_info=None):
+
+        if allele_to_allele_specific_models is None:
+            allele_to_allele_specific_models = {}
+        if class1_pan_allele_models is None:
+            class1_pan_allele_models = []
+
+        self.allele_to_sequence = (
+            dict(allele_to_sequence)
+            if allele_to_sequence is not None else None)
+
+        self._master_allele_encoding = None
+        if class1_pan_allele_models:
+            assert self.allele_to_sequence
+
+        self.allele_to_allele_specific_models = allele_to_allele_specific_models
+        self.class1_pan_allele_models = class1_pan_allele_models
+        self._manifest_df = manifest_df
+
+        if not allele_to_percent_rank_transform:
+            allele_to_percent_rank_transform = {}
+        self.allele_to_percent_rank_transform = allele_to_percent_rank_transform
+        self.metadata_dataframes = (
+            dict(metadata_dataframes) if metadata_dataframes else {})
+        self._cache = {}
+        self.optimization_info = optimization_info if optimization_info else {}
+
+        assert isinstance(self.allele_to_allele_specific_models, dict)
+        assert isinstance(self.class1_pan_allele_models, list)
+
+        self.provenance_string = provenance_string
 
     @classmethod
     def load(cls, models_dir):
