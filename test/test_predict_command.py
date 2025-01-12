@@ -6,6 +6,7 @@ import os
 
 import pandas
 import pytest
+from numpy.testing import assert_array_almost_equal
 from numpy.testing import assert_equal
 
 import tensorflow as tf
@@ -51,6 +52,68 @@ def test_csv():
             os.unlink(delete)
 
     assert result.shape == (3, 8)
+
+
+def test_tensorflow_vs_pytorch_backends():
+    """Test that tensorflow and pytorch backends produce matching results."""
+    args = [
+        "--alleles", "HLA-A0201",
+        "--peptides", "SIINFEKL", "DENDREKLLL",
+        "--prediction-column-prefix", "mhcflurry_",
+        "--affinity-only",
+    ]
+
+    deletes = []
+    try:
+        # Run with tensorflow backend
+        fd_out_tf = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        deletes.append(fd_out_tf.name)
+        tf_args = args + ["--out", fd_out_tf.name, "--backend", "tensorflow"]
+        print("Running tensorflow with args: %s" % tf_args)
+        predict_command.run(tf_args)
+        result_tf = pandas.read_csv(fd_out_tf.name)
+        print("TensorFlow results:")
+        print(result_tf)
+
+        # Run with pytorch backend
+        fd_out_torch = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        deletes.append(fd_out_torch.name)
+        torch_args = args + ["--out", fd_out_torch.name, "--backend", "pytorch"]
+        print("Running pytorch with args: %s" % torch_args)
+        predict_command.run(torch_args)
+        result_torch = pandas.read_csv(fd_out_torch.name)
+        print("PyTorch results:")
+        print(result_torch)
+
+    finally:
+        for delete in deletes:
+            os.unlink(delete)
+
+    # Check that results match
+    assert result_tf.shape == result_torch.shape, "Output shapes differ"
+    assert all(result_tf.columns == result_torch.columns), "Output columns differ"
+    
+    # Compare numeric columns with tolerance
+    numeric_columns = [
+        col for col in result_tf.columns 
+        if col.startswith("mhcflurry_") and result_tf[col].dtype in ['float64', 'float32']
+    ]
+    
+    for col in numeric_columns:
+        print(f"Comparing {col}:")
+        print(f"TensorFlow: {result_tf[col].values}")
+        print(f"PyTorch: {result_torch[col].values}")
+        assert_array_almost_equal(
+            result_tf[col].values,
+            result_torch[col].values,
+            decimal=4,
+            err_msg=f"Values differ in column {col}"
+        )
+
+    # Compare non-numeric columns exactly
+    other_columns = [col for col in result_tf.columns if col not in numeric_columns]
+    for col in other_columns:
+        assert all(result_tf[col] == result_torch[col]), f"Values differ in column {col}"
 
 
 def test_no_csv():
