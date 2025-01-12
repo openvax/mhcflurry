@@ -183,6 +183,11 @@ model_args.add_argument(
     "Default: %s" % get_default_class1_presentation_models_dir(
         test_exists=False))
 model_args.add_argument(
+    "--backend",
+    choices=["tensorflow", "pytorch"],
+    default="tensorflow",
+    help="Deep learning backend to use for predictions")
+model_args.add_argument(
     "--no-flanking",
     action="store_true",
     default=False,
@@ -239,7 +244,18 @@ def run(argv=sys.argv[1:]):
         # message instructing them to download the models if needed.
         models_dir = get_default_class1_presentation_models_dir(test_exists=True)
 
-    predictor = Class1PresentationPredictor.load(models_dir)
+    if args.backend == "pytorch":
+        from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
+        print("Using torch")
+        if os.path.exists(os.path.join(models_dir, "weights.csv")):
+            # Using a presentation predictor.
+            predictor = Class1PresentationPredictor.load(models_dir)
+        else:
+            # Using just an affinity predictor.
+            affinity_predictor = TorchPredictor.load(models_dir)
+            predictor = Class1PresentationPredictor(affinity_predictor=affinity_predictor)
+    else:
+        predictor = Class1PresentationPredictor.load(models_dir)
 
     if args.list_supported_alleles:
         print("\n".join(predictor.supported_alleles))

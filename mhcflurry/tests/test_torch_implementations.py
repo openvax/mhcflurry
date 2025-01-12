@@ -58,6 +58,59 @@ def test_affinity_predictor_matches_keras():
     torch_output_modified = to_numpy(torch_model(test_input))
     assert_array_almost_equal(keras_output_modified, torch_output_modified, decimal=4)
 
+def test_predict_scan_command_backends_match():
+    """Test that PyTorch and TensorFlow backends give matching results for scan command."""
+    from nose.tools import assert_almost_equal
+    import tempfile
+    import pandas as pd
+    
+    sequence = "MFVFLVLLPLVSSQCVNLTTRTQLPPAYTNSFTRGVYYPDKVFRSSVLHS"
+    alleles = ["HLA-A*02:01"]
+    
+    # Run predictions with both backends
+    tf_out = tempfile.NamedTemporaryFile(suffix='.csv', delete=False)
+    torch_out = tempfile.NamedTemporaryFile(suffix='.csv', delete=False)
+    
+    try:
+        # TensorFlow predictions
+        from mhcflurry.predict_scan_command import run as predict_scan_run
+        predict_scan_run([
+            "--sequences", sequence,
+            "--alleles"] + alleles + [
+            "--out", tf_out.name
+        ])
+        
+        # PyTorch predictions  
+        predict_scan_run([
+            "--backend", "pytorch",
+            "--sequences", sequence,
+            "--alleles"] + alleles + [
+            "--out", torch_out.name
+        ])
+        
+        # Close files before reading
+        tf_out.close()
+        torch_out.close()
+        
+        # Load results
+        tf_results = pd.read_csv(tf_out.name)
+        torch_results = pd.read_csv(torch_out.name)
+        
+        # Compare results
+        prediction_columns = [col for col in tf_results.columns 
+                            if col.startswith(('presentation_score', 'processing_score', 'affinity'))]
+        
+        for col in prediction_columns:
+            assert_array_almost_equal(
+                tf_results[col].values,
+                torch_results[col].values,
+                decimal=4)
+    finally:
+        # Clean up temporary files
+        import os
+        os.unlink(tf_out.name)
+        os.unlink(torch_out.name)
+
 def test_predict_command_backends_match():
     """Test that PyTorch and TensorFlow backends give matching results."""
     from nose.tools import assert_almost_equal
