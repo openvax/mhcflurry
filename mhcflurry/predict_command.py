@@ -77,39 +77,48 @@ helper_args.add_argument(
 )
 
 input_args = parser.add_argument_group(title="Input (required)")
-input_args.add_argument("input", metavar="INPUT.csv", nargs="?", help="Input CSV")
 input_args.add_argument(
-    "--alleles", metavar="ALLELE", nargs="+", help="Alleles to predict (exclusive with passing an input CSV)"
-)
+    "input",
+    metavar="INPUT.csv",
+    nargs="?",
+    help="Input CSV")
 input_args.add_argument(
-    "--peptides", metavar="PEPTIDE", nargs="+", help="Peptides to predict (exclusive with passing an input CSV)"
-)
+    "--alleles",
+    metavar="ALLELE",
+    nargs="+",
+    help="Alleles to predict (exclusive with passing an input CSV)")
+input_args.add_argument(
+    "--peptides",
+    metavar="PEPTIDE",
+    nargs="+",
+    help="Peptides to predict (exclusive with passing an input CSV)")
 
 input_mod_args = parser.add_argument_group(title="Input options")
 input_mod_args.add_argument(
-    "--allele-column", metavar="NAME", default="allele", help="Input column name for alleles. Default: '%(default)s'"
-)
+    "--allele-column",
+    metavar="NAME",
+    default="allele",
+    help="Input column name for alleles. Default: '%(default)s'")
 input_mod_args.add_argument(
-    "--peptide-column", metavar="NAME", default="peptide", help="Input column name for peptides. Default: '%(default)s'"
-)
+    "--peptide-column",
+    metavar="NAME",
+    default="peptide",
+    help="Input column name for peptides. Default: '%(default)s'")
 input_mod_args.add_argument(
     "--n-flank-column",
     metavar="NAME",
     default="n_flank",
-    help="Column giving N-terminal flanking sequence. Default: '%(default)s'",
-)
+    help="Column giving N-terminal flanking sequence. Default: '%(default)s'")
 input_mod_args.add_argument(
     "--c-flank-column",
     metavar="NAME",
     default="c_flank",
-    help="Column giving C-terminal flanking sequence. Default: '%(default)s'",
-)
+    help="Column giving C-terminal flanking sequence. Default: '%(default)s'")
 input_mod_args.add_argument(
     "--no-throw",
     action="store_true",
     default=False,
-    help="Return NaNs for unsupported alleles or peptides instead of raising",
-)
+    help="Return NaNs for unsupported alleles or peptides instead of raising")
 
 output_args = parser.add_argument_group(title="Output options")
 output_args.add_argument("--out", metavar="OUTPUT.csv", help="Output CSV")
