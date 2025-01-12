@@ -75,6 +75,10 @@ class TorchNeuralNetwork(nn.Module):
         # Input layers
         self.peptide_layers = nn.ModuleList()
         current_size = peptide_input_dim
+
+        # Handle batch_norm_early if no peptide_dense_layer_sizes
+        if self.hyperparameters["batch_normalization"] and not self.hyperparameters["peptide_dense_layer_sizes"]:
+            self.peptide_layers.append(nn.BatchNorm1d(current_size))
         
         # Peptide dense layers
         for size in self.hyperparameters["peptide_dense_layer_sizes"]:
@@ -253,7 +257,6 @@ class TorchNeuralNetwork(nn.Module):
             if isinstance(layer, nn.Linear):
                 x = self.hidden_activation(layer(x))
             elif isinstance(layer, nn.BatchNorm1d):
-                x = layer(x)
                 x = layer(x)
             x = x.to(self.device)
 
