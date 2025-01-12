@@ -60,6 +60,9 @@ def test_affinity_predictor_matches_keras():
     """Test that PyTorch affinity predictor gives identical results to Keras."""
     keras_model, torch_model = create_test_networks()
     
+    # Transfer weights from Keras to PyTorch
+    torch_model.load_weights_from_keras(keras_model)
+    
     # Test with random input
     test_input = np.random.rand(10, 128).astype("float32")
     
