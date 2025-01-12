@@ -64,30 +64,46 @@ def test_tensorflow_vs_pytorch_backends():
     ]
 
     deletes = []
+    result_tf = None
+    result_torch = None
+    
     try:
         # Run with tensorflow backend
-        fd_out_tf = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
-        deletes.append(fd_out_tf.name)
-        tf_args = args + ["--out", fd_out_tf.name, "--backend", "tensorflow"]
-        print("Running tensorflow with args: %s" % tf_args)
-        predict_command.run(tf_args)
-        result_tf = pandas.read_csv(fd_out_tf.name)
-        print("TensorFlow results:")
-        print(result_tf)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as fd_out_tf:
+            deletes.append(fd_out_tf.name)
+            tf_args = args + ["--out", fd_out_tf.name, "--backend", "tensorflow"]
+            print("Running tensorflow with args: %s" % tf_args)
+            predict_command.run(tf_args)
+            fd_out_tf.close()  # Explicitly close file
+            result_tf = pandas.read_csv(fd_out_tf.name)
+            print("TensorFlow results:")
+            print(result_tf)
 
         # Run with pytorch backend
-        fd_out_torch = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
-        deletes.append(fd_out_torch.name)
-        torch_args = args + ["--out", fd_out_torch.name, "--backend", "pytorch"]
-        print("Running pytorch with args: %s" % torch_args)
-        predict_command.run(torch_args)
-        result_torch = pandas.read_csv(fd_out_torch.name)
-        print("PyTorch results:")
-        print(result_torch)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as fd_out_torch:
+            deletes.append(fd_out_torch.name)
+            torch_args = args + ["--out", fd_out_torch.name, "--backend", "pytorch"]
+            print("Running pytorch with args: %s" % torch_args)
+            predict_command.run(torch_args)
+            fd_out_torch.close()  # Explicitly close file
+            result_torch = pandas.read_csv(fd_out_torch.name)
+            print("PyTorch results:")
+            print(result_torch)
 
     finally:
+        # Make sure we've closed the files and pandas has released them
+        import gc
+        gc.collect()  # Force garbage collection
+        
+        # Add a small delay to ensure files are released
+        import time
+        time.sleep(0.1)
+        
         for delete in deletes:
-            os.unlink(delete)
+            try:
+                os.unlink(delete)
+            except Exception as e:
+                print(f"Warning: Could not delete {delete}: {e}")
 
     # Check that results match
     assert result_tf.shape == result_torch.shape, "Output shapes differ"
@@ -125,17 +141,30 @@ def test_no_csv():
     ]
 
     deletes = []
+    result = None
     try:
-        fd_out = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
-        deletes.append(fd_out.name)
-        full_args = args + ["--out", fd_out.name]
-        print("Running with args: %s" % full_args)
-        predict_command.run(full_args)
-        result = pandas.read_csv(fd_out.name)
-        print(result)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as fd_out:
+            deletes.append(fd_out.name)
+            full_args = args + ["--out", fd_out.name]
+            print("Running with args: %s" % full_args)
+            predict_command.run(full_args)
+            fd_out.close()  # Explicitly close
+            result = pandas.read_csv(fd_out.name)
+            print(result)
     finally:
+        # Make sure we've closed the files and pandas has released them
+        import gc
+        gc.collect()  # Force garbage collection
+        
+        # Add a small delay to ensure files are released
+        import time
+        time.sleep(0.1)
+        
         for delete in deletes:
-            os.unlink(delete)
+            try:
+                os.unlink(delete)
+            except Exception as e:
+                print(f"Warning: Could not delete {delete}: {e}")
 
     print(result)
     assert len(result) == 6
