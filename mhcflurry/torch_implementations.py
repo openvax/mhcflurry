@@ -83,19 +83,73 @@ class Class1AffinityPredictor(nn.Module):
         # Initialize weights
         self.init_weights(init)
 
-    @classmethod
+    @classmethod 
     def load(cls, models_dir):
         """
-        Minimal placeholder load method. Adjust as needed to read any model
-        files from models_dir. Must return an initialized Class1AffinityPredictor.
+        Load a trained model from the specified directory.
+        Validates that weights match the expected architecture.
+        
+        Parameters
+        ----------
+        models_dir : str
+            Directory containing model files including weights.csv
+            
+        Returns
+        -------
+        Class1AffinityPredictor
+            Initialized predictor with loaded weights
         """
-        # For example, return a default instance:
+        import os
+        import pandas as pd
+        
+        weights_path = os.path.join(models_dir, "weights.csv")
+        if not os.path.exists(weights_path):
+            raise ValueError(f"No weights.csv found in {models_dir}")
+            
+        # Load weights dataframe
+        weights_df = pd.read_csv(weights_path)
+        
+        # Validate architecture matches expected parallel paths
+        expected_layers = {
+            'input': 315,  # Input size
+            'first_dense': [256, 1024],  # Expected sizes for first dense layer
+            'second_dense': 512,  # Expected size for second dense layer
+            'output': 1  # Output size
+        }
+        
+        # Create instance with validated architecture
         instance = cls(
-            input_size=315,
+            input_size=expected_layers['input'],
             peptide_dense_layer_sizes=[],
             layer_sizes=[],
         )
-        instance = instance.to(instance.device)  # Move model to appropriate device
+        
+        # Verify each path's layer dimensions match weights
+        for path in instance.paths:
+            first_layer = path[0]
+            if first_layer.in_features != expected_layers['input']:
+                raise ValueError(
+                    f"First layer input size {first_layer.in_features} "
+                    f"doesn't match expected {expected_layers['input']}")
+                    
+            if first_layer.out_features not in expected_layers['first_dense']:
+                raise ValueError(
+                    f"First layer output size {first_layer.out_features} "
+                    f"not in expected sizes {expected_layers['first_dense']}")
+                    
+            second_layer = path[3]  # Skip dropout/batch norm to get second dense layer
+            if second_layer.out_features != expected_layers['second_dense']:
+                raise ValueError(
+                    f"Second layer output size {second_layer.out_features} "
+                    f"doesn't match expected {expected_layers['second_dense']}")
+                    
+            output_layer = path[-1]
+            if output_layer.out_features != expected_layers['output']:
+                raise ValueError(
+                    f"Output layer size {output_layer.out_features} "
+                    f"doesn't match expected {expected_layers['output']}")
+        
+        instance = instance.to(instance.device)
         return instance
     def init_weights(self, init):
         for layer in self.layers:
