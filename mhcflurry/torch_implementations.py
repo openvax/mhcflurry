@@ -29,52 +29,37 @@ def to_numpy(x):
 
 class TorchNeuralNetwork(nn.Module):
     """
-    PyTorch implementation of Class1NeuralNetwork
+    PyTorch implementation of Class1NeuralNetwork that exactly matches the Keras architecture
     """
     def __init__(
             self,
             input_size=315,
             peptide_dense_layer_sizes=[],
-            layer_sizes=[],
+            allele_dense_layer_sizes=[],
+            layer_sizes=[32],
             dropout_probability=0.0,
             batch_normalization=False,
             activation="tanh",
             init="glorot_uniform",
             output_activation="sigmoid",
-            num_outputs=1):
+            num_outputs=1,
+            locally_connected_layers=[],
+            topology="feedforward",
+            peptide_allele_merge_method="multiply",
+            peptide_allele_merge_activation="",
+            allele_amino_acid_encoding="BLOSUM62",
+            dense_layer_l1_regularization=0.001,
+            dense_layer_l2_regularization=0.0):
         super().__init__()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.input_size = input_size
         self.dropout_prob = dropout_probability
         self.use_batch_norm = batch_normalization
+        self.topology = topology
+        self.merge_method = peptide_allele_merge_method
+        self.merge_activation = peptide_allele_merge_activation
         
-        # Build parallel paths
-        self.paths = nn.ModuleList()
-        for i in range(10):  # Match Keras model's 10 parallel paths
-            path_layers = []
-            current_size = input_size
-            
-            # First dense layer varies by path
-            first_layer_size = 256 if i in [0, 2, 4, 5, 9] else 1024
-            path_layers.append(nn.Linear(current_size, first_layer_size))
-            if batch_normalization:
-                path_layers.append(nn.BatchNorm1d(first_layer_size))
-            path_layers.append(nn.Dropout(dropout_probability))
-            current_size = first_layer_size
-            
-            # Second dense layer
-            second_layer_size = 512
-            path_layers.append(nn.Linear(current_size, second_layer_size))
-            if batch_normalization:
-                path_layers.append(nn.BatchNorm1d(second_layer_size))
-            path_layers.append(nn.Dropout(dropout_probability))
-            
-            # Output layer for this path
-            path_layers.append(nn.Linear(second_layer_size, 1))
-            
-            self.paths.append(nn.ModuleList(path_layers))
-
         # Activation functions
         self.hidden_activation = {
             "tanh": torch.tanh,
@@ -85,6 +70,57 @@ class TorchNeuralNetwork(nn.Module):
             "sigmoid": torch.sigmoid,
             "linear": lambda x: x,
         }[output_activation]
+
+        # Build network layers
+        self.layers = nn.ModuleList()
+        current_size = input_size
+
+        # Peptide dense layers
+        self.peptide_layers = nn.ModuleList()
+        for size in peptide_dense_layer_sizes:
+            self.peptide_layers.extend([
+                nn.Linear(current_size, size),
+                nn.Dropout(dropout_probability) if dropout_probability > 0 else nn.Identity()
+            ])
+            if batch_normalization:
+                self.peptide_layers.append(nn.BatchNorm1d(size))
+            current_size = size
+
+        # Locally connected layers
+        self.local_layers = nn.ModuleList()
+        for params in locally_connected_layers:
+            self.local_layers.append(
+                nn.Conv1d(
+                    in_channels=1,
+                    out_channels=params['filters'],
+                    kernel_size=params['kernel_size'],
+                    groups=input_size // params['kernel_size'],
+                    bias=True
+                )
+            )
+            current_size = params['filters'] * (input_size - params['kernel_size'] + 1)
+
+        # Main dense layers
+        self.dense_layers = nn.ModuleList()
+        prev_layers = []
+        for size in layer_sizes:
+            if topology == "with-skip-connections" and prev_layers:
+                # Concatenate previous two layers
+                if len(prev_layers) > 1:
+                    current_size = prev_layers[-1].out_features + prev_layers[-2].out_features
+            
+            layer = nn.Linear(current_size, size)
+            self.dense_layers.append(layer)
+            prev_layers.append(layer)
+            
+            if batch_normalization:
+                self.dense_layers.append(nn.BatchNorm1d(size))
+            if dropout_probability > 0:
+                self.dense_layers.append(nn.Dropout(dropout_probability))
+            current_size = size
+
+        # Output layer
+        self.output_layer = nn.Linear(current_size, num_outputs)
 
         # Initialize weights
         self.init_weights(init)
