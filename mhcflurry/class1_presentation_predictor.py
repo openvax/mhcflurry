@@ -580,8 +580,8 @@ class Class1PresentationPredictor(object):
                     # Invalid peptides will be null.
                     null_mask = input_matrix.isnull().any(axis=1)
                     input_matrix = input_matrix.fillna(0.0)
-                df["presentation_score"] = model.predict_proba(
-                    input_matrix.values)[:,1]
+                logits = model.decision_function(input_matrix.values)
+                df["presentation_score"] = 1.0 / (1.0 + numpy.exp(-logits))
                 if null_mask is not None:
                     df.loc[null_mask, "presentation_score"] = numpy.nan
                 df["presentation_percentile"] = self.percentile_ranks(
