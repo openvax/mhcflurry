@@ -168,7 +168,6 @@ class Class1AffinityPredictor(nn.Module):
             Predicted binding affinities in nM
         """
         from mhcflurry.encodable_sequences import EncodableSequences
-        from mhcflurry.amino_acid import AMINO_ACID_INDEX
         
         # Convert to EncodableSequences if needed
         if not isinstance(peptides, EncodableSequences):
@@ -191,13 +190,14 @@ class Class1AffinityPredictor(nn.Module):
             encoded = to_torch(encoded).to(self.device)
             
             # Get predictions
-            outputs = self.forward(encoded)
+            outputs = self(encoded)
             outputs = to_numpy(outputs).flatten()
 
-        # Convert network output (0-1) to nM predictions (same as Keras version)
+        # Convert network output (0-1) to nM predictions
+        # Using same conversion as Keras version
         max_ic50 = 50000.0
         predictions_nM = max_ic50 ** (1.0 - outputs)
-        
+
         return predictions_nM
 
     def load_weights_from_keras(self, keras_model):
