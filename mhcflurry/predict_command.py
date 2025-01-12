@@ -1,4 +1,4 @@
-'''
+"""
 Run MHCflurry predictor on specified peptides.
 
 By default, the presentation predictor is used, and predictions for
@@ -36,7 +36,8 @@ $ mhcflurry-predict --peptides SIINFEKL DENDREKLLL \\
 
 will give the tightest predicted affinities across alleles for each of the two
 genotypes specified for each peptide.
-'''
+"""
+
 from __future__ import print_function, division, absolute_import
 import sys
 import argparse
@@ -77,75 +78,61 @@ helper_args.add_argument(
 )
 
 input_args = parser.add_argument_group(title="Input (required)")
+input_args.add_argument("input", metavar="INPUT.csv", nargs="?", help="Input CSV")
 input_args.add_argument(
-    "input",
-    metavar="INPUT.csv",
-    nargs="?",
-    help="Input CSV")
+    "--alleles", metavar="ALLELE", nargs="+", help="Alleles to predict (exclusive with passing an input CSV)"
+)
 input_args.add_argument(
-    "--alleles",
-    metavar="ALLELE",
-    nargs="+",
-    help="Alleles to predict (exclusive with passing an input CSV)")
-input_args.add_argument(
-    "--peptides",
-    metavar="PEPTIDE",
-    nargs="+",
-    help="Peptides to predict (exclusive with passing an input CSV)")
+    "--peptides", metavar="PEPTIDE", nargs="+", help="Peptides to predict (exclusive with passing an input CSV)"
+)
 
 input_mod_args = parser.add_argument_group(title="Input options")
 input_mod_args.add_argument(
-    "--allele-column",
-    metavar="NAME",
-    default="allele",
-    help="Input column name for alleles. Default: '%(default)s'")
+    "--allele-column", metavar="NAME", default="allele", help="Input column name for alleles. Default: '%(default)s'"
+)
 input_mod_args.add_argument(
-    "--peptide-column",
-    metavar="NAME",
-    default="peptide",
-    help="Input column name for peptides. Default: '%(default)s'")
+    "--peptide-column", metavar="NAME", default="peptide", help="Input column name for peptides. Default: '%(default)s'"
+)
 input_mod_args.add_argument(
     "--n-flank-column",
     metavar="NAME",
     default="n_flank",
-    help="Column giving N-terminal flanking sequence. Default: '%(default)s'")
+    help="Column giving N-terminal flanking sequence. Default: '%(default)s'",
+)
 input_mod_args.add_argument(
     "--c-flank-column",
     metavar="NAME",
     default="c_flank",
-    help="Column giving C-terminal flanking sequence. Default: '%(default)s'")
+    help="Column giving C-terminal flanking sequence. Default: '%(default)s'",
+)
 input_mod_args.add_argument(
     "--no-throw",
     action="store_true",
     default=False,
-    help="Return NaNs for unsupported alleles or peptides instead of raising")
+    help="Return NaNs for unsupported alleles or peptides instead of raising",
+)
 
 output_args = parser.add_argument_group(title="Output options")
-output_args.add_argument(
-    "--out",
-    metavar="OUTPUT.csv",
-    help="Output CSV")
+output_args.add_argument("--out", metavar="OUTPUT.csv", help="Output CSV")
 output_args.add_argument(
     "--prediction-column-prefix",
     metavar="NAME",
     default="mhcflurry_",
-    help="Prefix for output column names. Default: '%(default)s'")
+    help="Prefix for output column names. Default: '%(default)s'",
+)
 output_args.add_argument(
-    "--output-delimiter",
-    metavar="CHAR",
-    default=",",
-    help="Delimiter character for results. Default: '%(default)s'")
+    "--output-delimiter", metavar="CHAR", default=",", help="Delimiter character for results. Default: '%(default)s'"
+)
 output_args.add_argument(
-    "--no-affinity-percentile",
-    default=False,
-    action="store_true",
-    help="Do not include affinity percentile rank")
+    "--no-affinity-percentile", default=False, action="store_true", help="Do not include affinity percentile rank"
+)
 output_args.add_argument(
     "--always-include-best-allele",
     default=False,
     action="store_true",
     help="Always include the best_allele column even when it is identical "
-    "to the allele column (i.e. all queries are monoallelic).")
+    "to the allele column (i.e. all queries are monoallelic).",
+)
 
 model_args = parser.add_argument_group(title="Model options")
 model_args.add_argument(
@@ -154,22 +141,26 @@ model_args.add_argument(
     default=None,
     help="Directory containing models. Either a binding affinity predictor or "
     "a presentation predictor can be used. "
-    "Default: %s" % get_default_class1_presentation_models_dir(test_exists=False))
+    "Default: %s" % get_default_class1_presentation_models_dir(test_exists=False),
+)
 model_args.add_argument(
     "--affinity-only",
     action="store_true",
     default=False,
-    help="Affinity prediction only (no antigen processing or presentation)")
+    help="Affinity prediction only (no antigen processing or presentation)",
+)
 model_args.add_argument(
     "--backend",
     choices=["tensorflow", "pytorch"],
     default="tensorflow",
-    help="Deep learning backend to use for predictions")
+    help="Deep learning backend to use for predictions",
+)
 model_args.add_argument(
     "--no-flanking",
     action="store_true",
     default=False,
-    help="Do not use flanking sequence information even when available")
+    help="Do not use flanking sequence information even when available",
+)
 
 
 def run(argv=sys.argv[1:]):
