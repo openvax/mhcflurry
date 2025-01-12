@@ -208,11 +208,8 @@ def run(argv=sys.argv[1:]):
         print("Using torch")
         if os.path.exists(os.path.join(models_dir, "weights.csv")):
             # Using a presentation predictor.
-            # TODO: Implement PyTorch version of presentation predictor
-            logging.warning(
-                "PyTorch backend does not yet support presentation prediction. "
-                "Falling back to TensorFlow implementation.")
-            predictor = Class1PresentationPredictor.load(models_dir)
+            from mhcflurry.torch_presentation_predictor import TorchPresentationPredictor
+            predictor = TorchPresentationPredictor.load(models_dir)
         else:
             # Using just an affinity predictor.
             affinity_predictor = TorchPredictor.load(models_dir)
