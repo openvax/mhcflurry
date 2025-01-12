@@ -159,7 +159,7 @@ model_args.add_argument(
     "--backend",
     choices=["tensorflow", "pytorch"],
     default="tensorflow",
-    help="Deep learning backend to use for predictions"
+    help="Deep learning backend to use for predictions",
 )
 model_args.add_argument(
     "--no-flanking",
@@ -191,6 +191,8 @@ def run(argv=sys.argv[1:]):
 
     if args.backend == "pytorch":
         from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
+
+        print("Using torch")
         if os.path.exists(os.path.join(models_dir, "weights.csv")):
             # Using a presentation predictor.
             predictor = Class1PresentationPredictor.load(models_dir)
