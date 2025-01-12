@@ -11,7 +11,12 @@ import torch
 from nose.tools import eq_
 from numpy.testing import assert_array_almost_equal
 
-from mhcflurry.torch_implementations import Class1AffinityPredictor, to_torch, to_numpy
+from mhcflurry.torch_implementations import (
+    Class1AffinityPredictor,
+    TorchNeuralNetwork,
+    to_torch,
+    to_numpy
+)
 from mhcflurry.common import configure_tensorflow
 from mhcflurry.predict_scan_command import run as predict_scan_run
 from mhcflurry.predict_command import run as predict_run
