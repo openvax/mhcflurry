@@ -113,21 +113,19 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
                 with torch.no_grad():
                     model.eval()
                     logits = model(inputs)
-                    probs = torch.sigmoid(logits)
-                    df["presentation_score"] = probs.squeeze().cpu().numpy()
+                    df["presentation_score"] = torch.sigmoid(logits).squeeze().cpu().numpy()
                 
                 if null_mask is not None:
                     df.loc[null_mask, "presentation_score"] = numpy.nan
                     
                 df["presentation_percentile"] = self.percentile_ranks(
                     df["presentation_score"], throw=kwargs.get("throw", True))
-                
             else:
                 df["presentation_score"] = []
                 df["presentation_percentile"] = []
-                
-            del df["affinity_score"]
             
+            del df["affinity_score"]
+        
         return df
 
     @classmethod
