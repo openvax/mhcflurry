@@ -277,42 +277,16 @@ class TorchNeuralNetwork(nn.Module):
             Keras model with matching architecture
         """
         from tf_keras.layers import Dense, BatchNormalization
-        keras_layers = [l for l in keras_model.layers 
-                       if isinstance(l, (Dense, BatchNormalization))]
-        torch_layers = [l for l in self.modules()
-                       if isinstance(l, (nn.Linear, nn.BatchNorm1d))]
-        
-        assert len(keras_layers) == len(torch_layers), "Model architectures do not match"
-        
-        for k_layer, t_layer in zip(keras_layers, torch_layers):
-            weights = k_layer.get_weights()
-            
-            if isinstance(t_layer, nn.Linear):
-                # Keras stores weights as (input_dim, output_dim)
-                # PyTorch stores as (output_dim, input_dim)
-                t_layer.weight.data = torch.from_numpy(weights[0].T).float()
-                t_layer.bias.data = torch.from_numpy(weights[1]).float()
+        keras_layers = [l for l in keras_model.layers if isinstance(l, (Dense, BatchNormalization))]
+        torch_layers = []
+        # ADD peptide_layers:
+        torch_layers.extend([l for l in self.peptide_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
+        # Existing dense_layers:
+        torch_layers.extend([l for l in self.dense_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
+        if hasattr(self, 'output_layer'):
+            torch_layers.append(self.output_layer)
 
-                print(f"[DEBUG] LINEAR layer => weight min/max/mean: "
-                      f"{t_layer.weight.data.min().item()}/{t_layer.weight.data.max().item()}/{t_layer.weight.data.mean().item()}, "
-                      f"bias: {t_layer.bias.data.min().item()}/{t_layer.bias.data.max().item()}/{t_layer.bias.data.mean().item()}")
-                
-            elif isinstance(t_layer, nn.BatchNorm1d):
-                if len(weights) == 4:  # Has learned parameters
-                    # In Keras: [gamma, beta, moving_mean, moving_variance]
-                    # In PyTorch: weight=gamma, bias=beta
-                    with torch.no_grad():
-                        t_layer.weight.data.copy_(torch.from_numpy(weights[0]).float())
-                        t_layer.bias.data.copy_(torch.from_numpy(weights[1]).float())
-                        t_layer.running_mean.data.copy_(torch.from_numpy(weights[2]).float())
-                        t_layer.running_var.data.copy_(torch.from_numpy(weights[3]).float())
-                    
-                    # Configure batch norm settings to exactly match Keras
-                    t_layer.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum (0.99)
-                    t_layer.eps = 1e-3  # Keras default
-                    t_layer.track_running_stats = True
-                    t_layer.training = False
-                    t_layer.eval()  # Double ensure eval mode
+        assert len(keras_layers) == len(torch_layers), "Model architectures do not match"
 
 class Class1AffinityPredictor(object):
     """
@@ -652,6 +626,9 @@ class Class1AffinityPredictor(object):
         
         # Get corresponding PyTorch layers
         torch_layers = []
+        # ADD peptide_layers:
+        torch_layers.extend([l for l in self.peptide_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
+        # Existing dense_layers:
         torch_layers.extend([l for l in self.dense_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
         if hasattr(self, 'output_layer'):
             torch_layers.append(self.output_layer)
