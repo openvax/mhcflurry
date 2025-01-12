@@ -158,7 +158,7 @@ class Class1AffinityPredictor(nn.Module):
         # your calibration data
         return np.array([50.0] * len(affinities))
 
-    def predict(self, peptides, allele=None, model_kwargs=None, throw=True):
+    def predict(self, peptides, allele=None, alleles=None, model_kwargs=None, throw=True):
         """
         Predict binding affinity in nM for peptides.
         
@@ -167,7 +167,9 @@ class Class1AffinityPredictor(nn.Module):
         peptides : list of string or EncodableSequences
             Peptide sequences
         allele : string
-            Allele name 
+            Single allele name for all predictions
+        alleles : list of string
+            List of allele names, one per peptide
         model_kwargs : dict
             Extra kwargs to pass to model
         throw : boolean
@@ -180,6 +182,18 @@ class Class1AffinityPredictor(nn.Module):
         """
         from mhcflurry.encodable_sequences import EncodableSequences
         
+        if allele is not None and alleles is not None:
+            raise ValueError("Specify exactly one of allele or alleles")
+            
+        if alleles is not None:
+            if len(alleles) != len(peptides):
+                raise ValueError(f"Got {len(alleles)} alleles but {len(peptides)} peptides")
+            predictions = []
+            for peptide, single_allele in zip(peptides, alleles):
+                pred = self.predict([peptide], allele=single_allele, throw=throw)
+                predictions.append(pred[0])
+            return numpy.array(predictions)
+            
         # Convert to EncodableSequences if needed
         if not isinstance(peptides, EncodableSequences):
             peptides = EncodableSequences.create(peptides)
