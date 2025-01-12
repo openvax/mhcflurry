@@ -247,14 +247,17 @@ class TorchNeuralNetwork(nn.Module):
         for layer in self.peptide_layers:
             layer = layer.to(self.device)
             x = layer(x)
-            if isinstance(layer, nn.Linear):
-                x = self.hidden_activation(x)
                 
-        # Process dense layers
-        for layer in self.dense_layers:
+        # Process dense layers with activation after batch norm
+        for i, layer in enumerate(self.dense_layers):
             layer = layer.to(self.device)
             x = layer(x)
-            if isinstance(layer, nn.Linear):
+            if isinstance(layer, nn.Linear) and i < len(self.dense_layers) - 1:
+                # Only apply activation if there's a batch norm layer following
+                if i + 1 < len(self.dense_layers) and isinstance(self.dense_layers[i+1], nn.BatchNorm1d):
+                    continue
+                x = self.hidden_activation(x)
+            elif isinstance(layer, nn.BatchNorm1d):
                 x = self.hidden_activation(x)
                 
         # Output layer with final activation
@@ -306,10 +309,10 @@ class TorchNeuralNetwork(nn.Module):
                     t_layer.running_var.data = torch.from_numpy(weights[3]).float()
                         
                     # Configure batch norm settings to match Keras
-                    t_layer.momentum = 0.99  # Match Keras momentum
-                    t_layer.eps = 0.001  # Match Keras epsilon
+                    t_layer.momentum = 0.99  # Match Keras momentum 
+                    t_layer.eps = 1e-3  # Match Keras epsilon
                     t_layer.track_running_stats = True
-                    t_layer.training = False  # Set to eval mode
+                    t_layer.eval()  # Set to eval mode
 
 class Class1AffinityPredictor(object):
     """
