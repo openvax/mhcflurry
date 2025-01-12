@@ -80,11 +80,15 @@ class TorchNeuralNetwork(nn.Module):
         self.hidden_activation = {
             "tanh": torch.tanh,
             "relu": F.relu,
+            "sigmoid": torch.sigmoid,
+            "": lambda x: x,  # Match Keras behavior for empty string
         }[activation]
         
         self.output_activation = {
             "sigmoid": torch.sigmoid,
             "linear": lambda x: x,
+            "tanh": torch.tanh,
+            "": lambda x: x,  # Match Keras behavior for empty string
         }[output_activation]
 
         # Build network layers
@@ -346,12 +350,34 @@ class Class1AffinityPredictor(object):
         x = x.to(self.device)
         
         # Process peptide layers
+        peptide_output = x
         for layer in self.peptide_layers:
             if isinstance(layer, nn.Linear):
-                x = self.hidden_activation(layer(x))
+                peptide_output = self.hidden_activation(layer(peptide_output))
             else:
-                x = layer(x)
-            x = x.to(self.device)  # Ensure intermediate tensors stay on device
+                peptide_output = layer(peptide_output)
+            peptide_output = peptide_output.to(self.device)
+                
+        # Process allele layers if present
+        if hasattr(self, 'allele_layers'):
+            allele_output = self.allele_input
+            for layer in self.allele_layers:
+                if isinstance(layer, nn.Linear):
+                    allele_output = self.hidden_activation(layer(allele_output))
+                else:
+                    allele_output = layer(allele_output)
+                allele_output = allele_output.to(self.device)
+                
+            # Merge peptide and allele outputs
+            if self.merge_method == "concatenate":
+                x = torch.cat([peptide_output, allele_output], dim=1)
+            elif self.merge_method == "multiply":
+                x = peptide_output * allele_output
+                
+            if self.merge_activation:
+                x = self.hidden_activation(x)
+        else:
+            x = peptide_output
                 
         # Process locally connected layers
         if self.local_layers:

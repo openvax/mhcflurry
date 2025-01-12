@@ -36,42 +36,6 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
             return nn.Linear(len(self.model_inputs), 1)
             
         if name not in self._torch_models:
-            model = nn.Sequential(
-                nn.Linear(len(self.model_inputs), 1)
-            )
-            row = self.weights_dataframe.loc[name]
-            
-            # Convert weights and bias to PyTorch tensors
-            weights = torch.FloatTensor(row[self.model_inputs].values)
-            bias = torch.FloatTensor([row.intercept])
-            
-            # Assign the weights to first layer
-            with torch.no_grad():
-                model[0].weight.copy_(weights.unsqueeze(0))
-                model[0].bias.copy_(bias)
-                
-            model = model.to(self.device)
-            self._torch_models[name] = model
-            
-        return self._torch_models[name]
-
-    def get_model(self, name=None):
-        """
-        Load or instantiate a new logistic regression model in PyTorch.
-        
-        Parameters
-        ----------
-        name : string
-            Model variant name ('with_flanks' or 'without_flanks')
-            
-        Returns
-        -------
-        torch.nn.Module
-        """
-        if name is None:
-            return nn.Linear(len(self.model_inputs), 1)
-            
-        if name not in self._torch_models:
             model = nn.Linear(len(self.model_inputs), 1)
             row = self.weights_dataframe.loc[name]
             
