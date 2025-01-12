@@ -11,7 +11,6 @@ import math
 
 import numpy
 import pandas
-import torch
 
 from .hyperparameters import HyperparameterDefaults
 from .encodable_sequences import EncodableSequences, EncodingError
