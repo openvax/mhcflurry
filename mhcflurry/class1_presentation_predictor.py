@@ -590,11 +590,12 @@ class Class1PresentationPredictor(object):
                         df["presentation_score"], throw=False)
                 else:
                     # skip computing presentation score here, Torch predictor will handle it
+                    # Do not delete 'affinity_score' here
                     pass
             else:
                 df["presentation_score"] = []
                 df["presentation_percentile"] = []
-            del df["affinity_score"]
+                del df["affinity_score"]
         return df
 
     def predict_sequences(
