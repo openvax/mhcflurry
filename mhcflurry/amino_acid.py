@@ -129,7 +129,7 @@ def index_encoding(sequences, letter_to_index_dict):
     numpy.array of integers with shape (`k`, `n`)
     """
     df = pandas.DataFrame(iter(s) for s in sequences)
-    result = df.replace(letter_to_index_dict)
+    result = df.replace(letter_to_index_dict).infer_objects(copy=False)
     return result.values
 
 
