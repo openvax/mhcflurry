@@ -106,6 +106,9 @@ class Class1AffinityPredictor(nn.Module):
         Applies hidden_activation on each Linear layer (except the last),
         and applies self.output_activation at the end.
         """
+        # Convert input to torch tensor if needed
+        x = to_torch(x)
+        
         # Pass through all but final Linear
         for layer in self.layers[:-1]:
             x = layer(x)
@@ -135,7 +138,7 @@ class Class1AffinityPredictor(nn.Module):
             X.append(encoding)
 
         X = np.array(X, dtype=np.float32)
-        # Forward pass
+        # Forward pass (X will be converted to tensor in forward())
         outputs = self.forward(X)
         # The network outputs a 0..1 score. Convert to nM. Suppose let's do
         # an approximate mapping, e.g.: nM = 50000^(1 - outputs).
