@@ -119,6 +119,30 @@ class Class1AffinityPredictor(nn.Module):
         x = self.layers[-1](x)
         x = self.output_activation(x)
         return x
+    def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
+        """
+        Return percentile ranks for the given binding affinities.
+        
+        Parameters
+        ----------
+        affinities : list of float
+            Binding affinities in nM
+        allele : string
+            Allele name
+        alleles : list of string
+            Allele names, alternative to allele parameter
+        throw : boolean
+            Whether to raise exception if predictor is not available
+            
+        Returns
+        -------
+        numpy.array of float
+        """
+        # For now return placeholder percentile ranks
+        # You'll want to implement proper percentile calculation based on 
+        # your calibration data
+        return np.array([50.0] * len(affinities))
+
     def predict(self, peptides, allele=None, model_kwargs=None, throw=True):
         """
         Minimal example for predicted binding affinity in nM (similar to Keras predictor).
