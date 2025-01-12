@@ -1346,7 +1346,12 @@ class Class1NeuralNetwork(object):
             BatchNormalization,
         )
 
-        peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
+        # Calculate input shape from peptide encoding parameters
+        max_length = peptide_encoding["max_length"]
+        # BLOSUM62 encoding has 21 dimensions (20 amino acids + gap)
+        amino_acid_encoding_dims = 21
+        peptide_encoding_shape = (max_length * amino_acid_encoding_dims,)
+
         peptide_input = Input(
             shape=peptide_encoding_shape, dtype="float32", name="peptide"
         )
