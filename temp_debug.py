@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import pandas as pd
 import logging
+import tensorflow as tf
 from mhcflurry.predict_command import run as predict_run
 from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
 from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
@@ -90,10 +91,16 @@ def compare_layer_outputs():
                         layer_inputs.append(tensor_dict[inp.name])
             
             # Compute layer output
-            if len(layer_inputs) == 1:
-                tensor_dict[layer.name] = layer(layer_inputs[0])
+            if isinstance(layer, tf.keras.layers.Embedding):
+                # Special handling for Embedding layers - they expect a single input
+                if len(layer_inputs) > 0:
+                    tensor_dict[layer.name] = layer(layer_inputs[0])
             else:
-                tensor_dict[layer.name] = layer(layer_inputs)
+                # For other layers, pass inputs as list or single tensor
+                if len(layer_inputs) == 1:
+                    tensor_dict[layer.name] = layer(layer_inputs[0])
+                elif len(layer_inputs) > 1:
+                    tensor_dict[layer.name] = layer(layer_inputs)
             
             layer_outputs.append(tensor_dict[layer.name])
         
