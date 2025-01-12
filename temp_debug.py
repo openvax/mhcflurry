@@ -10,207 +10,79 @@ from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
 
 logging.basicConfig(level=logging.INFO)
 
-def compare_layer_outputs():
-    logging.info("Starting layer output comparison test")
+def analyze_network_architectures():
+    """Compare network architectures and weights between Keras and PyTorch models"""
+    logging.info("Starting network architecture analysis")
+    
     try:
-        # Test data
-        alleles = ["HLA-A0201", "HLA-A0301"]
-        peptides = ["SIINFEKL", "SIINFEKD", "SIINFEKQ"]
-
-        # Get models directory and load predictors
+        # Load models
         from mhcflurry.downloads import get_default_class1_presentation_models_dir
         models_dir = get_default_class1_presentation_models_dir()
         logging.info(f"Using models directory: {models_dir}")
 
-        logging.info("Loading predictors...")
         presentation_predictor = Class1PresentationPredictor.load(models_dir)
         tf_predictor = presentation_predictor.affinity_predictor
         torch_predictor = TorchPredictor.load(models_dir)
-        logging.info("Predictors loaded successfully")
-
-    # Add hooks to capture intermediate outputs in PyTorch
-        torch_activations = {}
-        def get_activation(name):
-            def hook(model, input, output):
-                torch_activations[name] = output.detach().cpu().numpy()
-                logging.info(f"PyTorch layer {name} output shape: {output.shape}")
-                logging.info(f"PyTorch layer {name} output first few values: {output.flatten()[:5]}")
-            return hook
-
-        # Register hooks for each layer
-        logging.info("Registering PyTorch hooks...")
-        for name, layer in torch_predictor.named_modules():
-            if isinstance(layer, (torch.nn.Linear, torch.nn.BatchNorm1d)):
-                layer.register_forward_hook(get_activation(name))
-                logging.info(f"Registered hook for layer: {name}")
-
-        # Get TensorFlow predictions and intermediate outputs
-        logging.info("Setting up TensorFlow model...")
-        import tensorflow as tf
-        tf_model = tf_predictor.neural_networks[0]  # Get first model in ensemble
+        
+        # Get first Keras model from ensemble
+        tf_model = tf_predictor.neural_networks[0]
         network = tf_model.network()
-
-        # Create intermediate model that maintains graph connectivity
-        peptide_input = network.get_layer('peptide').input
-        allele_input = network.get_layer('allele').input
         
-        logging.info("Successfully got input layers")
-        logging.info(f"Peptide input shape: {peptide_input.shape}")
-        logging.info(f"Allele input shape: {allele_input.shape}")
+        logging.info("\n=== Keras Model Architecture ===")
+        network.summary()
         
-        # Build list of layer outputs while maintaining connections
-        layer_outputs = []
-        tensor_dict = {}
-        
-        logging.info("Starting layer traversal...")
-        
-        # Process all layers
-        for layer in network.layers:
-            # Skip input layers since we handle them separately
-            if layer.name in ['peptide', 'allele']:
-                continue
-                
-            # Get layer inputs
-            layer_inputs = []
-            for node in layer._inbound_nodes:
-                try:
-                    inbound_layers = node.inbound_layers
-                    if not isinstance(inbound_layers, list):
-                        inbound_layers = [inbound_layers]
-                except AttributeError:
-                    continue
-                
-                for inp in inbound_layers:
-                    if isinstance(inp, str):
-                        continue
-                    if inp.name == 'peptide':
-                        layer_inputs.append(peptide_input)
-                    elif inp.name == 'allele':
-                        layer_inputs.append(allele_input) 
-                    else:
-                        layer_inputs.append(tensor_dict[inp.name])
-            
-            # Compute layer output
-            if len(layer_inputs) == 0:
-                continue
-                
-            # Handle layer inputs based on layer type and input shape
-            if isinstance(layer, tf.keras.layers.Concatenate):
-                # Concatenate expects a list of tensors
-                tensor_dict[layer.name] = layer(layer_inputs)
-            elif isinstance(layer, (tf.keras.layers.Add, tf.keras.layers.Multiply)):
-                # Add and Multiply expect lists of tensors
-                tensor_dict[layer.name] = layer(layer_inputs)
-            elif isinstance(layer, tf.keras.layers.Dense):
-                # For Dense layers, we need to handle potential concatenated inputs
-                if len(layer_inputs) > 1:
-                    # If multiple inputs, concatenate them first
-                    combined_input = tf.keras.layers.Concatenate()(layer_inputs)
-                    tensor_dict[layer.name] = layer(combined_input)
-                else:
-                    tensor_dict[layer.name] = layer(layer_inputs[0])
-            else:
-                # For all other layer types (Flatten, Embedding etc)
-                # Pass first input only, with shape checking
-                input_tensor = layer_inputs[0]
-                if isinstance(input_tensor, list):
-                    # If we somehow got a list instead of a tensor, concatenate
-                    input_tensor = tf.keras.layers.Concatenate()(input_tensor)
-                tensor_dict[layer.name] = layer(input_tensor)
-            
-            layer_outputs.append(tensor_dict[layer.name])
-        
-        # Create the intermediate model
-        try:
-            tf_intermediate_model = tf.keras.Model(
-                inputs={'peptide': peptide_input, 'allele': allele_input},
-                outputs=layer_outputs
-            )
-            logging.info("Successfully created intermediate model")
-            logging.info(f"Number of outputs: {len(layer_outputs)}")
-        except Exception as e:
-            logging.error(f"Failed to create intermediate model: {str(e)}")
-            raise
-        logging.info("TensorFlow model ready")
-
-        # Prepare input data
-        logging.info("Preparing input data...")
-        from mhcflurry.encodable_sequences import EncodableSequences
-        from mhcflurry.allele_encoding import AlleleEncoding
-        
-        # Prepare peptide input
-        peptides_obj = EncodableSequences.create(peptides)
-        encoded_peptides = torch_predictor.peptides_to_network_input(peptides_obj)
-        
-        # Prepare allele input
-        allele_encoding = AlleleEncoding(alleles)
-        allele_input, allele_representations = tf_predictor.allele_encoding_to_network_input(allele_encoding)
-
-        logging.info(f"Peptide input shape: {encoded_peptides.shape}")
-        logging.info(f"Allele input shape: {allele_input.shape}")
-
-        # Get TensorFlow intermediate outputs with both inputs
-        logging.info("Getting TensorFlow outputs...")
-        tf_outputs = tf_intermediate_model.predict({
-            'peptide': encoded_peptides,
-            'allele': allele_input
-        })
-        for i, output in enumerate(tf_outputs):
-            logging.info(f"TF layer {i} output shape: {output.shape}")
-            logging.info(f"TF layer {i} output first few values: {output.flatten()[:5]}")
-        
-        # Get PyTorch intermediate outputs
-        logging.info("Getting PyTorch outputs...")
-        torch_predictor.eval()
-        with torch.no_grad():
-            encoded_tensor = torch.from_numpy(encoded_peptides).float().to(torch_predictor.device)
-            torch_output = torch_predictor(encoded_tensor)
-
-        # Compare outputs layer by layer
-        logging.info("\n=== Layer-by-layer comparison ===")
-        
-        # Compare input encoding
-        logging.info("\nInput encoding comparison:")
-        logging.info(f"TF input shape: {encoded_peptides.shape}")
-        logging.info(f"Torch input shape: {encoded_tensor.shape}")
-        input_diff = np.abs(encoded_peptides - encoded_tensor.cpu().numpy()).max()
-        logging.info(f"Input max diff: {input_diff}")
-
-        # Compare each layer's output
-        for i, (name, activation) in enumerate(torch_activations.items()):
-            if i < len(tf_outputs):  # Make sure we have corresponding TF output
-                tf_out = tf_outputs[i]
-                torch_out = activation
-                
-                logging.info(f"\nLayer {name}:")
-                logging.info(f"TF output shape: {tf_out.shape}")
-                logging.info(f"Torch output shape: {torch_out.shape}")
-                max_diff = np.abs(tf_out - torch_out).max()
-                mean_diff = np.abs(tf_out - torch_out).mean()
-                logging.info(f"Max difference: {max_diff}")
-                logging.info(f"Mean difference: {mean_diff}")
-                logging.info(f"TF first few values: {tf_out[0, :5]}")
-                logging.info(f"Torch first few values: {torch_out[0, :5]}")
-
-        # Compare final predictions
-        logging.info("\n=== Final Predictions ===")
-        tf_preds = tf_predictor.predict(peptides, alleles=alleles)
-        torch_preds = torch_predictor.predict(peptides, alleles=alleles)
-
-        logging.info(f"TF predictions: {tf_preds}")
-        logging.info(f"Torch predictions: {torch_preds}")
-        pred_diff = np.abs(tf_preds - torch_preds).max()
-        logging.info(f"Max prediction difference: {pred_diff}")
-
-        # Print model architectures
-        logging.info("\n=== Model Architectures ===")
-        logging.info("TensorFlow model:")
-        tf_model.network().summary()
-        logging.info("\nPyTorch model:")
+        logging.info("\n=== PyTorch Model Architecture ===")
         logging.info(str(torch_predictor))
+        
+        # Analyze layer dimensions
+        logging.info("\n=== Layer-by-layer Analysis ===")
+        
+        for layer in network.layers:
+            logging.info(f"\nKeras layer: {layer.name}")
+            logging.info(f"Type: {type(layer).__name__}")
+            logging.info(f"Input shape: {layer.input_shape}")
+            logging.info(f"Output shape: {layer.output_shape}")
+            
+            if isinstance(layer, tf.keras.layers.Dense):
+                weights = layer.get_weights()
+                logging.info(f"Weight shape: {weights[0].shape}")
+                logging.info(f"Bias shape: {weights[1].shape}")
+                logging.info(f"Weight stats - min: {weights[0].min():.4f}, max: {weights[0].max():.4f}, mean: {weights[0].mean():.4f}")
+                logging.info(f"Bias stats - min: {weights[1].min():.4f}, max: {weights[1].max():.4f}, mean: {weights[1].mean():.4f}")
+
+        logging.info("\n=== PyTorch Layer Analysis ===")
+        for name, module in torch_predictor.named_modules():
+            if len(name) > 0:  # Skip the root module
+                logging.info(f"\nPyTorch layer: {name}")
+                logging.info(f"Type: {type(module).__name__}")
+                
+                if isinstance(module, torch.nn.Linear):
+                    logging.info(f"Weight shape: {module.weight.shape}")
+                    logging.info(f"Bias shape: {module.bias.shape}")
+                    weight = module.weight.detach().cpu().numpy()
+                    bias = module.bias.detach().cpu().numpy()
+                    logging.info(f"Weight stats - min: {weight.min():.4f}, max: {weight.max():.4f}, mean: {weight.mean():.4f}")
+                    logging.info(f"Bias stats - min: {bias.min():.4f}, max: {bias.max():.4f}, mean: {bias.mean():.4f}")
+
+        # Compare input/output dimensions
+        test_peptides = ["SIINFEKL", "SIINFEKD", "SIINFEKQ"]
+        test_alleles = ["HLA-A0201", "HLA-A0301"]
+        
+        from mhcflurry.encodable_sequences import EncodableSequences
+        peptides_obj = EncodableSequences.create(test_peptides)
+        
+        logging.info("\n=== Input/Output Dimension Analysis ===")
+        
+        # Analyze Keras input dimensions
+        encoded_peptides_keras = tf_predictor.predict(test_peptides, alleles=test_alleles)
+        logging.info(f"Keras prediction shape: {encoded_peptides_keras.shape}")
+        
+        # Analyze PyTorch input dimensions  
+        encoded_peptides_torch = torch_predictor.predict(test_peptides, alleles=test_alleles)
+        logging.info(f"PyTorch prediction shape: {encoded_peptides_torch.shape}")
 
     except Exception as e:
-        logging.error(f"Error during comparison: {str(e)}", exc_info=True)
+        logging.error(f"Error during analysis: {str(e)}", exc_info=True)
 
 if __name__ == "__main__":
-    compare_layer_outputs()
+    analyze_network_architectures()
