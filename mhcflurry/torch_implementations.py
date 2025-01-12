@@ -238,25 +238,28 @@ class TorchNeuralNetwork(nn.Module):
         if not isinstance(x, torch.Tensor):
             x = to_torch(x)
         x = x.to(self.device)
+
+        # Ensure model is on correct device
+        self.to(self.device)
         
         # Process peptide layers
         peptide_output = x
         for layer in self.peptide_layers:
+            layer = layer.to(self.device)
             if isinstance(layer, nn.Linear):
                 peptide_output = self.hidden_activation(layer(peptide_output))
             else:
                 peptide_output = layer(peptide_output)
-            peptide_output = peptide_output.to(self.device)
                 
         # Process allele layers if present
         if hasattr(self, 'allele_layers'):
-            allele_output = self.allele_input
+            allele_output = self.allele_input.to(self.device)
             for layer in self.allele_layers:
+                layer = layer.to(self.device)
                 if isinstance(layer, nn.Linear):
                     allele_output = self.hidden_activation(layer(allele_output))
                 else:
                     allele_output = layer(allele_output)
-                allele_output = allele_output.to(self.device)
                 
             # Merge peptide and allele outputs
             if self.merge_method == "concatenate":
@@ -278,6 +281,7 @@ class TorchNeuralNetwork(nn.Module):
         if self.local_layers:
             x = x.unsqueeze(1)  # Add channel dimension
             for layer in self.local_layers:
+                layer = layer.to(self.device)
                 x = self.hidden_activation(layer(x))
             x = x.flatten(1)  # Flatten back to 2D
             
