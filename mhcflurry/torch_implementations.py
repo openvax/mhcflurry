@@ -101,12 +101,18 @@ class TorchNeuralNetwork(nn.Module):
         # Locally connected layers
         self.local_layers = nn.ModuleList()
         for params in self.hyperparameters["locally_connected_layers"]:
+            kernel_size = params["kernel_size"]
+            # Ensure groups divides input channels evenly
+            groups = min(current_size, current_size // kernel_size)
+            if current_size % groups != 0:
+                groups = 1
+            
             self.local_layers.append(
                 nn.Conv1d(
-                    in_channels=1,
-                    out_channels=params["filters"],
-                    kernel_size=params["kernel_size"],
-                    groups=current_size // params["kernel_size"],
+                    in_channels=current_size,
+                    out_channels=params["filters"] * groups,
+                    kernel_size=kernel_size,
+                    groups=groups,
                     bias=True
                 )
             )

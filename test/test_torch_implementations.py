@@ -31,11 +31,16 @@ def create_test_networks():
     ])
 
     torch_network = TorchNeuralNetwork(
-        input_size=315,
+        peptide_encoding={
+            "vector_encoding_name": "BLOSUM62",
+            "alignment_method": "pad_middle",
+            "max_length": 15,
+        },
         layer_sizes=[64, 32],
-        activation="tanh",
+        activation="tanh", 
         output_activation="sigmoid",
         batch_normalization=True,
+        locally_connected_layers=[],  # No locally connected layers for basic test
     )
 
     return keras_model, torch_network
