@@ -98,8 +98,30 @@ def test_tensor_conversion():
     assert isinstance(t, torch.Tensor)
     assert_array_almost_equal(x, to_numpy(t))
 
-    # Test torch to numpy
+    # Test torch to numpy  
     t = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
     x = to_numpy(t)
     assert isinstance(x, np.ndarray)
     assert_array_almost_equal(x, t.numpy())
+
+def test_activation_functions():
+    """Test that PyTorch and Keras activation functions match"""
+    import tensorflow as tf
+    
+    # Test sigmoid specifically since it's used as final activation
+    x = np.linspace(-5, 5, 20)
+    
+    # PyTorch sigmoid
+    torch_x = to_torch(x)
+    torch_sigmoid = torch.sigmoid(torch_x)
+    
+    # Keras sigmoid
+    keras_x = tf.convert_to_tensor(x)
+    keras_sigmoid = tf.sigmoid(keras_x)
+    
+    # Compare outputs
+    assert_array_almost_equal(
+        to_numpy(torch_sigmoid),
+        keras_sigmoid.numpy(),
+        decimal=6,
+        err_msg="PyTorch and Keras sigmoid functions produce different outputs")
