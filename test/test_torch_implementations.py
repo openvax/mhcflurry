@@ -63,14 +63,11 @@ def test_weight_transfer_and_predictions():
     test_input = np.random.rand(10, 315).astype("float32")
 
     # Add debug prints for Keras
-    intermediate_outputs = []
+    x = test_input
+    print("\nKeras Input:", np.mean(x), np.std(x))
     for i, layer in enumerate(keras_model.layers):
-        if i == 0:
-            x = test_input
-            print("\nKeras Input:", np.mean(x), np.std(x))
         x = layer(x)
         print(f"Keras After Layer {i}:", np.mean(x), np.std(x))
-        intermediate_outputs.append(x)
     keras_output = x.numpy()
 
     # Set PyTorch model to eval mode and get predictions
@@ -209,26 +206,22 @@ def test_full_network_architectures():
         # Create Keras model
         keras_model = Class1NeuralNetwork(**arch_params)
         
-        # Initialize the network
-        keras_model.network()
+        # Create test input to force network initialization
+        test_peptides = ["SIINFEKL", "KLGGALQAK"]
+        peptide_encoding = EncodableSequences.create(test_peptides)
         
-        # Ensure network is compiled
-        keras_model.network().compile(
-            optimizer='adam',
-            loss='mse'
-        )
+        # This will force network creation
+        keras_model.peptides_to_network_input(peptide_encoding)
+        
+        # Now we can safely get and compile the network
+        network = keras_model.network()
+        network.compile(optimizer='adam', loss='mse')
 
         # Create equivalent PyTorch model
         torch_model = TorchNeuralNetwork(**arch_params)
 
         # Transfer weights
-        torch_model.load_weights_from_keras(keras_model.network())
-
-        # Create test input
-        test_peptides = ["SIINFEKL", "KLGGALQAK"]
-
-        # Create encodings
-        peptide_encoding = EncodableSequences.create(test_peptides)
+        torch_model.load_weights_from_keras(network)
 
         # Get predictions from both models
         keras_predictions = keras_model.predict(peptides=peptide_encoding)
