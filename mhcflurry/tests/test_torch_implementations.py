@@ -14,22 +14,25 @@ def test_affinity_predictor_matches_keras():
     """Test that PyTorch affinity predictor gives identical results to Keras."""
     configure_tensorflow()
     from tf_keras.models import Sequential
-    from tf_keras.layers import Dense
+    from tf_keras.layers import Dense, BatchNormalization
 
     # Create a simple test network in Keras
     keras_model = Sequential([
         Dense(64, activation='tanh', input_shape=(128,)),
+        BatchNormalization(),
         Dense(32, activation='tanh'),
+        BatchNormalization(),
         Dense(1, activation='sigmoid')
     ])
 
-    # Create matching PyTorch network
+    # Create matching PyTorch network  
     torch_model = Class1AffinityPredictor(
         input_size=128,
         peptide_dense_layer_sizes=[],
         layer_sizes=[64, 32],
         activation='tanh',
-        output_activation='sigmoid'
+        output_activation='sigmoid',
+        batch_normalization=True
     )
 
     # Load Keras weights into PyTorch model
