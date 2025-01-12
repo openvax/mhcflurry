@@ -60,6 +60,7 @@ def test_affinity_predictor_matches_keras():
 
 def test_predict_command_backends_match():
     """Test that PyTorch and TensorFlow backends give matching results."""
+    from nose.tools import assert_almost_equal
     import tempfile
     import pandas as pd
     
