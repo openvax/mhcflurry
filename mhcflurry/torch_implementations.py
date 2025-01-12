@@ -664,24 +664,23 @@ class Class1AffinityPredictor(object):
         from tf_keras.layers import Dense, BatchNormalization
         
         # Get all dense and batch norm layers from both models
-        keras_layers = [l for l in keras_model.layers
-        print(f"[DEBUG] Keras layer count = {len(keras_layers)}")
+        keras_layers = [l for l in keras_model.layers]
+        print("[DEBUG] Keras layer count =", len(keras_layers))
         for i, layer in enumerate(keras_layers):
             shapes = [w.shape for w in layer.get_weights()]
-            print(f"[DEBUG]  Keras layer {i}: {layer.name}, weight shapes: {shapes}")
+            print("[DEBUG]  Keras layer", i, ":", layer.name, ", weight shapes:", shapes)
 
-        print(f"[DEBUG] Torch layer count = {len(torch_layers)}")
+        print("[DEBUG] Torch layer count =", len(torch_layers))
         for i, layer in enumerate(torch_layers):
             if hasattr(layer, 'weight'):
-                print(f"[DEBUG]  Torch layer {i}: {layer}, weight shape = {list(layer.weight.shape)}")
+                print("[DEBUG]  Torch layer", i, ":", layer, ", weight shape =", list(layer.weight.shape))
                 if isinstance(layer, nn.BatchNorm1d):
-                    print(f"[DEBUG]           BN => running_mean shape = {list(layer.running_mean.shape)}, "
-                          f"running_var shape = {list(layer.running_var.shape)}")
+                    print("[DEBUG]           BN => running_mean shape =", list(layer.running_mean.shape), 
+                          ", running_var shape =", list(layer.running_var.shape))
             else:
                 print(f"[DEBUG]  Torch layer {i}: {layer} (no weight)")
 
         print("[DEBUG] Checking that layer list lengths match...")
-                       if isinstance(l, (Dense, BatchNormalization))]
         
         # Get corresponding PyTorch layers
         torch_layers = []
