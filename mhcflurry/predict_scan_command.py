@@ -310,7 +310,7 @@ def run(argv=sys.argv[1:]):
             parser.error(
                 "Specify either an input file or the --sequences argument")
 
-        df = pandas.DataFrame({
+        df = pd.DataFrame({
             args.sequence_column: args.sequences,
         })
 

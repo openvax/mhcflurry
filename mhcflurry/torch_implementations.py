@@ -78,7 +78,19 @@ class Class1AffinityPredictor(nn.Module):
         # Initialize weights
         self.init_weights(init)
 
-    def init_weights(self, init):
+    @classmethod
+    def load(cls, models_dir):
+        """
+        Minimal placeholder load method. Adjust as needed to read any model
+        files from models_dir. Must return an initialized Class1AffinityPredictor.
+        """
+        # For example, return a default instance:
+        instance = cls(
+            input_size=128,
+            peptide_dense_layer_sizes=[],
+            layer_sizes=[],
+        )
+        return instance
         """Initialize network weights."""
         for layer in self.layers:
             if isinstance(layer, nn.Linear):
