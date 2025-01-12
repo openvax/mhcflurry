@@ -53,12 +53,16 @@ from .version import __version__
 
 
 parser = argparse.ArgumentParser(
-    description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter, add_help=False
+    description=__doc__,
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    add_help=False,
 )
 
 
 helper_args = parser.add_argument_group(title="Help")
-helper_args.add_argument("-h", "--help", action="help", help="Show this help message and exit")
+helper_args.add_argument(
+    "-h", "--help", action="help", help="Show this help message and exit"
+)
 helper_args.add_argument(
     "--list-supported-alleles",
     action="store_true",
@@ -78,20 +82,34 @@ helper_args.add_argument(
 )
 
 input_args = parser.add_argument_group(title="Input (required)")
-input_args.add_argument("input", metavar="INPUT.csv", nargs="?", help="Input CSV")
 input_args.add_argument(
-    "--alleles", metavar="ALLELE", nargs="+", help="Alleles to predict (exclusive with passing an input CSV)"
+    "input", metavar="INPUT.csv", nargs="?", help="Input CSV"
 )
 input_args.add_argument(
-    "--peptides", metavar="PEPTIDE", nargs="+", help="Peptides to predict (exclusive with passing an input CSV)"
+    "--alleles",
+    metavar="ALLELE",
+    nargs="+",
+    help="Alleles to predict (exclusive with passing an input CSV)",
+)
+input_args.add_argument(
+    "--peptides",
+    metavar="PEPTIDE",
+    nargs="+",
+    help="Peptides to predict (exclusive with passing an input CSV)",
 )
 
 input_mod_args = parser.add_argument_group(title="Input options")
 input_mod_args.add_argument(
-    "--allele-column", metavar="NAME", default="allele", help="Input column name for alleles. Default: '%(default)s'"
+    "--allele-column",
+    metavar="NAME",
+    default="allele",
+    help="Input column name for alleles. Default: '%(default)s'",
 )
 input_mod_args.add_argument(
-    "--peptide-column", metavar="NAME", default="peptide", help="Input column name for peptides. Default: '%(default)s'"
+    "--peptide-column",
+    metavar="NAME",
+    default="peptide",
+    help="Input column name for peptides. Default: '%(default)s'",
 )
 input_mod_args.add_argument(
     "--n-flank-column",
@@ -121,7 +139,10 @@ output_args.add_argument(
     help="Prefix for output column names. Default: '%(default)s'",
 )
 output_args.add_argument(
-    "--output-delimiter", metavar="CHAR", default=",", help="Delimiter character for results. Default: '%(default)s'"
+    "--output-delimiter",
+    metavar="CHAR",
+    default=",",
+    help="Delimiter character for results. Default: '%(default)s'",
 )
 output_args.add_argument(
     "--no-affinity-percentile", default=False, action="store_true", help="Do not include affinity percentile rank"
