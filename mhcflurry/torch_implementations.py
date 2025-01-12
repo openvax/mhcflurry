@@ -136,8 +136,56 @@ class TorchNeuralNetwork(nn.Module):
         self.output_layer = nn.Linear(current_size, num_outputs)
 
         # Build network layers
-        self.build_layers()
-        
+        self.layers = nn.ModuleList()
+        current_size = input_size
+
+        # Peptide dense layers
+        self.peptide_layers = nn.ModuleList()
+        for size in peptide_dense_layer_sizes:
+            self.peptide_layers.extend([
+                nn.Linear(current_size, size),
+                nn.Dropout(dropout_probability) if dropout_probability > 0 else nn.Identity()
+            ])
+            if batch_normalization:
+                self.peptide_layers.append(nn.BatchNorm1d(size))
+            current_size = size
+
+        # Locally connected layers
+        self.local_layers = nn.ModuleList()
+        for params in locally_connected_layers:
+            self.local_layers.append(
+                nn.Conv1d(
+                    in_channels=1,
+                    out_channels=params['filters'], 
+                    kernel_size=params['kernel_size'],
+                    groups=input_size // params['kernel_size'],
+                    bias=True
+                )
+            )
+            current_size = params['filters'] * (input_size - params['kernel_size'] + 1)
+
+        # Main dense layers
+        self.dense_layers = nn.ModuleList()
+        prev_layers = []
+        for size in layer_sizes:
+            if topology == "with-skip-connections" and prev_layers:
+                # Concatenate previous two layers
+                if len(prev_layers) > 1:
+                    current_size = prev_layers[-1].out_features + prev_layers[-2].out_features
+            
+            layer = nn.Linear(current_size, size)
+            self.dense_layers.append(layer)
+            prev_layers.append(layer)
+            
+            if batch_normalization:
+                self.dense_layers.append(nn.BatchNorm1d(size))
+            if dropout_probability > 0:
+                self.dense_layers.append(nn.Dropout(dropout_probability))
+            current_size = size
+
+        # Output layer
+        self.output_layer = nn.Linear(current_size, num_outputs)
+
         # Initialize weights
         self.init_weights(init)
 
