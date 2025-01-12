@@ -35,21 +35,36 @@ HLA-B4403,PPPPPPPP,18
 def test_csv():
     args = ["--allele-column", "Allele", "--peptide-column", "Peptide"]
     deletes = []
+    result = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as fd:
             fd.write(TEST_CSV.encode())
             deletes.append(fd.name)
-        fd_out = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
-        deletes.append(fd_out.name)
-        full_args = [fd.name] + args + ["--out", fd_out.name]
-        print("Running with args: %s" % full_args)
-        predict_command.run(full_args)
-        result = pandas.read_csv(fd_out.name)
-        print(result)
-        assert not result.isnull().any().any()
+            fd.close()  # Explicitly close
+            
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as fd_out:
+            deletes.append(fd_out.name)
+            full_args = [fd.name] + args + ["--out", fd_out.name]
+            print("Running with args: %s" % full_args)
+            predict_command.run(full_args)
+            fd_out.close()  # Explicitly close
+            result = pandas.read_csv(fd_out.name)
+            print(result)
+            assert not result.isnull().any().any()
     finally:
+        # Make sure we've closed the files and pandas has released them
+        import gc
+        gc.collect()  # Force garbage collection
+        
+        # Add a small delay to ensure files are released
+        import time
+        time.sleep(0.1)
+        
         for delete in deletes:
-            os.unlink(delete)
+            try:
+                os.unlink(delete)
+            except Exception as e:
+                print(f"Warning: Could not delete {delete}: {e}")
 
     assert result.shape == (3, 8)
 
