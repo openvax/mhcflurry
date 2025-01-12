@@ -49,7 +49,7 @@ import itertools
 import logging
 import os
 
-import pandas
+import pandas as pd
 
 from .downloads import get_default_class1_presentation_models_dir
 from .class1_affinity_predictor import Class1AffinityPredictor
