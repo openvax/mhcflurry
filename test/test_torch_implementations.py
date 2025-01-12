@@ -53,7 +53,20 @@ def test_weight_transfer_and_predictions():
 
     # Test with random input
     test_input = np.random.rand(10, 315).astype("float32")
-    keras_output = keras_model.predict(test_input)
+    
+    # Add debug prints for Keras
+    intermediate_outputs = []
+    for i, layer in enumerate(keras_model.layers):
+        if i == 0:
+            x = test_input
+            print("\nKeras Input:", np.mean(x), np.std(x))
+        x = layer(x)
+        print(f"Keras After Layer {i}:", np.mean(x), np.std(x))
+        intermediate_outputs.append(x)
+    keras_output = x.numpy()
+    
+    # Set PyTorch model to eval mode and get predictions
+    torch_network.eval()
     torch_output = to_numpy(torch_network(to_torch(test_input)))
 
     print("\nKeras output shape:", keras_output.shape)
