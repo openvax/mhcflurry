@@ -319,7 +319,7 @@ class TorchNeuralNetwork(nn.Module):
         if hasattr(self, 'output_layer'):
             torch_layers.append(self.output_layer)
 
-        print(f"[DEBUG] Checking that layer list lengths match... {len(keras_layers)} vs. {len(torch_layers)}")
+        print("[DEBUG] Checking that layer list lengths match...")
         if len(keras_layers) != len(torch_layers):
             print("[DEBUG] Keras layers:")
             for idx, k_layer in enumerate(keras_layers):
@@ -669,6 +669,12 @@ class Class1AffinityPredictor(object):
         for i, layer in enumerate(keras_layers):
             shapes = [w.shape for w in layer.get_weights()]
             print("[DEBUG]  Keras layer", i, ":", layer.name, ", weight shapes:", shapes)
+
+        torch_layers = []
+        torch_layers.extend([l for l in self.peptide_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
+        torch_layers.extend([l for l in self.dense_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
+        if hasattr(self, 'output_layer'):
+            torch_layers.append(self.output_layer)
 
         print("[DEBUG] Torch layer count =", len(torch_layers))
         for i, layer in enumerate(torch_layers):
