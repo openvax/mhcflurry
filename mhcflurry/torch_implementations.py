@@ -77,11 +77,14 @@ class TorchNeuralNetwork(nn.Module):
         current_size = peptide_input_dim
 
         # Handle batch_norm_early if no peptide_dense_layer_sizes
+        # If no peptide_dense_layer_sizes, handle “batch_norm_early”
         if self.hyperparameters["batch_normalization"] and not self.hyperparameters["peptide_dense_layer_sizes"]:
+            print("[DEBUG] Adding batch_norm_early for peptide input dim =", current_size)
             self.peptide_layers.append(nn.BatchNorm1d(current_size))
-        
-        # Peptide dense layers
+
+        # Build peptide dense layers
         for size in self.hyperparameters["peptide_dense_layer_sizes"]:
+            print(f"[DEBUG] Adding peptide dense layer: in={current_size}, out={size}")
             linear = nn.Linear(current_size, size)
             self.peptide_layers.append(linear)
             if self.hyperparameters["dense_layer_l1_regularization"] > 0:
@@ -94,8 +97,8 @@ class TorchNeuralNetwork(nn.Module):
                     nn.Dropout(self.hyperparameters["dropout_probability"]))
             current_size = size
 
-        # Add a single batch normalization after all peptide dense layers
         if self.hyperparameters["batch_normalization"] and self.hyperparameters["peptide_dense_layer_sizes"]:
+            print("[DEBUG] Adding single BN after peptide denselayers: dim =", current_size)
             self.peptide_layers.append(nn.BatchNorm1d(current_size))
 
         # Allele representation layers
@@ -282,7 +285,24 @@ class TorchNeuralNetwork(nn.Module):
 
         return x
 
-    def load_weights_from_keras(self, keras_model):
+    def predict(self, peptides, batch_size=32):
+        from .encodable_sequences import EncodableSequences
+        from .common import to_numpy
+
+        print("[DEBUG] TorchNeuralNetwork.predict called with", len(peptides), "peptides")
+        if not isinstance(peptides, EncodableSequences):
+            peptides = EncodableSequences.create(peptides)
+        encoded = peptides.variable_length_to_fixed_length_vector_encoding(
+            "BLOSUM62",
+            alignment_method="pad_middle",
+            max_length=15
+        )
+        encoded = encoded.reshape(encoded.shape[0], -1)
+
+        self.eval()
+        with torch.no_grad():
+            outputs = self(to_torch(encoded))
+        return to_numpy(outputs)
         """
         Load weights from a Keras model into this PyTorch model.
         
