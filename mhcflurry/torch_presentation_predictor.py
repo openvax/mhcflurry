@@ -79,13 +79,8 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
                 # Get predictions
                 with torch.no_grad():
                     model.eval()
-                    logits = model(inputs)
-                    probs = torch.sigmoid(logits)
-                    # Return probabilities for both classes [0, 1] to match sklearn's predict_proba
-                    class_0_probs = 1 - probs
-                    class_probs = torch.cat([class_0_probs, probs], dim=1)
-                    # Take probability of positive class
-                    df["presentation_score"] = class_probs[:, 1].cpu().numpy()
+                    probs = model(inputs)  # Model now includes sigmoid in Sequential
+                    df["presentation_score"] = probs.squeeze().cpu().numpy()
                 
                 if null_mask is not None:
                     df.loc[null_mask, "presentation_score"] = numpy.nan
