@@ -70,14 +70,21 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
                     null_mask = input_matrix.isnull().any(axis=1)
                     input_matrix = input_matrix.fillna(0.0)
                 
-                # Convert to PyTorch tensor
+                # Convert to PyTorch tensor and add debug prints
                 inputs = torch.FloatTensor(input_matrix.values).to(self.device)
+                print("\nInput matrix stats:")
+                print("Mean:", input_matrix.values.mean())
+                print("Std:", input_matrix.values.std())
                 
                 # Get predictions
                 with torch.no_grad():
                     model.eval()
                     logits = model(inputs)
-                    df["presentation_score"] = torch.sigmoid(logits).squeeze().cpu().numpy()
+                    scores = torch.sigmoid(logits).squeeze().cpu().numpy()
+                    print("\nPrediction stats:")
+                    print("Mean:", scores.mean())
+                    print("Std:", scores.std())
+                    df["presentation_score"] = scores
                 
                 if null_mask is not None:
                     df.loc[null_mask, "presentation_score"] = numpy.nan
