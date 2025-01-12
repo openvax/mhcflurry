@@ -243,61 +243,21 @@ class TorchNeuralNetwork(nn.Module):
         self.to(self.device)
         
         # Process peptide layers
-        peptide_output = x
+        x = x
         for layer in self.peptide_layers:
             layer = layer.to(self.device)
+            x = layer(x)
             if isinstance(layer, nn.Linear):
-                peptide_output = self.hidden_activation(layer(peptide_output))
-            else:
-                peptide_output = layer(peptide_output)
+                x = self.hidden_activation(x)
                 
-        # Process allele layers if present
-        if hasattr(self, 'allele_layers'):
-            allele_output = self.allele_input.to(self.device)
-            for layer in self.allele_layers:
-                layer = layer.to(self.device)
-                if isinstance(layer, nn.Linear):
-                    allele_output = self.hidden_activation(layer(allele_output))
-                else:
-                    allele_output = layer(allele_output)
-                
-            # Merge peptide and allele outputs
-            if self.merge_method == "concatenate":
-                x = torch.cat([peptide_output, allele_output], dim=1)
-            elif self.merge_method == "multiply":
-                x = peptide_output * allele_output
-                
-            if self.merge_activation:
-                x = {
-                    "tanh": torch.tanh,
-                    "relu": F.relu,
-                    "sigmoid": torch.sigmoid,
-                    "": lambda x: x,
-                }[self.merge_activation](x)
-        else:
-            x = peptide_output
-                
-        # Process locally connected layers
-        if self.local_layers:
-            x = x.unsqueeze(1)  # Add channel dimension
-            for layer in self.local_layers:
-                layer = layer.to(self.device)
-                x = self.hidden_activation(layer(x))
-            x = x.flatten(1)  # Flatten back to 2D
-            
-        # Process dense layers with topology handling
-        layer_outputs = []
-        for i, layer in enumerate(self.dense_layers):
+        # Process dense layers
+        for layer in self.dense_layers:
+            layer = layer.to(self.device)
+            x = layer(x)
             if isinstance(layer, nn.Linear):
-                if self.topology == "with-skip-connections" and len(layer_outputs) > 1:
-                    # Concatenate previous two layer outputs
-                    x = torch.cat(layer_outputs[-2:], dim=1)
-                x = self.hidden_activation(layer(x))
-                layer_outputs.append(x)
-            else:
-                x = layer(x)
+                x = self.hidden_activation(x)
                 
-        # Output layer
+        # Output layer with final activation
         x = self.output_layer(x)
         x = self.output_activation(x)
         
@@ -346,7 +306,7 @@ class TorchNeuralNetwork(nn.Module):
                     t_layer.running_var.data = torch.from_numpy(weights[3]).float()
                         
                     # Configure batch norm settings to match Keras
-                    t_layer.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum (0.99)
+                    t_layer.momentum = 0.99  # Match Keras momentum
                     t_layer.eps = 0.001  # Match Keras epsilon
                     t_layer.track_running_stats = True
                     t_layer.training = False  # Set to eval mode
