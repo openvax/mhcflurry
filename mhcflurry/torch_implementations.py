@@ -79,12 +79,12 @@ class TorchNeuralNetwork(nn.Module):
         # Peptide dense layers
         for size in self.hyperparameters["peptide_dense_layer_sizes"]:
             linear = nn.Linear(current_size, size)
+            self.peptide_layers.append(linear)
             if self.hyperparameters["dense_layer_l1_regularization"] > 0:
                 self.regularization_losses.append(
                     lambda: self.hyperparameters["dense_layer_l1_regularization"] * 
                            linear.weight.abs().sum()
                 )
-            self.peptide_layers.append(linear)
             if self.hyperparameters["batch_normalization"]:
                 self.peptide_layers.append(nn.BatchNorm1d(size))
             if self.hyperparameters["dropout_probability"] > 0:
@@ -254,7 +254,15 @@ class TorchNeuralNetwork(nn.Module):
                 x = layer(x)
             x = x.to(self.device)
 
-        # Process dense layers with Keras-matching activation order
+        # Process peptide layers with Keras-matching activation order
+        for layer in self.peptide_layers:
+            if isinstance(layer, nn.Linear):
+                x = self.hidden_activation(layer(x))
+            else:
+                x = layer(x)
+            x = x.to(self.device)
+
+        # Process main dense layers with Keras-matching activation order
         for layer in self.dense_layers:
             layer = layer.to(self.device)
             x = x.to(self.device)
@@ -287,9 +295,8 @@ class TorchNeuralNetwork(nn.Module):
         from tf_keras.layers import Dense, BatchNormalization
         keras_layers = [l for l in keras_model.layers if isinstance(l, (Dense, BatchNormalization))]
         torch_layers = []
-        # ADD peptide_layers:
-        torch_layers.extend([l for l in self.peptide_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
         # Include peptide_layers:
+        torch_layers.extend([l for l in self.peptide_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
         torch_layers.extend([l for l in self.peptide_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
         torch_layers.extend([l for l in self.dense_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
         if hasattr(self, 'output_layer'):
