@@ -53,6 +53,8 @@ class TorchNeuralNetwork(nn.Module):
             data_dependent_initialization_method=None):
         super().__init__()
         
+        # Set device first thing
+        
         # Initialize list to store regularization loss functions
         self.regularization_losses = []
 
@@ -169,9 +171,8 @@ class TorchNeuralNetwork(nn.Module):
 
     def to(self, device):
         """Move model to specified device"""
+        super().to(device)
         self.device = device
-        for module in self.modules():
-            module.to(device)
         return self
         
     def train(self, mode=True):
