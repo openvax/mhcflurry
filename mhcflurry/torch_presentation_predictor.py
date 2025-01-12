@@ -55,6 +55,40 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
             
         return self._torch_models[name]
 
+    def get_model(self, name=None):
+        """
+        Load or instantiate a new logistic regression model in PyTorch.
+        
+        Parameters
+        ----------
+        name : string
+            Model variant name ('with_flanks' or 'without_flanks')
+            
+        Returns
+        -------
+        torch.nn.Module
+        """
+        if name is None:
+            return nn.Linear(len(self.model_inputs), 1)
+            
+        if name not in self._torch_models:
+            model = nn.Linear(len(self.model_inputs), 1)
+            row = self.weights_dataframe.loc[name]
+            
+            # Convert weights and bias to PyTorch tensors
+            weights = torch.FloatTensor(row[self.model_inputs].values)
+            bias = torch.FloatTensor([row.intercept])
+            
+            # Assign the weights
+            with torch.no_grad():
+                model.weight.copy_(weights.unsqueeze(0))
+                model.bias.copy_(bias)
+                
+            model = model.to(self.device)
+            self._torch_models[name] = model
+            
+        return self._torch_models[name]
+
     def predict(self, *args, **kwargs):
         """
         Override predict to use PyTorch models for the final presentation score calculation
@@ -78,8 +112,8 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
                 # Get predictions
                 with torch.no_grad():
                     model.eval()
-                    logits = model[0](inputs)  # Get raw logits from first layer
-                    probs = torch.sigmoid(logits)  # Apply sigmoid manually
+                    logits = model(inputs)
+                    probs = torch.sigmoid(logits)
                     df["presentation_score"] = probs.squeeze().cpu().numpy()
                 
                 if null_mask is not None:
