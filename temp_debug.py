@@ -23,6 +23,31 @@ def analyze_network_architectures():
         presentation_predictor = Class1PresentationPredictor.load(models_dir)
         tf_predictor = presentation_predictor.affinity_predictor
         torch_predictor = TorchPredictor.load(models_dir)
+
+        # Test weight loading
+        logging.info("\n=== Testing Weight Loading ===")
+        
+        # Get weights from Keras model
+        tf_model = tf_predictor.neural_networks[0]
+        tf_weights = tf_model.get_weights()
+        
+        # Load weights into PyTorch model
+        torch_predictor.load_weights_from_keras(tf_model)
+        
+        # Generate test input
+        test_peptides = ["SIINFEKL", "KLGGALQAK"]
+        test_allele = "HLA-A*02:01"
+        
+        # Get predictions from both models
+        tf_pred = tf_predictor.predict(test_peptides, allele=test_allele)
+        torch_pred = torch_predictor.predict(test_peptides, allele=test_allele)
+        
+        logging.info("\n=== Prediction Comparison After Weight Loading ===")
+        for i, (k_pred, t_pred) in enumerate(zip(tf_pred, torch_pred)):
+            logging.info(f"Peptide: {test_peptides[i]}")
+            logging.info(f"Keras prediction: {k_pred:.4f}")
+            logging.info(f"PyTorch prediction: {t_pred:.4f}")
+            logging.info(f"Absolute difference: {abs(k_pred - t_pred):.4f}")
         
         # Get first Keras model from ensemble
         tf_model = tf_predictor.neural_networks[0]
