@@ -65,7 +65,7 @@ def analyze_network_architectures():
                     logging.info(f"Bias stats - min: {bias.min():.4f}, max: {bias.max():.4f}, mean: {bias.mean():.4f}")
 
         # Compare input/output dimensions
-        test_peptides = ["SIINFEKL", "SIINFEKD", "SIINFEKQ"]
+        test_peptides = ["SIINFEKL", "SIINFEKD"]
         test_alleles = ["HLA-A0201", "HLA-A0301"]
         
         from mhcflurry.encodable_sequences import EncodableSequences
