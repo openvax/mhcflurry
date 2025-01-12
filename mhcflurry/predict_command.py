@@ -1,4 +1,4 @@
-"""
+'''
 Run MHCflurry predictor on specified peptides.
 
 By default, the presentation predictor is used, and predictions for
@@ -29,27 +29,20 @@ give a comma separated list of alleles giving a sample genotype. In this case,
 the tightest binding affinity across the alleles for the sample will be
 returned. For example:
 
-$ mhcflurry-predict --peptides SIINFEKL DENDREKLLL \
-    --alleles \
-        HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:01,HLA-C*07:02 \
+$ mhcflurry-predict --peptides SIINFEKL DENDREKLLL \\
+    --alleles \\
+        HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:01,HLA-C*07:02 \\
         HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:01,HLA-C*03:01
 
 will give the tightest predicted affinities across alleles for each of the two
 genotypes specified for each peptide.
-"""
-
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
-
+'''
+from __future__ import print_function, division, absolute_import
 import sys
 import argparse
 import itertools
 import logging
 import os
-
 import pandas
 
 from .downloads import get_default_class1_presentation_models_dir
