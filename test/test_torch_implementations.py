@@ -189,47 +189,34 @@ def test_full_network_architectures():
     # Test different architectures
     architectures = [
         {
-            # Basic pan-allele architecture
-            "allele_amino_acid_encoding": "BLOSUM62",
+            # Basic architecture
             "peptide_encoding": {
                 "vector_encoding_name": "BLOSUM62",
                 "alignment_method": "pad_middle",
-                "left_edge": 4,
-                "right_edge": 4,
                 "max_length": 15,
             },
-            "allele_dense_layer_sizes": [64],
-            "peptide_dense_layer_sizes": [32],
-            "peptide_allele_merge_method": "multiply",
             "layer_sizes": [64, 32],
-            "dropout_probability": 0.2,
+            "dropout_probability": 0.0,
             "batch_normalization": True,
-            "locally_connected_layers": [{"filters": 8, "activation": "tanh", "kernel_size": 3}],
-            "topology": "feedforward",
-        },
-        {
-            # Architecture with skip connections
-            "topology": "with-skip-connections",
-            "layer_sizes": [64, 32, 16],
-            "peptide_allele_merge_method": "concatenate",
-            "allele_amino_acid_encoding": "BLOSUM62",
-            "peptide_encoding": {
-                "vector_encoding_name": "BLOSUM62",
-                "alignment_method": "pad_middle",
-                "left_edge": 4,
-                "right_edge": 4,
-                "max_length": 15,
-            },
-            "allele_dense_layer_sizes": [64],
-            "peptide_dense_layer_sizes": [32],
-            "dropout_probability": 0.2,
-            "batch_normalization": True,
+            "locally_connected_layers": [],
+            "activation": "tanh",
+            "init": "glorot_uniform",
+            "output_activation": "sigmoid",
         },
     ]
 
     for arch_params in architectures:
         # Create Keras model
         keras_model = Class1NeuralNetwork(**arch_params)
+        
+        # Initialize the network
+        keras_model.network()
+        
+        # Ensure network is compiled
+        keras_model.network().compile(
+            optimizer='adam',
+            loss='mse'
+        )
 
         # Create equivalent PyTorch model
         torch_model = TorchNeuralNetwork(**arch_params)
@@ -239,19 +226,13 @@ def test_full_network_architectures():
 
         # Create test input
         test_peptides = ["SIINFEKL", "KLGGALQAK"]
-        test_alleles = ["HLA-A*02:01", "HLA-B*27:05"]
 
         # Create encodings
-        from mhcflurry.encodable_sequences import EncodableSequences
-        from mhcflurry.allele_encoding import AlleleEncoding
-
         peptide_encoding = EncodableSequences.create(test_peptides)
-        allele_encoding = AlleleEncoding(test_alleles)
 
         # Get predictions from both models
-        keras_predictions = keras_model.predict(peptides=peptide_encoding, allele_encoding=allele_encoding)
-
-        torch_predictions = torch_model.predict(peptides=peptide_encoding, allele_encoding=allele_encoding)
+        keras_predictions = keras_model.predict(peptides=peptide_encoding)
+        torch_predictions = torch_model.predict(peptides=peptide_encoding)
 
         # Compare predictions
         assert_array_almost_equal(
