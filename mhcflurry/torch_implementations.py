@@ -59,92 +59,95 @@ class TorchNeuralNetwork(nn.Module):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        # Activation functions
-        self.hidden_activation = {
-            "tanh": torch.tanh,
-            "relu": F.relu,
-            "sigmoid": torch.sigmoid,
-            "": lambda x: x,  # Match Keras behavior for empty string
-        }[activation]
+    def _build_network(self):
+        """Build PyTorch network matching Keras architecture"""
+        # Get dimensions from peptide encoding config
+        peptide_input_dim = self._get_peptide_input_dim()
         
-        self.output_activation = {
-            "sigmoid": torch.sigmoid,
-            "linear": lambda x: x,
-            "tanh": torch.tanh,
-            "": lambda x: x,  # Match Keras behavior for empty string
-        }[output_activation]
-
-        # Build network layers
-        self.layers = nn.ModuleList()
-        current_size = input_size
-
-        # Store topology info for forward pass
-        self.topology = topology
-        self.prev_layer_outputs = []
-
-        # Peptide dense layers with regularization
+        # Input layers
         self.peptide_layers = nn.ModuleList()
-        for size in peptide_dense_layer_sizes:
+        current_size = peptide_input_dim
+        
+        # Peptide dense layers
+        for size in self.hyperparameters["peptide_dense_layer_sizes"]:
             linear = nn.Linear(current_size, size)
-            if dense_layer_l1_regularization > 0 or dense_layer_l2_regularization > 0:
+            if self.hyperparameters["dense_layer_l1_regularization"] > 0:
                 self.regularization_losses.append(
-                    lambda: dense_layer_l1_regularization * linear.weight.abs().sum() +
-                           dense_layer_l2_regularization * (linear.weight ** 2).sum()
+                    lambda: self.hyperparameters["dense_layer_l1_regularization"] * 
+                           linear.weight.abs().sum()
                 )
-            self.peptide_layers.extend([
-                linear,
-                nn.Dropout(dropout_probability) if dropout_probability > 0 else nn.Identity()
-            ])
-            if batch_normalization:
+            self.peptide_layers.append(linear)
+            if self.hyperparameters["batch_normalization"]:
                 self.peptide_layers.append(nn.BatchNorm1d(size))
+            if self.hyperparameters["dropout_probability"] > 0:
+                self.peptide_layers.append(
+                    nn.Dropout(self.hyperparameters["dropout_probability"]))
             current_size = size
+
+        # Allele representation layers
+        if self.hyperparameters["allele_dense_layer_sizes"]:
+            self.allele_layers = nn.ModuleList()
+            self.allele_embedding = nn.Embedding(
+                num_embeddings=1,  # Will be set when allele representations are loaded
+                embedding_dim=1    # Will be set when allele representations are loaded
+            )
+            current_allele_size = self.allele_embedding.embedding_dim
+            for size in self.hyperparameters["allele_dense_layer_sizes"]:
+                self.allele_layers.append(nn.Linear(current_allele_size, size))
+                current_allele_size = size
 
         # Locally connected layers
         self.local_layers = nn.ModuleList()
-        for params in locally_connected_layers:
+        for params in self.hyperparameters["locally_connected_layers"]:
             self.local_layers.append(
                 nn.Conv1d(
                     in_channels=1,
-                    out_channels=params['filters'],
-                    kernel_size=params['kernel_size'],
-                    groups=input_size // params['kernel_size'],
+                    out_channels=params["filters"],
+                    kernel_size=params["kernel_size"],
+                    groups=current_size // params["kernel_size"],
                     bias=True
                 )
             )
-            current_size = params['filters'] * (input_size - params['kernel_size'] + 1)
+            if params["activation"] == "tanh":
+                self.local_layers.append(nn.Tanh())
+            current_size = params["filters"] * (current_size - params["kernel_size"] + 1)
 
-        # Main dense layers with regularization
+        # Main dense layers
         self.dense_layers = nn.ModuleList()
-        for size in layer_sizes:
-            if topology == "with-skip-connections" and len(self.prev_layer_outputs) > 1:
-                current_size = sum(l.out_features for l in self.prev_layer_outputs[-2:])
+        self.layer_outputs = []  # For skip connections
+        
+        for size in self.hyperparameters["layer_sizes"]:
+            if self.hyperparameters["topology"] == "with-skip-connections" and len(self.layer_outputs) > 1:
+                current_size = sum(l.out_features for l in self.layer_outputs[-2:])
             
             linear = nn.Linear(current_size, size)
-            if dense_layer_l1_regularization > 0 or dense_layer_l2_regularization > 0:
+            if self.hyperparameters["dense_layer_l1_regularization"] > 0:
                 self.regularization_losses.append(
-                    lambda: dense_layer_l1_regularization * linear.weight.abs().sum() +
-                           dense_layer_l2_regularization * (linear.weight ** 2).sum()
+                    lambda: self.hyperparameters["dense_layer_l1_regularization"] * 
+                           linear.weight.abs().sum()
                 )
-            
             self.dense_layers.append(linear)
-            self.prev_layer_outputs.append(linear)
+            self.layer_outputs.append(linear)
             
-            if batch_normalization:
-                self.dense_layers.append(nn.BatchNorm1d(size, momentum=0.01))
-            if dropout_probability > 0:
-                self.dense_layers.append(nn.Dropout(dropout_probability))
+            if self.hyperparameters["batch_normalization"]:
+                self.dense_layers.append(nn.BatchNorm1d(size))
+            if self.hyperparameters["dropout_probability"] > 0:
+                self.dense_layers.append(
+                    nn.Dropout(self.hyperparameters["dropout_probability"]))
             current_size = size
 
         # Output layer
-        self.output_layer = nn.Linear(current_size, num_outputs)
+        self.output_layer = nn.Linear(
+            current_size, 
+            self.hyperparameters["num_outputs"]
+        )
 
-        # Initialize weights
-        self.init_weights(init)
-        
-        # Move model and all submodules to device
-        self.to(self.device)
-        for module in self.modules():
-            module.to(self.device)
+    def _get_peptide_input_dim(self):
+        """Calculate input dimension from peptide encoding config"""
+        encoding = self.hyperparameters["peptide_encoding"]
+        max_length = encoding["max_length"]
+        # This is simplified - would need to match exact Keras dimension calculation
+        return max_length * 21  # 21 amino acids
 
 
     def __del__(self):
