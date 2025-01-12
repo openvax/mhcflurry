@@ -342,14 +342,29 @@ class Class1AffinityPredictor(object):
                         layer.running_mean.data = torch.FloatTensor(weights_df[mean_key].values)
                         layer.running_var.data = torch.FloatTensor(weights_df[var_key].values)
 
-    def forward(self, x):
+    def forward(self, x, initialize=False):
         """
         Run a forward pass through the network.
+        
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor
+        initialize : bool
+            If True and data_dependent_initialization_method is set,
+            perform initialization
         """
         x = to_torch(x)
-        
-        # Ensure input is on correct device
         x = x.to(self.device)
+        
+        if initialize and self.data_dependent_initialization_method:
+            if self.data_dependent_initialization_method == "lsuv":
+                # Initialize using Layer-Sequential Unit-Variance (LSUV)
+                from .data_dependent_weights_initialization import lsuv_init
+                lsuv_init(self, {"peptide": x}, verbose=True)
+            else:
+                raise ValueError(
+                    f"Unknown initialization method: {self.data_dependent_initialization_method}")
         
         # Process peptide layers
         peptide_output = x
