@@ -31,53 +31,31 @@ class TorchNeuralNetwork(nn.Module):
     """
     PyTorch implementation of Class1NeuralNetwork that exactly matches the Keras architecture
     """
-    def __init__(
-            self,
-            input_size=315,
-            peptide_dense_layer_sizes=[],
-            allele_dense_layer_sizes=[],
-            layer_sizes=[32],
-            dropout_probability=0.0,
-            batch_normalization=False,
-            activation="tanh",
-            init="glorot_uniform",
-            output_activation="sigmoid",
-            num_outputs=1,
-            locally_connected_layers=[],
-            topology="feedforward",
-            peptide_allele_merge_method="multiply",
-            peptide_allele_merge_activation="",
-            allele_amino_acid_encoding="BLOSUM62",
-            dense_layer_l1_regularization=0.001,
-            dense_layer_l2_regularization=0.0,
-            data_dependent_initialization_method=None):
+    def __init__(self, **hyperparameters):
+        """
+        Initialize neural network with hyperparameters matching Keras version.
+        
+        Parameters
+        ----------
+        hyperparameters : dict
+            Hyperparameters as defined in Class1NeuralNetwork
+        """
         super().__init__()
         
-        # Set device first thing and ensure it's available
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Use same hyperparameter defaults as Keras version
+        self.hyperparameters = Class1NeuralNetwork.hyperparameter_defaults.with_defaults(
+            Class1NeuralNetwork.apply_hyperparameter_renames(hyperparameters)
+        )
         
-        # Initialize list to store regularization loss functions
+        # Set device and initialize storage
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.regularization_losses = []
-
-        # Store all parameters as instance attributes
-        self.input_size = input_size
-        self.peptide_dense_layer_sizes = peptide_dense_layer_sizes
-        self.allele_dense_layer_sizes = allele_dense_layer_sizes
-        self.layer_sizes = layer_sizes
-        self.dropout_prob = dropout_probability
-        self.use_batch_norm = batch_normalization
-        self.activation = activation
-        self.init = init
-        self.output_activation = output_activation
-        self.num_outputs = num_outputs
-        self.locally_connected_layers = locally_connected_layers
-        self.topology = topology
-        self.merge_method = peptide_allele_merge_method
-        self.merge_activation = peptide_allele_merge_activation
-        self.allele_amino_acid_encoding = allele_amino_acid_encoding
-        self.dense_layer_l1_regularization = dense_layer_l1_regularization
-        self.dense_layer_l2_regularization = dense_layer_l2_regularization
-        self.data_dependent_initialization_method = data_dependent_initialization_method
+        self._network = None
+        self.network_json = None 
+        self.network_weights = None
+        self.network_weights_loader = None
+        self.fit_info = []
+        self.prediction_cache = weakref.WeakKeyDictionary()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         

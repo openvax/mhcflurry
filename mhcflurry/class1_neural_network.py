@@ -451,7 +451,7 @@ class Class1NeuralNetwork(object):
             **self.hyperparameters["peptide_encoding"]
         )
         assert len(encoded) == len(peptides)
-        return encoded
+        return encoded.reshape(encoded.shape[0], -1)  # Flatten to 2D
 
     @property
     def supported_peptide_lengths(self):
