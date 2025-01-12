@@ -63,9 +63,9 @@ def compare_layer_outputs():
             tensor_dict = {}
             
             logging.info("Starting layer traversal...")
-        
-        # First pass - get all layer outputs
-        for layer in network.layers:
+            
+            # Process all layers
+            for layer in network.layers:
             # Skip input layers since we handle them separately
             if layer.name in ['peptide', 'allele']:
                 continue
