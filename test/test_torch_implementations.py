@@ -42,6 +42,12 @@ def test_weight_transfer_and_predictions():
     """Test weight transfer and prediction matching between Keras and PyTorch."""
     keras_model, torch_network = create_test_networks()
 
+    # Print model architectures
+    print("\nKeras model architecture:")
+    keras_model.summary()
+    print("\nPyTorch model architecture:")
+    print(torch_network)
+
     # Transfer weights from Keras to PyTorch
     torch_network.load_weights_from_keras(keras_model)
 
@@ -49,6 +55,11 @@ def test_weight_transfer_and_predictions():
     test_input = np.random.rand(10, 315).astype("float32")
     keras_output = keras_model.predict(test_input)
     torch_output = to_numpy(torch_network(to_torch(test_input)))
+
+    print("\nKeras output shape:", keras_output.shape)
+    print("PyTorch output shape:", torch_output.shape)
+    print("\nKeras output:", keras_output[:3])
+    print("PyTorch output:", torch_output[:3])
 
     # Verify outputs match
     assert_array_almost_equal(keras_output, torch_output, decimal=4)
