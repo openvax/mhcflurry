@@ -36,17 +36,20 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
             return nn.Linear(len(self.model_inputs), 1)
             
         if name not in self._torch_models:
-            model = nn.Linear(len(self.model_inputs), 1)
+            model = nn.Sequential(
+                nn.Linear(len(self.model_inputs), 1),
+                nn.Sigmoid()
+            )
             row = self.weights_dataframe.loc[name]
             
             # Convert weights and bias to PyTorch tensors
             weights = torch.FloatTensor(row[self.model_inputs].values)
             bias = torch.FloatTensor([row.intercept])
             
-            # Assign the weights
+            # Assign the weights to first layer
             with torch.no_grad():
-                model.weight.copy_(weights.unsqueeze(0))
-                model.bias.copy_(bias)
+                model[0].weight.copy_(weights.unsqueeze(0))
+                model[0].bias.copy_(bias)
                 
             model = model.to(self.device)
             self._torch_models[name] = model
@@ -78,7 +81,11 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
                     model.eval()
                     logits = model(inputs)
                     probs = torch.sigmoid(logits)
-                    df["presentation_score"] = probs.cpu().numpy().flatten()
+                    # Return probabilities for both classes [0, 1] to match sklearn's predict_proba
+                    class_0_probs = 1 - probs
+                    class_probs = torch.cat([class_0_probs, probs], dim=1)
+                    # Take probability of positive class
+                    df["presentation_score"] = class_probs[:, 1].cpu().numpy()
                 
                 if null_mask is not None:
                     df.loc[null_mask, "presentation_score"] = numpy.nan
