@@ -178,10 +178,18 @@ class Class1AffinityPredictor(nn.Module):
 
         encoded = encoded.reshape(encoded.shape[0], -1)
 
-        # Forward pass
-        outputs = self.forward(encoded)
-        outputs = to_numpy(outputs).flatten()
-        
+        # Set model to eval mode
+        self.eval()
+
+        # Forward pass with no gradients
+        with torch.no_grad():
+            # Convert to torch tensor and move to device
+            encoded = to_torch(encoded).to(self.device)
+            
+            # Get predictions
+            outputs = self.forward(encoded)
+            outputs = to_numpy(outputs).flatten()
+
         # Convert network output (0-1) to nM predictions (same as Keras version)
         max_ic50 = 50000.0
         predictions_nM = max_ic50 ** (1.0 - outputs)
