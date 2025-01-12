@@ -177,6 +177,154 @@ def test_batch_norm_parameters_after_loading():
         assert_array_almost_equal(k_weights[3], t_bn.running_var.data.cpu().numpy(), decimal=6,
                                 err_msg=f"moving_variance/running_var mismatch in layer {i}")
 
+def test_full_network_architectures():
+    """Test that full Class1NeuralNetwork and TorchNeuralNetwork implementations match."""
+    
+    # Test different architectures
+    architectures = [
+        {
+            # Basic pan-allele architecture
+            "allele_amino_acid_encoding": "BLOSUM62",
+            "peptide_encoding": {
+                "vector_encoding_name": "BLOSUM62",
+                "alignment_method": "pad_middle",
+                "left_edge": 4,
+                "right_edge": 4,
+                "max_length": 15,
+            },
+            "allele_dense_layer_sizes": [64],
+            "peptide_dense_layer_sizes": [32],
+            "peptide_allele_merge_method": "multiply",
+            "layer_sizes": [64, 32],
+            "dropout_probability": 0.2,
+            "batch_normalization": True,
+            "locally_connected_layers": [
+                {"filters": 8, "activation": "tanh", "kernel_size": 3}
+            ],
+            "topology": "feedforward",
+        },
+        {
+            # Architecture with skip connections
+            "topology": "with-skip-connections",
+            "layer_sizes": [64, 32, 16],
+            "peptide_allele_merge_method": "concatenate",
+            "allele_amino_acid_encoding": "BLOSUM62",
+            "peptide_encoding": {
+                "vector_encoding_name": "BLOSUM62",
+                "alignment_method": "pad_middle",
+                "left_edge": 4,
+                "right_edge": 4,
+                "max_length": 15,
+            },
+            "allele_dense_layer_sizes": [64],
+            "peptide_dense_layer_sizes": [32],
+            "dropout_probability": 0.2,
+            "batch_normalization": True,
+        }
+    ]
+
+    for arch_params in architectures:
+        # Create Keras model
+        keras_model = Class1NeuralNetwork(**arch_params)
+        
+        # Create equivalent PyTorch model
+        torch_model = TorchNeuralNetwork(**arch_params)
+
+        # Transfer weights
+        torch_model.load_weights_from_keras(keras_model.network())
+
+        # Create test input
+        test_peptides = ["SIINFEKL", "KLGGALQAK"]
+        test_alleles = ["HLA-A*02:01", "HLA-B*27:05"]
+        
+        # Create encodings
+        from mhcflurry.encodable_sequences import EncodableSequences
+        from mhcflurry.allele_encoding import AlleleEncoding
+        
+        peptide_encoding = EncodableSequences.create(test_peptides)
+        allele_encoding = AlleleEncoding(test_alleles)
+
+        # Get predictions from both models
+        keras_predictions = keras_model.predict(
+            peptides=peptide_encoding,
+            allele_encoding=allele_encoding
+        )
+        
+        torch_predictions = torch_model.predict(
+            peptides=peptide_encoding,
+            allele_encoding=allele_encoding
+        )
+
+        # Compare predictions
+        assert_array_almost_equal(
+            keras_predictions,
+            torch_predictions,
+            decimal=4,
+            err_msg=f"Predictions don't match for architecture: {arch_params}"
+        )
+
+def test_training_behavior():
+    """Test that training behavior matches between implementations."""
+    # Create models with same architecture
+    keras_model = Class1NeuralNetwork(
+        peptide_allele_merge_method="multiply",
+        layer_sizes=[64, 32],
+        batch_normalization=True
+    )
+    torch_model = TorchNeuralNetwork(
+        peptide_allele_merge_method="multiply",
+        layer_sizes=[64, 32],
+        batch_normalization=True
+    )
+
+    # Create training data
+    peptides = ["SIINFEKL", "KLGGALQAK", "GILGFVFTL"]
+    alleles = ["HLA-A*02:01", "HLA-B*27:05", "HLA-A*02:01"]
+    affinities = [100.0, 200.0, 500.0]  # IC50 values in nM
+
+    # Encode data
+    peptide_encoding = EncodableSequences.create(peptides)
+    allele_encoding = AlleleEncoding(alleles)
+
+    # Train both models
+    keras_model.fit(
+        peptides=peptide_encoding,
+        affinities=affinities,
+        allele_encoding=allele_encoding,
+        verbose=0
+    )
+    
+    torch_model.fit(
+        peptides=peptide_encoding,
+        affinities=affinities,
+        allele_encoding=allele_encoding,
+        verbose=0
+    )
+
+    # Compare predictions after training
+    test_peptides = ["SIINFEKL", "KLGGALQAK"]
+    test_alleles = ["HLA-A*02:01", "HLA-B*27:05"]
+    
+    test_peptide_encoding = EncodableSequences.create(test_peptides)
+    test_allele_encoding = AlleleEncoding(test_alleles)
+
+    keras_predictions = keras_model.predict(
+        peptides=test_peptide_encoding,
+        allele_encoding=test_allele_encoding
+    )
+    
+    torch_predictions = torch_model.predict(
+        peptides=test_peptide_encoding,
+        allele_encoding=test_allele_encoding
+    )
+
+    # Allow some difference due to different optimization paths
+    assert_array_almost_equal(
+        keras_predictions,
+        torch_predictions,
+        decimal=2
+    )
+
 def test_batch_norm_behavior():
     """Test that batch normalization behaves the same in PyTorch and Keras"""
     import tensorflow as tf
