@@ -155,6 +155,29 @@ class TorchNeuralNetwork(nn.Module):
         self.init_weights(init)
 
 
+    def __del__(self):
+        """Cleanup GPU memory"""
+        if hasattr(self, '_network'):
+            del self._network
+        torch.cuda.empty_cache()
+
+    def to(self, device):
+        """Move model to specified device"""
+        self.device = device
+        for module in self.modules():
+            module.to(device)
+        return self
+        
+    def train(self, mode=True):
+        """Set training mode"""
+        super().train(mode)
+        # Ensure batch norm uses running stats in eval mode
+        if not mode:
+            for module in self.modules():
+                if isinstance(module, nn.BatchNorm1d):
+                    module.track_running_stats = True
+        return self
+
     def init_weights(self, init):
         """Initialize network weights."""
         for module in self.modules():
@@ -275,21 +298,6 @@ class Class1AffinityPredictor(object):
         
         instance = instance.to(instance.device)
         return instance
-    def init_weights(self, init):
-        for layer in self.layers:
-            if isinstance(layer, nn.Linear):
-                if init == "glorot_uniform":
-                    # TensorFlow's glorot_uniform is slightly different from PyTorch's xavier_uniform
-                    # TF uses a uniform distribution between [-limit, limit] where:
-                    # limit = sqrt(6 / (fan_in + fan_out))
-                    fan_in = layer.weight.size(1)
-                    fan_out = layer.weight.size(0)
-                    limit = numpy.sqrt(6. / (fan_in + fan_out))
-                    nn.init.uniform_(layer.weight, -limit, limit)
-                    nn.init.zeros_(layer.bias)
-                else:
-                    raise ValueError(f"Unsupported initialization: {init}")
-                    
     def load_weights(self, weights_df):
         """
         Load weights from weights DataFrame
@@ -334,12 +342,16 @@ class Class1AffinityPredictor(object):
         """
         x = to_torch(x)
         
+        # Ensure input is on correct device
+        x = x.to(self.device)
+        
         # Process peptide layers
         for layer in self.peptide_layers:
             if isinstance(layer, nn.Linear):
                 x = self.hidden_activation(layer(x))
             else:
                 x = layer(x)
+            x = x.to(self.device)  # Ensure intermediate tensors stay on device
                 
         # Process locally connected layers
         if self.local_layers:
