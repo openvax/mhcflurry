@@ -234,36 +234,22 @@ class TorchNeuralNetwork(nn.Module):
         torch.Tensor
             Output predictions
         """
-        # Ensure input is a torch tensor and on correct device
-        if not isinstance(x, torch.Tensor):
-            x = to_torch(x)
+        # Ensure input is on correct device
         x = x.to(self.device)
 
-        # Ensure model is on correct device
-        self.to(self.device)
-        
-        # Process peptide layers
-        x = x
-        for layer in self.peptide_layers:
-            layer = layer.to(self.device)
-            x = layer(x)
-                
-        # Process dense layers
+        # Process dense layers with correct activation order
         for layer in self.dense_layers:
             layer = layer.to(self.device)
-            x = layer(x)
             if isinstance(layer, nn.Linear):
+                x = layer(x)
                 x = self.hidden_activation(x)
-                
-        # Output layer with final activation
+            else:  # BatchNorm
+                x = layer(x)
+
+        # Output layer with sigmoid activation
         x = self.output_layer(x)
-        x = self.output_activation(x)  # Ensure sigmoid is applied
-        
-        # Add regularization losses if in training mode
-        if self.training:
-            for loss_fn in self.regularization_losses:
-                x = x + loss_fn()
-                
+        x = self.output_activation(x)  # This ensures final sigmoid is applied
+
         return x
 
     def load_weights_from_keras(self, keras_model):
