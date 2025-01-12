@@ -95,6 +95,10 @@ def compare_layer_outputs():
                 # Special handling for Embedding layers - they expect a single input
                 if len(layer_inputs) > 0:
                     tensor_dict[layer.name] = layer(layer_inputs[0])
+            elif isinstance(layer, tf.keras.layers.Flatten):
+                # Special handling for Flatten layers - they expect a single input
+                if len(layer_inputs) > 0:
+                    tensor_dict[layer.name] = layer(layer_inputs[0])
             else:
                 # For other layers, pass inputs as list or single tensor
                 if len(layer_inputs) == 1:
