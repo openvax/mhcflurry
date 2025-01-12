@@ -156,6 +156,12 @@ model_args.add_argument(
     help="Affinity prediction only (no antigen processing or presentation)",
 )
 model_args.add_argument(
+    "--backend",
+    choices=["tensorflow", "pytorch"],
+    default="tensorflow",
+    help="Deep learning backend to use for predictions"
+)
+model_args.add_argument(
     "--no-flanking",
     action="store_true",
     default=False,
@@ -183,19 +189,35 @@ def run(argv=sys.argv[1:]):
         # message instructing them to download the models if needed.
         models_dir = get_default_class1_presentation_models_dir(test_exists=True)
 
-    if os.path.exists(os.path.join(models_dir, "weights.csv")):
-        # Using a presentation predictor.
-        predictor = Class1PresentationPredictor.load(models_dir)
+    if args.backend == "pytorch":
+        from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
+        if os.path.exists(os.path.join(models_dir, "weights.csv")):
+            # Using a presentation predictor.
+            predictor = Class1PresentationPredictor.load(models_dir)
+        else:
+            # Using just an affinity predictor.
+            affinity_predictor = TorchPredictor.load(models_dir)
+            predictor = Class1PresentationPredictor(affinity_predictor=affinity_predictor)
+            if not args.affinity_only:
+                logging.warning(
+                    "Specified models are an affinity predictor, which implies "
+                    "--affinity-only. Specify this argument to silence this warning."
+                )
+                args.affinity_only = True
     else:
-        # Using just an affinity predictor.
-        affinity_predictor = Class1AffinityPredictor.load(models_dir)
-        predictor = Class1PresentationPredictor(affinity_predictor=affinity_predictor)
-        if not args.affinity_only:
-            logging.warning(
-                "Specified models are an affinity predictor, which implies "
-                "--affinity-only. Specify this argument to silence this warning."
-            )
-            args.affinity_only = True
+        if os.path.exists(os.path.join(models_dir, "weights.csv")):
+            # Using a presentation predictor.
+            predictor = Class1PresentationPredictor.load(models_dir)
+        else:
+            # Using just an affinity predictor.
+            affinity_predictor = Class1AffinityPredictor.load(models_dir)
+            predictor = Class1PresentationPredictor(affinity_predictor=affinity_predictor)
+            if not args.affinity_only:
+                logging.warning(
+                    "Specified models are an affinity predictor, which implies "
+                    "--affinity-only. Specify this argument to silence this warning."
+                )
+                args.affinity_only = True
 
     if args.list_supported_alleles:
         print("\n".join(predictor.supported_alleles))
