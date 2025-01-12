@@ -193,21 +193,19 @@ def run(argv=sys.argv[1:]):
         from mhcflurry.torch_presentation_predictor import TorchPresentationPredictor
 
         print("Using torch")
-        # Always use TorchPresentationPredictor, even if weights.csv is absent
-        # If no weights.csv, the logistic regression step is effectively skipped,
-        # but the code still uses torch-based logic for presentation if possible.
-        affinity_predictor = TorchPredictor.load(models_dir)
-        predictor = TorchPresentationPredictor(
-            affinity_predictor=affinity_predictor,
-            # Fallback if weights.csv is missing, or load properly if present
-            weights_dataframe=(
-                pd.read_csv(os.path.join(models_dir, "weights.csv"), index_col=0)
-                if os.path.exists(os.path.join(models_dir, "weights.csv"))
-                else None
-            ),
-        )
-        if not args.affinity_only and not os.path.exists(os.path.join(models_dir, "weights.csv")):
-            logging.warning("No weights.csv => skipping logistic regression.")
+        if os.path.exists(os.path.join(models_dir, "weights.csv")):
+            # Using a presentation predictor
+            predictor = TorchPresentationPredictor.load(models_dir)
+        else:
+            # Using just an affinity predictor
+            affinity_predictor = TorchPredictor.load(models_dir)
+            predictor = TorchPresentationPredictor(affinity_predictor=affinity_predictor)
+            if not args.affinity_only:
+                logging.warning(
+                    "Specified models are an affinity predictor, which implies "
+                    "--affinity-only. Specify this argument to silence this warning."
+                )
+                args.affinity_only = True
     else:
         if os.path.exists(os.path.join(models_dir, "weights.csv")):
             # Using a presentation predictor.
