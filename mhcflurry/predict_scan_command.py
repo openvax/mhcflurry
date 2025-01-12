@@ -46,7 +46,7 @@ import os
 import argparse
 import logging
 
-import pandas
+import pandas as pd
 
 from .downloads import get_default_class1_presentation_models_dir
 from .class1_presentation_predictor import Class1PresentationPredictor

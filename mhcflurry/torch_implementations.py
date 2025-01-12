@@ -91,8 +91,8 @@ class Class1AffinityPredictor(nn.Module):
             layer_sizes=[],
         )
         return instance
-        """Initialize network weights."""
-        for layer in self.layers:
+    def init_weights(self, init):
+        for layer in instance.layers:
             if isinstance(layer, nn.Linear):
                 if init == "glorot_uniform":
                     nn.init.xavier_uniform_(layer.weight)
