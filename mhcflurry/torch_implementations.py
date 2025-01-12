@@ -47,17 +47,18 @@ class TorchNeuralNetwork(nn.Module):
             Class1NeuralNetwork.apply_hyperparameter_renames(hyperparameters)
         )
         
-        # Set device and initialize storage
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.regularization_losses = []
         self._network = None
-        self.network_json = None 
+        self.network_json = None
         self.network_weights = None
         self.network_weights_loader = None
         self.fit_info = []
         self.prediction_cache = weakref.WeakKeyDictionary()
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Build network based on hyperparameters
+        self._build_network()
+        self.to(self.device)
         
     def _build_network(self):
         """Build PyTorch network matching Keras architecture"""
