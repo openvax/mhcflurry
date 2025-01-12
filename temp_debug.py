@@ -94,18 +94,29 @@ def compare_layer_outputs():
             if len(layer_inputs) == 0:
                 continue
                 
-            # All Keras layers expect a single tensor input, not a list
-            # Special handling for layers that might receive multiple inputs
+            # Handle layer inputs based on layer type and input shape
             if isinstance(layer, tf.keras.layers.Concatenate):
+                # Concatenate expects a list of tensors
                 tensor_dict[layer.name] = layer(layer_inputs)
-            elif isinstance(layer, tf.keras.layers.Add):
+            elif isinstance(layer, (tf.keras.layers.Add, tf.keras.layers.Multiply)):
+                # Add and Multiply expect lists of tensors
                 tensor_dict[layer.name] = layer(layer_inputs)
-            elif isinstance(layer, tf.keras.layers.Multiply):
-                tensor_dict[layer.name] = layer(layer_inputs)
+            elif isinstance(layer, tf.keras.layers.Dense):
+                # For Dense layers, we need to handle potential concatenated inputs
+                if len(layer_inputs) > 1:
+                    # If multiple inputs, concatenate them first
+                    combined_input = tf.keras.layers.Concatenate()(layer_inputs)
+                    tensor_dict[layer.name] = layer(combined_input)
+                else:
+                    tensor_dict[layer.name] = layer(layer_inputs[0])
             else:
-                # For all other layer types (Dense, Flatten, Embedding etc)
-                # we always pass the first input only
-                tensor_dict[layer.name] = layer(layer_inputs[0])
+                # For all other layer types (Flatten, Embedding etc)
+                # Pass first input only, with shape checking
+                input_tensor = layer_inputs[0]
+                if isinstance(input_tensor, list):
+                    # If we somehow got a list instead of a tensor, concatenate
+                    input_tensor = tf.keras.layers.Concatenate()(input_tensor)
+                tensor_dict[layer.name] = layer(input_tensor)
             
             layer_outputs.append(tensor_dict[layer.name])
         
