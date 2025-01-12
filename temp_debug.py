@@ -47,24 +47,35 @@ def compare_layer_outputs():
         logging.info("Setting up TensorFlow model...")
         import tensorflow as tf
         tf_model = tf_predictor.neural_networks[0]  # Get first model in ensemble
+        network = tf_model.network()
         tf_intermediate_model = tf.keras.Model(
-            inputs=tf_model.network().inputs,
-            outputs=[layer.output for layer in tf_model.network().layers]
+            inputs=network.inputs,
+            outputs=[layer.output for layer in network.layers]
         )
         logging.info("TensorFlow model ready")
 
         # Prepare input data
         logging.info("Preparing input data...")
         from mhcflurry.encodable_sequences import EncodableSequences
+        from mhcflurry.allele_encoding import AlleleEncoding
+        
+        # Prepare peptide input
         peptides_obj = EncodableSequences.create(peptides)
         encoded_peptides = torch_predictor.peptides_to_network_input(peptides_obj)
+        
+        # Prepare allele input
+        allele_encoding = AlleleEncoding(alleles)
+        allele_input, allele_representations = tf_predictor.allele_encoding_to_network_input(allele_encoding)
 
-        logging.info(f"Input shape: {encoded_peptides.shape}")
-        logging.info(f"Input first few values: {encoded_peptides[0, :10]}")
+        logging.info(f"Peptide input shape: {encoded_peptides.shape}")
+        logging.info(f"Allele input shape: {allele_input.shape}")
 
-        # Get TensorFlow intermediate outputs
+        # Get TensorFlow intermediate outputs with both inputs
         logging.info("Getting TensorFlow outputs...")
-        tf_outputs = tf_intermediate_model.predict(encoded_peptides)
+        tf_outputs = tf_intermediate_model.predict({
+            'peptide': encoded_peptides,
+            'allele': allele_input
+        })
         for i, output in enumerate(tf_outputs):
             logging.info(f"TF layer {i} output shape: {output.shape}")
             logging.info(f"TF layer {i} output first few values: {output.flatten()[:5]}")
