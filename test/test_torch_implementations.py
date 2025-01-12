@@ -125,3 +125,49 @@ def test_activation_functions():
         keras_sigmoid.numpy(),
         decimal=6,
         err_msg="PyTorch and Keras sigmoid functions produce different outputs")
+
+def test_batch_norm_behavior():
+    """Test that batch normalization behaves the same in PyTorch and Keras"""
+    import tensorflow as tf
+    from tf_keras.layers import BatchNormalization
+    
+    # Create test input
+    x = np.random.randn(100, 32).astype(np.float32)
+    
+    # Create and configure batch norm layers
+    keras_bn = BatchNormalization(
+        momentum=0.99,  # Keras default 
+        epsilon=0.001,  # Keras default
+    )
+    torch_bn = nn.BatchNorm1d(
+        32,
+        momentum=0.01,  # PyTorch momentum = 1 - Keras momentum
+        eps=0.001,  # Match Keras epsilon
+    )
+    
+    # Initialize with same weights
+    keras_bn.build((None, 32))
+    gamma = keras_bn.gamma.numpy()
+    beta = keras_bn.beta.numpy()
+    running_mean = keras_bn.moving_mean.numpy()
+    running_var = keras_bn.moving_variance.numpy()
+    
+    with torch.no_grad():
+        torch_bn.weight.copy_(torch.from_numpy(gamma))
+        torch_bn.bias.copy_(torch.from_numpy(beta))
+        torch_bn.running_mean.copy_(torch.from_numpy(running_mean))
+        torch_bn.running_var.copy_(torch.from_numpy(running_var))
+    
+    # Get predictions in eval mode
+    keras_bn.trainable = False
+    torch_bn.eval()
+    
+    keras_output = keras_bn(x)
+    torch_output = torch_bn(torch.from_numpy(x))
+    
+    # Compare outputs
+    assert_array_almost_equal(
+        keras_output.numpy(),
+        to_numpy(torch_output),
+        decimal=6,
+        err_msg="BatchNorm produces different outputs between Keras and PyTorch")
