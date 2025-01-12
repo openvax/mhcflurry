@@ -49,7 +49,8 @@ class TorchNeuralNetwork(nn.Module):
             peptide_allele_merge_activation="",
             allele_amino_acid_encoding="BLOSUM62",
             dense_layer_l1_regularization=0.001,
-            dense_layer_l2_regularization=0.0):
+            dense_layer_l2_regularization=0.0,
+            data_dependent_initialization_method=None):
         super().__init__()
         
         # Initialize list to store regularization loss functions
@@ -73,6 +74,7 @@ class TorchNeuralNetwork(nn.Module):
         self.allele_amino_acid_encoding = allele_amino_acid_encoding
         self.dense_layer_l1_regularization = dense_layer_l1_regularization
         self.dense_layer_l2_regularization = dense_layer_l2_regularization
+        self.data_dependent_initialization_method = data_dependent_initialization_method
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
@@ -375,7 +377,12 @@ class Class1AffinityPredictor(object):
                 x = peptide_output * allele_output
                 
             if self.merge_activation:
-                x = self.hidden_activation(x)
+                x = {
+                    "tanh": torch.tanh,
+                    "relu": F.relu,
+                    "sigmoid": torch.sigmoid,
+                    "": lambda x: x,
+                }[self.merge_activation](x)
         else:
             x = peptide_output
                 
