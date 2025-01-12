@@ -51,6 +51,9 @@ class TorchNeuralNetwork(nn.Module):
             dense_layer_l1_regularization=0.001,
             dense_layer_l2_regularization=0.0):
         super().__init__()
+        
+        # Initialize list to store regularization loss functions
+        self.regularization_losses = []
 
         # Store all parameters as instance attributes
         self.input_size = input_size
@@ -88,11 +91,21 @@ class TorchNeuralNetwork(nn.Module):
         self.layers = nn.ModuleList()
         current_size = input_size
 
-        # Peptide dense layers
+        # Store topology info for forward pass
+        self.topology = topology
+        self.prev_layer_outputs = []
+
+        # Peptide dense layers with regularization
         self.peptide_layers = nn.ModuleList()
         for size in peptide_dense_layer_sizes:
+            linear = nn.Linear(current_size, size)
+            if dense_layer_l1_regularization > 0 or dense_layer_l2_regularization > 0:
+                self.regularization_losses.append(
+                    lambda: dense_layer_l1_regularization * linear.weight.abs().sum() +
+                           dense_layer_l2_regularization * (linear.weight ** 2).sum()
+                )
             self.peptide_layers.extend([
-                nn.Linear(current_size, size),
+                linear,
                 nn.Dropout(dropout_probability) if dropout_probability > 0 else nn.Identity()
             ])
             if batch_normalization:
@@ -113,69 +126,21 @@ class TorchNeuralNetwork(nn.Module):
             )
             current_size = params['filters'] * (input_size - params['kernel_size'] + 1)
 
-        # Main dense layers
+        # Main dense layers with regularization
         self.dense_layers = nn.ModuleList()
-        prev_layers = []
         for size in layer_sizes:
-            if topology == "with-skip-connections" and prev_layers:
-                # Concatenate previous two layers
-                if len(prev_layers) > 1:
-                    current_size = prev_layers[-1].out_features + prev_layers[-2].out_features
+            if topology == "with-skip-connections" and len(self.prev_layer_outputs) > 1:
+                current_size = sum(l.out_features for l in self.prev_layer_outputs[-2:])
             
-            layer = nn.Linear(current_size, size)
-            self.dense_layers.append(layer)
-            prev_layers.append(layer)
-            
-            if batch_normalization:
-                self.dense_layers.append(nn.BatchNorm1d(size))
-            if dropout_probability > 0:
-                self.dense_layers.append(nn.Dropout(dropout_probability))
-            current_size = size
-
-        # Output layer
-        self.output_layer = nn.Linear(current_size, num_outputs)
-
-        # Build network layers
-        self.layers = nn.ModuleList()
-        current_size = input_size
-
-        # Peptide dense layers
-        self.peptide_layers = nn.ModuleList()
-        for size in peptide_dense_layer_sizes:
-            self.peptide_layers.extend([
-                nn.Linear(current_size, size),
-                nn.Dropout(dropout_probability) if dropout_probability > 0 else nn.Identity()
-            ])
-            if batch_normalization:
-                self.peptide_layers.append(nn.BatchNorm1d(size))
-            current_size = size
-
-        # Locally connected layers
-        self.local_layers = nn.ModuleList()
-        for params in locally_connected_layers:
-            self.local_layers.append(
-                nn.Conv1d(
-                    in_channels=1,
-                    out_channels=params['filters'], 
-                    kernel_size=params['kernel_size'],
-                    groups=input_size // params['kernel_size'],
-                    bias=True
+            linear = nn.Linear(current_size, size)
+            if dense_layer_l1_regularization > 0 or dense_layer_l2_regularization > 0:
+                self.regularization_losses.append(
+                    lambda: dense_layer_l1_regularization * linear.weight.abs().sum() +
+                           dense_layer_l2_regularization * (linear.weight ** 2).sum()
                 )
-            )
-            current_size = params['filters'] * (input_size - params['kernel_size'] + 1)
-
-        # Main dense layers
-        self.dense_layers = nn.ModuleList()
-        prev_layers = []
-        for size in layer_sizes:
-            if topology == "with-skip-connections" and prev_layers:
-                # Concatenate previous two layers
-                if len(prev_layers) > 1:
-                    current_size = prev_layers[-1].out_features + prev_layers[-2].out_features
             
-            layer = nn.Linear(current_size, size)
-            self.dense_layers.append(layer)
-            prev_layers.append(layer)
+            self.dense_layers.append(linear)
+            self.prev_layer_outputs.append(linear)
             
             if batch_normalization:
                 self.dense_layers.append(nn.BatchNorm1d(size))
@@ -365,34 +330,45 @@ class Class1AffinityPredictor(object):
 
     def forward(self, x):
         """
-        Run a forward pass through parallel paths and combine results.
+        Run a forward pass through the network.
         """
-        # Convert input to torch tensor if needed
         x = to_torch(x)
         
-        # Process each path
-        path_outputs = []
-        for path in self.paths:
-            path_x = x
+        # Process peptide layers
+        for layer in self.peptide_layers:
+            if isinstance(layer, nn.Linear):
+                x = self.hidden_activation(layer(x))
+            else:
+                x = layer(x)
+                
+        # Process locally connected layers
+        if self.local_layers:
+            x = x.unsqueeze(1)  # Add channel dimension
+            for layer in self.local_layers:
+                x = self.hidden_activation(layer(x))
+            x = x.flatten(1)  # Flatten back to 2D
             
-            # Pass through layers in order
-            for i, layer in enumerate(path):
-                if isinstance(layer, nn.Linear):
-                    path_x = layer(path_x)
-                    # Apply activation unless this is the final layer
-                    if i < len(path) - 1:
-                        path_x = self.hidden_activation(path_x)
-                else:
-                    path_x = layer(path_x)
-            
-            path_outputs.append(path_x)
-            
-        # Concatenate outputs from all paths
-        x = torch.cat(path_outputs, dim=1)
-        
-        # Apply final output activation to mean of path outputs
-        x = torch.mean(x, dim=1, keepdim=True)
+        # Process dense layers with topology handling
+        layer_outputs = []
+        for i, layer in enumerate(self.dense_layers):
+            if isinstance(layer, nn.Linear):
+                if self.topology == "with-skip-connections" and len(layer_outputs) > 1:
+                    # Concatenate previous two layer outputs
+                    x = torch.cat(layer_outputs[-2:], dim=1)
+                x = self.hidden_activation(layer(x))
+                layer_outputs.append(x)
+            else:
+                x = layer(x)
+                
+        # Output layer
+        x = self.output_layer(x)
         x = self.output_activation(x)
+        
+        # Add regularization losses if in training mode
+        if self.training:
+            for loss_fn in self.regularization_losses:
+                x = x + loss_fn()
+                
         return x
     def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
         """
