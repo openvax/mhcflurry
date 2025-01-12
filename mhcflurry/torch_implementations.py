@@ -99,7 +99,13 @@ class Class1AffinityPredictor(nn.Module):
         for layer in self.layers:
             if isinstance(layer, nn.Linear):
                 if init == "glorot_uniform":
-                    nn.init.xavier_uniform_(layer.weight)
+                    # TensorFlow's glorot_uniform is slightly different from PyTorch's xavier_uniform
+                    # TF uses a uniform distribution between [-limit, limit] where:
+                    # limit = sqrt(6 / (fan_in + fan_out))
+                    fan_in = layer.weight.size(1)
+                    fan_out = layer.weight.size(0)
+                    limit = np.sqrt(6. / (fan_in + fan_out))
+                    nn.init.uniform_(layer.weight, -limit, limit)
                     nn.init.zeros_(layer.bias)
                 else:
                     raise ValueError(f"Unsupported initialization: {init}")
@@ -113,14 +119,19 @@ class Class1AffinityPredictor(nn.Module):
         # Convert input to torch tensor if needed
         x = to_torch(x)
         
-        # Pass through all but final Linear
-        for layer in self.layers[:-1]:
-            x = layer(x)
+        # Pass through layers in order, applying activation after Linear layers
+        # but before BatchNorm (to match TensorFlow behavior)
+        for i, layer in enumerate(self.layers):
             if isinstance(layer, nn.Linear):
-                x = self.hidden_activation(x)
+                x = layer(x)
+                # Apply activation unless this is the final layer
+                if i < len(self.layers) - 1 or not isinstance(layer, nn.Linear):
+                    x = self.hidden_activation(x)
+            else:
+                # For non-Linear layers (e.g. BatchNorm, Dropout)
+                x = layer(x)
 
-        # Final layer
-        x = self.layers[-1](x)
+        # Apply final output activation
         x = self.output_activation(x)
         return x
     def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
