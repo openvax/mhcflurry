@@ -145,7 +145,10 @@ output_args.add_argument(
     help="Delimiter character for results. Default: '%(default)s'",
 )
 output_args.add_argument(
-    "--no-affinity-percentile", default=False, action="store_true", help="Do not include affinity percentile rank"
+    "--no-affinity-percentile",
+    default=False,
+    action="store_true",
+    help="Do not include affinity percentile rank",
 )
 output_args.add_argument(
     "--always-include-best-allele",
