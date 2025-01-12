@@ -3,7 +3,7 @@ import torch
 from nose.tools import eq_
 from numpy.testing import assert_array_almost_equal
 
-from ..torch_implementations import (
+from mhcflurry.torch_implementations import (
     Class1AffinityPredictor,
     to_torch,
     to_numpy
