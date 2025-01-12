@@ -85,12 +85,14 @@ class TorchNeuralNetwork(nn.Module):
                     lambda: self.hyperparameters["dense_layer_l1_regularization"] * 
                            linear.weight.abs().sum()
                 )
-            if self.hyperparameters["batch_normalization"]:
-                self.peptide_layers.append(nn.BatchNorm1d(size))
             if self.hyperparameters["dropout_probability"] > 0:
                 self.peptide_layers.append(
                     nn.Dropout(self.hyperparameters["dropout_probability"]))
             current_size = size
+
+        # Add a single batch normalization after all peptide dense layers
+        if self.hyperparameters["batch_normalization"] and self.hyperparameters["peptide_dense_layer_sizes"]:
+            self.peptide_layers.append(nn.BatchNorm1d(current_size))
 
         # Allele representation layers
         if self.hyperparameters["allele_dense_layer_sizes"]:
@@ -250,7 +252,8 @@ class TorchNeuralNetwork(nn.Module):
         for layer in self.peptide_layers:
             if isinstance(layer, nn.Linear):
                 x = self.hidden_activation(layer(x))
-            else:
+            elif isinstance(layer, nn.BatchNorm1d):
+                x = layer(x)
                 x = layer(x)
             x = x.to(self.device)
 
