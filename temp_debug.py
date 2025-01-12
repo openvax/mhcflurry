@@ -16,14 +16,14 @@ def compare_layer_outputs():
         alleles = ["HLA-A0201", "HLA-A0301"]
         peptides = ["SIINFEKL", "SIINFEKD", "SIINFEKQ"]
 
-        # Get models directory from presentation predictor
+        # Get models directory from presentation predictor's affinity predictor
         presentation_predictor = Class1PresentationPredictor.load()
-        models_dir = presentation_predictor.models_dir
+        tf_predictor = presentation_predictor.affinity_predictor
+        models_dir = tf_predictor.manifest_df.model[0].network().model_dir
         logging.info(f"Using models directory: {models_dir}")
 
         logging.info("Loading predictors...")
-        # Load both predictors with the models directory
-        tf_predictor = presentation_predictor.affinity_predictor
+        # Load torch predictor with the models directory
         torch_predictor = TorchPredictor.load(models_dir)
         logging.info("Predictors loaded successfully")
 
