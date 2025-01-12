@@ -673,10 +673,12 @@ class Class1AffinityPredictor(object):
                     t_layer.running_var.data = torch.from_numpy(weights[3]).float()
                         
                     # Configure batch norm settings to match Keras
-                    t_layer.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum (0.99)
-                    t_layer.eps = 0.001  # Match Keras epsilon
-                    t_layer.track_running_stats = True
-                    t_layer.training = False  # Set to eval mode
+                    # PyTorch momentum = 1 - Keras momentum
+                    # Keras default momentum is 0.99, so PyTorch should be 0.01
+                    t_layer.momentum = 0.01
+                    t_layer.eps = 0.001  # Match Keras epsilon of 0.001
+                    t_layer.track_running_stats = True  # Enable running stats tracking
+                    t_layer.eval()  # Set to eval mode to use running stats
 
     def export_weights_to_keras(self, keras_model):
         """

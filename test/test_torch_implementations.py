@@ -159,10 +159,14 @@ def test_batch_norm_behavior():
         torch_bn.running_mean.copy_(torch.from_numpy(running_mean))
         torch_bn.running_var.copy_(torch.from_numpy(running_var))
     
+    # Configure batch norm settings to match Keras
+    torch_bn.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum (0.99)
+    torch_bn.eps = 0.001  # Match Keras epsilon
+    torch_bn.track_running_stats = True
+    torch_bn.eval()  # Set to eval mode
+    
     # Get predictions in eval mode
     keras_bn.trainable = False
-    torch_bn.eval()
-    
     keras_output = keras_bn(x)
     torch_output = torch_bn(torch.from_numpy(x))
     
