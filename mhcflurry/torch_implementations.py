@@ -293,6 +293,16 @@ class TorchNeuralNetwork(nn.Module):
         if hasattr(self, 'output_layer'):
             torch_layers.append(self.output_layer)
 
+        print(f"[DEBUG] TorchNeuralNetwork.load_weights_from_keras: Keras layer count = {len(keras_layers)}")
+        print(f"[DEBUG] TorchNeuralNetwork.load_weights_from_keras: Torch layer count = {len(torch_layers)}")
+        for i, (k_layer, t_layer) in enumerate(zip(keras_layers, torch_layers)):
+            k_shapes = [arr.shape for arr in k_layer.get_weights()]
+            print(f"[DEBUG]  Pair {i}: Keras layer = {k_layer.name}, weight shapes = {k_shapes}")
+            if hasattr(t_layer, 'weight'):
+                print(f"[DEBUG]           Torch layer = {t_layer}, weight shape = {list(t_layer.weight.shape)}")
+            if hasattr(t_layer, 'running_mean'):
+                print(f"[DEBUG]           Torch BN => running_mean shape = {list(t_layer.running_mean.shape)}, running_var shape = {list(t_layer.running_var.shape)}")
+        print("[DEBUG] Checking that layer list lengths match...")
         assert len(keras_layers) == len(torch_layers), "Model architectures do not match"
 
 class Class1AffinityPredictor(object):
