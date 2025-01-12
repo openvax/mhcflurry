@@ -111,8 +111,9 @@ class Class1AffinityPredictor(nn.Module):
         keras_model : keras.Model
             Keras model with matching architecture
         """
+        from tf_keras.layers import Dense, BatchNormalization
         keras_layers = [l for l in keras_model.layers 
-                       if isinstance(l, (keras_model.Dense, keras_model.BatchNormalization))]
+                       if isinstance(l, (Dense, BatchNormalization))]
         torch_layers = [l for l in self.layers 
                        if isinstance(l, (nn.Linear, nn.BatchNorm1d))]
         
