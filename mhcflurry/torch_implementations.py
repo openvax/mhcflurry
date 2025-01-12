@@ -241,14 +241,11 @@ class TorchNeuralNetwork(nn.Module):
             layer = layer.to(self.device)
             x = x.to(self.device)
             if isinstance(layer, nn.Linear):
-                x = layer(x)  # Just linear transformation
+                x = layer(x)  # Linear transformation
+                x = self.hidden_activation(x)  # Activation immediately after linear
             elif isinstance(layer, nn.BatchNorm1d):
-                x = self.hidden_activation(x)  # Activation before batch norm
                 x = layer(x)  # Then batch norm
         
-        # Final activation for last dense layer before output
-        x = self.hidden_activation(x)
-
         # Output layer with sigmoid activation
         self.output_layer = self.output_layer.to(self.device)
         x = self.output_layer(x)
