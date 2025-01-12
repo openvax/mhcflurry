@@ -580,12 +580,17 @@ class Class1PresentationPredictor(object):
                     # Invalid peptides will be null.
                     null_mask = input_matrix.isnull().any(axis=1)
                     input_matrix = input_matrix.fillna(0.0)
-                logits = model.decision_function(input_matrix.values)
-                df["presentation_score"] = 1.0 / (1.0 + numpy.exp(-logits))
-                if null_mask is not None:
-                    df.loc[null_mask, "presentation_score"] = numpy.nan
-                df["presentation_percentile"] = self.percentile_ranks(
-                    df["presentation_score"], throw=False)
+                import sklearn.linear_model
+                if isinstance(model, sklearn.linear_model.LogisticRegression):
+                    logits = model.decision_function(input_matrix.values)
+                    df["presentation_score"] = 1.0 / (1.0 + numpy.exp(-logits))
+                    if null_mask is not None:
+                        df.loc[null_mask, "presentation_score"] = numpy.nan
+                    df["presentation_percentile"] = self.percentile_ranks(
+                        df["presentation_score"], throw=False)
+                else:
+                    # skip computing presentation score here, Torch predictor will handle it
+                    pass
             else:
                 df["presentation_score"] = []
                 df["presentation_percentile"] = []
