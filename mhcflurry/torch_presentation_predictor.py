@@ -33,7 +33,7 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
         torch.nn.Module
         """
         if name is None:
-            return nn.Linear(len(self.model_inputs), 1)
+            return nn.Linear(len(self.model_inputs), 1).to(self.device)
             
         if name not in self._torch_models:
             model = nn.Linear(len(self.model_inputs), 1)
