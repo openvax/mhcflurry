@@ -11,6 +11,7 @@ import math
 
 import numpy
 import pandas
+import torch
 
 from .hyperparameters import HyperparameterDefaults
 from .encodable_sequences import EncodableSequences, EncodingError
@@ -20,6 +21,7 @@ from .common import configure_tensorflow
 from .custom_loss import get_loss
 from .data_dependent_weights_initialization import lsuv_init
 from .random_negative_peptides import RandomNegativePeptides
+from .torch_implementations import Class1AffinityPredictor, to_numpy
 
 
 DEFAULT_PREDICT_BATCH_SIZE = 4096
