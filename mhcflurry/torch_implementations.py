@@ -31,7 +31,7 @@ class Class1AffinityPredictor(nn.Module):
             dropout_probability=0.0,
             batch_normalization=False,
             activation="tanh",
-            init="glorot_uniform",
+            init="glorot_uniform", 
             output_activation="sigmoid",
             num_outputs=1):
         super().__init__()
@@ -54,30 +54,31 @@ class Class1AffinityPredictor(nn.Module):
             "linear": lambda x: x,
         }[output_activation]
 
-        # Build network layers
-        layers = []
-        current_size = input_size
-
-        # Peptide dense layers
-        for size in peptide_dense_layer_sizes:
-            layers.append(nn.Linear(current_size, size))
+        # Build parallel paths
+        self.paths = nn.ModuleList()
+        for i in range(10):  # Match Keras model's 10 parallel paths
+            path_layers = []
+            current_size = input_size
+            
+            # First dense layer varies by path
+            first_layer_size = 256 if i in [0, 2, 4, 5, 9] else 1024
+            path_layers.append(nn.Linear(current_size, first_layer_size))
             if batch_normalization:
-                layers.append(nn.BatchNorm1d(size))
-            layers.append(nn.Dropout(dropout_probability))
-            current_size = size
-
-        # Main dense layers  
-        for size in layer_sizes:
-            layers.append(nn.Linear(current_size, size))
+                path_layers.append(nn.BatchNorm1d(first_layer_size))
+            path_layers.append(nn.Dropout(dropout_probability))
+            current_size = first_layer_size
+            
+            # Second dense layer
+            second_layer_size = 512
+            path_layers.append(nn.Linear(current_size, second_layer_size))
             if batch_normalization:
-                layers.append(nn.BatchNorm1d(size))
-            layers.append(nn.Dropout(dropout_probability))
-            current_size = size
-
-        # Output layer
-        layers.append(nn.Linear(current_size, num_outputs))
-        
-        self.layers = nn.ModuleList(layers)
+                path_layers.append(nn.BatchNorm1d(second_layer_size))
+            path_layers.append(nn.Dropout(dropout_probability))
+            
+            # Output layer for this path
+            path_layers.append(nn.Linear(second_layer_size, 1))
+            
+            self.paths.append(nn.ModuleList(path_layers))
 
         # Initialize weights
         self.init_weights(init)
@@ -113,26 +114,33 @@ class Class1AffinityPredictor(nn.Module):
 
     def forward(self, x):
         """
-        Run a forward pass on input x (shape: (batch_size, input_size)).
-        Applies hidden_activation on each Linear layer (except the last),
-        and applies self.output_activation at the end.
+        Run a forward pass through parallel paths and combine results.
         """
         # Convert input to torch tensor if needed
         x = to_torch(x)
         
-        # Pass through layers in order, applying activation after Linear layers
-        # but before BatchNorm (to match TensorFlow behavior)
-        for i, layer in enumerate(self.layers):
-            if isinstance(layer, nn.Linear):
-                x = layer(x)
-                # Apply activation unless this is the final layer
-                if i < len(self.layers) - 1 or not isinstance(layer, nn.Linear):
-                    x = self.hidden_activation(x)
-            else:
-                # For non-Linear layers (e.g. BatchNorm, Dropout)
-                x = layer(x)
-
-        # Apply final output activation
+        # Process each path
+        path_outputs = []
+        for path in self.paths:
+            path_x = x
+            
+            # Pass through layers in order
+            for i, layer in enumerate(path):
+                if isinstance(layer, nn.Linear):
+                    path_x = layer(path_x)
+                    # Apply activation unless this is the final layer
+                    if i < len(path) - 1:
+                        path_x = self.hidden_activation(path_x)
+                else:
+                    path_x = layer(path_x)
+            
+            path_outputs.append(path_x)
+            
+        # Concatenate outputs from all paths
+        x = torch.cat(path_outputs, dim=1)
+        
+        # Apply final output activation to mean of path outputs
+        x = torch.mean(x, dim=1, keepdim=True)
         x = self.output_activation(x)
         return x
     def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
