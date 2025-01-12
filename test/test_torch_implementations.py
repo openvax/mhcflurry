@@ -126,6 +126,44 @@ def test_activation_functions():
         decimal=6,
         err_msg="PyTorch and Keras sigmoid functions produce different outputs")
 
+def test_batch_norm_parameters_after_loading():
+    """Test that batch normalization parameters match exactly after weight loading."""
+    keras_model, torch_network = create_test_networks()
+    
+    # Transfer weights from Keras to PyTorch
+    torch_network.load_weights_from_keras(keras_model)
+    
+    # Get all batch norm layers
+    keras_bn_layers = [l for l in keras_model.layers if 'batch_normalization' in l.name]
+    torch_bn_layers = [l for l in torch_network.dense_layers if isinstance(l, torch.nn.BatchNorm1d)]
+    
+    print("\nBatch Normalization Parameter Comparison:")
+    for i, (k_bn, t_bn) in enumerate(zip(keras_bn_layers, torch_bn_layers)):
+        k_weights = k_bn.get_weights()
+        print(f"\nBatch Norm Layer {i}:")
+        print(f"Keras gamma (weight): {k_weights[0][:5]}")
+        print(f"PyTorch weight: {t_bn.weight.data[:5].cpu().numpy()}")
+        print(f"Keras beta (bias): {k_weights[1][:5]}")
+        print(f"PyTorch bias: {t_bn.bias.data[:5].cpu().numpy()}")
+        print(f"Keras moving_mean: {k_weights[2][:5]}")
+        print(f"PyTorch running_mean: {t_bn.running_mean.data[:5].cpu().numpy()}")
+        print(f"Keras moving_variance: {k_weights[3][:5]}")
+        print(f"PyTorch running_var: {t_bn.running_var.data[:5].cpu().numpy()}")
+        print(f"PyTorch momentum: {t_bn.momentum}")
+        print(f"PyTorch eps: {t_bn.eps}")
+        print(f"PyTorch track_running_stats: {t_bn.track_running_stats}")
+        print(f"PyTorch training mode: {t_bn.training}")
+        
+        # Verify parameters match
+        assert_array_almost_equal(k_weights[0], t_bn.weight.data.cpu().numpy(), decimal=6,
+                                err_msg=f"gamma/weight mismatch in layer {i}")
+        assert_array_almost_equal(k_weights[1], t_bn.bias.data.cpu().numpy(), decimal=6,
+                                err_msg=f"beta/bias mismatch in layer {i}")
+        assert_array_almost_equal(k_weights[2], t_bn.running_mean.data.cpu().numpy(), decimal=6,
+                                err_msg=f"moving_mean/running_mean mismatch in layer {i}")
+        assert_array_almost_equal(k_weights[3], t_bn.running_var.data.cpu().numpy(), decimal=6,
+                                err_msg=f"moving_variance/running_var mismatch in layer {i}")
+
 def test_batch_norm_behavior():
     """Test that batch normalization behaves the same in PyTorch and Keras"""
     import tensorflow as tf
