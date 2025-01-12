@@ -235,21 +235,29 @@ class TorchNeuralNetwork(nn.Module):
             Output predictions
         """
         x = x.to(self.device)
-
+        print("\nPyTorch Input:", x.mean().item(), x.std().item())
+        
         # Process dense layers with Keras-matching activation order
-        for layer in self.dense_layers:
+        for i, layer in enumerate(self.dense_layers):
             layer = layer.to(self.device)
             x = x.to(self.device)
             if isinstance(layer, nn.Linear):
+                x_pre = x
                 x = layer(x)  # Linear transformation
+                print(f"PyTorch After Linear {i}:", x.mean().item(), x.std().item())
                 x = self.hidden_activation(x)  # Activation immediately after linear
+                print(f"PyTorch After Activation {i}:", x.mean().item(), x.std().item())
             elif isinstance(layer, nn.BatchNorm1d):
+                x_pre = x
                 x = layer(x)  # Then batch norm
+                print(f"PyTorch After BN {i}:", x.mean().item(), x.std().item())
         
         # Output layer with sigmoid activation
         self.output_layer = self.output_layer.to(self.device)
         x = self.output_layer(x)
+        print("PyTorch After final linear:", x.mean().item(), x.std().item())
         x = self.output_activation(x)
+        print("PyTorch Final output:", x.mean().item(), x.std().item())
 
         return x
 
