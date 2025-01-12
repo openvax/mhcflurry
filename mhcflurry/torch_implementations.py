@@ -76,11 +76,8 @@ class TorchNeuralNetwork(nn.Module):
         self.peptide_layers = nn.ModuleList()
         current_size = peptide_input_dim
 
-        # Handle batch_norm_early if no peptide_dense_layer_sizes
-        # If no peptide_dense_layer_sizes, handle “batch_norm_early”
-        if self.hyperparameters["batch_normalization"] and not self.hyperparameters["peptide_dense_layer_sizes"]:
-            print("[DEBUG] Adding batch_norm_early for peptide input dim =", current_size)
-            self.peptide_layers.append(nn.BatchNorm1d(current_size))
+        # [DEBUG] No unconditional batch_norm_early here. We rely on the BN 
+        # layers added in the main dense layers instead (for parity with Keras).
 
         # Build peptide dense layers
         for size in self.hyperparameters["peptide_dense_layer_sizes"]:
@@ -158,6 +155,9 @@ class TorchNeuralNetwork(nn.Module):
                 self.dense_layers.append(
                     nn.Dropout(self.hyperparameters["dropout_probability"]))
             current_size = size
+
+        print("[DEBUG] Done building peptide_layers. Count =", len(self.peptide_layers))
+        print("[DEBUG] Done building dense_layers. Count =", len(self.dense_layers))
 
         # Output layer
         self.output_layer = nn.Linear(
@@ -664,7 +664,23 @@ class Class1AffinityPredictor(object):
         from tf_keras.layers import Dense, BatchNormalization
         
         # Get all dense and batch norm layers from both models
-        keras_layers = [l for l in keras_model.layers 
+        keras_layers = [l for l in keras_model.layers
+        print(f"[DEBUG] Keras layer count = {len(keras_layers)}")
+        for i, layer in enumerate(keras_layers):
+            shapes = [w.shape for w in layer.get_weights()]
+            print(f"[DEBUG]  Keras layer {i}: {layer.name}, weight shapes: {shapes}")
+
+        print(f"[DEBUG] Torch layer count = {len(torch_layers)}")
+        for i, layer in enumerate(torch_layers):
+            if hasattr(layer, 'weight'):
+                print(f"[DEBUG]  Torch layer {i}: {layer}, weight shape = {list(layer.weight.shape)}")
+                if isinstance(layer, nn.BatchNorm1d):
+                    print(f"[DEBUG]           BN => running_mean shape = {list(layer.running_mean.shape)}, "
+                          f"running_var shape = {list(layer.running_var.shape)}")
+            else:
+                print(f"[DEBUG]  Torch layer {i}: {layer} (no weight)")
+
+        print("[DEBUG] Checking that layer list lengths match...")
                        if isinstance(l, (Dense, BatchNormalization))]
         
         # Get corresponding PyTorch layers
