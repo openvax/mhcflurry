@@ -182,7 +182,7 @@ class Class1AffinityPredictor(object):
                     # limit = sqrt(6 / (fan_in + fan_out))
                     fan_in = layer.weight.size(1)
                     fan_out = layer.weight.size(0)
-                    limit = np.sqrt(6. / (fan_in + fan_out))
+                    limit = numpy.sqrt(6. / (fan_in + fan_out))
                     nn.init.uniform_(layer.weight, -limit, limit)
                     nn.init.zeros_(layer.bias)
                 else:
@@ -254,7 +254,7 @@ class Class1AffinityPredictor(object):
         # For now return placeholder percentile ranks
         # You'll want to implement proper percentile calculation based on 
         # your calibration data
-        return np.array([50.0] * len(affinities))
+        return numpy.array([50.0] * len(affinities))
 
     def predict(self, peptides, allele=None, alleles=None, model_kwargs=None, throw=True):
         """
