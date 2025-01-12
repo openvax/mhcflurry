@@ -200,6 +200,20 @@ class TorchNeuralNetwork(nn.Module):
                 else:
                     raise ValueError(f"Unsupported initialization: {init}")
 
+    def set_allele_representations(self, allele_representations):
+        """
+        Set allele representations in the embedding layer.
+        
+        Parameters
+        ----------
+        allele_representations : numpy.ndarray
+            Matrix of allele representations
+        """
+        if hasattr(self, 'allele_embedding'):
+            with torch.no_grad():
+                self.allele_embedding.weight.copy_(
+                    torch.from_numpy(allele_representations).to(self.device))
+
     def forward(self, x):
         """
         Run a forward pass through the network.
