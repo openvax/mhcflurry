@@ -152,7 +152,7 @@ class TorchNeuralNetwork(nn.Module):
             self.prev_layer_outputs.append(linear)
             
             if batch_normalization:
-                self.dense_layers.append(nn.BatchNorm1d(size))
+                self.dense_layers.append(nn.BatchNorm1d(size, momentum=0.01))
             if dropout_probability > 0:
                 self.dense_layers.append(nn.Dropout(dropout_probability))
             current_size = size
