@@ -10,6 +10,9 @@ from mhcflurry.torch_implementations import (
     to_torch,
     to_numpy
 )
+from mhcflurry.class1_neural_network import Class1NeuralNetwork
+from mhcflurry.encodable_sequences import EncodableSequences
+from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.common import configure_tensorflow
 
 
