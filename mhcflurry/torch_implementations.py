@@ -240,6 +240,7 @@ class TorchNeuralNetwork(nn.Module):
         # Process dense layers with correct activation order
         for layer in self.dense_layers:
             layer = layer.to(self.device)
+            x = x.to(self.device)  # Ensure intermediate tensors stay on device
             if isinstance(layer, nn.Linear):
                 x = layer(x)
                 x = self.hidden_activation(x)
@@ -247,6 +248,8 @@ class TorchNeuralNetwork(nn.Module):
                 x = layer(x)
 
         # Output layer with sigmoid activation
+        self.output_layer = self.output_layer.to(self.device)  # Ensure output layer is on device
+        x = x.to(self.device)  # Ensure final tensor is on device
         x = self.output_layer(x)
         x = self.output_activation(x)  # This ensures final sigmoid is applied
 
