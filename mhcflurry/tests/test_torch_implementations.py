@@ -68,8 +68,10 @@ def test_predict_command_backends_match():
     peptides = ["SIINFEKL", "SIINFEKD", "SIINFEKQ"]
     
     # Run predictions with both backends
-    with tempfile.NamedTemporaryFile(suffix='.csv') as tf_out, \
-         tempfile.NamedTemporaryFile(suffix='.csv') as torch_out:
+    tf_out = tempfile.NamedTemporaryFile(suffix='.csv', delete=False)
+    torch_out = tempfile.NamedTemporaryFile(suffix='.csv', delete=False)
+    
+    try:
          
         # TensorFlow predictions
         from mhcflurry.predict_command import run as predict_run
@@ -87,6 +89,10 @@ def test_predict_command_backends_match():
             "--out", torch_out.name
         ])
         
+        # Close files before reading
+        tf_out.close()
+        torch_out.close()
+        
         # Load results
         tf_results = pd.read_csv(tf_out.name)
         torch_results = pd.read_csv(torch_out.name)
@@ -100,6 +106,11 @@ def test_predict_command_backends_match():
                 tf_results[col].values,
                 torch_results[col].values,
                 decimal=4)
+    finally:
+        # Clean up temporary files
+        import os
+        os.unlink(tf_out.name)
+        os.unlink(torch_out.name)
     configure_tensorflow()
     from tf_keras.models import Sequential
     from tf_keras.layers import Dense, BatchNormalization
