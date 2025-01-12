@@ -300,13 +300,18 @@ class TorchNeuralNetwork(nn.Module):
                 if len(weights) == 4:  # Has learned parameters
                     # In Keras: [gamma, beta, moving_mean, moving_variance]
                     # In PyTorch: weight=gamma, bias=beta
-                    t_layer.weight.data = torch.from_numpy(weights[0]).float()
-                    t_layer.bias.data = torch.from_numpy(weights[1]).float()
-                        
-                    # Set running statistics
-                    t_layer.running_mean.data = torch.from_numpy(weights[2]).float()
-                    t_layer.running_var.data = torch.from_numpy(weights[3]).float()
-                        
+                    with torch.no_grad():
+                        t_layer.weight.data.copy_(torch.from_numpy(weights[0]).float())
+                        t_layer.bias.data.copy_(torch.from_numpy(weights[1]).float())
+                        t_layer.running_mean.data.copy_(torch.from_numpy(weights[2]).float())
+                        t_layer.running_var.data.copy_(torch.from_numpy(weights[3]).float())
+                    
+                    # Configure batch norm settings to exactly match Keras
+                    t_layer.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum (0.99)
+                    t_layer.eps = 1e-3  # Keras default
+                    t_layer.track_running_stats = True
+                    t_layer.training = False
+                    t_layer.eval()  # Double ensure eval mode
 
 class Class1AffinityPredictor(object):
     """
