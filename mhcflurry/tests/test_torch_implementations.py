@@ -67,9 +67,11 @@ def test_predict_scan_command_backends_match():
     sequence = "MFVFLVLLPLVSSQCVNLTTRTQLPPAYTNSFTRGVYYPDKVFRSSVLHS"
     alleles = ["HLA-A*02:01"]
     
-    # Run predictions with both backends
-    tf_out = tempfile.NamedTemporaryFile(suffix='.csv', delete=False)
-    torch_out = tempfile.NamedTemporaryFile(suffix='.csv', delete=False)
+    # Run predictions with both backends using Windows temp directory
+    import os
+    temp_dir = os.environ.get('TEMP', os.environ.get('TMP', os.path.expanduser('~')))
+    tf_out = os.path.join(temp_dir, 'tf_predictions.csv')
+    torch_out = os.path.join(temp_dir, 'torch_predictions.csv')
     
     try:
         # TensorFlow predictions
@@ -77,7 +79,7 @@ def test_predict_scan_command_backends_match():
         predict_scan_run([
             "--sequences", sequence,
             "--alleles"] + alleles + [
-            "--out", tf_out.name
+            "--out", tf_out
         ])
         
         # PyTorch predictions  
@@ -85,16 +87,12 @@ def test_predict_scan_command_backends_match():
             "--backend", "pytorch",
             "--sequences", sequence,
             "--alleles"] + alleles + [
-            "--out", torch_out.name
+            "--out", torch_out
         ])
         
-        # Close files before reading
-        tf_out.close()
-        torch_out.close()
-        
         # Load results
-        tf_results = pd.read_csv(tf_out.name)
-        torch_results = pd.read_csv(torch_out.name)
+        tf_results = pd.read_csv(tf_out)
+        torch_results = pd.read_csv(torch_out)
         
         # Compare results
         prediction_columns = [col for col in tf_results.columns 
@@ -108,8 +106,8 @@ def test_predict_scan_command_backends_match():
     finally:
         # Clean up temporary files
         import os
-        os.unlink(tf_out.name)
-        os.unlink(torch_out.name)
+        os.unlink(tf_out)
+        os.unlink(torch_out)
 
 def test_predict_command_backends_match():
     """Test that PyTorch and TensorFlow backends give matching results."""
