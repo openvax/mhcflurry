@@ -82,15 +82,6 @@ def test_weight_transfer_and_predictions():
     # Verify outputs match
     assert_array_almost_equal(keras_output, torch_output, decimal=4)
 
-    # Test batch normalization parameters match
-    for k_layer, t_layer in zip(keras_model.layers, torch_network.layers):
-        if isinstance(t_layer, torch.nn.BatchNorm1d):
-            k_weights = k_layer.get_weights()
-            assert_array_almost_equal(k_weights[0], to_numpy(t_layer.weight.data), decimal=4)  # gamma
-            assert_array_almost_equal(k_weights[1], to_numpy(t_layer.bias.data), decimal=4)  # beta
-            assert_array_almost_equal(k_weights[2], to_numpy(t_layer.running_mean.data), decimal=4)  # moving mean
-            assert_array_almost_equal(k_weights[3], to_numpy(t_layer.running_var.data), decimal=4)  # moving variance
-
 
 def test_tensor_conversion():
     """Test numpy/torch tensor conversion utilities."""
@@ -182,7 +173,7 @@ def test_batch_norm_parameters_after_loading():
 
 def test_full_network_architectures():
     """Test that full Class1NeuralNetwork and TorchNeuralNetwork implementations match."""
-
+    
     # Test different architectures
     architectures = [
         {
@@ -210,11 +201,12 @@ def test_full_network_architectures():
         test_peptides = ["SIINFEKL", "KLGGALQAK"]
         peptide_encoding = EncodableSequences.create(test_peptides)
         
-        # This will force network creation
-        keras_model.peptides_to_network_input(peptide_encoding)
+        # Force network creation by making a prediction
+        _ = keras_model.predict(peptides=peptide_encoding)
         
         # Now we can safely get and compile the network
         network = keras_model.network()
+        assert network is not None, "Network initialization failed"
         network.compile(optimizer='adam', loss='mse')
 
         # Create equivalent PyTorch model
