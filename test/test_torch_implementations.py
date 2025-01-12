@@ -18,7 +18,7 @@ from mhcflurry.predict_command import run as predict_run
 
 def create_temp_csv() -> Tuple[str, str]:
     """Create temporary CSV files for test output."""
-    tf_out = os.path.join(tempfile.gettempdir(), "tf_predictions.csv") 
+    tf_out = os.path.join(tempfile.gettempdir(), "tf_predictions.csv")
     torch_out = os.path.join(tempfile.gettempdir(), "torch_predictions.csv")
     return tf_out, torch_out
 
@@ -36,13 +36,15 @@ def create_test_networks() -> Tuple[any, Class1AffinityPredictor]:
     from tf_keras.models import Sequential
     from tf_keras.layers import Dense, BatchNormalization
 
-    keras_model = Sequential([
-        Dense(64, activation="tanh", input_shape=(315,)),
-        BatchNormalization(),
-        Dense(32, activation="tanh"),
-        BatchNormalization(),
-        Dense(1, activation="sigmoid"),
-    ])
+    keras_model = Sequential(
+        [
+            Dense(64, activation="tanh", input_shape=(315,)),
+            BatchNormalization(),
+            Dense(32, activation="tanh"),
+            BatchNormalization(),
+            Dense(1, activation="sigmoid"),
+        ]
+    )
 
     torch_model = Class1AffinityPredictor(
         input_size=315,
@@ -59,17 +61,17 @@ def create_test_networks() -> Tuple[any, Class1AffinityPredictor]:
 def test_affinity_predictor_matches_keras():
     """Test that PyTorch affinity predictor gives identical results to Keras."""
     keras_model, torch_model = create_test_networks()
-    
+
     # Transfer weights from Keras to PyTorch
     torch_model.load_weights_from_keras(keras_model)
-    
+
     # Test with random input
     test_input = np.random.rand(10, 315).astype("float32")
-    
+
     # Get predictions from both models
     keras_output = keras_model.predict(test_input)
     torch_output = to_numpy(torch_model(test_input))
-    
+
     # Verify outputs match
     assert_array_almost_equal(keras_output, torch_output, decimal=4)
 
@@ -78,29 +80,26 @@ def test_predict_scan_command_backends_match():
     """Test that PyTorch and TensorFlow backends give matching results for scan command."""
     sequence = "MFVFLVLLPLVSSQCVNLTTRTQLPPAYTNSFTRGVYYPDKVFRSSVLHS"
     alleles = ["HLA-A*02:01"]
-    
+
     tf_out, torch_out = create_temp_csv()
-    
+
     try:
         # Run predictions with both backends
         predict_scan_run(["--sequences", sequence, "--alleles"] + alleles + ["--out", tf_out])
-        predict_scan_run(["--backend", "pytorch", "--sequences", sequence, "--alleles"] + alleles + ["--out", torch_out])
+        predict_scan_run(
+            ["--backend", "pytorch", "--sequences", sequence, "--alleles"] + alleles + ["--out", torch_out]
+        )
 
         # Compare results
         tf_results = pd.read_csv(tf_out)
         torch_results = pd.read_csv(torch_out)
 
         prediction_columns = [
-            col for col in tf_results.columns 
-            if col.startswith(("presentation_score", "processing_score", "affinity"))
+            col for col in tf_results.columns if col.startswith(("presentation_score", "processing_score", "affinity"))
         ]
 
         for col in prediction_columns:
-            assert_array_almost_equal(
-                tf_results[col].values, 
-                torch_results[col].values, 
-                decimal=4
-            )
+            assert_array_almost_equal(tf_results[col].values, torch_results[col].values, decimal=4)
     finally:
         cleanup_temp_files([tf_out, torch_out])
 
@@ -109,9 +108,9 @@ def test_predict_command_backends_match():
     """Test that PyTorch and TensorFlow backends give matching results."""
     alleles = ["HLA-A0201", "HLA-A0301"]
     peptides = ["SIINFEKL", "SIINFEKD", "SIINFEKQ"]
-    
+
     tf_out, torch_out = create_temp_csv()
-    
+
     try:
         # Run predictions with both backends
         predict_run(["--alleles"] + alleles + ["--peptides"] + peptides + ["--out", tf_out])
@@ -121,17 +120,10 @@ def test_predict_command_backends_match():
         tf_results = pd.read_csv(tf_out)
         torch_results = pd.read_csv(torch_out)
 
-        prediction_columns = [
-            col for col in tf_results.columns 
-            if col.startswith("mhcflurry_")
-        ]
+        prediction_columns = [col for col in tf_results.columns if col.startswith("mhcflurry_")]
 
         for col in prediction_columns:
-            assert_array_almost_equal(
-                tf_results[col].values,
-                torch_results[col].values,
-                decimal=4
-            )
+            assert_array_almost_equal(tf_results[col].values, torch_results[col].values, decimal=4)
     finally:
         cleanup_temp_files([tf_out, torch_out])
 
@@ -139,10 +131,10 @@ def test_predict_command_backends_match():
 def test_weight_transfer():
     """Test weight transfer between Keras and PyTorch models."""
     keras_model, torch_model = create_test_networks()
-    
+
     # Test Keras -> PyTorch weight loading
     torch_model.load_weights_from_keras(keras_model)
-    
+
     test_input = np.random.rand(10, 315).astype("float32")
     keras_output = keras_model.predict(test_input)
     torch_output = to_numpy(torch_model(test_input))
@@ -156,7 +148,7 @@ def test_weight_transfer():
 
     # Test PyTorch -> Keras weight loading
     torch_model.export_weights_to_keras(keras_model)
-    
+
     keras_output = keras_model.predict(test_input)
     torch_output = to_numpy(torch_model(test_input))
     assert_array_almost_equal(keras_output, torch_output, decimal=4)
@@ -182,44 +174,36 @@ def test_presentation_predictor_matches_keras():
     """Test that PyTorch presentation predictor gives identical results to Keras version."""
     from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
     from mhcflurry.torch_presentation_predictor import TorchPresentationPredictor
-    
+
     # Load both predictors
     keras_predictor = Class1PresentationPredictor.load()
     torch_predictor = TorchPresentationPredictor.load()
-    
+
     # Test data
     peptides = ["SIINFEKL", "KLGGALQAK", "EAAGIGILTV"]
     alleles = ["HLA-A*02:01", "HLA-B*07:02"]
-    n_flanks = ["AAA", "CCC", "GGG"] 
+    n_flanks = ["AAA", "CCC", "GGG"]
     c_flanks = ["TTT", "GGG", "CCC"]
-    
+
     # Get predictions from both models
     keras_predictions = keras_predictor.predict(
-        peptides=peptides,
-        alleles=alleles,
-        n_flanks=n_flanks,
-        c_flanks=c_flanks)
-    
+        peptides=peptides, alleles=alleles, n_flanks=n_flanks, c_flanks=c_flanks
+    )
+
     torch_predictions = torch_predictor.predict(
-        peptides=peptides,
-        alleles=alleles,
-        n_flanks=n_flanks,
-        c_flanks=c_flanks)
-    
+        peptides=peptides, alleles=alleles, n_flanks=n_flanks, c_flanks=c_flanks
+    )
+
     # Verify outputs match
-    prediction_columns = [
-        "presentation_score",
-        "presentation_percentile",
-        "processing_score"
-    ]
-    
+    prediction_columns = ["presentation_score", "presentation_percentile", "processing_score"]
+
     for col in prediction_columns:
         if col in keras_predictions.columns:
             assert_array_almost_equal(
-                keras_predictions[col].values,
-                torch_predictions[col].values,
-                decimal=4,
-                err_msg=f"Mismatch in {col}")
+                keras_predictions[col].values, torch_predictions[col].values, decimal=4, err_msg=f"Mismatch in {col}"
+            )
+
+
 def test_torch_backend_no_weights():
     """Confirm that torch backend is used even if weights.csv is missing."""
     import shutil
@@ -233,14 +217,21 @@ def test_torch_backend_no_weights():
 
         # Try running prediction with --backend pytorch.
         out_csv = os.path.join(model_dir, "out.csv")
-        predict_run([
-            "--backend", "pytorch",
-            "--models", model_dir,
-            "--affinity-only",
-            "--alleles", "HLA-A0201",
-            "--peptides", "SIINFEKL",
-            "--out", out_csv
-        ])
+        predict_run(
+            [
+                "--backend",
+                "pytorch",
+                "--models",
+                model_dir,
+                "--affinity-only",
+                "--alleles",
+                "HLA-A0201",
+                "--peptides",
+                "SIINFEKL",
+                "--out",
+                out_csv,
+            ]
+        )
 
         # If it loads and runs without error, the test passes.
         assert os.path.exists(out_csv), "No output file written with torch backend"
