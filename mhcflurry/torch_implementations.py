@@ -52,13 +52,26 @@ class TorchNeuralNetwork(nn.Module):
             dense_layer_l2_regularization=0.0):
         super().__init__()
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Store all parameters as instance attributes
         self.input_size = input_size
+        self.peptide_dense_layer_sizes = peptide_dense_layer_sizes
+        self.allele_dense_layer_sizes = allele_dense_layer_sizes
+        self.layer_sizes = layer_sizes
         self.dropout_prob = dropout_probability
         self.use_batch_norm = batch_normalization
+        self.activation = activation
+        self.init = init
+        self.output_activation = output_activation
+        self.num_outputs = num_outputs
+        self.locally_connected_layers = locally_connected_layers
         self.topology = topology
         self.merge_method = peptide_allele_merge_method
         self.merge_activation = peptide_allele_merge_activation
+        self.allele_amino_acid_encoding = allele_amino_acid_encoding
+        self.dense_layer_l1_regularization = dense_layer_l1_regularization
+        self.dense_layer_l2_regularization = dense_layer_l2_regularization
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         # Activation functions
         self.hidden_activation = {
@@ -128,56 +141,6 @@ class TorchNeuralNetwork(nn.Module):
         # Initialize weights
         self.init_weights(init)
 
-    def build_layers(self):
-        """Build the network layers."""
-        current_size = self.input_size
-
-        # Peptide dense layers
-        self.peptide_layers = nn.ModuleList()
-        for size in self.peptide_dense_layer_sizes:
-            self.peptide_layers.extend([
-                nn.Linear(current_size, size),
-                nn.Dropout(self.dropout_prob) if self.dropout_prob > 0 else nn.Identity()
-            ])
-            if self.use_batch_norm:
-                self.peptide_layers.append(nn.BatchNorm1d(size))
-            current_size = size
-
-        # Locally connected layers
-        self.local_layers = nn.ModuleList()
-        for params in self.locally_connected_layers:
-            self.local_layers.append(
-                nn.Conv1d(
-                    in_channels=1,
-                    out_channels=params['filters'],
-                    kernel_size=params['kernel_size'],
-                    groups=self.input_size // params['kernel_size'],
-                    bias=True
-                )
-            )
-            current_size = params['filters'] * (self.input_size - params['kernel_size'] + 1)
-
-        # Main dense layers
-        self.dense_layers = nn.ModuleList()
-        prev_layers = []
-        for size in self.layer_sizes:
-            if self.topology == "with-skip-connections" and prev_layers:
-                # Concatenate previous two layers
-                if len(prev_layers) > 1:
-                    current_size = prev_layers[-1].out_features + prev_layers[-2].out_features
-            
-            layer = nn.Linear(current_size, size)
-            self.dense_layers.append(layer)
-            prev_layers.append(layer)
-            
-            if self.use_batch_norm:
-                self.dense_layers.append(nn.BatchNorm1d(size))
-            if self.dropout_prob > 0:
-                self.dense_layers.append(nn.Dropout(self.dropout_prob))
-            current_size = size
-
-        # Output layer
-        self.output_layer = nn.Linear(current_size, self.num_outputs)
 
     def init_weights(self, init):
         """Initialize network weights."""
