@@ -130,7 +130,13 @@ class Class1AffinityPredictor(nn.Module):
                 
             elif isinstance(t_layer, nn.BatchNorm1d):
                 if len(weights) == 4:  # Has learned parameters
+                    # In Keras: [gamma, beta, moving_mean, moving_variance]
+                    # In PyTorch: weight=gamma, bias=beta
                     t_layer.weight.data = torch.from_numpy(weights[0]).float()
                     t_layer.bias.data = torch.from_numpy(weights[1]).float()
                     t_layer.running_mean.data = torch.from_numpy(weights[2]).float()
+                    # Keras uses moving_variance, PyTorch expects running_var
                     t_layer.running_var.data = torch.from_numpy(weights[3]).float()
+                    # Set momentum to match Keras default of 0.99
+                    t_layer.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum
+                    t_layer.eps = 0.001  # Match Keras default epsilon
