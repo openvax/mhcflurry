@@ -122,8 +122,78 @@ class TorchNeuralNetwork(nn.Module):
         # Output layer
         self.output_layer = nn.Linear(current_size, num_outputs)
 
+        # Build network layers
+        self.build_layers()
+        
         # Initialize weights
         self.init_weights(init)
+
+    def build_layers(self):
+        """Build the network layers."""
+        current_size = self.input_size
+
+        # Peptide dense layers
+        self.peptide_layers = nn.ModuleList()
+        for size in self.peptide_dense_layer_sizes:
+            self.peptide_layers.extend([
+                nn.Linear(current_size, size),
+                nn.Dropout(self.dropout_prob) if self.dropout_prob > 0 else nn.Identity()
+            ])
+            if self.use_batch_norm:
+                self.peptide_layers.append(nn.BatchNorm1d(size))
+            current_size = size
+
+        # Locally connected layers
+        self.local_layers = nn.ModuleList()
+        for params in self.locally_connected_layers:
+            self.local_layers.append(
+                nn.Conv1d(
+                    in_channels=1,
+                    out_channels=params['filters'],
+                    kernel_size=params['kernel_size'],
+                    groups=self.input_size // params['kernel_size'],
+                    bias=True
+                )
+            )
+            current_size = params['filters'] * (self.input_size - params['kernel_size'] + 1)
+
+        # Main dense layers
+        self.dense_layers = nn.ModuleList()
+        prev_layers = []
+        for size in self.layer_sizes:
+            if self.topology == "with-skip-connections" and prev_layers:
+                # Concatenate previous two layers
+                if len(prev_layers) > 1:
+                    current_size = prev_layers[-1].out_features + prev_layers[-2].out_features
+            
+            layer = nn.Linear(current_size, size)
+            self.dense_layers.append(layer)
+            prev_layers.append(layer)
+            
+            if self.use_batch_norm:
+                self.dense_layers.append(nn.BatchNorm1d(size))
+            if self.dropout_prob > 0:
+                self.dense_layers.append(nn.Dropout(self.dropout_prob))
+            current_size = size
+
+        # Output layer
+        self.output_layer = nn.Linear(current_size, self.num_outputs)
+
+    def init_weights(self, init):
+        """Initialize network weights."""
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                if init == "glorot_uniform":
+                    # TensorFlow's glorot_uniform is slightly different from PyTorch's xavier_uniform
+                    # TF uses a uniform distribution between [-limit, limit] where:
+                    # limit = sqrt(6 / (fan_in + fan_out))
+                    fan_in = module.weight.size(1)
+                    fan_out = module.weight.size(0)
+                    limit = numpy.sqrt(6. / (fan_in + fan_out))
+                    nn.init.uniform_(module.weight, -limit, limit)
+                    nn.init.zeros_(module.bias)
+                else:
+                    raise ValueError(f"Unsupported initialization: {init}")
 
 class Class1AffinityPredictor(object):
     """
