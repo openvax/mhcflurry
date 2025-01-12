@@ -129,6 +129,7 @@ def test_activation_functions():
 def test_batch_norm_behavior():
     """Test that batch normalization behaves the same in PyTorch and Keras"""
     import tensorflow as tf
+    import torch.nn as nn
     from tf_keras.layers import BatchNormalization
     
     # Create test input
