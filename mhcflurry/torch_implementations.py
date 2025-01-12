@@ -330,6 +330,25 @@ class TorchNeuralNetwork(nn.Module):
         final_outputs = torch.cat(outputs_list, dim=0)
         return to_numpy(final_outputs)
 
+    def load_weights_from_keras(self, keras_model):
+        """
+        Load weights from a Keras model into this PyTorch model.
+        
+        Parameters
+        ----------
+        keras_model : keras.Model
+            Keras model with matching architecture
+        """
+        for keras_layer, torch_layer in zip(keras_model.layers, self.dense_layers):
+            # Extract the Keras weights and biases
+            weights, biases = keras_layer.get_weights()
+            # Load into the Torch linear layer
+            torch_layer.weight.data = torch.from_numpy(weights.T)
+            torch_layer.bias.data = torch.from_numpy(biases)
+
+        # If you have BatchNorm layers, also match gamma, beta, moving_mean, moving_variance
+        # from Keras to PyTorch’s BatchNorm parameters.
+
 class Class1AffinityPredictor(object):
     """
     PyTorch implementation of Class1AffinityPredictor.
