@@ -200,6 +200,49 @@ class TorchNeuralNetwork(nn.Module):
                 else:
                     raise ValueError(f"Unsupported initialization: {init}")
 
+    def load_weights_from_keras(self, keras_model):
+        """
+        Load weights from a Keras model into this PyTorch model.
+        
+        Parameters
+        ----------
+        keras_model : keras.Model
+            Keras model with matching architecture
+        """
+        from tf_keras.layers import Dense, BatchNormalization
+        keras_layers = [l for l in keras_model.layers 
+                       if isinstance(l, (Dense, BatchNormalization))]
+        torch_layers = [l for l in self.modules()
+                       if isinstance(l, (nn.Linear, nn.BatchNorm1d))]
+        
+        assert len(keras_layers) == len(torch_layers), "Model architectures do not match"
+        
+        for k_layer, t_layer in zip(keras_layers, torch_layers):
+            weights = k_layer.get_weights()
+            
+            if isinstance(t_layer, nn.Linear):
+                # Keras stores weights as (input_dim, output_dim)
+                # PyTorch stores as (output_dim, input_dim)
+                t_layer.weight.data = torch.from_numpy(weights[0].T).float()
+                t_layer.bias.data = torch.from_numpy(weights[1]).float()
+                
+            elif isinstance(t_layer, nn.BatchNorm1d):
+                if len(weights) == 4:  # Has learned parameters
+                    # In Keras: [gamma, beta, moving_mean, moving_variance]
+                    # In PyTorch: weight=gamma, bias=beta
+                    t_layer.weight.data = torch.from_numpy(weights[0]).float()
+                    t_layer.bias.data = torch.from_numpy(weights[1]).float()
+                        
+                    # Set running statistics
+                    t_layer.running_mean.data = torch.from_numpy(weights[2]).float()
+                    t_layer.running_var.data = torch.from_numpy(weights[3]).float()
+                        
+                    # Configure batch norm settings to match Keras
+                    t_layer.momentum = 0.01  # PyTorch momentum = 1 - Keras momentum (0.99)
+                    t_layer.eps = 0.001  # Match Keras epsilon
+                    t_layer.track_running_stats = True
+                    t_layer.training = False  # Set to eval mode
+
 class Class1AffinityPredictor(object):
     """
     PyTorch implementation of Class1AffinityPredictor.
