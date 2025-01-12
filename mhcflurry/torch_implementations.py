@@ -151,19 +151,39 @@ class Class1AffinityPredictor(object):
         """
         import os
         import pandas as pd
+        import json
         
-        # Create instance with default architecture matching Keras model
-        instance = cls(
-            input_size=315,
-            peptide_dense_layer_sizes=[],
-            layer_sizes=[],
-            dropout_probability=0.0,
-            batch_normalization=False,
-            activation='tanh',
-            init='glorot_uniform',
-            output_activation='sigmoid',
-            num_outputs=1
-        )
+        # Load manifest if available
+        manifest_path = os.path.join(models_dir, "manifest.csv")
+        if os.path.exists(manifest_path):
+            manifest_df = pd.read_csv(manifest_path)
+            # Get network config from first model
+            config = json.loads(manifest_df.iloc[0].config_json)
+            
+            instance = cls(
+                input_size=config.get('input_size', 315),
+                peptide_dense_layer_sizes=config.get('peptide_dense_layer_sizes', []),
+                layer_sizes=config.get('layer_sizes', []),
+                dropout_probability=config.get('dropout_probability', 0.0),
+                batch_normalization=config.get('batch_normalization', False),
+                activation=config.get('activation', 'tanh'),
+                init=config.get('init', 'glorot_uniform'),
+                output_activation=config.get('output_activation', 'sigmoid'),
+                num_outputs=config.get('num_outputs', 1)
+            )
+        else:
+            # Fallback to default architecture
+            instance = cls(
+                input_size=315,
+                peptide_dense_layer_sizes=[],
+                layer_sizes=[],
+                dropout_probability=0.0,
+                batch_normalization=False,
+                activation='tanh',
+                init='glorot_uniform',
+                output_activation='sigmoid',
+                num_outputs=1
+            )
         
         # Load weights if available
         weights_path = os.path.join(models_dir, "weights.csv")
@@ -197,9 +217,34 @@ class Class1AffinityPredictor(object):
         weights_df : pandas.DataFrame
             DataFrame containing model weights
         """
-        # Convert weights to appropriate format and load into model
-        # This will need to be implemented based on how weights are stored
-        pass  # TODO: Implement weight loading logic
+        if not isinstance(weights_df, pandas.DataFrame):
+            weights_df = pandas.read_csv(weights_df)
+            
+        weights = []
+        for i in range(len(self.paths)):
+            path_weights = []
+            for j, layer in enumerate(self.paths[i]):
+                if isinstance(layer, nn.Linear):
+                    weight_key = f"path_{i}_dense_{j}_weight" 
+                    bias_key = f"path_{i}_dense_{j}_bias"
+                    
+                    if weight_key in weights_df and bias_key in weights_df:
+                        weight = torch.FloatTensor(weights_df[weight_key].values)
+                        bias = torch.FloatTensor(weights_df[bias_key].values)
+                        layer.weight.data = weight
+                        layer.bias.data = bias
+                        
+                elif isinstance(layer, nn.BatchNorm1d):
+                    weight_key = f"path_{i}_bn_{j}_weight"
+                    bias_key = f"path_{i}_bn_{j}_bias"
+                    mean_key = f"path_{i}_bn_{j}_running_mean"
+                    var_key = f"path_{i}_bn_{j}_running_var"
+                    
+                    if all(k in weights_df for k in [weight_key, bias_key, mean_key, var_key]):
+                        layer.weight.data = torch.FloatTensor(weights_df[weight_key].values) 
+                        layer.bias.data = torch.FloatTensor(weights_df[bias_key].values)
+                        layer.running_mean.data = torch.FloatTensor(weights_df[mean_key].values)
+                        layer.running_var.data = torch.FloatTensor(weights_df[var_key].values)
 
     def forward(self, x):
         """
