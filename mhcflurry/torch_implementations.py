@@ -296,6 +296,10 @@ class TorchNeuralNetwork(nn.Module):
                 # PyTorch stores as (output_dim, input_dim)
                 t_layer.weight.data = torch.from_numpy(weights[0].T).float()
                 t_layer.bias.data = torch.from_numpy(weights[1]).float()
+
+                print(f"[DEBUG] LINEAR layer => weight min/max/mean: "
+                      f"{t_layer.weight.data.min().item()}/{t_layer.weight.data.max().item()}/{t_layer.weight.data.mean().item()}, "
+                      f"bias: {t_layer.bias.data.min().item()}/{t_layer.bias.data.max().item()}/{t_layer.bias.data.mean().item()}")
                 
             elif isinstance(t_layer, nn.BatchNorm1d):
                 if len(weights) == 4:  # Has learned parameters
@@ -681,6 +685,12 @@ class Class1AffinityPredictor(object):
                     t_layer.eps = 0.001  # Match Keras epsilon of 0.001
                     t_layer.track_running_stats = True  # Enable running stats tracking
                     t_layer.eval()  # Set to eval mode to use running stats
+
+                    print(f"[DEBUG] BN layer => gamma min/max/mean: "
+                          f"{t_layer.weight.data.min().item()}/{t_layer.weight.data.max().item()}/{t_layer.weight.data.mean().item()}, "
+                          f"beta: {t_layer.bias.data.min().item()}/{t_layer.bias.data.max().item()}/{t_layer.bias.data.mean().item()}, "
+                          f"running_mean avg: {t_layer.running_mean.data.mean().item()}, "
+                          f"running_var avg: {t_layer.running_var.data.mean().item()}")
 
     def export_weights_to_keras(self, keras_model):
         """
