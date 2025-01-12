@@ -50,27 +50,26 @@ def compare_layer_outputs():
         network = tf_model.network()
 
         # Create intermediate model that maintains graph connectivity
-        try:
-            peptide_input = network.get_layer('peptide').input
-            allele_input = network.get_layer('allele').input
-            
-            logging.info("Successfully got input layers")
-            logging.info(f"Peptide input shape: {peptide_input.shape}")
-            logging.info(f"Allele input shape: {allele_input.shape}")
-            
-            # Build list of layer outputs while maintaining connections
-            layer_outputs = []
-            tensor_dict = {}
-            
-            logging.info("Starting layer traversal...")
-            
-            # Process all layers
-            for layer in network.layers:
-                # Skip input layers since we handle them separately
-                if layer.name in ['peptide', 'allele']:
-                    continue
-                    
-                # Get layer inputs
+        peptide_input = network.get_layer('peptide').input
+        allele_input = network.get_layer('allele').input
+        
+        logging.info("Successfully got input layers")
+        logging.info(f"Peptide input shape: {peptide_input.shape}")
+        logging.info(f"Allele input shape: {allele_input.shape}")
+        
+        # Build list of layer outputs while maintaining connections
+        layer_outputs = []
+        tensor_dict = {}
+        
+        logging.info("Starting layer traversal...")
+        
+        # Process all layers
+        for layer in network.layers:
+            # Skip input layers since we handle them separately
+            if layer.name in ['peptide', 'allele']:
+                continue
+                
+            # Get layer inputs
             layer_inputs = []
             for node in layer._inbound_nodes:
                 try:
@@ -79,7 +78,7 @@ def compare_layer_outputs():
                         inbound_layers = [inbound_layers]
                 except AttributeError:
                     continue
-                    
+                
                 for inp in inbound_layers:
                     if isinstance(inp, str):
                         continue
@@ -89,15 +88,16 @@ def compare_layer_outputs():
                         layer_inputs.append(allele_input) 
                     else:
                         layer_inputs.append(tensor_dict[inp.name])
-                        
+            
             # Compute layer output
             if len(layer_inputs) == 1:
                 tensor_dict[layer.name] = layer(layer_inputs[0])
             else:
                 tensor_dict[layer.name] = layer(layer_inputs)
-                
-            layer_outputs.append(tensor_dict[layer.name])
             
+            layer_outputs.append(tensor_dict[layer.name])
+        
+        # Create the intermediate model
         try:
             tf_intermediate_model = tf.keras.Model(
                 inputs={'peptide': peptide_input, 'allele': allele_input},
