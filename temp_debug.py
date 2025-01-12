@@ -16,14 +16,14 @@ def compare_layer_outputs():
         alleles = ["HLA-A0201", "HLA-A0301"]
         peptides = ["SIINFEKL", "SIINFEKD", "SIINFEKQ"]
 
-        # Get models directory from presentation predictor
-        presentation_predictor = Class1PresentationPredictor.load()
-        tf_predictor = presentation_predictor.affinity_predictor
-        models_dir = presentation_predictor.models_dir
+        # Get models directory and load predictors
+        from mhcflurry.downloads import get_default_class1_presentation_models_dir
+        models_dir = get_default_class1_presentation_models_dir()
         logging.info(f"Using models directory: {models_dir}")
 
         logging.info("Loading predictors...")
-        # Load torch predictor with the models directory 
+        presentation_predictor = Class1PresentationPredictor.load(models_dir)
+        tf_predictor = presentation_predictor.affinity_predictor
         torch_predictor = TorchPredictor.load(models_dir)
         logging.info("Predictors loaded successfully")
 
