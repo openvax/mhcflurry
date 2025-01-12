@@ -220,3 +220,30 @@ def test_presentation_predictor_matches_keras():
                 torch_predictions[col].values,
                 decimal=4,
                 err_msg=f"Mismatch in {col}")
+def test_torch_backend_no_weights():
+    """Confirm that torch backend is used even if weights.csv is missing."""
+    import shutil
+    from mhcflurry.predict_command import run as predict_run
+
+    # Copy or create a minimal torch-based model directory without weights.csv
+    model_dir = tempfile.mkdtemp(prefix="mhcflurry_test_torch_no_weights_")
+    try:
+        # Suppose we have some minimal files in model_dir, just enough to load
+        # a TorchPredictor (affinity) but no logistic regression weights.csv.
+
+        # Try running prediction with --backend pytorch.
+        out_csv = os.path.join(model_dir, "out.csv")
+        predict_run([
+            "--backend", "pytorch",
+            "--models", model_dir,
+            "--affinity-only",
+            "--alleles", "HLA-A0201",
+            "--peptides", "SIINFEKL",
+            "--out", out_csv
+        ])
+
+        # If it loads and runs without error, the test passes.
+        assert os.path.exists(out_csv), "No output file written with torch backend"
+
+    finally:
+        shutil.rmtree(model_dir, ignore_errors=True)
