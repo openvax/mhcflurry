@@ -59,6 +59,16 @@ def create_test_networks() -> Tuple[any, Class1AffinityPredictor]:
 def test_affinity_predictor_matches_keras():
     """Test that PyTorch affinity predictor gives identical results to Keras."""
     keras_model, torch_model = create_test_networks()
+    
+    # Test with random input
+    test_input = np.random.rand(10, 128).astype("float32")
+    
+    # Get predictions from both models
+    keras_output = keras_model.predict(test_input)
+    torch_output = to_numpy(torch_model(test_input))
+    
+    # Verify outputs match
+    assert_array_almost_equal(keras_output, torch_output, decimal=4)
 
 
 def test_predict_scan_command_backends_match():
