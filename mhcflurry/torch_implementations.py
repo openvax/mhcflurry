@@ -53,7 +53,7 @@ class TorchNeuralNetwork(nn.Module):
             data_dependent_initialization_method=None):
         super().__init__()
         
-        # Set device first thing
+        # Set device and move model to it
         
         # Initialize list to store regularization loss functions
         self.regularization_losses = []
@@ -159,8 +159,9 @@ class TorchNeuralNetwork(nn.Module):
         # Output layer
         self.output_layer = nn.Linear(current_size, num_outputs)
 
-        # Initialize weights
+        # Initialize weights and move model to device
         self.init_weights(init)
+        self.to(self.device)
 
 
     def __del__(self):
@@ -171,9 +172,8 @@ class TorchNeuralNetwork(nn.Module):
 
     def to(self, device):
         """Move model to specified device"""
-        super().to(device)
         self.device = device
-        return self
+        return super().to(device)
         
     def train(self, mode=True):
         """Set training mode"""
