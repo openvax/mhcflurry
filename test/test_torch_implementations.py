@@ -47,13 +47,17 @@ def create_test_networks() -> Tuple[any, Class1AffinityPredictor]:
         ]
     )
 
-    torch_model = Class1AffinityPredictor(
+    torch_network = TorchNeuralNetwork(
         input_size=315,
         peptide_dense_layer_sizes=[],
         layer_sizes=[64, 32],
-        activation="tanh",
+        activation="tanh", 
         output_activation="sigmoid",
         batch_normalization=True,
+    )
+    
+    torch_model = Class1AffinityPredictor(
+        class1_pan_allele_models=[torch_network]
     )
 
     return keras_model, torch_model

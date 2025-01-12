@@ -123,9 +123,6 @@ class TorchPresentationPredictor(Class1PresentationPredictor):
             else:
                 df["presentation_score"] = []
                 df["presentation_percentile"] = []
-            
-            # Keep "affinity_score" so test doesn't fail
-            # del df["affinity_score"]
         
         return df
 
