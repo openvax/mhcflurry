@@ -56,6 +56,12 @@ def test_weight_transfer_and_predictions():
     print("\nPyTorch model architecture:")
     print(torch_network)
 
+    # Ensure Keras model is compiled before trying to access weights
+    keras_model.compile(
+        optimizer='adam',
+        loss='mse'
+    )
+
     # Transfer weights from Keras to PyTorch
     torch_network.load_weights_from_keras(keras_model)
 
@@ -275,10 +281,19 @@ def test_training_behavior():
     """Test that training behavior matches between implementations."""
     # Create models with same architecture
     keras_model = Class1NeuralNetwork(
+        peptide_allele_merge_method="multiply",
         layer_sizes=[64, 32],
         batch_normalization=True
     )
+    
+    # Ensure Keras model is compiled
+    keras_model.network().compile(
+        optimizer='adam',
+        loss='mse'
+    )
+
     torch_model = TorchNeuralNetwork(
+        peptide_allele_merge_method="multiply",
         layer_sizes=[64, 32],
         batch_normalization=True
     )

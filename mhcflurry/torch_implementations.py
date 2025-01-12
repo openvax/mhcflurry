@@ -57,6 +57,12 @@ class TorchNeuralNetwork(nn.Module):
         self.fit_info = []
         self.prediction_cache = weakref.WeakKeyDictionary()
 
+        # Set activation functions
+        self.hidden_activation = self._get_activation_function(
+            hyperparameters.get('activation', 'tanh'))
+        self.output_activation = self._get_activation_function(
+            hyperparameters.get('output_activation', 'sigmoid'))
+
         # Build network based on hyperparameters
         self._build_network()
         self.to(self.device)
@@ -149,6 +155,21 @@ class TorchNeuralNetwork(nn.Module):
             current_size, 
             self.hyperparameters["num_outputs"]
         )
+
+    def _get_activation_function(self, name):
+        """Convert activation function name to PyTorch function"""
+        if callable(name):
+            return name
+        activations = {
+            'tanh': torch.tanh,
+            'relu': F.relu,
+            'sigmoid': torch.sigmoid,
+            'linear': lambda x: x,
+            '': lambda x: x,
+        }
+        if name not in activations:
+            raise ValueError(f"Unknown activation function: {name}")
+        return activations[name]
 
     def _get_peptide_input_dim(self):
         """Calculate input dimension from peptide encoding config"""
