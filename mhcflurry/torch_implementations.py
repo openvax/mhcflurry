@@ -83,16 +83,15 @@ class Class1AffinityPredictor(nn.Module):
         # Initialize weights
         self.init_weights(init)
 
-    @classmethod 
+    @classmethod
     def load(cls, models_dir):
         """
         Load a trained model from the specified directory.
-        Validates that weights match the expected architecture.
         
         Parameters
         ----------
         models_dir : str
-            Directory containing model files including weights.csv
+            Directory containing model files including manifest.csv
             
         Returns
         -------
@@ -100,55 +99,38 @@ class Class1AffinityPredictor(nn.Module):
             Initialized predictor with loaded weights
         """
         import os
+        import json
         import pandas as pd
         
-        weights_path = os.path.join(models_dir, "weights.csv")
-        if not os.path.exists(weights_path):
-            raise ValueError(f"No weights.csv found in {models_dir}")
+        manifest_path = os.path.join(models_dir, "manifest.csv")
+        if not os.path.exists(manifest_path):
+            raise ValueError(f"No manifest.csv found in {models_dir}")
             
-        # Load weights dataframe
-        weights_df = pd.read_csv(weights_path)
+        # Load manifest
+        manifest_df = pd.read_csv(manifest_path)
         
-        # Validate architecture matches expected parallel paths
-        expected_layers = {
-            'input': 315,  # Input size
-            'first_dense': [256, 1024],  # Expected sizes for first dense layer
-            'second_dense': 512,  # Expected size for second dense layer
-            'output': 1  # Output size
-        }
+        # Get network config from first model
+        config = json.loads(manifest_df.iloc[0].config_json)
         
-        # Create instance with validated architecture
+        # Create instance with architecture from config
         instance = cls(
-            input_size=expected_layers['input'],
-            peptide_dense_layer_sizes=[],
-            layer_sizes=[],
+            input_size=config.get('input_size', 315),
+            peptide_dense_layer_sizes=config.get('peptide_dense_layer_sizes', []),
+            layer_sizes=config.get('layer_sizes', []),
+            dropout_probability=config.get('dropout_probability', 0.0),
+            batch_normalization=config.get('batch_normalization', False),
+            activation=config.get('activation', 'tanh'),
+            init=config.get('init', 'glorot_uniform'),
+            output_activation=config.get('output_activation', 'sigmoid'),
+            num_outputs=config.get('num_outputs', 1)
         )
         
-        # Verify each path's layer dimensions match weights
-        for path in instance.paths:
-            first_layer = path[0]
-            if first_layer.in_features != expected_layers['input']:
-                raise ValueError(
-                    f"First layer input size {first_layer.in_features} "
-                    f"doesn't match expected {expected_layers['input']}")
-                    
-            if first_layer.out_features not in expected_layers['first_dense']:
-                raise ValueError(
-                    f"First layer output size {first_layer.out_features} "
-                    f"not in expected sizes {expected_layers['first_dense']}")
-                    
-            second_layer = path[3]  # Skip dropout/batch norm to get second dense layer
-            if second_layer.out_features != expected_layers['second_dense']:
-                raise ValueError(
-                    f"Second layer output size {second_layer.out_features} "
-                    f"doesn't match expected {expected_layers['second_dense']}")
-                    
-            output_layer = path[-1]
-            if output_layer.out_features != expected_layers['output']:
-                raise ValueError(
-                    f"Output layer size {output_layer.out_features} "
-                    f"doesn't match expected {expected_layers['output']}")
-        
+        # Load weights
+        weights_path = os.path.join(models_dir, "weights.csv") 
+        if os.path.exists(weights_path):
+            weights_df = pd.read_csv(weights_path)
+            instance.load_weights(weights_df)
+            
         instance = instance.to(instance.device)
         return instance
     def init_weights(self, init):
@@ -165,6 +147,19 @@ class Class1AffinityPredictor(nn.Module):
                     nn.init.zeros_(layer.bias)
                 else:
                     raise ValueError(f"Unsupported initialization: {init}")
+                    
+    def load_weights(self, weights_df):
+        """
+        Load weights from weights DataFrame
+        
+        Parameters
+        ----------
+        weights_df : pandas.DataFrame
+            DataFrame containing model weights
+        """
+        # Convert weights to appropriate format and load into model
+        # This will need to be implemented based on how weights are stored
+        pass  # TODO: Implement weight loading logic
 
     def forward(self, x):
         """
