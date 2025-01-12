@@ -235,7 +235,6 @@ class TorchNeuralNetwork(nn.Module):
             Output predictions
         """
         x = x.to(self.device)
-        print("\nPyTorch Input:", x.mean().item(), x.std().item())
         
         # Process dense layers with Keras-matching activation order
         for i, layer in enumerate(self.dense_layers):
@@ -245,24 +244,16 @@ class TorchNeuralNetwork(nn.Module):
                 x = x.to(self.device, dtype=torch.float32)  # Ensure float32
                 x_pre = x
                 x = layer(x)  # Linear transformation
-                print(f"PyTorch After Linear {i}:", x.mean().item(), x.std().item())
                 x = self.hidden_activation(x)  # Activation immediately after linear
-                print(f"PyTorch After Activation {i}:", x.mean().item(), x.std().item())
             elif isinstance(layer, nn.BatchNorm1d):
                 x = x.to(self.device, dtype=torch.float32)  # Ensure float32
                 x_pre = x
-                print(f"Before BN {i}:", x.mean().item(), x.std().item())
-                print(f"BN {i} running_mean:", layer.running_mean.mean().item())
-                print(f"BN {i} running_var:", layer.running_var.mean().item())
                 x = layer(x)  # Then batch norm
-                print(f"After BN {i}:", x.mean().item(), x.std().item())
         
         # Output layer with sigmoid activation
         self.output_layer = self.output_layer.to(self.device)
         x = self.output_layer(x)
-        print("PyTorch After final linear:", x.mean().item(), x.std().item())
         x = self.output_activation(x)
-        print("PyTorch Final output:", x.mean().item(), x.std().item())
 
         return x
 
