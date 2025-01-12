@@ -653,6 +653,21 @@ class Class1AffinityPredictor(object):
 
     def load_weights_from_keras(self, keras_model):
         """
+        Load weights from the given Keras model into the PyTorch model.
+        Make sure the layer order and shapes match your network structure.
+        """
+        for keras_layer, torch_layer in zip(keras_model.layers, self.dense_layers):
+            # Extract the Keras weights and biases
+            weights, biases = keras_layer.get_weights()
+            # Load into the Torch linear layer
+            torch_layer.weight.data = torch.from_numpy(weights.T)
+            torch_layer.bias.data = torch.from_numpy(biases)
+
+        # If you have BatchNorm layers, also match gamma, beta, moving_mean, moving_variance
+        # from Keras to PyTorch’s BatchNorm parameters.
+
+    def load_weights_from_keras(self, keras_model):
+        """
         Load weights from a Keras model into this PyTorch model.
         
         Parameters
