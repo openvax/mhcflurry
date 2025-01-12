@@ -53,7 +53,8 @@ class TorchNeuralNetwork(nn.Module):
             data_dependent_initialization_method=None):
         super().__init__()
         
-        # Set device and move model to it
+        # Set device first thing and ensure it's available
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         # Initialize list to store regularization loss functions
         self.regularization_losses = []
@@ -159,9 +160,13 @@ class TorchNeuralNetwork(nn.Module):
         # Output layer
         self.output_layer = nn.Linear(current_size, num_outputs)
 
-        # Initialize weights and move model to device
+        # Initialize weights
         self.init_weights(init)
+        
+        # Move model and all submodules to device
         self.to(self.device)
+        for module in self.modules():
+            module.to(self.device)
 
 
     def __del__(self):
@@ -229,7 +234,9 @@ class TorchNeuralNetwork(nn.Module):
         torch.Tensor
             Output predictions
         """
-        x = to_torch(x)
+        # Ensure input is a torch tensor and on correct device
+        if not isinstance(x, torch.Tensor):
+            x = to_torch(x)
         x = x.to(self.device)
         
         # Process peptide layers
