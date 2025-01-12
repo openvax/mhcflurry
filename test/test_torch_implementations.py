@@ -176,3 +176,47 @@ def test_to_numpy():
     x = to_numpy(t)
     assert isinstance(x, np.ndarray)
     assert_array_almost_equal(x, t.numpy())
+
+
+def test_presentation_predictor_matches_keras():
+    """Test that PyTorch presentation predictor gives identical results to Keras version."""
+    from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
+    from mhcflurry.torch_presentation_predictor import TorchPresentationPredictor
+    
+    # Load both predictors
+    keras_predictor = Class1PresentationPredictor.load()
+    torch_predictor = TorchPresentationPredictor.load()
+    
+    # Test data
+    peptides = ["SIINFEKL", "KLGGALQAK", "EAAGIGILTV"]
+    alleles = ["HLA-A*02:01", "HLA-B*07:02"]
+    n_flanks = ["AAA", "CCC", "GGG"] 
+    c_flanks = ["TTT", "GGG", "CCC"]
+    
+    # Get predictions from both models
+    keras_predictions = keras_predictor.predict(
+        peptides=peptides,
+        alleles=alleles,
+        n_flanks=n_flanks,
+        c_flanks=c_flanks)
+    
+    torch_predictions = torch_predictor.predict(
+        peptides=peptides,
+        alleles=alleles,
+        n_flanks=n_flanks,
+        c_flanks=c_flanks)
+    
+    # Verify outputs match
+    prediction_columns = [
+        "presentation_score",
+        "presentation_percentile",
+        "processing_score"
+    ]
+    
+    for col in prediction_columns:
+        if col in keras_predictions.columns:
+            assert_array_almost_equal(
+                keras_predictions[col].values,
+                torch_predictions[col].values,
+                decimal=4,
+                err_msg=f"Mismatch in {col}")
