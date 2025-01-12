@@ -62,18 +62,47 @@ def test_affinity_predictor_matches_keras():
     """Test that PyTorch affinity predictor gives identical results to Keras."""
     keras_model, torch_model = create_test_networks()
 
+    # Test architecture components
+    assert len(torch_model.peptide_layers) == len(keras_model.layers)
+    assert torch_model.input_size == 315
+    assert torch_model.dropout_prob == 0.0
+    assert torch_model.use_batch_norm == True
+
     # Transfer weights from Keras to PyTorch
     torch_model.load_weights_from_keras(keras_model)
 
     # Test with random input
     test_input = np.random.rand(10, 315).astype("float32")
-
-    # Get predictions from both models
     keras_output = keras_model.predict(test_input)
-    torch_output = to_numpy(torch_model(test_input))
+    torch_output = to_numpy(torch_model(to_torch(test_input)))
 
     # Verify outputs match
     assert_array_almost_equal(keras_output, torch_output, decimal=4)
+
+    # Test batch normalization parameters
+    for k_layer, t_layer in zip(keras_model.layers, torch_model.layers):
+        if isinstance(t_layer, torch.nn.BatchNorm1d):
+            k_weights = k_layer.get_weights()
+            assert_array_almost_equal(
+                k_weights[0],  # gamma
+                to_numpy(t_layer.weight.data),
+                decimal=4
+            )
+            assert_array_almost_equal(
+                k_weights[1],  # beta
+                to_numpy(t_layer.bias.data),
+                decimal=4
+            )
+            assert_array_almost_equal(
+                k_weights[2],  # moving mean
+                to_numpy(t_layer.running_mean.data),
+                decimal=4
+            )
+            assert_array_almost_equal(
+                k_weights[3],  # moving variance
+                to_numpy(t_layer.running_var.data),
+                decimal=4
+            )
 
 
 def test_predict_scan_command_backends_match():
@@ -135,23 +164,46 @@ def test_weight_transfer():
     # Test Keras -> PyTorch weight loading
     torch_model.load_weights_from_keras(keras_model)
 
+    # Verify initial predictions match
     test_input = np.random.rand(10, 315).astype("float32")
     keras_output = keras_model.predict(test_input)
-    torch_output = to_numpy(torch_model(test_input))
+    torch_output = to_numpy(torch_model(to_torch(test_input)))
     assert_array_almost_equal(keras_output, torch_output, decimal=4)
 
-    # Modify PyTorch weights
+    # Test weight modification
+    original_weights = []
     for layer in torch_model.layers:
         if isinstance(layer, torch.nn.Linear):
+            original_weights.append(
+                (to_numpy(layer.weight.data.clone()),
+                 to_numpy(layer.bias.data.clone())))
             layer.weight.data *= 1.5
             layer.bias.data += 0.1
+
+    # Verify predictions changed
+    modified_output = to_numpy(torch_model(to_torch(test_input)))
+    assert not numpy.allclose(torch_output, modified_output, rtol=1e-4)
 
     # Test PyTorch -> Keras weight loading
     torch_model.export_weights_to_keras(keras_model)
 
+    # Verify predictions match again
     keras_output = keras_model.predict(test_input)
-    torch_output = to_numpy(torch_model(test_input))
+    torch_output = to_numpy(torch_model(to_torch(test_input)))
     assert_array_almost_equal(keras_output, torch_output, decimal=4)
+
+    # Verify weights were actually modified
+    for i, layer in enumerate(torch_model.layers):
+        if isinstance(layer, torch.nn.Linear):
+            orig_weight, orig_bias = original_weights[i]
+            assert not numpy.allclose(
+                orig_weight, 
+                to_numpy(layer.weight.data),
+                rtol=1e-4)
+            assert not numpy.allclose(
+                orig_bias,
+                to_numpy(layer.bias.data), 
+                rtol=1e-4)
 
 
 def test_to_torch():
