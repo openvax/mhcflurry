@@ -5,7 +5,7 @@ import logging
 from mhcflurry.predict_command import run as predict_run
 from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
 from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
-from mhcflurry.downloads import get_default_class1_models_dir
+from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
 
 logging.basicConfig(level=logging.INFO)
 
@@ -16,13 +16,14 @@ def compare_layer_outputs():
         alleles = ["HLA-A0201", "HLA-A0301"]
         peptides = ["SIINFEKL", "SIINFEKD", "SIINFEKQ"]
 
-        # Get the default models directory
-        models_dir = get_default_class1_models_dir()
+        # Get models directory from presentation predictor
+        presentation_predictor = Class1PresentationPredictor.load()
+        models_dir = presentation_predictor.models_dir
         logging.info(f"Using models directory: {models_dir}")
 
         logging.info("Loading predictors...")
         # Load both predictors with the models directory
-        tf_predictor = Class1AffinityPredictor.load(models_dir)
+        tf_predictor = presentation_predictor.affinity_predictor
         torch_predictor = TorchPredictor.load(models_dir)
         logging.info("Predictors loaded successfully")
 
