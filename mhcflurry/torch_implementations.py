@@ -4,6 +4,7 @@ PyTorch implementations of MHCflurry neural networks.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy
 import numpy as np
 
 def to_torch(x):
