@@ -201,8 +201,10 @@ def test_full_network_architectures():
         test_peptides = ["SIINFEKL", "KLGGALQAK"]
         peptide_encoding = EncodableSequences.create(test_peptides)
         
-        # Force network creation by making a prediction
-        _ = keras_model.predict(peptides=peptide_encoding)
+        # Initialize network explicitly
+        keras_model._network = keras_model.make_network(
+            **keras_model.network_hyperparameter_defaults.subselect(keras_model.hyperparameters)
+        )
         
         # Now we can safely get and compile the network
         network = keras_model.network()
