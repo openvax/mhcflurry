@@ -64,7 +64,7 @@ def test_affinity_predictor_matches_keras():
     torch_model.load_weights_from_keras(keras_model)
     
     # Test with random input
-    test_input = np.random.rand(10, 128).astype("float32")
+    test_input = np.random.rand(10, 315).astype("float32")
     
     # Get predictions from both models
     keras_output = keras_model.predict(test_input)
@@ -143,7 +143,7 @@ def test_weight_transfer():
     # Test Keras -> PyTorch weight loading
     torch_model.load_weights_from_keras(keras_model)
     
-    test_input = np.random.rand(10, 128).astype("float32")
+    test_input = np.random.rand(10, 315).astype("float32")
     keras_output = keras_model.predict(test_input)
     torch_output = to_numpy(torch_model(test_input))
     assert_array_almost_equal(keras_output, torch_output, decimal=4)

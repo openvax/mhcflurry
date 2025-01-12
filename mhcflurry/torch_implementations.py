@@ -175,7 +175,9 @@ class Class1AffinityPredictor(nn.Module):
             "BLOSUM62",
             alignment_method="pad_middle",
             max_length=15)
-            
+
+        encoded = encoded.reshape(encoded.shape[0], -1)
+
         # Forward pass
         outputs = self.forward(encoded)
         outputs = to_numpy(outputs).flatten()
