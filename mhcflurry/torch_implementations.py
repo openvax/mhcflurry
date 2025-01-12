@@ -248,21 +248,16 @@ class TorchNeuralNetwork(nn.Module):
             layer = layer.to(self.device)
             x = layer(x)
                 
-        # Process dense layers with activation after batch norm
-        for i, layer in enumerate(self.dense_layers):
+        # Process dense layers
+        for layer in self.dense_layers:
             layer = layer.to(self.device)
             x = layer(x)
-            if isinstance(layer, nn.Linear) and i < len(self.dense_layers) - 1:
-                # Only apply activation if there's a batch norm layer following
-                if i + 1 < len(self.dense_layers) and isinstance(self.dense_layers[i+1], nn.BatchNorm1d):
-                    continue
-                x = self.hidden_activation(x)
-            elif isinstance(layer, nn.BatchNorm1d):
+            if isinstance(layer, nn.Linear):
                 x = self.hidden_activation(x)
                 
         # Output layer with final activation
         x = self.output_layer(x)
-        x = self.output_activation(x)
+        x = self.output_activation(x)  # Ensure sigmoid is applied
         
         # Add regularization losses if in training mode
         if self.training:
