@@ -145,30 +145,45 @@ class Class1AffinityPredictor(nn.Module):
 
     def predict(self, peptides, allele=None, model_kwargs=None, throw=True):
         """
-        Minimal example for predicted binding affinity in nM (similar to Keras predictor).
-        You may ignore allele or handle it if you want.
+        Predict binding affinity in nM for peptides.
+        
+        Parameters
+        ----------
+        peptides : list of string or EncodableSequences
+            Peptide sequences
+        allele : string
+            Allele name 
+        model_kwargs : dict
+            Extra kwargs to pass to model
+        throw : boolean
+            Whether to raise exceptions on invalid input
+            
+        Returns
+        -------
+        numpy.array of float
+            Predicted binding affinities in nM
         """
-        # If EncodableSequences, extract raw strings
-        if hasattr(peptides, "sequences"):
-            peptides = peptides.sequences
-
-        # Convert peptides to some numeric encoding (placeholder example).
-        # E.g. if peptides is a list of strings:
-        X = []
-        for pep in peptides:
-            # convert pep -> numeric vector, length 128 as an example
-            encoding = np.zeros(128, dtype=np.float32)
-            # (Write a real encoding if needed)
-            X.append(encoding)
-
-        X = np.array(X, dtype=np.float32)
-        # Forward pass (X will be converted to tensor in forward())
-        outputs = self.forward(X)
-        # The network outputs a 0..1 score. Convert to nM. Suppose let's do
-        # an approximate mapping, e.g.: nM = 50000^(1 - outputs).
-        # You can adapt the formula from your Class1NeuralNetwork code or
-        # from_ic50 logic, etc.
-        predictions_nM = 50000.0 ** (1.0 - to_numpy(outputs).flatten())
+        from mhcflurry.encodable_sequences import EncodableSequences
+        from mhcflurry.amino_acid import AMINO_ACID_INDEX
+        
+        # Convert to EncodableSequences if needed
+        if not isinstance(peptides, EncodableSequences):
+            peptides = EncodableSequences.create(peptides)
+            
+        # Get encoded peptides matrix
+        encoded = peptides.variable_length_to_fixed_length_vector_encoding(
+            "BLOSUM62",
+            alignment_method="pad_middle",
+            max_length=15)
+            
+        # Forward pass
+        outputs = self.forward(encoded)
+        outputs = to_numpy(outputs).flatten()
+        
+        # Convert network output (0-1) to nM predictions (same as Keras version)
+        max_ic50 = 50000.0
+        predictions_nM = max_ic50 ** (1.0 - outputs)
+        
         return predictions_nM
 
     def load_weights_from_keras(self, keras_model):
