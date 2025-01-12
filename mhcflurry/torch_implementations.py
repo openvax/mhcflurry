@@ -246,8 +246,16 @@ class TorchNeuralNetwork(nn.Module):
         """
         x = x.to(self.device)
         
+        # Process peptide layers
+        for layer in self.peptide_layers:
+            if isinstance(layer, nn.Linear):
+                x = self.hidden_activation(layer(x))
+            else:
+                x = layer(x)
+            x = x.to(self.device)
+
         # Process dense layers with Keras-matching activation order
-        for i, layer in enumerate(self.dense_layers):
+        for layer in self.dense_layers:
             layer = layer.to(self.device)
             x = x.to(self.device)
             if isinstance(layer, nn.Linear):
@@ -281,7 +289,8 @@ class TorchNeuralNetwork(nn.Module):
         torch_layers = []
         # ADD peptide_layers:
         torch_layers.extend([l for l in self.peptide_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
-        # Existing dense_layers:
+        # Include peptide_layers:
+        torch_layers.extend([l for l in self.peptide_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
         torch_layers.extend([l for l in self.dense_layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))])
         if hasattr(self, 'output_layer'):
             torch_layers.append(self.output_layer)
