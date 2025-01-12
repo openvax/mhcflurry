@@ -4,6 +4,7 @@ import os
 import tempfile
 from typing import Tuple
 
+import numpy
 import numpy as np
 import pandas as pd
 import torch
@@ -182,7 +183,7 @@ def test_weight_transfer():
 
     # Verify predictions changed
     modified_output = to_numpy(torch_model(to_torch(test_input)))
-    assert not numpy.allclose(torch_output, modified_output, rtol=1e-4)
+    assert not np.allclose(torch_output, modified_output, rtol=1e-4)
 
     # Test PyTorch -> Keras weight loading
     torch_model.export_weights_to_keras(keras_model)
@@ -196,11 +197,11 @@ def test_weight_transfer():
     for i, layer in enumerate(torch_model.layers):
         if isinstance(layer, torch.nn.Linear):
             orig_weight, orig_bias = original_weights[i]
-            assert not numpy.allclose(
+            assert not np.allclose(
                 orig_weight, 
                 to_numpy(layer.weight.data),
                 rtol=1e-4)
-            assert not numpy.allclose(
+            assert not np.allclose(
                 orig_bias,
                 to_numpy(layer.bias.data), 
                 rtol=1e-4)
