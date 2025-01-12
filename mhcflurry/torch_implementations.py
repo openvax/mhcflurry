@@ -200,6 +200,88 @@ class TorchNeuralNetwork(nn.Module):
                 else:
                     raise ValueError(f"Unsupported initialization: {init}")
 
+    def forward(self, x):
+        """
+        Run a forward pass through the network.
+        
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor
+            
+        Returns
+        -------
+        torch.Tensor
+            Output predictions
+        """
+        x = to_torch(x)
+        x = x.to(self.device)
+        
+        # Process peptide layers
+        peptide_output = x
+        for layer in self.peptide_layers:
+            if isinstance(layer, nn.Linear):
+                peptide_output = self.hidden_activation(layer(peptide_output))
+            else:
+                peptide_output = layer(peptide_output)
+            peptide_output = peptide_output.to(self.device)
+                
+        # Process allele layers if present
+        if hasattr(self, 'allele_layers'):
+            allele_output = self.allele_input
+            for layer in self.allele_layers:
+                if isinstance(layer, nn.Linear):
+                    allele_output = self.hidden_activation(layer(allele_output))
+                else:
+                    allele_output = layer(allele_output)
+                allele_output = allele_output.to(self.device)
+                
+            # Merge peptide and allele outputs
+            if self.merge_method == "concatenate":
+                x = torch.cat([peptide_output, allele_output], dim=1)
+            elif self.merge_method == "multiply":
+                x = peptide_output * allele_output
+                
+            if self.merge_activation:
+                x = {
+                    "tanh": torch.tanh,
+                    "relu": F.relu,
+                    "sigmoid": torch.sigmoid,
+                    "": lambda x: x,
+                }[self.merge_activation](x)
+        else:
+            x = peptide_output
+                
+        # Process locally connected layers
+        if self.local_layers:
+            x = x.unsqueeze(1)  # Add channel dimension
+            for layer in self.local_layers:
+                x = self.hidden_activation(layer(x))
+            x = x.flatten(1)  # Flatten back to 2D
+            
+        # Process dense layers with topology handling
+        layer_outputs = []
+        for i, layer in enumerate(self.dense_layers):
+            if isinstance(layer, nn.Linear):
+                if self.topology == "with-skip-connections" and len(layer_outputs) > 1:
+                    # Concatenate previous two layer outputs
+                    x = torch.cat(layer_outputs[-2:], dim=1)
+                x = self.hidden_activation(layer(x))
+                layer_outputs.append(x)
+            else:
+                x = layer(x)
+                
+        # Output layer
+        x = self.output_layer(x)
+        x = self.output_activation(x)
+        
+        # Add regularization losses if in training mode
+        if self.training:
+            for loss_fn in self.regularization_losses:
+                x = x + loss_fn()
+                
+        return x
+
     def load_weights_from_keras(self, keras_model):
         """
         Load weights from a Keras model into this PyTorch model.
