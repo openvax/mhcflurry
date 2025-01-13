@@ -326,10 +326,8 @@ class TorchNeuralNetwork(nn.Module):
             final_outputs = final_outputs.unsqueeze(1)
         # Convert network output (0-1) to nM predictions
         # Using same conversion as Keras version
-        final_outputs = torch.pow(
-            torch.tensor(50000.0, device=self.device, dtype=torch.float32),
-            (1.0 - final_outputs)
-        )
+        const_50000 = torch.tensor(50000.0, device=final_outputs.device, dtype=torch.float32)
+        final_outputs = torch.pow(const_50000, (1.0 - final_outputs))
         final_outputs = final_outputs.squeeze(-1)  # shape (N,)
 
         return to_numpy(final_outputs)
