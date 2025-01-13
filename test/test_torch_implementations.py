@@ -1,7 +1,17 @@
 """Tests for PyTorch implementations of MHCflurry models."""
 
 import numpy as np
+import random
 import torch
+import tensorflow as tf
+
+SEED = 123
+np.random.seed(SEED)
+random.seed(SEED)
+torch.manual_seed(SEED)
+tf.random.set_seed(SEED)
+
+tf.keras.backend.set_floatx("float64")
 from numpy.testing import assert_array_almost_equal
 
 from mhcflurry.torch_implementations import Class1AffinityPredictor, TorchNeuralNetwork, to_torch, to_numpy
@@ -26,6 +36,12 @@ def create_test_networks():
             Dense(1, activation="sigmoid"),
         ]
     )
+
+    for layer in keras_model.layers:
+        if layer.__class__.__name__ == "BatchNormalization":
+            layer.trainable = False
+
+    keras_model.compile(optimizer="adam", loss="mse")
 
     torch_network = TorchNeuralNetwork(
         peptide_encoding={

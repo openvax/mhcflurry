@@ -316,7 +316,7 @@ class TorchNeuralNetwork(nn.Module):
         with torch.no_grad():
             for start in range(0, len(encoded), batch_size):
                 batch = encoded[start : start + batch_size]
-                batch_tensor = to_torch(batch).to(self.device)
+                batch_tensor = to_torch(batch).to(self.device, dtype=torch.float64)
                 batch_output = self(batch_tensor)
                 outputs_list.append(batch_output.cpu())
 
