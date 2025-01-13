@@ -183,7 +183,7 @@ def test_no_csv():
             print("Running with args: %s" % full_args)
             predict_command.run(full_args)
             
-            result = pd.read_csv(output_path)
+            result = pandas.read_csv(output_path)
             print(result)
 
             # Verify results
