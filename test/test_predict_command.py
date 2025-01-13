@@ -176,36 +176,27 @@ def test_no_csv():
         "--affinity-only",
     ]
 
-    deletes = []
-    result = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as fd_out:
-            deletes.append(fd_out.name)
-            full_args = args + ["--out", fd_out.name]
+    with tempfile.NamedTemporaryFile(mode='w', suffix=".csv", delete=False) as output_file:
+        output_path = output_file.name
+        try:
+            full_args = args + ["--out", output_path]
             print("Running with args: %s" % full_args)
             predict_command.run(full_args)
-            fd_out.close()  # Explicitly close
-            result = pandas.read_csv(fd_out.name)
+            
+            result = pd.read_csv(output_path)
             print(result)
-    finally:
-        # Make sure we've closed the files and pandas has released them
-        import gc
-        gc.collect()  # Force garbage collection
-        
-        # Add a small delay to ensure files are released
-        import time
-        time.sleep(0.1)
-        
-        for delete in deletes:
-            try:
-                os.unlink(delete)
-            except Exception as e:
-                print(f"Warning: Could not delete {delete}: {e}")
 
-    print(result)
-    assert len(result) == 6
-    sub_result1 = result.loc[result.peptide == "SIINFEKL"].set_index("allele")
-    print(sub_result1)
-    assert (
-        sub_result1.loc["H-2-Kb"].mhcflurry1_affinity <
-        sub_result1.loc["HLA-A0201"].mhcflurry1_affinity)
+            # Verify results
+            assert len(result) == 6
+            sub_result1 = result.loc[result.peptide == "SIINFEKL"].set_index("allele")
+            print(sub_result1)
+            assert (
+                sub_result1.loc["H-2-Kb"].mhcflurry1_affinity <
+                sub_result1.loc["HLA-A0201"].mhcflurry1_affinity)
+
+        finally:
+            try:
+                os.unlink(output_path)
+            except OSError as e:
+                if e.errno != errno.ENOENT:
+                    print(f"Error removing file {output_path}: {e}")
