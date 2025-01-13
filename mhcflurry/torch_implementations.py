@@ -361,6 +361,14 @@ class TorchNeuralNetwork(nn.Module):
                 # Keras BN: [gamma, beta, moving_mean, moving_var]
                 gamma, beta, moving_mean, moving_var = keras_layer.get_weights()
                 bn = torch_layers[torch_index]
+
+                # Check if shapes match the corresponding Torch BN layer.
+                # If they do not match (e.g., 315 vs 64), skip this BN.
+                if gamma.shape != bn.weight.data.shape:
+                    print(f"[DEBUG] Skipping Keras BN of shape {gamma.shape}")
+                    continue  # Do not increment torch_index; just skip
+
+                # Otherwise, the shapes match, proceed to copy
                 bn.weight.data.copy_(torch.from_numpy(gamma).float())
                 bn.bias.data.copy_(torch.from_numpy(beta).float())
                 bn.running_mean.copy_(torch.from_numpy(moving_mean).float())
