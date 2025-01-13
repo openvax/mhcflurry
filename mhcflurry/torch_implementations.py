@@ -340,7 +340,16 @@ class TorchNeuralNetwork(nn.Module):
         import torch
         
         # Gather the Linear/BatchNorm layers in the order they should match
-        torch_layers = list(self.dense_layers) + [self.output_layer]
+        torch_layers = []
+        for layer in self.peptide_layers:
+            if isinstance(layer, (nn.Linear, nn.BatchNorm1d)):
+                torch_layers.append(layer)
+
+        for layer in self.dense_layers:
+            if isinstance(layer, (nn.Linear, nn.BatchNorm1d)):
+                torch_layers.append(layer)
+
+        torch_layers.append(self.output_layer)
 
         torch_index = 0
         for keras_layer in keras_model.layers:
