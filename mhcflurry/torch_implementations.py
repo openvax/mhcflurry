@@ -92,8 +92,8 @@ class TorchNeuralNetwork(nn.Module):
                     nn.Dropout(self.hyperparameters["dropout_probability"]))
             current_size = size
 
-        if self.hyperparameters["batch_normalization"] and self.hyperparameters["peptide_dense_layer_sizes"]:
-            print("[DEBUG] Adding single BN after peptide denselayers: dim =", current_size)
+        if self.hyperparameters["batch_normalization"]:
+            print(f"[DEBUG] Adding BN for flattened dim={current_size}")
             self.peptide_layers.append(nn.BatchNorm1d(current_size))
 
         # Allele representation layers
