@@ -92,9 +92,6 @@ class TorchNeuralNetwork(nn.Module):
                     nn.Dropout(self.hyperparameters["dropout_probability"]))
             current_size = size
 
-        if self.hyperparameters["batch_normalization"]:
-            print(f"[DEBUG] Adding BN for flattened dim={current_size}")
-            self.peptide_layers.append(nn.BatchNorm1d(current_size))
 
         # Allele representation layers
         if self.hyperparameters["allele_dense_layer_sizes"]:
@@ -325,6 +322,8 @@ class TorchNeuralNetwork(nn.Module):
 
         # Concatenate all batches and return as numpy
         final_outputs = torch.cat(outputs_list, dim=0)
+        if final_outputs.dim() == 1:
+            final_outputs = final_outputs.unsqueeze(1)
         return to_numpy(final_outputs)
 
     def load_weights_from_keras(self, keras_model):
