@@ -214,7 +214,20 @@ def test_full_network_architectures():
         # Create equivalent PyTorch model
         torch_model = TorchNeuralNetwork(**arch_params)
 
-        # Transfer weights
+        # Debugging: Print Keras and Torch layer shapes
+        print("\n[DEBUG] Keras model layers:")
+        for idx, k_layer in enumerate(network.layers):
+            k_weights = k_layer.get_weights()
+            shapes = [w.shape for w in k_weights]
+            print(f"  Keras layer #{idx}: {k_layer.__class__.__name__} weight shapes={shapes}")
+
+        print("\n[DEBUG] Torch model (dense_layers + output_layer):")
+        combined_layers = list(torch_model.dense_layers) + [torch_model.output_layer]
+        for idx, t_layer in enumerate(combined_layers):
+            if hasattr(t_layer, 'weight') and t_layer.weight is not None:
+                print(f"  Torch layer #{idx}: {t_layer.__class__.__name__} weight shape={tuple(t_layer.weight.shape)}, bias shape={tuple(t_layer.bias.shape)}")
+            else:
+                print(f"  Torch layer #{idx}: {t_layer.__class__.__name__} (no linear weights)")
         torch_model.load_weights_from_keras(network)
 
         # Get predictions from both models
