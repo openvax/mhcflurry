@@ -76,8 +76,10 @@ class TorchNeuralNetwork(nn.Module):
         self.peptide_layers = nn.ModuleList()
         current_size = peptide_input_dim
 
-        # [DEBUG] No unconditional batch_norm_early here. We rely on the BN 
-        # layers added in the main dense layers instead (for parity with Keras).
+        # Add early BatchNormalization layer if batch_normalization is enabled
+        if self.hyperparameters["batch_normalization"]:
+            print(f"[DEBUG] Adding early BN for input dim = {current_size}")
+            self.peptide_layers.append(nn.BatchNorm1d(current_size))
 
         # Build peptide dense layers
         for size in self.hyperparameters["peptide_dense_layer_sizes"]:
