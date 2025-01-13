@@ -3,6 +3,7 @@ initialize()
 
 import tempfile
 import os
+import errno
 
 import pandas
 import pytest
@@ -33,40 +34,37 @@ HLA-B4403,PPPPPPPP,18
 
 
 def test_csv():
+    """Test CSV input/output functionality."""
     args = ["--allele-column", "Allele", "--peptide-column", "Peptide"]
-    deletes = []
-    result = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as fd:
-            fd.write(TEST_CSV.encode())
-            deletes.append(fd.name)
-            fd.close()  # Explicitly close
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix=".csv", delete=False) as input_file:
+        input_file.write(TEST_CSV)
+        input_file.flush()
+        input_path = input_file.name
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix=".csv", delete=False) as output_file:
+            output_path = output_file.name
             
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as fd_out:
-            deletes.append(fd_out.name)
-            full_args = [fd.name] + args + ["--out", fd_out.name]
-            print("Running with args: %s" % full_args)
-            predict_command.run(full_args)
-            fd_out.close()  # Explicitly close
-            result = pandas.read_csv(fd_out.name)
-            print(result)
-            assert not result.isnull().any().any()
-    finally:
-        # Make sure we've closed the files and pandas has released them
-        import gc
-        gc.collect()  # Force garbage collection
-        
-        # Add a small delay to ensure files are released
-        import time
-        time.sleep(0.1)
-        
-        for delete in deletes:
             try:
-                os.unlink(delete)
-            except Exception as e:
-                print(f"Warning: Could not delete {delete}: {e}")
-
-    assert result.shape == (3, 8)
+                full_args = [input_path] + args + ["--out", output_path]
+                print("Running with args: %s" % full_args)
+                predict_command.run(full_args)
+                
+                result = pandas.read_csv(output_path)
+                print(result)
+                
+                # Verify results
+                assert not result.isnull().any().any()
+                assert result.shape == (3, 8)
+                
+            finally:
+                # Clean up files
+                for path in [input_path, output_path]:
+                    try:
+                        os.unlink(path)
+                    except OSError as e:
+                        if e.errno != errno.ENOENT:  # No such file or directory
+                            print(f"Error removing file {path}: {e}")
 
 
 def test_tensorflow_vs_pytorch_backends():
@@ -84,47 +82,36 @@ def test_tensorflow_vs_pytorch_backends():
         "--affinity-only",
     ]
 
-    deletes = []
-    result_tf = None
-    result_torch = None
-    
-    try:
-        # Run with tensorflow backend
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as fd_out_tf:
-            deletes.append(fd_out_tf.name)
-            tf_args = args + ["--out", fd_out_tf.name, "--backend", "tensorflow"]
-            print("Running tensorflow with args: %s" % tf_args)
-            predict_command.run(tf_args)
-            fd_out_tf.close()  # Explicitly close file
-            result_tf = pandas.read_csv(fd_out_tf.name)
-            print("TensorFlow results:")
-            print(result_tf)
-
-        # Run with pytorch backend
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as fd_out_torch:
-            deletes.append(fd_out_torch.name)
-            torch_args = args + ["--out", fd_out_torch.name, "--backend", "pytorch"]
-            print("Running pytorch with args: %s" % torch_args)
-            predict_command.run(torch_args)
-            fd_out_torch.close()  # Explicitly close file
-            result_torch = pandas.read_csv(fd_out_torch.name)
-            print("PyTorch results:")
-            print(result_torch)
-
-    finally:
-        # Make sure we've closed the files and pandas has released them
-        import gc
-        gc.collect()  # Force garbage collection
-        
-        # Add a small delay to ensure files are released
-        import time
-        time.sleep(0.1)
-        
-        for delete in deletes:
+    with tempfile.NamedTemporaryFile(mode='w', suffix=".csv", delete=False) as tf_output:
+        tf_path = tf_output.name
+        with tempfile.NamedTemporaryFile(mode='w', suffix=".csv", delete=False) as torch_output:
+            torch_path = torch_output.name
+            
             try:
-                os.unlink(delete)
-            except Exception as e:
-                print(f"Warning: Could not delete {delete}: {e}")
+                # Run with tensorflow backend
+                tf_args = args + ["--out", tf_path, "--backend", "tensorflow"]
+                print("Running tensorflow with args: %s" % tf_args)
+                predict_command.run(tf_args)
+                result_tf = pandas.read_csv(tf_path)
+                print("TensorFlow results:")
+                print(result_tf)
+
+                # Run with pytorch backend  
+                torch_args = args + ["--out", torch_path, "--backend", "pytorch"]
+                print("Running pytorch with args: %s" % torch_args)
+                predict_command.run(torch_args)
+                result_torch = pandas.read_csv(torch_path)
+                print("PyTorch results:")
+                print(result_torch)
+
+            finally:
+                # Clean up files
+                for path in [tf_path, torch_path]:
+                    try:
+                        os.unlink(path)
+                    except OSError as e:
+                        if e.errno != errno.ENOENT:  # No such file or directory
+                            print(f"Error removing file {path}: {e}")
 
     # Verify both backends produced results
     assert result_tf is not None, "TensorFlow backend failed to produce results"
