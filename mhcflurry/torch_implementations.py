@@ -324,6 +324,14 @@ class TorchNeuralNetwork(nn.Module):
         final_outputs = torch.cat(outputs_list, dim=0)
         if final_outputs.dim() == 1:
             final_outputs = final_outputs.unsqueeze(1)
+        # Convert network output (0-1) to nM predictions
+        # Using same conversion as Keras version
+        final_outputs = torch.pow(
+            torch.tensor(50000.0, device=self.device, dtype=torch.float32),
+            (1.0 - final_outputs)
+        )
+        final_outputs = final_outputs.squeeze(-1)  # shape (N,)
+
         return to_numpy(final_outputs)
 
     def load_weights_from_keras(self, keras_model):
