@@ -161,6 +161,12 @@ model_args.add_argument(
     help="Deep learning backend to use for predictions",
 )
 model_args.add_argument(
+    "--backend",
+    choices=["tensorflow", "pytorch"],
+    default="tensorflow",
+    help="Deep learning backend to use for predictions",
+)
+model_args.add_argument(
     "--no-flanking",
     action="store_true",
     default=False,
