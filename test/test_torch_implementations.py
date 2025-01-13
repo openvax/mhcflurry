@@ -4,6 +4,7 @@ import numpy as np
 import random
 import torch
 import tensorflow as tf
+import pytest
 
 SEED = 123
 np.random.seed(SEED)
@@ -43,6 +44,7 @@ def create_test_networks():
 
     keras_model.compile(optimizer="adam", loss="mse")
 
+    # Create PyTorch model
     torch_network = TorchNeuralNetwork(
         peptide_encoding={
             "vector_encoding_name": "BLOSUM62",
@@ -53,9 +55,13 @@ def create_test_networks():
         activation="tanh",
         output_activation="sigmoid",
         batch_normalization=True,
-        locally_connected_layers=[],  # No locally connected layers for basic test
+        locally_connected_layers=[],
     )
-
+    
+    # Verify PyTorch model structure
+    assert hasattr(torch_network, 'dense_layers'), "PyTorch model missing dense layers"
+    assert hasattr(torch_network, 'output_layer'), "PyTorch model missing output layer"
+    
     return keras_model, torch_network
 
 
