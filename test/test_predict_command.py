@@ -73,7 +73,8 @@ def test_tensorflow_vs_pytorch_backends():
     """Test that tensorflow and pytorch backends produce matching results."""
     args = [
         "--alleles", "HLA-A0201",
-        "--peptides", "SIINFEKL", "DENDREKLLL",
+        "--alleles", "HLA-A0201", "HLA-A0301",
+        "--peptides", "SIINFEKL", "SIINFEKD", "SIINFEKQ",
         "--prediction-column-prefix", "mhcflurry_",
         "--affinity-only",
     ]
