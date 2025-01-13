@@ -28,6 +28,7 @@ def create_test_networks():
     from tf_keras.models import Sequential
     from tf_keras.layers import Dense, BatchNormalization
 
+    # Create Keras model
     keras_model = Sequential(
         [
             Dense(64, activation="tanh", input_shape=(315,)),
@@ -38,11 +39,8 @@ def create_test_networks():
         ]
     )
 
-    for layer in keras_model.layers:
-        if layer.__class__.__name__ == "BatchNormalization":
-            layer.trainable = False
-
-    keras_model.compile(optimizer="adam", loss="mse")
+    # Verify Keras model was created successfully
+    assert len(keras_model.layers) == 5, "Keras model creation failed"
 
     # Create PyTorch model
     torch_network = TorchNeuralNetwork(
