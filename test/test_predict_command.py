@@ -71,6 +71,11 @@ def test_csv():
 
 def test_tensorflow_vs_pytorch_backends():
     """Test that tensorflow and pytorch backends produce matching results."""
+    try:
+        import torch
+    except ImportError:
+        pytest.skip("PyTorch not installed - skipping backend comparison test")
+
     args = [
         "--alleles", "HLA-A0201",
         "--alleles", "HLA-A0201", "HLA-A0301",
@@ -120,6 +125,34 @@ def test_tensorflow_vs_pytorch_backends():
                 os.unlink(delete)
             except Exception as e:
                 print(f"Warning: Could not delete {delete}: {e}")
+
+    # Verify both backends produced results
+    assert result_tf is not None, "TensorFlow backend failed to produce results"
+    assert result_torch is not None, "PyTorch backend failed to produce results"
+    
+    # Verify both results contain predictions
+    prediction_columns = [col for col in result_tf.columns if col.startswith("mhcflurry_")]
+    assert len(prediction_columns) > 0, "No prediction columns found in TensorFlow results"
+    
+    # Check that no prediction columns contain all nulls
+    for col in prediction_columns:
+        assert not result_tf[col].isnull().all(), f"TensorFlow predictions are all null for column {col}"
+        assert not result_torch[col].isnull().all(), f"PyTorch predictions are all null for column {col}"
+        
+        # Verify predictions are numeric and within expected ranges
+        assert result_tf[col].dtype in ['float64', 'float32'], f"TensorFlow column {col} is not numeric"
+        assert result_torch[col].dtype in ['float64', 'float32'], f"PyTorch column {col} is not numeric"
+        
+        if "affinity" in col.lower():
+            # Affinity predictions should be positive numbers
+            assert (result_tf[col] > 0).all(), f"Invalid affinity values in TensorFlow column {col}"
+            assert (result_torch[col] > 0).all(), f"Invalid affinity values in PyTorch column {col}"
+        elif "percentile" in col.lower():
+            # Percentile predictions should be between 0 and 100
+            assert ((result_tf[col] >= 0) & (result_tf[col] <= 100)).all(), \
+                f"Invalid percentile values in TensorFlow column {col}"
+            assert ((result_torch[col] >= 0) & (result_torch[col] <= 100)).all(), \
+                f"Invalid percentile values in PyTorch column {col}"
 
     # Check that results match
     assert result_tf.shape == result_torch.shape, "Output shapes differ"
