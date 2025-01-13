@@ -451,7 +451,7 @@ class Class1NeuralNetwork(object):
             **self.hyperparameters["peptide_encoding"]
         )
         assert len(encoded) == len(peptides)
-        return encoded.reshape(encoded.shape[0], -1)  # Flatten to 2D
+        return encoded
 
     @property
     def supported_peptide_lengths(self):
@@ -1346,12 +1346,7 @@ class Class1NeuralNetwork(object):
             BatchNormalization,
         )
 
-        # Calculate input shape from peptide encoding parameters
-        max_length = peptide_encoding["max_length"]
-        # BLOSUM62 encoding has 21 dimensions (20 amino acids + gap)
-        amino_acid_encoding_dims = 21
-        peptide_encoding_shape = (max_length * amino_acid_encoding_dims,)
-
+        peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
         peptide_input = Input(
             shape=peptide_encoding_shape, dtype="float32", name="peptide"
         )
