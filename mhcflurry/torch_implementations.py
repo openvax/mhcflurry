@@ -42,6 +42,15 @@ class TorchNeuralNetwork(nn.Module):
         instance = cls(**hyperparameters)
         return instance
 
+    @property
+    def supported_alleles(self):
+        if "supported_alleles" not in self._cache:
+            result = set(self.allele_to_allele_specific_models)
+            if self.allele_to_sequence:
+                result = result.union(self.allele_to_sequence)
+            self._cache["supported_alleles"] = sorted(result)
+        return self._cache["supported_alleles"]
+
     def __init__(self, **hyperparameters):
         """
         Initialize neural network with hyperparameters matching Keras version.
@@ -83,15 +92,6 @@ class TorchNeuralNetwork(nn.Module):
             "hyperparameters": self.hyperparameters
         }
 
-    @property
-    def supported_alleles(self):
-        if "supported_alleles" not in self._cache:
-            result = set(self.allele_to_allele_specific_models)
-            if self.allele_to_sequence:
-                result = result.union(self.allele_to_sequence)
-            self._cache["supported_alleles"] = sorted(result)
-        return self._cache["supported_alleles"]
-        return self._cache["supported_alleles"]
 
     def load_weights(self, weights_filename):
         """
