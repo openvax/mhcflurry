@@ -118,7 +118,7 @@ def test_batch_norm_behavior():
     from tf_keras.layers import BatchNormalization
 
     # Create test input
-    x = np.random.randn(100, 32).astype(np.float32)
+    x = np.random.randn(100, 32).astype(np.float64)
 
     # Create and configure batch norm layers
     keras_bn = BatchNormalization(
@@ -129,7 +129,7 @@ def test_batch_norm_behavior():
         32,
         momentum=0.01,  # PyTorch momentum = 1 - Keras momentum
         eps=0.001,  # Match Keras epsilon
-    )
+    ).double()
 
     # Initialize with same weights
     keras_bn.build((None, 32))
@@ -298,7 +298,7 @@ def test_weight_transfer_and_predictions():
     torch_network.load_weights_from_keras(keras_model)
 
     # Test with random input
-    test_input = np.random.rand(10, 315).astype("float32")
+    test_input = np.random.rand(10, 315).astype("float64")
 
     # Add debug prints for Keras
     x = test_input
@@ -310,7 +310,7 @@ def test_weight_transfer_and_predictions():
 
     # Set PyTorch model to eval mode and get predictions
     torch_network.eval()
-    torch_output = to_numpy(torch_network(to_torch(test_input)))
+    torch_output = to_numpy(torch_network(to_torch(test_input).double()))
 
     print("\nKeras output shape:", keras_output.shape)
     print("PyTorch output shape:", torch_output.shape)
