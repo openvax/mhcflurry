@@ -13,6 +13,8 @@ import tensorflow as tf
 import tempfile
 import pandas as pd
 
+pd.set_option("future.no_silent_downcasting", True)
+
 SEED = 123
 np.random.seed(SEED)
 random.seed(SEED)
@@ -282,7 +284,7 @@ def test_full_network_architectures():
         assert_array_almost_equal(
             keras_predictions,
             torch_predictions,
-            decimal=0,  # or add atol=1.0
+            decimal=1,  # or add atol=1.0
             err_msg=f"Predictions don't match for architecture: {arch_params}",
         )
 
@@ -329,24 +331,22 @@ def test_weight_transfer_and_predictions():
 
 def test_tensorflow_vs_pytorch_backends():
     """Test that tensorflow and pytorch backends produce matching results."""
-    
+
     # Generate random peptides for each length 8-15
     all_peptides = []
     for length in range(8, 16):  # 16 because range is exclusive
         peptides = random_peptides(num=100, length=length)
         all_peptides.extend(peptides)
 
-    args = [
-        "--alleles",
-        "HLA-A0201",
-        "--alleles", 
-        "HLA-A0201,HLA-A0301",
-        "--peptides"
-    ] + all_peptides + [
-        "--prediction-column-prefix",
-        "mhcflurry_",
-        "--affinity-only",
-    ]
+    args = (
+        ["--alleles", "HLA-A0201", "--alleles", "HLA-A0201,HLA-A0301", "--peptides"]
+        + all_peptides
+        + [
+            "--prediction-column-prefix",
+            "mhcflurry_",
+            "--affinity-only",
+        ]
+    )
 
     # Run with tensorflow backend
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tf_output:
@@ -383,7 +383,7 @@ def test_tensorflow_vs_pytorch_backends():
     # Verify both backends produced results
     assert result_tf is not None, "TensorFlow backend failed to produce results"
     assert result_torch is not None, "PyTorch backend failed to produce results"
-    
+
     # Verify shapes and columns match
     assert result_tf.shape == result_torch.shape, "Output shapes differ"
     assert all(result_tf.columns == result_torch.columns), "Output columns differ"
@@ -423,12 +423,12 @@ def test_tensorflow_vs_pytorch_backends():
         print(f"\nComparing numeric column {col}:")
         print(f"TensorFlow stats: mean={result_tf[col].mean():.4f}, std={result_tf[col].std():.4f}")
         print(f"PyTorch stats: mean={result_torch[col].mean():.4f}, std={result_torch[col].std():.4f}")
-        
+
         # Check for NaN values
         tf_nans = pd.isna(result_tf[col])
         torch_nans = pd.isna(result_torch[col])
         assert np.array_equal(tf_nans, torch_nans), f"NaN patterns differ in column {col}"
-        
+
         # Compare non-NaN values
         non_nan_mask = ~tf_nans
         if non_nan_mask.any():
@@ -436,7 +436,7 @@ def test_tensorflow_vs_pytorch_backends():
                 result_tf[col][non_nan_mask].values,
                 result_torch[col][non_nan_mask].values,
                 decimal=4,
-                err_msg=f"Values differ in numeric column {col}"
+                err_msg=f"Values differ in numeric column {col}",
             )
 
     # Additional validation for specific column types
@@ -448,10 +448,9 @@ def test_tensorflow_vs_pytorch_backends():
     if "mhcflurry_affinity_percentile" in numeric_columns:
         # Percentile predictions should be between 0 and 100
         assert (
-            (result_tf["mhcflurry_affinity_percentile"] >= 0) & 
-            (result_tf["mhcflurry_affinity_percentile"] <= 100)
+            (result_tf["mhcflurry_affinity_percentile"] >= 0) & (result_tf["mhcflurry_affinity_percentile"] <= 100)
         ).all(), "Invalid percentile values in TensorFlow results"
         assert (
-            (result_torch["mhcflurry_affinity_percentile"] >= 0) & 
-            (result_torch["mhcflurry_affinity_percentile"] <= 100)
+            (result_torch["mhcflurry_affinity_percentile"] >= 0)
+            & (result_torch["mhcflurry_affinity_percentile"] <= 100)
         ).all(), "Invalid percentile values in PyTorch results"
