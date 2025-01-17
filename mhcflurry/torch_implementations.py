@@ -191,9 +191,6 @@ class TorchNeuralNetwork(nn.Module):
                 self.dense_layers.append(nn.Dropout(self.hyperparameters["dropout_probability"]))
             current_size = size
 
-        print("[DEBUG] Done building peptide_layers. Count =", len(self.peptide_layers))
-        print("[DEBUG] Done building dense_layers. Count =", len(self.dense_layers))
-
         # Output layer
         self.output_layer = nn.Linear(current_size, self.hyperparameters["num_outputs"])
 
@@ -403,7 +400,6 @@ class TorchNeuralNetwork(nn.Module):
                 # Check if shapes match the corresponding Torch BN layer.
                 # If they do not match (e.g., 315 vs 64), skip this BN.
                 if gamma.shape != bn.weight.data.shape:
-                    print(f"[DEBUG] Skipping Keras BN of shape {gamma.shape}")
                     continue  # Do not increment torch_index; just skip
 
                 # Otherwise, the shapes match, proceed to copy
@@ -418,7 +414,6 @@ class TorchNeuralNetwork(nn.Module):
                 torch_index += 1
 
             else:
-                print(f"[DEBUG] Skipping unrecognized Keras layer: {layer_type}")
 
 
 class Class1AffinityPredictor(object):
