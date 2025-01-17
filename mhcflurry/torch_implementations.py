@@ -138,20 +138,7 @@ class TorchNeuralNetwork(nn.Module):
                 if new_name is not None:
                     result[new_name] = val
 
-        # Filter out training-related hyperparameters that aren't needed for the PyTorch implementation
-        UNWANTED = [
-            "loss", "optimizer", "learning_rate", "max_epochs", "validation_split",
-            "early_stopping", "minibatch_size", "data_dependent_initialization_method",
-            "random_negative_affinity_min", "random_negative_affinity_max",
-            "random_negative_output_indices", "random_negative_rate",
-            "random_negative_constant", "random_negative_match_distribution",
-            "random_negative_distribution_smoothing", "random_negative_method",
-            "random_negative_binder_threshold", "random_negative_lengths",
-            "patience", "train_data"
-        ]
-        for key in UNWANTED:
-            if key in result:
-                del result[key]
+        # We keep all hyperparameters to maintain compatibility with Keras models
                 
         return result
 
@@ -878,6 +865,8 @@ class Class1AffinityPredictor(object):
         """
         for allele_models in self.allele_to_allele_specific_models.values():
             for model in allele_models:
-                model.eval()
+                if hasattr(model, "eval") and callable(model.eval):
+                    model.eval()
         for model in self.class1_pan_allele_models:
-            model.eval()
+            if hasattr(model, "eval") and callable(model.eval):
+                model.eval()
