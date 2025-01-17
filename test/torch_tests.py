@@ -359,9 +359,18 @@ def test_basic_model_loading():
         locally_connected_layers=[],
     )
 
-    # Initialize the network by making a prediction on dummy data
+    # Initialize the network explicitly
+    keras_model._network = keras_model.make_network(
+        **keras_model.network_hyperparameter_defaults.subselect(keras_model.hyperparameters)
+    )
+    
+    # Now we can safely get and compile the network
+    network = keras_model.network()
+    network.compile(optimizer="adam", loss="mse")
+
+    # Initialize with a prediction
     dummy_peptides = ["SIINFEKL"]
-    keras_model.predict(dummy_peptides)  # This forces network initialization
+    keras_model.predict(dummy_peptides)
 
     # Create a temporary directory for the model files
     with tempfile.TemporaryDirectory() as temp_dir:
