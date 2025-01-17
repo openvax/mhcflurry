@@ -414,6 +414,7 @@ class TorchNeuralNetwork(nn.Module):
                 torch_index += 1
 
             else:
+                pass
 
 
 class Class1AffinityPredictor(object):
