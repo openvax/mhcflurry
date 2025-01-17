@@ -414,9 +414,6 @@ def test_basic_model_loading():
         # ADD these lines to show both configs side by side before the assertion
         print("[DEBUG] Keras config:\n", keras_config)
         print("[DEBUG] Torch config:\n", torch_config)
-        # Remove 'network_json' from the configs before comparison
-        keras_config.pop('network_json', None)
-        torch_config.pop('network_json', None)
         
         assert keras_config["hyperparameters"] == torch_config["hyperparameters"], "Hyperparameters differ"
 
