@@ -92,7 +92,13 @@ class TorchNeuralNetwork(nn.Module):
         Return a dict of the same shape as Class1NeuralNetwork's get_config().
         """
         config = {
-            "hyperparameters": self.hyperparameters
+            "hyperparameters": self.hyperparameters,
+            "_network": None,
+            "network_json": None,
+            "network_weights": None,
+            "network_weights_loader": None,
+            "fit_info": [],
+            "prediction_cache": None,
         }
         logging.info("[TORCH get_config] returning: %s", config)
         return config
