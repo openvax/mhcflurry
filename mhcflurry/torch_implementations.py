@@ -295,12 +295,10 @@ class TorchNeuralNetwork(nn.Module):
             layer = layer.to(self.device)
             x = x.to(self.device)
             if isinstance(layer, nn.Linear):
-                x = x.to(self.device, dtype=torch.float32)  # Ensure float32
                 x_pre = x
                 x = layer(x)  # Linear transformation
                 x = self.hidden_activation(x)  # Activation immediately after linear
             elif isinstance(layer, nn.BatchNorm1d):
-                x = x.to(self.device, dtype=torch.float32)  # Ensure float32
                 x_pre = x
                 x = layer(x)  # Then batch norm
 
