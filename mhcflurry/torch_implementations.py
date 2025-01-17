@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from tf_keras.layers import Dense, BatchNormalization
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
+from mhcflurry.regression_target import to_ic50
 
 
 def to_torch(x):
@@ -489,9 +490,7 @@ class Class1AffinityPredictor(object):
         if not isinstance(weights_df, pd.DataFrame):
             weights_df = pd.read_csv(weights_df)
 
-        weights = []
         for i in range(len(self.paths)):
-            path_weights = []
             for j, layer in enumerate(self.paths[i]):
                 if isinstance(layer, nn.Linear):
                     weight_key = f"path_{i}_dense_{j}_weight"
@@ -690,8 +689,7 @@ class Class1AffinityPredictor(object):
 
         # Convert network output (0-1) to nM predictions
         # Using same conversion as Keras version
-        max_ic50 = 50000.0
-        predictions_nM = max_ic50 ** (1.0 - outputs)
+        predictions_nM = to_ic50(outputs)
 
         return predictions_nM
 
