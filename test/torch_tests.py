@@ -421,14 +421,41 @@ def test_tensorflow_vs_pytorch_backends():
     ]
 
     for col in numeric_columns:
-        print(f"Comparing {col}:")
-        print(f"TensorFlow: {result_tf[col].values}")
-        print(f"PyTorch: {result_torch[col].values}")
-        assert_array_almost_equal(
-            result_tf[col].values, result_torch[col].values, decimal=4, err_msg=f"Values differ in column {col}"
-        )
+        print(f"\nComparing {col}:")
+        tf_vals = result_tf[col].values
+        torch_vals = result_torch[col].values
+        
+        # Check for NaN values
+        tf_nans = np.isnan(tf_vals)
+        torch_nans = np.isnan(torch_vals)
+        assert np.array_equal(tf_nans, torch_nans), f"NaN patterns differ in column {col}"
+        
+        # Compare non-NaN values
+        non_nan_mask = ~tf_nans
+        if non_nan_mask.any():
+            print(f"TensorFlow (first 5): {tf_vals[non_nan_mask][:5]}")
+            print(f"PyTorch (first 5): {torch_vals[non_nan_mask][:5]}")
+            assert_array_almost_equal(
+                tf_vals[non_nan_mask],
+                torch_vals[non_nan_mask],
+                decimal=4,
+                err_msg=f"Values differ in column {col}"
+            )
 
     # Compare non-numeric columns exactly
     other_columns = [col for col in result_tf.columns if col not in numeric_columns]
     for col in other_columns:
+        print(f"\nComparing {col}:")
+        print(f"TensorFlow unique values: {result_tf[col].unique()}")
+        print(f"PyTorch unique values: {result_torch[col].unique()}")
         assert all(result_tf[col] == result_torch[col]), f"Values differ in column {col}"
+
+    # Validate best_allele behavior
+    if "mhcflurry_best_allele" in result_tf.columns:
+        print("\nValidating best_allele behavior:")
+        # For single allele queries, best_allele should match input allele
+        single_allele_mask = ~result_tf["allele"].str.contains(",")
+        assert all(
+            result_tf.loc[single_allele_mask, "allele"] == 
+            result_tf.loc[single_allele_mask, "mhcflurry_best_allele"]
+        ), "best_allele mismatch for single allele queries"
