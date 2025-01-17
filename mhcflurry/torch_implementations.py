@@ -61,8 +61,19 @@ class TorchNeuralNetwork(nn.Module):
         super().__init__()
 
         # Apply hyperparameter renames
+        from copy import deepcopy
         renamed = self._rename_hyperparameters(hyperparameters)
-        final = self._get_hyperparameter_defaults().with_defaults(renamed)
+        defaults = self._get_hyperparameter_defaults().defaults
+
+        # 1. Copy only the keys that TorchNeuralNetwork recognizes
+        filtered = {}
+        for (k, v) in renamed.items():
+            if k in defaults:
+                filtered[k] = v
+
+        # 2. Give default value to any missing key
+        final = deepcopy(defaults)
+        final.update(filtered)
         if "num_outputs" not in final:
             final["num_outputs"] = 1
         self.hyperparameters = final
@@ -566,6 +577,9 @@ class Class1AffinityPredictor(object):
         assert isinstance(self.class1_pan_allele_models, list)
 
         self.provenance_string = provenance_string
+        
+        import torch
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     @property
     def supported_alleles(self):
