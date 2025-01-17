@@ -399,7 +399,99 @@ def test_basic_model_loading():
 
 def test_single_model_predictions():
     """Test predictions with a single allele-specific model"""
-    pass
+    # Create a basic test model with known architecture
+    keras_model = Class1NeuralNetwork(
+        peptide_encoding={
+            "vector_encoding_name": "BLOSUM62",
+            "alignment_method": "pad_middle",
+            "max_length": 15,
+        },
+        layer_sizes=[64, 32],
+        activation="tanh",
+        output_activation="sigmoid",
+        batch_normalization=True,
+        locally_connected_layers=[],
+    )
+
+    # Initialize network explicitly
+    keras_model._network = keras_model.make_network(
+        **keras_model.network_hyperparameter_defaults.subselect(keras_model.hyperparameters)
+    )
+    network = keras_model.network()
+    network.compile(optimizer="adam", loss="mse")
+
+    # Create equivalent PyTorch model
+    torch_model = TorchNeuralNetwork(
+        peptide_encoding={
+            "vector_encoding_name": "BLOSUM62",
+            "alignment_method": "pad_middle",
+            "max_length": 15,
+        },
+        layer_sizes=[64, 32],
+        activation="tanh",
+        output_activation="sigmoid",
+        batch_normalization=True,
+        locally_connected_layers=[],
+    )
+
+    # Transfer weights from Keras to PyTorch
+    torch_model.load_weights_from_keras(network)
+
+    # Create test peptides
+    test_peptides = [
+        "SIINFEKL",  # Known H-2Kb epitope
+        "FALPYWNM",  # Random sequence
+        "KLGGALQAK",  # Known HLA-A2 epitope
+        "VNTPEHVVP"   # Random sequence
+    ]
+    peptide_encoding = EncodableSequences.create(test_peptides)
+
+    # Get predictions from both models
+    keras_predictions = keras_model.predict(peptides=peptide_encoding)
+    torch_predictions = torch_model.predict(peptides=peptide_encoding)
+
+    # Print predictions for debugging
+    print("\nPredictions comparison:")
+    for i, peptide in enumerate(test_peptides):
+        print(f"{peptide}: Keras={keras_predictions[i]:.2f}, "
+              f"PyTorch={torch_predictions[i]:.2f}")
+
+    # Compare predictions
+    assert_array_almost_equal(
+        keras_predictions,
+        torch_predictions,
+        decimal=2,
+        err_msg="Single model predictions don't match between Keras and PyTorch"
+    )
+
+    # Test with a Class1AffinityPredictor wrapper
+    allele = "HLA-A*02:01"
+    keras_predictor = Class1AffinityPredictor(
+        allele_to_allele_specific_models={
+            allele: [keras_model]
+        }
+    )
+    torch_predictor = Class1AffinityPredictor(
+        allele_to_allele_specific_models={
+            allele: [torch_model]
+        }
+    )
+
+    # Compare predictor-level predictions
+    keras_pred = keras_predictor.predict(peptides=test_peptides, allele=allele)
+    torch_pred = torch_predictor.predict(peptides=test_peptides, allele=allele)
+
+    print("\nPredictor-level predictions comparison:")
+    for i, peptide in enumerate(test_peptides):
+        print(f"{peptide}: Keras={keras_pred[i]:.2f}, "
+              f"PyTorch={torch_pred[i]:.2f}")
+
+    assert_array_almost_equal(
+        keras_pred,
+        torch_pred,
+        decimal=2,
+        err_msg="Predictor-level single model predictions don't match"
+    )
 
 def test_allele_sequence_handling():
     """Test loading and using allele sequences"""
