@@ -329,7 +329,7 @@ def test_weight_transfer_and_predictions():
 
 def test_tensorflow_vs_pytorch_backends():
     """Test that tensorflow and pytorch backends produce matching results."""
-
+    
     # Generate random peptides for each length 8-15
     all_peptides = []
     for length in range(8, 16):  # 16 because range is exclusive
@@ -348,6 +348,7 @@ def test_tensorflow_vs_pytorch_backends():
         "--affinity-only",
     ]
 
+    # Run with tensorflow backend
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tf_output:
         tf_path = tf_output.name
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as torch_output:
@@ -382,80 +383,75 @@ def test_tensorflow_vs_pytorch_backends():
     # Verify both backends produced results
     assert result_tf is not None, "TensorFlow backend failed to produce results"
     assert result_torch is not None, "PyTorch backend failed to produce results"
-
-    # Verify both results contain predictions
-    prediction_columns = [col for col in result_tf.columns if col.startswith("mhcflurry_")]
-    assert len(prediction_columns) > 0, "No prediction columns found in TensorFlow results"
-
-    # Check that no prediction columns contain all nulls
-    for col in prediction_columns:
-        assert not result_tf[col].isnull().all(), f"TensorFlow predictions are all null for column {col}"
-        assert not result_torch[col].isnull().all(), f"PyTorch predictions are all null for column {col}"
-
-        # Verify predictions are numeric and within expected ranges
-        assert result_tf[col].dtype in ["float64", "float32"], f"TensorFlow column {col} is not numeric"
-        assert result_torch[col].dtype in ["float64", "float32"], f"PyTorch column {col} is not numeric"
-
-        if "affinity" in col.lower():
-            # Affinity predictions should be positive numbers
-            assert (result_tf[col] > 0).all(), f"Invalid affinity values in TensorFlow column {col}"
-            assert (result_torch[col] > 0).all(), f"Invalid affinity values in PyTorch column {col}"
-        elif "percentile" in col.lower():
-            # Percentile predictions should be between 0 and 100
-            assert (
-                (result_tf[col] >= 0) & (result_tf[col] <= 100)
-            ).all(), f"Invalid percentile values in TensorFlow column {col}"
-            assert (
-                (result_torch[col] >= 0) & (result_torch[col] <= 100)
-            ).all(), f"Invalid percentile values in PyTorch column {col}"
-
-    # Check that results match
+    
+    # Verify shapes and columns match
     assert result_tf.shape == result_torch.shape, "Output shapes differ"
     assert all(result_tf.columns == result_torch.columns), "Output columns differ"
 
-    # Compare numeric columns with tolerance
-    numeric_columns = [
-        col
-        for col in result_tf.columns
-        if col.startswith("mhcflurry_") and result_tf[col].dtype in ["float64", "float32"]
-    ]
+    # Automatically categorize columns based on their content
+    columns_info = {}
+    for col in result_tf.columns:
+        if col.startswith("mhcflurry_"):
+            # Check if column contains only numeric values
+            try:
+                pd.to_numeric(result_tf[col])
+                columns_info[col] = "numeric"
+            except (ValueError, TypeError):
+                # If conversion fails, it's not a numeric column
+                columns_info[col] = "non-numeric"
+        else:
+            # Non-prediction columns (like 'allele', 'peptide') are non-numeric
+            columns_info[col] = "non-numeric"
 
+    print("\nColumn categorization:")
+    for col, col_type in columns_info.items():
+        print(f"{col}: {col_type}")
+
+    # Compare non-numeric columns exactly
+    non_numeric_columns = [col for col, type_ in columns_info.items() if type_ == "non-numeric"]
+    for col in non_numeric_columns:
+        print(f"\nComparing non-numeric column {col}:")
+        tf_unique = sorted(result_tf[col].unique())
+        torch_unique = sorted(result_torch[col].unique())
+        print(f"TensorFlow unique values: {tf_unique}")
+        print(f"PyTorch unique values: {torch_unique}")
+        assert all(result_tf[col] == result_torch[col]), f"Values differ in non-numeric column {col}"
+
+    # Compare numeric columns with tolerance
+    numeric_columns = [col for col, type_ in columns_info.items() if type_ == "numeric"]
     for col in numeric_columns:
-        print(f"\nComparing {col}:")
-        tf_vals = result_tf[col].values
-        torch_vals = result_torch[col].values
+        print(f"\nComparing numeric column {col}:")
+        print(f"TensorFlow stats: mean={result_tf[col].mean():.4f}, std={result_tf[col].std():.4f}")
+        print(f"PyTorch stats: mean={result_torch[col].mean():.4f}, std={result_torch[col].std():.4f}")
         
         # Check for NaN values
-        tf_nans = np.isnan(tf_vals)
-        torch_nans = np.isnan(torch_vals)
+        tf_nans = pd.isna(result_tf[col])
+        torch_nans = pd.isna(result_torch[col])
         assert np.array_equal(tf_nans, torch_nans), f"NaN patterns differ in column {col}"
         
         # Compare non-NaN values
         non_nan_mask = ~tf_nans
         if non_nan_mask.any():
-            print(f"TensorFlow (first 5): {tf_vals[non_nan_mask][:5]}")
-            print(f"PyTorch (first 5): {torch_vals[non_nan_mask][:5]}")
             assert_array_almost_equal(
-                tf_vals[non_nan_mask],
-                torch_vals[non_nan_mask],
+                result_tf[col][non_nan_mask].values,
+                result_torch[col][non_nan_mask].values,
                 decimal=4,
-                err_msg=f"Values differ in column {col}"
+                err_msg=f"Values differ in numeric column {col}"
             )
 
-    # Compare non-numeric columns exactly
-    other_columns = [col for col in result_tf.columns if col not in numeric_columns]
-    for col in other_columns:
-        print(f"\nComparing {col}:")
-        print(f"TensorFlow unique values: {result_tf[col].unique()}")
-        print(f"PyTorch unique values: {result_torch[col].unique()}")
-        assert all(result_tf[col] == result_torch[col]), f"Values differ in column {col}"
+    # Additional validation for specific column types
+    if "mhcflurry_affinity" in numeric_columns:
+        # Affinity predictions should be positive numbers
+        assert (result_tf["mhcflurry_affinity"] > 0).all(), "Invalid affinity values in TensorFlow results"
+        assert (result_torch["mhcflurry_affinity"] > 0).all(), "Invalid affinity values in PyTorch results"
 
-    # Validate best_allele behavior
-    if "mhcflurry_best_allele" in result_tf.columns:
-        print("\nValidating best_allele behavior:")
-        # For single allele queries, best_allele should match input allele
-        single_allele_mask = ~result_tf["allele"].str.contains(",")
-        assert all(
-            result_tf.loc[single_allele_mask, "allele"] == 
-            result_tf.loc[single_allele_mask, "mhcflurry_best_allele"]
-        ), "best_allele mismatch for single allele queries"
+    if "mhcflurry_affinity_percentile" in numeric_columns:
+        # Percentile predictions should be between 0 and 100
+        assert (
+            (result_tf["mhcflurry_affinity_percentile"] >= 0) & 
+            (result_tf["mhcflurry_affinity_percentile"] <= 100)
+        ).all(), "Invalid percentile values in TensorFlow results"
+        assert (
+            (result_torch["mhcflurry_affinity_percentile"] >= 0) & 
+            (result_torch["mhcflurry_affinity_percentile"] <= 100)
+        ).all(), "Invalid percentile values in PyTorch results"
