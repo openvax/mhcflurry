@@ -4,6 +4,7 @@ from . import initialize
 
 initialize()
 
+import logging
 import os
 import errno
 import numpy as np
