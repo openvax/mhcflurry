@@ -280,6 +280,12 @@ def test_full_network_architectures():
         keras_predictions = keras_model.predict(peptides=peptide_encoding)
         torch_predictions = torch_model.predict(peptides=peptide_encoding)
 
+        # Print raw and transformed predictions for debugging
+        print("\nPredictions before IC50 transformation:")
+        print("Keras raw output:", network.predict({"peptide": keras_model.peptides_to_network_input(peptide_encoding)}))
+        print("Final Keras predictions (after IC50):", keras_predictions)
+        print("Final PyTorch predictions (after IC50):", torch_predictions)
+
         # Compare predictions
         assert_array_almost_equal(
             keras_predictions,
