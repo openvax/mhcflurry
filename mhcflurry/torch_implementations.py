@@ -105,7 +105,6 @@ class TorchNeuralNetwork(nn.Module):
         logging.info("[TORCH get_config] returning: %s", config)
         return config
 
-
     def load_weights(self, weights_filename):
         """
         Minimal placeholder to avoid crash when loading weights.
@@ -119,7 +118,7 @@ class TorchNeuralNetwork(nn.Module):
         """Build PyTorch network matching Keras architecture"""
         # Get dimensions from peptide encoding config
         peptide_input_dim = self._get_peptide_input_dim()
-        
+
         # Ensure network uses double precision
         self.double()
 
@@ -505,14 +504,14 @@ class Class1AffinityPredictor(object):
             allele_to_allele_specific_models={},
             class1_pan_allele_models=[],
             allele_to_sequence=allele_to_sequence,
-            manifest_df=manifest_df
+            manifest_df=manifest_df,
         )
 
         # Load models from manifest
         for _, row in manifest_df.iterrows():
             config = json.loads(row.config_json)
             model = TorchNeuralNetwork.from_config(config)
-            
+
             # Load weights if available
             weights_path = os.path.join(models_dir, f"weights_{row.model_name}.npz")
             if os.path.exists(weights_path):
@@ -790,3 +789,13 @@ class Class1AffinityPredictor(object):
                     to_numpy(t_layer.running_var.data),
                 ]
                 k_layer.set_weights(weights)
+
+    def eval(self):
+        """
+        Put all underlying TorchNeuralNetwork models in eval mode.
+        """
+        for allele_models in self.allele_to_allele_specific_models.values():
+            for model in allele_models:
+                model.eval()
+        for model in self.class1_pan_allele_models:
+            model.eval()
