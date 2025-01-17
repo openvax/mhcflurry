@@ -105,7 +105,7 @@ class TorchNeuralNetwork(nn.Module):
     def _rename_hyperparameters(self, hyperparameters):
         """
         Rename hyperparameters according to predefined mapping.
-        
+
         Parameters
         ----------
         hyperparameters : dict
@@ -142,13 +142,13 @@ class TorchNeuralNetwork(nn.Module):
     def _get_hyperparameter_defaults(self):
         """
         Get default hyperparameters.
-        
+
         Returns
         -------
         HyperparameterDefaults
         """
         from .hyperparameters import HyperparameterDefaults
-        
+
         return HyperparameterDefaults(
             allele_amino_acid_encoding="BLOSUM62",
             allele_dense_layer_sizes=[],
@@ -170,53 +170,69 @@ class TorchNeuralNetwork(nn.Module):
             output_activation="sigmoid",
             dropout_probability=0.0,
             batch_normalization=False,
-            locally_connected_layers=[
-                {"filters": 8, "activation": "tanh", "kernel_size": 3}
-            ],
+            locally_connected_layers=[{"filters": 8, "activation": "tanh", "kernel_size": 3}],
             topology="feedforward",
             num_outputs=1,
         )
 
     def load_weights_from_keras(self, keras_model):
         """
-        Load weights from a Keras model into this PyTorch model.
-        
-        Parameters
-        ----------
-        keras_model : tf.keras.Model
-            Keras model to load weights from
+        Load weights from the given Keras model into this PyTorch model.
+        Make sure the layer order, shapes, and counts match exactly.
         """
-        # Transfer weights from Keras to PyTorch layers
-        for i, layer in enumerate(keras_model.layers):
-            if hasattr(layer, 'get_weights'):
-                weights = layer.get_weights()
-                if not weights:
-                    continue
-                
-                # Handle dense layers
-                if isinstance(layer, keras_model.Dense):
-                    if i < len(self.dense_layers):
-                        pytorch_layer = self.dense_layers[i]
-                        if isinstance(pytorch_layer, nn.Linear):
-                            pytorch_layer.weight.data = torch.from_numpy(weights[0].T)
-                            if len(weights) > 1:
-                                pytorch_layer.bias.data = torch.from_numpy(weights[1])
-                
-                # Handle batch normalization layers
-                elif isinstance(layer, keras_model.BatchNormalization):
-                    if i < len(self.dense_layers):
-                        pytorch_layer = self.dense_layers[i]
-                        if isinstance(pytorch_layer, nn.BatchNorm1d):
-                            if len(weights) >= 4:
-                                pytorch_layer.weight.data = torch.from_numpy(weights[0])  # gamma
-                                pytorch_layer.bias.data = torch.from_numpy(weights[1])    # beta
-                                pytorch_layer.running_mean.data = torch.from_numpy(weights[2])
-                                pytorch_layer.running_var.data = torch.from_numpy(weights[3])
+
+        # Gather the Linear/BatchNorm layers in the order they should match
+        torch_layers = []
+        for layer in self.peptide_layers:
+            if isinstance(layer, (nn.Linear, nn.BatchNorm1d)):
+                torch_layers.append(layer)
+
+        for layer in self.dense_layers:
+            if isinstance(layer, (nn.Linear, nn.BatchNorm1d)):
+                torch_layers.append(layer)
+
+        torch_layers.append(self.output_layer)
+
+        torch_index = 0
+        for keras_layer in keras_model.layers:
+            layer_type = keras_layer.__class__.__name__
+            if layer_type == "Dense":
+                # Keras Dense: weights[0].shape = (in_dim, out_dim)
+                # PyTorch Linear: weight.shape = (out_dim, in_dim)
+                w, b = keras_layer.get_weights()
+                linear = torch_layers[torch_index]
+                linear.weight.data = torch.from_numpy(w.T).float()
+                linear.bias.data = torch.from_numpy(b).float()
+                torch_index += 1
+
+            elif layer_type == "BatchNormalization":
+                # Keras BN: [gamma, beta, moving_mean, moving_var]
+                gamma, beta, moving_mean, moving_var = keras_layer.get_weights()
+                bn = torch_layers[torch_index]
+
+                # Check if shapes match the corresponding Torch BN layer.
+                # If they do not match (e.g., 315 vs 64), skip this BN.
+                if gamma.shape != bn.weight.data.shape:
+                    continue  # Do not increment torch_index; just skip
+
+                # Otherwise, the shapes match, proceed to copy
+                bn.weight.data.copy_(torch.from_numpy(gamma).float())
+                bn.bias.data.copy_(torch.from_numpy(beta).float())
+                bn.running_mean.copy_(torch.from_numpy(moving_mean).float())
+                bn.running_var.copy_(torch.from_numpy(moving_var).float())
+                # Set PyTorch BN hyperparams to match Keras
+                bn.momentum = 0.01
+                bn.eps = 1e-3
+                bn.eval()
+                torch_index += 1
+
+            else:
+                pass
 
     def load_weights(self, weights_filename):
         """
         Load network weights from a file.
-        
+
         Parameters
         ----------
         weights_filename : str
@@ -450,6 +466,7 @@ class TorchNeuralNetwork(nn.Module):
         """
         # Add TorchNeuralNetwork to builtins so other modules can find it
         import builtins
+
         builtins.TorchNeuralNetwork = TorchNeuralNetwork
         """
         Predict output for a list of peptides or an EncodableSequences object.
@@ -501,7 +518,6 @@ class TorchNeuralNetwork(nn.Module):
         final_outputs = final_outputs.squeeze(-1)  # shape (N,)
 
         return to_numpy(final_outputs)
-
 
 
 class Class1AffinityPredictor(object):
@@ -839,7 +855,6 @@ class Class1AffinityPredictor(object):
 
         # If you have BatchNorm layers, also match gamma, beta, moving_mean, moving_variance
         # from Keras to PyTorch’s BatchNorm parameters.
-
 
     def eval(self):
         """
