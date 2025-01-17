@@ -69,6 +69,23 @@ class TorchNeuralNetwork(nn.Module):
         self._build_network()
         self.to(self.device)
 
+    def get_config(self):
+        """
+        Return a dict of the same shape as Class1NeuralNetwork's get_config().
+        """
+        return {
+            "hyperparameters": self.hyperparameters
+        }
+
+    @classmethod
+    def from_config(cls, config, weights_loader=None):
+        """
+        Recreate an instance from the given config, just like Class1NeuralNetwork.from_config().
+        """
+        instance = cls(**config["hyperparameters"])
+        instance.network_weights_loader = weights_loader
+        return instance
+
     def _build_network(self):
         """Build PyTorch network matching Keras architecture"""
         # Get dimensions from peptide encoding config
@@ -458,7 +475,7 @@ class Class1AffinityPredictor(object):
         # Load models from manifest
         for _, row in manifest_df.iterrows():
             config = json.loads(row.config_json)
-            model = TorchNeuralNetwork(**config)
+            model = TorchNeuralNetwork.from_config(config)
             
             # Load weights if available
             weights_path = os.path.join(models_dir, f"weights_{row.model_name}.npz")
