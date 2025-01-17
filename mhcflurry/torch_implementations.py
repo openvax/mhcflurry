@@ -86,6 +86,16 @@ class TorchNeuralNetwork(nn.Module):
         instance.network_weights_loader = weights_loader
         return instance
 
+    @property
+    def supported_alleles(self):
+        if "supported_alleles" not in self._cache:
+            # Same logic as the Keras version
+            result = set(self.allele_to_allele_specific_models)
+            if self.allele_to_sequence:
+                result = result.union(self.allele_to_sequence)
+            self._cache["supported_alleles"] = sorted(result)
+        return self._cache["supported_alleles"]
+
     def load_weights(self, weights_filename):
         """
         Minimal placeholder to avoid crash when loading weights.
