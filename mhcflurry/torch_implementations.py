@@ -77,7 +77,14 @@ class TorchNeuralNetwork(nn.Module):
             "hyperparameters": self.hyperparameters
         }
 
-    @classmethod
+    @property
+    def supported_alleles(self):
+        if "supported_alleles" not in self._cache:
+            result = set(self.allele_to_allele_specific_models)
+            if self.allele_to_sequence:
+                result = result.union(self.allele_to_sequence)
+            self._cache["supported_alleles"] = sorted(result)
+        return self._cache["supported_alleles"]
     def from_config(cls, config, weights_loader=None):
         """
         Recreate an instance from the given config, just like Class1NeuralNetwork.from_config().
@@ -86,16 +93,6 @@ class TorchNeuralNetwork(nn.Module):
         instance.network_weights_loader = weights_loader
         return instance
 
-    @property
-    def supported_alleles(self):
-        if "supported_alleles" not in self._cache:
-            result = set(self.allele_to_allele_specific_models)
-            if self.allele_to_sequence:
-                # Just like the Keras predictor does, add all allele names
-                # present in allele_to_sequence to the result
-                result = result.union(self.allele_to_sequence)
-            self._cache["supported_alleles"] = sorted(result)
-        return self._cache["supported_alleles"]
 
     @property
     def supported_alleles(self):
