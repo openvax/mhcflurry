@@ -89,6 +89,17 @@ class TorchNeuralNetwork(nn.Module):
     @property
     def supported_alleles(self):
         if "supported_alleles" not in self._cache:
+            result = set(self.allele_to_allele_specific_models)
+            if self.allele_to_sequence:
+                # Just like the Keras predictor does, add all allele names
+                # present in allele_to_sequence to the result
+                result = result.union(self.allele_to_sequence)
+            self._cache["supported_alleles"] = sorted(result)
+        return self._cache["supported_alleles"]
+
+    @property
+    def supported_alleles(self):
+        if "supported_alleles" not in self._cache:
             # Same logic as the Keras version
             result = set(self.allele_to_allele_specific_models)
             if self.allele_to_sequence:
