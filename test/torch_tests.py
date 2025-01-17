@@ -25,7 +25,7 @@ from mhcflurry.torch_implementations import Class1AffinityPredictor, TorchNeural
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.allele_encoding import AlleleEncoding
-from mhcflurry.common import configure_tensorflow
+from mhcflurry.common import configure_tensorflow, random_peptides
 from mhcflurry import predict_command
 
 
@@ -330,16 +330,19 @@ def test_weight_transfer_and_predictions():
 def test_tensorflow_vs_pytorch_backends():
     """Test that tensorflow and pytorch backends produce matching results."""
 
+    # Generate random peptides for each length 8-15
+    all_peptides = []
+    for length in range(8, 16):  # 16 because range is exclusive
+        peptides = random_peptides(num=100, length=length)
+        all_peptides.extend(peptides)
+
     args = [
         "--alleles",
         "HLA-A0201",
-        "--alleles",
-        "HLA-A0201",
-        "HLA-A0301",
-        "--peptides",
-        "SIINFEKL",
-        "SIINFEKD",
-        "SIINFEKQ",
+        "--alleles", 
+        "HLA-A0201,HLA-A0301",
+        "--peptides"
+    ] + all_peptides + [
         "--prediction-column-prefix",
         "mhcflurry_",
         "--affinity-only",
