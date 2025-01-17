@@ -192,12 +192,13 @@ def run(argv=sys.argv[1:]):
         from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
         from mhcflurry.torch_presentation_predictor import TorchPresentationPredictor
 
-        print("Using torch")
         if os.path.exists(os.path.join(models_dir, "weights.csv")):
             # Using a presentation predictor
+            print("Using torch TorchPresentationPredictor")
             predictor = TorchPresentationPredictor.load(models_dir)
         else:
             # Using just an affinity predictor
+            print("Using torch TorchClass1AffinityPredictor")
             affinity_predictor = TorchPredictor.load(models_dir)
             predictor = TorchPresentationPredictor(affinity_predictor=affinity_predictor)
             if not args.affinity_only:
