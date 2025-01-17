@@ -454,6 +454,15 @@ class Class1AffinityPredictor(object):
 
         self.provenance_string = provenance_string
 
+    @property
+    def supported_alleles(self):
+        if "supported_alleles" not in self._cache:
+            result = set(self.allele_to_allele_specific_models)
+            if self.allele_to_sequence:
+                result = result.union(self.allele_to_sequence)
+            self._cache["supported_alleles"] = sorted(result)
+        return self._cache["supported_alleles"]
+
     @classmethod
     def load(cls, models_dir):
         """
