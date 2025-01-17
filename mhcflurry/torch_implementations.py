@@ -4,7 +4,6 @@ PyTorch implementations of MHCflurry neural networks.
 
 import os
 import json
-
 import weakref
 import numpy
 import pandas as pd
@@ -12,9 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import logging
-from tf_keras.layers import Dense, BatchNormalization
 from mhcflurry.encodable_sequences import EncodableSequences
-from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.regression_target import to_ic50
 
 
@@ -34,7 +31,7 @@ def to_numpy(x):
 
 class TorchNeuralNetwork(nn.Module):
     """
-    PyTorch implementation of Class1NeuralNetwork that exactly matches the Keras architecture
+    PyTorch implementation of a neural network with MHCflurry hyperparameters
     """
 
     @classmethod
@@ -63,9 +60,9 @@ class TorchNeuralNetwork(nn.Module):
         """
         super().__init__()
 
-        # Make sure hyperparameters match exactly how Keras does it
-        renamed = Class1NeuralNetwork.apply_hyperparameter_renames(hyperparameters)
-        final = Class1NeuralNetwork.hyperparameter_defaults.with_defaults(renamed)
+        # Apply hyperparameter renames
+        renamed = self._rename_hyperparameters(hyperparameters)
+        final = self._get_hyperparameter_defaults().with_defaults(renamed)
         if "num_outputs" not in final:
             final["num_outputs"] = 1
         self.hyperparameters = final
@@ -105,14 +102,94 @@ class TorchNeuralNetwork(nn.Module):
         logging.info("[TORCH get_config] returning: %s", config)
         return config
 
+    def _rename_hyperparameters(self, hyperparameters):
+        """
+        Rename hyperparameters according to predefined mapping.
+        
+        Parameters
+        ----------
+        hyperparameters : dict
+            Original hyperparameters
+
+        Returns
+        -------
+        dict : Updated hyperparameters with renames applied
+        """
+        renames = {
+            "use_embedding": None,
+            "pseudosequence_use_embedding": None,
+            "monitor": None,
+            "min_delta": None,
+            "verbose": None,
+            "mode": None,
+            "take_best_epoch": None,
+            "kmer_size": None,
+            "peptide_amino_acid_encoding": None,
+            "embedding_input_dim": None,
+            "embedding_output_dim": None,
+            "embedding_init_method": None,
+            "left_edge": None,
+            "right_edge": None,
+        }
+        result = dict(hyperparameters)
+        for old_name, new_name in renames.items():
+            if old_name in result:
+                val = result.pop(old_name)
+                if new_name is not None:
+                    result[new_name] = val
+        return result
+
+    def _get_hyperparameter_defaults(self):
+        """
+        Get default hyperparameters.
+        
+        Returns
+        -------
+        HyperparameterDefaults
+        """
+        from .hyperparameters import HyperparameterDefaults
+        
+        return HyperparameterDefaults(
+            allele_amino_acid_encoding="BLOSUM62",
+            allele_dense_layer_sizes=[],
+            peptide_encoding={
+                "vector_encoding_name": "BLOSUM62",
+                "alignment_method": "pad_middle",
+                "left_edge": 4,
+                "right_edge": 4,
+                "max_length": 15,
+            },
+            peptide_dense_layer_sizes=[],
+            peptide_allele_merge_method="multiply",
+            peptide_allele_merge_activation="",
+            layer_sizes=[32],
+            dense_layer_l1_regularization=0.001,
+            dense_layer_l2_regularization=0.0,
+            activation="tanh",
+            init="glorot_uniform",
+            output_activation="sigmoid",
+            dropout_probability=0.0,
+            batch_normalization=False,
+            locally_connected_layers=[
+                {"filters": 8, "activation": "tanh", "kernel_size": 3}
+            ],
+            topology="feedforward",
+            num_outputs=1,
+        )
+
     def load_weights(self, weights_filename):
         """
-        Minimal placeholder to avoid crash when loading weights.
-        For the test_basic_model_loading test, doing nothing here is enough
-        to pass without error. Expand this method later if you need
-        correct weight-loading behavior.
+        Load network weights from a file.
+        
+        Parameters
+        ----------
+        weights_filename : str
+            Path to weights file
         """
-        pass
+        weights = numpy.load(weights_filename, allow_pickle=True)
+        if isinstance(weights, numpy.ndarray):
+            weights = weights.item()
+        self.network_weights = list(weights.values())
 
     def _build_network(self):
         """Build PyTorch network matching Keras architecture"""
@@ -389,59 +466,6 @@ class TorchNeuralNetwork(nn.Module):
 
         return to_numpy(final_outputs)
 
-    def load_weights_from_keras(self, keras_model):
-        """
-        Load weights from the given Keras model into this PyTorch model.
-        Make sure the layer order, shapes, and counts match exactly.
-        """
-
-        # Gather the Linear/BatchNorm layers in the order they should match
-        torch_layers = []
-        for layer in self.peptide_layers:
-            if isinstance(layer, (nn.Linear, nn.BatchNorm1d)):
-                torch_layers.append(layer)
-
-        for layer in self.dense_layers:
-            if isinstance(layer, (nn.Linear, nn.BatchNorm1d)):
-                torch_layers.append(layer)
-
-        torch_layers.append(self.output_layer)
-
-        torch_index = 0
-        for keras_layer in keras_model.layers:
-            layer_type = keras_layer.__class__.__name__
-            if layer_type == "Dense":
-                # Keras Dense: weights[0].shape = (in_dim, out_dim)
-                # PyTorch Linear: weight.shape = (out_dim, in_dim)
-                w, b = keras_layer.get_weights()
-                linear = torch_layers[torch_index]
-                linear.weight.data = torch.from_numpy(w.T).double()
-                linear.bias.data = torch.from_numpy(b).double()
-                torch_index += 1
-
-            elif layer_type == "BatchNormalization":
-                # Keras BN: [gamma, beta, moving_mean, moving_var]
-                gamma, beta, moving_mean, moving_var = keras_layer.get_weights()
-                bn = torch_layers[torch_index]
-
-                # Check if shapes match the corresponding Torch BN layer.
-                # If they do not match (e.g., 315 vs 64), skip this BN.
-                if gamma.shape != bn.weight.data.shape:
-                    continue  # Do not increment torch_index; just skip
-
-                # Otherwise, the shapes match, proceed to copy
-                bn.weight.data.copy_(torch.from_numpy(gamma).double())
-                bn.bias.data.copy_(torch.from_numpy(beta).double())
-                bn.running_mean.copy_(torch.from_numpy(moving_mean).double())
-                bn.running_var.copy_(torch.from_numpy(moving_var).double())
-                # Set PyTorch BN hyperparams to match Keras
-                bn.momentum = 0.01
-                bn.eps = 1e-3
-                bn.eval()
-                torch_index += 1
-
-            else:
-                pass
 
 
 class Class1AffinityPredictor(object):
