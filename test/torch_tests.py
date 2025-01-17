@@ -359,6 +359,10 @@ def test_basic_model_loading():
         locally_connected_layers=[],
     )
 
+    # Initialize the network by making a prediction on dummy data
+    dummy_peptides = ["SIINFEKL"]
+    keras_model.predict(dummy_peptides)  # This forces network initialization
+
     # Create a temporary directory for the model files
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a manifest DataFrame with one model
