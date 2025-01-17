@@ -73,6 +73,8 @@ class TorchNeuralNetwork(nn.Module):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.regularization_losses = []
         self._network = None
+        # Set default dtype to match Keras
+        torch.set_default_dtype(torch.float64)
         self.network_json = None
         self.network_weights = None
         self.network_weights_loader = None
@@ -117,6 +119,9 @@ class TorchNeuralNetwork(nn.Module):
         """Build PyTorch network matching Keras architecture"""
         # Get dimensions from peptide encoding config
         peptide_input_dim = self._get_peptide_input_dim()
+        
+        # Ensure network uses double precision
+        self.double()
 
         # Input layers
         self.peptide_layers = nn.ModuleList()
@@ -344,6 +349,7 @@ class TorchNeuralNetwork(nn.Module):
             for start in range(0, len(encoded), batch_size):
                 batch = encoded[start : start + batch_size]
                 batch_tensor = to_torch(batch).to(self.device, dtype=torch.float64)
+                batch_tensor = batch_tensor.double()
                 batch_output = self(batch_tensor)
                 outputs_list.append(batch_output.cpu())
 
@@ -386,8 +392,8 @@ class TorchNeuralNetwork(nn.Module):
                 # PyTorch Linear: weight.shape = (out_dim, in_dim)
                 w, b = keras_layer.get_weights()
                 linear = torch_layers[torch_index]
-                linear.weight.data = torch.from_numpy(w.T).float()
-                linear.bias.data = torch.from_numpy(b).float()
+                linear.weight.data = torch.from_numpy(w.T).double()
+                linear.bias.data = torch.from_numpy(b).double()
                 torch_index += 1
 
             elif layer_type == "BatchNormalization":
@@ -401,10 +407,10 @@ class TorchNeuralNetwork(nn.Module):
                     continue  # Do not increment torch_index; just skip
 
                 # Otherwise, the shapes match, proceed to copy
-                bn.weight.data.copy_(torch.from_numpy(gamma).float())
-                bn.bias.data.copy_(torch.from_numpy(beta).float())
-                bn.running_mean.copy_(torch.from_numpy(moving_mean).float())
-                bn.running_var.copy_(torch.from_numpy(moving_var).float())
+                bn.weight.data.copy_(torch.from_numpy(gamma).double())
+                bn.bias.data.copy_(torch.from_numpy(beta).double())
+                bn.running_mean.copy_(torch.from_numpy(moving_mean).double())
+                bn.running_var.copy_(torch.from_numpy(moving_var).double())
                 # Set PyTorch BN hyperparams to match Keras
                 bn.momentum = 0.01
                 bn.eps = 1e-3
