@@ -85,11 +85,6 @@ class TorchNeuralNetwork(nn.Module):
                 result = result.union(self.allele_to_sequence)
             self._cache["supported_alleles"] = sorted(result)
         return self._cache["supported_alleles"]
-            # Same logic as the Keras version
-            result = set(self.allele_to_allele_specific_models)
-            if self.allele_to_sequence:
-                result = result.union(self.allele_to_sequence)
-            self._cache["supported_alleles"] = sorted(result)
         return self._cache["supported_alleles"]
 
     def load_weights(self, weights_filename):
