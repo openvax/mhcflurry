@@ -241,6 +241,20 @@ class TorchNeuralNetwork(nn.Module):
                     module.track_running_stats = True
         return self
 
+    def eval(self):
+        """
+        Put all underlying TorchNeuralNetwork models into eval mode,
+        skipping any Keras Class1NeuralNetwork models.
+        """
+        from mhcflurry.torch_implementations import TorchNeuralNetwork
+        for allele_models in self.allele_to_allele_specific_models.values():
+            for model in allele_models:
+                if isinstance(model, TorchNeuralNetwork):
+                    model.eval()
+        for model in self.class1_pan_allele_models:
+            if isinstance(model, TorchNeuralNetwork):
+                model.eval()
+
     def init_weights(self, init):
         """Initialize network weights."""
         for module in self.modules():
