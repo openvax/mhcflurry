@@ -429,53 +429,49 @@ class Class1AffinityPredictor(object):
         Parameters
         ----------
         models_dir : str
-            Directory containing model files including weights.csv
+            Directory containing model files including manifest.csv
 
         Returns
         -------
         Class1AffinityPredictor
             Initialized predictor with loaded weights
         """
-
         # Load manifest if available
         manifest_path = os.path.join(models_dir, "manifest.csv")
-        if os.path.exists(manifest_path):
-            manifest_df = pd.read_csv(manifest_path)
-            # Get network config from first model
-            config = json.loads(manifest_df.iloc[0].config_json)
+        manifest_df = pd.read_csv(manifest_path)
 
-            instance = cls(
-                input_size=config.get("input_size", 315),
-                peptide_dense_layer_sizes=config.get("peptide_dense_layer_sizes", []),
-                layer_sizes=config.get("layer_sizes", []),
-                dropout_probability=config.get("dropout_probability", 0.0),
-                batch_normalization=config.get("batch_normalization", False),
-                activation=config.get("activation", "tanh"),
-                init=config.get("init", "glorot_uniform"),
-                output_activation=config.get("output_activation", "sigmoid"),
-                num_outputs=config.get("num_outputs", 1),
-            )
-        else:
-            # Fallback to default architecture
-            instance = cls(
-                input_size=315,
-                peptide_dense_layer_sizes=[],
-                layer_sizes=[],
-                dropout_probability=0.0,
-                batch_normalization=False,
-                activation="tanh",
-                init="glorot_uniform",
-                output_activation="sigmoid",
-                num_outputs=1,
-            )
+        # Load allele sequences if available
+        allele_to_sequence = None
+        allele_sequences_path = os.path.join(models_dir, "allele_sequences.csv")
+        if os.path.exists(allele_sequences_path):
+            allele_sequences_df = pd.read_csv(allele_sequences_path)
+            allele_to_sequence = dict(zip(allele_sequences_df.allele, allele_sequences_df.sequence))
 
-        # Load weights if available
-        weights_path = os.path.join(models_dir, "weights.csv")
-        if os.path.exists(weights_path):
-            weights_df = pd.read_csv(weights_path)
-            instance.load_weights(weights_df)
+        # Create empty predictor with just the manifest
+        instance = cls(
+            allele_to_allele_specific_models={},
+            class1_pan_allele_models=[],
+            allele_to_sequence=allele_to_sequence,
+            manifest_df=manifest_df
+        )
 
-        instance = instance.to(instance.device)
+        # Load models from manifest
+        for _, row in manifest_df.iterrows():
+            config = json.loads(row.config_json)
+            model = TorchNeuralNetwork(**config)
+            
+            # Load weights if available
+            weights_path = os.path.join(models_dir, f"weights_{row.model_name}.npz")
+            if os.path.exists(weights_path):
+                model.load_weights(weights_path)
+
+            if row.allele == "pan-class1":
+                instance.class1_pan_allele_models.append(model)
+            else:
+                if row.allele not in instance.allele_to_allele_specific_models:
+                    instance.allele_to_allele_specific_models[row.allele] = []
+                instance.allele_to_allele_specific_models[row.allele].append(model)
+
         return instance
 
     def load_weights(self, weights_df):
