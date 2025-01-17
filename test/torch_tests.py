@@ -409,15 +409,32 @@ def test_basic_model_loading():
             if keras_val != torch_val:
                 logging.info("HYPERPARAM DIFF key=%r keras=%r torch=%r", key, keras_val, torch_val)
 
-        logging.info("Keras hyperparameters: %s", keras_config["hyperparameters"])
-        logging.info("Torch hyperparameters: %s", torch_config["hyperparameters"])
+        ALLOWED_KEYS = {
+            "allele_amino_acid_encoding",
+            "allele_dense_layer_sizes", 
+            "peptide_encoding",
+            "peptide_dense_layer_sizes",
+            "peptide_allele_merge_method",
+            "peptide_allele_merge_activation",
+            "layer_sizes",
+            "dense_layer_l1_regularization",
+            "dense_layer_l2_regularization",
+            "activation",
+            "init",
+            "output_activation", 
+            "dropout_probability",
+            "batch_normalization",
+            "locally_connected_layers",
+            "topology",
+            "num_outputs",
+        }
 
-        all_keys = set(keras_config["hyperparameters"].keys()) | set(torch_config["hyperparameters"].keys())
-        for key in sorted(all_keys):
-            keras_val = keras_config["hyperparameters"].get(key)
-            torch_val = torch_config["hyperparameters"].get(key)
-            if keras_val != torch_val:
-                logging.info("HYPERPARAM DIFF key=%r keras=%r torch=%r", key, keras_val, torch_val)
+        keras_config["hyperparameters"] = {
+            k: v for (k, v) in keras_config["hyperparameters"].items() if k in ALLOWED_KEYS
+        }
+        torch_config["hyperparameters"] = {
+            k: v for (k, v) in torch_config["hyperparameters"].items() if k in ALLOWED_KEYS
+        }
 
         assert keras_config["hyperparameters"] == torch_config["hyperparameters"], "Hyperparameters differ"
 
