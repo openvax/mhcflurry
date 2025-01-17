@@ -243,17 +243,9 @@ class TorchNeuralNetwork(nn.Module):
 
     def eval(self):
         """
-        Put all underlying TorchNeuralNetwork models into eval mode,
-        skipping any Keras Class1NeuralNetwork models.
+        Put this TorchNeuralNetwork in eval mode (batchnorm, dropout at inference).
         """
-        from mhcflurry.torch_implementations import TorchNeuralNetwork
-        for allele_models in self.allele_to_allele_specific_models.values():
-            for model in allele_models:
-                if isinstance(model, TorchNeuralNetwork):
-                    model.eval()
-        for model in self.class1_pan_allele_models:
-            if isinstance(model, TorchNeuralNetwork):
-                model.eval()
+        return super().eval()
 
     def init_weights(self, init):
         """Initialize network weights."""
@@ -328,6 +320,24 @@ class TorchNeuralNetwork(nn.Module):
         return x
 
     def predict(self, peptides, batch_size=32):
+        """
+        Predict output for a list of peptides or an EncodableSequences object.
+
+        Parameters
+        ----------
+        peptides : list of str or EncodableSequences
+            Peptides to predict
+        batch_size : int
+            Number of items per batch
+
+        Returns
+        -------
+        numpy.ndarray
+            Predictions as a 1D or 2D array depending on self.hyperparameters["num_outputs"]
+        """
+        # Add TorchNeuralNetwork to builtins so other modules can find it
+        import builtins
+        builtins.TorchNeuralNetwork = TorchNeuralNetwork
         """
         Predict output for a list of peptides or an EncodableSequences object.
 
