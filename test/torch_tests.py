@@ -266,7 +266,9 @@ def test_full_network_architectures():
 
         # Print raw and transformed predictions for debugging
         print("\nPredictions before IC50 transformation:")
-        print("Keras raw output:", network.predict({"peptide": keras_model.peptides_to_network_input(peptide_encoding)}))
+        print(
+            "Keras raw output:", network.predict({"peptide": keras_model.peptides_to_network_input(peptide_encoding)})
+        )
         print("Final Keras predictions (after IC50):", keras_predictions)
         print("Final PyTorch predictions (after IC50):", torch_predictions)
 
@@ -328,7 +330,7 @@ def test_basic_model_loading():
     from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor as KerasPredictor
     from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
     from mhcflurry.class1_neural_network import Class1NeuralNetwork
-    
+
     # Create a minimal test model
     keras_model = Class1NeuralNetwork(
         peptide_encoding={
@@ -347,7 +349,7 @@ def test_basic_model_loading():
     keras_model._network = keras_model.make_network(
         **keras_model.network_hyperparameter_defaults.subselect(keras_model.hyperparameters)
     )
-    
+
     # Now we can safely get and compile the network
     network = keras_model.network()
     network.compile(optimizer="adam", loss="mse")
@@ -359,19 +361,17 @@ def test_basic_model_loading():
     # Create a temporary directory for the model files
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a manifest DataFrame with one model
-        manifest_df = pd.DataFrame({
-            'model_name': ['test_model_0'],
-            'allele': ['HLA-A*02:01'],
-            'config_json': [keras_model.get_config()],
-        })
+        manifest_df = pd.DataFrame(
+            {
+                "model_name": ["test_model_0"],
+                "allele": ["HLA-A*02:01"],
+                "config_json": [keras_model.get_config()],
+            }
+        )
         manifest_df.to_csv(os.path.join(temp_dir, "manifest.csv"), index=False)
 
         # Create a predictor with this model and save it
-        keras_predictor = KerasPredictor(
-            allele_to_allele_specific_models={
-                'HLA-A*02:01': [keras_model]
-            }
-        )
+        keras_predictor = KerasPredictor(allele_to_allele_specific_models={"HLA-A*02:01": [keras_model]})
         keras_predictor.save(temp_dir)
 
         # Load with both implementations
@@ -379,23 +379,26 @@ def test_basic_model_loading():
         torch_loaded = TorchPredictor.load(temp_dir)
 
         # Basic structure tests
-        assert hasattr(torch_loaded, 'allele_to_allele_specific_models'), \
-            "PyTorch predictor missing allele_to_allele_specific_models"
-        
-        assert 'HLA-A*02:01' in torch_loaded.allele_to_allele_specific_models, \
-            "PyTorch predictor missing test allele"
-            
-        assert len(torch_loaded.allele_to_allele_specific_models['HLA-A*02:01']) == 1, \
-            "PyTorch predictor has wrong number of models for test allele"
+        assert hasattr(
+            torch_loaded, "allele_to_allele_specific_models"
+        ), "PyTorch predictor missing allele_to_allele_specific_models"
+
+        assert "HLA-A*02:01" in torch_loaded.allele_to_allele_specific_models, "PyTorch predictor missing test allele"
+
+        assert (
+            len(torch_loaded.allele_to_allele_specific_models["HLA-A*02:01"]) == 1
+        ), "PyTorch predictor has wrong number of models for test allele"
 
         # Compare supported alleles
-        assert set(torch_loaded.supported_alleles) == set(keras_loaded.supported_alleles), \
-            "Supported alleles don't match"
+        assert set(torch_loaded.supported_alleles) == set(
+            keras_loaded.supported_alleles
+        ), "Supported alleles don't match"
 
         # Compare model architectures
-        keras_config = keras_loaded.allele_to_allele_specific_models['HLA-A*02:01'][0].get_config()
-        torch_config = torch_loaded.allele_to_allele_specific_models['HLA-A*02:01'][0].get_config()
+        keras_config = keras_loaded.allele_to_allele_specific_models["HLA-A*02:01"][0].get_config()
+        torch_config = torch_loaded.allele_to_allele_specific_models["HLA-A*02:01"][0].get_config()
         assert keras_config["hyperparameters"] == torch_config["hyperparameters"], "Hyperparameters differ"
+
 
 def test_single_model_predictions():
     """Test predictions with a single allele-specific model"""
@@ -442,7 +445,7 @@ def test_single_model_predictions():
         "SIINFEKL",  # Known H-2Kb epitope
         "FALPYWNM",  # Random sequence
         "KLGGALQAK",  # Known HLA-A2 epitope
-        "VNTPEHVVP"   # Random sequence
+        "VNTPEHVVP",  # Random sequence
     ]
     peptide_encoding = EncodableSequences.create(test_peptides)
 
@@ -453,29 +456,20 @@ def test_single_model_predictions():
     # Print predictions for debugging
     print("\nPredictions comparison:")
     for i, peptide in enumerate(test_peptides):
-        print(f"{peptide}: Keras={keras_predictions[i]:.2f}, "
-              f"PyTorch={torch_predictions[i]:.2f}")
+        print(f"{peptide}: Keras={keras_predictions[i]:.2f}, " f"PyTorch={torch_predictions[i]:.2f}")
 
     # Compare predictions
     assert_array_almost_equal(
         keras_predictions,
         torch_predictions,
         decimal=2,
-        err_msg="Single model predictions don't match between Keras and PyTorch"
+        err_msg="Single model predictions don't match between Keras and PyTorch",
     )
 
     # Test with a Class1AffinityPredictor wrapper
     allele = "HLA-A*02:01"
-    keras_predictor = Class1AffinityPredictor(
-        allele_to_allele_specific_models={
-            allele: [keras_model]
-        }
-    )
-    torch_predictor = Class1AffinityPredictor(
-        allele_to_allele_specific_models={
-            allele: [torch_model]
-        }
-    )
+    keras_predictor = Class1AffinityPredictor(allele_to_allele_specific_models={allele: [keras_model]})
+    torch_predictor = Class1AffinityPredictor(allele_to_allele_specific_models={allele: [torch_model]})
 
     # Compare predictor-level predictions
     keras_pred = keras_predictor.predict(peptides=test_peptides, allele=allele)
@@ -483,43 +477,47 @@ def test_single_model_predictions():
 
     print("\nPredictor-level predictions comparison:")
     for i, peptide in enumerate(test_peptides):
-        print(f"{peptide}: Keras={keras_pred[i]:.2f}, "
-              f"PyTorch={torch_pred[i]:.2f}")
+        print(f"{peptide}: Keras={keras_pred[i]:.2f}, " f"PyTorch={torch_pred[i]:.2f}")
 
     assert_array_almost_equal(
-        keras_pred,
-        torch_pred,
-        decimal=2,
-        err_msg="Predictor-level single model predictions don't match"
+        keras_pred, torch_pred, decimal=2, err_msg="Predictor-level single model predictions don't match"
     )
+
 
 def test_allele_sequence_handling():
     """Test loading and using allele sequences"""
     pass
 
+
 def test_ensemble_predictions():
     """Test predictions with multiple models for same allele"""
     pass
+
 
 def test_pan_allele_predictions():
     """Test pan-allele model predictions"""
     pass
 
+
 def test_percentile_ranks():
     """Test percentile rank calculations"""
     pass
+
 
 def test_mixed_model_predictions():
     """Test predictions using both allele-specific and pan-allele models"""
     pass
 
+
 def test_edge_cases():
     """Test handling of edge cases and errors"""
     pass
 
+
 def test_full_predictor():
     """Test complete predictor functionality"""
     pass
+
 
 def test_tensorflow_vs_pytorch_backends():
     """Test that tensorflow and pytorch backends produce matching results."""
