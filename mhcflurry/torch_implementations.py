@@ -36,6 +36,12 @@ class TorchNeuralNetwork(nn.Module):
     PyTorch implementation of Class1NeuralNetwork that exactly matches the Keras architecture
     """
 
+    @classmethod
+    def from_config(cls, config):
+        hyperparameters = config["hyperparameters"]
+        instance = cls(**hyperparameters)
+        return instance
+
     def __init__(self, **hyperparameters):
         """
         Initialize neural network with hyperparameters matching Keras version.
