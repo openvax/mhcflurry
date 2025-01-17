@@ -313,7 +313,8 @@ def test_weight_transfer_and_predictions():
 
     # Set PyTorch model to eval mode and get predictions
     torch_network.eval()
-    torch_output = to_numpy(torch_network(to_torch(test_input).double()))
+    torch_input = to_torch(test_input).double()
+    torch_output = to_numpy(torch_network(torch_input))
 
     print("\nKeras output shape:", keras_output.shape)
     print("PyTorch output shape:", torch_output.shape)

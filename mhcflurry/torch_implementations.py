@@ -861,8 +861,8 @@ class Class1AffinityPredictor(object):
 
         # Forward pass with no gradients
         with torch.no_grad():
-            # Convert to torch tensor and move to device
-            encoded = to_torch(encoded).to(self.device)
+            # Convert to torch tensor, cast to double, and move to device
+            encoded = to_torch(encoded).double().to(self.device)
 
             # Get predictions from the model for this allele
             model = self.allele_to_allele_specific_models[allele][0]
