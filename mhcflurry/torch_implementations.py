@@ -804,39 +804,6 @@ class Class1AffinityPredictor(object):
         # If you have BatchNorm layers, also match gamma, beta, moving_mean, moving_variance
         # from Keras to PyTorch’s BatchNorm parameters.
 
-    def export_weights_to_keras(self, keras_model):
-        """
-        Export weights from this PyTorch model to a Keras model.
-
-        Parameters
-        ----------
-        keras_model : keras.Model
-            Keras model with matching architecture
-        """
-
-        keras_layers = [l for l in keras_model.layers if isinstance(l, (Dense, BatchNormalization))]
-        torch_layers = [l for l in self.layers if isinstance(l, (nn.Linear, nn.BatchNorm1d))]
-
-        assert len(keras_layers) == len(torch_layers), "Model architectures do not match"
-
-        for k_layer, t_layer in zip(keras_layers, torch_layers):
-            if isinstance(t_layer, nn.Linear):
-                # Convert PyTorch weights to Keras format
-                weights = [
-                    to_numpy(t_layer.weight.data.T),  # Transpose back to Keras format
-                    to_numpy(t_layer.bias.data),
-                ]
-                k_layer.set_weights(weights)
-
-            elif isinstance(t_layer, nn.BatchNorm1d):
-                # Convert PyTorch batch norm parameters to Keras format
-                weights = [
-                    to_numpy(t_layer.weight.data),  # gamma
-                    to_numpy(t_layer.bias.data),  # beta
-                    to_numpy(t_layer.running_mean.data),
-                    to_numpy(t_layer.running_var.data),
-                ]
-                k_layer.set_weights(weights)
 
     def eval(self):
         """
