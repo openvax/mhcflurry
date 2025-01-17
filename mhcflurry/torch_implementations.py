@@ -61,21 +61,37 @@ class TorchNeuralNetwork(nn.Module):
         super().__init__()
 
         # Apply hyperparameter renames
-        from copy import deepcopy
         renamed = self._rename_hyperparameters(hyperparameters)
-        defaults = self._get_hyperparameter_defaults().defaults
 
-        # 1. Copy only the keys that TorchNeuralNetwork recognizes
+        ALLOWED_KEYS = {
+            "allele_amino_acid_encoding",
+            "allele_dense_layer_sizes", 
+            "peptide_encoding",
+            "peptide_dense_layer_sizes",
+            "peptide_allele_merge_method",
+            "peptide_allele_merge_activation",
+            "layer_sizes",
+            "dense_layer_l1_regularization",
+            "dense_layer_l2_regularization", 
+            "activation",
+            "init",
+            "output_activation",
+            "dropout_probability",
+            "batch_normalization",
+            "locally_connected_layers",
+            "topology",
+            "num_outputs",
+        }
+
         filtered = {}
         for (k, v) in renamed.items():
-            if k in defaults:
+            if k in ALLOWED_KEYS:
                 filtered[k] = v
 
-        # 2. Give default value to any missing key
-        final = deepcopy(defaults)
-        final.update(filtered)
-        if "num_outputs" not in final:
-            final["num_outputs"] = 1
+        defaults = self._get_hyperparameter_defaults().defaults
+        final = dict(defaults)  # baseline defaults
+        final.update(filtered)  # override with only allowed keys
+
         self.hyperparameters = final
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
