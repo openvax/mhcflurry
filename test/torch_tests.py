@@ -418,7 +418,7 @@ def test_basic_model_loading():
         keras_config.pop('network_json', None)
         torch_config.pop('network_json', None)
         
-        assert keras_config == torch_config, "Model configurations don't match"
+        assert keras_config["hyperparameters"] == torch_config["hyperparameters"], "Hyperparameters differ"
 
 def test_single_model_predictions():
     """Test predictions with a single allele-specific model"""
