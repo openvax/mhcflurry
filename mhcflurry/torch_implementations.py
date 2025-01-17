@@ -11,6 +11,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import logging
 from tf_keras.layers import Dense, BatchNormalization
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
@@ -65,6 +66,8 @@ class TorchNeuralNetwork(nn.Module):
         # Make sure hyperparameters match exactly how Keras does it
         renamed = Class1NeuralNetwork.apply_hyperparameter_renames(hyperparameters)
         final = Class1NeuralNetwork.hyperparameter_defaults.with_defaults(renamed)
+        if "num_outputs" not in final:
+            final["num_outputs"] = 1
         self.hyperparameters = final
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -88,9 +91,11 @@ class TorchNeuralNetwork(nn.Module):
         """
         Return a dict of the same shape as Class1NeuralNetwork's get_config().
         """
-        return {
+        config = {
             "hyperparameters": self.hyperparameters
         }
+        logging.info("[TORCH get_config] returning: %s", config)
+        return config
 
 
     def load_weights(self, weights_filename):

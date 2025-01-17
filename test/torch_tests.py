@@ -411,6 +411,9 @@ def test_basic_model_loading():
         # Compare model architectures
         keras_config = keras_loaded.allele_to_allele_specific_models['HLA-A*02:01'][0].get_config()
         torch_config = torch_loaded.allele_to_allele_specific_models['HLA-A*02:01'][0].get_config()
+        # ADD these lines to show both configs side by side before the assertion
+        print("[DEBUG] Keras config:\n", keras_config)
+        print("[DEBUG] Torch config:\n", torch_config)
         assert keras_config == torch_config, "Model configurations don't match"
 
 def test_single_model_predictions():
