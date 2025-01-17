@@ -397,6 +397,17 @@ def test_basic_model_loading():
         # Compare model architectures
         keras_config = keras_loaded.allele_to_allele_specific_models["HLA-A*02:01"][0].get_config()
         torch_config = torch_loaded.allele_to_allele_specific_models["HLA-A*02:01"][0].get_config()
+
+        logging.info("Keras hyperparameters: %s", keras_config["hyperparameters"])
+        logging.info("Torch hyperparameters: %s", torch_config["hyperparameters"])
+
+        all_keys = set(keras_config["hyperparameters"].keys()) | set(torch_config["hyperparameters"].keys())
+        for key in sorted(all_keys):
+            keras_val = keras_config["hyperparameters"].get(key)
+            torch_val = torch_config["hyperparameters"].get(key)
+            if keras_val != torch_val:
+                logging.info("HYPERPARAM DIFF key=%r keras=%r torch=%r", key, keras_val, torch_val)
+
         assert keras_config["hyperparameters"] == torch_config["hyperparameters"], "Hyperparameters differ"
 
 
