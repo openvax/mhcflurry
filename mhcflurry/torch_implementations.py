@@ -864,8 +864,9 @@ class Class1AffinityPredictor(object):
             # Convert to torch tensor and move to device
             encoded = to_torch(encoded).to(self.device)
 
-            # Get predictions
-            outputs = self(encoded)
+            # Get predictions from the model for this allele
+            model = self.allele_to_allele_specific_models[allele][0]
+            outputs = model(encoded)
             outputs = to_numpy(outputs).flatten()
 
         # Convert network output (0-1) to nM predictions
