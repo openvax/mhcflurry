@@ -24,7 +24,9 @@ torch.manual_seed(SEED)
 tf.keras.backend.set_floatx("float64")
 from numpy.testing import assert_array_almost_equal
 
-from mhcflurry.torch_implementations import Class1AffinityPredictor, TorchNeuralNetwork, to_torch, to_numpy
+from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
+from mhcflurry.torch_implementations import TorchNeuralNetwork, to_torch, to_numpy
+from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor as KerasPredictor
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.allele_encoding import AlleleEncoding
@@ -505,10 +507,12 @@ def test_single_model_predictions():
         err_msg="Single model predictions don't match between Keras and PyTorch",
     )
 
-    # Test with a Class1AffinityPredictor wrapper
+    # Test with both predictors
     allele = "HLA-A*02:01"
-    keras_predictor = Class1AffinityPredictor(allele_to_allele_specific_models={allele: [keras_model]})
-    torch_predictor = Class1AffinityPredictor(allele_to_allele_specific_models={allele: [torch_model]})
+    # Use Keras model with Keras predictor
+    keras_predictor = KerasPredictor(allele_to_allele_specific_models={allele: [keras_model]})
+    # Use PyTorch model with PyTorch predictor
+    torch_predictor = TorchPredictor(allele_to_allele_specific_models={allele: [torch_model]})
 
     # Compare predictor-level predictions
     keras_pred = keras_predictor.predict(peptides=test_peptides, allele=allele)
