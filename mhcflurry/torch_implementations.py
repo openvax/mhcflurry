@@ -177,6 +177,42 @@ class TorchNeuralNetwork(nn.Module):
             num_outputs=1,
         )
 
+    def load_weights_from_keras(self, keras_model):
+        """
+        Load weights from a Keras model into this PyTorch model.
+        
+        Parameters
+        ----------
+        keras_model : tf.keras.Model
+            Keras model to load weights from
+        """
+        # Transfer weights from Keras to PyTorch layers
+        for i, layer in enumerate(keras_model.layers):
+            if hasattr(layer, 'get_weights'):
+                weights = layer.get_weights()
+                if not weights:
+                    continue
+                
+                # Handle dense layers
+                if isinstance(layer, keras_model.Dense):
+                    if i < len(self.dense_layers):
+                        pytorch_layer = self.dense_layers[i]
+                        if isinstance(pytorch_layer, nn.Linear):
+                            pytorch_layer.weight.data = torch.from_numpy(weights[0].T)
+                            if len(weights) > 1:
+                                pytorch_layer.bias.data = torch.from_numpy(weights[1])
+                
+                # Handle batch normalization layers
+                elif isinstance(layer, keras_model.BatchNormalization):
+                    if i < len(self.dense_layers):
+                        pytorch_layer = self.dense_layers[i]
+                        if isinstance(pytorch_layer, nn.BatchNorm1d):
+                            if len(weights) >= 4:
+                                pytorch_layer.weight.data = torch.from_numpy(weights[0])  # gamma
+                                pytorch_layer.bias.data = torch.from_numpy(weights[1])    # beta
+                                pytorch_layer.running_mean.data = torch.from_numpy(weights[2])
+                                pytorch_layer.running_var.data = torch.from_numpy(weights[3])
+
     def load_weights(self, weights_filename):
         """
         Load network weights from a file.
