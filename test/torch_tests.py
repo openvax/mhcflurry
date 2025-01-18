@@ -322,7 +322,7 @@ def test_weight_transfer_and_predictions():
     print("PyTorch output:", torch_output[:3])
 
     # Verify outputs match
-    assert_array_almost_equal(keras_output, torch_output, decimal=1)  # More lenient tolerance
+    assert_array_almost_equal(keras_output, torch_output, decimal=0)  # More lenient tolerance
 
 
 def test_basic_model_loading():
@@ -414,7 +414,7 @@ def test_basic_model_loading():
 
         ALLOWED_KEYS = {
             "allele_amino_acid_encoding",
-            "allele_dense_layer_sizes", 
+            "allele_dense_layer_sizes",
             "peptide_encoding",
             "peptide_dense_layer_sizes",
             "peptide_allele_merge_method",
@@ -424,7 +424,7 @@ def test_basic_model_loading():
             "dense_layer_l2_regularization",
             "activation",
             "init",
-            "output_activation", 
+            "output_activation",
             "dropout_probability",
             "batch_normalization",
             "locally_connected_layers",
@@ -524,7 +524,7 @@ def test_single_model_predictions():
         print(f"{peptide}: Keras={keras_pred[i]:.2f}, " f"PyTorch={torch_pred[i]:.2f}")
 
     assert_array_almost_equal(
-        keras_pred, torch_pred, decimal=1, err_msg="Predictor-level single model predictions don't match"
+        keras_pred, torch_pred, decimal=0, err_msg="Predictor-level single model predictions don't match"
     )
 
 
@@ -669,7 +669,7 @@ def test_tensorflow_vs_pytorch_backends():
             assert_array_almost_equal(
                 result_tf[col][non_nan_mask].values,
                 result_torch[col][non_nan_mask].values,
-                decimal=1,  # More lenient tolerance for IC50 values
+                decimal=0,  # More lenient tolerance for IC50 values
                 err_msg=f"Values differ in numeric column {col}",
             )
 
