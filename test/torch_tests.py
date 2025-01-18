@@ -688,3 +688,51 @@ def test_tensorflow_vs_pytorch_backends():
             (result_torch["mhcflurry_affinity_percentile"] >= 0)
             & (result_torch["mhcflurry_affinity_percentile"] <= 100)
         ).all(), "Invalid percentile values in PyTorch results"
+
+
+def test_skeleton_ensemble_predictions():
+    """
+    TODO: Test predictions with multiple allele-specific models and/or pan-allele models.
+    - Mock or instantiate multiple TorchNeuralNetwork models
+    - Add them to TorchPredictor
+    - Ensure the predictor handles combining their predictions appropriately
+    """
+    pass
+
+
+def test_skeleton_percentile_ranks():
+    """
+    TODO: Test percent-rank calibration for TorchPredictor.
+    - Generate random predictions
+    - Calibrate percentile ranks
+    - Validate transformations are consistent
+    """
+    pass
+
+
+def test_skeleton_save_and_load_predictor():
+    """
+    TODO: Test saving a TorchPredictor with multiple models to a manifest directory,
+    then reloading it. Verify the manifest usage, consolidated weights, etc.
+    """
+    pass
+
+
+def test_skeleton_merge_predictors():
+    """
+    TODO: Test merging multiple TorchPredictor instances into a single predictor
+    (similar to the Keras version's merge/merge_in_place calls).
+    - Create several TorchPredictor objects
+    - Merge them
+    - Check that final predictor has all models combined
+    """
+    pass
+
+
+def test_skeleton_train_new_models():
+    """
+    TODO: Test training new Torch models (allele-specific and pan-allele)
+    from scratch or partial data, verifying that fit methods
+    (analogous to Keras version) work as expected.
+    """
+    pass
