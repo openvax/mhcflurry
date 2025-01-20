@@ -189,7 +189,7 @@ def run(argv=sys.argv[1:]):
         models_dir = get_default_class1_presentation_models_dir(test_exists=True)
 
     if args.backend == "pytorch":
-        from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
+        from mhcflurry.torch_implementations import TorchClass1AffinityPredictor
         from mhcflurry.torch_presentation_predictor import TorchPresentationPredictor
 
         if os.path.exists(os.path.join(models_dir, "weights.csv")):
@@ -199,7 +199,7 @@ def run(argv=sys.argv[1:]):
         else:
             # Using just an affinity predictor
             print("Using torch TorchClass1AffinityPredictor")
-            affinity_predictor = TorchPredictor.load(models_dir)
+            affinity_predictor = TorchClass1AffinityPredictor.load(models_dir)
             predictor = TorchPresentationPredictor(affinity_predictor=affinity_predictor)
             if not args.affinity_only:
                 logging.warning(

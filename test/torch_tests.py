@@ -24,9 +24,9 @@ torch.manual_seed(SEED)
 tf.keras.backend.set_floatx("float64")
 from numpy.testing import assert_array_almost_equal
 
-from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
+from mhcflurry.torch_implementations import TorchClass1AffinityPredictor
 from mhcflurry.torch_implementations import TorchNeuralNetwork, to_torch, to_numpy
-from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor as KerasPredictor
+from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.allele_encoding import AlleleEncoding
@@ -327,13 +327,6 @@ def test_weight_transfer_and_predictions():
 
 def test_basic_model_loading():
     """Test that PyTorch predictor can load a basic manifest and weights"""
-    import tempfile
-    import os
-    import pandas as pd
-    import numpy as np
-    from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor as KerasPredictor
-    from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
-    from mhcflurry.class1_neural_network import Class1NeuralNetwork
 
     # Create a minimal test model
     keras_model = Class1NeuralNetwork(
@@ -375,12 +368,12 @@ def test_basic_model_loading():
         manifest_df.to_csv(os.path.join(temp_dir, "manifest.csv"), index=False)
 
         # Create a predictor with this model and save it
-        keras_predictor = KerasPredictor(allele_to_allele_specific_models={"HLA-A*02:01": [keras_model]})
+        keras_predictor = Class1AffinityPredictor(allele_to_allele_specific_models={"HLA-A*02:01": [keras_model]})
         keras_predictor.save(temp_dir)
 
         # Load with both implementations
-        keras_loaded = KerasPredictor.load(temp_dir)
-        torch_loaded = TorchPredictor.load(temp_dir)
+        keras_loaded = Class1AffinityPredictor.load(temp_dir)
+        torch_loaded = TorchClass1AffinityPredictor.load(temp_dir)
 
         # Basic structure tests
         assert hasattr(
@@ -511,9 +504,9 @@ def test_single_model_predictions():
     # Test with both predictors
     allele = "HLA-A*02:01"
     # Use Keras model with Keras predictor
-    keras_predictor = KerasPredictor(allele_to_allele_specific_models={allele: [keras_model]})
+    keras_predictor = Class1AffinityPredictor(allele_to_allele_specific_models={allele: [keras_model]})
     # Use PyTorch model with PyTorch predictor
-    torch_predictor = TorchPredictor(allele_to_allele_specific_models={allele: [torch_model]})
+    torch_predictor = TorchClass1AffinityPredictor(allele_to_allele_specific_models={allele: [torch_model]})
 
     # Compare predictor-level predictions
     keras_pred = keras_predictor.predict(peptides=test_peptides, allele=allele)
@@ -694,7 +687,7 @@ def test_skeleton_ensemble_predictions():
     """
     TODO: Test predictions with multiple allele-specific models and/or pan-allele models.
     - Mock or instantiate multiple TorchNeuralNetwork models
-    - Add them to TorchPredictor
+    - Add them to TorchClass1AffinityPredictor
     - Ensure the predictor handles combining their predictions appropriately
     """
     pass
@@ -702,7 +695,7 @@ def test_skeleton_ensemble_predictions():
 
 def test_skeleton_percentile_ranks():
     """
-    TODO: Test percent-rank calibration for TorchPredictor.
+    TODO: Test percent-rank calibration for TorchClass1AffinityPredictor.
     - Generate random predictions
     - Calibrate percentile ranks
     - Validate transformations are consistent
@@ -712,7 +705,7 @@ def test_skeleton_percentile_ranks():
 
 def test_skeleton_save_and_load_predictor():
     """
-    TODO: Test saving a TorchPredictor with multiple models to a manifest directory,
+    TODO: Test saving a TorchClass1AffinityPredictor with multiple models to a manifest directory,
     then reloading it. Verify the manifest usage, consolidated weights, etc.
     """
     pass
@@ -720,9 +713,9 @@ def test_skeleton_save_and_load_predictor():
 
 def test_skeleton_merge_predictors():
     """
-    TODO: Test merging multiple TorchPredictor instances into a single predictor
+    TODO: Test merging multiple TorchClass1AffinityPredictor instances into a single predictor
     (similar to the Keras version's merge/merge_in_place calls).
-    - Create several TorchPredictor objects
+    - Create several TorchClass1AffinityPredictor objects
     - Merge them
     - Check that final predictor has all models combined
     """

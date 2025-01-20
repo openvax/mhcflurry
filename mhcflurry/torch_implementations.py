@@ -65,14 +65,14 @@ class TorchNeuralNetwork(nn.Module):
 
         ALLOWED_KEYS = {
             "allele_amino_acid_encoding",
-            "allele_dense_layer_sizes", 
+            "allele_dense_layer_sizes",
             "peptide_encoding",
             "peptide_dense_layer_sizes",
             "peptide_allele_merge_method",
             "peptide_allele_merge_activation",
             "layer_sizes",
             "dense_layer_l1_regularization",
-            "dense_layer_l2_regularization", 
+            "dense_layer_l2_regularization",
             "activation",
             "init",
             "output_activation",
@@ -84,7 +84,7 @@ class TorchNeuralNetwork(nn.Module):
         }
 
         filtered = {}
-        for (k, v) in renamed.items():
+        for k, v in renamed.items():
             if k in ALLOWED_KEYS:
                 filtered[k] = v
 
@@ -166,7 +166,7 @@ class TorchNeuralNetwork(nn.Module):
                     result[new_name] = val
 
         # We keep all hyperparameters to maintain compatibility with Keras models
-                
+
         return result
 
     def _get_hyperparameter_defaults(self):
@@ -550,7 +550,7 @@ class TorchNeuralNetwork(nn.Module):
         return to_numpy(final_outputs)
 
 
-class Class1AffinityPredictor(object):
+class TorchClass1AffinityPredictor(object):
     """
     PyTorch implementation of Class1AffinityPredictor.
     """
@@ -593,8 +593,9 @@ class Class1AffinityPredictor(object):
         assert isinstance(self.class1_pan_allele_models, list)
 
         self.provenance_string = provenance_string
-        
+
         import torch
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     @property
@@ -618,7 +619,7 @@ class Class1AffinityPredictor(object):
 
         Returns
         -------
-        Class1AffinityPredictor
+        TorchClass1AffinityPredictor
             Initialized predictor with loaded weights
         """
         # Load manifest if available

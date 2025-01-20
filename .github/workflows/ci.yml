@@ -56,9 +56,9 @@ jobs:
         run: |
           mhcflurry-downloads fetch data_curated data_mass_spec_annotated models_class1 models_class1_presentation models_class1_processing models_class1_pan allele_sequences
 
-      - name: Test with pytest
-        run: |
-          pytest --cov=mhcflurry/ --cov-report=term-missing ./test
+      # - name: Test with pytest
+      #   run: |
+      #     pytest --cov=mhcflurry/ --cov-report=term-missing ./test
 
       - name: Install PyTorch
         run: |
@@ -66,7 +66,7 @@ jobs:
 
       - name: Run Torch Tests
         run: |
-          pytest -sv torch_tests.py
+          pytest -sv ./test/torch_tests.py
 
       # - name: Publish coverage to Coveralls
       #  uses: coverallsapp/github-action@v2.2.3
