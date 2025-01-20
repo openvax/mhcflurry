@@ -1,4 +1,4 @@
-'''
+"""
 Run MHCflurry predictor on specified peptides.
 
 By default, the presentation predictor is used, and predictions for
@@ -36,7 +36,8 @@ $ mhcflurry-predict --peptides SIINFEKL DENDREKLLL \
 
 will give the tightest predicted affinities across alleles for each of the two
 genotypes specified for each peptide.
-'''
+"""
+
 from __future__ import (
     print_function,
     division,
@@ -49,7 +50,7 @@ import itertools
 import logging
 import os
 
-import pandas
+import pandas as pd
 
 from .downloads import get_default_class1_presentation_models_dir
 from .class1_affinity_predictor import Class1AffinityPredictor
@@ -58,28 +59,22 @@ from .version import __version__
 
 
 parser = argparse.ArgumentParser(
-    description=__doc__,
-    formatter_class=argparse.RawDescriptionHelpFormatter,
-    add_help=False)
-
+    description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter, add_help=False
+)
 
 helper_args = parser.add_argument_group(title="Help")
-helper_args.add_argument(
-    "-h", "--help",
-    action="help",
-    help="Show this help message and exit"
-)
+helper_args.add_argument("-h", "--help", action="help", help="Show this help message and exit")
 helper_args.add_argument(
     "--list-supported-alleles",
     action="store_true",
     default=False,
-    help="Prints the list of supported alleles and exits"
+    help="Prints the list of supported alleles and exits",
 )
 helper_args.add_argument(
     "--list-supported-peptide-lengths",
     action="store_true",
     default=False,
-    help="Prints the list of supported peptide lengths and exits"
+    help="Prints the list of supported peptide lengths and exits",
 )
 helper_args.add_argument(
     "--version",
@@ -88,75 +83,61 @@ helper_args.add_argument(
 )
 
 input_args = parser.add_argument_group(title="Input (required)")
+input_args.add_argument("input", metavar="INPUT.csv", nargs="?", help="Input CSV")
 input_args.add_argument(
-    "input",
-    metavar="INPUT.csv",
-    nargs="?",
-    help="Input CSV")
+    "--alleles", metavar="ALLELE", nargs="+", help="Alleles to predict (exclusive with passing an input CSV)"
+)
 input_args.add_argument(
-    "--alleles",
-    metavar="ALLELE",
-    nargs="+",
-    help="Alleles to predict (exclusive with passing an input CSV)")
-input_args.add_argument(
-    "--peptides",
-    metavar="PEPTIDE",
-    nargs="+",
-    help="Peptides to predict (exclusive with passing an input CSV)")
+    "--peptides", metavar="PEPTIDE", nargs="+", help="Peptides to predict (exclusive with passing an input CSV)"
+)
 
 input_mod_args = parser.add_argument_group(title="Input options")
 input_mod_args.add_argument(
-    "--allele-column",
-    metavar="NAME",
-    default="allele",
-    help="Input column name for alleles. Default: '%(default)s'")
+    "--allele-column", metavar="NAME", default="allele", help="Input column name for alleles. Default: '%(default)s'"
+)
 input_mod_args.add_argument(
-    "--peptide-column",
-    metavar="NAME",
-    default="peptide",
-    help="Input column name for peptides. Default: '%(default)s'")
+    "--peptide-column", metavar="NAME", default="peptide", help="Input column name for peptides. Default: '%(default)s'"
+)
 input_mod_args.add_argument(
     "--n-flank-column",
     metavar="NAME",
     default="n_flank",
-    help="Column giving N-terminal flanking sequence. Default: '%(default)s'")
+    help="Column giving N-terminal flanking sequence. Default: '%(default)s'",
+)
 input_mod_args.add_argument(
     "--c-flank-column",
     metavar="NAME",
     default="c_flank",
-    help="Column giving C-terminal flanking sequence. Default: '%(default)s'")
+    help="Column giving C-terminal flanking sequence. Default: '%(default)s'",
+)
 input_mod_args.add_argument(
     "--no-throw",
     action="store_true",
     default=False,
-    help="Return NaNs for unsupported alleles or peptides instead of raising")
+    help="Return NaNs for unsupported alleles or peptides instead of raising",
+)
 
 output_args = parser.add_argument_group(title="Output options")
-output_args.add_argument(
-    "--out",
-    metavar="OUTPUT.csv",
-    help="Output CSV")
+output_args.add_argument("--out", metavar="OUTPUT.csv", help="Output CSV")
 output_args.add_argument(
     "--prediction-column-prefix",
     metavar="NAME",
     default="mhcflurry_",
-    help="Prefix for output column names. Default: '%(default)s'")
+    help="Prefix for output column names. Default: '%(default)s'",
+)
 output_args.add_argument(
-    "--output-delimiter",
-    metavar="CHAR",
-    default=",",
-    help="Delimiter character for results. Default: '%(default)s'")
+    "--output-delimiter", metavar="CHAR", default=",", help="Delimiter character for results. Default: '%(default)s'"
+)
 output_args.add_argument(
-    "--no-affinity-percentile",
-    default=False,
-    action="store_true",
-    help="Do not include affinity percentile rank")
+    "--no-affinity-percentile", default=False, action="store_true", help="Do not include affinity percentile rank"
+)
 output_args.add_argument(
     "--always-include-best-allele",
     default=False,
     action="store_true",
     help="Always include the best_allele column even when it is identical "
-    "to the allele column (i.e. all queries are monoallelic).")
+    "to the allele column (i.e. all queries are monoallelic).",
+)
 
 model_args = parser.add_argument_group(title="Model options")
 model_args.add_argument(
@@ -165,22 +146,30 @@ model_args.add_argument(
     default=None,
     help="Directory containing models. Either a binding affinity predictor or "
     "a presentation predictor can be used. "
-    "Default: %s" % get_default_class1_presentation_models_dir(
-        test_exists=False))
+    "Default: %s" % get_default_class1_presentation_models_dir(test_exists=False),
+)
 model_args.add_argument(
     "--affinity-only",
     action="store_true",
     default=False,
-    help="Affinity prediction only (no antigen processing or presentation)")
+    help="Affinity prediction only (no antigen processing or presentation)",
+)
+model_args.add_argument(
+    "--backend",
+    choices=["tensorflow", "pytorch"],
+    default="tensorflow",
+    help="Deep learning backend to use for predictions",
+)
 model_args.add_argument(
     "--no-flanking",
     action="store_true",
     default=False,
-    help="Do not use flanking sequence information even when available")
+    help="Do not use flanking sequence information even when available",
+)
 
 
 def run(argv=sys.argv[1:]):
-    logging.getLogger('tensorflow').disabled = True
+    logging.getLogger("tensorflow").disabled = True
 
     if not argv:
         parser.print_help()
@@ -199,19 +188,39 @@ def run(argv=sys.argv[1:]):
         # message instructing them to download the models if needed.
         models_dir = get_default_class1_presentation_models_dir(test_exists=True)
 
-    if os.path.exists(os.path.join(models_dir, "weights.csv")):
-        # Using a presentation predictor.
-        predictor = Class1PresentationPredictor.load(models_dir)
+    if args.backend == "pytorch":
+        from mhcflurry.torch_implementations import TorchClass1AffinityPredictor
+        from mhcflurry.torch_presentation_predictor import TorchPresentationPredictor
+
+        if os.path.exists(os.path.join(models_dir, "weights.csv")):
+            # Using a presentation predictor
+            print("Using torch TorchPresentationPredictor")
+            predictor = TorchPresentationPredictor.load(models_dir)
+        else:
+            # Using just an affinity predictor
+            print("Using torch TorchClass1AffinityPredictor")
+            affinity_predictor = TorchClass1AffinityPredictor.load(models_dir)
+            predictor = TorchPresentationPredictor(affinity_predictor=affinity_predictor)
+            if not args.affinity_only:
+                logging.warning(
+                    "Specified models are an affinity predictor, which implies "
+                    "--affinity-only. Specify this argument to silence this warning."
+                )
+                args.affinity_only = True
     else:
-        # Using just an affinity predictor.
-        affinity_predictor = Class1AffinityPredictor.load(models_dir)
-        predictor = Class1PresentationPredictor(
-            affinity_predictor=affinity_predictor)
-        if not args.affinity_only:
-            logging.warning(
-                "Specified models are an affinity predictor, which implies "
-                "--affinity-only. Specify this argument to silence this warning.")
-            args.affinity_only = True
+        if os.path.exists(os.path.join(models_dir, "weights.csv")):
+            # Using a presentation predictor.
+            predictor = Class1PresentationPredictor.load(models_dir)
+        else:
+            # Using just an affinity predictor.
+            affinity_predictor = Class1AffinityPredictor.load(models_dir)
+            predictor = Class1PresentationPredictor(affinity_predictor=affinity_predictor)
+            if not args.affinity_only:
+                logging.warning(
+                    "Specified models are an affinity predictor, which implies "
+                    "--affinity-only. Specify this argument to silence this warning."
+                )
+                args.affinity_only = True
 
     if args.list_supported_alleles:
         print("\n".join(predictor.supported_alleles))
@@ -219,42 +228,40 @@ def run(argv=sys.argv[1:]):
 
     if args.list_supported_peptide_lengths:
         min_len, max_len = predictor.supported_peptide_lengths
-        print("\n".join([str(l) for l in range(min_len, max_len+1)]))
+        print("\n".join([str(l) for l in range(min_len, max_len + 1)]))
         return
 
     if args.input:
         if args.alleles or args.peptides:
-            parser.error(
-                "If an input file is specified, do not specify --alleles "
-                "or --peptides")
-        df = pandas.read_csv(args.input)
-        print("Read input CSV with %d rows, columns are: %s" % (
-            len(df), ", ".join(df.columns)))
+            parser.error("If an input file is specified, do not specify --alleles " "or --peptides")
+        df = pd.read_csv(args.input)
+        print("Read input CSV with %d rows, columns are: %s" % (len(df), ", ".join(df.columns)))
         for col in [args.allele_column, args.peptide_column]:
             if col not in df.columns:
                 raise ValueError(
-                    "No such column '%s' in CSV. Columns are: %s" % (
-                        col, ", ".join(["'%s'" % c for c in df.columns])))
+                    "No such column '%s' in CSV. Columns are: %s" % (col, ", ".join(["'%s'" % c for c in df.columns]))
+                )
     else:
         if not args.alleles or not args.peptides:
-            parser.error(
-                "Specify either an input CSV file or both the "
-                "--alleles and --peptides arguments")
+            parser.error("Specify either an input CSV file or both the " "--alleles and --peptides arguments")
 
         pairs = list(itertools.product(args.alleles, args.peptides))
-        df = pandas.DataFrame({
-            "allele": [p[0] for p in pairs],
-            "peptide": [p[1] for p in pairs],
-        })
+        df = pd.DataFrame(
+            {
+                "allele": [p[0] for p in pairs],
+                "peptide": [p[1] for p in pairs],
+            }
+        )
         logging.info(
-            "Predicting for %d alleles and %d peptides = %d predictions" % (
-                len(args.alleles), len(args.peptides), len(df)))
+            "Predicting for %d alleles and %d peptides = %d predictions"
+            % (len(args.alleles), len(args.peptides), len(df))
+        )
 
     allele_string_to_alleles = (
-        df.drop_duplicates(args.allele_column).set_index(
-            args.allele_column, drop=False)[
-                args.allele_column
-        ].str.split(r"[,\s]+")).to_dict()
+        df.drop_duplicates(args.allele_column)
+        .set_index(args.allele_column, drop=False)[args.allele_column]
+        .str.split(r"[,\s]+")
+    ).to_dict()
 
     if args.affinity_only:
         predictions = predictor.predict_affinity(
@@ -262,7 +269,8 @@ def run(argv=sys.argv[1:]):
             alleles=allele_string_to_alleles,
             sample_names=df[args.allele_column],
             throw=not args.no_throw,
-            include_affinity_percentile=not args.no_affinity_percentile)
+            include_affinity_percentile=not args.no_affinity_percentile,
+        )
     else:
         n_flanks = None
         c_flanks = None
@@ -271,9 +279,7 @@ def run(argv=sys.argv[1:]):
                 n_flanks = df[args.n_flank_column]
                 c_flanks = df[args.c_flank_column]
             else:
-                logging.warning(
-                    "No flanking information provided. Specify --no-flanking "
-                    "to silence this warning")
+                logging.warning("No flanking information provided. Specify --no-flanking " "to silence this warning")
 
         predictions = predictor.predict(
             peptides=df[args.peptide_column].values,
@@ -282,7 +288,8 @@ def run(argv=sys.argv[1:]):
             alleles=allele_string_to_alleles,
             sample_names=df[args.allele_column],
             throw=not args.no_throw,
-            include_affinity_percentile=not args.no_affinity_percentile)
+            include_affinity_percentile=not args.no_affinity_percentile,
+        )
 
     # If each query is just for a single allele, the "best_allele" column
     # is redundant so we remove it.
