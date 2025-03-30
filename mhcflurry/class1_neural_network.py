@@ -799,7 +799,7 @@ class Class1NeuralNetwork(object):
             )
         num_random_negatives = random_negatives_planner.get_total_count()
 
-        y_values = from_ic50(numpy.array(affinities, copy=False))
+        y_values = from_ic50(numpy.asarray(affinities))
         assert numpy.isnan(y_values).sum() == 0, y_values
         if inequalities is not None:
             # Reverse inequalities because from_ic50() flips the direction
@@ -845,11 +845,11 @@ class Class1NeuralNetwork(object):
                 shuffle_permutation
             ]
         if sample_weights is not None:
-            sample_weights = numpy.array(sample_weights, copy=False)[
+            sample_weights = numpy.asarray(sample_weights)[
                 shuffle_permutation
             ]
         if output_indices is not None:
-            output_indices = numpy.array(output_indices, copy=False)[
+            output_indices = numpy.asarray(output_indices)[
                 shuffle_permutation
             ]
 

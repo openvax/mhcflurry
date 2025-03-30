@@ -181,7 +181,7 @@ class Class1PresentationPredictor(object):
         pandas.DataFrame : predictions
         """
         df = pandas.DataFrame({
-            "peptide": numpy.array(peptides, copy=False),
+            "peptide": numpy.asarray(peptides),
         })
         df["peptide_num"] = df.index
         if sample_names is None:
@@ -222,7 +222,7 @@ class Class1PresentationPredictor(object):
 
             result_df = pandas.concat(dfs, ignore_index=True)
         else:
-            df["sample_name"] = numpy.array(sample_names, copy=False)
+            df["sample_name"] = numpy.asarray(sample_names)
 
             iterator = df.groupby("sample_name")
             if verbose > 0:
@@ -348,7 +348,7 @@ class Class1PresentationPredictor(object):
             sample_names=sample_names,
             verbose=verbose)
         df["affinity_score"] = from_ic50(df.affinity)
-        df["target"] = numpy.array(targets, copy=False)
+        df["target"] = numpy.asarray(targets)
 
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
@@ -511,7 +511,7 @@ class Class1PresentationPredictor(object):
                 raise ValueError(
                     "alleles must be a dict when sample_names is specified")
 
-            alleles = numpy.array(alleles, copy=False)
+            alleles = numpy.asarray(alleles)
             if len(alleles) > MAX_ALLELES_PER_SAMPLE:
                 raise ValueError(
                     "When alleles is a list, it must have at most %d elements. "

@@ -115,13 +115,13 @@ def mse(
         actual = from_ic50(actual)
 
     deviations = (
-        numpy.array(predictions, copy=False) - numpy.array(actual, copy=False))
+        numpy.asarray(predictions) - numpy.asarray(actual))
 
     if inequalities is not None:
         # Must reverse meaning of inequality since we are working with
         # transformed 0-1 values, which are anti-correlated with the ic50s.
         # The measurement_inequality column is given in terms of ic50s.
-        inequalities = numpy.array(inequalities, copy=False)
+        inequalities = numpy.asarray(inequalities)
         deviations[
             ((inequalities == "<") & (deviations > 0)) | (
              (inequalities == ">") & (deviations < 0))
