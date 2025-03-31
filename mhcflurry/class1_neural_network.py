@@ -1385,7 +1385,7 @@ class Class1NeuralNetwork(object):
             allele_layer = Embedding(
                 name="allele_representation",
                 input_dim=allele_representations.shape[0],
-                output_dim=numpy.product(allele_representations.shape[1:], dtype=int),
+                output_dim=numpy.prod(allele_representations.shape[1:], dtype=int),
                 input_length=1,
                 trainable=False,
             )(allele_input)
@@ -1504,7 +1504,7 @@ class Class1NeuralNetwork(object):
         reshaped = allele_representations.reshape(
             (
                 allele_representations.shape[0],
-                numpy.product(allele_representations.shape[1:]),
+                numpy.prod(allele_representations.shape[1:]),
             )
         )
         original_model = self.network()
