@@ -42,10 +42,12 @@ from __future__ import (
 )
 
 import sys
+import pandas as pd
+import os
 import argparse
 import logging
 
-import pandas
+import pandas as pd
 
 from .downloads import get_default_class1_presentation_models_dir
 from .class1_presentation_predictor import Class1PresentationPredictor
@@ -183,6 +185,11 @@ model_args.add_argument(
     "Default: %s" % get_default_class1_presentation_models_dir(
         test_exists=False))
 model_args.add_argument(
+    "--backend",
+    choices=["tensorflow", "pytorch"],
+    default="tensorflow",
+    help="Deep learning backend to use for predictions")
+model_args.add_argument(
     "--no-flanking",
     action="store_true",
     default=False,
@@ -239,7 +246,18 @@ def run(argv=sys.argv[1:]):
         # message instructing them to download the models if needed.
         models_dir = get_default_class1_presentation_models_dir(test_exists=True)
 
-    predictor = Class1PresentationPredictor.load(models_dir)
+    if args.backend == "pytorch":
+        from mhcflurry.torch_implementations import Class1AffinityPredictor as TorchPredictor
+        print("Using torch")
+        if os.path.exists(os.path.join(models_dir, "weights.csv")):
+            # Using a presentation predictor.
+            predictor = Class1PresentationPredictor.load(models_dir)
+        else:
+            # Using just an affinity predictor.
+            affinity_predictor = TorchPredictor.load(models_dir)
+            predictor = Class1PresentationPredictor(affinity_predictor=affinity_predictor)
+    else:
+        predictor = Class1PresentationPredictor.load(models_dir)
 
     if args.list_supported_alleles:
         print("\n".join(predictor.supported_alleles))
@@ -273,7 +291,7 @@ def run(argv=sys.argv[1:]):
             print("Guessed input file format:", input_format)
 
         if input_format == "csv":
-            df = pandas.read_csv(args.input)
+            df = pd.read_csv(args.input)
             print("Read input CSV with %d rows, columns are: %s" % (
                 len(df), ", ".join(df.columns)))
             for col in [args.sequence_column,]:
@@ -293,7 +311,7 @@ def run(argv=sys.argv[1:]):
             parser.error(
                 "Specify either an input file or the --sequences argument")
 
-        df = pandas.DataFrame({
+        df = pd.DataFrame({
             args.sequence_column: args.sequences,
         })
 
@@ -303,7 +321,7 @@ def run(argv=sys.argv[1:]):
     df = df.set_index(args.sequence_id_column)
 
     if args.alleles:
-        genotypes = pandas.Series(args.alleles).str.split(r"[,\s]+")
+        genotypes = pd.Series(args.alleles).str.split(r"[,\s]+")
         genotypes.index = genotypes.index.map(lambda i: "genotype_%02d" % i)
         alleles = genotypes.to_dict()
     else:

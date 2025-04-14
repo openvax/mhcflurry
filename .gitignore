@@ -75,3 +75,5 @@ target/
 
 # OS X extra files
 .DS_Store
+.aider*
+.env
