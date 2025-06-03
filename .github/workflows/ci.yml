@@ -60,6 +60,14 @@ jobs:
         run: |
           pytest --cov=mhcflurry/ --cov-report=term-missing ./test
 
+      - name: Install PyTorch
+        run: |
+          pip install torch
+
+      - name: Run Torch Tests
+        run: |
+          pytest -sv ./test/torch_tests.py
+
       # - name: Publish coverage to Coveralls
       #  uses: coverallsapp/github-action@v2.2.3
       #  with:
