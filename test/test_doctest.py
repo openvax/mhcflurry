@@ -23,8 +23,8 @@ def test_doctests():
     original_precision = pandas.get_option('display.precision')
     pandas.set_option('display.precision', 3)
 
-    results1 = doctest.testmod(mhcflurry)
-    results2 = doctest.testmod(mhcflurry.class1_presentation_predictor)
+    doctest.testmod(mhcflurry)
+    doctest.testmod(mhcflurry.class1_presentation_predictor)
 
     # Disabling for now until we figure out how to deal with numerical precision
     # for predictions.

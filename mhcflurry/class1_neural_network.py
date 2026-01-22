@@ -1,3 +1,7 @@
+"""
+Class1NeuralNetwork - PyTorch implementation for MHC class I binding prediction.
+"""
+
 import gc
 import time
 import collections
@@ -6,18 +10,19 @@ import weakref
 import itertools
 import os
 import logging
-import random
-import math
 
 import numpy
 import pandas
+import torch
+import torch.nn as nn
 
 from .hyperparameters import HyperparameterDefaults
 from .encodable_sequences import EncodableSequences, EncodingError
 from .allele_encoding import AlleleEncoding
 from .regression_target import to_ic50, from_ic50
-from .common import configure_tensorflow
-from .custom_loss import get_loss
+from .common import configure_pytorch, get_pytorch_device
+from .pytorch_layers import LocallyConnected1D, get_activation
+from .pytorch_losses import get_pytorch_loss
 from .data_dependent_weights_initialization import lsuv_init
 from .random_negative_peptides import RandomNegativePeptides
 
@@ -28,6 +33,452 @@ if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
     logging.info(
         "Configured default predict batch size: %d" % DEFAULT_PREDICT_BATCH_SIZE
     )
+
+
+class Class1NeuralNetworkModel(nn.Module):
+    """
+    PyTorch module for Class1 neural network.
+    """
+
+    def __init__(
+            self,
+            peptide_encoding_shape,
+            allele_representations=None,
+            locally_connected_layers=None,
+            peptide_dense_layer_sizes=None,
+            allele_dense_layer_sizes=None,
+            layer_sizes=None,
+            peptide_allele_merge_method="multiply",
+            peptide_allele_merge_activation="",
+            activation="tanh",
+            output_activation="sigmoid",
+            dropout_probability=0.0,
+            batch_normalization=False,
+            dense_layer_l1_regularization=0.001,
+            dense_layer_l2_regularization=0.0,
+            topology="feedforward",
+            num_outputs=1,
+            init="glorot_uniform"):
+        super(Class1NeuralNetworkModel, self).__init__()
+
+        self.peptide_encoding_shape = peptide_encoding_shape
+        self.has_allele = allele_representations is not None
+        self.peptide_allele_merge_method = peptide_allele_merge_method
+        self.peptide_allele_merge_activation = peptide_allele_merge_activation
+        self.dropout_probability = dropout_probability
+        self.topology = topology
+        self.num_outputs = num_outputs
+        self.activation_name = activation
+        self.output_activation_name = output_activation
+
+        if locally_connected_layers is None:
+            locally_connected_layers = []
+        if peptide_dense_layer_sizes is None:
+            peptide_dense_layer_sizes = []
+        if allele_dense_layer_sizes is None:
+            allele_dense_layer_sizes = []
+        if layer_sizes is None:
+            layer_sizes = [32]
+
+        # Build locally connected layers
+        self.lc_layers = nn.ModuleList()
+        input_length = peptide_encoding_shape[0]
+        in_channels = peptide_encoding_shape[1]
+
+        for i, lc_params in enumerate(locally_connected_layers):
+            filters = lc_params.get('filters', 8)
+            kernel_size = lc_params.get('kernel_size', 3)
+            lc_activation = lc_params.get('activation', 'tanh')
+
+            lc_layer = LocallyConnected1D(
+                in_channels=in_channels,
+                out_channels=filters,
+                input_length=input_length,
+                kernel_size=kernel_size,
+                activation=lc_activation
+            )
+            self.lc_layers.append(lc_layer)
+            in_channels = filters
+            input_length = lc_layer.output_length
+
+        # Flattened size after locally connected layers
+        self.flatten_size = input_length * in_channels
+
+        # Peptide dense layers
+        self.peptide_dense_layers = nn.ModuleList()
+        peptide_layer_input = self.flatten_size
+        for i, size in enumerate(peptide_dense_layer_sizes):
+            layer = nn.Linear(peptide_layer_input, size)
+            self.peptide_dense_layers.append(layer)
+            peptide_layer_input = size
+
+        # Batch normalization after peptide processing (early)
+        self.batch_norm_early = None
+        if batch_normalization:
+            self.batch_norm_early = nn.BatchNorm1d(peptide_layer_input)
+
+        # Allele embedding and processing
+        self.allele_embedding = None
+        self.allele_dense_layers = nn.ModuleList()
+        allele_output_size = 0
+
+        if self.has_allele:
+            num_alleles = allele_representations.shape[0]
+            embedding_dim = numpy.prod(allele_representations.shape[1:])
+
+            self.allele_embedding = nn.Embedding(
+                num_embeddings=num_alleles,
+                embedding_dim=embedding_dim
+            )
+            # Set embedding weights and freeze
+            self.allele_embedding.weight.data = torch.from_numpy(
+                allele_representations.reshape(num_alleles, -1).astype(numpy.float32)
+            )
+            self.allele_embedding.weight.requires_grad = False
+
+            allele_layer_input = embedding_dim
+            for i, size in enumerate(allele_dense_layer_sizes):
+                layer = nn.Linear(allele_layer_input, size)
+                self.allele_dense_layers.append(layer)
+                allele_layer_input = size
+            allele_output_size = allele_layer_input
+
+        # Compute merged size
+        if self.has_allele:
+            if peptide_allele_merge_method == "concatenate":
+                merged_size = peptide_layer_input + allele_output_size
+            elif peptide_allele_merge_method == "multiply":
+                # Both must have the same size for multiply
+                merged_size = peptide_layer_input
+            else:
+                raise ValueError(f"Unknown merge method: {peptide_allele_merge_method}")
+        else:
+            merged_size = peptide_layer_input
+
+        # Merge activation
+        self.merge_activation = get_activation(peptide_allele_merge_activation)
+
+        # Main dense layers
+        self.dense_layers = nn.ModuleList()
+        self.batch_norms = nn.ModuleList()
+        self.dropouts = nn.ModuleList()
+
+        # For DenseNet topology, track input sizes for skip connections
+        self.merged_size = merged_size
+        current_size = merged_size
+        prev_sizes = []  # Track previous layer output sizes for skip connections
+
+        for i, size in enumerate(layer_sizes):
+            # For DenseNet topology (with-skip-connections):
+            # - Layer 0: input = merged_size
+            # - Layer 1: input = merged_size + layer_sizes[0] (skip from input)
+            # - Layer 2+: input = layer_sizes[i-2] + layer_sizes[i-1] (skip from 2 layers back)
+            if topology == "with-skip-connections" and i > 0:
+                if i == 1:
+                    # Skip from original merged input
+                    current_size = merged_size + prev_sizes[-1]
+                else:
+                    # Skip from 2 layers back
+                    current_size = prev_sizes[-2] + prev_sizes[-1]
+
+            layer = nn.Linear(current_size, size)
+            self.dense_layers.append(layer)
+
+            if batch_normalization:
+                self.batch_norms.append(nn.BatchNorm1d(size))
+            else:
+                self.batch_norms.append(None)
+
+            if dropout_probability > 0:
+                # Note: Keras uses "rate" which is keep probability
+                # PyTorch uses p which is drop probability
+                self.dropouts.append(nn.Dropout(p=dropout_probability))
+            else:
+                self.dropouts.append(None)
+
+            prev_sizes.append(size)
+            current_size = size
+
+        # Note: For DenseNet topology, output layer receives only the last hidden layer output
+        # (skip connections are only between hidden layers, not to the output layer)
+
+        # Output layer
+        self.output_layer = nn.Linear(current_size, num_outputs)
+
+        # Activation functions
+        self.activation = get_activation(activation)
+        self.output_activation = get_activation(output_activation)
+
+        # Initialize weights
+        self._initialize_weights(init)
+
+    def _initialize_weights(self, init):
+        """Initialize layer weights."""
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                if init == "glorot_uniform":
+                    nn.init.xavier_uniform_(module.weight)
+                elif init == "glorot_normal":
+                    nn.init.xavier_normal_(module.weight)
+                elif init == "he_uniform":
+                    nn.init.kaiming_uniform_(module.weight)
+                elif init == "he_normal":
+                    nn.init.kaiming_normal_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
+    def forward(self, inputs):
+        """
+        Forward pass.
+
+        Parameters
+        ----------
+        inputs : dict
+            Dictionary with 'peptide' and optionally 'allele' keys
+
+        Returns
+        -------
+        torch.Tensor
+            Predictions of shape (batch, num_outputs)
+        """
+        peptide = inputs['peptide']
+
+        # Locally connected layers
+        x = peptide
+        for lc_layer in self.lc_layers:
+            x = lc_layer(x)
+
+        # Flatten
+        x = x.reshape(x.size(0), -1)
+
+        # Peptide dense layers
+        for layer in self.peptide_dense_layers:
+            x = layer(x)
+            if self.activation is not None:
+                x = self.activation(x)
+
+        # Early batch normalization
+        if self.batch_norm_early is not None:
+            x = self.batch_norm_early(x)
+
+        # Allele processing and merge
+        if self.has_allele and 'allele' in inputs:
+            allele_idx = inputs['allele'].long()
+            # Handle case where input might be (batch,) or (batch, 1)
+            if allele_idx.dim() > 1:
+                allele_idx = allele_idx.squeeze(-1)
+            allele_embed = self.allele_embedding(allele_idx)
+
+            # Allele dense layers
+            for layer in self.allele_dense_layers:
+                allele_embed = layer(allele_embed)
+                if self.activation is not None:
+                    allele_embed = self.activation(allele_embed)
+
+            # Flatten allele embedding
+            allele_embed = allele_embed.reshape(allele_embed.size(0), -1)
+
+            # Merge
+            if self.peptide_allele_merge_method == "concatenate":
+                x = torch.cat([x, allele_embed], dim=-1)
+            elif self.peptide_allele_merge_method == "multiply":
+                x = x * allele_embed
+
+            # Merge activation
+            if self.merge_activation is not None:
+                x = self.merge_activation(x)
+
+        # Main dense layers (with optional skip connections for DenseNet topology)
+        prev_outputs = []  # Track outputs for skip connections
+        merged_input = x  # Save for DenseNet skip connections
+
+        for i, layer in enumerate(self.dense_layers):
+            # For DenseNet topology, concatenate skip connections
+            if self.topology == "with-skip-connections" and i > 0:
+                if i == 1:
+                    # Skip from original merged input
+                    x = torch.cat([merged_input, prev_outputs[-1]], dim=-1)
+                else:
+                    # Skip from 2 layers back
+                    x = torch.cat([prev_outputs[-2], prev_outputs[-1]], dim=-1)
+
+            x = layer(x)
+            if self.activation is not None:
+                x = self.activation(x)
+            if self.batch_norms[i] is not None:
+                x = self.batch_norms[i](x)
+            if self.dropouts[i] is not None:
+                x = self.dropouts[i](x)
+
+            prev_outputs.append(x)
+
+        # Note: For DenseNet topology, output layer receives only the last hidden layer output
+        # (skip connections are only between hidden layers, not to the output layer)
+
+        # Output
+        output = self.output_layer(x)
+        if self.output_activation is not None:
+            output = self.output_activation(output)
+
+        return output
+
+    def get_weights_list(self):
+        """
+        Get weights as a list of numpy arrays (for compatibility with NPZ format).
+
+        Returns
+        -------
+        list of numpy.ndarray
+        """
+        weights = []
+        for name, param in self.named_parameters():
+            weights.append(param.detach().cpu().numpy())
+        # Also include buffers (running mean/var for batch norm)
+        for name, buffer in self.named_buffers():
+            weights.append(buffer.detach().cpu().numpy())
+        return weights
+
+    def set_weights_list(self, weights, auto_convert_keras=True):
+        """
+        Set weights from a list of numpy arrays.
+
+        Supports automatic detection and conversion of Keras-format weights
+        to PyTorch format for backward compatibility with pre-trained models.
+
+        Parameters
+        ----------
+        weights : list of numpy.ndarray
+        auto_convert_keras : bool
+            If True, automatically detect and convert Keras-format weights
+        """
+        idx = 0
+
+        # Check for keras metadata to know if we need to skip embedding weights
+        keras_metadata = getattr(self, '_keras_metadata', None)
+        skip_keras_embedding = False
+        if keras_metadata and keras_metadata.get('skip_embedding_weights', False):
+            skip_keras_embedding = True
+
+        for name, param in self.named_parameters():
+            # Skip allele_embedding when loading Keras weights with placeholder
+            if skip_keras_embedding and 'allele_embedding' in name:
+                # Also skip the corresponding placeholder weight in the weights list
+                # Placeholder embeddings have shape (0, embed_dim)
+                while idx < len(weights) and len(weights[idx].shape) == 2 and weights[idx].shape[0] == 0:
+                    idx += 1
+                continue
+            w = weights[idx].astype(numpy.float32)
+
+            # Skip allele_embedding if shapes don't match (pan-allele models)
+            # The embedding will be set by set_allele_representations later
+            if 'allele_embedding' in name and w.shape != param.shape:
+                # Advance index past this weight
+                idx += 1
+                continue
+
+            # Auto-detect and convert Keras weights if shapes don't match
+            if auto_convert_keras and w.shape != param.shape:
+                # Dense/Linear layer: Keras (in, out) -> PyTorch (out, in)
+                if len(w.shape) == 2 and w.shape == param.shape[::-1]:
+                    w = w.T
+                # LocallyConnected1D weight: Keras (out_len, 1, k, in_ch, out_ch)
+                # -> PyTorch (out_len, out_ch, in_ch * k)
+                elif len(w.shape) == 5 and w.shape[1] == 1:
+                    out_len, _, k, in_ch, out_ch = w.shape
+                    w = w.squeeze(1)  # (out_len, k, in_ch, out_ch)
+                    w = w.reshape(out_len, k * in_ch, out_ch)
+                    w = w.transpose(0, 2, 1)  # (out_len, out_ch, k * in_ch)
+                # LocallyConnected1D weight (3D): Keras (out_len, k*in_ch, out_ch)
+                # -> PyTorch (out_len, out_ch, in_ch*k)
+                # Note: Keras stores kernel_positions as outer loop, channels as inner
+                # PyTorch unfold produces channels as outer loop, kernel_positions as inner
+                elif len(w.shape) == 3 and w.shape[0] == param.shape[0] and \
+                        w.shape[1] == param.shape[2] and w.shape[2] == param.shape[1]:
+                    # Get kernel_size from the layer if available
+                    layer_idx = int(name.split('.')[1]) if 'lc_layers' in name else None
+                    if layer_idx is not None and hasattr(self, 'lc_layers') and layer_idx < len(self.lc_layers):
+                        kernel_size = self.lc_layers[layer_idx].kernel_size
+                        out_len = w.shape[0]
+                        k_times_in_ch = w.shape[1]
+                        out_ch = w.shape[2]
+                        in_ch = k_times_in_ch // kernel_size
+                        # Reshape to (out_len, k, in_ch, out_ch)
+                        w = w.reshape(out_len, kernel_size, in_ch, out_ch)
+                        # Permute to (out_len, in_ch, k, out_ch)
+                        w = w.transpose(0, 2, 1, 3)
+                        # Reshape to (out_len, in_ch*k, out_ch)
+                        w = w.reshape(out_len, in_ch * kernel_size, out_ch)
+                    # Final transpose to PyTorch format (out_len, out_ch, in_ch*k)
+                    w = w.transpose(0, 2, 1)
+                # LocallyConnected1D bias: Keras (out_len * out_ch,) -> PyTorch (out_len, out_ch)
+                elif len(w.shape) == 1 and len(param.shape) == 2 and \
+                        w.shape[0] == param.shape[0] * param.shape[1]:
+                    w = w.reshape(param.shape)
+
+            if w.shape != param.shape:
+                raise ValueError(
+                    f"Weight shape mismatch for {name}: "
+                    f"got {weights[idx].shape}, expected {param.shape}"
+                )
+
+            param.data = torch.from_numpy(w)
+            idx += 1
+        for name, buffer in self.named_buffers():
+            self._buffers[name] = torch.from_numpy(weights[idx].astype(numpy.float32))
+            idx += 1
+
+    def to_json(self):
+        """
+        Serialize model configuration to JSON string.
+
+        Returns
+        -------
+        str
+            JSON representation of model configuration
+        """
+        import json
+
+        # Extract layer configurations
+        lc_layers_config = []
+        for lc_layer in self.lc_layers:
+            lc_layers_config.append({
+                'in_channels': lc_layer.in_channels,
+                'out_channels': lc_layer.out_channels,
+                'kernel_size': lc_layer.kernel_size,
+                'input_length': lc_layer.input_length,
+                'output_length': lc_layer.output_length,
+                'activation': lc_layer.activation_name,
+            })
+
+        peptide_dense_sizes = [
+            layer.out_features for layer in self.peptide_dense_layers
+        ]
+        allele_dense_sizes = [
+            layer.out_features for layer in self.allele_dense_layers
+        ]
+        layer_sizes = [
+            layer.out_features for layer in self.dense_layers
+        ]
+
+        config = {
+            'class': 'Class1NeuralNetworkModel',
+            'peptide_encoding_shape': list(self.peptide_encoding_shape),
+            'has_allele': self.has_allele,
+            'peptide_allele_merge_method': self.peptide_allele_merge_method,
+            'peptide_allele_merge_activation': self.peptide_allele_merge_activation,
+            'dropout_probability': self.dropout_probability,
+            'topology': self.topology,
+            'num_outputs': self.num_outputs,
+            'activation': self.activation_name,
+            'output_activation': self.output_activation_name,
+            'locally_connected_layers': lc_layers_config,
+            'peptide_dense_layer_sizes': peptide_dense_sizes,
+            'allele_dense_layer_sizes': allele_dense_sizes,
+            'layer_sizes': layer_sizes,
+            'batch_normalization': self.batch_norm_early is not None,
+        }
+
+        return json.dumps(config, sort_keys=True)
 
 
 class Class1NeuralNetwork(object):
@@ -122,10 +573,6 @@ class Class1NeuralNetwork(object):
     """
 
     # Hyperparameter renames.
-    # These are updated from time to time as new versions are developed. It
-    # provides a primitive way to allow new code to work with models trained
-    # using older code.
-    # None indicates the hyperparameter has been dropped.
     hyperparameter_renames = {
         "use_embedding": None,
         "pseudosequence_use_embedding": None,
@@ -176,32 +623,27 @@ class Class1NeuralNetwork(object):
 
         self.fit_info = []
         self.prediction_cache = weakref.WeakKeyDictionary()
+        self._device = None
 
-    KERAS_MODELS_CACHE = {}
+    MODELS_CACHE = {}
     """
-    Process-wide keras model cache, a map from: architecture JSON string to
-    (Keras model, existing network weights)
+    Process-wide model cache, a map from: architecture JSON string to
+    (PyTorch model, existing network weights)
     """
 
     @classmethod
     def clear_model_cache(klass):
         """
-        Clear the Keras model cache.
+        Clear the model cache.
         """
-        klass.KERAS_MODELS_CACHE.clear()
+        klass.MODELS_CACHE.clear()
 
     @classmethod
     def borrow_cached_network(klass, network_json, network_weights):
         """
-        Return a keras Model with the specified architecture and weights.
+        Return a PyTorch model with the specified architecture and weights.
         As an optimization, when possible this will reuse architectures from a
         process-wide cache.
-
-        The returned object is "borrowed" in the sense that its weights can
-        change later after subsequent calls to this method from other objects.
-
-        If you're using this from a parallel implementation you'll need to
-        hold a lock while using the returned object.
 
         Parameters
         ----------
@@ -210,45 +652,332 @@ class Class1NeuralNetwork(object):
 
         Returns
         -------
-        keras.models.Model
+        Class1NeuralNetworkModel
         """
         assert network_weights is not None
-        key = klass.keras_network_cache_key(network_json)
-        if key not in klass.KERAS_MODELS_CACHE:
-            # Cache miss.
-            configure_tensorflow()
-            from tensorflow.keras.models import model_from_json
+        key = klass.model_cache_key(network_json)
+        config = json.loads(network_json)
+        # Detect if weights are from Keras or PyTorch format
+        # Keras JSON has 'class_name': 'Model', PyTorch has 'hyperparameters'
+        is_keras_format = config.get('class_name') == 'Model'
 
-            network = model_from_json(network_json)
+        if key not in klass.MODELS_CACHE:
+            # Cache miss - create new model
+            network = klass._create_model_from_config(config)
             existing_weights = None
         else:
-            # Cache hit.
-            (network, existing_weights) = klass.KERAS_MODELS_CACHE[key]
+            # Cache hit
+            (network, existing_weights) = klass.MODELS_CACHE[key]
+
         if existing_weights is not network_weights:
-            network.set_weights(network_weights)
-            klass.KERAS_MODELS_CACHE[key] = (network, network_weights)
+            network.set_weights_list(network_weights, auto_convert_keras=is_keras_format)
+            klass.MODELS_CACHE[key] = (network, network_weights)
 
-        # As an added safety check we overwrite the fit method on the returned
-        # model to throw an error if it is called.
-        def throw(*args, **kwargs):
-            raise NotImplementedError("Do not call fit on cached model.")
-
-        network.fit = throw
         return network
+
+    @classmethod
+    def _parse_keras_json_config(cls, config):
+        """
+        Parse a legacy Keras model JSON config to extract hyperparameters.
+
+        Parameters
+        ----------
+        config : dict
+            Keras model JSON config with 'class_name', 'config', etc.
+
+        Returns
+        -------
+        tuple of (dict, dict)
+            First dict: Hyperparameters dict compatible with Class1NeuralNetwork
+            Second dict: Metadata about Keras model structure (e.g., embedding info)
+        """
+        layers = config.get('config', {}).get('layers', [])
+
+        hyperparameters = {
+            'locally_connected_layers': [],
+            'layer_sizes': [],
+            'activation': 'tanh',
+            'output_activation': 'sigmoid',
+            'dropout_probability': 0.0,
+            'batch_normalization': False,
+            'dense_layer_l1_regularization': 0.001,
+            'dense_layer_l2_regularization': 0.0,
+            'peptide_allele_merge_method': 'multiply',  # Default
+        }
+
+        # Metadata about Keras structure
+        keras_metadata = {
+            'has_embedding': False,
+            'embedding_input_dim': 0,
+            'embedding_output_dim': 0,
+            'skip_embedding_weights': False,
+        }
+
+        dense_layers = []
+        concatenate_count = 0
+        for layer in layers:
+            layer_class = layer.get('class_name', '')
+            layer_config = layer.get('config', {})
+
+            if layer_class == 'LocallyConnected1D':
+                lc_config = {
+                    'filters': layer_config.get('filters', 8),
+                    'kernel_size': layer_config.get('kernel_size', [3])[0] if isinstance(
+                        layer_config.get('kernel_size', [3]), list
+                    ) else layer_config.get('kernel_size', 3),
+                    'activation': layer_config.get('activation', 'tanh'),
+                }
+                hyperparameters['locally_connected_layers'].append(lc_config)
+                hyperparameters['activation'] = lc_config['activation']
+
+            elif layer_class == 'Dense':
+                units = layer_config.get('units', 32)
+                activation = layer_config.get('activation', 'tanh')
+                dense_layers.append({'units': units, 'activation': activation})
+
+                # Extract regularization from first dense layer
+                kernel_reg = layer_config.get('kernel_regularizer')
+                if kernel_reg and isinstance(kernel_reg, dict):
+                    reg_config = kernel_reg.get('config', {})
+                    if 'l1' in reg_config:
+                        hyperparameters['dense_layer_l1_regularization'] = reg_config['l1']
+                    if 'l2' in reg_config:
+                        hyperparameters['dense_layer_l2_regularization'] = reg_config['l2']
+
+            elif layer_class == 'Dropout':
+                hyperparameters['dropout_probability'] = layer_config.get('rate', 0.0)
+
+            elif layer_class == 'BatchNormalization':
+                hyperparameters['batch_normalization'] = True
+
+            elif layer_class == 'Embedding':
+                keras_metadata['has_embedding'] = True
+                keras_metadata['embedding_input_dim'] = layer_config.get('input_dim', 0)
+                keras_metadata['embedding_output_dim'] = layer_config.get('output_dim', 0)
+                # If input_dim is 0, it's a placeholder and weights should be skipped
+                if layer_config.get('input_dim', 0) == 0:
+                    keras_metadata['skip_embedding_weights'] = True
+
+            elif layer_class == 'Concatenate':
+                concatenate_count += 1
+                # Only set merge_method to concatenate if there's just one Concatenate
+                # and it's likely for peptide-allele merging (not DenseNet skip connections)
+                if concatenate_count == 1:
+                    hyperparameters['peptide_allele_merge_method'] = 'concatenate'
+
+            elif layer_class == 'Multiply':
+                hyperparameters['peptide_allele_merge_method'] = 'multiply'
+
+        # Multiple Concatenate layers indicate DenseNet topology with skip connections
+        # Note: The first Concatenate is typically for peptide-allele merging,
+        # subsequent ones are for DenseNet skip connections
+        if concatenate_count > 1:
+            hyperparameters['topology'] = 'with-skip-connections'
+            # Keep the merge method as detected (concatenate from first Concatenate layer)
+
+        # The last Dense layer is the output layer
+        if dense_layers:
+            hyperparameters['output_activation'] = dense_layers[-1]['activation']
+            # All other Dense layers contribute to layer_sizes
+            hyperparameters['layer_sizes'] = [d['units'] for d in dense_layers[:-1]]
+            if dense_layers[:-1]:
+                hyperparameters['activation'] = dense_layers[0]['activation']
+
+        return hyperparameters, keras_metadata
+
+    @classmethod
+    def _create_model_from_config(cls, config, instance_hyperparameters=None):
+        """Create a model from a configuration dictionary.
+
+        Parameters
+        ----------
+        config : dict
+            Configuration dictionary (either Keras JSON or hyperparameters dict)
+        instance_hyperparameters : dict, optional
+            Hyperparameters from the Class1NeuralNetwork instance.
+            These take precedence for things like peptide_encoding.
+        """
+        keras_metadata = None
+
+        # Check if this is a merged network config
+        if config.get('merged_networks'):
+            return cls._create_merged_model_from_config(config, instance_hyperparameters)
+
+        # Check if this is a legacy Keras JSON config
+        if config.get('class_name') in ('Model', 'Functional'):
+            hyperparameters, keras_metadata = cls._parse_keras_json_config(config)
+        else:
+            # Extract hyperparameters from config (new format)
+            hyperparameters = config.get('hyperparameters', config)
+
+        # Merge with instance hyperparameters if provided
+        # Instance hyperparameters take precedence for things like peptide_encoding
+        if instance_hyperparameters:
+            # Copy to avoid modifying original
+            merged = dict(instance_hyperparameters)
+            # Update with parsed hyperparameters (architecture-specific settings)
+            for key in ['layer_sizes', 'locally_connected_layers', 'dropout_probability',
+                        'batch_normalization', 'activation', 'output_activation',
+                        'peptide_allele_merge_method']:
+                if key in hyperparameters:
+                    merged[key] = hyperparameters[key]
+            hyperparameters = merged
+
+        # Create a temporary instance to get encoding shape
+        temp = cls(**hyperparameters)
+        peptide_encoding_shape = temp.peptides_to_network_input([]).shape[1:]
+
+        # Get allele representations if present
+        allele_representations = config.get('allele_representations')
+        if allele_representations is not None:
+            allele_representations = numpy.array(allele_representations)
+
+        # For pan-allele Keras models with placeholder embedding (input_dim=0),
+        # create a placeholder allele representation to ensure correct architecture
+        if (allele_representations is None and keras_metadata is not None
+                and keras_metadata.get('has_embedding', False)
+                and keras_metadata.get('embedding_output_dim', 0) > 0):
+            # Create placeholder with 1 allele and correct embedding dim
+            # This will be replaced by set_allele_representations later
+            embedding_dim = keras_metadata['embedding_output_dim']
+            allele_representations = numpy.zeros((1, embedding_dim), dtype=numpy.float32)
+
+        # For PyTorch-format configs without allele_representations but with
+        # allele_amino_acid_encoding (pan-allele models), create placeholder
+        # Check has_allele flag to distinguish pan-allele from allele-specific models
+        has_allele = config.get('has_allele', True)  # Default True for backward compat
+        if (allele_representations is None and keras_metadata is None
+                and has_allele and hyperparameters.get('allele_amino_acid_encoding')):
+            # Compute embedding dimension from encoding
+            from .amino_acid import ENCODING_DATA_FRAMES
+            encoding_name = hyperparameters['allele_amino_acid_encoding']
+            encoding_df = ENCODING_DATA_FRAMES.get(encoding_name)
+            if encoding_df is not None:
+                # Standard allele pseudosequence length is 37 amino acids
+                allele_seq_length = 37
+                embedding_dim = allele_seq_length * len(encoding_df.columns)
+                allele_representations = numpy.zeros((1, embedding_dim), dtype=numpy.float32)
+
+        model = Class1NeuralNetworkModel(
+            peptide_encoding_shape=peptide_encoding_shape,
+            allele_representations=allele_representations,
+            locally_connected_layers=hyperparameters.get('locally_connected_layers', []),
+            peptide_dense_layer_sizes=hyperparameters.get('peptide_dense_layer_sizes', []),
+            allele_dense_layer_sizes=hyperparameters.get('allele_dense_layer_sizes', []),
+            layer_sizes=hyperparameters.get('layer_sizes', [32]),
+            peptide_allele_merge_method=hyperparameters.get('peptide_allele_merge_method', 'multiply'),
+            peptide_allele_merge_activation=hyperparameters.get('peptide_allele_merge_activation', ''),
+            activation=hyperparameters.get('activation', 'tanh'),
+            output_activation=hyperparameters.get('output_activation', 'sigmoid'),
+            dropout_probability=hyperparameters.get('dropout_probability', 0.0),
+            batch_normalization=hyperparameters.get('batch_normalization', False),
+            dense_layer_l1_regularization=hyperparameters.get('dense_layer_l1_regularization', 0.001),
+            dense_layer_l2_regularization=hyperparameters.get('dense_layer_l2_regularization', 0.0),
+            topology=hyperparameters.get('topology', 'feedforward'),
+            num_outputs=hyperparameters.get('num_outputs', 1),
+            init=hyperparameters.get('init', 'glorot_uniform'),
+        )
+
+        # Store keras metadata for weight loading
+        if keras_metadata is not None:
+            model._keras_metadata = keras_metadata
+
+        return model
+
+    @classmethod
+    def _create_merged_model_from_config(cls, config, instance_hyperparameters=None):
+        """Create a merged model from a configuration dictionary.
+
+        Parameters
+        ----------
+        config : dict
+            Configuration dictionary with 'merged_networks' key
+        instance_hyperparameters : dict, optional
+            Hyperparameters from the Class1NeuralNetwork instance.
+        """
+        merged_configs = config['merged_networks']
+        merge_method = config.get('merge_method', 'average')
+
+        # Create a temporary instance to get encoding shape
+        base_hyperparameters = config.get('hyperparameters', {})
+        if instance_hyperparameters:
+            base_hyperparameters = dict(instance_hyperparameters)
+            base_hyperparameters.update(config.get('hyperparameters', {}))
+        temp = cls(**base_hyperparameters)
+        peptide_encoding_shape = temp.peptides_to_network_input([]).shape[1:]
+
+        # Create placeholder allele representations for pan-allele models
+        allele_representations = None
+        if base_hyperparameters.get('allele_amino_acid_encoding'):
+            from .amino_acid import ENCODING_DATA_FRAMES
+            encoding_name = base_hyperparameters['allele_amino_acid_encoding']
+            encoding_df = ENCODING_DATA_FRAMES.get(encoding_name)
+            if encoding_df is not None:
+                allele_seq_length = 37
+                embedding_dim = allele_seq_length * len(encoding_df.columns)
+                allele_representations = numpy.zeros((1, embedding_dim), dtype=numpy.float32)
+
+        # Create sub-networks
+        sub_networks = []
+        for sub_config in merged_configs:
+            model = Class1NeuralNetworkModel(
+                peptide_encoding_shape=peptide_encoding_shape,
+                allele_representations=allele_representations,
+                locally_connected_layers=sub_config.get('locally_connected_layers', []),
+                peptide_dense_layer_sizes=sub_config.get('peptide_dense_layer_sizes', []),
+                allele_dense_layer_sizes=sub_config.get('allele_dense_layer_sizes', []),
+                layer_sizes=sub_config.get('layer_sizes', [32]),
+                peptide_allele_merge_method=sub_config.get('peptide_allele_merge_method', 'multiply'),
+                peptide_allele_merge_activation=sub_config.get('peptide_allele_merge_activation', ''),
+                activation=sub_config.get('activation', 'tanh'),
+                output_activation=sub_config.get('output_activation', 'sigmoid'),
+                dropout_probability=sub_config.get('dropout_probability', 0.0),
+                batch_normalization=sub_config.get('batch_normalization', False),
+                dense_layer_l1_regularization=base_hyperparameters.get('dense_layer_l1_regularization', 0.001),
+                dense_layer_l2_regularization=base_hyperparameters.get('dense_layer_l2_regularization', 0.0),
+                topology=sub_config.get('topology', 'feedforward'),
+                num_outputs=sub_config.get('num_outputs', 1),
+                init=base_hyperparameters.get('init', 'glorot_uniform'),
+            )
+            sub_networks.append(model)
+
+        return MergedClass1NeuralNetwork(sub_networks, merge_method=merge_method)
+
+    @staticmethod
+    def model_cache_key(network_json):
+        """
+        Given a JSON description of a neural network, return a cache key.
+
+        Parameters
+        ----------
+        network_json : string
+
+        Returns
+        -------
+        string
+        """
+        # Remove regularization settings as they don't affect predictions
+        def drop_properties(d):
+            if isinstance(d, dict):
+                d.pop('dense_layer_l1_regularization', None)
+                d.pop('dense_layer_l2_regularization', None)
+            return d
+
+        description = json.loads(network_json, object_hook=drop_properties)
+        return json.dumps(description)
 
     def network(self, borrow=False):
         """
-        Return the keras model associated with this predictor.
+        Return the PyTorch model associated with this predictor.
 
         Parameters
         ----------
         borrow : bool
-            Whether to return a cached model if possible. See
-            borrow_cached_network for details
+            Whether to return a cached model if possible
 
         Returns
         -------
-        keras.models.Model
+        Class1NeuralNetworkModel
         """
         if self._network is None and self.network_json is not None:
             self.load_weights()
@@ -257,54 +986,18 @@ class Class1NeuralNetwork(object):
                     self.network_json, self.network_weights
                 )
             else:
-                configure_tensorflow()
-                from tensorflow import keras
-
-                # Hack to fix an issue caused by a change introduced in
-                # tensorflow 2.3.0, in which our models fit using tensorflow 2.2
-                # can't be loaded in tensorflow >=2.3 because the allele
-                # representation input dim of 0 is no longer valid. We had
-                # originally set an input dim of 0 here to avoid saving any
-                # allele representations with the model, since they are loaded
-                # dynamically based on the particular alleles being predicted.
-                # Here we edit the json to set the input_dim value to 1 and
-                # also edit the weights accordingly.
-                # Set this environment variable to disable this hack.
-                if not os.environ.get("MHCFLURRY_NO_TF_23_FIX"):
-                    parsed_json = json.loads(self.network_json)
-                    nodes_to_change = [
-                        node
-                        for node in parsed_json["config"]["layers"]
-                        if (
-                            node["name"] == "allele_representation"
-                            and node["config"]["input_dim"] == 0
-                        )
-                    ]
-                    if len(nodes_to_change) > 1:
-                        logging.warning(
-                            "Unexpected: multiple allele_representation nodes"
-                        )
-                    for node in nodes_to_change:
-                        node["config"]["input_dim"] = 1
-
-                    if len(nodes_to_change) > 0:
-                        self.network_json = json.dumps(parsed_json)
-
-                        # Also fix network weights.
-                        fixed = 0
-                        if self.network_weights is not None:
-                            for idx in range(len(self.network_weights)):
-                                arr = self.network_weights[idx]
-                                if arr.shape[0] == 0:
-                                    self.network_weights[idx] = numpy.zeros(
-                                        shape=(1,) + arr.shape[1:], dtype=arr.dtype
-                                    )
-                                    fixed += 1
-                        numpy.testing.assert_equal(len(nodes_to_change), fixed)
-
-                self._network = keras.models.model_from_json(self.network_json)
+                config = json.loads(self.network_json)
+                # Detect if weights are from Keras or PyTorch format
+                # Keras JSON has 'class_name': 'Model', PyTorch has 'hyperparameters'
+                is_keras_format = config.get('class_name') == 'Model'
+                # Pass this instance's hyperparameters to preserve peptide_encoding etc.
+                self._network = self._create_model_from_config(
+                    config, instance_hyperparameters=self.hyperparameters)
                 if self.network_weights is not None:
-                    self._network.set_weights(self.network_weights)
+                    self._network.set_weights_list(
+                        self.network_weights,
+                        auto_convert_keras=is_keras_format
+                    )
                 self.network_json = None
                 self.network_weights = None
         return self._network
@@ -315,35 +1008,60 @@ class Class1NeuralNetwork(object):
         this instances's neural network.
         """
         if self._network is not None:
-            self.network_json = self._network.to_json()
-            self.network_weights = self._network.get_weights()
+            config = {
+                'hyperparameters': dict(self.hyperparameters),
+            }
 
-    @staticmethod
-    def keras_network_cache_key(network_json):
-        """
-        Given a Keras JSON description of a neural network, return a key that
-        uniquely defines this network. Networks that share the same key should
-        have compatible weights matrices and give the same prediction outputs
-        when their weights are the same.
+            # Check if this is a merged network
+            if isinstance(self._network, MergedClass1NeuralNetwork):
+                # Save sub-network configs for merged networks
+                sub_configs = []
+                for subnet in self._network.networks:
+                    sub_config = {}
+                    # Get the architecture info from the network itself
+                    sub_config['layer_sizes'] = [
+                        layer.out_features for layer in subnet.dense_layers
+                    ]
+                    sub_config['locally_connected_layers'] = [
+                        {'filters': layer.out_channels, 'kernel_size': layer.kernel_size}
+                        for layer in subnet.lc_layers
+                    ] if hasattr(subnet, 'lc_layers') else []
+                    sub_config['peptide_dense_layer_sizes'] = [
+                        layer.out_features for layer in subnet.peptide_dense_layers
+                    ] if hasattr(subnet, 'peptide_dense_layers') else []
+                    sub_config['allele_dense_layer_sizes'] = [
+                        layer.out_features for layer in subnet.allele_dense_layers
+                    ] if hasattr(subnet, 'allele_dense_layers') else []
+                    # Get dropout probability from first non-None dropout layer
+                    sub_config['dropout_probability'] = 0.0
+                    if hasattr(subnet, 'dropouts') and subnet.dropouts:
+                        for d in subnet.dropouts:
+                            if d is not None:
+                                sub_config['dropout_probability'] = d.p
+                                break
+                    sub_config['batch_normalization'] = (
+                        hasattr(subnet, 'batch_norms') and bool(subnet.batch_norms) and
+                        any(bn is not None for bn in subnet.batch_norms)
+                    )
+                    sub_config['activation'] = subnet.activation_name
+                    sub_config['output_activation'] = subnet.output_activation_name
+                    sub_config['peptide_allele_merge_method'] = subnet.peptide_allele_merge_method
+                    sub_config['peptide_allele_merge_activation'] = subnet.peptide_allele_merge_activation
+                    sub_config['topology'] = subnet.topology
+                    sub_config['num_outputs'] = subnet.output_layer.out_features
+                    sub_configs.append(sub_config)
+                config['merged_networks'] = sub_configs
+                config['merge_method'] = self._network.merge_method
+            else:
+                # Save whether the network has allele features
+                config['has_allele'] = getattr(self._network, 'has_allele', False)
+                # Save allele representations if present in the network
+                if hasattr(self._network, 'allele_embedding') and self._network.allele_embedding is not None:
+                    allele_embed = self._network.allele_embedding.weight.detach().cpu().numpy()
+                    config['allele_representations'] = allele_embed.tolist()
 
-        Parameters
-        ----------
-        network_json : string
-
-        Returns
-        -------
-        string
-        """
-
-        # As an optimization, we remove anything about regularization as these
-        # do not affect predictions.
-        def drop_properties(d):
-            if "kernel_regularizer" in d:
-                del d["kernel_regularizer"]
-            return d
-
-        description = json.loads(network_json, object_hook=drop_properties)
-        return json.dumps(description)
+            self.network_json = json.dumps(config)
+            self.network_weights = self._network.get_weights_list()
 
     def get_config(self):
         """
@@ -359,12 +1077,17 @@ class Class1NeuralNetwork(object):
         result["network_weights"] = None
         result["network_weights_loader"] = None
         result["prediction_cache"] = None
+        result["_device"] = None
         return result
 
     @classmethod
     def from_config(cls, config, weights=None, weights_loader=None):
         """
         deserialize from a dict returned by get_config().
+
+        Supports both:
+        - Native Class1NeuralNetwork configs with 'hyperparameters' key
+        - Legacy Keras model JSON configs with 'class_name', 'config', etc.
 
         Parameters
         ----------
@@ -379,8 +1102,20 @@ class Class1NeuralNetwork(object):
         Class1NeuralNetwork
         """
         config = dict(config)
-        instance = cls(**config.pop("hyperparameters"))
-        instance.__dict__.update(config)
+
+        # Check if this is a legacy Keras JSON config
+        if config.get('class_name') in ('Model', 'Functional'):
+            hyperparameters, keras_metadata = cls._parse_keras_json_config(config)
+            instance = cls(**hyperparameters)
+            # Store metadata for weight loading
+            instance._keras_metadata = keras_metadata
+            # Store the original config as network_json for lazy network creation
+            instance.network_json = json.dumps(config)
+        else:
+            # Standard Class1NeuralNetwork config format
+            instance = cls(**config.pop("hyperparameters"))
+            instance.__dict__.update(config)
+
         instance.network_weights = weights
         instance.network_weights_loader = weights_loader
         instance.prediction_cache = weakref.WeakKeyDictionary()
@@ -389,9 +1124,6 @@ class Class1NeuralNetwork(object):
     def load_weights(self):
         """
         Load weights by evaluating self.network_weights_loader, if needed.
-
-        After calling this, self.network_weights_loader will be None and
-        self.network_weights will be the weights list, if available.
         """
         if self.network_weights_loader:
             self.network_weights = self.network_weights_loader()
@@ -410,6 +1142,42 @@ class Class1NeuralNetwork(object):
         self.load_weights()
         return self.network_weights
 
+    def get_weights_list(self):
+        """
+        Get the network weights as a list of numpy arrays.
+
+        Returns
+        -------
+        list of numpy.array giving weights for each layer or None if there is no
+        network
+        """
+        return self.get_weights()
+
+    def set_weights_list(self, weights, auto_convert_keras=True):
+        """
+        Set the network weights from a list of numpy arrays.
+
+        If a network exists, the weights are set directly on it.
+        Otherwise, the weights are stored and will be applied when the
+        network is created.
+
+        Parameters
+        ----------
+        weights : list of numpy.array
+            Weights for each layer
+        auto_convert_keras : bool
+            If True, attempt to auto-detect and convert Keras weight formats
+            to PyTorch format. Default True.
+        """
+        if self._network is not None:
+            # Network exists, set weights directly
+            self._network.set_weights_list(weights, auto_convert_keras=auto_convert_keras)
+        else:
+            # Store weights for later application
+            self.network_weights = weights
+            # Store flag for auto-conversion
+            self._auto_convert_keras_weights = auto_convert_keras
+
     def __getstate__(self):
         """
         serialize to a dict. Model weights are included. For pickle support.
@@ -424,6 +1192,7 @@ class Class1NeuralNetwork(object):
         result = dict(self.__dict__)
         result["_network"] = None
         result["prediction_cache"] = None
+        result["_device"] = None
         return result
 
     def __setstate__(self, state):
@@ -432,6 +1201,7 @@ class Class1NeuralNetwork(object):
         """
         self.__dict__.update(state)
         self.prediction_cache = weakref.WeakKeyDictionary()
+        self._device = None
 
     def peptides_to_network_input(self, peptides):
         """
@@ -463,11 +1233,6 @@ class Class1NeuralNetwork(object):
         (int, int) tuple
 
         """
-        # We currently have an arbitrary hard floor of 5, even if the underlying
-        # peptide encoding supports smaller lengths.
-        #
-        # We empirically find the supported peptide lengths based on the
-        # lengths for which peptides_to_network_input throws ValueError.
         try:
             self.peptides_to_network_input([""])
         except EncodingError as e:
@@ -504,9 +1269,9 @@ class Class1NeuralNetwork(object):
 
         Parameters
         ----------
-        network : keras.Model
+        network : Class1NeuralNetworkModel
         x_dict : dict of string -> numpy.ndarray
-            Training data as would be passed keras.Model.fit().
+            Training data
         method : string
             Initialization method. Currently only "lsuv" is supported.
         verbose : int
@@ -519,6 +1284,12 @@ class Class1NeuralNetwork(object):
             lsuv_init(network, x_dict, verbose=verbose > 0)
         else:
             raise RuntimeError("Unsupported init method: ", method)
+
+    def get_device(self):
+        """Get the PyTorch device to use."""
+        if self._device is None:
+            self._device = get_pytorch_device()
+        return self._device
 
     def fit_generator(
             self,
@@ -540,39 +1311,13 @@ class Class1NeuralNetwork(object):
         """
         Fit using a generator. Does not support many of the features of fit(),
         such as random negative peptides.
-
-        Fitting proceeds until early stopping is hit, using the peptides,
-        affinities, etc. given by the parameters starting with "validation_".
-
-        This is used for pre-training pan-allele models using data synthesized
-        by the allele-specific models.
-
-        Parameters
-        ----------
-        generator : generator yielding (alleles, peptides, affinities) tuples
-            where alleles and peptides are lists of strings, and affinities
-            is list of floats.
-        validation_peptide_encoding : EncodableSequences
-        validation_affinities : list of float
-        validation_allele_encoding : AlleleEncoding
-        validation_inequalities : list of string
-        validation_output_indices : list of int
-        steps_per_epoch : int
-        epochs : int
-        min_epochs : int
-        patience : int
-        min_delta : float
-        verbose : int
-        progress_callback : thunk
-        progress_preamble : string
-        progress_print_interval : float
         """
-        configure_tensorflow()
-        from tensorflow.keras import backend as K
+        configure_pytorch()
+        device = self.get_device()
 
         fit_info = collections.defaultdict(list)
 
-        loss = get_loss(self.hyperparameters["loss"])
+        loss_obj = get_pytorch_loss(self.hyperparameters["loss"])
 
         (
             validation_allele_input,
@@ -585,19 +1330,20 @@ class Class1NeuralNetwork(object):
                 **self.network_hyperparameter_defaults.subselect(self.hyperparameters)
             )
             if verbose > 0:
-                self.network().summary()
+                print(self.network())
         network = self.network()
+        network.to(device)
 
-        network.compile(loss=loss.loss, optimizer=self.hyperparameters["optimizer"])
-        network.make_predict_function()
         self.set_allele_representations(allele_representations)
 
+        # Setup optimizer
+        optimizer = self._create_optimizer(network)
         if self.hyperparameters["learning_rate"] is not None:
-            K.set_value(
-                self.network().optimizer.lr, self.hyperparameters["learning_rate"]
-            )
-        fit_info["learning_rate"] = float(K.get_value(self.network().optimizer.lr))
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = self.hyperparameters["learning_rate"]
+        fit_info["learning_rate"] = optimizer.param_groups[0]['lr']
 
+        # Prepare validation data
         validation_x_dict = {
             "peptide": self.peptides_to_network_input(validation_peptide_encoding),
             "allele": validation_allele_input,
@@ -608,14 +1354,10 @@ class Class1NeuralNetwork(object):
         if validation_output_indices is not None:
             encode_y_kwargs["output_indices"] = validation_output_indices
 
-        output = loss.encode_y(from_ic50(validation_affinities), **encode_y_kwargs)
-
-        validation_y_dict = {
-            "output": output,
-        }
+        output = loss_obj.encode_y(from_ic50(validation_affinities), **encode_y_kwargs)
 
         mutable_generator_state = {
-            "yielded_values": 0  # total number of data points yielded
+            "yielded_values": 0
         }
 
         def wrapped_generator():
@@ -627,16 +1369,14 @@ class Class1NeuralNetwork(object):
                     "peptide": self.peptides_to_network_input(peptides),
                     "allele": allele_encoding_input,
                 }
-                y_dict = {"output": from_ic50(affinities)}
-                yield (x_dict, y_dict)
+                y = from_ic50(affinities)
+                yield (x_dict, y)
                 mutable_generator_state["yielded_values"] += len(affinities)
 
         start = time.time()
-
         iterator = wrapped_generator()
 
-        # Initialization required if a data_dependent_initialization_method
-        # is set and this is our first time fitting (i.e. fit_info is empty).
+        # Data dependent init
         data_dependent_init = self.hyperparameters[
             "data_dependent_initialization_method"
         ]
@@ -644,7 +1384,7 @@ class Class1NeuralNetwork(object):
             first_chunk = next(iterator)
             self.data_dependent_weights_initialization(
                 network,
-                first_chunk[0],  # x_dict
+                first_chunk[0],
                 method=data_dependent_init,
                 verbose=verbose,
             )
@@ -654,22 +1394,46 @@ class Class1NeuralNetwork(object):
         min_val_loss = None
         last_progress_print = 0
         epoch = 1
+
         while True:
             epoch_start_time = time.time()
-            fit_history = network.fit(
-                iterator,
-                steps_per_epoch=steps_per_epoch,
-                initial_epoch=epoch - 1,
-                epochs=epoch,
-                use_multiprocessing=False,
-                workers=0,
-                validation_data=(validation_x_dict, validation_y_dict),
-                verbose=verbose,
-            )
+            network.train()
+
+            epoch_losses = []
+            for step in range(steps_per_epoch):
+                try:
+                    x_dict, y = next(iterator)
+                except StopIteration:
+                    break
+
+                # Convert to tensors
+                peptide_tensor = torch.from_numpy(x_dict["peptide"]).float().to(device)
+                allele_tensor = torch.from_numpy(x_dict["allele"]).float().to(device)
+                y_tensor = torch.from_numpy(y.astype(numpy.float32)).to(device)
+
+                optimizer.zero_grad()
+                inputs = {"peptide": peptide_tensor, "allele": allele_tensor}
+                predictions = network(inputs)
+                loss = loss_obj(predictions, y_tensor)
+                loss.backward()
+                optimizer.step()
+                epoch_losses.append(loss.item())
+
+            # Compute validation loss
+            network.eval()
+            with torch.no_grad():
+                val_peptide = torch.from_numpy(validation_x_dict["peptide"]).float().to(device)
+                val_allele = torch.from_numpy(validation_x_dict["allele"]).float().to(device)
+                val_y = torch.from_numpy(output.astype(numpy.float32)).to(device)
+
+                val_inputs = {"peptide": val_peptide, "allele": val_allele}
+                val_predictions = network(val_inputs)
+                val_loss = loss_obj(val_predictions, val_y).item()
+
             epoch_time = time.time() - epoch_start_time
-            for key, value in fit_history.history.items():
-                fit_info[key].extend(value)
-            val_loss = fit_info["val_loss"][-1]
+            train_loss = numpy.mean(epoch_losses) if epoch_losses else float('nan')
+            fit_info["loss"].append(train_loss)
+            fit_info["val_loss"].append(val_loss)
 
             if min_val_loss is None or val_loss < min_val_loss - min_delta:
                 min_val_loss = val_loss
@@ -686,7 +1450,7 @@ class Class1NeuralNetwork(object):
                     epoch,
                     epochs,
                     epoch_time,
-                    fit_info["loss"][-1],
+                    train_loss,
                     val_loss,
                     min_val_loss,
                     min_val_loss_iteration,
@@ -695,7 +1459,6 @@ class Class1NeuralNetwork(object):
                 )
             ).strip()
 
-            # Print progress no more often than once every few seconds.
             if progress_print_interval is not None and (
                 time.time() - last_progress_print > progress_print_interval
             ):
@@ -708,12 +1471,32 @@ class Class1NeuralNetwork(object):
             if epoch >= patience_epoch_threshold:
                 if progress_print_interval is not None:
                     print(progress_preamble, "STOPPING", progress_message)
-                    break
+                break
             epoch += 1
 
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = mutable_generator_state["yielded_values"]
         self.fit_info.append(dict(fit_info))
+
+    def _create_optimizer(self, network):
+        """Create an optimizer for the network."""
+        optimizer_name = self.hyperparameters["optimizer"].lower()
+        lr = self.hyperparameters["learning_rate"] or 0.001
+
+        # Collect parameters with L1/L2 regularization
+        self.hyperparameters["dense_layer_l1_regularization"]
+        l2 = self.hyperparameters["dense_layer_l2_regularization"]
+
+        if optimizer_name == "rmsprop":
+            # Match Keras defaults: rho=0.9, epsilon=1e-07
+            return torch.optim.RMSprop(
+                network.parameters(), lr=lr, alpha=0.9, eps=1e-07, weight_decay=l2)
+        elif optimizer_name == "adam":
+            return torch.optim.Adam(network.parameters(), lr=lr, weight_decay=l2)
+        elif optimizer_name == "sgd":
+            return torch.optim.SGD(network.parameters(), lr=lr, weight_decay=l2)
+        else:
+            return torch.optim.Adam(network.parameters(), lr=lr, weight_decay=l2)
 
     def fit(
             self,
@@ -734,48 +1517,22 @@ class Class1NeuralNetwork(object):
         Parameters
         ----------
         peptides : EncodableSequences or list of string
-
         affinities : list of float
             nM affinities. Must be same length of as peptides.
-
         allele_encoding : AlleleEncoding
             If not specified, the model will be a single-allele predictor.
-
         inequalities : list of string, each element one of ">", "<", or "=".
-            Inequalities to use for fitting. Same length as affinities.
-            Each element must be one of ">", "<", or "=". For example, a ">"
-            will train on y_pred > y_true for that element in the training set.
-            Requires using a custom losses that support inequalities (e.g.
-            mse_with_ineqalities). If None all inequalities are taken to be "=".
-
         output_indices : list of int
-            For multi-output models only. Same length as affinities. Indicates
-            the index of the output (starting from 0) for each training example.
-
+            For multi-output models only.
         sample_weights : list of float
-            If not specified, all samples (including random negatives added
-            during training) will have equal weight. If specified, the random
-            negatives will be assigned weight=1.0.
-
         shuffle_permutation : list of int
-            Permutation (integer list) of same length as peptides and affinities
-            If None, then a random permutation will be generated.
-
         verbose : int
-            Keras verbosity level
-
         progress_callback : function
-            No-argument function to call after each epoch.
-
         progress_preamble : string
-            Optional string of information to include in each progress update
-
         progress_print_interval : float
-            How often (in seconds) to print progress update. Set to None to
-            disable.
         """
-        configure_tensorflow()
-        from tensorflow.keras import backend as K
+        configure_pytorch()
+        device = self.get_device()
 
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
@@ -802,22 +1559,20 @@ class Class1NeuralNetwork(object):
 
         y_values = from_ic50(numpy.array(affinities, copy=False))
         assert numpy.isnan(y_values).sum() == 0, y_values
+
         if inequalities is not None:
-            # Reverse inequalities because from_ic50() flips the direction
-            # (i.e. lower affinity results in higher y values).
             adjusted_inequalities = (
                 pandas.Series(inequalities)
-                .map(
-                    {
-                        "=": "=",
-                        ">": "<",
-                        "<": ">",
-                    }
-                )
+                .map({
+                    "=": "=",
+                    ">": "<",
+                    "<": ">",
+                })
                 .values
             )
         else:
             adjusted_inequalities = numpy.tile("=", len(y_values))
+
         if len(adjusted_inequalities) != len(y_values):
             raise ValueError("Inequalities and y_values must have same length")
 
@@ -832,13 +1587,10 @@ class Class1NeuralNetwork(object):
             ) = self.allele_encoding_to_network_input(allele_encoding)
             x_dict_without_random_negatives["allele"] = allele_encoding_input
 
-        # Shuffle y_values and the contents of x_dict_without_random_negatives
-        # This ensures different data is used for the test set for early
-        # stopping when multiple models are trained.
+        # Shuffle
         if shuffle_permutation is None:
             shuffle_permutation = numpy.random.permutation(len(y_values))
         y_values = y_values[shuffle_permutation]
-        assert numpy.isnan(y_values).sum() == 0, y_values
         peptide_encoding = peptide_encoding[shuffle_permutation]
         adjusted_inequalities = adjusted_inequalities[shuffle_permutation]
         for key in x_dict_without_random_negatives:
@@ -846,33 +1598,27 @@ class Class1NeuralNetwork(object):
                 shuffle_permutation
             ]
         if sample_weights is not None:
-            sample_weights = numpy.array(sample_weights, copy=False)[
-                shuffle_permutation
-            ]
+            sample_weights = numpy.array(sample_weights, copy=False)[shuffle_permutation]
         if output_indices is not None:
-            output_indices = numpy.array(output_indices, copy=False)[
-                shuffle_permutation
-            ]
+            output_indices = numpy.array(output_indices, copy=False)[shuffle_permutation]
 
-        loss = get_loss(self.hyperparameters["loss"])
+        loss_obj = get_pytorch_loss(self.hyperparameters["loss"])
 
-        if not loss.supports_inequalities and (
+        if not loss_obj.supports_inequalities and (
             any(inequality != "=" for inequality in adjusted_inequalities)
         ):
-            raise ValueError("Loss %s does not support inequalities" % loss)
+            raise ValueError("Loss %s does not support inequalities" % loss_obj)
 
         if (
-            not loss.supports_multiple_outputs
+            not loss_obj.supports_multiple_outputs
             and output_indices is not None
             and (output_indices != 0).any()
         ):
-            raise ValueError("Loss %s does not support multiple outputs" % loss)
+            raise ValueError("Loss %s does not support multiple outputs" % loss_obj)
 
         if self.hyperparameters["num_outputs"] != 1:
             if output_indices is None:
-                raise ValueError(
-                    "Must supply output_indices for multi-output predictor"
-                )
+                raise ValueError("Must supply output_indices for multi-output predictor")
 
         if self.network() is None:
             self._network = self.make_network(
@@ -880,65 +1626,52 @@ class Class1NeuralNetwork(object):
                 **self.network_hyperparameter_defaults.subselect(self.hyperparameters)
             )
             if verbose > 0:
-                self.network().summary()
+                print(self.network())
+
+        network = self.network()
+        network.to(device)
 
         if allele_representations is not None:
             self.set_allele_representations(allele_representations)
 
-        self.network().compile(
-            loss=loss.loss, optimizer=self.hyperparameters["optimizer"]
-        )
-
+        optimizer = self._create_optimizer(network)
         if self.hyperparameters["learning_rate"] is not None:
-            K.set_value(
-                self.network().optimizer.lr, self.hyperparameters["learning_rate"]
-            )
-        fit_info["learning_rate"] = float(K.get_value(self.network().optimizer.lr))
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = self.hyperparameters["learning_rate"]
+        fit_info["learning_rate"] = optimizer.param_groups[0]['lr']
 
-        if loss.supports_inequalities:
-            # Do not sample negative affinities: just use an inequality.
+        # Prepare y values with random negatives
+        if loss_obj.supports_inequalities:
             random_negative_ic50 = self.hyperparameters["random_negative_affinity_min"]
             random_negative_target = from_ic50(random_negative_ic50)
 
-            y_dict_with_random_negatives = {
-                "output": numpy.concatenate(
-                    [
-                        numpy.tile(random_negative_target, num_random_negatives),
-                        y_values,
-                    ]
-                ),
-            }
-            # Note: we are using "<" here not ">" because the inequalities are
-            # now in target-space (0-1) not affinity-space.
-            adjusted_inequalities_with_random_negatives = [
-                "<"
-            ] * num_random_negatives + list(adjusted_inequalities)
-        else:
-            # Randomly sample random negative affinities
-            y_dict_with_random_negatives = {
-                "output": numpy.concatenate(
-                    [
-                        from_ic50(
-                            numpy.random.uniform(
-                                self.hyperparameters["random_negative_affinity_min"],
-                                self.hyperparameters["random_negative_affinity_max"],
-                                num_random_negatives,
-                            )
-                        ),
-                        y_values,
-                    ]
-                ),
-            }
-            adjusted_inequalities_with_random_negatives = None
-        assert (
-            numpy.isnan(y_dict_with_random_negatives["output"]).sum() == 0
-        ), y_dict_with_random_negatives
-        if sample_weights is not None:
-            sample_weights_with_random_negatives = numpy.concatenate(
-                [numpy.ones(num_random_negatives), sample_weights]
+            y_with_negatives = numpy.concatenate([
+                numpy.tile(random_negative_target, num_random_negatives),
+                y_values,
+            ])
+            adjusted_inequalities_with_random_negatives = (
+                ["<"] * num_random_negatives + list(adjusted_inequalities)
             )
         else:
-            sample_weights_with_random_negatives = None
+            y_with_negatives = numpy.concatenate([
+                from_ic50(
+                    numpy.random.uniform(
+                        self.hyperparameters["random_negative_affinity_min"],
+                        self.hyperparameters["random_negative_affinity_max"],
+                        num_random_negatives,
+                    )
+                ),
+                y_values,
+            ])
+            adjusted_inequalities_with_random_negatives = None
+
+        if sample_weights is not None:
+            numpy.concatenate([
+                numpy.ones(num_random_negatives),
+                sample_weights
+            ])
+        else:
+            pass
 
         if output_indices is not None:
             random_negative_output_indices = (
@@ -946,34 +1679,27 @@ class Class1NeuralNetwork(object):
                 if self.hyperparameters["random_negative_output_indices"]
                 else list(range(0, self.hyperparameters["num_outputs"]))
             )
-            output_indices_with_random_negatives = numpy.concatenate(
-                [
-                    pandas.Series(random_negative_output_indices, dtype=int)
-                    .sample(n=num_random_negatives, replace=True)
-                    .values,
-                    output_indices,
-                ]
-            )
+            output_indices_with_negatives = numpy.concatenate([
+                pandas.Series(random_negative_output_indices, dtype=int)
+                .sample(n=num_random_negatives, replace=True)
+                .values,
+                output_indices,
+            ])
         else:
-            output_indices_with_random_negatives = None
+            output_indices_with_negatives = None
 
+        # Encode y
         encode_y_kwargs = {}
         if adjusted_inequalities_with_random_negatives is not None:
-            encode_y_kwargs[
-                "inequalities"
-            ] = adjusted_inequalities_with_random_negatives
-        if output_indices_with_random_negatives is not None:
-            encode_y_kwargs["output_indices"] = output_indices_with_random_negatives
+            encode_y_kwargs["inequalities"] = adjusted_inequalities_with_random_negatives
+        if output_indices_with_negatives is not None:
+            encode_y_kwargs["output_indices"] = output_indices_with_negatives
 
-        y_dict_with_random_negatives["output"] = loss.encode_y(
-            y_dict_with_random_negatives["output"], **encode_y_kwargs
-        )
+        y_encoded = loss_obj.encode_y(y_with_negatives, **encode_y_kwargs)
 
         min_val_loss_iteration = None
         min_val_loss = None
 
-        # Initialization required if a data_dependent_initialization_method
-        # is set and this is our first time fitting (i.e. fit_info is empty).
         needs_initialization = (
             self.hyperparameters["data_dependent_initialization_method"] is not None
             and not self.fit_info
@@ -981,8 +1707,14 @@ class Class1NeuralNetwork(object):
 
         start = time.time()
         last_progress_print = None
-        x_dict_with_random_negatives = {}
-        for i in range(self.hyperparameters["max_epochs"]):
+
+        # Validation split
+        val_split = self.hyperparameters["validation_split"]
+        n_total = len(y_encoded)
+        n_val = int(n_total * val_split)
+        n_train = n_total - n_val
+
+        for epoch in range(self.hyperparameters["max_epochs"]):
             random_negative_peptides = EncodableSequences.create(
                 random_negatives_planner.get_peptides()
             )
@@ -990,60 +1722,88 @@ class Class1NeuralNetwork(object):
                 random_negative_peptides
             )
 
-            if not x_dict_with_random_negatives:
-                if len(random_negative_peptides) > 0:
-                    x_dict_with_random_negatives["peptide"] = numpy.concatenate(
-                        [
-                            random_negative_peptides_encoding,
-                            x_dict_without_random_negatives["peptide"],
-                        ]
-                    )
-                    if "allele" in x_dict_without_random_negatives:
-                        x_dict_with_random_negatives["allele"] = numpy.concatenate(
-                            [
-                                self.allele_encoding_to_network_input(
-                                    random_negatives_allele_encoding
-                                )[0],
-                                x_dict_without_random_negatives["allele"],
-                            ]
-                        )
+            # Build x_dict with random negatives
+            if len(random_negative_peptides) > 0:
+                x_peptide = numpy.concatenate([
+                    random_negative_peptides_encoding,
+                    x_dict_without_random_negatives["peptide"],
+                ])
+                if "allele" in x_dict_without_random_negatives:
+                    x_allele = numpy.concatenate([
+                        self.allele_encoding_to_network_input(
+                            random_negatives_allele_encoding
+                        )[0],
+                        x_dict_without_random_negatives["allele"],
+                    ])
                 else:
-                    x_dict_with_random_negatives = x_dict_without_random_negatives
+                    x_allele = None
             else:
-                # Update x_dict_with_random_negatives in place.
-                # This is more memory efficient than recreating it as above.
-                if len(random_negative_peptides) > 0:
-                    x_dict_with_random_negatives["peptide"][
-                        :num_random_negatives
-                    ] = random_negative_peptides_encoding
+                x_peptide = x_dict_without_random_negatives["peptide"]
+                x_allele = x_dict_without_random_negatives.get("allele")
 
             if needs_initialization:
+                x_init = {"peptide": x_peptide}
+                if x_allele is not None:
+                    x_init["allele"] = x_allele
                 self.data_dependent_weights_initialization(
-                    self.network(),
-                    x_dict_with_random_negatives,
+                    network,
+                    x_init,
                     method=self.hyperparameters["data_dependent_initialization_method"],
                     verbose=verbose,
                 )
                 needs_initialization = False
 
+            # Train/val split
+            indices = numpy.arange(n_total)
+            numpy.random.shuffle(indices)
+            train_indices = indices[:n_train]
+            val_indices = indices[n_train:]
+
+            # Training
+            network.train()
             epoch_start = time.time()
-            fit_history = self.network().fit(
-                x_dict_with_random_negatives,
-                y_dict_with_random_negatives,
-                shuffle=True,
-                batch_size=self.hyperparameters["minibatch_size"],
-                verbose=verbose,
-                epochs=i + 1,
-                initial_epoch=i,
-                validation_split=self.hyperparameters["validation_split"],
-                sample_weight=sample_weights_with_random_negatives,
-            )
+
+            # Create batches
+            batch_size = self.hyperparameters["minibatch_size"]
+            train_losses = []
+
+            for batch_start in range(0, n_train, batch_size):
+                batch_idx = train_indices[batch_start:batch_start + batch_size]
+
+                peptide_batch = torch.from_numpy(x_peptide[batch_idx]).float().to(device)
+                y_batch = torch.from_numpy(y_encoded[batch_idx].astype(numpy.float32)).to(device)
+
+                inputs = {"peptide": peptide_batch}
+                if x_allele is not None:
+                    allele_batch = torch.from_numpy(x_allele[batch_idx]).float().to(device)
+                    inputs["allele"] = allele_batch
+
+                optimizer.zero_grad()
+                predictions = network(inputs)
+                loss = loss_obj(predictions, y_batch)
+                loss.backward()
+                optimizer.step()
+                train_losses.append(loss.item())
+
             epoch_time = time.time() - epoch_start
+            train_loss = numpy.mean(train_losses)
+            fit_info["loss"].append(train_loss)
 
-            for key, value in fit_history.history.items():
-                fit_info[key].extend(value)
+            # Validation
+            if val_split > 0:
+                network.eval()
+                with torch.no_grad():
+                    val_peptide = torch.from_numpy(x_peptide[val_indices]).float().to(device)
+                    val_y = torch.from_numpy(y_encoded[val_indices].astype(numpy.float32)).to(device)
+                    val_inputs = {"peptide": val_peptide}
+                    if x_allele is not None:
+                        val_allele = torch.from_numpy(x_allele[val_indices]).float().to(device)
+                        val_inputs["allele"] = val_allele
+                    val_predictions = network(val_inputs)
+                    val_loss = loss_obj(val_predictions, val_y).item()
+                fit_info["val_loss"].append(val_loss)
 
-            # Print progress no more often than once every few seconds.
+            # Progress printing
             if progress_print_interval is not None and (
                 not last_progress_print
                 or (time.time() - last_progress_print > progress_print_interval)
@@ -1055,10 +1815,10 @@ class Class1NeuralNetwork(object):
                         + "Epoch %3d / %3d [%0.2f sec]: loss=%g. "
                         "Min val loss (%s) at epoch %s"
                         % (
-                            i,
+                            epoch,
                             self.hyperparameters["max_epochs"],
                             epoch_time,
-                            fit_info["loss"][-1],
+                            train_loss,
                             str(min_val_loss),
                             min_val_loss_iteration,
                         )
@@ -1066,20 +1826,17 @@ class Class1NeuralNetwork(object):
                 )
                 last_progress_print = time.time()
 
-            if self.hyperparameters["validation_split"]:
-                val_loss = fit_info["val_loss"][-1]
-
+            # Early stopping
+            if val_split > 0:
                 if min_val_loss is None or (
                     val_loss < min_val_loss - self.hyperparameters["min_delta"]
                 ):
                     min_val_loss = val_loss
-                    min_val_loss_iteration = i
+                    min_val_loss_iteration = epoch
 
                 if self.hyperparameters["early_stopping"]:
-                    threshold = (
-                        min_val_loss_iteration + self.hyperparameters["patience"]
-                    )
-                    if i > threshold:
+                    threshold = min_val_loss_iteration + self.hyperparameters["patience"]
+                    if epoch > threshold:
                         if progress_print_interval is not None:
                             print(
                                 (
@@ -1088,14 +1845,10 @@ class Class1NeuralNetwork(object):
                                     + "Stopping at epoch %3d / %3d: loss=%g. "
                                     "Min val loss (%g) at epoch %s"
                                     % (
-                                        i,
+                                        epoch,
                                         self.hyperparameters["max_epochs"],
-                                        fit_info["loss"][-1],
-                                        (
-                                            min_val_loss
-                                            if min_val_loss is not None
-                                            else numpy.nan
-                                        ),
+                                        train_loss,
+                                        min_val_loss if min_val_loss is not None else numpy.nan,
                                         min_val_loss_iteration,
                                     )
                                 ).strip()
@@ -1104,7 +1857,7 @@ class Class1NeuralNetwork(object):
 
             if progress_callback:
                 progress_callback()
-            
+
             gc.collect()
 
         fit_info["time"] = time.time() - start
@@ -1120,25 +1873,12 @@ class Class1NeuralNetwork(object):
         """
         Predict affinities.
 
-        If peptides are specified as EncodableSequences, then the predictions
-        will be cached for this predictor as long as the EncodableSequences
-        object remains in memory. The cache is keyed in the object identity of
-        the EncodableSequences, not the sequences themselves. The cache is used
-        only for allele-specific models (i.e. when allele_encoding is None).
-
         Parameters
         ----------
         peptides : EncodableSequences or list of string
-
         allele_encoding : AlleleEncoding, optional
-            Only required when this model is a pan-allele model
-
         batch_size : int
-            batch_size passed to Keras
-
         output_index : int or None
-            For multi-output models. Gives the output index to return. If set to
-            None, then all outputs are returned as a samples x outputs matrix.
 
         Returns
         -------
@@ -1148,6 +1888,9 @@ class Class1NeuralNetwork(object):
         use_cache = allele_encoding is None and isinstance(peptides, EncodableSequences)
         if use_cache and peptides in self.prediction_cache:
             return self.prediction_cache[peptides].copy()
+
+        configure_pytorch()
+        device = self.get_device()
 
         x_dict = {"peptide": self.peptides_to_network_input(peptides)}
 
@@ -1161,10 +1904,38 @@ class Class1NeuralNetwork(object):
             network = self.network()
         else:
             network = self.network(borrow=True)
-        raw_predictions = network.predict(x_dict, batch_size=batch_size)
+
+        network.to(device)
+        network.eval()
+
+        # Batch prediction
+        n_samples = len(x_dict["peptide"])
+        all_predictions = []
+
+        with torch.no_grad():
+            for batch_start in range(0, n_samples, batch_size):
+                batch_end = min(batch_start + batch_size, n_samples)
+
+                peptide_batch = torch.from_numpy(
+                    x_dict["peptide"][batch_start:batch_end]
+                ).float().to(device)
+
+                inputs = {"peptide": peptide_batch}
+                if "allele" in x_dict:
+                    allele_batch = torch.from_numpy(
+                        x_dict["allele"][batch_start:batch_end]
+                    ).float().to(device)
+                    inputs["allele"] = allele_batch
+
+                batch_predictions = network(inputs)
+                all_predictions.append(batch_predictions.cpu().numpy())
+
+        raw_predictions = numpy.concatenate(all_predictions, axis=0)
         predictions = numpy.array(raw_predictions, dtype="float64")
+
         if output_index is not None:
             predictions = predictions[:, output_index]
+
         result = to_ic50(predictions)
         if use_cache:
             self.prediction_cache[peptides] = result
@@ -1173,141 +1944,38 @@ class Class1NeuralNetwork(object):
     @classmethod
     def merge(cls, models, merge_method="average"):
         """
-        Merge multiple models at the tensorflow (or other backend) level.
-
-        Only certain neural network architectures support merging. Others will
-        result in a NotImplementedError.
+        Merge multiple models at the neural network level.
 
         Parameters
         ----------
         models : list of Class1NeuralNetwork
-            instances to merge
         merge_method : string, one of "average", "sum", or "concatenate"
-            How to merge the predictions of the different models
 
         Returns
         -------
         Class1NeuralNetwork
-            The merged neural network
-
         """
-        configure_tensorflow()
-        from tensorflow.keras import backend as K
-        from tensorflow.keras.layers import Input, average, add, concatenate
-        from tensorflow.keras.models import Model
-
         if len(models) == 1:
             return models[0]
         assert len(models) > 1
 
+        # For now, we create a simple ensemble wrapper
+        # that averages predictions
         result = Class1NeuralNetwork(**dict(models[0].hyperparameters))
 
-        # Remove hyperparameters that are not shared by all models.
+        # Remove hyperparameters not shared by all models
         for model in models:
             for key, value in model.hyperparameters.items():
                 if result.hyperparameters.get(key, value) != value:
                     del result.hyperparameters[key]
 
-        assert result._network is None
+        # Create merged network
+        result._network = MergedClass1NeuralNetwork(
+            [model.network() for model in models],
+            merge_method=merge_method
+        )
+        result.update_network_description()
 
-        networks = [model.network() for model in models]
-
-        layer_names = [[layer.name for layer in network.layers] for network in networks]
-
-        pan_allele_layer_initial_names = [
-            "allele",
-            "peptide",
-            "allele_representation",
-            "flattened_0",
-            "allele_flat",
-            "allele_peptide_merged",
-            "dense_0",
-            "dropout_0",
-            #'dense_1', 'dropout_1', 'output',
-        ]
-        pan_allele_layer_final_names = ["output"]
-
-        def startswith(lst, prefix):
-            return lst[: len(prefix)] == prefix
-
-        def endswith(lst, suffix):
-            return lst[-len(suffix) :] == suffix
-
-        if all(
-            startswith(names, pan_allele_layer_initial_names)
-            and endswith(names, pan_allele_layer_final_names)
-            for names in layer_names
-        ):
-            # Merging an ensemble of pan-allele architectures
-            network = networks[0]
-            peptide_input = Input(
-                shape=tuple(int(x) for x in K.int_shape(network.inputs[0])[1:]),
-                dtype="float32",
-                name="peptide",
-            )
-            allele_input = Input(shape=(1,), dtype="float32", name="allele")
-
-            allele_embedding = network.get_layer("allele_representation")(allele_input)
-            peptide_flat = network.get_layer("flattened_0")(peptide_input)
-            allele_flat = network.get_layer("allele_flat")(allele_embedding)
-            allele_peptide_merged = network.get_layer("allele_peptide_merged")(
-                [peptide_flat, allele_flat]
-            )
-
-            sub_networks = []
-            for i, network in enumerate(networks):
-                layers = network.layers[
-                    pan_allele_layer_initial_names.index("allele_peptide_merged") + 1 :
-                ]
-                for layer in layers:
-                    new_name = layer.name + "_%d" % i
-                    layer._name = new_name
-                    assert layer.name == new_name, (layer.name, new_name)
-
-                node = allele_peptide_merged
-                layer_name_to_new_node = {
-                    "allele_peptide_merged": allele_peptide_merged,
-                }
-                for layer in layers:
-                    assert layer.name not in layer_name_to_new_node
-                    input_layer_names = []
-                    for inbound_node in layer._inbound_nodes:
-                        try:
-                            inbound_layers = list(inbound_node.inbound_layers)
-                        except TypeError:
-                            inbound_layers = [inbound_node.inbound_layers]
-                        for inbound_layer in inbound_layers:
-                            input_layer_names.append(inbound_layer.name)
-                    input_nodes = [
-                        layer_name_to_new_node[name] for name in input_layer_names
-                    ]
-                    if len(input_nodes) == 1:
-                        node = layer(input_nodes[0])
-                    else:
-                        node = layer(input_nodes)
-                    layer_name_to_new_node[layer.name] = node
-                sub_networks.append(node)
-
-            if merge_method == "average":
-                output = average(sub_networks)
-            elif merge_method == "sum":
-                output = add(sub_networks)
-            elif merge_method == "concatenate":
-                output = concatenate(sub_networks)
-            else:
-                raise NotImplementedError("Unsupported merge method", merge_method)
-
-            result._network = Model(
-                inputs=[peptide_input, allele_input],
-                outputs=[output],
-                name="merged_predictor",
-            )
-            result.update_network_description()
-        else:
-            raise NotImplementedError(
-                "Don't know merge_method to merge networks with layer names: ",
-                layer_names,
-            )
         return result
 
     def make_network(
@@ -1331,232 +1999,137 @@ class Class1NeuralNetwork(object):
             num_outputs=1,
             allele_representations=None):
         """
-        Helper function to make a keras network for class 1 affinity prediction.
+        Helper function to make a PyTorch network for class 1 affinity prediction.
         """
-
-        # We import keras here to avoid tensorflow debug output, etc. unless we
-        # are actually about to use Keras.
-        configure_tensorflow()
-        from tensorflow import keras
-        from tensorflow.keras.layers import (
-            Input,
-            Dense,
-            Flatten,
-            Dropout,
-            Embedding,
-            BatchNormalization,
-        )
+        configure_pytorch()
 
         peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
-        peptide_input = Input(
-            shape=peptide_encoding_shape, dtype="float32", name="peptide"
+
+        return Class1NeuralNetworkModel(
+            peptide_encoding_shape=peptide_encoding_shape,
+            allele_representations=allele_representations,
+            locally_connected_layers=locally_connected_layers,
+            peptide_dense_layer_sizes=peptide_dense_layer_sizes,
+            allele_dense_layer_sizes=allele_dense_layer_sizes,
+            layer_sizes=layer_sizes,
+            peptide_allele_merge_method=peptide_allele_merge_method,
+            peptide_allele_merge_activation=peptide_allele_merge_activation,
+            activation=activation,
+            output_activation=output_activation,
+            dropout_probability=dropout_probability,
+            batch_normalization=batch_normalization,
+            dense_layer_l1_regularization=dense_layer_l1_regularization,
+            dense_layer_l2_regularization=dense_layer_l2_regularization,
+            topology=topology,
+            num_outputs=num_outputs,
+            init=init,
         )
-        current_layer = peptide_input
-
-        inputs = [peptide_input]
-
-        kernel_regularizer = None
-        l1 = dense_layer_l1_regularization
-        l2 = dense_layer_l2_regularization
-        if l1 > 0 or l2 > 0:
-            kernel_regularizer = keras.regularizers.l1_l2(l1, l2)
-
-        for i, locally_connected_params in enumerate(locally_connected_layers):
-            current_layer = keras.layers.LocallyConnected1D(
-                name="lc_%d" % i, **locally_connected_params
-            )(current_layer)
-
-        current_layer = Flatten(name="flattened_0")(current_layer)
-
-        for i, layer_size in enumerate(peptide_dense_layer_sizes):
-            current_layer = Dense(
-                layer_size,
-                name="peptide_dense_%d" % i,
-                kernel_regularizer=kernel_regularizer,
-                activation=activation,
-            )(current_layer)
-
-        if batch_normalization:
-            current_layer = BatchNormalization(name="batch_norm_early")(current_layer)
-
-        if allele_representations is not None:
-            allele_input = Input(shape=(1,), dtype="float32", name="allele")
-            inputs.append(allele_input)
-
-            allele_layer = Embedding(
-                name="allele_representation",
-                input_dim=allele_representations.shape[0],
-                output_dim=numpy.product(allele_representations.shape[1:], dtype=int),
-                input_length=1,
-                trainable=False,
-            )(allele_input)
-
-            for i, layer_size in enumerate(allele_dense_layer_sizes):
-                allele_layer = Dense(
-                    layer_size,
-                    name="allele_dense_%d" % i,
-                    kernel_regularizer=kernel_regularizer,
-                    activation=activation,
-                )(allele_layer)
-
-            allele_layer = Flatten(name="allele_flat")(allele_layer)
-
-            if peptide_allele_merge_method == "concatenate":
-                current_layer = keras.layers.concatenate(
-                    [current_layer, allele_layer], name="allele_peptide_merged"
-                )
-            elif peptide_allele_merge_method == "multiply":
-                current_layer = keras.layers.multiply(
-                    [current_layer, allele_layer], name="allele_peptide_merged"
-                )
-            else:
-                raise ValueError(
-                    "Unsupported peptide_allele_encoding_merge_method: %s"
-                    % peptide_allele_merge_method
-                )
-
-            if peptide_allele_merge_activation:
-                current_layer = keras.layers.Activation(
-                    peptide_allele_merge_activation,
-                    name="alelle_peptide_merged_%s" % peptide_allele_merge_activation,
-                )(current_layer)
-
-        if topology == "feedforward":
-            densenet_layers = None
-        elif topology == "with-skip-connections":
-            densenet_layers = []
-        else:
-            raise NotImplementedError(topology)
-        for i, layer_size in enumerate(layer_sizes):
-            if densenet_layers is not None:
-                densenet_layers.append(current_layer)
-                if len(densenet_layers) > 1:
-                    current_layer = keras.layers.concatenate(densenet_layers[-2:])
-                else:
-                    (current_layer,) = densenet_layers
-
-            current_layer = Dense(
-                layer_size,
-                activation=activation,
-                kernel_regularizer=kernel_regularizer,
-                name="dense_%d" % i,
-            )(current_layer)
-
-            if batch_normalization:
-                current_layer = BatchNormalization(name="batch_norm_%d" % i)(
-                    current_layer
-                )
-
-            if dropout_probability > 0:
-                current_layer = Dropout(
-                    rate=1 - dropout_probability, name="dropout_%d" % i
-                )(current_layer)
-
-        # Note that when using densenet topology, we intentionally do not have
-        # any skip connections to the final output node. This empirically seems
-        # to work better.
-
-        output = Dense(
-            num_outputs,
-            kernel_initializer=init,
-            activation=output_activation,
-            name="output",
-        )(current_layer)
-        model = keras.models.Model(inputs=inputs, outputs=[output], name="predictor")
-
-        return model
 
     def clear_allele_representations(self):
         """
-        Set allele representations to an empty array. Useful before saving to
-        save a smaller version of the model.
+        Set allele representations to an empty array.
         """
         original_model = self.network()
-        layer = original_model.get_layer("allele_representation")
-        existing_weights_shape = (layer.input_dim, layer.output_dim)
-        self.set_allele_representations(
-            numpy.zeros(shape=(1,) + existing_weights_shape[1:]), force_surgery=True
-        )
+        if original_model is not None and original_model.allele_embedding is not None:
+            existing_shape = original_model.allele_embedding.weight.shape
+            new_weight = numpy.zeros(
+                shape=(1, existing_shape[1]),
+                dtype=numpy.float32
+            )
+            original_model.allele_embedding.weight.data = torch.from_numpy(new_weight)
+            original_model.allele_embedding.weight.requires_grad = False
 
     def set_allele_representations(self, allele_representations, force_surgery=False):
         """
-        Set the allele representations in use by this model. This means mutating
-        the weights for the allele input embedding layer.
-
-        Rationale: instead of passing in the allele sequence for each data point
-        during model training or prediction (which is expensive in terms of
-        memory usage), we pass in an allele index between 0 and n-1 where n is
-        the number of alleles in some universe of possible alleles. This index
-        is used in the model to lookup the corresponding allele sequence. This
-        function sets the lookup table.
-
-        See also: AlleleEncoding.allele_representations()
+        Set the allele representations in use by this model.
 
         Parameters
         ----------
         allele_representations : numpy.ndarray of shape (a, l, m)
-            where a is the total number of alleles,
-                  l is the allele sequence length,
-                  m is the length of the vectors used to represent amino acids
+        force_surgery : bool
         """
-        configure_tensorflow()
-        from tensorflow.keras.models import clone_model
+        network = self.network()
+        if network is None:
+            return
 
         reshaped = allele_representations.reshape(
             (
                 allele_representations.shape[0],
                 numpy.product(allele_representations.shape[1:]),
             )
-        )
-        original_model = self.network()
-        layer = original_model.get_layer("allele_representation")
-        existing_weights_shape = (layer.input_dim, layer.output_dim)
+        ).astype(numpy.float32)
 
-        # Only changes to the number of supported alleles (not the length of
-        # the allele sequences) are allowed.
-        assert existing_weights_shape[1:] == reshaped.shape[1:], (
-            existing_weights_shape,
-            reshaped.shape,
-        )
+        # Handle merged networks (ensembles)
+        if isinstance(network, MergedClass1NeuralNetwork):
+            for sub_network in network.networks:
+                self._update_embedding(sub_network, reshaped, force_surgery)
+        elif hasattr(network, 'allele_embedding') and network.allele_embedding is not None:
+            self._update_embedding(network, reshaped, force_surgery)
 
-        if existing_weights_shape[0] > reshaped.shape[0] and not force_surgery:
-            # Extend with NaNs so we can avoid having to reshape the weights
-            # matrix, which is expensive.
+    def _update_embedding(self, network, reshaped, force_surgery):
+        """Update the allele embedding for a single network."""
+        if network.allele_embedding is None:
+            return
+
+        existing_shape = network.allele_embedding.weight.shape
+
+        if existing_shape[0] > reshaped.shape[0] and not force_surgery:
+            # Extend with NaNs
             reshaped = numpy.append(
                 reshaped,
-                numpy.ones(
-                    [existing_weights_shape[0] - reshaped.shape[0], reshaped.shape[1]]
-                )
+                numpy.ones([existing_shape[0] - reshaped.shape[0], reshaped.shape[1]])
                 * numpy.nan,
                 axis=0,
             )
 
-        if existing_weights_shape != reshaped.shape:
-            # Network surgery required. Make a new network with this layer's
-            # dimensions changed. Kind of a hack.
-            layer.input_dim = reshaped.shape[0]
-            new_model = clone_model(original_model)
+        if existing_shape != reshaped.shape:
+            # Need to resize embedding
+            new_embedding = nn.Embedding(
+                num_embeddings=reshaped.shape[0],
+                embedding_dim=reshaped.shape[1]
+            )
+            new_embedding.weight.data = torch.from_numpy(reshaped)
+            new_embedding.weight.requires_grad = False
+            network.allele_embedding = new_embedding
+        else:
+            network.allele_embedding.weight.data = torch.from_numpy(reshaped)
+            network.allele_embedding.weight.requires_grad = False
 
-            # copy weights for other layers over
-            for layer in new_model.layers:
-                if layer.name != "allele_representation":
-                    layer.set_weights(
-                        original_model.get_layer(name=layer.name).get_weights()
-                    )
 
-            self._network = new_model
-            self.update_network_description()
+class MergedClass1NeuralNetwork(nn.Module):
+    """
+    A merged ensemble of Class1NeuralNetworkModel instances.
+    """
 
-            layer = new_model.get_layer("allele_representation")
+    def __init__(self, networks, merge_method="average"):
+        super(MergedClass1NeuralNetwork, self).__init__()
+        self.networks = nn.ModuleList(networks)
+        self.merge_method = merge_method
 
-            # Disable the old model to catch bugs.
-            def throw(*args, **kwargs):
-                raise RuntimeError("Using a disabled model!")
+    def forward(self, inputs):
+        outputs = [network(inputs) for network in self.networks]
+        stacked = torch.stack(outputs, dim=-1)
 
-            original_model.predict = (
-                original_model.to_json
-            ) = (
-                original_model.get_weights
-            ) = original_model.fit = original_model.fit_generator = throw
+        if self.merge_method == "average":
+            return stacked.mean(dim=-1)
+        elif self.merge_method == "sum":
+            return stacked.sum(dim=-1)
+        elif self.merge_method == "concatenate":
+            return torch.cat(outputs, dim=-1)
+        else:
+            raise ValueError(f"Unknown merge method: {self.merge_method}")
 
-        layer.set_weights([reshaped])
+    def get_weights_list(self):
+        """Get all weights as a flat list."""
+        weights = []
+        for network in self.networks:
+            weights.extend(network.get_weights_list())
+        return weights
+
+    def set_weights_list(self, weights, auto_convert_keras=False):
+        """Set weights from a flat list."""
+        idx = 0
+        for network in self.networks:
+            n_weights = len(list(network.parameters())) + len(list(network.buffers()))
+            network.set_weights_list(weights[idx:idx + n_weights], auto_convert_keras=auto_convert_keras)
+            idx += n_weights

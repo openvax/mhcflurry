@@ -41,7 +41,7 @@ if __name__ == "__main__":
         "mhcgnomes>=0.8.4",
         "pyyaml",
         "tqdm",
-        "tensorflow>=2.12.0",
+        "torch>=2.0.0",
     ]
 
     setup(

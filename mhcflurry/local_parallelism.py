@@ -15,7 +15,7 @@ import random
 
 import numpy
 
-from .common import configure_tensorflow
+from .common import configure_pytorch
 
 
 def add_local_parallelism_args(parser):
@@ -37,8 +37,8 @@ def add_local_parallelism_args(parser):
              "Set to 0 for serial run. Default: %(default)s.")
     group.add_argument(
         "--backend",
-        choices=("tensorflow-gpu", "tensorflow-cpu", "tensorflow-default"),
-        help="Keras backend. If not specified will use system default.")
+        choices=("gpu", "cpu", "default"),
+        help="Backend device type. If not specified will use system default.")
     group.add_argument(
         "--gpus",
         type=int,
@@ -57,7 +57,7 @@ def add_local_parallelism_args(parser):
         type=int,
         metavar="N",
         default=None,
-        help="Restart workers after N tasks. Workaround for tensorflow memory "
+        help="Restart workers after N tasks. Workaround for memory "
              "leaks. Requires Python >=3.2.")
     group.add_argument(
         "--worker-log-dir",
@@ -116,16 +116,12 @@ def worker_pool_with_gpu_assignments(
     """
 
     if num_jobs == 0:
-        if backend:
-            configure_tensorflow(backend)
+        configure_pytorch()
         return None
 
     worker_init_kwargs = [{} for _ in range(num_jobs)]
     if num_gpus:
         print("Attempting to round-robin assign each worker a GPU.")
-        if backend != "tensorflow-default":
-            print("Forcing keras backend to be tensorflow-default")
-            backend = "tensorflow-default"
 
         gpu_assignments_remaining = dict((
             (gpu, max_workers_per_gpu) for gpu in range(num_gpus)
@@ -146,7 +142,6 @@ def worker_pool_with_gpu_assignments(
 
             kwargs.update({
                 'gpu_device_nums': gpu_assignment,
-                'keras_backend': backend
             })
             print("Worker %d assigned GPUs: %s" % (
                 worker_num, gpu_assignment))
@@ -259,7 +254,7 @@ def worker_init_entry_point(
     init_function(**kwargs)
 
 
-def worker_init(keras_backend=None, gpu_device_nums=None, worker_log_dir=None):
+def worker_init(gpu_device_nums=None, worker_log_dir=None):
     if worker_log_dir:
         sys.stderr = sys.stdout = open(os.path.join(
             worker_log_dir,
@@ -268,11 +263,12 @@ def worker_init(keras_backend=None, gpu_device_nums=None, worker_log_dir=None):
     # Each worker needs distinct random numbers
     numpy.random.seed()
     random.seed()
-    if keras_backend or gpu_device_nums:
+    if gpu_device_nums:
         print("WORKER pid=%d assigned GPU devices: %s" % (
             os.getpid(), gpu_device_nums))
-        configure_tensorflow(
-            keras_backend, gpu_device_nums=gpu_device_nums)
+        configure_pytorch(gpu_device_nums=gpu_device_nums)
+    else:
+        configure_pytorch()
 
 
 # Solution suggested in https://bugs.python.org/issue13831

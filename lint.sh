@@ -1,15 +1,10 @@
 #!/bin/bash
 set -o errexit
 
+# Lint using ruff (fast Python linter)
+# Run from project root directory
 
-# disabling several categories of errors due to false positives in pylint,
-# see these issues:
-# - https://bitbucket.org/logilab/pylint/issues/701/false-positives-with-not-an-iterable-and
-# - https://bitbucket.org/logilab/pylint/issues/58
+echo "Running ruff linter..."
+ruff check mhcflurry/ test/ --output-format=concise
 
-find . -name '*.py' -not -path "./docs/*" \
-  | xargs pylint \
-  --errors-only \
-  --disable=unsubscriptable-object,not-an-iterable,no-member,assignment-from-no-return
-
-echo 'Passes pylint check'
+echo "Passes ruff check"

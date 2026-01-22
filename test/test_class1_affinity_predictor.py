@@ -1,3 +1,5 @@
+"""Tests for Class1AffinityPredictor."""
+import pytest
 from . import initialize
 initialize()
 
@@ -13,24 +15,26 @@ import pandas
 
 from mhcflurry import Class1AffinityPredictor
 
-from nose.tools import eq_, assert_raises
+from .pytest_helpers import eq_, assert_raises
 from numpy import testing
 
 from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import cleanup, startup
 
-DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+DOWNLOADED_PREDICTOR = None
 
 
-def setup():
+@pytest.fixture(autouse=True)
+def setup_teardown():
+    """Setup and teardown for each test."""
     global DOWNLOADED_PREDICTOR
     startup()
-    DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+    try:
+        DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+    except Exception:
+        DOWNLOADED_PREDICTOR = None
     logging.basicConfig(level=logging.DEBUG)
-
-
-def teardown():
-    global DOWNLOADED_PREDICTOR
+    yield
     DOWNLOADED_PREDICTOR = None
     cleanup()
 

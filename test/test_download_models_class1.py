@@ -14,13 +14,13 @@ from mhcflurry.testing_utils import cleanup, startup
 DOWNLOADED_PREDICTOR = None
 
 
-def setup():
+def setup_module():
     global DOWNLOADED_PREDICTOR
     startup()
     DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
 
 
-def teardown():
+def teardown_module():
     global DOWNLOADED_PREDICTOR
     DOWNLOADED_PREDICTOR = None
     cleanup()

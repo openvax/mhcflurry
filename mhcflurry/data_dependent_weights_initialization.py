@@ -40,11 +40,24 @@ See:
 
 from __future__ import print_function
 import numpy
-
-from .common import configure_tensorflow
+import torch
+import torch.nn as nn
 
 
 def svd_orthonormal(shape):
+    """
+    Generate an orthonormal matrix using SVD.
+
+    Parameters
+    ----------
+    shape : tuple
+        Shape of the weight matrix (must have at least 2 dimensions)
+
+    Returns
+    -------
+    numpy.ndarray
+        Orthonormal matrix of the given shape
+    """
     # Orthonormal init code is from Lasagne
     # https://github.com/Lasagne/Lasagne/blob/master/lasagne/init.py
     if len(shape) < 2:
@@ -57,15 +70,65 @@ def svd_orthonormal(shape):
     return q
 
 
-def get_activations(model, layer, X_batch):
-    configure_tensorflow()
-    from tensorflow.keras.models import Model
-    intermediate_layer_model = Model(
-        inputs=model.input,
-        outputs=layer.get_output_at(0)
-    )
-    activations = intermediate_layer_model.predict(X_batch)
-    return activations
+def get_activations_pytorch(model, layer_name, x_dict, device=None):
+    """
+    Get activations from a specific layer in a PyTorch model.
+
+    Parameters
+    ----------
+    model : nn.Module
+        PyTorch model
+    layer_name : str
+        Name of the layer to get activations from
+    x_dict : dict
+        Input dictionary with tensors
+    device : torch.device, optional
+        Device to run on
+
+    Returns
+    -------
+    numpy.ndarray
+        Activations from the specified layer
+    """
+    if device is None:
+        device = next(model.parameters()).device
+
+    activations = {}
+
+    def hook_fn(module, input, output):
+        activations['output'] = output.detach().cpu().numpy()
+
+    # Find the layer by name
+    target_layer = None
+    for name, module in model.named_modules():
+        if name == layer_name:
+            target_layer = module
+            break
+
+    if target_layer is None:
+        raise ValueError(f"Layer '{layer_name}' not found in model")
+
+    # Register hook
+    handle = target_layer.register_forward_hook(hook_fn)
+
+    # Forward pass
+    model.eval()
+    with torch.no_grad():
+        # Convert inputs to tensors
+        inputs = {}
+        for key, value in x_dict.items():
+            if isinstance(value, numpy.ndarray):
+                inputs[key] = torch.from_numpy(value).to(device)
+            else:
+                inputs[key] = value.to(device)
+
+        # Run forward pass
+        _ = model(inputs)
+
+    # Remove hook
+    handle.remove()
+
+    return activations['output']
 
 
 def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
@@ -79,46 +142,70 @@ def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
 
     Parameters
     ----------
-    model : keras.Model
+    model : nn.Module
+        PyTorch model
     batch : dict
-        Training data, as would be passed keras.Model.fit()
+        Training data batch (dict of numpy arrays or tensors)
     verbose : boolean
         Whether to print progress to stdout
     margin : float
+        Acceptable variance margin
     max_iter : int
+        Maximum iterations per layer
 
     Returns
     -------
-    keras.Model
-        Same as what was passed in.
+    nn.Module
+        Same model, modified in-place
     """
-    configure_tensorflow()
-    from tensorflow.keras.layers import Dense, Convolution2D
     needed_variance = 1.0
-    layers_inintialized = 0
-    for layer in model.layers:
-        if not isinstance(layer, (Dense, Convolution2D)):
-            continue
-        # avoid small layers where activation variance close to zero, esp.
-        # for small batches_generator
-        if numpy.prod(layer.get_output_shape_at(0)[1:]) < 32:
+    layers_initialized = 0
+
+    device = next(model.parameters()).device
+
+    # Get list of layers to initialize (Dense/Linear and Conv layers)
+    layers_to_init = []
+    for name, module in model.named_modules():
+        if isinstance(module, (nn.Linear, nn.Conv1d, nn.Conv2d)):
+            layers_to_init.append((name, module))
+
+    for layer_name, layer in layers_to_init:
+        # Get output shape
+        try:
+            activations = get_activations_pytorch(model, layer_name, batch, device)
+            output_size = numpy.prod(activations.shape[1:])
+        except Exception as e:
             if verbose:
-                print('LSUV initialization skipping', layer.name)
+                print(f'LSUV initialization skipping {layer_name}: {e}')
             continue
-        layers_inintialized += 1
-        weights_and_biases = layer.get_weights()
-        weights_and_biases[0] = svd_orthonormal(weights_and_biases[0].shape)
-        layer.set_weights(weights_and_biases)
-        activations = get_activations(model, layer, batch)
+
+        # Skip small layers
+        if output_size < 32:
+            if verbose:
+                print(f'LSUV initialization skipping {layer_name} (output size {output_size} < 32)')
+            continue
+
+        layers_initialized += 1
+
+        # Apply orthonormal initialization to weights
+        with torch.no_grad():
+            weight = layer.weight.data.cpu().numpy()
+            ortho_weight = svd_orthonormal(weight.shape)
+            layer.weight.data = torch.from_numpy(ortho_weight).to(device)
+
+        # Get activations and compute variance
+        activations = get_activations_pytorch(model, layer_name, batch, device)
         variance = numpy.var(activations)
+
         iteration = 0
         if verbose:
-            print(layer.name, variance)
+            print(layer_name, variance)
+
         while abs(needed_variance - variance) > margin:
             if verbose:
                 print(
                     'LSUV initialization',
-                    layer.name,
+                    layer_name,
                     iteration,
                     needed_variance,
                     margin,
@@ -127,16 +214,19 @@ def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
             if numpy.abs(numpy.sqrt(variance)) < 1e-7:
                 break  # avoid zero division
 
-            weights_and_biases = layer.get_weights()
-            weights_and_biases[0] /= numpy.sqrt(variance) / numpy.sqrt(
-                needed_variance)
-            layer.set_weights(weights_and_biases)
-            activations = get_activations(model, layer, batch)
+            # Scale weights to achieve unit variance
+            with torch.no_grad():
+                scale_factor = numpy.sqrt(needed_variance) / numpy.sqrt(variance)
+                layer.weight.data *= scale_factor
+
+            # Recompute activations and variance
+            activations = get_activations_pytorch(model, layer_name, batch, device)
             variance = numpy.var(activations)
 
             iteration += 1
             if iteration >= max_iter:
                 break
+
     if verbose:
-        print('Done with LSUV: total layers initialized', layers_inintialized)
+        print('Done with LSUV: total layers initialized', layers_initialized)
     return model

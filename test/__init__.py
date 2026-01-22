@@ -16,17 +16,27 @@ def data_path(name):
 
 def initialize():
     '''
-    Initialize logging and tensorflow, numpy, and python random seeds.
+    Initialize logging and PyTorch, numpy, and python random seeds.
     '''
     import logging
-    logging.getLogger("tensorflow").disabled = True
     logging.getLogger("matplotlib").disabled = True
 
-    import tensorflow as tf
+    import numpy
+    import random
+    import torch
+
     seed = int(os.environ.get("MHCFLURRY_TEST_SEED", 1))
     if seed == 0:
         # Enable nondeterminism
         seed = int(time.time())
     print("Using random seed", seed)
-    tf.keras.utils.set_random_seed(seed)
-    tf.config.experimental.enable_op_determinism()
+
+    # Set seeds for reproducibility
+    numpy.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+    # Enable deterministic operations where possible
+    torch.use_deterministic_algorithms(False)  # Some ops don't have deterministic impl

@@ -12,7 +12,7 @@ from mhcflurry.testing_utils import cleanup, startup
 PAN_ALLELE_PREDICTOR = None
 
 
-def setup():
+def setup_module():
     global PAN_ALLELE_PREDICTOR
     startup()
     PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
@@ -20,7 +20,7 @@ def setup():
         optimization_level=0,)
 
 
-def teardown():
+def teardown_module():
     global PAN_ALLELE_PREDICTOR
     PAN_ALLELE_PREDICTOR = None
     cleanup()

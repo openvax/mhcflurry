@@ -5,13 +5,14 @@ The study that generated this dataset has now been published
 (Bonsack et al 2019, DOI: 10.1158/2326-6066.CIR-18-0584), and the authors
 request that any work based on the HPV dataset cite this paper.
 """
+import pytest
 from . import initialize
 initialize()
 
 import os
 import pandas
 from sklearn.metrics import roc_auc_score
-from nose.tools import assert_greater
+from .pytest_helpers import assert_greater
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
@@ -30,7 +31,7 @@ DF = pandas.read_csv(data_path("hpv_predictions.csv"))
 PREDICTORS = None
 
 
-def setup():
+def setup_module():
     global PREDICTORS
     startup()
     PREDICTORS = {
@@ -38,10 +39,10 @@ def setup():
             get_path("models_class1", "models")),
         'pan-allele': Class1AffinityPredictor.load(
             get_path("models_class1_pan", "models.combined"))
-}
+    }
 
 
-def teardown():
+def teardown_module():
     global PREDICTORS
     PREDICTORS = None
     cleanup()

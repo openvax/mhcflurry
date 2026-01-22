@@ -1,3 +1,5 @@
+"""Tests for regression target conversion."""
+import pytest
 from . import initialize
 initialize()
 
@@ -5,7 +7,7 @@ from mhcflurry.regression_target import (
     from_ic50,
     to_ic50,
 )
-from nose.tools import eq_
+from .pytest_helpers import eq_
 
 
 def test_regression_target_to_ic50():

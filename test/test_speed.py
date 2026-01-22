@@ -28,7 +28,7 @@ ALLELE_SPECIFIC_PREDICTOR = None
 PAN_ALLELE_PREDICTOR = None
 
 
-def setup():
+def setup_module():
     global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR
     startup()
     ALLELE_SPECIFIC_PREDICTOR = Class1AffinityPredictor.load(
@@ -38,7 +38,7 @@ def setup():
         get_path("models_class1_pan", "models.combined"))
 
 
-def teardown():
+def teardown_module():
     global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR
     ALLELE_SPECIFIC_PREDICTOR = None
     PAN_ALLELE_PREDICTOR = None
@@ -159,7 +159,7 @@ if __name__ == '__main__':
     # to explore results.
 
     args = parser.parse_args(sys.argv[1:])
-    setup()
+    setup_module()
 
     if "allele-specific" in args.predictor:
         print("Running allele-specific test")

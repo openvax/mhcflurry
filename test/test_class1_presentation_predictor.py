@@ -6,7 +6,7 @@ import tempfile
 import pickle
 
 from numpy.testing import assert_, assert_equal, assert_allclose, assert_array_equal
-from nose.tools import assert_greater, assert_less
+from .pytest_helpers import assert_greater, assert_less
 import numpy
 
 from sklearn.metrics import roc_auc_score
@@ -26,7 +26,7 @@ CLEAVAGE_PREDICTOR_NO_FLANKING = None
 PRESENTATION_PREDICTOR = None
 
 
-def setup():
+def setup_module():
     global AFFINITY_PREDICTOR
     global CLEAVAGE_PREDICTOR
     global CLEAVAGE_PREDICTOR_NO_FLANKING
@@ -45,7 +45,7 @@ def setup():
     PRESENTATION_PREDICTOR = Class1PresentationPredictor.load()
 
 
-def teardown():
+def teardown_module():
     global AFFINITY_PREDICTOR
     global CLEAVAGE_PREDICTOR
     global CLEAVAGE_PREDICTOR_NO_FLANKING

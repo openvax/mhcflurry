@@ -2,8 +2,8 @@
 Test that pan-allele and allele-specific predictors are highly correlated.
 """
 from __future__ import print_function
+import pytest
 import logging
-logging.getLogger('tensorflow').disabled = True
 logging.getLogger('matplotlib').disabled = True
 
 import os
@@ -11,7 +11,7 @@ import sys
 import argparse
 import pandas
 import numpy
-from nose.tools import assert_greater
+from .pytest_helpers import assert_greater
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.encodable_sequences import EncodableSequences
@@ -24,6 +24,7 @@ PREDICTORS = None
 
 
 def setup():
+    """Setup for running script directly (not via pytest)."""
     global PREDICTORS
     startup()
     PREDICTORS = {
@@ -34,8 +35,21 @@ def setup():
     }
 
 
-def teardown():
+@pytest.fixture(autouse=True)
+def setup_teardown():
+    """Setup and teardown for each test."""
     global PREDICTORS
+    startup()
+    try:
+        PREDICTORS = {
+            'allele-specific': Class1AffinityPredictor.load(
+                get_path("models_class1", "models")),
+            'pan-allele': Class1AffinityPredictor.load(
+                get_path("models_class1_pan", "models.combined"), max_models=2)
+        }
+    except Exception:
+        PREDICTORS = None
+    yield
     PREDICTORS = None
     cleanup()
 

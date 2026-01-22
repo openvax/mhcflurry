@@ -12,7 +12,6 @@ from functools import partial
 from six import string_types
 
 import numpy
-from numpy.testing import assert_equal
 import pandas
 
 
@@ -45,7 +44,7 @@ class Class1AffinityPredictor(object):
     High-level interface for peptide/MHC I binding affinity prediction.
 
     This class manages low-level `Class1NeuralNetwork` instances, each of which
-    wraps a single Keras network. The purpose of `Class1AffinityPredictor` is to
+    wraps a single PyTorch network. The purpose of `Class1AffinityPredictor` is to
     implement ensembles, handling of multiple alleles, and predictor loading and
     saving. It also provides a place to keep track of metadata like prediction
     histograms for percentile rank calibration.
@@ -73,7 +72,7 @@ class Class1AffinityPredictor(object):
             MHC allele name to fixed-length amino acid sequence (sometimes
             referred to as the pseudosequence). Required only if
             class1_pan_allele_models is specified.
-        
+
         manifest_df : `pandas.DataFrame`, optional
             Must have columns: model_name, allele, config_json, model.
             Only required if you want to update an existing serialization of a
@@ -93,7 +92,7 @@ class Class1AffinityPredictor(object):
         optimization_info : dict, optional
             Dict describing any optimizations already performed on the model.
             The only currently supported optimization is to merge ensembles
-            together into one tensorflow graph.
+            together into one PyTorch model.
         """
 
         if allele_to_allele_specific_models is None:
@@ -288,7 +287,7 @@ class Class1AffinityPredictor(object):
     def supported_alleles(self):
         """
         Alleles for which predictions can be made.
-        
+
         Returns
         -------
         list of string
@@ -346,19 +345,19 @@ class Class1AffinityPredictor(object):
         """
         Serialize the predictor to a directory on disk. If the directory does
         not exist it will be created.
-        
+
         The serialization format consists of a file called "manifest.csv" with
         the configurations of each Class1NeuralNetwork, along with per-network
         files giving the model weights. If there are pan-allele predictors in
         the ensemble, the allele sequences are also stored in the
         directory. There is also a small file "index.txt" with basic metadata:
         when the models were trained, by whom, on what host.
-        
+
         Parameters
         ----------
         models_dir : string
             Path to directory. It will be created if it doesn't exist.
-            
+
         model_names_to_write : list of string, optional
             Only write the weights for the specified models. Useful for
             incremental updates during training.
@@ -463,13 +462,13 @@ class Class1AffinityPredictor(object):
     def load(models_dir=None, max_models=None, optimization_level=None):
         """
         Deserialize a predictor from a directory on disk.
-        
+
         Parameters
         ----------
         models_dir : string
             Path to directory. If unspecified the default downloaded models are
             used.
-            
+
         max_models : int, optional
             Maximum number of `Class1NeuralNetwork` instances to load
 
@@ -635,7 +634,7 @@ class Class1AffinityPredictor(object):
         EXPERIMENTAL: Optimize the predictor for faster predictions.
 
         Currently the only optimization implemented is to merge multiple pan-
-        allele predictors at the tensorflow level.
+        allele predictors at the PyTorch level.
 
         The optimization is performed in-place, mutating the instance.
 
@@ -672,7 +671,7 @@ class Class1AffinityPredictor(object):
     def model_name(allele, num):
         """
         Generate a model name
-        
+
         Parameters
         ----------
         allele : string
@@ -694,7 +693,7 @@ class Class1AffinityPredictor(object):
     def weights_path(models_dir, model_name):
         """
         Generate the path to the weights file for a model
-        
+
         Parameters
         ----------
         models_dir : string
@@ -739,22 +738,22 @@ class Class1AffinityPredictor(object):
         """
         Fit one or more allele specific predictors for a single allele using one
         or more neural network architectures.
-        
+
         The new predictors are saved in the Class1AffinityPredictor instance
         and will be used on subsequent calls to `predict`.
-        
+
         Parameters
         ----------
         n_models : int
             Number of neural networks to fit
-        
+
         architecture_hyperparameters_list : list of dict
             List of hyperparameter sets.
-               
+
         allele : string
-        
+
         peptides : `EncodableSequences` or list of string
-        
+
         affinities : list of float
             nM affinities
 
@@ -764,11 +763,11 @@ class Class1AffinityPredictor(object):
         train_rounds : sequence of int
             Each training point i will be used on training rounds r for which
             train_rounds[i] > r, r >= 0.
-        
+
         models_dir_for_save : string, optional
             If specified, the Class1AffinityPredictor is (incrementally) written
             to the given models dir after each neural network is fit.
-        
+
         verbose : int
             Keras verbosity
 
@@ -878,32 +877,32 @@ class Class1AffinityPredictor(object):
         """
         Fit one or more pan-allele predictors using a single neural network
         architecture.
-        
+
         The new predictors are saved in the Class1AffinityPredictor instance
         and will be used on subsequent calls to `predict`.
-        
+
         Parameters
         ----------
         n_models : int
             Number of neural networks to fit
-            
+
         architecture_hyperparameters : dict
-        
+
         alleles : list of string
             Allele names (not sequences) corresponding to each peptide
-        
+
         peptides : `EncodableSequences` or list of string
-        
+
         affinities : list of float
             nM affinities
 
         inequalities : list of string, each element one of ">", "<", or "="
             See Class1NeuralNetwork.fit for details.
-        
+
         models_dir_for_save : string, optional
             If specified, the Class1AffinityPredictor is (incrementally) written
             to the given models dir after each neural network is fit.
-        
+
         verbose : int
             Keras verbosity
 
@@ -1054,15 +1053,15 @@ class Class1AffinityPredictor(object):
             model_kwargs={}):
         """
         Predict nM binding affinities.
-        
+
         If multiple predictors are available for an allele, the predictions are
         the geometric means of the individual model (nM) predictions.
-        
+
         One of 'allele' or 'alleles' must be specified. If 'allele' is specified
         all predictions will be for the given allele. If 'alleles' is specified
         it must be the same length as 'peptides' and give the allele
         corresponding to each peptide.
-        
+
         Parameters
         ----------
         peptides : `EncodableSequences` or list of string
@@ -1108,15 +1107,15 @@ class Class1AffinityPredictor(object):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
-        
+
         If multiple predictors are available for an allele, the predictions are
         the geometric means of the individual model predictions.
-        
+
         One of 'allele' or 'alleles' must be specified. If 'allele' is specified
         all predictions will be for the given allele. If 'alleles' is specified
         it must be the same length as 'peptides' and give the allele
-        corresponding to each peptide. 
-        
+        corresponding to each peptide.
+
         Parameters
         ----------
         peptides : `EncodableSequences` or list of string
@@ -1287,7 +1286,7 @@ class Class1AffinityPredictor(object):
 
                 if self.optimization_info.get("pan_models_merged"):
                     # Multiple pan-allele models have been merged into one
-                    # at the tensorflow level.
+                    # at the PyTorch level.
                     assert len(self.class1_pan_allele_models) == 1
                     predictions = self.class1_pan_allele_models[0].predict(
                         masked_peptides,

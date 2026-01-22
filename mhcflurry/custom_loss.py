@@ -4,13 +4,19 @@ Custom loss functions.
 For losses supporting inequalities, each training data point is associated with
 one of (=), (<), or (>). For e.g. (>) inequalities, penalization is applied only
 if the prediction is less than the given value.
+
+This module now delegates to pytorch_losses.py for the actual loss implementations.
 """
 from __future__ import division
-import pandas
 import numpy
-from numpy import isnan, array
 
-from .common import configure_tensorflow
+# Import PyTorch implementations
+from .pytorch_losses import (
+    MSEWithInequalities as PyTorchMSEWithInequalities,
+    MSEWithInequalitiesAndMultipleOutputs as PyTorchMSEWithInequalitiesAndMultipleOutputs,
+    MultiallelicMassSpecLoss as PyTorchMultiallelicMassSpecLoss,
+    StandardLoss as PyTorchStandardLoss,
+)
 
 CUSTOM_LOSSES = {}
 
@@ -44,12 +50,12 @@ def get_loss(name):
 class Loss(object):
     """
     Thin wrapper to keep track of neural network loss functions, which could
-    be custom or baked into Keras.
+    be custom or baked into PyTorch.
 
     Each subclass or instance should define these properties/methods:
     - name : string
-    - loss : string or function
-        This is what gets passed to keras.fit()
+    - loss : callable
+        This is the PyTorch loss function
     - encode_y : numpy.ndarray -> numpy.ndarray
         Transformation to apply to regression target before fitting
     """
@@ -62,27 +68,22 @@ class Loss(object):
     def loss(self, y_true, y_pred):
         raise NotImplementedError()
 
-    def get_keras_loss(self, reduction="sum_over_batch_size"):
-        configure_tensorflow()
-        from tensorflow.keras.losses import LossFunctionWrapper
-        return LossFunctionWrapper(
-            self.loss, reduction=reduction, name=self.name)
-
 
 class StandardKerasLoss(Loss):
     """
-    A loss function supported by Keras, such as MSE.
+    A standard loss function such as MSE.
     """
     supports_inequalities = False
     supports_multiple_outputs = False
 
     def __init__(self, loss_name="mse"):
+        self._pytorch_loss = PyTorchStandardLoss(loss_name)
         self.loss = loss_name
         Loss.__init__(self, loss_name)
 
     @staticmethod
     def encode_y(y):
-        return y
+        return numpy.array(y, dtype=numpy.float32)
 
 
 class TransformPredictionsLossWrapper(Loss):
@@ -139,66 +140,15 @@ class MSEWithInequalities(Loss):
     supports_inequalities = True
     supports_multiple_outputs = False
 
+    def __init__(self):
+        self._pytorch_loss = PyTorchMSEWithInequalities()
+
     @staticmethod
     def encode_y(y, inequalities=None):
-        y = array(y, dtype="float32")
-        if isnan(y).any():
-            raise ValueError("y contains NaN", y)
-        if (y > 1.0).any():
-            raise ValueError("y contains values > 1.0", y)
-        if (y < 0.0).any():
-            raise ValueError("y contains values < 0.0", y)
+        return PyTorchMSEWithInequalities.encode_y(y, inequalities)
 
-        if inequalities is None:
-            encoded = y
-        else:
-            offsets = pandas.Series(inequalities).map({
-                '=': 0,
-                '>': 2,
-                '<': 4,
-            }).values
-            if isnan(offsets).any():
-                raise ValueError("Invalid inequality. Must be =, <, or >")
-            encoded = y + offsets
-        assert not isnan(encoded).any()
-        return encoded
-
-    def loss(self, y_true, y_pred):
-        # We always delay import of Keras so that mhcflurry can be imported
-        # initially without tensorflow debug output, etc.
-        configure_tensorflow()
-        import tensorflow as tf
-
-        # from tensorflow.keras import backend as K
-        y_true = tf.reshape(y_true, [-1])
-        y_pred = tf.reshape(y_pred, [-1])
-
-        # Handle (=) inequalities
-        diff1 = y_pred - y_true
-        diff1 *= tf.cast(y_true >= 0.0, "float32")
-        diff1 *= tf.cast(y_true <= 1.0, "float32")
-
-        # Handle (>) inequalities
-        diff2 = y_pred - (y_true - 2.0)
-        diff2 *= tf.cast(y_true >= 2.0, "float32")
-        diff2 *= tf.cast(y_true <= 3.0, "float32")
-        diff2 *= tf.cast(diff2 < 0.0, "float32")
-
-        # Handle (<) inequalities
-        diff3 = y_pred - (y_true - 4.0)
-        diff3 *= tf.cast(y_true >= 4.0, "float32")
-        diff3 *= tf.cast(diff3 > 0.0, "float32")
-
-        denominator = tf.maximum(
-            tf.reduce_sum(tf.cast(tf.not_equal(y_true, 2.0), "float32"), 0),
-            1.0)
-
-        result = (
-            tf.reduce_sum(tf.math.square(diff1)) +
-            tf.reduce_sum(tf.math.square(diff2)) +
-            tf.reduce_sum(tf.math.square(diff3))) / denominator
-
-        return result
+    def loss(self, y_pred, y_true):
+        return self._pytorch_loss(y_pred, y_true)
 
 
 class MSEWithInequalitiesAndMultipleOutputs(Loss):
@@ -226,60 +176,22 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
     supports_inequalities = True
     supports_multiple_outputs = True
 
+    def __init__(self):
+        self._pytorch_loss = PyTorchMSEWithInequalitiesAndMultipleOutputs()
+
     @staticmethod
     def encode_y(y, inequalities=None, output_indices=None):
-        y = array(y, dtype="float32")
-        if isnan(y).any():
-            raise ValueError("y contains NaN", y)
-        if (y > 1.0).any():
-            raise ValueError("y contains values > 1.0", y)
-        if (y < 0.0).any():
-            raise ValueError("y contains values < 0.0", y)
+        return PyTorchMSEWithInequalitiesAndMultipleOutputs.encode_y(
+            y, inequalities, output_indices
+        )
 
-        encoded = MSEWithInequalities.encode_y(
-            y, inequalities=inequalities)
-
-        if output_indices is not None:
-            output_indices = numpy.array(output_indices)
-            check_shape("output_indices", output_indices, (len(encoded),))
-            if (output_indices < 0).any():
-                raise ValueError("Invalid output indices: ", output_indices)
-
-            encoded += output_indices * 10
-
-        return encoded
-
-    def loss(self, y_true, y_pred):
-        configure_tensorflow()
-        import tensorflow as tf
-
-        y_true = tf.reshape(y_true, [-1])
-
-        output_indices = y_true // 10
-        updated_y_true = y_true - (10 * output_indices)
-
-        # We index into y_pred using flattened indices since Keras backend
-        # supports gather but has no equivalent of tf.gather_nd:
-        #ordinals = K.arange(K.shape(y_true)[0])
-        #flattened_indices = (
-        #    ordinals * y_pred.shape[1] + K.cast(output_indices, "int32"))
-        #updated_y_pred = K.gather(K.flatten(y_pred), flattened_indices)
-
-        # Alternative implementation using tensorflow, which could be used if
-        # we drop support for other backends:
-        #ordinals = K.arange(K.shape(y_true)[0])
-        ordinals = tf.range(tf.shape(y_true)[0])
-        indexer = tf.stack([
-            ordinals,
-            tf.cast(output_indices, "int32")
-        ], axis=-1)
-        updated_y_pred = tf.gather_nd(y_pred, indexer)
-
-        return MSEWithInequalities().loss(updated_y_true, updated_y_pred)
+    def loss(self, y_pred, y_true):
+        return self._pytorch_loss(y_pred, y_true)
 
 
 class MultiallelicMassSpecLoss(Loss):
     """
+    Multiallelic mass spec loss function.
     """
     name = "multiallelic_mass_spec_loss"
     supports_inequalities = True
@@ -288,29 +200,14 @@ class MultiallelicMassSpecLoss(Loss):
     def __init__(self, delta=0.2, multiplier=1.0):
         self.delta = delta
         self.multiplier = multiplier
+        self._pytorch_loss = PyTorchMultiallelicMassSpecLoss(delta, multiplier)
 
     @staticmethod
     def encode_y(y):
-        encoded = pandas.Series(y, dtype="float32", copy=True)
-        assert all(item in (-1.0, 1.0, 0.0) for item in encoded), set(y)
-        print(
-            "MultiallelicMassSpecLoss: y-value counts:\n",
-            encoded.value_counts())
-        return encoded.values
+        return PyTorchMultiallelicMassSpecLoss.encode_y(y)
 
-    def loss(self, y_true, y_pred):
-        configure_tensorflow()
-        import tensorflow as tf
-
-        y_true = tf.reshape(y_true, (-1,))
-        pos = tf.boolean_mask(y_pred, tf.math.equal(y_true, 1.0))
-        pos_max = tf.reduce_max(pos, axis=1)
-        neg = tf.boolean_mask(y_pred, tf.math.equal(y_true, 0.0))
-        term = tf.reshape(neg, (-1, 1)) - pos_max + self.delta
-        result = tf.math.divide_no_nan(
-            tf.reduce_sum(tf.maximum(0.0, term) ** 2),
-            tf.cast(tf.size(term), tf.float32)) * self.multiplier
-        return result
+    def loss(self, y_pred, y_true):
+        return self._pytorch_loss(y_pred, y_true)
 
 
 def check_shape(name, arr, expected_shape):
@@ -335,5 +232,3 @@ for cls in [
         MSEWithInequalitiesAndMultipleOutputs,
         MultiallelicMassSpecLoss]:
     CUSTOM_LOSSES[cls.name] = cls()
-
-

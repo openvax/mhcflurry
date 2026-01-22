@@ -9,7 +9,6 @@ from __future__ import (
 
 import math
 from six import string_types
-from functools import partial
 
 import numpy
 import pandas
@@ -31,7 +30,7 @@ class EncodingError(ValueError):
 class EncodableSequences(object):
     """
     Class for encoding variable-length peptides to fixed-size numerical matrices
-    
+
     This class caches various encodings of a list of sequences.
 
     In practice this is used only for peptides. To encode MHC allele sequences,
@@ -79,7 +78,7 @@ class EncodableSequences(object):
         matrix.
 
         See `sequences_to_fixed_length_index_encoded_array` for details.
-        
+
         Parameters
         ----------
         alignment_method : string
@@ -211,7 +210,7 @@ class EncodableSequences(object):
             pad_middle
                 Encoding designed for preserving the anchor positions of class
                 I peptides. This is what is used in allele-specific models.
-                
+
                 Each string must be of length at least left_edge + right_edge
                 and at most max_length. The first left_edge characters in the
                 input always map to the first left_edge characters in the

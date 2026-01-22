@@ -89,6 +89,14 @@ print("Loaded %d training and %d ms hits" % (
 
 
 def test_train_simple():
+    # Reset random seeds to ensure reproducibility regardless of test order
+    import numpy
+    import random
+    import torch
+    numpy.random.seed(1)
+    random.seed(1)
+    torch.manual_seed(1)
+
     network = Class1NeuralNetwork(**HYPERPARAMETERS)
     allele_encoding = AlleleEncoding(
         TRAIN_DF.allele.values,
