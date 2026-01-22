@@ -4,7 +4,7 @@ import numpy
 def from_ic50(ic50, max_ic50=50000.0):
     """
     Convert ic50s to regression targets in the range [0.0, 1.0].
-    
+
     Parameters
     ----------
     ic50 : numpy.array of float
@@ -24,7 +24,7 @@ def to_ic50(x, max_ic50=50000.0):
     """
     Convert regression targets in the range [0.0, 1.0] to ic50s in the range
     [0, 50000.0].
-    
+
     Parameters
     ----------
     x : numpy.array of float

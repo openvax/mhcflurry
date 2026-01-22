@@ -21,6 +21,28 @@ from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import cleanup, startup
 
+
+ALLELE_SPECIFIC_PREDICTOR = None
+PAN_ALLELE_PREDICTOR = None
+
+
+def setup_module():
+    global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR
+    startup()
+    ALLELE_SPECIFIC_PREDICTOR = Class1AffinityPredictor.load(
+        get_path("models_class1", "models"))
+
+    PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.combined"))
+
+
+def teardown_module():
+    global ALLELE_SPECIFIC_PREDICTOR, PAN_ALLELE_PREDICTOR
+    ALLELE_SPECIFIC_PREDICTOR = None
+    PAN_ALLELE_PREDICTOR = None
+    cleanup()
+
+
 DEFAULT_NUM_PREDICTIONS = 10000
 
 
@@ -153,7 +175,7 @@ if __name__ == '__main__':
     # to explore results.
 
     args = parser.parse_args(sys.argv[1:])
-    predictors_dict = load_predictors()
+    setup_module()
 
     if "allele-specific" in args.predictor:
         print("Running allele-specific test")

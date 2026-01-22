@@ -42,8 +42,7 @@ if __name__ == "__main__":
         "numpy",
         "pyyaml",
         "tqdm",
-        "tensorflow>=2.15.0",
-        "tf-keras"
+        "torch>=2.0.0",
     ]
 
     setup(

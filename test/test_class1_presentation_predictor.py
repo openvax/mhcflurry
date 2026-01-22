@@ -6,7 +6,7 @@ import tempfile
 import pickle
 
 from numpy.testing import assert_, assert_equal, assert_allclose, assert_array_equal
-import pytest
+from .pytest_helpers import assert_greater, assert_less
 import numpy
 
 from sklearn.metrics import roc_auc_score
@@ -21,23 +21,35 @@ mhcflurry.class1_presentation_predictor.PREDICT_CHUNK_SIZE = 15
 from . import data_path
 
 
-@pytest.fixture(scope="module")
-def predictors():
+
+def setup_module():
+    global AFFINITY_PREDICTOR
+    global CLEAVAGE_PREDICTOR
+    global CLEAVAGE_PREDICTOR_NO_FLANKING
+    global PRESENTATION_PREDICTOR
     startup()
-    predictors = {
-        'affinity_predictor': Class1AffinityPredictor.load(
-            get_path("models_class1_pan", "models.combined"),
-            optimization_level=0,
-            max_models=1),
-        'cleavage_predictor': Class1ProcessingPredictor.load(
-            get_path("models_class1_processing", "models.selected.with_flanks"),
-            max_models=1),
-        'cleavage_predictor_no_flanking': Class1ProcessingPredictor.load(
-            get_path("models_class1_processing", "models.selected.no_flank"),
-            max_models=1),
-        'presentation_predictor': Class1PresentationPredictor.load()
-    }
-    yield predictors
+    AFFINITY_PREDICTOR = Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.combined"),
+        optimization_level=0,
+        max_models=1)
+    CLEAVAGE_PREDICTOR = Class1ProcessingPredictor.load(
+        get_path("models_class1_processing", "models.selected.with_flanks"),
+        max_models=1)
+    CLEAVAGE_PREDICTOR_NO_FLANKING = Class1ProcessingPredictor.load(
+        get_path("models_class1_processing", "models.selected.no_flank"),
+        max_models=1)
+    PRESENTATION_PREDICTOR = Class1PresentationPredictor.load()
+
+
+def teardown_module():
+    global AFFINITY_PREDICTOR
+    global CLEAVAGE_PREDICTOR
+    global CLEAVAGE_PREDICTOR_NO_FLANKING
+    global PRESENTATION_PREDICTOR
+    AFFINITY_PREDICTOR = None
+    CLEAVAGE_PREDICTOR = None
+    CLEAVAGE_PREDICTOR_NO_FLANKING = None
+    PRESENTATION_PREDICTOR = None
     cleanup()
 
 

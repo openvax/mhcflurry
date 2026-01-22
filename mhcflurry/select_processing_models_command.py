@@ -246,7 +246,6 @@ def model_select(
     -------
     dict with keys 'fold_num', 'selected_indices', 'summary'
     """
-    from .flanking_encoding import FlankingEncoding
 
     full_data = constant_data["data"]
     df = full_data.loc[

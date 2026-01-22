@@ -12,11 +12,18 @@ from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 
 from mhcflurry.testing_utils import cleanup, startup
 
-# Define a fixture to initialize and clean up predictors
-@pytest.fixture(scope="module")
-def downloaded_predictor():
+DOWNLOADED_PREDICTOR = None
+
+
+def setup_module():
+    global DOWNLOADED_PREDICTOR
     startup()
-    yield Class1AffinityPredictor.load()
+    DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+
+
+def teardown_module():
+    global DOWNLOADED_PREDICTOR
+    DOWNLOADED_PREDICTOR = None
     cleanup()
 
 
