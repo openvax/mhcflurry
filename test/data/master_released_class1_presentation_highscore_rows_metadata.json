@@ -1,0 +1,27 @@
+{
+  "allele_count": 35,
+  "context_count": 9,
+  "high_score_threshold": 0.9,
+  "low_score_stats": {
+    "pres_with_presentation_score": {
+      "context_count": 9,
+      "contexts_with_low_allele": 9,
+      "low_score_threshold": 0.2
+    },
+    "pres_without_presentation_score": {
+      "context_count": 9,
+      "contexts_with_low_allele": 9,
+      "low_score_threshold": 0.2
+    }
+  },
+  "low_score_threshold": 0.2,
+  "presentation_internal_affinity_provenance": "generated on Thu Jun 11 13:31:45 2020",
+  "presentation_provenance": "generated on Thu Jun 11 13:37:18 2020",
+  "release": "2.2.0",
+  "row_count": 315,
+  "score_columns": [
+    "pres_with_presentation_score",
+    "pres_without_presentation_score"
+  ],
+  "source_tf_predictions_csv": "/private/tmp/mhcflurry-cross-allele-1000-randflanks/tf_predictions.csv.gz"
+}
