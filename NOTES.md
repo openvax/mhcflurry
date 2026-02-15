@@ -88,3 +88,32 @@
     - `test/test_released_presentation_highscore_rows.py`
     - validates fixture high/low context properties and compares released
       PyTorch predictions against TF fixture outputs.
+
+## 2026-02-12
+
+- Packaging / Torch readiness checks:
+  - Verified `setup.py` publishes `torch>=2.0.0` in metadata and wheel:
+    - `python setup.py egg_info`
+    - `python -m pip wheel --no-deps .`
+  - Verified generated metadata includes `Requires-Dist: torch>=2.0.0`.
+  - Editable install attempt failed in this sandbox due permissions in
+    shared virtualenv `bin/` path, not due packaging metadata.
+
+- Warning triage:
+  - Important forward-compat warnings fixed:
+    - `class1_presentation_predictor.py`: avoid `idxmin` on all-NA rows.
+    - `random_negative_peptides.py`: avoid assigning `NaN` into int-typed frame.
+  - Test warning cleanup:
+    - `test_class1_processing_neural_network.py`: avoid `SettingWithCopyWarning`
+      by copying train/test subsets before assignment.
+  - Deprecated imports cleanup:
+    - `downloads.py`: replaced `pipes.quote` with `shlex.quote`.
+    - `downloads.py`: replaced `pkg_resources.resource_string` with
+      `importlib.resources.files(...).read_text()`.
+
+- Targeted validation after fixes:
+  - `pytest -q test/test_class1_presentation_predictor.py::test_downloaded_predictor_invalid_peptides`
+  - `pytest -q test/test_random_negative_peptides.py::test_random_negative_peptides_by_allele`
+  - `pytest -q test/test_class1_processing_neural_network.py::test_small`
+  - Result: all pass; only isolated `pytest.mark.slow` registration warning remains
+    when running that single test file directly.

@@ -16,7 +16,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import StratifiedKFold
 from .common import normalize_allele_name
 import tqdm  # progress bar
-tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import configure_logging
@@ -26,6 +25,8 @@ from .local_parallelism import (
     call_wrapped_kwargs)
 from .hyperparameters import HyperparameterDefaults
 from .allele_encoding import AlleleEncoding
+
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 
 # To avoid pickling large matrices to send to child processes when running in

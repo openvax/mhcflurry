@@ -218,8 +218,12 @@ def cluster_results(
         item_script_pieces = [
             script_prefix.format(work_item_num=i, work_dir=item_workdir)
         ]
+        worker_command = os.environ.get(
+            "MHCFLURRY_CLUSTER_WORKER_COMMAND",
+            "_mhcflurry-cluster-worker-entry-point"
+        )
         item_script_pieces.append(" ".join([
-            "_mhcflurry-cluster-worker-entry-point",
+            worker_command,
             "--constant-data", quote(constant_payload_path),
             "--worker-data", quote(item_data_path),
             "--result-out", quote(item_result_path),

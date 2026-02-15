@@ -2,19 +2,11 @@
 Tests for Class1ProcessingNeuralNetwork.
 """
 import pytest
-from . import initialize
-initialize()
 
 import re
 import numpy
-numpy.random.seed(0)
-
 from sklearn.metrics import roc_auc_score
-
-from .pytest_helpers import eq_, assert_less, assert_greater, assert_almost_equal
-
 import pandas
-import pytest
 
 from mhcflurry.class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from mhcflurry.common import random_peptides
@@ -22,6 +14,8 @@ from mhcflurry.amino_acid import BLOSUM62_MATRIX
 from mhcflurry.flanking_encoding import FlankingEncoding
 
 from mhcflurry.testing_utils import cleanup, startup
+
+numpy.random.seed(0)
 
 
 @pytest.fixture(autouse=True)
@@ -212,8 +206,8 @@ def train_basic_network(num, do_assertions=True, is_hit=None, **hyperparameters)
         for (_, row) in df.iterrows()
     ]
 
-    train_df = df.sample(frac=0.9)
-    test_df = df.loc[~df.index.isin(train_df.index)]
+    train_df = df.sample(frac=0.9).copy()
+    test_df = df.loc[~df.index.isin(train_df.index)].copy()
 
     print(
         "Generated dataset",

@@ -1,12 +1,10 @@
-from . import initialize
-initialize()
 
 import tempfile
 import os
 
 import pandas
 import pytest
-from numpy.testing import assert_equal, assert_array_less, assert_array_equal
+from numpy.testing import assert_array_less
 
 from mhcflurry import predict_scan_command
 

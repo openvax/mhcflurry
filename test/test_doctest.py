@@ -1,8 +1,6 @@
 """
 Run doctests.
 """
-from . import initialize
-initialize()
 
 import os
 import doctest

@@ -2,16 +2,13 @@
 Test that pan-allele and allele-specific predictors are highly correlated.
 """
 from __future__ import print_function
-import pytest
-import logging
-logging.getLogger('matplotlib').disabled = True
-
-import pytest
-import sys
 import argparse
-import pandas
+import logging
+import sys
+
 import numpy
-from .pytest_helpers import assert_greater
+import pandas
+import pytest
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.encodable_sequences import EncodableSequences
@@ -20,13 +17,14 @@ from mhcflurry.common import random_peptides
 
 from mhcflurry.testing_utils import cleanup, startup
 
-
+logger = logging.getLogger("matplotlib")
+logger.disabled = True
 
 def setup():
     """Setup for running script directly (not via pytest)."""
     global PREDICTORS
     startup()
-    predictors_dict = {
+    PREDICTORS = {
         'allele-specific': Class1AffinityPredictor.load(get_path("models_class1", "models")),
         'pan-allele': Class1AffinityPredictor.load(get_path("models_class1_pan", "models.combined")),
     }
@@ -49,6 +47,11 @@ def setup_teardown():
     yield
     PREDICTORS = None
     cleanup()
+
+
+@pytest.fixture
+def predictors():
+    return PREDICTORS
 
 
 def test_correlation(
@@ -87,7 +90,8 @@ def test_correlation(
             df["tightest"] = df.min(1)
             print(df.sort_values("tightest").iloc[:, :-1])
             if debug:
-                import ipdb ; ipdb.set_trace()
+                import ipdb  # pylint: disable=import-error
+                ipdb.set_trace()
             del df["tightest"]
 
     results_df = pandas.DataFrame(results_df, columns=["allele", "correlation"])

@@ -33,7 +33,6 @@ import tarfile
 from shutil import copyfileobj
 from tempfile import NamedTemporaryFile
 from tqdm import tqdm
-tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 import posixpath
 import pandas
@@ -51,6 +50,8 @@ from .downloads import (
     get_downloads_dir,
     get_path,
     ENVIRONMENT_VARIABLES)
+
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 parser = argparse.ArgumentParser(
     description=__doc__,

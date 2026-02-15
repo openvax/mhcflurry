@@ -129,7 +129,11 @@ def index_encoding(sequences, letter_to_index_dict):
     numpy.array of integers with shape (`k`, `n`)
     """
     df = pandas.DataFrame(iter(s) for s in sequences)
-    result = df.replace(letter_to_index_dict)
+    # pandas 2.2 warns that replace() downcasting behavior is changing.
+    # Use the future behavior during replace, then infer dtypes explicitly.
+    with pandas.option_context("future.no_silent_downcasting", True):
+        result = df.replace(letter_to_index_dict)
+    result = result.infer_objects(copy=False)
     return result.values
 
 
@@ -159,4 +163,3 @@ def fixed_vectors_encoding(index_encoded_sequences, letter_to_vector_df):
         index_encoded_sequences.reshape((-1,))  # reshape() avoids copy
     ].values.reshape(target_shape)
     return result
-

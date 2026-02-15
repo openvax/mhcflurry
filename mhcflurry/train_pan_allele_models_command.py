@@ -19,7 +19,6 @@ import numpy
 import pandas
 import yaml
 import tqdm  # progress bar
-tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import Class1NeuralNetwork
@@ -33,6 +32,8 @@ from .cluster_parallelism import (
     cluster_results_from_args)
 from .allele_encoding import AlleleEncoding
 from .encodable_sequences import EncodableSequences
+
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 
 # To avoid pickling large matrices to send to child processes when running in

@@ -215,9 +215,12 @@ class Class1PresentationPredictor(object):
                 if len(df) == 0:
                     new_df["best_allele"] = []
                 else:
-                    new_df["best_allele"] = predictions_df[
-                        sample_alleles
-                    ].idxmin(1).values
+                    sample_predictions = predictions_df[sample_alleles]
+                    best_allele = pandas.Series(index=sample_predictions.index, dtype=object)
+                    valid = sample_predictions.notna().any(axis=1)
+                    if valid.any():
+                        best_allele.loc[valid] = sample_predictions.loc[valid].idxmin(1)
+                    new_df["best_allele"] = best_allele.values
                 dfs.append(new_df)
 
             result_df = pandas.concat(dfs, ignore_index=True)
@@ -243,9 +246,13 @@ class Class1PresentationPredictor(object):
                 df.loc[
                     sub_df.index, "affinity"
                 ] = predictions_df.min(1).values
+                best_allele = pandas.Series(index=predictions_df.index, dtype=object)
+                valid = predictions_df.notna().any(axis=1)
+                if valid.any():
+                    best_allele.loc[valid] = predictions_df.loc[valid].idxmin(1)
                 df.loc[
                     sub_df.index, "best_allele"
-                ] = predictions_df.idxmin(1).values
+                ] = best_allele.values
 
             result_df = df
 

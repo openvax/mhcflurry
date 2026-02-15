@@ -18,7 +18,6 @@ from sklearn.metrics import roc_auc_score
 
 
 import tqdm  # progress bar
-tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import normalize_allele_name
@@ -26,6 +25,8 @@ from .encodable_sequences import EncodableSequences
 from .common import configure_logging, random_peptides
 from .local_parallelism import worker_pool_with_gpu_assignments_from_args, add_local_parallelism_args
 from .regression_target import from_ic50
+
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 
 # To avoid pickling large matrices to send to child processes when running in

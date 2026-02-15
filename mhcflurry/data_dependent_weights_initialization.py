@@ -131,6 +131,25 @@ def get_activations_pytorch(model, layer_name, x_dict, device=None):
     return activations['output']
 
 
+def get_activations(model, layer, X_batch):
+    """
+    Backward-compatible activation helper from the TF backend era.
+
+    Parameters
+    ----------
+    model : nn.Module
+    layer : str or object with ``name`` attribute
+    X_batch : dict
+        Network input dictionary.
+    """
+    layer_name = layer if isinstance(layer, str) else getattr(layer, "name", None)
+    if layer_name is None:
+        raise ValueError("Layer must be a layer name or an object with a name attribute.")
+    if not isinstance(X_batch, dict):
+        raise ValueError("X_batch must be a dict of model inputs.")
+    return get_activations_pytorch(model, layer_name, X_batch)
+
+
 def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
     """
     Initialize neural network weights using layer-sequential unit-variance

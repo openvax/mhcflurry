@@ -1,5 +1,3 @@
-from . import initialize
-initialize()
 
 import pandas
 import pytest

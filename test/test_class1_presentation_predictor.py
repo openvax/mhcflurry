@@ -1,13 +1,10 @@
-from . import initialize
-initialize()
 
 import pandas
 import tempfile
 import pickle
 
-from numpy.testing import assert_, assert_equal, assert_allclose, assert_array_equal
-from .pytest_helpers import assert_greater, assert_less
 import numpy
+import pytest
 
 from sklearn.metrics import roc_auc_score
 
@@ -16,9 +13,10 @@ from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
 from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import cleanup, startup
 import mhcflurry.class1_presentation_predictor
-mhcflurry.class1_presentation_predictor.PREDICT_CHUNK_SIZE = 15
 
 from . import data_path
+
+mhcflurry.class1_presentation_predictor.PREDICT_CHUNK_SIZE = 15
 
 
 
@@ -51,6 +49,16 @@ def teardown_module():
     CLEAVAGE_PREDICTOR_NO_FLANKING = None
     PRESENTATION_PREDICTOR = None
     cleanup()
+
+
+@pytest.fixture(scope="module")
+def predictors():
+    return {
+        "affinity_predictor": AFFINITY_PREDICTOR,
+        "cleavage_predictor": CLEAVAGE_PREDICTOR,
+        "cleavage_predictor_no_flanking": CLEAVAGE_PREDICTOR_NO_FLANKING,
+        "presentation_predictor": PRESENTATION_PREDICTOR,
+    }
 
 
 def test_basic(predictors):

@@ -1,22 +1,22 @@
 """
 Tests for training and predicting using Class1 pan-allele models.
 """
-from . import initialize
-initialize()
 
 import json
 import os
 import shutil
 import tempfile
 import subprocess
+import sys
 
 import pandas
 import pytest
 
-from numpy.testing import assert_equal, assert_array_less
+from numpy.testing import assert_array_less
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
+from .pytest_helpers import mhcflurry_cli
 
 from mhcflurry.testing_utils import cleanup, startup
 
@@ -27,6 +27,9 @@ def setup_module():
     cleanup()
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["MHCFLURRY_CLUSTER_WORKER_COMMAND"] = (
+    f"{sys.executable} -m mhcflurry.cluster_worker_entry_point"
+)
 
 
 HYPERPARAMETERS_LIST = [
@@ -151,8 +154,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
     selected_data_df.to_csv(
         os.path.join(models_dir, "_train_data.csv"), index=False)
 
-    args = [
-        "mhcflurry-class1-train-pan-allele-models",
+    args = mhcflurry_cli("mhcflurry-class1-train-pan-allele-models") + [
         "--data", os.path.join(models_dir, "_train_data.csv"),
         "--allele-sequences", get_path("allele_sequences", "allele_sequences.csv"),
         "--pretrain-data", pretrain_data_filename,
@@ -168,8 +170,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
     # Run model selection
     models_dir_selected = tempfile.mkdtemp(
         prefix="mhcflurry-test-models-selected")
-    args = [
-        "mhcflurry-class1-select-pan-allele-models",
+    args = mhcflurry_cli("mhcflurry-class1-select-pan-allele-models") + [
         "--data", os.path.join(models_dir, "train_data.csv.bz2"),
         "--models-dir", models_dir,
         "--out-models-dir", models_dir_selected,

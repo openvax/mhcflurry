@@ -190,9 +190,12 @@ class Class1NeuralNetworkModel(nn.Module):
                 self.batch_norms.append(None)
 
             if dropout_probability > 0:
-                # Note: Keras uses "rate" which is keep probability
-                # PyTorch uses p which is drop probability
-                self.dropouts.append(nn.Dropout(p=dropout_probability))
+                # Dropout probability in MHCflurry hyperparameters is keep-probability.
+                drop_prob = max(0.0, 1.0 - dropout_probability)
+                if drop_prob > 0:
+                    self.dropouts.append(nn.Dropout(p=drop_prob))
+                else:
+                    self.dropouts.append(None)
             else:
                 self.dropouts.append(None)
 
@@ -351,6 +354,129 @@ class Class1NeuralNetworkModel(nn.Module):
         auto_convert_keras : bool
             If True, automatically detect and convert Keras-format weights
         """
+        if auto_convert_keras and getattr(self, "_keras_config", None):
+            keras_layers = self._keras_config.get("config", {}).get("layers", [])
+            idx = 0
+
+            def assign_dense(layer, w, b):
+                w = w.astype(numpy.float32)
+                b = b.astype(numpy.float32)
+                if w.shape == layer.weight.shape[::-1] or (
+                    w.shape == layer.weight.shape and w.shape[0] == w.shape[1]
+                ):
+                    w = w.T
+                if w.shape != layer.weight.shape:
+                    raise ValueError(
+                        f"Weight shape mismatch for {layer}: got {w.shape}, "
+                        f"expected {layer.weight.shape}"
+                    )
+                if b.shape != layer.bias.shape:
+                    raise ValueError(
+                        f"Bias shape mismatch for {layer}: got {b.shape}, "
+                        f"expected {layer.bias.shape}"
+                    )
+                layer.weight.data = torch.from_numpy(w)
+                layer.bias.data = torch.from_numpy(b)
+
+            def assign_locally_connected(layer, w, b):
+                w = w.astype(numpy.float32)
+                b = b.astype(numpy.float32)
+                if len(w.shape) == 5 and w.shape[1] == 1:
+                    out_len, _, k, in_ch, out_ch = w.shape
+                    w = w.squeeze(1)
+                    w = w.reshape(out_len, k * in_ch, out_ch)
+                    w = w.transpose(0, 2, 1)
+                elif len(w.shape) == 3 and w.shape[0] == layer.output_length:
+                    # Keras (out_len, k*in_ch, out_ch) -> PyTorch (out_len, out_ch, in_ch*k)
+                    if w.shape[1] == layer.weight.shape[2] and w.shape[2] == layer.weight.shape[1]:
+                        w = w.transpose(0, 2, 1)
+                    else:
+                        kernel_size = layer.kernel_size
+                        out_len = w.shape[0]
+                        k_times_in_ch = w.shape[1]
+                        out_ch = w.shape[2]
+                        in_ch = k_times_in_ch // kernel_size
+                        w = w.reshape(out_len, kernel_size, in_ch, out_ch)
+                        w = w.transpose(0, 2, 1, 3)
+                        w = w.reshape(out_len, in_ch * kernel_size, out_ch)
+                        w = w.transpose(0, 2, 1)
+                if w.shape != layer.weight.shape:
+                    raise ValueError(
+                        f"Weight shape mismatch for {layer}: got {w.shape}, "
+                        f"expected {layer.weight.shape}"
+                    )
+                if b.shape != layer.bias.shape:
+                    raise ValueError(
+                        f"Bias shape mismatch for {layer}: got {b.shape}, "
+                        f"expected {layer.bias.shape}"
+                    )
+                layer.weight.data = torch.from_numpy(w)
+                layer.bias.data = torch.from_numpy(b)
+
+            def assign_batch_norm(layer, gamma, beta, mean, var):
+                layer.weight.data = torch.from_numpy(gamma.astype(numpy.float32))
+                layer.bias.data = torch.from_numpy(beta.astype(numpy.float32))
+                layer.running_mean.data = torch.from_numpy(mean.astype(numpy.float32))
+                layer.running_var.data = torch.from_numpy(var.astype(numpy.float32))
+
+            skip_keras_embedding = False
+            keras_metadata = getattr(self, "_keras_metadata", None)
+            if keras_metadata and keras_metadata.get("skip_embedding_weights", False):
+                skip_keras_embedding = True
+
+            for layer in keras_layers:
+                layer_class = layer.get("class_name", "")
+                layer_name = layer.get("config", {}).get("name", "")
+
+                if layer_class == "Dense":
+                    w = weights[idx]
+                    b = weights[idx + 1]
+                    idx += 2
+                    if layer_name == "output":
+                        assign_dense(self.output_layer, w, b)
+                    elif layer_name.startswith("dense_"):
+                        dense_idx = int(layer_name.split("_")[1])
+                        assign_dense(self.dense_layers[dense_idx], w, b)
+                    elif layer_name.startswith("peptide_dense_"):
+                        dense_idx = int(layer_name.split("_")[2])
+                        assign_dense(self.peptide_dense_layers[dense_idx], w, b)
+                    elif layer_name.startswith("allele_dense_"):
+                        dense_idx = int(layer_name.split("_")[2])
+                        assign_dense(self.allele_dense_layers[dense_idx], w, b)
+                elif layer_class == "LocallyConnected1D":
+                    w = weights[idx]
+                    b = weights[idx + 1]
+                    idx += 2
+                    lc_idx = int(layer_name.split("_")[1])
+                    assign_locally_connected(self.lc_layers[lc_idx], w, b)
+                elif layer_class == "Embedding":
+                    w = weights[idx]
+                    idx += 1
+                    if skip_keras_embedding:
+                        continue
+                    if self.allele_embedding is None:
+                        continue
+                    if w.shape == self.allele_embedding.weight.shape:
+                        self.allele_embedding.weight.data = torch.from_numpy(
+                            w.astype(numpy.float32)
+                        )
+                elif layer_class == "BatchNormalization":
+                    gamma = weights[idx]
+                    beta = weights[idx + 1]
+                    mean = weights[idx + 2]
+                    var = weights[idx + 3]
+                    idx += 4
+                    if layer_name == "batch_norm_early":
+                        if self.batch_norm_early is not None:
+                            assign_batch_norm(self.batch_norm_early, gamma, beta, mean, var)
+                    elif layer_name.startswith("batch_norm_"):
+                        bn_idx = int(layer_name.split("_")[2])
+                        if self.batch_norms[bn_idx] is not None:
+                            assign_batch_norm(self.batch_norms[bn_idx], gamma, beta, mean, var)
+                else:
+                    continue
+
+            return
         idx = 0
 
         # Check for keras metadata to know if we need to skip embedding weights
@@ -358,6 +484,8 @@ class Class1NeuralNetworkModel(nn.Module):
         skip_keras_embedding = False
         if keras_metadata and keras_metadata.get('skip_embedding_weights', False):
             skip_keras_embedding = True
+
+        named_modules = dict(self.named_modules()) if auto_convert_keras else {}
 
         for name, param in self.named_parameters():
             # Skip allele_embedding when loading Keras weights with placeholder
@@ -368,6 +496,11 @@ class Class1NeuralNetworkModel(nn.Module):
                     idx += 1
                 continue
             w = weights[idx].astype(numpy.float32)
+            extra_keras_skip = 0
+            module = None
+            if auto_convert_keras and "." in name:
+                module_name = name.rsplit(".", 1)[0]
+                module = named_modules.get(module_name)
 
             # Skip allele_embedding if shapes don't match (pan-allele models)
             # The embedding will be set by set_allele_representations later
@@ -376,10 +509,16 @@ class Class1NeuralNetworkModel(nn.Module):
                 idx += 1
                 continue
 
-            # Auto-detect and convert Keras weights if shapes don't match
-            if auto_convert_keras and w.shape != param.shape:
+            # Auto-detect and convert Keras weights
+            if auto_convert_keras:
                 # Dense/Linear layer: Keras (in, out) -> PyTorch (out, in)
-                if len(w.shape) == 2 and w.shape == param.shape[::-1]:
+                # Note: Must transpose even when shapes match (square matrices)
+                # Check for weight (not bias) by looking at param name
+                is_linear_weight = ('weight' in name and
+                                    'embedding' not in name and
+                                    len(w.shape) == 2)
+                if is_linear_weight and (w.shape == param.shape[::-1] or
+                        (w.shape == param.shape and w.shape[0] == w.shape[1])):
                     w = w.T
                 # LocallyConnected1D weight: Keras (out_len, 1, k, in_ch, out_ch)
                 # -> PyTorch (out_len, out_ch, in_ch * k)
@@ -394,26 +533,24 @@ class Class1NeuralNetworkModel(nn.Module):
                 # PyTorch unfold produces channels as outer loop, kernel_positions as inner
                 elif len(w.shape) == 3 and w.shape[0] == param.shape[0] and \
                         w.shape[1] == param.shape[2] and w.shape[2] == param.shape[1]:
-                    # Get kernel_size from the layer if available
-                    layer_idx = int(name.split('.')[1]) if 'lc_layers' in name else None
-                    if layer_idx is not None and hasattr(self, 'lc_layers') and layer_idx < len(self.lc_layers):
-                        kernel_size = self.lc_layers[layer_idx].kernel_size
-                        out_len = w.shape[0]
-                        k_times_in_ch = w.shape[1]
-                        out_ch = w.shape[2]
-                        in_ch = k_times_in_ch // kernel_size
-                        # Reshape to (out_len, k, in_ch, out_ch)
-                        w = w.reshape(out_len, kernel_size, in_ch, out_ch)
-                        # Permute to (out_len, in_ch, k, out_ch)
-                        w = w.transpose(0, 2, 1, 3)
-                        # Reshape to (out_len, in_ch*k, out_ch)
-                        w = w.reshape(out_len, in_ch * kernel_size, out_ch)
-                    # Final transpose to PyTorch format (out_len, out_ch, in_ch*k)
+                    # LocallyConnected1D weight (3D): Keras (out_len, k*in_ch, out_ch)
+                    # -> PyTorch (out_len, out_ch, k*in_ch)
                     w = w.transpose(0, 2, 1)
                 # LocallyConnected1D bias: Keras (out_len * out_ch,) -> PyTorch (out_len, out_ch)
                 elif len(w.shape) == 1 and len(param.shape) == 2 and \
                         w.shape[0] == param.shape[0] * param.shape[1]:
                     w = w.reshape(param.shape)
+                # BatchNorm: Keras provides gamma, beta, moving_mean, moving_var.
+                # PyTorch exposes gamma/beta as params and moving stats as buffers.
+                if module is not None and isinstance(module, torch.nn.BatchNorm1d):
+                    if name.endswith("bias") and idx + 2 < len(weights):
+                        running_mean = weights[idx + 1].astype(numpy.float32)
+                        running_var = weights[idx + 2].astype(numpy.float32)
+                        if module.running_mean.shape == running_mean.shape:
+                            module.running_mean.data = torch.from_numpy(running_mean)
+                        if module.running_var.shape == running_var.shape:
+                            module.running_var.data = torch.from_numpy(running_var)
+                        extra_keras_skip = 2
 
             if w.shape != param.shape:
                 raise ValueError(
@@ -422,10 +559,11 @@ class Class1NeuralNetworkModel(nn.Module):
                 )
 
             param.data = torch.from_numpy(w)
-            idx += 1
-        for name, buffer in self.named_buffers():
-            self._buffers[name] = torch.from_numpy(weights[idx].astype(numpy.float32))
-            idx += 1
+            idx += 1 + extra_keras_skip
+        if not auto_convert_keras:
+            for name, buffer in self.named_buffers():
+                self._buffers[name] = torch.from_numpy(weights[idx].astype(numpy.float32))
+                idx += 1
 
     def to_json(self):
         """
@@ -658,8 +796,8 @@ class Class1NeuralNetwork(object):
         key = klass.model_cache_key(network_json)
         config = json.loads(network_json)
         # Detect if weights are from Keras or PyTorch format
-        # Keras JSON has 'class_name': 'Model', PyTorch has 'hyperparameters'
-        is_keras_format = config.get('class_name') == 'Model'
+        # Keras JSON has 'class_name': 'Model' or 'Functional'; PyTorch has 'hyperparameters'
+        is_keras_format = config.get('class_name') in ('Model', 'Functional')
 
         if key not in klass.MODELS_CACHE:
             # Cache miss - create new model
@@ -714,6 +852,8 @@ class Class1NeuralNetwork(object):
         }
 
         dense_layers = []
+        peptide_dense_sizes = []
+        allele_dense_sizes = []
         concatenate_count = 0
         for layer in layers:
             layer_class = layer.get('class_name', '')
@@ -733,7 +873,13 @@ class Class1NeuralNetwork(object):
             elif layer_class == 'Dense':
                 units = layer_config.get('units', 32)
                 activation = layer_config.get('activation', 'tanh')
-                dense_layers.append({'units': units, 'activation': activation})
+                layer_name = layer_config.get('name', '')
+                if layer_name.startswith('peptide_dense_'):
+                    peptide_dense_sizes.append(units)
+                elif layer_name.startswith('allele_dense_'):
+                    allele_dense_sizes.append(units)
+                else:
+                    dense_layers.append({'units': units, 'activation': activation})
 
                 # Extract regularization from first dense layer
                 kernel_reg = layer_config.get('kernel_regularizer')
@@ -745,7 +891,8 @@ class Class1NeuralNetwork(object):
                         hyperparameters['dense_layer_l2_regularization'] = reg_config['l2']
 
             elif layer_class == 'Dropout':
-                hyperparameters['dropout_probability'] = layer_config.get('rate', 0.0)
+                rate = layer_config.get('rate', 0.0)
+                hyperparameters['dropout_probability'] = 1.0 - rate
 
             elif layer_class == 'BatchNormalization':
                 hyperparameters['batch_normalization'] = True
@@ -778,10 +925,16 @@ class Class1NeuralNetwork(object):
         # The last Dense layer is the output layer
         if dense_layers:
             hyperparameters['output_activation'] = dense_layers[-1]['activation']
+            hyperparameters['num_outputs'] = dense_layers[-1]['units']
             # All other Dense layers contribute to layer_sizes
             hyperparameters['layer_sizes'] = [d['units'] for d in dense_layers[:-1]]
             if dense_layers[:-1]:
                 hyperparameters['activation'] = dense_layers[0]['activation']
+
+        if peptide_dense_sizes:
+            hyperparameters['peptide_dense_layer_sizes'] = peptide_dense_sizes
+        if allele_dense_sizes:
+            hyperparameters['allele_dense_layer_sizes'] = allele_dense_sizes
 
         return hyperparameters, keras_metadata
 
@@ -878,9 +1031,10 @@ class Class1NeuralNetwork(object):
             init=hyperparameters.get('init', 'glorot_uniform'),
         )
 
-        # Store keras metadata for weight loading
+        # Store keras metadata and config for weight loading
         if keras_metadata is not None:
             model._keras_metadata = keras_metadata
+            model._keras_config = config
 
         return model
 
@@ -966,6 +1120,13 @@ class Class1NeuralNetwork(object):
         description = json.loads(network_json, object_hook=drop_properties)
         return json.dumps(description)
 
+    @staticmethod
+    def keras_network_cache_key(network_json):
+        """
+        Backward-compatible alias for ``model_cache_key``.
+        """
+        return Class1NeuralNetwork.model_cache_key(network_json)
+
     def network(self, borrow=False):
         """
         Return the PyTorch model associated with this predictor.
@@ -988,8 +1149,8 @@ class Class1NeuralNetwork(object):
             else:
                 config = json.loads(self.network_json)
                 # Detect if weights are from Keras or PyTorch format
-                # Keras JSON has 'class_name': 'Model', PyTorch has 'hyperparameters'
-                is_keras_format = config.get('class_name') == 'Model'
+                # Keras JSON has 'class_name': 'Model' or 'Functional'; PyTorch has 'hyperparameters'
+                is_keras_format = config.get('class_name') in ('Model', 'Functional')
                 # Pass this instance's hyperparameters to preserve peptide_encoding etc.
                 self._network = self._create_model_from_config(
                     config, instance_hyperparameters=self.hyperparameters)
@@ -1666,12 +1827,12 @@ class Class1NeuralNetwork(object):
             adjusted_inequalities_with_random_negatives = None
 
         if sample_weights is not None:
-            numpy.concatenate([
+            sample_weights_with_negatives = numpy.concatenate([
                 numpy.ones(num_random_negatives),
                 sample_weights
             ])
         else:
-            pass
+            sample_weights_with_negatives = None
 
         if output_indices is not None:
             random_negative_output_indices = (
@@ -1708,11 +1869,34 @@ class Class1NeuralNetwork(object):
         start = time.time()
         last_progress_print = None
 
-        # Validation split
+        # Validation split (fixed across epochs; only training data is reshuffled)
         val_split = self.hyperparameters["validation_split"]
         n_total = len(y_encoded)
         n_val = int(n_total * val_split)
         n_train = n_total - n_val
+        indices = numpy.arange(n_total)
+        if n_val > 0:
+            train_indices_base = indices[:n_train]
+            val_indices = indices[n_train:]
+        else:
+            train_indices_base = indices
+            val_indices = None
+
+        l1_reg = self.hyperparameters["dense_layer_l1_regularization"]
+        l1_params = []
+        if l1_reg:
+            for name, param in network.named_parameters():
+                if not param.requires_grad:
+                    continue
+                if not name.endswith("weight"):
+                    continue
+                if name.startswith((
+                    "dense_layers",
+                    "peptide_dense_layers",
+                    "allele_dense_layers",
+                    "output_layer",
+                )):
+                    l1_params.append(param)
 
         for epoch in range(self.hyperparameters["max_epochs"]):
             random_negative_peptides = EncodableSequences.create(
@@ -1753,11 +1937,9 @@ class Class1NeuralNetwork(object):
                 )
                 needs_initialization = False
 
-            # Train/val split
-            indices = numpy.arange(n_total)
-            numpy.random.shuffle(indices)
-            train_indices = indices[:n_train]
-            val_indices = indices[n_train:]
+            # Train/val split (keep validation fixed)
+            train_indices = train_indices_base.copy()
+            numpy.random.shuffle(train_indices)
 
             # Training
             network.train()
@@ -1780,7 +1962,15 @@ class Class1NeuralNetwork(object):
 
                 optimizer.zero_grad()
                 predictions = network(inputs)
-                loss = loss_obj(predictions, y_batch)
+                weights_batch = None
+                if sample_weights_with_negatives is not None:
+                    weights_batch = torch.from_numpy(
+                        sample_weights_with_negatives[batch_idx]
+                    ).float().to(device)
+                loss = loss_obj(predictions, y_batch, sample_weights=weights_batch)
+                if l1_params:
+                    l1_penalty = sum(param.abs().sum() for param in l1_params)
+                    loss = loss + l1_reg * l1_penalty
                 loss.backward()
                 optimizer.step()
                 train_losses.append(loss.item())
@@ -1955,9 +2145,13 @@ class Class1NeuralNetwork(object):
         -------
         Class1NeuralNetwork
         """
+        if merge_method == "allele-specific":
+            raise NotImplementedError("Allele-specific merge is not implemented")
         if len(models) == 1:
             return models[0]
         assert len(models) > 1
+        if any(not model.network().has_allele for model in models):
+            raise NotImplementedError("Merging allele-specific models is not implemented")
 
         # For now, we create a simple ensemble wrapper
         # that averages predictions

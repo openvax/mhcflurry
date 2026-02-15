@@ -5,15 +5,11 @@ The study that generated this dataset has now been published
 (Bonsack et al 2019, DOI: 10.1158/2326-6066.CIR-18-0584), and the authors
 request that any work based on the HPV dataset cite this paper.
 """
-import pytest
-from . import initialize
-initialize()
 
 import os
 import pandas
 import pytest
 from sklearn.metrics import roc_auc_score
-from .pytest_helpers import assert_greater
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
@@ -46,6 +42,11 @@ def teardown_module():
     global PREDICTORS
     PREDICTORS = None
     cleanup()
+
+
+@pytest.fixture(scope="module")
+def predictors():
+    return PREDICTORS
 
 
 def test_on_hpv(predictors, df=DF):

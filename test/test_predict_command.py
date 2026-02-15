@@ -1,21 +1,18 @@
 """Tests for the predict command."""
 import pytest
-from . import initialize
-initialize()
 
 import tempfile
 import os
 
 import pandas
-import pytest
-from numpy.testing import assert_equal
 
 import torch
-torch.manual_seed(1)
 
 from mhcflurry import predict_command
 
 from mhcflurry.testing_utils import cleanup, startup
+
+torch.manual_seed(1)
 
 
 @pytest.fixture(autouse=True)

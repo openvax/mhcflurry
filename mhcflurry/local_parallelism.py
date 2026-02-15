@@ -254,7 +254,8 @@ def worker_init_entry_point(
     init_function(**kwargs)
 
 
-def worker_init(gpu_device_nums=None, worker_log_dir=None):
+def worker_init(keras_backend=None, gpu_device_nums=None, worker_log_dir=None):
+    del keras_backend  # legacy argument retained for API compatibility
     if worker_log_dir:
         sys.stderr = sys.stdout = open(os.path.join(
             worker_log_dir,
@@ -302,7 +303,7 @@ def call_wrapped(function, *args, **kwargs):
     """
     try:
         return function(*args, **kwargs)
-    except:
+    except Exception:
         raise WrapException()
 
 

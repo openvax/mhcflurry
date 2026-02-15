@@ -1,23 +1,13 @@
 """Tests for random negative peptide generation."""
-import pytest
-from . import initialize
-initialize()
 
-from mhcflurry import amino_acid
-from .pytest_helpers import eq_
-from numpy.testing import assert_equal
-import numpy
 import pandas
 import math
 
-from mhcflurry import Class1NeuralNetwork
-from mhcflurry.encodable_sequences import EncodableSequences
-from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.common import random_peptides
 from mhcflurry.random_negative_peptides import RandomNegativePeptides
 
 
-def test_random_negative_peptides_by_allele():
+def test_random_negative_peptides_by_allele_equalize_nonbinders():
     planner = RandomNegativePeptides(
         random_negative_method="by_allele",
         random_negative_binder_threshold=500,

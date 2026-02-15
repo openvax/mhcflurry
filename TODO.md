@@ -1,12 +1,9 @@
 # TODO
 
-## In Progress
-
-- [ ] Optional follow-up: run broader/full test suite before merge
-  - Status: targeted parity and regression suites pass.
-  - Next: run additional suites as needed for merge confidence.
-
 ## DONE
+
+- [x] Run broader/full test suite before merge.
+  - `pytest -q` passed: 100 tests.
 
 - [x] Localize parity mismatch component.
   - Affinity and processing-without-flanks parity confirmed.
@@ -59,6 +56,12 @@
 - [x] Build a high-score TF fixture for presentation regression tests.
   - Added `scripts/extract_high_presentation_fixture.py`.
   - Extracted contexts with any presentation score > 0.9 and retained all
-    alleles per context (including low-score alleles).
+  alleles per context (including low-score alleles).
   - Added fixture files under `test/data/` and new test
-    `test/test_released_presentation_highscore_rows.py`.
+  `test/test_released_presentation_highscore_rows.py`.
+
+- [x] Triage and fix important warnings.
+  - Fixed future pandas warning in `Class1PresentationPredictor` (`idxmin` on all-NA rows).
+  - Fixed future pandas warning in `random_negative_peptides` (assigning NaN into int dtype).
+  - Fixed test `SettingWithCopyWarning` in processing NN tests.
+  - Removed deprecated `pipes` and `pkg_resources` usage from `downloads.py`.

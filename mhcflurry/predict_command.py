@@ -219,7 +219,7 @@ def run(argv=sys.argv[1:]):
 
     if args.list_supported_peptide_lengths:
         min_len, max_len = predictor.supported_peptide_lengths
-        print("\n".join([str(l) for l in range(min_len, max_len+1)]))
+        print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
         return
 
     if args.input:

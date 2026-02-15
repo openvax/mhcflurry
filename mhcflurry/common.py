@@ -107,6 +107,23 @@ def configure_pytorch(gpu_device_nums=None, num_threads=None):
         torch.set_num_threads(num_threads)
 
 
+def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
+    """
+    Backward-compatible configuration entry point from the TF backend era.
+
+    Parameters
+    ----------
+    backend : str, optional
+        Ignored. Kept for API compatibility.
+    gpu_device_nums : list of int, optional
+        GPU devices to potentially use.
+    num_threads : int, optional
+        Number of threads for backend operations.
+    """
+    del backend  # unused legacy argument
+    configure_pytorch(gpu_device_nums=gpu_device_nums, num_threads=num_threads)
+
+
 def get_pytorch_device():
     """
     Get the appropriate PyTorch device (GPU if available, else CPU).

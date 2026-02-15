@@ -1,5 +1,3 @@
-from . import initialize
-initialize()
 
 import numpy
 import pandas
@@ -25,6 +23,11 @@ def teardown_module():
     global PAN_ALLELE_PREDICTOR
     PAN_ALLELE_PREDICTOR = None
     cleanup()
+
+
+@pytest.fixture(scope="module")
+def predictors():
+    return {"pan-allele": PAN_ALLELE_PREDICTOR}
 
 
 def test_merge(predictors):

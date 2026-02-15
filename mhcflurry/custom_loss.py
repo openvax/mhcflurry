@@ -68,6 +68,18 @@ class Loss(object):
     def loss(self, y_true, y_pred):
         raise NotImplementedError()
 
+    def get_keras_loss(self, reduction="sum_over_batch_size"):
+        """
+        Backward-compatible accessor from the TF/Keras backend era.
+
+        Parameters
+        ----------
+        reduction : string
+            Ignored. Kept for API compatibility.
+        """
+        del reduction  # unused legacy argument
+        return self.loss
+
 
 class StandardKerasLoss(Loss):
     """
@@ -147,7 +159,17 @@ class MSEWithInequalities(Loss):
     def encode_y(y, inequalities=None):
         return PyTorchMSEWithInequalities.encode_y(y, inequalities)
 
-    def loss(self, y_pred, y_true):
+    @staticmethod
+    def _max_value(values):
+        if hasattr(values, "detach"):
+            return float(values.detach().max().item())
+        return float(numpy.asarray(values).max())
+
+    def loss(self, y_true, y_pred):
+        # Support both historical Keras-style (y_true, y_pred) and current
+        # PyTorch-style (y_pred, y_true) calling conventions.
+        if self._max_value(y_true) <= 1.5 and self._max_value(y_pred) > 1.5:
+            y_true, y_pred = y_pred, y_true
         return self._pytorch_loss(y_pred, y_true)
 
 
@@ -185,7 +207,20 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
             y, inequalities, output_indices
         )
 
-    def loss(self, y_pred, y_true):
+    def loss(self, y_true, y_pred):
+        # Support both historical Keras-style (y_true, y_pred) and current
+        # PyTorch-style (y_pred, y_true) calling conventions.
+        if (
+                getattr(y_true, "ndim", None) == 2 and
+                getattr(y_pred, "ndim", None) == 2 and
+                y_true.shape[1] > 1 and
+                y_pred.shape[1] == 1):
+            y_true, y_pred = y_pred, y_true
+        else:
+            max_true = MSEWithInequalities._max_value(y_true)
+            max_pred = MSEWithInequalities._max_value(y_pred)
+            if max_true <= 1.5 and max_pred > 1.5:
+                y_true, y_pred = y_pred, y_true
         return self._pytorch_loss(y_pred, y_true)
 
 
@@ -206,7 +241,11 @@ class MultiallelicMassSpecLoss(Loss):
     def encode_y(y):
         return PyTorchMultiallelicMassSpecLoss.encode_y(y)
 
-    def loss(self, y_pred, y_true):
+    def loss(self, y_true, y_pred):
+        # Support both historical Keras-style (y_true, y_pred) and current
+        # PyTorch-style (y_pred, y_true) calling conventions.
+        if getattr(y_true, "ndim", None) == 2 and y_true.shape[1] > 1:
+            y_true, y_pred = y_pred, y_true
         return self._pytorch_loss(y_pred, y_true)
 
 

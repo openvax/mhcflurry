@@ -1,8 +1,6 @@
 """
 Test train, calibrate percentile ranks, and model selection commands.
 """
-from . import initialize
-initialize()
 
 import json
 import os
@@ -12,10 +10,11 @@ import subprocess
 from copy import deepcopy
 import pytest
 
-from numpy.testing import assert_array_less, assert_equal
+from numpy.testing import assert_array_less
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
+from .pytest_helpers import mhcflurry_cli
 
 from mhcflurry.testing_utils import cleanup, startup
 
@@ -70,8 +69,7 @@ def run_and_check(n_jobs=0):
     with open(hyperparameters_filename, "w") as fd:
         json.dump(HYPERPARAMETERS, fd)
 
-    args = [
-        "mhcflurry-class1-train-allele-specific-models",
+    args = mhcflurry_cli("mhcflurry-class1-train-allele-specific-models") + [
         "--data", get_path("data_curated", "curated_training_data.affinity.csv.bz2"),
         "--hyperparameters", hyperparameters_filename,
         "--allele", "HLA-A*02:01", "HLA-A*03:01",
@@ -82,8 +80,7 @@ def run_and_check(n_jobs=0):
     subprocess.check_call(args)
 
     # Calibrate percentile ranks
-    args = [
-        "mhcflurry-calibrate-percentile-ranks",
+    args = mhcflurry_cli("mhcflurry-calibrate-percentile-ranks") + [
         "--models-dir", models_dir,
         "--num-peptides-per-length", "10000",
         "--num-jobs", str(n_jobs),
@@ -122,8 +119,7 @@ def run_and_check_with_model_selection(n_jobs=1):
     with open(hyperparameters_filename, "w") as fd:
         json.dump(hyperparameters, fd)
 
-    args = [
-        "mhcflurry-class1-train-allele-specific-models",
+    args = mhcflurry_cli("mhcflurry-class1-train-allele-specific-models") + [
         "--data", get_path("data_curated", "curated_training_data.affinity.csv.bz2"),
         "--hyperparameters", hyperparameters_filename,
         "--allele", "HLA-A*02:01", "HLA-A*03:01",
@@ -139,8 +135,7 @@ def run_and_check_with_model_selection(n_jobs=1):
     assert len(result.neural_networks) == 4
 
     models_dir2 = tempfile.mkdtemp(prefix="mhcflurry-test-models")
-    args = [
-        "mhcflurry-class1-select-allele-specific-models",
+    args = mhcflurry_cli("mhcflurry-class1-select-allele-specific-models") + [
         "--data",
         get_path("data_curated", "curated_training_data.affinity.csv.bz2"),
         "--exclude-data", models_dir1 + "/train_data.csv.bz2",

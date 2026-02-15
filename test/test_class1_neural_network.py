@@ -2,13 +2,10 @@
 Tests for Class1NeuralNetwork.
 """
 import pytest
-from . import initialize
-initialize()
 
 import numpy
 from numpy import testing
 
-from .pytest_helpers import eq_, assert_less, assert_greater, assert_almost_equal
 
 import pandas
 

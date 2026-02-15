@@ -20,7 +20,6 @@ import numpy
 import pandas
 import yaml
 import tqdm  # progress bar
-tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
@@ -32,6 +31,8 @@ from .local_parallelism import (
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
+
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 # To avoid pickling large matrices to send to child processes when running in
 # parallel, we use this global variable as a place to store data. Data that is

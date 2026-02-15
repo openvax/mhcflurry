@@ -1347,14 +1347,26 @@ class Class1AffinityPredictor(object):
             centrality_function = CENTRALITY_MEASURES[centrality_measure]
 
         logs = numpy.log(predictions_array)
-        log_centers = centrality_function(logs)
+        row_has_predictions = (~numpy.isnan(logs)).any(axis=1)
+        log_centers = numpy.full(df.shape[0], numpy.nan, dtype="float64")
+        if row_has_predictions.any():
+            log_centers[row_has_predictions] = centrality_function(
+                logs[row_has_predictions]
+            )
         df["prediction"] = numpy.exp(log_centers)
 
         if include_confidence_intervals:
-            df["prediction_low"] = numpy.exp(
-                numpy.nanpercentile(logs, 5.0, axis=1))
-            df["prediction_high"] = numpy.exp(
-                numpy.nanpercentile(logs, 95.0, axis=1))
+            prediction_low = numpy.full(df.shape[0], numpy.nan, dtype="float64")
+            prediction_high = numpy.full(df.shape[0], numpy.nan, dtype="float64")
+            if row_has_predictions.any():
+                prediction_low[row_has_predictions] = numpy.exp(
+                    numpy.nanpercentile(logs[row_has_predictions], 5.0, axis=1)
+                )
+                prediction_high[row_has_predictions] = numpy.exp(
+                    numpy.nanpercentile(logs[row_has_predictions], 95.0, axis=1)
+                )
+            df["prediction_low"] = prediction_low
+            df["prediction_high"] = prediction_high
 
         if include_individual_model_predictions:
             for i in range(num_pan_models):

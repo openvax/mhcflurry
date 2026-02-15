@@ -3,7 +3,6 @@ Profile prediction speed
 
 """
 
-import numpy
 import time
 import cProfile
 import pstats
@@ -176,6 +175,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args(sys.argv[1:])
     setup_module()
+    predictors_dict = {
+        "allele_specific": ALLELE_SPECIFIC_PREDICTOR,
+        "pan_allele": PAN_ALLELE_PREDICTOR,
+    }
 
     if "allele-specific" in args.predictor:
         print("Running allele-specific test")

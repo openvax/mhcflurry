@@ -68,7 +68,7 @@ class Class1ProcessingModel(nn.Module):
         # Dropout
         self.dropout_rate = dropout_rate
         if dropout_rate > 0:
-            self.dropout = nn.Dropout(p=dropout_rate)
+            self.dropout = nn.Dropout1d(p=dropout_rate)
         else:
             self.dropout = None
 
@@ -197,9 +197,7 @@ class Class1ProcessingModel(nn.Module):
 
         # Optional flanking average
         if self.n_flank_avg_dense is not None and self.n_flank_length > 0:
-            # Average over n_flank region
-            n_flank_region = conv_result[:, :self.n_flank_length, :]  # (batch, n_flank_length, channels)
-            avg = n_flank_region.mean(dim=1)  # (batch, channels)
+            avg = self._extract_n_flank_avg(conv_result)
             dense_out = torch.tanh(self.n_flank_avg_dense(avg))  # (batch, 1)
             outputs.append(dense_out)
 
@@ -296,7 +294,13 @@ class Class1ProcessingModel(nn.Module):
         return result
 
     def _extract_c_flank_avg(self, conv_result, peptide_length):
-        """Average over c_flank region."""
+        """
+        Average over c-flank region using TF-compatible masking semantics.
+
+        In TF/Keras this is implemented as:
+            reduce_mean((x + 1) * mask, axis=1) - 1
+        which averages across the full sequence axis (not only masked positions).
+        """
         batch_size, seq_len, features = conv_result.shape
         peptide_length = peptide_length.view(-1)
 
@@ -309,11 +313,26 @@ class Class1ProcessingModel(nn.Module):
 
         x_shifted = conv_result + 1
         mask_expanded = mask.unsqueeze(-1).float()
-        masked_x = x_shifted * mask_expanded
-        sum_value = masked_x.sum(dim=1)
-        count = mask_expanded.sum(dim=1).clamp(min=1)
-        avg_value = sum_value / count - 1
+        avg_value = (x_shifted * mask_expanded).mean(dim=1) - 1
 
+        return avg_value
+
+    def _extract_n_flank_avg(self, conv_result):
+        """
+        Average over n-flank region using TF-compatible masking semantics.
+
+        In TF/Keras this is implemented as:
+            reduce_mean((x + 1) * mask, axis=1) - 1
+        where mask selects n-flank positions.
+        """
+        _, seq_len, _ = conv_result.shape
+
+        positions = torch.arange(seq_len, device=conv_result.device).unsqueeze(0)
+        mask = (positions >= 0) & (positions < self.n_flank_length)
+        mask_expanded = mask.unsqueeze(-1).float()
+
+        x_shifted = conv_result + 1
+        avg_value = (x_shifted * mask_expanded).mean(dim=1) - 1
         return avg_value
 
     def get_weights_list(self):

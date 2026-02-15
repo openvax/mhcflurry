@@ -1,9 +1,4 @@
-from . import initialize
-initialize()
-
 import numpy
-numpy.random.seed(0)
-
 import pickle
 import tempfile
 import pytest
@@ -11,6 +6,8 @@ import pytest
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 
 from mhcflurry.testing_utils import cleanup, startup
+
+numpy.random.seed(0)
 
 DOWNLOADED_PREDICTOR = None
 
@@ -25,6 +22,11 @@ def teardown_module():
     global DOWNLOADED_PREDICTOR
     DOWNLOADED_PREDICTOR = None
     cleanup()
+
+
+@pytest.fixture(scope="module")
+def downloaded_predictor():
+    return DOWNLOADED_PREDICTOR
 
 
 def predict_and_check(
@@ -107,5 +109,3 @@ def test_downloaded_predictor_gives_percentile_ranks(downloaded_predictor):
     print(predictions)
     assert not predictions.prediction.isnull().any()
     assert not predictions.prediction_percentile.isnull().any()
-
-

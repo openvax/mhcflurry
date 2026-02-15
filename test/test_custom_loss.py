@@ -2,10 +2,8 @@
 Tests for custom loss functions.
 """
 import pytest
-from . import initialize
-initialize()
 
-from .pytest_helpers import eq_, assert_less, assert_greater, assert_almost_equal
+from .pytest_helpers import assert_greater, assert_almost_equal
 
 import numpy
 import torch

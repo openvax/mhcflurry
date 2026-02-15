@@ -220,7 +220,9 @@ class RandomNegativePeptides(object):
         first_pass_plan = self.plan_df
         self.plan_df = None
 
-        new_plan = first_pass_plan.copy()
+        # Use floating point while populating so NaN assignment remains valid
+        # across pandas versions; cast to int at the end.
+        new_plan = first_pass_plan.astype(float).copy()
         new_plan[:] = numpy.nan
 
         for (allele, first_pass_per_length) in first_pass_plan.iterrows():
@@ -231,6 +233,12 @@ class RandomNegativePeptides(object):
                 real_nonbinders_by_length + first_pass_per_length)
             new_plan.loc[allele] = first_pass_per_length + (
                 total_nonbinders_by_length.max() - total_nonbinders_by_length)
+
+        if new_plan.isna().any().any():
+            raise AssertionError(
+                "Random negative plan contains NaN after equalization; "
+                "this indicates an incomplete per-allele assignment bug."
+            )
 
         self.plan_df = new_plan.astype(int)
 
