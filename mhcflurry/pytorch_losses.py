@@ -40,6 +40,8 @@ class MSEWithInequalities(nn.Module):
         numpy.ndarray
         """
         y = numpy.array(y, dtype=numpy.float32)
+        if numpy.isnan(y).any():
+            raise ValueError("y contains NaN")
         if (y < 0).any() or (y > 1).any():
             raise ValueError("Targets must be in [0, 1] for MSEWithInequalities")
         if inequalities is None:
@@ -133,7 +135,15 @@ class MSEWithInequalitiesAndMultipleOutputs(nn.Module):
         """
         encoded = MSEWithInequalities.encode_y(y, inequalities)
         if output_indices is not None:
-            encoded = encoded + numpy.array(output_indices, dtype=numpy.float32) * 10
+            output_indices = numpy.array(output_indices)
+            if output_indices.shape != (len(encoded),):
+                raise ValueError(
+                    "Expected output_indices to have shape %s not %s"
+                    % ((len(encoded),), output_indices.shape)
+                )
+            if (output_indices < 0).any():
+                raise ValueError("Invalid output indices: %s" % output_indices)
+            encoded = encoded + output_indices.astype(numpy.float32) * 10
         return encoded
 
     def forward(self, y_pred, y_true, sample_weights=None):
