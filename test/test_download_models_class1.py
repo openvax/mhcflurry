@@ -9,6 +9,8 @@ from mhcflurry.testing_utils import cleanup, startup
 
 numpy.random.seed(0)
 
+SERIALIZATION_RTOL = 1e-6
+
 DOWNLOADED_PREDICTOR = None
 
 
@@ -81,11 +83,17 @@ def test_caching(downloaded_predictor):
 
 def test_downloaded_predictor_is_serializable(downloaded_predictor):
     predictor_copy = pickle.loads(pickle.dumps(downloaded_predictor))
-    numpy.testing.assert_equal(
+    # Optimized pan-model round-trips can differ at float-noise level across
+    # platforms, so require a tight numerical match rather than bitwise
+    # equality.
+    numpy.testing.assert_allclose(
         downloaded_predictor.predict(
             ["RSKERAVVVAW"], allele="HLA-A*01:01")[0],
         predictor_copy.predict(
-            ["RSKERAVVVAW"], allele="HLA-A*01:01")[0])
+            ["RSKERAVVVAW"], allele="HLA-A*01:01")[0],
+        rtol=SERIALIZATION_RTOL,
+        atol=0.0,
+    )
 
 
 def test_downloaded_predictor_is_savable(downloaded_predictor):
@@ -94,11 +102,14 @@ def test_downloaded_predictor_is_savable(downloaded_predictor):
     downloaded_predictor.save(models_dir)
     predictor_copy = Class1AffinityPredictor.load(models_dir)
 
-    numpy.testing.assert_equal(
+    numpy.testing.assert_allclose(
         downloaded_predictor.predict(
             ["RSKERAVVVAW"], allele="HLA-A*01:01")[0],
         predictor_copy.predict(
-            ["RSKERAVVVAW"], allele="HLA-A*01:01")[0])
+            ["RSKERAVVVAW"], allele="HLA-A*01:01")[0],
+        rtol=SERIALIZATION_RTOL,
+        atol=0.0,
+    )
 
 
 def test_downloaded_predictor_gives_percentile_ranks(downloaded_predictor):
