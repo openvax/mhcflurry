@@ -385,10 +385,13 @@ class Class1ProcessingModel(nn.Module):
                     f"got {weights[idx].shape}, expected {param.shape}"
                 )
 
-            param.data = torch.from_numpy(w)
+            param.data = torch.from_numpy(w).to(dtype=param.dtype)
             idx += 1
         for name, buffer in self.named_buffers():
-            self._buffers[name] = torch.from_numpy(weights[idx].astype(numpy.float32))
+            tensor = torch.from_numpy(weights[idx])
+            if tensor.dtype != buffer.dtype:
+                tensor = tensor.to(dtype=buffer.dtype)
+            self._buffers[name] = tensor
             idx += 1
 
     def _reorder_keras_weights(self, weights):
@@ -553,7 +556,7 @@ class Class1ProcessingNeuralNetwork(object):
                 # Keras JSON has 'class_name': 'Model', PyTorch has 'hyperparameters'
                 try:
                     config = json.loads(self.network_json)
-                    is_keras_format = config.get('class_name') == 'Model'
+                    is_keras_format = config.get('class_name') in ('Model', 'Functional')
                 except (json.JSONDecodeError, TypeError):
                     is_keras_format = False
                 self._network.set_weights_list(
@@ -561,6 +564,36 @@ class Class1ProcessingNeuralNetwork(object):
                     auto_convert_keras=is_keras_format
                 )
         return self._network
+
+    @staticmethod
+    def _regularized_parameters(network):
+        """
+        Parameters subject to master-branch convolution kernel regularization.
+        """
+        for name, param in network.named_parameters():
+            if not param.requires_grad or not name.endswith("weight"):
+                continue
+            if (
+                    name == "conv1.weight" or
+                    "n_flank_post_convs" in name or
+                    "c_flank_post_convs" in name):
+                yield param
+
+    @staticmethod
+    def _regularization_penalty(parameters, l1=0.0, l2=0.0):
+        """
+        Match Keras kernel_regularizer semantics used on convolution kernels.
+        """
+        parameters = tuple(parameters)
+        if not parameters or (not l1 and not l2):
+            return None
+        penalty = torch.zeros((), device=parameters[0].device)
+        for param in parameters:
+            if l1:
+                penalty = penalty + (l1 * param.abs().sum())
+            if l2:
+                penalty = penalty + (l2 * param.square().sum())
+        return penalty
 
     def update_network_description(self):
         """
@@ -639,6 +672,11 @@ class Class1ProcessingNeuralNetwork(object):
 
         # Loss function (binary cross-entropy)
         loss_fn = nn.BCELoss(reduction='none')
+        reg_l1, reg_l2 = self.hyperparameters.get(
+            "convolutional_kernel_l1_l2",
+            [0.0, 0.0],
+        )
+        regularization_parameters = tuple(self._regularized_parameters(network))
 
         # Validation split
         val_split = self.hyperparameters["validation_split"]
@@ -647,7 +685,6 @@ class Class1ProcessingNeuralNetwork(object):
         n_train = n_total - n_val
 
         indices = numpy.arange(n_total)
-        numpy.random.shuffle(indices)
         train_indices = indices[:n_train]
         val_indices = indices[n_train:]
 
@@ -686,6 +723,13 @@ class Class1ProcessingNeuralNetwork(object):
                     loss = loss * weight_batch
 
                 loss = loss.mean()
+                regularization_penalty = self._regularization_penalty(
+                    regularization_parameters,
+                    l1=reg_l1,
+                    l2=reg_l2,
+                )
+                if regularization_penalty is not None:
+                    loss = loss + regularization_penalty
                 loss.backward()
                 optimizer.step()
                 train_losses.append(loss.item())
@@ -704,7 +748,21 @@ class Class1ProcessingNeuralNetwork(object):
 
                     val_inputs = {"sequence": val_seq, "peptide_length": val_length}
                     val_predictions = network(val_inputs)
-                    val_loss = loss_fn(val_predictions, val_targets).mean().item()
+                    val_loss = loss_fn(val_predictions, val_targets)
+                    if sample_weights is not None:
+                        val_weights = torch.from_numpy(
+                            sample_weights[val_indices].astype(numpy.float32)
+                        ).to(device)
+                        val_loss = val_loss * val_weights
+                    val_loss = val_loss.mean()
+                    regularization_penalty = self._regularization_penalty(
+                        regularization_parameters,
+                        l1=reg_l1,
+                        l2=reg_l2,
+                    )
+                    if regularization_penalty is not None:
+                        val_loss = val_loss + regularization_penalty
+                    val_loss = val_loss.item()
                 fit_info["val_loss"].append(val_loss)
 
             gc.collect()
@@ -779,19 +837,22 @@ class Class1ProcessingNeuralNetwork(object):
     def _create_optimizer(self, network):
         """Create an optimizer for the network."""
         optimizer_name = self.hyperparameters["optimizer"].lower()
-        lr = self.hyperparameters["learning_rate"] or 0.001
-
-        # L1/L2 regularization is applied via weight_decay (L2 only in PyTorch)
-        l1, l2 = self.hyperparameters.get("convolutional_kernel_l1_l2", [0.0, 0.0])
+        lr = (
+            self.hyperparameters["learning_rate"]
+            if self.hyperparameters["learning_rate"] is not None
+            else 0.001
+        )
 
         if optimizer_name == "adam":
-            return torch.optim.Adam(network.parameters(), lr=lr, weight_decay=l2)
+            # Match Keras default epsilon=1e-07.
+            return torch.optim.Adam(network.parameters(), lr=lr, eps=1e-07)
         elif optimizer_name == "rmsprop":
-            return torch.optim.RMSprop(network.parameters(), lr=lr, weight_decay=l2)
+            # Match Keras defaults: rho=0.9, epsilon=1e-07.
+            return torch.optim.RMSprop(network.parameters(), lr=lr, alpha=0.9, eps=1e-07)
         elif optimizer_name == "sgd":
-            return torch.optim.SGD(network.parameters(), lr=lr, weight_decay=l2)
+            return torch.optim.SGD(network.parameters(), lr=lr)
         else:
-            return torch.optim.Adam(network.parameters(), lr=lr, weight_decay=l2)
+            return torch.optim.Adam(network.parameters(), lr=lr, eps=1e-07)
 
     def predict(
         self,

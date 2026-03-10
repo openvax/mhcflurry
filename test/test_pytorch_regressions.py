@@ -11,8 +11,13 @@ import torch
 from mhcflurry.class1_neural_network import (
     Class1NeuralNetwork,
     Class1NeuralNetworkModel,
+    MergedClass1NeuralNetwork,
 )
-from mhcflurry.class1_processing_neural_network import Class1ProcessingModel
+from mhcflurry.class1_processing_neural_network import (
+    Class1ProcessingModel,
+    Class1ProcessingNeuralNetwork,
+)
+from mhcflurry.flanking_encoding import FlankingEncoding
 from mhcflurry.pytorch_losses import (
     MSEWithInequalities,
     MultiallelicMassSpecLoss,
@@ -119,6 +124,23 @@ def test_dropout_probability_is_keep_prob():
     assert model.dropouts[0].p == pytest.approx(0.2, abs=1e-6)
 
 
+def test_batch_norm_uses_keras_defaults():
+    nn = Class1NeuralNetwork()
+    peptide_shape = nn.peptides_to_network_input([]).shape[1:]
+    model = Class1NeuralNetworkModel(
+        peptide_encoding_shape=peptide_shape,
+        batch_normalization=True,
+        layer_sizes=[4],
+    )
+
+    assert model.batch_norm_early is not None
+    assert model.batch_norm_early.eps == pytest.approx(1e-3, abs=1e-12)
+    assert model.batch_norm_early.momentum == pytest.approx(0.01, abs=1e-12)
+    assert model.batch_norms[0] is not None
+    assert model.batch_norms[0].eps == pytest.approx(1e-3, abs=1e-12)
+    assert model.batch_norms[0].momentum == pytest.approx(0.01, abs=1e-12)
+
+
 def test_processing_dropout_is_spatial():
     model = Class1ProcessingModel(
         sequence_dims=(10, 3),
@@ -208,6 +230,171 @@ def test_merge_allele_specific_raises_not_implemented():
     )
     with pytest.raises(NotImplementedError):
         Class1NeuralNetwork.merge([model_a, model_b])
+
+
+def test_merged_network_serialization_preserves_dropout_keep_probability():
+    _seed_all(23)
+    allele_representations = np.zeros((2, 3, 4), dtype=np.float32)
+
+    models = []
+    for _ in range(2):
+        model = Class1NeuralNetwork(
+            dropout_probability=0.8,
+            layer_sizes=[4],
+            allele_dense_layer_sizes=[],
+            peptide_dense_layer_sizes=[],
+            locally_connected_layers=[],
+            batch_normalization=False,
+            dense_layer_l1_regularization=0.0,
+            dense_layer_l2_regularization=0.0,
+        )
+        model._network = model.make_network(
+            allele_representations=allele_representations,
+            **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+        )
+        models.append(model)
+
+    merged = Class1NeuralNetwork.merge(models)
+    config = merged.get_config()
+    roundtripped = Class1NeuralNetwork.from_config(
+        config,
+        weights=merged.get_weights(),
+    )
+    network = roundtripped.network()
+
+    assert isinstance(network, MergedClass1NeuralNetwork)
+    for subnet in network.networks:
+        assert subnet.dropout_probability == pytest.approx(0.8, abs=1e-12)
+        assert subnet.dropouts[0] is not None
+        assert subnet.dropouts[0].p == pytest.approx(0.2, abs=1e-12)
+
+
+def test_dense_regularization_excludes_output_layer():
+    peptides = ["AAAAAAAAA", "CCCCCCCCC"]
+
+    _seed_all(17)
+    model = _make_simple_affinity_model(
+        layer_sizes=[],
+        dense_layer_l1_regularization=0.1,
+        dense_layer_l2_regularization=0.2,
+        max_epochs=1,
+        validation_split=0.0,
+        early_stopping=False,
+    )
+
+    model._network = model.make_network(
+        allele_representations=None,
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+
+    affinities = model.predict(peptides)
+    weights_before = [p.detach().cpu().clone() for p in model.network().parameters()]
+
+    model.fit(
+        peptides,
+        affinities,
+        shuffle_permutation=[0, 1],
+    )
+
+    weights_after = [p.detach().cpu().clone() for p in model.network().parameters()]
+    for before, after in zip(weights_before, weights_after):
+        assert torch.allclose(before, after, rtol=0.0, atol=1e-7)
+
+
+def test_processing_validation_uses_last_fraction_and_sample_weights():
+    _seed_all(19)
+    model = Class1ProcessingNeuralNetwork(
+        max_epochs=1,
+        validation_split=0.5,
+        early_stopping=False,
+        learning_rate=0.0,
+        minibatch_size=2,
+        dropout_rate=0.0,
+        flanking_averages=False,
+        convolutional_kernel_l1_l2=[0.0, 0.0],
+        convolutional_filters=2,
+        convolutional_kernel_size=1,
+        n_flank_length=1,
+        c_flank_length=1,
+        peptide_max_length=8,
+    )
+
+    sequences = FlankingEncoding(
+        peptides=["AAAAAAAA", "CCCCCCCC", "DDDDDDDD", "EEEEEEEE"],
+        n_flanks=["Q", "R", "S", "T"],
+        c_flanks=["V", "W", "Y", "A"],
+    )
+    targets = np.array([1.0, 0.0, 1.0, 0.0], dtype=np.float32)
+    sample_weights = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+    shuffle_permutation = np.array([2, 0, 3, 1])
+
+    model._network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    network = model.network()
+    network.eval()
+
+    x_dict = model.network_input(sequences)
+    x_dict = {
+        key: value[shuffle_permutation]
+        for key, value in x_dict.items()
+    }
+    shuffled_targets = targets[shuffle_permutation]
+    shuffled_weights = sample_weights[shuffle_permutation]
+
+    val_indices = np.arange(len(targets))[2:]
+    with torch.no_grad():
+        val_inputs = {
+            "sequence": torch.from_numpy(x_dict["sequence"][val_indices]).float(),
+            "peptide_length": torch.from_numpy(x_dict["peptide_length"][val_indices]),
+        }
+        predictions = network(val_inputs)
+        expected = torch.nn.functional.binary_cross_entropy(
+            predictions,
+            torch.from_numpy(shuffled_targets[val_indices]),
+            reduction="none",
+        )
+        expected = (
+            expected *
+            torch.from_numpy(shuffled_weights[val_indices])
+        ).mean().item()
+
+    model.fit(
+        sequences=sequences,
+        targets=targets,
+        sample_weights=sample_weights,
+        shuffle_permutation=shuffle_permutation,
+        verbose=0,
+    )
+
+    assert model.fit_info[-1]["val_loss"][0] == pytest.approx(expected, abs=1e-7)
+
+
+def test_optimizer_defaults_match_keras():
+    affinity_model = _make_simple_affinity_model(optimizer="adam")
+    affinity_model._network = affinity_model.make_network(
+        allele_representations=None,
+        **affinity_model.network_hyperparameter_defaults.subselect(
+            affinity_model.hyperparameters
+        )
+    )
+    affinity_optimizer = affinity_model._create_optimizer(affinity_model.network())
+    assert affinity_optimizer.defaults["eps"] == pytest.approx(1e-07, abs=1e-12)
+
+    processing_model = Class1ProcessingNeuralNetwork(
+        optimizer="rmsprop",
+        learning_rate=0.001,
+    )
+    processing_model._network = processing_model.make_network(
+        **processing_model.network_hyperparameter_defaults.subselect(
+            processing_model.hyperparameters
+        )
+    )
+    processing_optimizer = processing_model._create_optimizer(
+        processing_model.network()
+    )
+    assert processing_optimizer.defaults["alpha"] == pytest.approx(0.9, abs=1e-12)
+    assert processing_optimizer.defaults["eps"] == pytest.approx(1e-07, abs=1e-12)
 
 
 def test_l1_regularization_changes_weights_even_with_zero_data_loss():
