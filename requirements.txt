@@ -1,8 +1,7 @@
 numpy
 six
 pandas>=0.20.3
-tensorflow>=2.15.0
-tf-keras
+torch>=2.0.0
 appdirs
 scikit-learn
 mhcgnomes
