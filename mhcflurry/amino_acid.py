@@ -9,6 +9,7 @@ from __future__ import (
     absolute_import,
 )
 import collections
+import warnings
 from copy import copy
 
 import pandas
@@ -129,11 +130,12 @@ def index_encoding(sequences, letter_to_index_dict):
     numpy.array of integers with shape (`k`, `n`)
     """
     df = pandas.DataFrame(iter(s) for s in sequences)
-    # pandas 2.2 warns that replace() downcasting behavior is changing.
-    # Use the future behavior during replace, then infer dtypes explicitly.
-    with pandas.option_context("future.no_silent_downcasting", True):
-        result = df.replace(letter_to_index_dict)
-    result = result.infer_objects(copy=False)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=FutureWarning,
+                                message=".*Downcasting.*")
+        warnings.filterwarnings("ignore", category=DeprecationWarning,
+                                message=".*no_silent_downcasting.*")
+        result = df.replace(letter_to_index_dict).infer_objects()
     return result.values
 
 

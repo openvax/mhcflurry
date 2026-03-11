@@ -390,9 +390,9 @@ def test_downloaded_predictor(predictors):
             ],
         })
 
-    numpy.testing.assert_equal(
-        scan_results6.peptide.values,
-        scan_results5.peptide.str.lower().values,
+    numpy.testing.assert_array_equal(
+        scan_results6.peptide.to_numpy(),
+        scan_results5.peptide.str.lower().to_numpy(),
     )
     numpy.testing.assert_almost_equal(
         scan_results6.affinity.values, scan_results5.affinity.values)

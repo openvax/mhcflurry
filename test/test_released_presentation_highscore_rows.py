@@ -134,8 +134,8 @@ def test_released_presentation_predictions_match_highscore_master_fixture():
             centrality_measure="mean",
             model_kwargs={"batch_size": 4096},
         )
-    np.testing.assert_array_equal(aff_df["peptide"].values, fixture_df["peptide"].values)
-    np.testing.assert_array_equal(aff_df["allele"].values, fixture_df["allele"].values)
+    np.testing.assert_array_equal(aff_df["peptide"].to_numpy(), fixture_df["peptide"].to_numpy())
+    np.testing.assert_array_equal(aff_df["allele"].to_numpy(), fixture_df["allele"].to_numpy())
 
     sample_names = alleles
     allele_map = {allele: [allele] for allele in sorted(set(alleles))}
@@ -196,7 +196,7 @@ def test_released_presentation_predictions_match_highscore_master_fixture():
 
     for col in STRING_COLUMNS:
         np.testing.assert_array_equal(
-            predicted[col].astype(str).values, fixture_df[col].astype(str).values
+            predicted[col].astype(str).to_numpy(), fixture_df[col].astype(str).to_numpy()
         )
 
     numeric_columns = [c for c in fixture_df.columns if c not in BASE_COLUMNS + STRING_COLUMNS]

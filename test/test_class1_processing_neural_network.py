@@ -130,7 +130,7 @@ def test_neural_network_input():
     encoding = FlankingEncoding(df.peptide, df.n_flank, df.c_flank)
     results = model.network_input(encoding)
     df["decoded"] = decode_matrix(results['sequence'])
-    numpy.testing.assert_array_equal(df.decoded.values, df.sequence.values)
+    numpy.testing.assert_array_equal(df.decoded.to_numpy(), df.sequence.to_numpy())
     numpy.testing.assert_equal(
         results['peptide_length'], df.peptide.str.len().values)
 
