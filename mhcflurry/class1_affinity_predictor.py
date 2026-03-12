@@ -124,7 +124,7 @@ class Class1AffinityPredictor(object):
         assert isinstance(self.class1_pan_allele_models, list)
 
         self.provenance_string = provenance_string
-        self.allele_alias_map = {}  # populated by load()
+        self.allele_to_canonical = {}  # populated by load()
 
     @property
     def manifest_df(self):
@@ -298,7 +298,7 @@ class Class1AffinityPredictor(object):
         str
         """
         normalized = normalize_allele_name(raw_name)
-        return self.allele_alias_map.get(normalized, normalized)
+        return self.allele_to_canonical.get(normalized, normalized)
 
     @property
     def supported_alleles(self):
@@ -517,32 +517,9 @@ class Class1AffinityPredictor(object):
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
 
-        allele_to_allele_specific_models = collections.defaultdict(list)
-        class1_pan_allele_models = []
-        all_models = []
-        for (_, row) in manifest_df.iterrows():
-            weights_filename = Class1AffinityPredictor.weights_path(
-                models_dir, row.model_name)
-            config = json.loads(row.config_json)
-
-            # We will lazy-load weights when the network is used.
-            model = Class1NeuralNetwork.from_config(
-                config,
-                weights_loader=partial(load_weights, abspath(weights_filename)))
-            if row.allele == "pan-class1":
-                class1_pan_allele_models.append(model)
-            else:
-                # Normalize allele name for consistency with how
-                # user-supplied allele names are normalized at predict time.
-                allele_key = normalize_allele_name(
-                    row.allele, raise_on_error=False) or row.allele
-                allele_to_allele_specific_models[allele_key].append(model)
-            all_models.append(model)
-
-        manifest_df["model"] = all_models
-
-        # Load allele sequences
+        # ----- Load pseudosequences first so we can canonicalize -----
         allele_to_sequence = None
+        allele_to_canonical = {}
         if exists(join(models_dir, "allele_sequences.csv")):
             allele_to_sequence = pandas.read_csv(
                 join(models_dir, "allele_sequences.csv"),
@@ -558,24 +535,16 @@ class Class1AffinityPredictor(object):
             # raw name so the pseudosequence remains available.
             renormalized = {}
             for (name, value) in allele_to_sequence.items():
-                # Try without aliases first
                 normalized = normalize_allele_name(
                     name, raise_on_error=False, use_allele_aliases=False)
                 if normalized is None or "X" in value:
-                    # Parse failed or pseudosequence is incomplete —
-                    # try with aliases to see if that resolves better
                     alias_normalized = normalize_allele_name(
                         name, raise_on_error=False, use_allele_aliases=True)
                     if alias_normalized is not None:
                         normalized = alias_normalized
                 if normalized is None:
-                    # mhcgnomes can't parse this name (e.g. non-human
-                    # species, class II genes filtered by only_class1).
-                    # Keep the raw name so the pseudosequence is still
-                    # available for pan-allele prediction.
                     normalized = name
                 if normalized in renormalized and name != normalized:
-                    # Collision: prefer the entry with fewer X positions
                     existing = renormalized[normalized]
                     if value.count("X") < existing.count("X"):
                         renormalized[normalized] = value
@@ -583,51 +552,53 @@ class Class1AffinityPredictor(object):
                 renormalized[normalized] = value
             allele_to_sequence = renormalized
 
-            # Build a reverse alias map so that user inputs normalized
-            # via mhcgnomes (with aliases) map back to the canonical
-            # pseudosequence key. For example, if the CSV has
-            # "Mamu-A*07:01" and mhcgnomes aliases that to
-            # "Mamu-A1*007:01", a user querying either form should
-            # resolve to "Mamu-A*07:01" (the pseudosequence key).
-            allele_alias_map = {}
+            # Map mhcgnomes-aliased forms back to pseudosequence keys.
+            # e.g. Mamu-A1*007:01 -> Mamu-A*07:01
             for canonical_name in allele_to_sequence:
                 aliased = normalize_allele_name(
                     canonical_name, raise_on_error=False,
                     use_allele_aliases=True)
                 if (aliased is not None and aliased != canonical_name
                         and aliased not in allele_to_sequence):
-                    allele_alias_map[aliased] = canonical_name
+                    allele_to_canonical[aliased] = canonical_name
 
-            # Re-key allele-specific models to use canonical
-            # pseudosequence names, so predict-time lookups (which go
-            # through canonicalize_allele_name) find the right models.
-            rekeyed = collections.defaultdict(list)
-            for key, models in allele_to_allele_specific_models.items():
-                canonical = allele_alias_map.get(key, key)
-                rekeyed[canonical].extend(models)
-            allele_to_allele_specific_models = dict(rekeyed)
+        def to_canonical(raw_name):
+            """Normalize a raw allele name to its canonical pseudosequence key."""
+            n = normalize_allele_name(raw_name, raise_on_error=False) or raw_name
+            return allele_to_canonical.get(n, n)
 
+        # ----- Load manifest -----
+        allele_to_allele_specific_models = collections.defaultdict(list)
+        class1_pan_allele_models = []
+        all_models = []
+        for (_, row) in manifest_df.iterrows():
+            weights_filename = Class1AffinityPredictor.weights_path(
+                models_dir, row.model_name)
+            config = json.loads(row.config_json)
+
+            model = Class1NeuralNetwork.from_config(
+                config,
+                weights_loader=partial(load_weights, abspath(weights_filename)))
+            if row.allele == "pan-class1":
+                class1_pan_allele_models.append(model)
+            else:
+                allele_to_allele_specific_models[
+                    to_canonical(row.allele)].append(model)
+            all_models.append(model)
+
+        manifest_df["model"] = all_models
+
+        # ----- Load percent ranks -----
         allele_to_percent_rank_transform = {}
         percent_ranks_path = join(models_dir, "percent_ranks.csv")
         if exists(percent_ranks_path):
             percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
             for allele in percent_ranks_df.columns:
-                # Same alias-fallback logic as for pseudosequences above.
-                normalized = normalize_allele_name(
-                    allele, raise_on_error=False, use_allele_aliases=False)
-                if normalized is None:
-                    normalized = normalize_allele_name(
-                        allele, raise_on_error=False, use_allele_aliases=True)
-                if normalized is None:
+                canonical = to_canonical(allele)
+                if (canonical in allele_to_percent_rank_transform and
+                        allele != canonical):
                     continue
-                # Map to canonical pseudosequence key if alias map exists
-                if allele_to_sequence is not None:
-                    normalized = allele_alias_map.get(
-                        normalized, normalized)
-                if (normalized in allele_to_percent_rank_transform and
-                        allele != normalized):
-                    continue
-                allele_to_percent_rank_transform[normalized] = (
+                allele_to_percent_rank_transform[canonical] = (
                     PercentRankTransform.from_series(percent_ranks_df[allele]))
 
         logging.info(
@@ -671,7 +642,7 @@ class Class1AffinityPredictor(object):
             optimization_info=optimization_info,
         )
         if allele_to_sequence is not None:
-            result.allele_alias_map = allele_alias_map
+            result.allele_to_canonical = allele_to_canonical
         if optimization_level >= 1:
             optimized = result.optimize()
             logging.info(
