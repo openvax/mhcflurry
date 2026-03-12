@@ -534,6 +534,7 @@ class Class1AffinityPredictor(object):
             # complete one. If mhcgnomes can't parse either way, keep the
             # raw name so the pseudosequence remains available.
             renormalized = {}
+            skipped_non_class1 = []
             for (name, value) in allele_to_sequence.items():
                 normalized = normalize_allele_name(
                     name, raise_on_error=False, use_allele_aliases=False)
@@ -543,6 +544,15 @@ class Class1AffinityPredictor(object):
                     if alias_normalized is not None:
                         normalized = alias_normalized
                 if normalized is None:
+                    # Detect class II, TAP, and pseudogene entries —
+                    # these don't belong in a class I predictor and
+                    # always have incomplete pseudosequences.
+                    gene = name.split("*")[0].split("-")[-1] if "-" in name else ""
+                    if ("X" in value and
+                            any(tag in gene
+                                for tag in ("DAA", "DAB", "TAP", "PS"))):
+                        skipped_non_class1.append(name)
+                        continue
                     normalized = name
                 if normalized in renormalized and name != normalized:
                     existing = renormalized[normalized]
@@ -551,6 +561,14 @@ class Class1AffinityPredictor(object):
                     continue
                 renormalized[normalized] = value
             allele_to_sequence = renormalized
+            if skipped_non_class1:
+                logging.info(
+                    "Skipped %d non-class-I entries from pseudosequence "
+                    "file (class II / TAP / pseudogene with incomplete "
+                    "pseudosequences): %s",
+                    len(skipped_non_class1),
+                    ", ".join(sorted(skipped_non_class1)[:10])
+                    + (" ..." if len(skipped_non_class1) > 10 else ""))
 
             # Map mhcgnomes-aliased forms back to pseudosequence keys.
             # e.g. Mamu-A1*007:01 -> Mamu-A*07:01
