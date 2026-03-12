@@ -598,6 +598,15 @@ class Class1AffinityPredictor(object):
                         and aliased not in allele_to_sequence):
                     allele_alias_map[aliased] = canonical_name
 
+            # Re-key allele-specific models to use canonical
+            # pseudosequence names, so predict-time lookups (which go
+            # through canonicalize_allele_name) find the right models.
+            rekeyed = collections.defaultdict(list)
+            for key, models in allele_to_allele_specific_models.items():
+                canonical = allele_alias_map.get(key, key)
+                rekeyed[canonical].extend(models)
+            allele_to_allele_specific_models = dict(rekeyed)
+
         allele_to_percent_rank_transform = {}
         percent_ranks_path = join(models_dir, "percent_ranks.csv")
         if exists(percent_ranks_path):
@@ -611,6 +620,10 @@ class Class1AffinityPredictor(object):
                         allele, raise_on_error=False, use_allele_aliases=True)
                 if normalized is None:
                     continue
+                # Map to canonical pseudosequence key if alias map exists
+                if allele_to_sequence is not None:
+                    normalized = allele_alias_map.get(
+                        normalized, normalized)
                 if (normalized in allele_to_percent_rank_transform and
                         allele != normalized):
                     continue
