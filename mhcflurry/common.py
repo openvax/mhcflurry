@@ -17,7 +17,8 @@ def normalize_allele_name(
         raw_name,
         forbidden_substrings=("MIC", "HFE"),
         raise_on_error=True,
-        default_value=None):
+        default_value=None,
+        use_allele_aliases=True):
     """
     Parses a string into a normalized allele representation.
 
@@ -35,6 +36,14 @@ def normalize_allele_name(
     default_value : str or None
         If raise_on_error is False and allele fails to parse, return this value
 
+    use_allele_aliases : bool
+        If True, use mhcgnomes allele alias table (IMGT historical name
+        reassignments). Some old allele names (e.g. B*44:01, Cw*0201) were
+        retired by IMGT when the original sequences were found to contain
+        errors. Defaults to False to preserve current IMGT nomenclature;
+        the pseudosequence loading code explicitly handles aliases with
+        fallback logic.
+
     Returns
     -------
     str or None
@@ -50,7 +59,7 @@ def normalize_allele_name(
         only_class1=True,
         required_result_types=[Allele, AlleleWithoutGene, Gene],
         preferred_result_types=[Allele],
-        use_allele_aliases=True,
+        use_allele_aliases=use_allele_aliases,
         infer_class2_pairing=False,
         collapse_singleton_haplotypes=True,
         collapse_singleton_serotypes=True,

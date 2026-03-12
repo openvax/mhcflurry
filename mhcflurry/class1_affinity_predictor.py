@@ -124,6 +124,7 @@ class Class1AffinityPredictor(object):
         assert isinstance(self.class1_pan_allele_models, list)
 
         self.provenance_string = provenance_string
+        self.allele_alias_map = {}  # populated by load()
 
     @property
     def manifest_df(self):
@@ -282,6 +283,22 @@ class Class1AffinityPredictor(object):
         self.clear_cache()
         self.check_consistency()
         return new_model_names
+
+    def canonicalize_allele_name(self, raw_name):
+        """
+        Normalize an allele name and map it to the canonical pseudosequence
+        key if possible.
+
+        Parameters
+        ----------
+        raw_name : str
+
+        Returns
+        -------
+        str
+        """
+        normalized = normalize_allele_name(raw_name)
+        return self.allele_alias_map.get(normalized, normalized)
 
     @property
     def supported_alleles(self):
@@ -515,7 +532,11 @@ class Class1AffinityPredictor(object):
             if row.allele == "pan-class1":
                 class1_pan_allele_models.append(model)
             else:
-                allele_to_allele_specific_models[row.allele].append(model)
+                # Normalize allele name for consistency with how
+                # user-supplied allele names are normalized at predict time.
+                allele_key = normalize_allele_name(
+                    row.allele, raise_on_error=False) or row.allele
+                allele_to_allele_specific_models[allele_key].append(model)
             all_models.append(model)
 
         manifest_df["model"] = all_models
@@ -527,38 +548,71 @@ class Class1AffinityPredictor(object):
                 join(models_dir, "allele_sequences.csv"),
                 index_col=0).iloc[:, 0].to_dict()
 
-            # This can be removed at a later point for a speed boost. We are
-            # re-normalizing allele names here because in late 2020 we switched
-            # from mhcnames to mhcgnomes, and the normalization of some alleles
-            # changed. We want to continue to support previous versions of the
-            # models, which have pseudosequence files with allele names
-            # normalized in the old way, so we re-normalize them here.
+            # Re-normalize allele names. We first try without IMGT allele
+            # aliases to preserve current nomenclature. If the parse fails
+            # or the pseudosequence contains unknown (X) positions, we
+            # retry with aliases — retired allele names like B*44:01 (an
+            # IMGT error reassigned to B*44:02 in 1994) often have
+            # incomplete pseudosequences, and the alias target may have a
+            # complete one. If mhcgnomes can't parse either way, keep the
+            # raw name so the pseudosequence remains available.
             renormalized = {}
             for (name, value) in allele_to_sequence.items():
-                normalized = normalize_allele_name(name, raise_on_error=False)
+                # Try without aliases first
+                normalized = normalize_allele_name(
+                    name, raise_on_error=False, use_allele_aliases=False)
+                if normalized is None or "X" in value:
+                    # Parse failed or pseudosequence is incomplete —
+                    # try with aliases to see if that resolves better
+                    alias_normalized = normalize_allele_name(
+                        name, raise_on_error=False, use_allele_aliases=True)
+                    if alias_normalized is not None:
+                        normalized = alias_normalized
                 if normalized is None:
-                    continue
+                    # mhcgnomes can't parse this name (e.g. non-human
+                    # species, class II genes filtered by only_class1).
+                    # Keep the raw name so the pseudosequence is still
+                    # available for pan-allele prediction.
+                    normalized = name
                 if normalized in renormalized and name != normalized:
-                    # If it's already here, only replace it if the new
-                    # normalization was a no-op. This is so that B*44:01, which
-                    # now parses to B*44:02, does not override the actual
-                    # B*44:02 pseudosequence.
+                    # Collision: prefer the entry with fewer X positions
+                    existing = renormalized[normalized]
+                    if value.count("X") < existing.count("X"):
+                        renormalized[normalized] = value
                     continue
                 renormalized[normalized] = value
             allele_to_sequence = renormalized
+
+            # Build a reverse alias map so that user inputs normalized
+            # via mhcgnomes (with aliases) map back to the canonical
+            # pseudosequence key. For example, if the CSV has
+            # "Mamu-A*07:01" and mhcgnomes aliases that to
+            # "Mamu-A1*007:01", a user querying either form should
+            # resolve to "Mamu-A*07:01" (the pseudosequence key).
+            allele_alias_map = {}
+            for canonical_name in allele_to_sequence:
+                aliased = normalize_allele_name(
+                    canonical_name, raise_on_error=False,
+                    use_allele_aliases=True)
+                if (aliased is not None and aliased != canonical_name
+                        and aliased not in allele_to_sequence):
+                    allele_alias_map[aliased] = canonical_name
 
         allele_to_percent_rank_transform = {}
         percent_ranks_path = join(models_dir, "percent_ranks.csv")
         if exists(percent_ranks_path):
             percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
             for allele in percent_ranks_df.columns:
-                # Similar to the above, we renormalize the allele name here.
-                normalized = normalize_allele_name(allele, raise_on_error=False)
+                # Same alias-fallback logic as for pseudosequences above.
+                normalized = normalize_allele_name(
+                    allele, raise_on_error=False, use_allele_aliases=False)
+                if normalized is None:
+                    normalized = normalize_allele_name(
+                        allele, raise_on_error=False, use_allele_aliases=True)
                 if normalized is None:
                     continue
                 if (normalized in allele_to_percent_rank_transform and
                         allele != normalized):
-                    # See comment 20 lines above for the rationale here.
                     continue
                 allele_to_percent_rank_transform[normalized] = (
                     PercentRankTransform.from_series(percent_ranks_df[allele]))
@@ -603,6 +657,8 @@ class Class1AffinityPredictor(object):
             provenance_string=provenance_string,
             optimization_info=optimization_info,
         )
+        if allele_to_sequence is not None:
+            result.allele_alias_map = allele_alias_map
         if optimization_level >= 1:
             optimized = result.optimize()
             logging.info(
@@ -1004,7 +1060,7 @@ class Class1AffinityPredictor(object):
         numpy.array of float
         """
         if allele is not None:
-            normalized_allele = normalize_allele_name(allele)
+            normalized_allele = self.canonicalize_allele_name(allele)
             try:
                 transform = self.allele_to_percent_rank_transform[normalized_allele]
                 return transform.transform(affinities)
@@ -1157,13 +1213,14 @@ class Class1AffinityPredictor(object):
         if allele is not None:
             if alleles is not None:
                 raise ValueError("Specify exactly one of allele or alleles")
-            df["allele"] = allele
-            normalized_allele = normalize_allele_name(allele)
+            normalized_allele = self.canonicalize_allele_name(allele)
+            df["allele"] = normalized_allele
             df["normalized_allele"] = normalized_allele
             unique_alleles = [normalized_allele]
         else:
-            df["allele"] = numpy.array(alleles)
-            df["normalized_allele"] = df.allele.map(normalize_allele_name)
+            df["allele"] = [
+                self.canonicalize_allele_name(a) for a in alleles]
+            df["normalized_allele"] = df["allele"]
             unique_alleles = df.normalized_allele.unique()
 
         if len(df) == 0:
