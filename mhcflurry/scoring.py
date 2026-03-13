@@ -1,11 +1,6 @@
 """
 Measures of prediction accuracy
 """
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
 import logging
 import sklearn.metrics
 import numpy

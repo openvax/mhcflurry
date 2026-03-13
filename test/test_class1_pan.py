@@ -1,16 +1,14 @@
 """
 Tests for training and predicting using Class1 pan-allele models.
 """
-from . import initialize
-initialize()
 
 from sklearn.metrics import roc_auc_score
 import pandas
 import pytest
 
-from numpy.testing import assert_, assert_equal
+from numpy.testing import assert_
 
-from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
+from mhcflurry import Class1NeuralNetwork
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
 
@@ -94,6 +92,14 @@ print("Loaded %d training and %d ms hits" % (
 
 
 def test_train_simple():
+    # Reset random seeds to ensure reproducibility regardless of test order
+    import numpy
+    import random
+    import torch
+    numpy.random.seed(1)
+    random.seed(1)
+    torch.manual_seed(1)
+
     network = Class1NeuralNetwork(**HYPERPARAMETERS)
     allele_encoding = AlleleEncoding(
         TRAIN_DF.allele.values,

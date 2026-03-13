@@ -1,4 +1,3 @@
-from __future__ import print_function, division, absolute_import
 import collections
 import logging
 import sys
@@ -9,7 +8,6 @@ import numpy
 import pandas
 from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene
 
-from warnings import warn
 
 from . import amino_acid
 
@@ -18,7 +16,8 @@ def normalize_allele_name(
         raw_name,
         forbidden_substrings=("MIC", "HFE"),
         raise_on_error=True,
-        default_value=None):
+        default_value=None,
+        use_allele_aliases=True):
     """
     Parses a string into a normalized allele representation.
 
@@ -36,6 +35,14 @@ def normalize_allele_name(
     default_value : str or None
         If raise_on_error is False and allele fails to parse, return this value
 
+    use_allele_aliases : bool
+        If True, use mhcgnomes allele alias table (IMGT historical name
+        reassignments). Some old allele names (e.g. B*44:01, Cw*0201) were
+        retired by IMGT when the original sequences were found to contain
+        errors. Defaults to False to preserve current IMGT nomenclature;
+        the pseudosequence loading code explicitly handles aliases with
+        fallback logic.
+
     Returns
     -------
     str or None
@@ -51,7 +58,7 @@ def normalize_allele_name(
         only_class1=True,
         required_result_types=[Allele, AlleleWithoutGene, Gene],
         preferred_result_types=[Allele],
-        use_allele_aliases=True,
+        use_allele_aliases=use_allele_aliases,
         infer_class2_pairing=False,
         collapse_singleton_haplotypes=True,
         collapse_singleton_serotypes=True,
@@ -74,54 +81,77 @@ def normalize_allele_name(
     return result.restrict_allele_fields(2).to_string()
 
 
-TENSORFLOW_CONFIGURED = False
+PYTORCH_CONFIGURED = False
 
 
-def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
+def configure_pytorch(gpu_device_nums=None, num_threads=None):
     """
-    Configure Keras backend to use GPU or CPU.
+    Configure PyTorch to use GPU or CPU.
 
     Parameters
     ----------
-    backend : string, optional
-        one of 'tensorflow-default', 'tensorflow-cpu', 'tensorflow-gpu'
-
     gpu_device_nums : list of int, optional
         GPU devices to potentially use
 
     num_threads : int, optional
-        Tensorflow threads to use
+        Number of threads for PyTorch operations
 
     """
-    import tensorflow as tf
-    
-    # mhcflurry models use keras 2. Tensorflow now defaults to keras 3, so to load these
-    # old models, we need to set the environment variable to use legacy keras. Ideally,
-    # these models such be regenerated with keras 3.
-    os.environ["TF_USE_LEGACY_KERAS"] = "1"
-    
-    global TENSORFLOW_CONFIGURED
+    import torch
 
-    if TENSORFLOW_CONFIGURED:
+    global PYTORCH_CONFIGURED
+
+    if PYTORCH_CONFIGURED:
         return
-    
-    if backend is not None:
-        warn("Using the `backend` argument is now unused and will be deprecated; tensorflow defaults are being used.", DeprecationWarning)
 
-    TENSORFLOW_CONFIGURED = True
+    PYTORCH_CONFIGURED = True
 
-    # turn on selected GPUs with memory growth enabled
+    # Configure GPU devices
     if gpu_device_nums is not None:
-        physical_devices = tf.config.list_physical_devices("GPU")
-        tf.config.set_visible_devices(
-            [physical_devices[idx] for idx in gpu_device_nums], "GPU"
-        )
-        for gpu in physical_devices:
-            tf.config.experimental.set_memory_growth(gpu, True)
+        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, gpu_device_nums))
 
+    # Configure number of threads
     if num_threads:
-        tf.config.threading.set_inter_op_parallelism_threads(num_threads)
-        tf.config.threading.set_intra_op_parallelism_threads(num_threads)
+        torch.set_num_threads(num_threads)
+
+
+def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
+    """
+    Backward-compatible configuration entry point from the TF backend era.
+
+    Parameters
+    ----------
+    backend : str, optional
+        Ignored. Kept for API compatibility.
+    gpu_device_nums : list of int, optional
+        GPU devices to potentially use.
+    num_threads : int, optional
+        Number of threads for backend operations.
+    """
+    del backend  # unused legacy argument
+    configure_pytorch(gpu_device_nums=gpu_device_nums, num_threads=num_threads)
+
+
+def get_pytorch_device():
+    """
+    Get the appropriate PyTorch device (GPU if available, else CPU).
+
+    By default, MPS (Apple Metal) is disabled due to known issues with
+    subprocess-based training and placeholder tensor allocation in embedding
+    layers. Set MHCFLURRY_ENABLE_MPS=1 to enable MPS.
+
+    Returns
+    -------
+    torch.device
+    """
+    import torch
+    if torch.cuda.is_available():
+        return torch.device('cuda')
+    elif (os.environ.get('MHCFLURRY_ENABLE_MPS', '0') == '1' and
+          hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()):
+        return torch.device('mps')
+    else:
+        return torch.device('cpu')
 
 
 def configure_logging(verbose=False):

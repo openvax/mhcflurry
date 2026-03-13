@@ -1,20 +1,13 @@
-from . import initialize
-initialize()
+"""Tests for random negative peptide generation."""
 
-from mhcflurry import amino_acid
-from numpy.testing import assert_equal
-import numpy
 import pandas
 import math
 
-from mhcflurry import Class1NeuralNetwork
-from mhcflurry.encodable_sequences import EncodableSequences
-from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.common import random_peptides
 from mhcflurry.random_negative_peptides import RandomNegativePeptides
 
 
-def test_random_negative_peptides_by_allele():
+def test_random_negative_peptides_by_allele_equalize_nonbinders():
     planner = RandomNegativePeptides(
         random_negative_method="by_allele",
         random_negative_binder_threshold=500,
@@ -52,14 +45,14 @@ def test_random_negative_peptides_by_allele():
 
     result_df["length"] = result_df.peptide.str.len()
     random_negatives = result_df.groupby(["allele", "length"]).peptide.count().unstack()
-    real_data = data.groupby(["allele", "length"]).peptide.count().unstack().fillna(0)
-    real_binders = data.loc[
+    data.groupby(["allele", "length"]).peptide.count().unstack().fillna(0)
+    data.loc[
         data.affinity <= 500
     ].groupby(["allele", "length"]).peptide.count().unstack().fillna(0)
     real_nonbinders = data.loc[
         data.affinity > 500
     ].groupby(["allele", "length"]).peptide.count().unstack().fillna(0)
-    total_nonbinders = random_negatives + real_nonbinders
+    random_negatives + real_nonbinders
 
     assert (random_negatives.loc["HLA-A*02:01"] == 1.0).all()
     assert (random_negatives.loc["HLA-B*44:02"] == math.ceil(1007 / 8)).all(), (
@@ -107,7 +100,7 @@ def test_random_negative_peptides_by_allele():
     result_df["length"] = result_df.peptide.str.len()
     random_negatives = result_df.groupby(["allele", "length"]).peptide.count().unstack()
     real_data = data.groupby(["allele", "length"]).peptide.count().unstack().fillna(0)
-    real_binders = data.loc[
+    data.loc[
         data.affinity <= 500
     ].groupby(["allele", "length"]).peptide.count().unstack().fillna(0)
     real_nonbinders = data.loc[

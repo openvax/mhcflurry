@@ -1,5 +1,4 @@
-from . import initialize
-initialize()
+"""Tests for regression target conversion."""
 
 from mhcflurry.regression_target import (
     from_ic50,

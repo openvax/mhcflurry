@@ -1,13 +1,10 @@
-from . import initialize
-initialize()
 
 import pandas
 import tempfile
 import pickle
 
-from numpy.testing import assert_, assert_equal, assert_allclose, assert_array_equal
-import pytest
 import numpy
+import pytest
 
 from sklearn.metrics import roc_auc_score
 
@@ -16,29 +13,52 @@ from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
 from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import cleanup, startup
 import mhcflurry.class1_presentation_predictor
-mhcflurry.class1_presentation_predictor.PREDICT_CHUNK_SIZE = 15
 
 from . import data_path
+
+mhcflurry.class1_presentation_predictor.PREDICT_CHUNK_SIZE = 15
+
+
+
+def setup_module():
+    global AFFINITY_PREDICTOR
+    global CLEAVAGE_PREDICTOR
+    global CLEAVAGE_PREDICTOR_NO_FLANKING
+    global PRESENTATION_PREDICTOR
+    startup()
+    AFFINITY_PREDICTOR = Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.combined"),
+        optimization_level=0,
+        max_models=1)
+    CLEAVAGE_PREDICTOR = Class1ProcessingPredictor.load(
+        get_path("models_class1_processing", "models.selected.with_flanks"),
+        max_models=1)
+    CLEAVAGE_PREDICTOR_NO_FLANKING = Class1ProcessingPredictor.load(
+        get_path("models_class1_processing", "models.selected.no_flank"),
+        max_models=1)
+    PRESENTATION_PREDICTOR = Class1PresentationPredictor.load()
+
+
+def teardown_module():
+    global AFFINITY_PREDICTOR
+    global CLEAVAGE_PREDICTOR
+    global CLEAVAGE_PREDICTOR_NO_FLANKING
+    global PRESENTATION_PREDICTOR
+    AFFINITY_PREDICTOR = None
+    CLEAVAGE_PREDICTOR = None
+    CLEAVAGE_PREDICTOR_NO_FLANKING = None
+    PRESENTATION_PREDICTOR = None
+    cleanup()
 
 
 @pytest.fixture(scope="module")
 def predictors():
-    startup()
-    predictors = {
-        'affinity_predictor': Class1AffinityPredictor.load(
-            get_path("models_class1_pan", "models.combined"),
-            optimization_level=0,
-            max_models=1),
-        'cleavage_predictor': Class1ProcessingPredictor.load(
-            get_path("models_class1_processing", "models.selected.with_flanks"),
-            max_models=1),
-        'cleavage_predictor_no_flanking': Class1ProcessingPredictor.load(
-            get_path("models_class1_processing", "models.selected.no_flank"),
-            max_models=1),
-        'presentation_predictor': Class1PresentationPredictor.load()
+    return {
+        "affinity_predictor": AFFINITY_PREDICTOR,
+        "cleavage_predictor": CLEAVAGE_PREDICTOR,
+        "cleavage_predictor_no_flanking": CLEAVAGE_PREDICTOR_NO_FLANKING,
+        "presentation_predictor": PRESENTATION_PREDICTOR,
     }
-    yield predictors
-    cleanup()
 
 
 def test_basic(predictors):
@@ -370,9 +390,9 @@ def test_downloaded_predictor(predictors):
             ],
         })
 
-    numpy.testing.assert_equal(
-        scan_results6.peptide.values,
-        scan_results5.peptide.str.lower().values,
+    numpy.testing.assert_array_equal(
+        scan_results6.peptide.to_numpy(),
+        scan_results5.peptide.str.lower().to_numpy(),
     )
     numpy.testing.assert_almost_equal(
         scan_results6.affinity.values, scan_results5.affinity.values)

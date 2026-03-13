@@ -1,21 +1,23 @@
 """
 Tests for calibrate percentile ranks command
 """
-from . import initialize
-initialize()
 
 import os
 import shutil
 import tempfile
 import subprocess
 import pytest
+import sys
 
-from numpy.testing import assert_equal
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
+from .pytest_helpers import mhcflurry_cli
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["MHCFLURRY_CLUSTER_WORKER_COMMAND"] = (
+    f"{sys.executable} -m mhcflurry.cluster_worker_entry_point"
+)
 
 from mhcflurry.testing_utils import cleanup, startup
 
@@ -43,8 +45,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
     new_predictor = Class1AffinityPredictor.load(dest_models_dir)
     assert len(new_predictor.allele_to_percent_rank_transform) == 0
 
-    args = [
-        "mhcflurry-calibrate-percentile-ranks",
+    args = mhcflurry_cli("mhcflurry-calibrate-percentile-ranks") + [
         "--models-dir", dest_models_dir,
         "--match-amino-acid-distribution-data", get_path(
             "data_curated", "curated_training_data.affinity.csv.bz2"),

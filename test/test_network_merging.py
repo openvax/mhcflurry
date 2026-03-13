@@ -1,5 +1,3 @@
-from . import initialize
-initialize()
 
 import numpy
 import pandas
@@ -12,16 +10,24 @@ from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import cleanup, startup
 
 
-# Define a fixture to initialize and clean up predictors
+
+def setup_module():
+    global PAN_ALLELE_PREDICTOR
+    startup()
+    PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.combined"),
+        optimization_level=0,)
+
+
+def teardown_module():
+    global PAN_ALLELE_PREDICTOR
+    PAN_ALLELE_PREDICTOR = None
+    cleanup()
+
+
 @pytest.fixture(scope="module")
 def predictors():
-    startup()
-    predictors_dict = {
-        'allele-specific': Class1AffinityPredictor.load(get_path("models_class1", "models")),
-        'pan-allele': Class1AffinityPredictor.load(get_path("models_class1_pan", "models.combined"), optimization_level=0),
-    }
-    yield predictors_dict
-    cleanup()
+    return {"pan-allele": PAN_ALLELE_PREDICTOR}
 
 
 def test_merge(predictors):

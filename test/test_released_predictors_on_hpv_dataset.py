@@ -5,8 +5,6 @@ The study that generated this dataset has now been published
 (Bonsack et al 2019, DOI: 10.1158/2326-6066.CIR-18-0584), and the authors
 request that any work based on the HPV dataset cite this paper.
 """
-from . import initialize
-initialize()
 
 import os
 import pandas
@@ -29,16 +27,26 @@ def data_path(name):
 DF = pandas.read_csv(data_path("hpv_predictions.csv"))
 
 
-# Define a fixture to initialize and clean up predictors
+def setup_module():
+    global PREDICTORS
+    startup()
+    PREDICTORS = {
+        'allele-specific': Class1AffinityPredictor.load(
+            get_path("models_class1", "models")),
+        'pan-allele': Class1AffinityPredictor.load(
+            get_path("models_class1_pan", "models.combined"))
+    }
+
+
+def teardown_module():
+    global PREDICTORS
+    PREDICTORS = None
+    cleanup()
+
+
 @pytest.fixture(scope="module")
 def predictors():
-    startup()
-    predictors_dict = {
-        'allele-specific': Class1AffinityPredictor.load(get_path("models_class1", "models")),
-        'pan-allele': Class1AffinityPredictor.load(get_path("models_class1_pan", "models.combined")),
-    }
-    yield predictors_dict
-    cleanup()
+    return PREDICTORS
 
 
 def test_on_hpv(predictors, df=DF):

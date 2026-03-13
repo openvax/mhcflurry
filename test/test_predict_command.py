@@ -1,27 +1,27 @@
-from . import initialize
-initialize()
+"""Tests for the predict command."""
+import pytest
 
 import tempfile
 import os
 
 import pandas
-import pytest
-from numpy.testing import assert_equal
 
-import tensorflow as tf
-
-tf.config.experimental.enable_op_determinism()
-tf.keras.utils.set_random_seed(1)
+import torch
 
 from mhcflurry import predict_command
 
 from mhcflurry.testing_utils import cleanup, startup
 
-pytest.fixture(autouse=True, scope="module")
-def setup_module():
+torch.manual_seed(1)
+
+
+@pytest.fixture(autouse=True)
+def setup_teardown():
+    """Setup and teardown for each test."""
     startup()
     yield
     cleanup()
+
 
 TEST_CSV = '''
 Allele,Peptide,Experiment
@@ -31,6 +31,7 @@ HLA-B4403,PPPPPPPP,18
 '''.strip()
 
 
+@pytest.mark.slow
 def test_csv():
     args = ["--allele-column", "Allele", "--peptide-column", "Peptide"]
     deletes = []
@@ -53,6 +54,7 @@ def test_csv():
     assert result.shape == (3, 8)
 
 
+@pytest.mark.slow
 def test_no_csv():
     args = [
         "--alleles", "HLA-A0201", "H-2-Kb",

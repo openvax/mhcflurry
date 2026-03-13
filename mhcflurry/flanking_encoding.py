@@ -2,10 +2,6 @@
 Class for encoding variable-length flanking and peptides to
 fixed-size numerical matrices
 """
-from __future__ import (
-    print_function, division, absolute_import, )
-
-from six import string_types
 from collections import namedtuple
 import logging
 

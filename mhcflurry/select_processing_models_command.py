@@ -20,7 +20,6 @@ import pandas
 from sklearn.metrics import roc_auc_score
 
 import tqdm  # progress bar
-tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .flanking_encoding import FlankingEncoding
@@ -31,6 +30,8 @@ from .local_parallelism import (
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
+
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 
 # To avoid pickling large matrices to send to child processes when running in
@@ -246,7 +247,6 @@ def model_select(
     -------
     dict with keys 'fold_num', 'selected_indices', 'summary'
     """
-    from .flanking_encoding import FlankingEncoding
 
     full_data = constant_data["data"]
     df = full_data.loc[

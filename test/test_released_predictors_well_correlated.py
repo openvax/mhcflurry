@@ -2,15 +2,13 @@
 Test that pan-allele and allele-specific predictors are highly correlated.
 """
 from __future__ import print_function
-import logging
-logging.getLogger('tensorflow').disabled = True
-logging.getLogger('matplotlib').disabled = True
-
-import pytest
-import sys
 import argparse
-import pandas
+import logging
+import sys
+
 import numpy
+import pandas
+import pytest
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.encodable_sequences import EncodableSequences
@@ -19,17 +17,41 @@ from mhcflurry.common import random_peptides
 
 from mhcflurry.testing_utils import cleanup, startup
 
+logger = logging.getLogger("matplotlib")
+logger.disabled = True
 
-# Define a fixture to initialize and clean up predictors
-@pytest.fixture(scope="module")
-def predictors():
+def setup():
+    """Setup for running script directly (not via pytest)."""
+    global PREDICTORS
     startup()
-    predictors_dict = {
+    PREDICTORS = {
         'allele-specific': Class1AffinityPredictor.load(get_path("models_class1", "models")),
         'pan-allele': Class1AffinityPredictor.load(get_path("models_class1_pan", "models.combined")),
     }
-    yield predictors_dict
+
+
+@pytest.fixture(autouse=True)
+def setup_teardown():
+    """Setup and teardown for each test."""
+    global PREDICTORS
+    startup()
+    try:
+        PREDICTORS = {
+            'allele-specific': Class1AffinityPredictor.load(
+                get_path("models_class1", "models")),
+            'pan-allele': Class1AffinityPredictor.load(
+                get_path("models_class1_pan", "models.combined"), max_models=2)
+        }
+    except Exception:
+        PREDICTORS = None
+    yield
+    PREDICTORS = None
     cleanup()
+
+
+@pytest.fixture
+def predictors():
+    return PREDICTORS
 
 
 def test_correlation(
@@ -68,7 +90,8 @@ def test_correlation(
             df["tightest"] = df.min(1)
             print(df.sort_values("tightest").iloc[:, :-1])
             if debug:
-                import ipdb ; ipdb.set_trace()
+                import ipdb  # pylint: disable=import-error
+                ipdb.set_trace()
             del df["tightest"]
 
     results_df = pandas.DataFrame(results_df, columns=["allele", "correlation"])

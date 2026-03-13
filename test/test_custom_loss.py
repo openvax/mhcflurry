@@ -1,9 +1,12 @@
-from . import initialize
-initialize()
+"""
+Tests for custom loss functions.
+"""
+import pytest
+
+from .pytest_helpers import assert_greater, assert_almost_equal
 
 import numpy
-import tensorflow as tf
-import pytest
+import torch
 from mhcflurry.custom_loss import CUSTOM_LOSSES, MultiallelicMassSpecLoss
 
 from mhcflurry.testing_utils import cleanup, startup
@@ -14,66 +17,81 @@ def setup_module():
     yield
     cleanup()
 
-def evaluate_loss(loss, y_true, y_pred):
-    y_true = tf.convert_to_tensor(y_true, dtype='float32', name='y_true')
-    y_pred = tf.convert_to_tensor(y_pred, dtype='float32', name='y_pred')
+@pytest.fixture(autouse=True)
+def setup_teardown():
+    """Setup and teardown for each test."""
+    startup()
+    yield
+    cleanup()
+
+
+def evaluate_loss(loss_obj, y_true, y_pred):
+    """Evaluate a loss function with PyTorch tensors."""
+    y_true = torch.tensor(y_true, dtype=torch.float32)
+    y_pred = torch.tensor(y_pred, dtype=torch.float32)
+
     if y_pred.ndim == 1:
-        y_pred = tf.reshape(y_pred, (len(y_pred), 1))
+        y_pred = y_pred.reshape(len(y_pred), 1)
     if y_true.ndim == 1:
-        y_true = tf.reshape(y_true, (len(y_true), 1))
+        y_true = y_true.reshape(len(y_true), 1)
 
     print("y_pred, y_true:", y_pred, y_true)
 
     assert y_true.ndim == 2
     assert y_pred.ndim == 2
 
-    result = loss(y_true, y_pred)
-    return result.numpy()
+    result = loss_obj.loss(y_pred, y_true)
+    return result.item()
 
 
-def test_mse_with_inequalities(loss_obj=CUSTOM_LOSSES['mse_with_inequalities']):
+def test_mse_with_inequalities(loss_obj=None):
+    """Test MSE with inequalities loss function."""
+    if loss_obj is None:
+        loss_obj = CUSTOM_LOSSES['mse_with_inequalities']
+
     y_values = [0.0, 0.5, 0.8, 1.0]
 
     adjusted_y = loss_obj.encode_y(y_values)
     print(adjusted_y)
-    loss0 = evaluate_loss(loss_obj.loss, adjusted_y, y_values)
+    loss0 = evaluate_loss(loss_obj, adjusted_y, y_values)
     print(loss0)
-    assert loss0 == 0.0
+    assert abs(loss0) < 1e-6, f"Expected 0, got {loss0}"
 
     adjusted_y = loss_obj.encode_y(y_values, [">", ">", ">", ">"])
-    loss0 = evaluate_loss(loss_obj.loss, adjusted_y, y_values)
-    assert loss0 == 0.0
+    loss0 = evaluate_loss(loss_obj, adjusted_y, y_values)
+    assert abs(loss0) < 1e-6, f"Expected 0, got {loss0}"
 
     adjusted_y = loss_obj.encode_y(y_values, ["<", "<", "<", "<"])
-    loss0 = evaluate_loss(loss_obj.loss, adjusted_y, y_values)
-    assert loss0 == 0.0
+    loss0 = evaluate_loss(loss_obj, adjusted_y, y_values)
+    assert abs(loss0) < 1e-6, f"Expected 0, got {loss0}"
 
     adjusted_y = loss_obj.encode_y(y_values, ["=", "<", "=", ">"])
-    loss0 = evaluate_loss(loss_obj.loss, adjusted_y, y_values)
-    assert loss0 == 0.0
+    loss0 = evaluate_loss(loss_obj, adjusted_y, y_values)
+    assert abs(loss0) < 1e-6, f"Expected 0, got {loss0}"
 
     adjusted_y = loss_obj.encode_y(y_values, ["=", "<", "=", ">"])
-    loss0 = evaluate_loss(loss_obj.loss, adjusted_y, [0.0, 0.4, 0.8, 1.0])
-    assert loss0 == 0.0
+    loss0 = evaluate_loss(loss_obj, adjusted_y, [0.0, 0.4, 0.8, 1.0])
+    assert abs(loss0) < 1e-6, f"Expected 0, got {loss0}"
 
     adjusted_y = loss_obj.encode_y(y_values, [">", "<", ">", ">"])
-    loss0 = evaluate_loss(loss_obj.loss, adjusted_y, [0.1, 0.4, 0.9, 1.0])
-    assert loss0 == 0.0
+    loss0 = evaluate_loss(loss_obj, adjusted_y, [0.1, 0.4, 0.9, 1.0])
+    assert abs(loss0) < 1e-6, f"Expected 0, got {loss0}"
 
     adjusted_y = loss_obj.encode_y(y_values, [">", "<", ">", ">"])
-    loss0 = evaluate_loss(loss_obj.loss, adjusted_y, [0.1, 0.6, 0.9, 1.0])
-    assert loss0 > 0.0
+    loss0 = evaluate_loss(loss_obj, adjusted_y, [0.1, 0.6, 0.9, 1.0])
+    assert_greater(loss0, 0.0)
 
     adjusted_y = loss_obj.encode_y(y_values, ["=", "<", ">", ">"])
-    loss0 = evaluate_loss(loss_obj.loss, adjusted_y, [0.1, 0.6, 0.9, 1.0])
-    assert loss0 == pytest.approx(0.02 / 4, abs=1e-7)
+    loss0 = evaluate_loss(loss_obj, adjusted_y, [0.1, 0.6, 0.9, 1.0])
+    assert_almost_equal(loss0, 0.02 / 4, places=5)
 
     adjusted_y = loss_obj.encode_y(y_values, ["=", "<", "=", ">"])
-    loss0 = evaluate_loss(loss_obj.loss, adjusted_y, [0.1, 0.6, 0.9, 1.0])
-    assert loss0 == pytest.approx(0.03 / 4, abs=1e-7)
+    loss0 = evaluate_loss(loss_obj, adjusted_y, [0.1, 0.6, 0.9, 1.0])
+    assert_almost_equal(loss0, 0.03 / 4, places=5)
 
 
 def test_mse_with_inequalities_and_multiple_outputs():
+    """Test MSE with inequalities and multiple outputs loss function."""
     loss_obj = CUSTOM_LOSSES['mse_with_inequalities_and_multiple_outputs']
     test_mse_with_inequalities(loss_obj)
 
@@ -81,7 +99,7 @@ def test_mse_with_inequalities_and_multiple_outputs():
     adjusted_y = loss_obj.encode_y(
         y_values, output_indices=[0, 1, 1, 1])
     loss0 = evaluate_loss(
-        loss_obj.loss,
+        loss_obj,
         adjusted_y,
         [
             [0.0, 1000],
@@ -89,13 +107,13 @@ def test_mse_with_inequalities_and_multiple_outputs():
             [3000, 0.8],
             [4000, 1.0],
         ])
-    assert loss0 == pytest.approx(0.0, abs=1e-7)
+    assert_almost_equal(loss0, 0.0, places=5)
 
     y_values = [0.0, 0.5, 0.8, 1.0]
     adjusted_y = loss_obj.encode_y(
         y_values, output_indices=[0, 1, 1, 0])
     loss0 = evaluate_loss(
-        loss_obj.loss,
+        loss_obj,
         adjusted_y,
         [
             [0.1, 1000],
@@ -103,13 +121,13 @@ def test_mse_with_inequalities_and_multiple_outputs():
             [3000, 0.8],
             [1.0, 4000],
         ])
-    assert loss0 == pytest.approx(0.02 / 4, abs=1e-7)
+    assert_almost_equal(loss0, 0.02 / 4, places=5)
 
     y_values = [0.0, 0.5, 0.8, 1.0]
     adjusted_y = loss_obj.encode_y(
         y_values, output_indices=[0, 1, 1, 0], inequalities=["=", ">", "<", "<"])
     loss0 = evaluate_loss(
-        loss_obj.loss,
+        loss_obj,
         adjusted_y,
         [
             [0.1, 1000],
@@ -117,13 +135,13 @@ def test_mse_with_inequalities_and_multiple_outputs():
             [3000, 0.8],
             [1.0, 4000],
         ])
-    assert loss0 == pytest.approx(0.01 / 4, abs=1e-7)
+    assert_almost_equal(loss0, 0.01 / 4, places=5)
 
     y_values = [0.0, 0.5, 0.8, 1.0]
     adjusted_y = loss_obj.encode_y(
         y_values, output_indices=[0, 1, 1, 0], inequalities=["=", "<", "<", "<"])
     loss0 = evaluate_loss(
-        loss_obj.loss,
+        loss_obj,
         adjusted_y,
         [
             [0.1, 1000],
@@ -131,10 +149,11 @@ def test_mse_with_inequalities_and_multiple_outputs():
             [3000, 0.8],
             [1.0, 4000],
         ])
-    assert loss0 == pytest.approx(0.02 / 4, abs=1e-7)
+    assert_almost_equal(loss0, 0.02 / 4, places=5)
 
 
 def test_multiallelic_mass_spec_loss():
+    """Test multiallelic mass spec loss function."""
     for delta in [0.0, 0.3]:
         print("delta", delta)
         # Hit labels
@@ -195,9 +214,74 @@ def test_multiallelic_mass_spec_loss():
 
         numpy.testing.assert_almost_equal(expected1, expected2)
 
+        loss_obj = MultiallelicMassSpecLoss(delta=delta)
         computed = evaluate_loss(
-            MultiallelicMassSpecLoss(delta=delta).loss,
+            loss_obj,
             y_true,
             y_pred.reshape(y_pred.shape))
 
         numpy.testing.assert_almost_equal(computed, expected1, 4)
+
+
+def test_encode_y_basic():
+    """Test basic y encoding functionality."""
+    from mhcflurry.pytorch_losses import MSEWithInequalities
+
+    # Test equality encoding
+    y = [0.0, 0.5, 1.0]
+    encoded = MSEWithInequalities.encode_y(y)
+    numpy.testing.assert_array_equal(encoded, y)
+
+    # Test greater than encoding (should add 2)
+    encoded_gt = MSEWithInequalities.encode_y(y, [">", ">", ">"])
+    numpy.testing.assert_array_equal(encoded_gt, [2.0, 2.5, 3.0])
+
+    # Test less than encoding (should add 4)
+    encoded_lt = MSEWithInequalities.encode_y(y, ["<", "<", "<"])
+    numpy.testing.assert_array_equal(encoded_lt, [4.0, 4.5, 5.0])
+
+
+def test_loss_gradient_flow():
+    """Test that gradients flow correctly through the loss."""
+    from mhcflurry.pytorch_losses import MSEWithInequalities
+
+    loss_fn = MSEWithInequalities()
+
+    # Create predictions that require gradients
+    y_pred = torch.tensor([[0.5]], requires_grad=True)
+    y_true = torch.tensor([[0.3]])  # equality
+
+    loss = loss_fn(y_pred, y_true)
+    loss.backward()
+
+    # Gradient should exist and be non-zero
+    assert y_pred.grad is not None
+    assert y_pred.grad.abs().item() > 0
+
+
+def test_inequality_gradient_respects_constraint():
+    """Test that gradients respect inequality constraints."""
+    from mhcflurry.pytorch_losses import MSEWithInequalities
+
+    loss_fn = MSEWithInequalities()
+
+    # Test greater-than constraint (y_true encoded as 2 + value)
+    # When pred > threshold, gradient should be 0
+    y_pred = torch.tensor([[0.7]], requires_grad=True)
+    y_true = torch.tensor([[2.5]])  # > 0.5
+
+    loss = loss_fn(y_pred, y_true)
+    loss.backward()
+
+    # Gradient should be 0 since pred (0.7) > threshold (0.5)
+    assert abs(y_pred.grad.item()) < 1e-6
+
+    # When pred < threshold, gradient should be non-zero
+    y_pred2 = torch.tensor([[0.3]], requires_grad=True)
+    y_true2 = torch.tensor([[2.5]])  # > 0.5
+
+    loss2 = loss_fn(y_pred2, y_true2)
+    loss2.backward()
+
+    # Gradient should be non-zero since pred (0.3) < threshold (0.5)
+    assert abs(y_pred2.grad.item()) > 0

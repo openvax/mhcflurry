@@ -1,5 +1,3 @@
-from . import initialize
-initialize()
 
 import pandas
 import tempfile
@@ -11,7 +9,6 @@ from mhcflurry.class1_processing_predictor import Class1ProcessingPredictor
 
 from mhcflurry.common import random_peptides
 
-from mhcflurry.testing_utils import cleanup, startup
 
 from .test_class1_processing_neural_network import train_basic_network
 

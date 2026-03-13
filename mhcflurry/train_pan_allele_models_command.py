@@ -19,7 +19,6 @@ import numpy
 import pandas
 import yaml
 import tqdm  # progress bar
-tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import Class1NeuralNetwork
@@ -33,6 +32,8 @@ from .cluster_parallelism import (
     cluster_results_from_args)
 from .allele_encoding import AlleleEncoding
 from .encodable_sequences import EncodableSequences
+
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 
 # To avoid pickling large matrices to send to child processes when running in
@@ -320,7 +321,7 @@ def initialize_training(args):
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
-    
+
     df = df.loc[~df.measurement_value.isnull()]
     print("Dropped NaNs: %s" % (str(df.shape)))
 
@@ -603,9 +604,9 @@ def train_model(
 
 
     def progress_callback():
-        import tensorflow as tf
-        if tf.config.list_physical_devices('GPU'):
-            mem = tf.config.experimental.get_memory_info('GPU:0')['current'] / 10**9
+        import torch
+        if torch.cuda.is_available():
+            mem = torch.cuda.memory_allocated() / 10**9
             print("Current used GPU memory: ", mem, "gb")
 
     if get_train_param("pretrain", False):
@@ -621,7 +622,7 @@ def train_model(
 
         if verbose:
             print("Unused train params", train_params)
-        
+
         attempt = 0
         while True:
             attempt += 1

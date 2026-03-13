@@ -1,9 +1,9 @@
-from . import initialize
-initialize()
+"""Tests for amino acid encoding."""
 
 from mhcflurry import amino_acid
 from numpy.testing import assert_equal
 import pandas
+import warnings
 
 letter_to_index_dict = {
     'A': 0,
@@ -50,3 +50,10 @@ def test_index_and_one_hot_encoding():
             [1, 0, 0],
         ])
 
+
+def test_index_encoding_no_downcast_futurewarning():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        index_encoding = amino_acid.index_encoding(
+            ["AAAA", "ABCA"], letter_to_index_dict)
+    assert index_encoding.dtype.kind in ("i", "u")

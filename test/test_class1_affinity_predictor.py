@@ -1,5 +1,5 @@
-from . import initialize
-initialize()
+"""Tests for Class1AffinityPredictor."""
+import pytest
 
 import tempfile
 import shutil
@@ -18,18 +18,20 @@ from numpy import testing
 from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import cleanup, startup
 
-DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+DOWNLOADED_PREDICTOR = None
 
 
-def setup():
+@pytest.fixture(autouse=True)
+def setup_teardown():
+    """Setup and teardown for each test."""
     global DOWNLOADED_PREDICTOR
     startup()
-    DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+    try:
+        DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
+    except Exception:
+        DOWNLOADED_PREDICTOR = None
     logging.basicConfig(level=logging.DEBUG)
-
-
-def teardown():
-    global DOWNLOADED_PREDICTOR
+    yield
     DOWNLOADED_PREDICTOR = None
     cleanup()
 
@@ -241,3 +243,25 @@ def test_predict_implementations_equivalent():
                 allele=allele, peptides=peptides, centrality_measure=centrality_measure
             ).prediction.values
             testing.assert_almost_equal(pred1, pred2, decimal=2)
+
+
+def test_no_runtime_warnings_for_unsupported_rows():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        df = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+            allele="HLA-A*02:01",
+            peptides=["SIINFEKL", "SSSN"],
+            throw=False,
+            include_confidence_intervals=True,
+            centrality_measure="mean",
+        )
+        df2 = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+            allele="HLA-A*02:01",
+            peptides=["SSSN"],
+            throw=False,
+            include_confidence_intervals=True,
+            centrality_measure="robust_mean",
+        )
+    assert not numpy.isnan(df.loc[df.peptide == "SIINFEKL", "prediction"].iloc[0])
+    assert numpy.isnan(df.loc[df.peptide == "SSSN", "prediction"].iloc[0])
+    assert numpy.isnan(df2["prediction"].iloc[0])

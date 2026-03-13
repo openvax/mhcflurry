@@ -34,16 +34,14 @@ with open("mhcflurry/version.py", "r") as f:
 
 if __name__ == "__main__":
     required_packages = [
-        "six",
-        "pandas>=0.20.3",
+        "pandas>=2.0",
         "appdirs",
         "scikit-learn",
-        "mhcgnomes>=0.8.4",
+        "mhcgnomes>=3.0.1",
         "numpy",
         "pyyaml",
         "tqdm",
-        "tensorflow>=2.15.0",
-        "tf-keras"
+        "torch>=2.0.0",
     ]
 
     setup(
@@ -79,13 +77,17 @@ if __name__ == "__main__":
                 "mhcflurry.cluster_parallelism:worker_entry_point",
             ]
         },
+        python_requires=">=3.10",
         classifiers=[
             "Development Status :: 5 - Production/Stable",
             "Environment :: Console",
             "Operating System :: OS Independent",
             "Intended Audience :: Science/Research",
             "License :: OSI Approved :: Apache Software License",
-            "Programming Language :: Python",
+            "Programming Language :: Python :: 3",
+            "Programming Language :: Python :: 3.10",
+            "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.12",
             "Topic :: Scientific/Engineering :: Bio-Informatics",
         ],
         package_data={

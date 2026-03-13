@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from os.path import join, exists
 from os import mkdir
 from socket import gethostname
@@ -9,8 +7,6 @@ import time
 import collections
 import logging
 import warnings
-from six import string_types
-
 import numpy
 import pandas
 import sklearn
@@ -211,13 +207,16 @@ class Class1PresentationPredictor(object):
                 new_df["sample_name"] = sample_name
                 new_df["affinity"] = predictions_df[
                     sample_alleles
-                ].min(1).values
+                ].min(axis=1).values
                 if len(df) == 0:
                     new_df["best_allele"] = []
                 else:
-                    new_df["best_allele"] = predictions_df[
-                        sample_alleles
-                    ].idxmin(1).values
+                    sample_predictions = predictions_df[sample_alleles]
+                    best_allele = pandas.Series(index=sample_predictions.index, dtype=object)
+                    valid = sample_predictions.notna().any(axis=1)
+                    if valid.any():
+                        best_allele.loc[valid] = sample_predictions.loc[valid].idxmin(axis=1)
+                    new_df["best_allele"] = best_allele.values
                 dfs.append(new_df)
 
             result_df = pandas.concat(dfs, ignore_index=True)
@@ -242,10 +241,14 @@ class Class1PresentationPredictor(object):
                         throw=throw)
                 df.loc[
                     sub_df.index, "affinity"
-                ] = predictions_df.min(1).values
+                ] = predictions_df.min(axis=1).values
+                best_allele = pandas.Series(index=predictions_df.index, dtype=object)
+                valid = predictions_df.notna().any(axis=1)
+                if valid.any():
+                    best_allele.loc[valid] = predictions_df.loc[valid].idxmin(axis=1)
                 df.loc[
                     sub_df.index, "best_allele"
-                ] = predictions_df.idxmin(1).values
+                ] = best_allele.values
 
             result_df = df
 
@@ -500,9 +503,9 @@ class Class1PresentationPredictor(object):
         Presentation scores and intermediate results.
         """
 
-        if isinstance(peptides, string_types):
+        if isinstance(peptides, str):
             raise TypeError("peptides must be a list not a string")
-        if isinstance(alleles, string_types):
+        if isinstance(alleles, str):
             raise TypeError("alleles must be a list or dict")
 
         if not isinstance(alleles, dict):
@@ -729,7 +732,7 @@ class Class1PresentationPredictor(object):
         c_flanks = [] if use_flanks else None
         peptides = []
 
-        if isinstance(sequences, string_types):
+        if isinstance(sequences, str):
             sequences = [sequences]
 
         if not isinstance(sequences, dict):
@@ -738,16 +741,16 @@ class Class1PresentationPredictor(object):
                 for (i, sequence) in enumerate(sequences))
 
         cross_product = True
-        if isinstance(alleles, string_types):
+        if isinstance(alleles, str):
             # Case (1) - alleles is a string
             alleles = [alleles]
 
         if isinstance(alleles, dict):
-            if any([isinstance(v, string_types) for v in alleles.values()]):
+            if any([isinstance(v, str) for v in alleles.values()]):
                 raise ValueError(
                     "The values in the alleles dict must be lists, not strings")
         else:
-            if all(isinstance(a, string_types) for a in alleles):
+            if all(isinstance(a, str) for a in alleles):
                 # Case (2) - a simple list of alleles
                 alleles = {
                     'sample1': alleles
@@ -775,7 +778,7 @@ class Class1PresentationPredictor(object):
         for (i, (name, sequence)) in enumerate(sequences.items()):
             genotype_name = None if cross_product else genotype_names[i]
 
-            if not isinstance(sequence, string_types):
+            if not isinstance(sequence, str):
                 raise ValueError("Expected string, not %s (%s)" % (
                     sequence, type(sequence)))
             for peptide_start in range(len(sequence) - min(peptide_lengths) + 1):

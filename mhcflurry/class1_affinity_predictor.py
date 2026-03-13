@@ -9,10 +9,7 @@ from os import mkdir, environ
 from socket import gethostname
 from getpass import getuser
 from functools import partial
-from six import string_types
-
 import numpy
-from numpy.testing import assert_equal
 import pandas
 
 
@@ -45,7 +42,7 @@ class Class1AffinityPredictor(object):
     High-level interface for peptide/MHC I binding affinity prediction.
 
     This class manages low-level `Class1NeuralNetwork` instances, each of which
-    wraps a single Keras network. The purpose of `Class1AffinityPredictor` is to
+    wraps a single PyTorch network. The purpose of `Class1AffinityPredictor` is to
     implement ensembles, handling of multiple alleles, and predictor loading and
     saving. It also provides a place to keep track of metadata like prediction
     histograms for percentile rank calibration.
@@ -73,7 +70,7 @@ class Class1AffinityPredictor(object):
             MHC allele name to fixed-length amino acid sequence (sometimes
             referred to as the pseudosequence). Required only if
             class1_pan_allele_models is specified.
-        
+
         manifest_df : `pandas.DataFrame`, optional
             Must have columns: model_name, allele, config_json, model.
             Only required if you want to update an existing serialization of a
@@ -93,7 +90,7 @@ class Class1AffinityPredictor(object):
         optimization_info : dict, optional
             Dict describing any optimizations already performed on the model.
             The only currently supported optimization is to merge ensembles
-            together into one tensorflow graph.
+            together into one PyTorch model.
         """
 
         if allele_to_allele_specific_models is None:
@@ -125,6 +122,7 @@ class Class1AffinityPredictor(object):
         assert isinstance(self.class1_pan_allele_models, list)
 
         self.provenance_string = provenance_string
+        self.allele_to_canonical = {}  # populated by load()
 
     @property
     def manifest_df(self):
@@ -284,11 +282,39 @@ class Class1AffinityPredictor(object):
         self.check_consistency()
         return new_model_names
 
+    def canonicalize_allele_name(self, raw_name):
+        """
+        Normalize an allele name and map it to the canonical pseudosequence
+        key if possible.
+
+        Tries without IMGT aliases first so that alleles like HLA-C*01:01
+        (which aliases map to C*01:02) resolve to their own pseudosequence
+        when one exists.
+
+        Parameters
+        ----------
+        raw_name : str
+
+        Returns
+        -------
+        str
+        """
+        # Try without aliases first — this matches pseudosequence keys
+        # directly and avoids mhcgnomes alias remapping or Q/N annotations.
+        if self.allele_to_sequence:
+            no_alias = normalize_allele_name(
+                raw_name, raise_on_error=False, use_allele_aliases=False)
+            if no_alias is not None and no_alias in self.allele_to_sequence:
+                return no_alias
+        # Fall back to aliases and map through canonical lookup.
+        normalized = normalize_allele_name(raw_name)
+        return self.allele_to_canonical.get(normalized, normalized)
+
     @property
     def supported_alleles(self):
         """
         Alleles for which predictions can be made.
-        
+
         Returns
         -------
         list of string
@@ -346,19 +372,19 @@ class Class1AffinityPredictor(object):
         """
         Serialize the predictor to a directory on disk. If the directory does
         not exist it will be created.
-        
+
         The serialization format consists of a file called "manifest.csv" with
         the configurations of each Class1NeuralNetwork, along with per-network
         files giving the model weights. If there are pan-allele predictors in
         the ensemble, the allele sequences are also stored in the
         directory. There is also a small file "index.txt" with basic metadata:
         when the models were trained, by whom, on what host.
-        
+
         Parameters
         ----------
         models_dir : string
             Path to directory. It will be created if it doesn't exist.
-            
+
         model_names_to_write : list of string, optional
             Only write the weights for the specified models. Useful for
             incremental updates during training.
@@ -463,13 +489,13 @@ class Class1AffinityPredictor(object):
     def load(models_dir=None, max_models=None, optimization_level=None):
         """
         Deserialize a predictor from a directory on disk.
-        
+
         Parameters
         ----------
         models_dir : string
             Path to directory. If unspecified the default downloaded models are
             used.
-            
+
         max_models : int, optional
             Maximum number of `Class1NeuralNetwork` instances to load
 
@@ -501,6 +527,75 @@ class Class1AffinityPredictor(object):
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
 
+        # ----- Load pseudosequences first so we can canonicalize -----
+        allele_to_sequence = None
+        allele_to_canonical = {}
+        if exists(join(models_dir, "allele_sequences.csv")):
+            allele_to_sequence = pandas.read_csv(
+                join(models_dir, "allele_sequences.csv"),
+                index_col=0).iloc[:, 0].to_dict()
+
+            # Re-normalize allele names. We first try without IMGT allele
+            # aliases to preserve current nomenclature. If the parse fails
+            # or the pseudosequence contains unknown (X) positions, we
+            # retry with aliases — retired allele names like B*44:01 (an
+            # IMGT error reassigned to B*44:02 in 1994) often have
+            # incomplete pseudosequences, and the alias target may have a
+            # complete one. If mhcgnomes can't parse either way, keep the
+            # raw name so the pseudosequence remains available.
+            renormalized = {}
+            skipped_non_class1 = []
+            for (name, value) in allele_to_sequence.items():
+                normalized = normalize_allele_name(
+                    name, raise_on_error=False, use_allele_aliases=False)
+                if normalized is None or "X" in value:
+                    alias_normalized = normalize_allele_name(
+                        name, raise_on_error=False, use_allele_aliases=True)
+                    if alias_normalized is not None:
+                        normalized = alias_normalized
+                if normalized is None:
+                    # Detect class II, TAP, and pseudogene entries —
+                    # these don't belong in a class I predictor and
+                    # always have incomplete pseudosequences.
+                    gene = name.split("*")[0].split("-")[-1] if "-" in name else ""
+                    if ("X" in value and
+                            any(tag in gene
+                                for tag in ("DAA", "DAB", "TAP", "PS"))):
+                        skipped_non_class1.append(name)
+                        continue
+                    normalized = name
+                if normalized in renormalized and name != normalized:
+                    existing = renormalized[normalized]
+                    if value.count("X") < existing.count("X"):
+                        renormalized[normalized] = value
+                    continue
+                renormalized[normalized] = value
+            allele_to_sequence = renormalized
+            if skipped_non_class1:
+                logging.info(
+                    "Skipped %d non-class-I entries from pseudosequence "
+                    "file (class II / TAP / pseudogene with incomplete "
+                    "pseudosequences): %s",
+                    len(skipped_non_class1),
+                    ", ".join(sorted(skipped_non_class1)[:10])
+                    + (" ..." if len(skipped_non_class1) > 10 else ""))
+
+            # Map mhcgnomes-aliased forms back to pseudosequence keys.
+            # e.g. Mamu-A1*007:01 -> Mamu-A*07:01
+            for canonical_name in allele_to_sequence:
+                aliased = normalize_allele_name(
+                    canonical_name, raise_on_error=False,
+                    use_allele_aliases=True)
+                if (aliased is not None and aliased != canonical_name
+                        and aliased not in allele_to_sequence):
+                    allele_to_canonical[aliased] = canonical_name
+
+        def to_canonical(raw_name):
+            """Normalize a raw allele name to its canonical pseudosequence key."""
+            n = normalize_allele_name(raw_name, raise_on_error=False) or raw_name
+            return allele_to_canonical.get(n, n)
+
+        # ----- Load manifest -----
         allele_to_allele_specific_models = collections.defaultdict(list)
         class1_pan_allele_models = []
         all_models = []
@@ -509,59 +604,29 @@ class Class1AffinityPredictor(object):
                 models_dir, row.model_name)
             config = json.loads(row.config_json)
 
-            # We will lazy-load weights when the network is used.
             model = Class1NeuralNetwork.from_config(
                 config,
                 weights_loader=partial(load_weights, abspath(weights_filename)))
             if row.allele == "pan-class1":
                 class1_pan_allele_models.append(model)
             else:
-                allele_to_allele_specific_models[row.allele].append(model)
+                allele_to_allele_specific_models[
+                    to_canonical(row.allele)].append(model)
             all_models.append(model)
 
         manifest_df["model"] = all_models
 
-        # Load allele sequences
-        allele_to_sequence = None
-        if exists(join(models_dir, "allele_sequences.csv")):
-            allele_to_sequence = pandas.read_csv(
-                join(models_dir, "allele_sequences.csv"),
-                index_col=0).iloc[:, 0].to_dict()
-
-            # This can be removed at a later point for a speed boost. We are
-            # re-normalizing allele names here because in late 2020 we switched
-            # from mhcnames to mhcgnomes, and the normalization of some alleles
-            # changed. We want to continue to support previous versions of the
-            # models, which have pseudosequence files with allele names
-            # normalized in the old way, so we re-normalize them here.
-            renormalized = {}
-            for (name, value) in allele_to_sequence.items():
-                normalized = normalize_allele_name(name, raise_on_error=False)
-                if normalized is None:
-                    continue
-                if normalized in renormalized and name != normalized:
-                    # If it's already here, only replace it if the new
-                    # normalization was a no-op. This is so that B*44:01, which
-                    # now parses to B*44:02, does not override the actual
-                    # B*44:02 pseudosequence.
-                    continue
-                renormalized[normalized] = value
-            allele_to_sequence = renormalized
-
+        # ----- Load percent ranks -----
         allele_to_percent_rank_transform = {}
         percent_ranks_path = join(models_dir, "percent_ranks.csv")
         if exists(percent_ranks_path):
             percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
             for allele in percent_ranks_df.columns:
-                # Similar to the above, we renormalize the allele name here.
-                normalized = normalize_allele_name(allele, raise_on_error=False)
-                if normalized is None:
+                canonical = to_canonical(allele)
+                if (canonical in allele_to_percent_rank_transform and
+                        allele != canonical):
                     continue
-                if (normalized in allele_to_percent_rank_transform and
-                        allele != normalized):
-                    # See comment 20 lines above for the rationale here.
-                    continue
-                allele_to_percent_rank_transform[normalized] = (
+                allele_to_percent_rank_transform[canonical] = (
                     PercentRankTransform.from_series(percent_ranks_df[allele]))
 
         logging.info(
@@ -604,6 +669,8 @@ class Class1AffinityPredictor(object):
             provenance_string=provenance_string,
             optimization_info=optimization_info,
         )
+        if allele_to_sequence is not None:
+            result.allele_to_canonical = allele_to_canonical
         if optimization_level >= 1:
             optimized = result.optimize()
             logging.info(
@@ -635,7 +702,7 @@ class Class1AffinityPredictor(object):
         EXPERIMENTAL: Optimize the predictor for faster predictions.
 
         Currently the only optimization implemented is to merge multiple pan-
-        allele predictors at the tensorflow level.
+        allele predictors at the PyTorch level.
 
         The optimization is performed in-place, mutating the instance.
 
@@ -672,7 +739,7 @@ class Class1AffinityPredictor(object):
     def model_name(allele, num):
         """
         Generate a model name
-        
+
         Parameters
         ----------
         allele : string
@@ -694,7 +761,7 @@ class Class1AffinityPredictor(object):
     def weights_path(models_dir, model_name):
         """
         Generate the path to the weights file for a model
-        
+
         Parameters
         ----------
         models_dir : string
@@ -739,22 +806,22 @@ class Class1AffinityPredictor(object):
         """
         Fit one or more allele specific predictors for a single allele using one
         or more neural network architectures.
-        
+
         The new predictors are saved in the Class1AffinityPredictor instance
         and will be used on subsequent calls to `predict`.
-        
+
         Parameters
         ----------
         n_models : int
             Number of neural networks to fit
-        
+
         architecture_hyperparameters_list : list of dict
             List of hyperparameter sets.
-               
+
         allele : string
-        
+
         peptides : `EncodableSequences` or list of string
-        
+
         affinities : list of float
             nM affinities
 
@@ -764,11 +831,11 @@ class Class1AffinityPredictor(object):
         train_rounds : sequence of int
             Each training point i will be used on training rounds r for which
             train_rounds[i] > r, r >= 0.
-        
+
         models_dir_for_save : string, optional
             If specified, the Class1AffinityPredictor is (incrementally) written
             to the given models dir after each neural network is fit.
-        
+
         verbose : int
             Keras verbosity
 
@@ -878,32 +945,32 @@ class Class1AffinityPredictor(object):
         """
         Fit one or more pan-allele predictors using a single neural network
         architecture.
-        
+
         The new predictors are saved in the Class1AffinityPredictor instance
         and will be used on subsequent calls to `predict`.
-        
+
         Parameters
         ----------
         n_models : int
             Number of neural networks to fit
-            
+
         architecture_hyperparameters : dict
-        
+
         alleles : list of string
             Allele names (not sequences) corresponding to each peptide
-        
+
         peptides : `EncodableSequences` or list of string
-        
+
         affinities : list of float
             nM affinities
 
         inequalities : list of string, each element one of ">", "<", or "="
             See Class1NeuralNetwork.fit for details.
-        
+
         models_dir_for_save : string, optional
             If specified, the Class1AffinityPredictor is (incrementally) written
             to the given models dir after each neural network is fit.
-        
+
         verbose : int
             Keras verbosity
 
@@ -1005,7 +1072,7 @@ class Class1AffinityPredictor(object):
         numpy.array of float
         """
         if allele is not None:
-            normalized_allele = normalize_allele_name(allele)
+            normalized_allele = self.canonicalize_allele_name(allele)
             try:
                 transform = self.allele_to_percent_rank_transform[normalized_allele]
                 return transform.transform(affinities)
@@ -1054,15 +1121,15 @@ class Class1AffinityPredictor(object):
             model_kwargs={}):
         """
         Predict nM binding affinities.
-        
+
         If multiple predictors are available for an allele, the predictions are
         the geometric means of the individual model (nM) predictions.
-        
+
         One of 'allele' or 'alleles' must be specified. If 'allele' is specified
         all predictions will be for the given allele. If 'alleles' is specified
         it must be the same length as 'peptides' and give the allele
         corresponding to each peptide.
-        
+
         Parameters
         ----------
         peptides : `EncodableSequences` or list of string
@@ -1108,15 +1175,15 @@ class Class1AffinityPredictor(object):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
-        
+
         If multiple predictors are available for an allele, the predictions are
         the geometric means of the individual model predictions.
-        
+
         One of 'allele' or 'alleles' must be specified. If 'allele' is specified
         all predictions will be for the given allele. If 'alleles' is specified
         it must be the same length as 'peptides' and give the allele
-        corresponding to each peptide. 
-        
+        corresponding to each peptide.
+
         Parameters
         ----------
         peptides : `EncodableSequences` or list of string
@@ -1143,9 +1210,9 @@ class Class1AffinityPredictor(object):
         -------
         `pandas.DataFrame` of predictions
         """
-        if isinstance(peptides, string_types):
+        if isinstance(peptides, str):
             raise TypeError("peptides must be a list or array, not a string")
-        if isinstance(alleles, string_types):
+        if isinstance(alleles, str):
             raise TypeError("alleles must be a list or array, not a string")
         if allele is None and alleles is None:
             raise ValueError("Must specify 'allele' or 'alleles'.")
@@ -1158,13 +1225,14 @@ class Class1AffinityPredictor(object):
         if allele is not None:
             if alleles is not None:
                 raise ValueError("Specify exactly one of allele or alleles")
-            df["allele"] = allele
-            normalized_allele = normalize_allele_name(allele)
+            normalized_allele = self.canonicalize_allele_name(allele)
+            df["allele"] = normalized_allele
             df["normalized_allele"] = normalized_allele
             unique_alleles = [normalized_allele]
         else:
-            df["allele"] = numpy.array(alleles)
-            df["normalized_allele"] = df.allele.map(normalize_allele_name)
+            df["allele"] = [
+                self.canonicalize_allele_name(a) for a in alleles]
+            df["normalized_allele"] = df["allele"]
             unique_alleles = df.normalized_allele.unique()
 
         if len(df) == 0:
@@ -1287,7 +1355,7 @@ class Class1AffinityPredictor(object):
 
                 if self.optimization_info.get("pan_models_merged"):
                     # Multiple pan-allele models have been merged into one
-                    # at the tensorflow level.
+                    # at the PyTorch level.
                     assert len(self.class1_pan_allele_models) == 1
                     predictions = self.class1_pan_allele_models[0].predict(
                         masked_peptides,
@@ -1348,14 +1416,26 @@ class Class1AffinityPredictor(object):
             centrality_function = CENTRALITY_MEASURES[centrality_measure]
 
         logs = numpy.log(predictions_array)
-        log_centers = centrality_function(logs)
+        row_has_predictions = (~numpy.isnan(logs)).any(axis=1)
+        log_centers = numpy.full(df.shape[0], numpy.nan, dtype="float64")
+        if row_has_predictions.any():
+            log_centers[row_has_predictions] = centrality_function(
+                logs[row_has_predictions]
+            )
         df["prediction"] = numpy.exp(log_centers)
 
         if include_confidence_intervals:
-            df["prediction_low"] = numpy.exp(
-                numpy.nanpercentile(logs, 5.0, axis=1))
-            df["prediction_high"] = numpy.exp(
-                numpy.nanpercentile(logs, 95.0, axis=1))
+            prediction_low = numpy.full(df.shape[0], numpy.nan, dtype="float64")
+            prediction_high = numpy.full(df.shape[0], numpy.nan, dtype="float64")
+            if row_has_predictions.any():
+                prediction_low[row_has_predictions] = numpy.exp(
+                    numpy.nanpercentile(logs[row_has_predictions], 5.0, axis=1)
+                )
+                prediction_high[row_has_predictions] = numpy.exp(
+                    numpy.nanpercentile(logs[row_has_predictions], 95.0, axis=1)
+                )
+            df["prediction_low"] = prediction_low
+            df["prediction_high"] = prediction_high
 
         if include_individual_model_predictions:
             for i in range(num_pan_models):

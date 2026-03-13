@@ -35,12 +35,6 @@ mhcflurry-predict-scan \
     --alleles HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02
 
 '''
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
-
 import sys
 import argparse
 import logging
@@ -247,7 +241,7 @@ def run(argv=sys.argv[1:]):
 
     if args.list_supported_peptide_lengths:
         min_len, max_len = predictor.supported_peptide_lengths
-        print("\n".join([str(l) for l in range(min_len, max_len+1)]))
+        print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
         return
 
     if args.input:

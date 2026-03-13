@@ -1,15 +1,13 @@
-from . import initialize
-initialize()
-
 import numpy
 import pandas
 import pytest
-numpy.random.seed(0)
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import random_peptides
 
 from mhcflurry.testing_utils import cleanup, startup
+
+numpy.random.seed(0)
 
 @pytest.fixture(scope="module")
 def setup_module():
@@ -89,4 +87,3 @@ def test_multi_output(setup_module):
     assert sub_correlation.iloc[0, 0] > 0.99, correlation
     assert sub_correlation.iloc[1, 1] > 0.99, correlation
     assert sub_correlation.iloc[2, 2] > 0.99, correlation
-

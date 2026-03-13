@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from os.path import join, exists, abspath
 from os import mkdir
 from socket import gethostname
@@ -198,7 +196,7 @@ class Class1ProcessingPredictor(object):
             peptides. If False, a warning will be logged and the predictions
             for those peptides will be NaN.
         batch_size : int
-            Prediction keras batch size.
+            Prediction batch size.
 
         Returns
         -------

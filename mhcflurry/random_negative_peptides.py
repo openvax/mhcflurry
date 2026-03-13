@@ -24,17 +24,17 @@ class RandomNegativePeptides(object):
         random_negative_lengths=[8,9,10,11,12,13,14,15])
     """
     Hyperperameters for random negative peptides.
-    
+
     Number of random negatives will be:
         random_negative_rate * (num measurements) + random_negative_constant
-        
+
     where the exact meaning of (num measurements) depends on the particular
     random_negative_method in use.
-    
+
     If random_negative_match_distribution is True, then the amino acid
     frequencies of the training data peptides are used to generate the
     random peptides.
-    
+
     Valid values for random_negative_method are:
         "by_length": used for allele-specific prediction. See description in
             `RandomNegativePeptides.plan_by_length` method.
@@ -43,8 +43,8 @@ class RandomNegativePeptides(object):
         "by_allele_equalize_nonbinders": used for pan-allele prediction. See
             `RandomNegativePeptides.plan_by_allele_equalize_nonbinders` method.
         "recommended": the default. Use by_length if the predictor is allele-
-            specific and by_allele if it's pan-allele.    
-        
+            specific and by_allele if it's pan-allele.
+
     """
 
     def __init__(self, **hyperparameters):
@@ -220,7 +220,9 @@ class RandomNegativePeptides(object):
         first_pass_plan = self.plan_df
         self.plan_df = None
 
-        new_plan = first_pass_plan.copy()
+        # Use floating point while populating so NaN assignment remains valid
+        # across pandas versions; cast to int at the end.
+        new_plan = first_pass_plan.astype(float).copy()
         new_plan[:] = numpy.nan
 
         for (allele, first_pass_per_length) in first_pass_plan.iterrows():
@@ -231,6 +233,12 @@ class RandomNegativePeptides(object):
                 real_nonbinders_by_length + first_pass_per_length)
             new_plan.loc[allele] = first_pass_per_length + (
                 total_nonbinders_by_length.max() - total_nonbinders_by_length)
+
+        if new_plan.isna().any().any():
+            raise AssertionError(
+                "Random negative plan contains NaN after equalization; "
+                "this indicates an incomplete per-allele assignment bug."
+            )
 
         self.plan_df = new_plan.astype(int)
 

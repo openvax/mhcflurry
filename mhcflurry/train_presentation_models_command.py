@@ -1,7 +1,6 @@
 """
 Train Class1 presentation models.
 """
-from __future__ import print_function
 import argparse
 import os
 import signal
@@ -11,12 +10,13 @@ import traceback
 
 import pandas
 import tqdm  # progress bar
-tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
 from .common import configure_logging
+
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 parser = argparse.ArgumentParser(usage=__doc__)
 

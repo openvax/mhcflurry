@@ -1,8 +1,6 @@
 """
 Test processing train and model selection commands.
 """
-from . import initialize
-initialize()
 
 import json
 import os
@@ -11,17 +9,15 @@ import tempfile
 import subprocess
 import re
 import pytest
-from copy import deepcopy
 
-from numpy.testing import assert_array_less, assert_equal
 from sklearn.metrics import roc_auc_score
 import pandas
 
 from mhcflurry.class1_processing_predictor import Class1ProcessingPredictor
-from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
 from mhcflurry.testing_utils import cleanup, startup
+from .pytest_helpers import mhcflurry_cli
 
 
 pytest.fixture(autouse=True, scope="module")
@@ -96,8 +92,7 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
     train_filename = os.path.join(models_dir, "training.csv")
     train_df.to_csv(train_filename, index=False)
 
-    args = [
-        "mhcflurry-class1-train-processing-models",
+    args = mhcflurry_cli("mhcflurry-class1-train-processing-models") + [
         "--data", train_filename,
         "--hyperparameters", hyperparameters_filename,
         "--out-models-dir", models_dir,
@@ -125,8 +120,7 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
     # Run model selection
     models_dir_selected = tempfile.mkdtemp(
         prefix="mhcflurry-test-models-selected")
-    args = [
-        "mhcflurry-class1-select-processing-models",
+    args = mhcflurry_cli("mhcflurry-class1-select-processing-models") + [
         "--data", os.path.join(models_dir, "train_data.csv.bz2"),
         "--models-dir", models_dir,
         "--out-models-dir", models_dir_selected,
