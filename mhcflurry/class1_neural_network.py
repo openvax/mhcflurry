@@ -583,11 +583,17 @@ class Class1NeuralNetworkModel(nn.Module):
             param.data = torch.from_numpy(w).to(dtype=param.dtype)
             idx += 1 + extra_keras_skip
         if not auto_convert_keras:
+            named_modules_dict = dict(self.named_modules())
             for name, buffer in self.named_buffers():
                 tensor = torch.from_numpy(weights[idx])
                 if tensor.dtype != buffer.dtype:
                     tensor = tensor.to(dtype=buffer.dtype)
-                self._buffers[name] = tensor
+                # Navigate to the correct submodule for nested buffers
+                if "." in name:
+                    module_path, buffer_name = name.rsplit(".", 1)
+                    named_modules_dict[module_path]._buffers[buffer_name] = tensor
+                else:
+                    self._buffers[name] = tensor
                 idx += 1
 
     def to_json(self):
