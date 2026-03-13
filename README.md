@@ -7,11 +7,10 @@
 prediction package with competitive accuracy and a fast and
 [documented](http://openvax.github.io/mhcflurry/) implementation.
 
-**The latest stable release is 2.1.5** (`pip install mhcflurry`), which uses
-TensorFlow/Keras. Version 2.2.0rc1 is a release candidate that migrates the
-backend from TensorFlow to [PyTorch](https://pytorch.org/). It loads the same
-published weights and produces equivalent predictions. Install the release
-candidate with `pip install mhcflurry==2.2.0rc1`.
+> [!IMPORTANT]
+> **The latest stable release is 2.1.5** (`pip install mhcflurry`), which uses TensorFlow/Keras.
+>
+> Version 2.2.0rc1 is a release candidate that migrates the backend from TensorFlow to [PyTorch](https://pytorch.org/). It loads the same published weights and produces equivalent predictions. Install the release candidate with `pip install mhcflurry==2.2.0rc1`. Please let us know if you encounter any issues!
 
 MHCflurry implements class I peptide/MHC binding affinity prediction.
 The current version provides pan-MHC I predictors supporting any MHC
