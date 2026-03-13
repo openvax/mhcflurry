@@ -6,12 +6,8 @@ The worse sin in bioinformatics is to write your own FASTA parser.
 We're doing this to avoid adding another dependency to MHCflurry, however.
 """
 
-from __future__ import print_function, division, absolute_import
-
 from gzip import GzipFile
 import logging
-
-from six import binary_type, PY3
 
 import pandas
 
@@ -93,13 +89,7 @@ class FastaParser(object):
             if len(self.current_lines) == 0:
                 logging.warning("No sequence data for '%s'", self.current_id)
             else:
-                sequence = b"".join(self.current_lines)
-                if PY3:
-                    # only decoding into an ASCII str for Python 3 since
-                    # the binary sequence type for Python 2 is already 'str'
-                    # and the unicode representation is inefficient
-                    # (using either 16 or 32 bits per character depends on build)
-                    sequence = sequence.decode("ascii")
+                sequence = b"".join(self.current_lines).decode("ascii")
                 return self.current_id, sequence
 
     @staticmethod
@@ -118,9 +108,9 @@ class FastaParser(object):
         Pull the transcript or protein identifier from the header line
         which starts with '>'
         """
-        if type(line) is not binary_type:
+        if type(line) is not bytes:
             raise TypeError("Expected header line to be of type %s but got %s" % (
-                binary_type, type(line)))
+                bytes, type(line)))
 
         if len(line) <= 1:
             raise ValueError("No identifier on FASTA line")

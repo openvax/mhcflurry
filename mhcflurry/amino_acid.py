@@ -3,17 +3,12 @@ Functions for encoding fixed length sequences of amino acids into various
 vector representations, such as one-hot and BLOSUM62.
 """
 
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
 import collections
 import warnings
 from copy import copy
+from io import StringIO
 
 import pandas
-from six import StringIO
 
 
 COMMON_AMINO_ACIDS = collections.OrderedDict(sorted({

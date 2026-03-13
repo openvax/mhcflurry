@@ -1,7 +1,6 @@
 """
 Train Class1 presentation models.
 """
-from __future__ import print_function
 import argparse
 import os
 import signal

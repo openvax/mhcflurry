@@ -18,11 +18,6 @@ Get the URL of a download:
 Summarize available and fetched downloads:
     $ mhcflurry-downloads info
 '''
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
 import sys
 import argparse
 import logging

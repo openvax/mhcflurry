@@ -7,8 +7,8 @@ import traceback
 import sys
 import os
 import time
+import queue
 from multiprocessing import Pool, Queue, cpu_count
-from six.moves import queue
 from multiprocessing.util import Finalize
 from pprint import pprint
 import random

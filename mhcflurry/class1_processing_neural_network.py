@@ -2,8 +2,6 @@
 Antigen processing neural network implementation - PyTorch version
 """
 
-from __future__ import print_function
-
 import time
 import collections
 import gc

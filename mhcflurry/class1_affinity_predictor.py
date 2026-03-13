@@ -9,8 +9,6 @@ from os import mkdir, environ
 from socket import gethostname
 from getpass import getuser
 from functools import partial
-from six import string_types
-
 import numpy
 import pandas
 
@@ -1212,9 +1210,9 @@ class Class1AffinityPredictor(object):
         -------
         `pandas.DataFrame` of predictions
         """
-        if isinstance(peptides, string_types):
+        if isinstance(peptides, str):
             raise TypeError("peptides must be a list or array, not a string")
-        if isinstance(alleles, string_types):
+        if isinstance(alleles, str):
             raise TypeError("alleles must be a list or array, not a string")
         if allele is None and alleles is None:
             raise ValueError("Must specify 'allele' or 'alleles'.")

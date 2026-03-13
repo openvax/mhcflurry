@@ -1,9 +1,8 @@
 numpy
-six
-pandas>=0.20.3
+pandas>=2.0
 torch>=2.0.0
 appdirs
 scikit-learn
-mhcgnomes
+mhcgnomes>=2.0.9
 pyyaml
 tqdm

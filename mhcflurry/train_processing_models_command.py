@@ -1,7 +1,6 @@
 """
 Train Class1 processing models.
 """
-from __future__ import print_function
 import argparse
 import os
 from os.path import join

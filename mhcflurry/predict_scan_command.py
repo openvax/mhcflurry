@@ -35,12 +35,6 @@ mhcflurry-predict-scan \
     --alleles HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02
 
 '''
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
-
 import sys
 import argparse
 import logging

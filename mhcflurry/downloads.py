@@ -2,11 +2,6 @@
 Manage local downloaded data.
 """
 
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
 import logging
 import yaml
 from os.path import join, exists

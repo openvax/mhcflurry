@@ -7,7 +7,6 @@ if the prediction is less than the given value.
 
 This module now delegates to pytorch_losses.py for the actual loss implementations.
 """
-from __future__ import division
 import numpy
 
 # Import PyTorch implementations

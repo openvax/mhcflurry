@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from os.path import join, exists, abspath
 from os import mkdir
 from socket import gethostname

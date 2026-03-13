@@ -1,14 +1,7 @@
 """
 Class for encoding variable-length peptides to fixed-size numerical matrices
 """
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
-
 import math
-from six import string_types
 
 import numpy
 import pandas
@@ -50,7 +43,7 @@ class EncodableSequences(object):
         return klass(sequences)
 
     def __init__(self, sequences):
-        if not all(isinstance(obj, string_types) for obj in sequences):
+        if not all(isinstance(obj, str) for obj in sequences):
             raise ValueError("Sequence of strings is required")
         self.sequences = numpy.array(sequences)
         lengths = pandas.Series(self.sequences, dtype=numpy.object_).str.len()

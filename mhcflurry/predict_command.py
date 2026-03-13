@@ -37,12 +37,6 @@ $ mhcflurry-predict --peptides SIINFEKL DENDREKLLL \
 will give the tightest predicted affinities across alleles for each of the two
 genotypes specified for each peptide.
 '''
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
-
 import sys
 import argparse
 import itertools

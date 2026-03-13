@@ -1,11 +1,6 @@
 """
 Hyperparameter (neural network options) management
 """
-from __future__ import (
-    print_function,
-    division,
-    absolute_import,
-)
 import itertools
 
 
