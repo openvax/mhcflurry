@@ -37,7 +37,7 @@ if __name__ == "__main__":
         "pandas>=2.0",
         "appdirs",
         "scikit-learn",
-        "mhcgnomes>=2.0.9",
+        "mhcgnomes>=3.0.1",
         "numpy",
         "pyyaml",
         "tqdm",
