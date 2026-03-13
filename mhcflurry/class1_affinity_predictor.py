@@ -289,6 +289,10 @@ class Class1AffinityPredictor(object):
         Normalize an allele name and map it to the canonical pseudosequence
         key if possible.
 
+        Tries without IMGT aliases first so that alleles like HLA-C*01:01
+        (which aliases map to C*01:02) resolve to their own pseudosequence
+        when one exists.
+
         Parameters
         ----------
         raw_name : str
@@ -297,6 +301,14 @@ class Class1AffinityPredictor(object):
         -------
         str
         """
+        # Try without aliases first — this matches pseudosequence keys
+        # directly and avoids mhcgnomes alias remapping or Q/N annotations.
+        if self.allele_to_sequence:
+            no_alias = normalize_allele_name(
+                raw_name, raise_on_error=False, use_allele_aliases=False)
+            if no_alias is not None and no_alias in self.allele_to_sequence:
+                return no_alias
+        # Fall back to aliases and map through canonical lookup.
         normalized = normalize_allele_name(raw_name)
         return self.allele_to_canonical.get(normalized, normalized)
 
