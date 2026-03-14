@@ -82,12 +82,20 @@ def _skip_if_fixture_incompatible(metadata, presentation_predictor):
         )
 
 
+def _on_gpu():
+    import torch
+    from mhcflurry.common import get_pytorch_device
+    return get_pytorch_device().type != "cpu"
+
+
 def _atol_for_output(column):
+    # GPU float32 arithmetic can differ from CPU by up to ~1e-4 for scores.
+    gpu = _on_gpu()
     if "percentile" in column:
-        return 1e-6
+        return 1e-3 if gpu else 1e-6
     if "affinity" in column:
-        return 0.05
-    return 1e-6
+        return 0.1 if gpu else 0.05
+    return 1e-3 if gpu else 1e-6
 
 
 def test_presentation_highscore_fixture_has_high_and_low_contexts():

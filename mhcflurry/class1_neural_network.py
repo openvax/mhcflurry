@@ -2355,6 +2355,7 @@ class Class1NeuralNetwork(object):
             return
 
         existing_shape = network.allele_embedding.weight.shape
+        target_device = network.allele_embedding.weight.device
 
         if existing_shape[0] > reshaped.shape[0] and not force_surgery:
             # Extend with NaNs
@@ -2371,11 +2372,13 @@ class Class1NeuralNetwork(object):
                 num_embeddings=reshaped.shape[0],
                 embedding_dim=reshaped.shape[1]
             )
-            new_embedding.weight.data = torch.from_numpy(reshaped)
+            new_embedding.weight.data = torch.from_numpy(reshaped).to(target_device)
             new_embedding.weight.requires_grad = False
             network.allele_embedding = new_embedding
         else:
-            network.allele_embedding.weight.data = torch.from_numpy(reshaped)
+            network.allele_embedding.weight.data = torch.from_numpy(
+                reshaped
+            ).to(target_device)
             network.allele_embedding.weight.requires_grad = False
 
 
