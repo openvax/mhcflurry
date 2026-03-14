@@ -5,6 +5,7 @@ on:
     branches: ["master"]
   pull_request:
     branches: ["master"]
+    types: [opened, synchronize, reopened, labeled]
 
 # TODO: CI improvements to adopt
 # - Concurrency control: cancel in-progress runs on same branch to save CI minutes
@@ -70,7 +71,8 @@ jobs:
       #  with:
       #    parallel: true
 
-  gpu:
+  gpu-tests:
+    name: "GPU Tests (Python 3.12, NVIDIA L4)"
     # Runs on merges to master and tagged releases.
     # For PRs, add the "gpu-ci" label to trigger.
     if: >
@@ -119,3 +121,11 @@ jobs:
       - name: Test with pytest (GPU)
         run: |
           pytest --tb=long ./test
+
+      - name: GPU test summary
+        if: always()
+        run: |
+          echo "## GPU Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Runner**: gpu-linux-l4-public" >> $GITHUB_STEP_SUMMARY
+          echo "- **GPU**: $(nvidia-smi --query-gpu=name --format=csv,noheader)" >> $GITHUB_STEP_SUMMARY
+          echo "- **PyTorch device**: $(python -c 'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")')" >> $GITHUB_STEP_SUMMARY
