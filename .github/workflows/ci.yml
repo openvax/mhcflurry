@@ -7,7 +7,7 @@ on:
     branches: ["master"]
     types: [opened, synchronize, reopened, labeled]
 
-# TODO: CI improvements to adopt
+# TODO: CI improvements to adopt:
 # - Concurrency control: cancel in-progress runs on same branch to save CI minutes
 # - pip caching: actions/cache for ~/.cache/pip to speed up installs
 # - MHCflurry data caching: cache ~/.local/share/mhcflurry keyed on downloads.yml hash
