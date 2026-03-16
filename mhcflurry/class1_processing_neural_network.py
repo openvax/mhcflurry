@@ -924,16 +924,22 @@ class Class1ProcessingNeuralNetwork(object):
         n_samples = len(x_dict["sequence"])
         all_predictions = []
 
+        def prediction_tensor(batch_array):
+            batch_array = numpy.asarray(batch_array)
+            if not batch_array.flags.writeable:
+                batch_array = batch_array.copy()
+            return torch.from_numpy(batch_array).to(device)
+
         with torch.no_grad():
             for batch_start in range(0, n_samples, batch_size):
                 batch_end = min(batch_start + batch_size, n_samples)
 
-                seq_batch = torch.from_numpy(
+                seq_batch = prediction_tensor(
                     x_dict["sequence"][batch_start:batch_end]
-                ).float().to(device)
-                length_batch = torch.from_numpy(
+                ).float()
+                length_batch = prediction_tensor(
                     x_dict["peptide_length"][batch_start:batch_end]
-                ).to(device)
+                )
 
                 inputs = {"sequence": seq_batch, "peptide_length": length_batch}
                 batch_predictions = network(inputs)

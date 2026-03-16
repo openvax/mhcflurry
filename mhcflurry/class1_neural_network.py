@@ -2206,19 +2206,25 @@ class Class1NeuralNetwork(object):
         n_samples = len(x_dict["peptide"])
         all_predictions = []
 
+        def prediction_tensor(batch_array):
+            batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
+            if not batch_array.flags.writeable:
+                batch_array = batch_array.copy()
+            return torch.from_numpy(batch_array).to(device)
+
         with torch.no_grad():
             for batch_start in range(0, n_samples, batch_size):
                 batch_end = min(batch_start + batch_size, n_samples)
 
-                peptide_batch = torch.from_numpy(
+                peptide_batch = prediction_tensor(
                     x_dict["peptide"][batch_start:batch_end]
-                ).float().to(device)
+                )
 
                 inputs = {"peptide": peptide_batch}
                 if "allele" in x_dict:
-                    allele_batch = torch.from_numpy(
+                    allele_batch = prediction_tensor(
                         x_dict["allele"][batch_start:batch_end]
-                    ).float().to(device)
+                    )
                     inputs["allele"] = allele_batch
 
                 batch_predictions = network(inputs)
