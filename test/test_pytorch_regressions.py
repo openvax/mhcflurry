@@ -56,6 +56,10 @@ def _make_simple_affinity_model(**overrides):
     return Class1NeuralNetwork(**hyperparameters)
 
 
+def _make_allele_representations(num_alleles=2):
+    return np.arange(num_alleles * 6, dtype=np.float32).reshape(num_alleles, 2, 3)
+
+
 def _seed_all(seed=1):
     np.random.seed(seed)
     random.seed(seed)
@@ -395,6 +399,58 @@ def test_optimizer_defaults_match_keras():
     )
     assert processing_optimizer.defaults["alpha"] == pytest.approx(0.9, abs=1e-12)
     assert processing_optimizer.defaults["eps"] == pytest.approx(1e-07, abs=1e-12)
+
+
+def test_weight_and_embedding_updates_preserve_device():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    affinity_model = _make_simple_affinity_model(batch_normalization=True)
+    affinity_model._network = affinity_model.make_network(
+        allele_representations=_make_allele_representations(),
+        **affinity_model.network_hyperparameter_defaults.subselect(
+            affinity_model.hyperparameters
+        )
+    )
+    affinity_network = affinity_model.network()
+    affinity_network.to(device)
+
+    affinity_network.set_weights_list(
+        affinity_network.get_weights_list(),
+        auto_convert_keras=False,
+    )
+    assert all(param.device == device for param in affinity_network.parameters())
+    assert all(buffer.device == device for buffer in affinity_network.buffers())
+
+    affinity_model.set_allele_representations(_make_allele_representations(3))
+    assert affinity_network.allele_embedding.weight.device == device
+
+    affinity_model.clear_allele_representations()
+    assert affinity_network.allele_embedding.weight.device == device
+
+    processing_model = Class1ProcessingNeuralNetwork(
+        dropout_rate=0.0,
+        flanking_averages=False,
+        convolutional_kernel_l1_l2=[0.0, 0.0],
+        convolutional_filters=2,
+        convolutional_kernel_size=1,
+        n_flank_length=1,
+        c_flank_length=1,
+        peptide_max_length=8,
+    )
+    processing_model._network = processing_model.make_network(
+        **processing_model.network_hyperparameter_defaults.subselect(
+            processing_model.hyperparameters
+        )
+    )
+    processing_network = processing_model.network()
+    processing_network.to(device)
+
+    processing_network.set_weights_list(
+        processing_network.get_weights_list(),
+        auto_convert_keras=False,
+    )
+    assert all(param.device == device for param in processing_network.parameters())
+    assert all(buffer.device == device for buffer in processing_network.buffers())
 
 
 def test_l1_regularization_changes_weights_even_with_zero_data_loss():

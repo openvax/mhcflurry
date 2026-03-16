@@ -383,12 +383,16 @@ class Class1ProcessingModel(nn.Module):
                     f"got {weights[idx].shape}, expected {param.shape}"
                 )
 
-            param.data = torch.from_numpy(w).to(dtype=param.dtype)
+            param.data = torch.from_numpy(w).to(
+                device=param.device,
+                dtype=param.dtype,
+            )
             idx += 1
         for name, buffer in self.named_buffers():
-            tensor = torch.from_numpy(weights[idx])
-            if tensor.dtype != buffer.dtype:
-                tensor = tensor.to(dtype=buffer.dtype)
+            tensor = torch.from_numpy(weights[idx]).to(
+                device=buffer.device,
+                dtype=buffer.dtype,
+            )
             self._buffers[name] = tensor
             idx += 1
 

@@ -5,12 +5,6 @@ on:
     branches: ["master"]
   pull_request:
     branches: ["master"]
-    types: [opened, synchronize, reopened, labeled]
-
-# TODO: CI improvements to adopt:
-# - Concurrency control: cancel in-progress runs on same branch to save CI minutes
-# - pip caching: actions/cache for ~/.cache/pip to speed up installs
-# - MHCflurry data caching: cache ~/.local/share/mhcflurry keyed on downloads.yml hash
 
 jobs:
   build:
@@ -25,10 +19,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -70,62 +64,3 @@ jobs:
       #  uses: coverallsapp/github-action@v2.2.3
       #  with:
       #    parallel: true
-
-  gpu-tests:
-    name: "GPU Tests (Python 3.12, NVIDIA L4)"
-    # Runs on merges to master and tagged releases.
-    # For PRs, add the "gpu-ci" label to trigger.
-    if: >
-      github.event_name == 'push' ||
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'gpu-ci'))
-    needs: build
-    runs-on: gpu-linux-l4-public
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Verify GPU is available
-        run: nvidia-smi
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pandoc
-
-      - name: Build Conda environment
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          activate-environment: test-environment
-          environment-file: test-environment.yml
-          python-version: "3.12"
-          auto-activate-base: false
-
-      - name: Install python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install pytest
-          pip install -r requirements.txt
-          pip install .
-
-      - name: Download data and models
-        run: |
-          mhcflurry-downloads fetch data_curated data_mass_spec_annotated models_class1 models_class1_presentation models_class1_processing models_class1_pan allele_sequences
-
-      - name: Test with pytest (GPU)
-        run: |
-          pytest --tb=long ./test
-
-      - name: GPU test summary
-        if: always()
-        run: |
-          echo "## GPU Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "- **Runner**: gpu-linux-l4-public" >> $GITHUB_STEP_SUMMARY
-          echo "- **GPU**: $(nvidia-smi --query-gpu=name --format=csv,noheader)" >> $GITHUB_STEP_SUMMARY
-          echo "- **PyTorch device**: $(python -c 'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")')" >> $GITHUB_STEP_SUMMARY

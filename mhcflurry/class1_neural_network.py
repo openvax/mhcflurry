@@ -479,9 +479,10 @@ class Class1NeuralNetworkModel(nn.Module):
                     if self.allele_embedding is None:
                         continue
                     if w.shape == self.allele_embedding.weight.shape:
+                        target = self.allele_embedding.weight
                         self.allele_embedding.weight.data = torch.from_numpy(
                             w.astype(numpy.float32)
-                        ).to(dtype=self.allele_embedding.weight.dtype)
+                        ).to(device=target.device, dtype=target.dtype)
                 elif layer_class == "BatchNormalization":
                     gamma = weights[idx]
                     beta = weights[idx + 1]
@@ -569,9 +570,19 @@ class Class1NeuralNetworkModel(nn.Module):
                         running_mean = weights[idx + 1].astype(numpy.float32)
                         running_var = weights[idx + 2].astype(numpy.float32)
                         if module.running_mean.shape == running_mean.shape:
-                            module.running_mean.data = torch.from_numpy(running_mean)
+                            module.running_mean.data = torch.from_numpy(
+                                running_mean
+                            ).to(
+                                device=module.running_mean.device,
+                                dtype=module.running_mean.dtype,
+                            )
                         if module.running_var.shape == running_var.shape:
-                            module.running_var.data = torch.from_numpy(running_var)
+                            module.running_var.data = torch.from_numpy(
+                                running_var
+                            ).to(
+                                device=module.running_var.device,
+                                dtype=module.running_var.dtype,
+                            )
                         extra_keras_skip = 2
 
             if w.shape != param.shape:
@@ -580,14 +591,18 @@ class Class1NeuralNetworkModel(nn.Module):
                     f"got {weights[idx].shape}, expected {param.shape}"
                 )
 
-            param.data = torch.from_numpy(w).to(dtype=param.dtype)
+            param.data = torch.from_numpy(w).to(
+                device=param.device,
+                dtype=param.dtype,
+            )
             idx += 1 + extra_keras_skip
         if not auto_convert_keras:
             named_modules_dict = dict(self.named_modules())
             for name, buffer in self.named_buffers():
-                tensor = torch.from_numpy(weights[idx])
-                if tensor.dtype != buffer.dtype:
-                    tensor = tensor.to(dtype=buffer.dtype)
+                tensor = torch.from_numpy(weights[idx]).to(
+                    device=buffer.device,
+                    dtype=buffer.dtype,
+                )
                 # Navigate to the correct submodule for nested buffers
                 if "." in name:
                     module_path, buffer_name = name.rsplit(".", 1)
@@ -2319,7 +2334,10 @@ class Class1NeuralNetwork(object):
                 shape=(1, existing_shape[1]),
                 dtype=numpy.float32
             )
-            original_model.allele_embedding.weight.data = torch.from_numpy(new_weight)
+            target = original_model.allele_embedding.weight
+            original_model.allele_embedding.weight.data = torch.from_numpy(
+                new_weight
+            ).to(device=target.device, dtype=target.dtype)
             original_model.allele_embedding.weight.requires_grad = False
 
     def set_allele_representations(self, allele_representations, force_surgery=False):
@@ -2354,8 +2372,10 @@ class Class1NeuralNetwork(object):
         if network.allele_embedding is None:
             return
 
-        existing_shape = network.allele_embedding.weight.shape
-        target_device = network.allele_embedding.weight.device
+        target_weight = network.allele_embedding.weight
+        existing_shape = target_weight.shape
+        target_device = target_weight.device
+        target_dtype = target_weight.dtype
 
         if existing_shape[0] > reshaped.shape[0] and not force_surgery:
             # Extend with NaNs
@@ -2371,14 +2391,17 @@ class Class1NeuralNetwork(object):
             new_embedding = nn.Embedding(
                 num_embeddings=reshaped.shape[0],
                 embedding_dim=reshaped.shape[1]
+            ).to(device=target_device)
+            new_embedding.weight.data = torch.from_numpy(reshaped).to(
+                device=target_device,
+                dtype=target_dtype,
             )
-            new_embedding.weight.data = torch.from_numpy(reshaped).to(target_device)
             new_embedding.weight.requires_grad = False
             network.allele_embedding = new_embedding
         else:
             network.allele_embedding.weight.data = torch.from_numpy(
                 reshaped
-            ).to(target_device)
+            ).to(device=target_device, dtype=target_dtype)
             network.allele_embedding.weight.requires_grad = False
 
 
