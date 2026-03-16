@@ -389,8 +389,14 @@ class Class1NeuralNetworkModel(nn.Module):
                         f"Bias shape mismatch for {layer}: got {b.shape}, "
                         f"expected {layer.bias.shape}"
                     )
-                layer.weight.data = torch.from_numpy(w).to(dtype=layer.weight.dtype)
-                layer.bias.data = torch.from_numpy(b).to(dtype=layer.bias.dtype)
+                layer.weight.data = torch.from_numpy(w).to(
+                    device=layer.weight.device,
+                    dtype=layer.weight.dtype,
+                )
+                layer.bias.data = torch.from_numpy(b).to(
+                    device=layer.bias.device,
+                    dtype=layer.bias.dtype,
+                )
 
             def assign_locally_connected(layer, w, b):
                 w = w.astype(numpy.float32)
@@ -424,22 +430,34 @@ class Class1NeuralNetworkModel(nn.Module):
                         f"Bias shape mismatch for {layer}: got {b.shape}, "
                         f"expected {layer.bias.shape}"
                     )
-                layer.weight.data = torch.from_numpy(w).to(dtype=layer.weight.dtype)
-                layer.bias.data = torch.from_numpy(b).to(dtype=layer.bias.dtype)
+                layer.weight.data = torch.from_numpy(w).to(
+                    device=layer.weight.device,
+                    dtype=layer.weight.dtype,
+                )
+                layer.bias.data = torch.from_numpy(b).to(
+                    device=layer.bias.device,
+                    dtype=layer.bias.dtype,
+                )
 
             def assign_batch_norm(layer, gamma, beta, mean, var):
                 layer.weight.data = torch.from_numpy(
                     gamma.astype(numpy.float32)
-                ).to(dtype=layer.weight.dtype)
+                ).to(device=layer.weight.device, dtype=layer.weight.dtype)
                 layer.bias.data = torch.from_numpy(
                     beta.astype(numpy.float32)
-                ).to(dtype=layer.bias.dtype)
+                ).to(device=layer.bias.device, dtype=layer.bias.dtype)
                 layer.running_mean.data = torch.from_numpy(
                     mean.astype(numpy.float32)
-                ).to(dtype=layer.running_mean.dtype)
+                ).to(
+                    device=layer.running_mean.device,
+                    dtype=layer.running_mean.dtype,
+                )
                 layer.running_var.data = torch.from_numpy(
                     var.astype(numpy.float32)
-                ).to(dtype=layer.running_var.dtype)
+                ).to(
+                    device=layer.running_var.device,
+                    dtype=layer.running_var.dtype,
+                )
 
             skip_keras_embedding = False
             keras_metadata = getattr(self, "_keras_metadata", None)

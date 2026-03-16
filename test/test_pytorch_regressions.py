@@ -1,6 +1,8 @@
 """
 Regression tests for PyTorch conversion gaps vs master behavior.
 """
+import json
+import os
 import random
 
 import pytest
@@ -17,6 +19,7 @@ from mhcflurry.class1_processing_neural_network import (
     Class1ProcessingModel,
     Class1ProcessingNeuralNetwork,
 )
+from mhcflurry.common import load_weights
 from mhcflurry.flanking_encoding import FlankingEncoding
 from mhcflurry.pytorch_losses import (
     MSEWithInequalities,
@@ -451,6 +454,32 @@ def test_weight_and_embedding_updates_preserve_device():
     )
     assert all(param.device == device for param in processing_network.parameters())
     assert all(buffer.device == device for buffer in processing_network.buffers())
+
+
+def test_cached_keras_weight_reload_preserves_device():
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    config_path = os.path.join(data_dir, "master_affinity_fixture_config.json")
+    weights_path = os.path.join(data_dir, "master_affinity_fixture_weights.npz")
+
+    with open(config_path, "r") as inp:
+        config = json.load(inp)
+
+    weights = load_weights(weights_path)
+    reloaded_weights = [w.copy() for w in weights]
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    Class1NeuralNetwork.clear_model_cache()
+
+    first_model = Class1NeuralNetwork.from_config(config, weights=weights)
+    first_network = first_model.network(borrow=True)
+    first_network.to(device)
+
+    second_model = Class1NeuralNetwork.from_config(config, weights=reloaded_weights)
+    second_network = second_model.network(borrow=True)
+
+    assert second_network is first_network
+    assert all(param.device == device for param in second_network.parameters())
+    assert all(buffer.device == device for buffer in second_network.buffers())
 
 
 def test_l1_regularization_changes_weights_even_with_zero_data_loss():
