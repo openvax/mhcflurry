@@ -342,7 +342,7 @@ def model_select(
         best_model_score = 0
         for i in remaining_models:
             possible_ensemble = list(selected) + [i]
-            predictions = predictions_df[possible_ensemble].mean(1)
+            predictions = predictions_df[possible_ensemble].mean(axis=1)
             mse_score = 1 - mse(
                 predictions,
                 actual,
