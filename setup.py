@@ -51,7 +51,7 @@ if __name__ == "__main__":
         author="Tim O'Donnell and Alex Rubinsteyn",
         author_email="timodonnell@gmail.com",
         url="https://github.com/openvax/mhcflurry",
-        license="http://www.apache.org/licenses/LICENSE-2.0.html",
+        license_expression="Apache-2.0",
         entry_points={
             "console_scripts": [
                 "mhcflurry-downloads = mhcflurry.downloads_command:run",
@@ -83,7 +83,6 @@ if __name__ == "__main__":
             "Environment :: Console",
             "Operating System :: OS Independent",
             "Intended Audience :: Science/Research",
-            "License :: OSI Approved :: Apache Software License",
             "Programming Language :: Python :: 3",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
