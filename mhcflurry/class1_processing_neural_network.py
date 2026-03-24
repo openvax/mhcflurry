@@ -518,7 +518,6 @@ class Class1ProcessingNeuralNetwork(object):
         self.network_json = None
         self.network_weights = None
         self.fit_info = []
-        self._device = None
 
     @property
     def sequence_lengths(self):
@@ -540,9 +539,7 @@ class Class1ProcessingNeuralNetwork(object):
 
     def get_device(self):
         """Get the PyTorch device to use."""
-        if self._device is None:
-            self._device = get_pytorch_device()
-        return self._device
+        return get_pytorch_device()
 
     def network(self):
         """
@@ -1040,7 +1037,6 @@ class Class1ProcessingNeuralNetwork(object):
         Deserialize. For pickle support.
         """
         self.__dict__.update(state)
-        self._device = None
 
     def get_weights(self):
         """

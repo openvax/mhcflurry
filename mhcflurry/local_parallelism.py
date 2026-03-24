@@ -37,8 +37,10 @@ def add_local_parallelism_args(parser):
              "Set to 0 for serial run. Default: %(default)s.")
     group.add_argument(
         "--backend",
-        choices=("gpu", "cpu", "default"),
-        help="Backend device type. If not specified will use system default.")
+        choices=("auto", "gpu", "mps", "cpu"),
+        default="auto",
+        help="Device backend. 'auto' (default) selects the best available "
+             "device: GPU > MPS > CPU.")
     group.add_argument(
         "--gpus",
         type=int,
@@ -116,10 +118,10 @@ def worker_pool_with_gpu_assignments(
     """
 
     if num_jobs == 0:
-        configure_pytorch()
+        configure_pytorch(backend=backend)
         return None
 
-    worker_init_kwargs = [{} for _ in range(num_jobs)]
+    worker_init_kwargs = [{"backend": backend} for _ in range(num_jobs)]
     if num_gpus:
         print("Attempting to round-robin assign each worker a GPU.")
 
@@ -254,7 +256,9 @@ def worker_init_entry_point(
     init_function(**kwargs)
 
 
-def worker_init(keras_backend=None, gpu_device_nums=None, worker_log_dir=None):
+def worker_init(
+        keras_backend=None, backend=None, gpu_device_nums=None,
+        worker_log_dir=None):
     del keras_backend  # legacy argument retained for API compatibility
     if worker_log_dir:
         sys.stderr = sys.stdout = open(os.path.join(
@@ -267,9 +271,9 @@ def worker_init(keras_backend=None, gpu_device_nums=None, worker_log_dir=None):
     if gpu_device_nums:
         print("WORKER pid=%d assigned GPU devices: %s" % (
             os.getpid(), gpu_device_nums))
-        configure_pytorch(gpu_device_nums=gpu_device_nums)
+        configure_pytorch(backend=backend, gpu_device_nums=gpu_device_nums)
     else:
-        configure_pytorch()
+        configure_pytorch(backend=backend)
 
 
 # Solution suggested in https://bugs.python.org/issue13831

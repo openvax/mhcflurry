@@ -81,36 +81,35 @@ def normalize_allele_name(
     return result.restrict_allele_fields(2).to_string()
 
 
-PYTORCH_CONFIGURED = False
+_pytorch_backend = "auto"
 
 
-def configure_pytorch(gpu_device_nums=None, num_threads=None):
+def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
     """
-    Configure PyTorch to use GPU or CPU.
+    Configure PyTorch device backend and threading.
+
+    Can be called multiple times. Each call updates the settings provided.
 
     Parameters
     ----------
+    backend : str, optional
+        Device backend: "auto", "gpu", "mps", or "cpu".
+        "auto" selects the best available device (GPU > MPS > CPU).
     gpu_device_nums : list of int, optional
         GPU devices to potentially use
-
     num_threads : int, optional
         Number of threads for PyTorch operations
-
     """
     import torch
 
-    global PYTORCH_CONFIGURED
+    global _pytorch_backend
 
-    if PYTORCH_CONFIGURED:
-        return
+    if backend is not None:
+        _pytorch_backend = backend
 
-    PYTORCH_CONFIGURED = True
-
-    # Configure GPU devices
     if gpu_device_nums is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, gpu_device_nums))
 
-    # Configure number of threads
     if num_threads:
         torch.set_num_threads(num_threads)
 
@@ -134,24 +133,38 @@ def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
 
 def get_pytorch_device():
     """
-    Get the appropriate PyTorch device (GPU if available, else CPU).
-
-    By default, MPS (Apple Metal) is disabled due to known issues with
-    subprocess-based training and placeholder tensor allocation in embedding
-    layers. Set MHCFLURRY_ENABLE_MPS=1 to enable MPS.
+    Get the PyTorch device based on the backend set by ``configure_pytorch``.
 
     Returns
     -------
     torch.device
     """
     import torch
-    if torch.cuda.is_available():
+
+    backend = _pytorch_backend
+
+    if backend == "gpu":
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "Backend 'gpu' requested but CUDA is not available")
         return torch.device('cuda')
-    elif (os.environ.get('MHCFLURRY_ENABLE_MPS', '0') == '1' and
-          hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()):
+    elif backend == "mps":
+        if not (hasattr(torch.backends, 'mps') and
+                torch.backends.mps.is_available()):
+            raise RuntimeError(
+                "Backend 'mps' requested but MPS is not available")
         return torch.device('mps')
-    else:
+    elif backend == "cpu":
         return torch.device('cpu')
+    else:
+        # auto: GPU > MPS > CPU
+        if torch.cuda.is_available():
+            return torch.device('cuda')
+        elif (hasattr(torch.backends, 'mps') and
+              torch.backends.mps.is_available()):
+            return torch.device('mps')
+        else:
+            return torch.device('cpu')
 
 
 def configure_logging(verbose=False):

@@ -470,22 +470,18 @@ class TestCanonicalizeAlleleName:
 
 
 class TestConfigurePyTorch:
-    def test_idempotent(self):
+    def test_reconfigure_backend(self):
         from mhcflurry import common
-        # Reset flag so we can test
-        old_flag = common.PYTORCH_CONFIGURED
-        common.PYTORCH_CONFIGURED = False
-        common.configure_pytorch()
-        assert common.PYTORCH_CONFIGURED
-        # Second call should be a no-op
-        common.configure_pytorch()
-        assert common.PYTORCH_CONFIGURED
-        common.PYTORCH_CONFIGURED = old_flag
+        old_backend = common._pytorch_backend
+        common.configure_pytorch(backend="cpu")
+        assert common._pytorch_backend == "cpu"
+        common.configure_pytorch(backend="auto")
+        assert common._pytorch_backend == "auto"
+        common._pytorch_backend = old_backend
 
     def test_configure_tensorflow_delegates(self):
         from mhcflurry import common
-        old_flag = common.PYTORCH_CONFIGURED
-        common.PYTORCH_CONFIGURED = False
+        old_backend = common._pytorch_backend
         common.configure_tensorflow(backend="tensorflow-cpu")
-        assert common.PYTORCH_CONFIGURED
-        common.PYTORCH_CONFIGURED = old_flag
+        # configure_tensorflow ignores backend arg, so backend unchanged
+        assert common._pytorch_backend == old_backend

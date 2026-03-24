@@ -825,7 +825,6 @@ class Class1NeuralNetwork(object):
 
         self.fit_info = []
         self.prediction_cache = weakref.WeakKeyDictionary()
-        self._device = None
 
     MODELS_CACHE = {}
     """
@@ -1426,7 +1425,6 @@ class Class1NeuralNetwork(object):
         """
         self.__dict__.update(state)
         self.prediction_cache = weakref.WeakKeyDictionary()
-        self._device = None
 
     def peptides_to_network_input(self, peptides):
         """
@@ -1542,9 +1540,7 @@ class Class1NeuralNetwork(object):
 
     def get_device(self):
         """Get the PyTorch device to use."""
-        if self._device is None:
-            self._device = get_pytorch_device()
-        return self._device
+        return get_pytorch_device()
 
     def fit_generator(
             self,
