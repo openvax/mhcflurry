@@ -9,6 +9,7 @@ Covers:
   skip-connections topology
 - class1_affinity_predictor: canonicalize_allele_name round-trip
 """
+import warnings
 import numpy as np
 import pytest
 import torch
@@ -91,6 +92,17 @@ class TestStandardLossWeighted:
         weights = torch.tensor([0.0, 1.0])
         val = loss(pred, target, sample_weights=weights).item()
         assert abs(val - 0.3) < 1e-6
+
+    def test_mse_column_vector_predictions_do_not_warn(self):
+        from mhcflurry.pytorch_losses import StandardLoss
+        loss = StandardLoss("mse")
+        pred = torch.tensor([[0.5], [0.3]])
+        target = torch.tensor([0.5, 0.0])
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            val = loss(pred, target).item()
+        assert abs(val - 0.045) < 1e-6
+        assert not caught
 
 
 class TestMSEWithInequalitiesSampleWeights:

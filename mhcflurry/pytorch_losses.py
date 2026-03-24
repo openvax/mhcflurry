@@ -323,6 +323,9 @@ class StandardLoss(nn.Module):
         torch.Tensor
             Scalar loss value
         """
+        y_pred = y_pred.reshape(-1)
+        y_true = y_true.reshape(-1)
+
         if sample_weights is None:
             return self._loss_fn(y_pred, y_true)
         if self.loss_name == "mse":
@@ -331,8 +334,6 @@ class StandardLoss(nn.Module):
             losses = F.l1_loss(y_pred, y_true, reduction="none")
         else:
             losses = self._loss_fn(y_pred, y_true)
-        if losses.dim() > 1:
-            losses = losses.view(losses.shape[0], -1).mean(dim=1)
         sample_weights = sample_weights.reshape(-1).to(losses.device)
         denominator = torch.clamp(sample_weights.sum(), min=1.0)
         return (losses * sample_weights).sum() / denominator
