@@ -1,4 +1,5 @@
 import inspect
+import pytest
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import configure_tensorflow
@@ -8,7 +9,8 @@ from mhcflurry.local_parallelism import worker_init
 
 
 def test_legacy_configure_tensorflow_entry_point():
-    configure_tensorflow(backend="tensorflow", gpu_device_nums=None, num_threads=1)
+    with pytest.warns(FutureWarning, match="configure_tensorflow"):
+        configure_tensorflow(backend="tensorflow", gpu_device_nums=None, num_threads=1)
 
 
 def test_legacy_worker_init_signature_kept():

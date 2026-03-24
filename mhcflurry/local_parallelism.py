@@ -16,7 +16,7 @@ import random
 
 import numpy
 
-from .common import configure_pytorch
+from .common import configure_pytorch, normalize_pytorch_backend
 
 
 def add_local_parallelism_args(parser):
@@ -38,9 +38,10 @@ def add_local_parallelism_args(parser):
              "Set to 0 for serial run. Default: %(default)s.")
     group.add_argument(
         "--backend",
-        choices=("auto", "gpu", "mps", "cpu"),
+        choices=("auto", "default", "gpu", "mps", "cpu"),
         default="auto",
-        help="Device backend. 'gpu' means CUDA. 'auto' (default) selects the "
+        help="Device backend. 'default' is a legacy alias for 'auto'. 'gpu' "
+             "means CUDA. 'auto' (default) selects the "
              "best available device: GPU > MPS > CPU. When --gpus is set, "
              "GPU-assigned workers use CUDA and overflow workers are forced "
              "to CPU.")
@@ -121,7 +122,7 @@ def worker_pool_with_gpu_assignments(
     -------
     multiprocessing.Pool
     """
-    backend = backend or "auto"
+    backend = normalize_pytorch_backend(backend or "auto")
     validate_worker_pool_args(
         num_jobs=num_jobs,
         num_gpus=num_gpus,
@@ -172,7 +173,7 @@ def validate_worker_pool_args(
     ``--gpus`` controls CUDA worker assignment only. It does not select MPS
     devices and it does not distribute a single model across multiple GPUs.
     """
-    backend = backend or "auto"
+    backend = normalize_pytorch_backend(backend or "auto")
     if num_jobs < 0:
         raise ValueError("num_jobs must be >= 0")
     if num_gpus is None:
@@ -201,7 +202,7 @@ def worker_init_kwargs_for_scheduler(
     robin order. Any additional workers are forced onto CPU by hiding CUDA and
     setting their backend to ``cpu``.
     """
-    backend = backend or "auto"
+    backend = normalize_pytorch_backend(backend or "auto")
     validate_worker_pool_args(
         num_jobs=num_jobs,
         num_gpus=num_gpus,

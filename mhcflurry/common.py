@@ -3,6 +3,7 @@ import logging
 import sys
 import os
 import json
+import warnings
 
 import numpy
 import pandas
@@ -82,6 +83,41 @@ def normalize_allele_name(
 
 
 _pytorch_backend = "auto"
+_PYTORCH_BACKEND_ALIASES = {
+    "default": "auto",
+}
+_TENSORFLOW_BACKEND_ALIASES = {
+    "tensorflow": "auto",
+    "tensorflow-default": "auto",
+    "tensorflow-gpu": "gpu",
+    "tensorflow-cpu": "cpu",
+}
+_VALID_PYTORCH_BACKENDS = ("auto", "gpu", "mps", "cpu")
+
+
+def normalize_pytorch_backend(backend):
+    """
+    Normalize a requested backend name and validate it.
+
+    Parameters
+    ----------
+    backend : str or None
+
+    Returns
+    -------
+    str or None
+    """
+    if backend is None:
+        return None
+    backend = _PYTORCH_BACKEND_ALIASES.get(backend, backend)
+    if backend not in _VALID_PYTORCH_BACKENDS:
+        raise ValueError(
+            "Invalid backend %r. Expected one of: %s" % (
+                backend,
+                ", ".join(_VALID_PYTORCH_BACKENDS),
+            )
+        )
+    return backend
 
 
 def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
@@ -106,7 +142,7 @@ def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
     global _pytorch_backend
 
     if backend is not None:
-        _pytorch_backend = backend
+        _pytorch_backend = normalize_pytorch_backend(backend)
 
     if gpu_device_nums is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, gpu_device_nums))
@@ -122,14 +158,33 @@ def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
     Parameters
     ----------
     backend : str, optional
-        Ignored. Kept for API compatibility.
+        Legacy backend value retained for API compatibility. TensorFlow-era
+        names such as "tensorflow-cpu" are translated to the equivalent
+        PyTorch backend and emit a deprecation warning.
     gpu_device_nums : list of int, optional
         GPU devices to potentially use.
     num_threads : int, optional
         Number of threads for backend operations.
     """
-    del backend  # unused legacy argument
-    configure_pytorch(gpu_device_nums=gpu_device_nums, num_threads=num_threads)
+    translated_backend = None
+    if backend is not None:
+        translated_backend = _TENSORFLOW_BACKEND_ALIASES.get(backend)
+        if translated_backend is not None:
+            warnings.warn(
+                (
+                    "configure_tensorflow(backend=%r) is deprecated; "
+                    "using PyTorch backend=%r. Use configure_pytorch() instead."
+                ) % (backend, translated_backend),
+                FutureWarning,
+                stacklevel=2,
+            )
+        else:
+            translated_backend = normalize_pytorch_backend(backend)
+    configure_pytorch(
+        backend=translated_backend,
+        gpu_device_nums=gpu_device_nums,
+        num_threads=num_threads,
+    )
 
 
 def get_pytorch_device():
