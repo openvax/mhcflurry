@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
-from .common import configure_pytorch, get_pytorch_device
+from .common import get_pytorch_device
 
 
 class Class1ProcessingModel(nn.Module):
@@ -639,7 +639,6 @@ class Class1ProcessingNeuralNetwork(object):
             How often (in seconds) to print progress update. Set to None to
             disable.
         """
-        configure_pytorch()
         device = self.get_device()
 
         x_dict = self.network_input(sequences)
@@ -910,7 +909,6 @@ class Class1ProcessingNeuralNetwork(object):
         -------
         numpy.array
         """
-        configure_pytorch()
         device = self.get_device()
 
         x_dict = self.network_input(sequences, throw=throw)
@@ -994,8 +992,6 @@ class Class1ProcessingNeuralNetwork(object):
         """
         Helper function to make a PyTorch network given hyperparameters.
         """
-        configure_pytorch()
-
         empty_x_dict = self.network_input(FlankingEncoding([], [], []))
         sequence_dims = empty_x_dict["sequence"].shape[1:]
 
@@ -1029,7 +1025,6 @@ class Class1ProcessingNeuralNetwork(object):
         self.update_network_description()
         result = dict(self.__dict__)
         result["_network"] = None
-        result["_device"] = None
         return result
 
     def __setstate__(self, state):
@@ -1062,7 +1057,6 @@ class Class1ProcessingNeuralNetwork(object):
         result = dict(self.__dict__)
         del result["_network"]
         result["network_weights"] = None
-        result["_device"] = None
         return result
 
     @classmethod

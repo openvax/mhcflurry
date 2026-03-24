@@ -3,6 +3,7 @@ Infrastructure for "local" parallelism, i.e. multiprocess parallelism on one
 compute node.
 """
 
+import itertools
 import traceback
 import sys
 import os
@@ -39,14 +40,18 @@ def add_local_parallelism_args(parser):
         "--backend",
         choices=("auto", "gpu", "mps", "cpu"),
         default="auto",
-        help="Device backend. 'auto' (default) selects the best available "
-             "device: GPU > MPS > CPU.")
+        help="Device backend. 'gpu' means CUDA. 'auto' (default) selects the "
+             "best available device: GPU > MPS > CPU. When --gpus is set, "
+             "GPU-assigned workers use CUDA and overflow workers are forced "
+             "to CPU.")
     group.add_argument(
         "--gpus",
         type=int,
         metavar="N",
-        help="Number of GPUs to attempt to parallelize across. Requires running "
-             "in parallel.")
+        help="Number of CUDA GPUs, starting at index 0, to assign across "
+             "parallel workers. Requires --num-jobs > 0. Each assigned worker "
+             "gets one GPU; workers beyond --gpus * --max-workers-per-gpu run "
+             "on CPU.")
     group.add_argument(
         "--max-workers-per-gpu",
         type=int,
@@ -116,37 +121,33 @@ def worker_pool_with_gpu_assignments(
     -------
     multiprocessing.Pool
     """
+    backend = backend or "auto"
+    validate_worker_pool_args(
+        num_jobs=num_jobs,
+        num_gpus=num_gpus,
+        backend=backend,
+        max_workers_per_gpu=max_workers_per_gpu)
 
     if num_jobs == 0:
         configure_pytorch(backend=backend)
         return None
 
-    worker_init_kwargs = [{"backend": backend} for _ in range(num_jobs)]
+    worker_init_kwargs = worker_init_kwargs_for_scheduler(
+        num_jobs=num_jobs,
+        num_gpus=num_gpus,
+        backend=backend,
+        max_workers_per_gpu=max_workers_per_gpu)
     if num_gpus:
-        print("Attempting to round-robin assign each worker a GPU.")
-
-        gpu_assignments_remaining = dict((
-            (gpu, max_workers_per_gpu) for gpu in range(num_gpus)
-        ))
+        print(
+            "Assigning %d workers across %d CUDA GPUs (%d workers max per GPU). "
+            "Overflow workers will run on CPU." % (
+                num_jobs, num_gpus, max_workers_per_gpu))
         for (worker_num, kwargs) in enumerate(worker_init_kwargs):
-            if gpu_assignments_remaining:
-                # Use a GPU
-                gpu_num = sorted(
-                    gpu_assignments_remaining,
-                    key=lambda key: gpu_assignments_remaining[key])[0]
-                gpu_assignments_remaining[gpu_num] -= 1
-                if not gpu_assignments_remaining[gpu_num]:
-                    del gpu_assignments_remaining[gpu_num]
-                gpu_assignment = [gpu_num]
-            else:
-                # Use CPU
-                gpu_assignment = []
-
-            kwargs.update({
-                'gpu_device_nums': gpu_assignment,
-            })
-            print("Worker %d assigned GPUs: %s" % (
-                worker_num, gpu_assignment))
+            print(
+                "Worker %d assigned backend=%s GPUs=%s" % (
+                    worker_num,
+                    kwargs["backend"],
+                    kwargs.get("gpu_device_nums")))
 
     if worker_log_dir:
         for kwargs in worker_init_kwargs:
@@ -158,6 +159,74 @@ def worker_pool_with_gpu_assignments(
         initializer_kwargs_per_process=worker_init_kwargs,
         max_tasks_per_worker=max_tasks_per_worker)
     return worker_pool
+
+
+def validate_worker_pool_args(
+        num_jobs,
+        num_gpus=0,
+        backend="auto",
+        max_workers_per_gpu=1):
+    """
+    Validate local worker scheduling arguments.
+
+    ``--gpus`` controls CUDA worker assignment only. It does not select MPS
+    devices and it does not distribute a single model across multiple GPUs.
+    """
+    backend = backend or "auto"
+    if num_jobs < 0:
+        raise ValueError("num_jobs must be >= 0")
+    if num_gpus is None:
+        num_gpus = 0
+    if num_gpus < 0:
+        raise ValueError("num_gpus must be >= 0")
+    if max_workers_per_gpu < 1:
+        raise ValueError("max_workers_per_gpu must be >= 1")
+    if num_gpus:
+        if num_jobs == 0:
+            raise ValueError("num_gpus requires num_jobs > 0")
+        if backend not in ("auto", "gpu"):
+            raise ValueError(
+                "num_gpus is only supported with backend 'auto' or 'gpu'")
+
+
+def worker_init_kwargs_for_scheduler(
+        num_jobs,
+        num_gpus=0,
+        backend="auto",
+        max_workers_per_gpu=1):
+    """
+    Build per-worker init kwargs from the local scheduling configuration.
+
+    When ``num_gpus`` is set, workers are assigned one CUDA GPU each in round
+    robin order. Any additional workers are forced onto CPU by hiding CUDA and
+    setting their backend to ``cpu``.
+    """
+    backend = backend or "auto"
+    validate_worker_pool_args(
+        num_jobs=num_jobs,
+        num_gpus=num_gpus,
+        backend=backend,
+        max_workers_per_gpu=max_workers_per_gpu)
+
+    if not num_gpus:
+        return [{"backend": backend} for _ in range(num_jobs)]
+
+    gpu_assignments = list(itertools.chain.from_iterable(
+        range(num_gpus) for _ in range(max_workers_per_gpu)))
+
+    worker_kwargs = []
+    for worker_num in range(num_jobs):
+        if worker_num < len(gpu_assignments):
+            worker_kwargs.append({
+                "backend": "gpu",
+                "gpu_device_nums": [gpu_assignments[worker_num]],
+            })
+        else:
+            worker_kwargs.append({
+                "backend": "cpu",
+                "gpu_device_nums": [],
+            })
+    return worker_kwargs
 
 
 def make_worker_pool(
@@ -268,7 +337,7 @@ def worker_init(
     # Each worker needs distinct random numbers
     numpy.random.seed()
     random.seed()
-    if gpu_device_nums:
+    if gpu_device_nums is not None:
         print("WORKER pid=%d assigned GPU devices: %s" % (
             os.getpid(), gpu_device_nums))
         configure_pytorch(backend=backend, gpu_device_nums=gpu_device_nums)

@@ -16,6 +16,22 @@ def test_legacy_worker_init_signature_kept():
     assert "keras_backend" in params
 
 
+def test_worker_init_preserves_empty_gpu_assignment(monkeypatch):
+    calls = []
+
+    def fake_configure_pytorch(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(
+        "mhcflurry.local_parallelism.configure_pytorch",
+        fake_configure_pytorch,
+    )
+
+    worker_init(backend="auto", gpu_device_nums=[])
+
+    assert calls == [{"backend": "auto", "gpu_device_nums": []}]
+
+
 def test_legacy_cache_key_alias():
     network_json = (
         '{"dense_layer_l1_regularization": 0.1, '

@@ -20,7 +20,7 @@ from .hyperparameters import HyperparameterDefaults
 from .encodable_sequences import EncodableSequences, EncodingError
 from .allele_encoding import AlleleEncoding
 from .regression_target import to_ic50, from_ic50
-from .common import configure_pytorch, get_pytorch_device
+from .common import get_pytorch_device
 from .pytorch_layers import LocallyConnected1D, get_activation
 from .pytorch_losses import get_pytorch_loss
 from .data_dependent_weights_initialization import lsuv_init
@@ -1301,7 +1301,6 @@ class Class1NeuralNetwork(object):
         result["network_weights"] = None
         result["network_weights_loader"] = None
         result["prediction_cache"] = None
-        result["_device"] = None
         return result
 
     @classmethod
@@ -1416,7 +1415,6 @@ class Class1NeuralNetwork(object):
         result = dict(self.__dict__)
         result["_network"] = None
         result["prediction_cache"] = None
-        result["_device"] = None
         return result
 
     def __setstate__(self, state):
@@ -1563,7 +1561,6 @@ class Class1NeuralNetwork(object):
         Fit using a generator. Does not support many of the features of fit(),
         such as random negative peptides.
         """
-        configure_pytorch()
         device = self.get_device()
 
         fit_info = collections.defaultdict(list)
@@ -1801,7 +1798,6 @@ class Class1NeuralNetwork(object):
         progress_preamble : string
         progress_print_interval : float
         """
-        configure_pytorch()
         device = self.get_device()
 
         encodable_peptides = EncodableSequences.create(peptides)
@@ -2197,7 +2193,6 @@ class Class1NeuralNetwork(object):
         if use_cache and peptides in self.prediction_cache:
             return self.prediction_cache[peptides].copy()
 
-        configure_pytorch()
         device = self.get_device()
 
         x_dict = {"peptide": self.peptides_to_network_input(peptides)}
@@ -2319,8 +2314,6 @@ class Class1NeuralNetwork(object):
         """
         Helper function to make a PyTorch network for class 1 affinity prediction.
         """
-        configure_pytorch()
-
         peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
 
         return Class1NeuralNetworkModel(

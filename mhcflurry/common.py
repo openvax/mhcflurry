@@ -96,7 +96,8 @@ def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
         Device backend: "auto", "gpu", "mps", or "cpu".
         "auto" selects the best available device (GPU > MPS > CPU).
     gpu_device_nums : list of int, optional
-        GPU devices to potentially use
+        CUDA devices to expose via CUDA_VISIBLE_DEVICES. An empty list hides
+        CUDA entirely for the current process.
     num_threads : int, optional
         Number of threads for PyTorch operations
     """
