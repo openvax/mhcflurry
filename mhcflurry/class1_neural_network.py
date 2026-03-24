@@ -389,8 +389,14 @@ class Class1NeuralNetworkModel(nn.Module):
                         f"Bias shape mismatch for {layer}: got {b.shape}, "
                         f"expected {layer.bias.shape}"
                     )
-                layer.weight.data = torch.from_numpy(w).to(dtype=layer.weight.dtype)
-                layer.bias.data = torch.from_numpy(b).to(dtype=layer.bias.dtype)
+                layer.weight.data = torch.from_numpy(w).to(
+                    device=layer.weight.device,
+                    dtype=layer.weight.dtype,
+                )
+                layer.bias.data = torch.from_numpy(b).to(
+                    device=layer.bias.device,
+                    dtype=layer.bias.dtype,
+                )
 
             def assign_locally_connected(layer, w, b):
                 w = w.astype(numpy.float32)
@@ -424,22 +430,34 @@ class Class1NeuralNetworkModel(nn.Module):
                         f"Bias shape mismatch for {layer}: got {b.shape}, "
                         f"expected {layer.bias.shape}"
                     )
-                layer.weight.data = torch.from_numpy(w).to(dtype=layer.weight.dtype)
-                layer.bias.data = torch.from_numpy(b).to(dtype=layer.bias.dtype)
+                layer.weight.data = torch.from_numpy(w).to(
+                    device=layer.weight.device,
+                    dtype=layer.weight.dtype,
+                )
+                layer.bias.data = torch.from_numpy(b).to(
+                    device=layer.bias.device,
+                    dtype=layer.bias.dtype,
+                )
 
             def assign_batch_norm(layer, gamma, beta, mean, var):
                 layer.weight.data = torch.from_numpy(
                     gamma.astype(numpy.float32)
-                ).to(dtype=layer.weight.dtype)
+                ).to(device=layer.weight.device, dtype=layer.weight.dtype)
                 layer.bias.data = torch.from_numpy(
                     beta.astype(numpy.float32)
-                ).to(dtype=layer.bias.dtype)
+                ).to(device=layer.bias.device, dtype=layer.bias.dtype)
                 layer.running_mean.data = torch.from_numpy(
                     mean.astype(numpy.float32)
-                ).to(dtype=layer.running_mean.dtype)
+                ).to(
+                    device=layer.running_mean.device,
+                    dtype=layer.running_mean.dtype,
+                )
                 layer.running_var.data = torch.from_numpy(
                     var.astype(numpy.float32)
-                ).to(dtype=layer.running_var.dtype)
+                ).to(
+                    device=layer.running_var.device,
+                    dtype=layer.running_var.dtype,
+                )
 
             skip_keras_embedding = False
             keras_metadata = getattr(self, "_keras_metadata", None)
@@ -479,9 +497,10 @@ class Class1NeuralNetworkModel(nn.Module):
                     if self.allele_embedding is None:
                         continue
                     if w.shape == self.allele_embedding.weight.shape:
+                        target = self.allele_embedding.weight
                         self.allele_embedding.weight.data = torch.from_numpy(
                             w.astype(numpy.float32)
-                        ).to(dtype=self.allele_embedding.weight.dtype)
+                        ).to(device=target.device, dtype=target.dtype)
                 elif layer_class == "BatchNormalization":
                     gamma = weights[idx]
                     beta = weights[idx + 1]
@@ -569,9 +588,19 @@ class Class1NeuralNetworkModel(nn.Module):
                         running_mean = weights[idx + 1].astype(numpy.float32)
                         running_var = weights[idx + 2].astype(numpy.float32)
                         if module.running_mean.shape == running_mean.shape:
-                            module.running_mean.data = torch.from_numpy(running_mean)
+                            module.running_mean.data = torch.from_numpy(
+                                running_mean
+                            ).to(
+                                device=module.running_mean.device,
+                                dtype=module.running_mean.dtype,
+                            )
                         if module.running_var.shape == running_var.shape:
-                            module.running_var.data = torch.from_numpy(running_var)
+                            module.running_var.data = torch.from_numpy(
+                                running_var
+                            ).to(
+                                device=module.running_var.device,
+                                dtype=module.running_var.dtype,
+                            )
                         extra_keras_skip = 2
 
             if w.shape != param.shape:
@@ -580,14 +609,18 @@ class Class1NeuralNetworkModel(nn.Module):
                     f"got {weights[idx].shape}, expected {param.shape}"
                 )
 
-            param.data = torch.from_numpy(w).to(dtype=param.dtype)
+            param.data = torch.from_numpy(w).to(
+                device=param.device,
+                dtype=param.dtype,
+            )
             idx += 1 + extra_keras_skip
         if not auto_convert_keras:
             named_modules_dict = dict(self.named_modules())
             for name, buffer in self.named_buffers():
-                tensor = torch.from_numpy(weights[idx])
-                if tensor.dtype != buffer.dtype:
-                    tensor = tensor.to(dtype=buffer.dtype)
+                tensor = torch.from_numpy(weights[idx]).to(
+                    device=buffer.device,
+                    dtype=buffer.dtype,
+                )
                 # Navigate to the correct submodule for nested buffers
                 if "." in name:
                     module_path, buffer_name = name.rsplit(".", 1)
@@ -2191,19 +2224,25 @@ class Class1NeuralNetwork(object):
         n_samples = len(x_dict["peptide"])
         all_predictions = []
 
+        def prediction_tensor(batch_array):
+            batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
+            if not batch_array.flags.writeable:
+                batch_array = batch_array.copy()
+            return torch.from_numpy(batch_array).to(device)
+
         with torch.no_grad():
             for batch_start in range(0, n_samples, batch_size):
                 batch_end = min(batch_start + batch_size, n_samples)
 
-                peptide_batch = torch.from_numpy(
+                peptide_batch = prediction_tensor(
                     x_dict["peptide"][batch_start:batch_end]
-                ).float().to(device)
+                )
 
                 inputs = {"peptide": peptide_batch}
                 if "allele" in x_dict:
-                    allele_batch = torch.from_numpy(
+                    allele_batch = prediction_tensor(
                         x_dict["allele"][batch_start:batch_end]
-                    ).float().to(device)
+                    )
                     inputs["allele"] = allele_batch
 
                 batch_predictions = network(inputs)
@@ -2319,7 +2358,10 @@ class Class1NeuralNetwork(object):
                 shape=(1, existing_shape[1]),
                 dtype=numpy.float32
             )
-            original_model.allele_embedding.weight.data = torch.from_numpy(new_weight)
+            target = original_model.allele_embedding.weight
+            original_model.allele_embedding.weight.data = torch.from_numpy(
+                new_weight
+            ).to(device=target.device, dtype=target.dtype)
             original_model.allele_embedding.weight.requires_grad = False
 
     def set_allele_representations(self, allele_representations, force_surgery=False):
@@ -2354,7 +2396,10 @@ class Class1NeuralNetwork(object):
         if network.allele_embedding is None:
             return
 
-        existing_shape = network.allele_embedding.weight.shape
+        target_weight = network.allele_embedding.weight
+        existing_shape = target_weight.shape
+        target_device = target_weight.device
+        target_dtype = target_weight.dtype
 
         if existing_shape[0] > reshaped.shape[0] and not force_surgery:
             # Extend with NaNs
@@ -2370,12 +2415,17 @@ class Class1NeuralNetwork(object):
             new_embedding = nn.Embedding(
                 num_embeddings=reshaped.shape[0],
                 embedding_dim=reshaped.shape[1]
+            ).to(device=target_device)
+            new_embedding.weight.data = torch.from_numpy(reshaped).to(
+                device=target_device,
+                dtype=target_dtype,
             )
-            new_embedding.weight.data = torch.from_numpy(reshaped)
             new_embedding.weight.requires_grad = False
             network.allele_embedding = new_embedding
         else:
-            network.allele_embedding.weight.data = torch.from_numpy(reshaped)
+            network.allele_embedding.weight.data = torch.from_numpy(
+                reshaped
+            ).to(device=target_device, dtype=target_dtype)
             network.allele_embedding.weight.requires_grad = False
 
 

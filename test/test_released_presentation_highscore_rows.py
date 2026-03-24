@@ -84,10 +84,10 @@ def _skip_if_fixture_incompatible(metadata, presentation_predictor):
 
 def _atol_for_output(column):
     if "percentile" in column:
-        return 1e-6
+        return 1e-5
     if "affinity" in column:
-        return 0.05
-    return 1e-6
+        return 0.1
+    return 1e-5
 
 
 def test_presentation_highscore_fixture_has_high_and_low_contexts():

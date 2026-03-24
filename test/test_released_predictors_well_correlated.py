@@ -87,7 +87,7 @@ def test_correlation(
 
         if correlation < 0.6:
             print("Warning: low correlation", allele)
-            df["tightest"] = df.min(1)
+            df["tightest"] = df.min(axis=1)
             print(df.sort_values("tightest").iloc[:, :-1])
             if debug:
                 import ipdb  # pylint: disable=import-error
