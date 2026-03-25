@@ -38,7 +38,7 @@ if __name__ == "__main__":
         "appdirs",
         "scikit-learn",
         "mhcgnomes>=3.0.1",
-        "numpy",
+        "numpy>=1.22.4",
         "pyyaml",
         "tqdm",
         "torch>=2.0.0",
