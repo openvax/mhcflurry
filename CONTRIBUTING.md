@@ -13,7 +13,7 @@ All contributions can be made as pull requests on Github. One of the core develo
 A few other guidelines:
 
  * Any generated resource, such as trained models, must be associated with a `GENERATE.sh` script in [downloads-generation](https://github.com/openvax/mhcflurry/tree/master/downloads-generation). Running this script with no arguments should fully reproduce the generated result. Reproducability of MHCflurry trained models and related data (such as curated training data, allele sequences, etc.) is key to allowing others to build upon and improve our work.
- * MHCflurry supports Python 2.7 and 3.3+ on Linux and OS X. We can't guarantee support for Windows. If you are having trouble running MHCflurry on Windows we would appreciate contributions that help us address this.
+ * MHCflurry supports Python 3.10+ on Linux and OS X. We can't guarantee support for Windows. If you are having trouble running MHCflurry on Windows we would appreciate contributions that help us address this.
  * All functions should be documented using [numpy-style docstrings](https://numpydoc.readthedocs.io/en/latest/format.html) and associated with unit tests.
  * Bugfixes should be accompanied with test that illustrates the bug when feasible.
  * Contributions are licensed under Apache 2.0

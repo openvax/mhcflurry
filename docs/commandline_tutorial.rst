@@ -249,8 +249,8 @@ MHCflurry behavior can be modified using these environment variables:
 
 ``MHCFLURRY_OPTIMIZATION_LEVEL``
     The pan-allele models can be somewhat slow. As an optimization, when this
-    variable is greater than 0 (default is 1), we "stitch" the pan-allele models in
-    the ensemble into one large tensorflow graph. In our experiments
+    variable is greater than 0 (default is 1), we merge the pan-allele models in
+    the ensemble into a single combined network. In our experiments
     it gives about a 30% speed improvement. It has no effect on allele-specific
     models. Set this variable to 0 to disable this behavior. This may be helpful
     if you are running out of memory using the pan-allele models.

@@ -76,7 +76,7 @@ parser.add_argument(
 parser.add_argument(
     "--verbosity",
     type=int,
-    help="Keras verbosity. Default: %(default)s",
+    help="Verbosity. Default: %(default)s",
     default=0)
 
 add_local_parallelism_args(parser)

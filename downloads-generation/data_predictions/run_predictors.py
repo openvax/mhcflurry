@@ -52,7 +52,7 @@ parser.add_argument(
     "--mhcflurry-batch-size",
     type=int,
     default=4096,
-    help="Keras batch size for MHCflurry predictions. Default: %(default)s")
+    help="Batch size for MHCflurry predictions. Default: %(default)s")
 parser.add_argument(
     "--allele",
     default=None,

@@ -20,8 +20,6 @@ import textwrap
 import logging
 import subprocess
 
-# Added by tim
-import tensorflow # to avoid "Using Tensorflow" message later
 if os.environ.get("READTHEDOCS"):
     # For rtd builds, call "make generate" first.
     subprocess.check_call("make generate", shell=True)
@@ -62,7 +60,6 @@ extensions = [
 doctest_global_setup = '''
 import logging
 logging.getLogger('matplotlib').disabled = True
-logging.getLogger('tensorflow').disabled = True
 import numpy
 import pandas
 import mhcflurry
