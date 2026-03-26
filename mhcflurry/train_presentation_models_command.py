@@ -127,8 +127,7 @@ def main(args):
 
     # We want to predict using an optimized Class1AffinityPredictor but
     # save the presentation models using an un-optimized Class1AffinityPredictor,
-    # since there seems to be issues saving and loading giant tensorflow
-    # graphs (which is what the optimization routine produces).
+    # since the optimized (merged) network is only needed at inference time.
     print("Before fit: saving affinity and processing predictors.")
     predictor.save(
         args.out_models_dir,

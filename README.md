@@ -8,19 +8,25 @@ prediction package with competitive accuracy and a fast and
 [documented](http://openvax.github.io/mhcflurry/) implementation.
 
 > [!IMPORTANT]
-> **The latest stable release is 2.1.5** (`pip install mhcflurry`), which uses TensorFlow/Keras.
+> **Version 2.2.0** is the first release to use [PyTorch](https://pytorch.org/) as its neural network backend, replacing TensorFlow/Keras used in previous versions. It loads the same published weights and produces equivalent predictions, so existing workflows should continue to work with no changes.
 >
-> Version 2.2.0rc3 is a release candidate that migrates the backend from TensorFlow to [PyTorch](https://pytorch.org/). It loads the same published weights and produces equivalent predictions. Install the release candidate with `pip install mhcflurry==2.2.0rc3`. Please let us know if you encounter any issues!
+> Key changes in 2.2.0:
+> - **Backend**: TensorFlow/Keras replaced by PyTorch (>= 2.0)
+> - **Python**: Requires Python 3.10+ (previously 3.9+)
+> - **Dependencies**: `pandas >= 2.0` is now required; `tensorflow` and `keras` are no longer needed
+> - **Hardware**: Automatic GPU detection; Apple Silicon (MPS) is now supported
+>
+> If you are upgrading from 2.1.x, simply `pip install --upgrade mhcflurry`. The published pre-trained models are unchanged and will be loaded and converted automatically.
 
 MHCflurry implements class I peptide/MHC binding affinity prediction.
 The current version provides pan-MHC I predictors supporting any MHC
-allele of known sequence. MHCflurry runs on Python 3.9+ using the
+allele of known sequence. MHCflurry runs on Python 3.10+ using the
 [PyTorch](https://pytorch.org/) neural network library.
 It exposes [command-line](http://openvax.github.io/mhcflurry/commandline_tutorial.html)
 and [Python library](http://openvax.github.io/mhcflurry/python_tutorial.html)
 interfaces.
 
-MHCflurry also includes two expermental predictors,
+MHCflurry also includes two experimental predictors,
 an "antigen processing" predictor that attempts to model MHC allele-independent
 effects such as proteosomal cleavage and a "presentation" predictor that
 integrates processing predictions with binding affinity predictions to give a
@@ -31,7 +37,7 @@ If you find MHCflurry useful in your research please cite:
 
 > T. O'Donnell, A. Rubinsteyn, U. Laserson. "MHCflurry 2.0: Improved pan-allele prediction of MHC I-presented peptides by incorporating antigen processing," *Cell Systems*, 2020. https://doi.org/10.1016/j.cels.2020.06.010
 
-> T. O’Donnell, A. Rubinsteyn, M. Bonsack, A. B. Riemer, U. Laserson, and J. Hammerbacher, "MHCflurry: Open-Source Class I MHC Binding Affinity Prediction," *Cell Systems*, 2018. https://doi.org/10.1016/j.cels.2018.05.014
+> T. O'Donnell, A. Rubinsteyn, M. Bonsack, A. B. Riemer, U. Laserson, and J. Hammerbacher, "MHCflurry: Open-Source Class I MHC Binding Affinity Prediction," *Cell Systems*, 2018. https://doi.org/10.1016/j.cels.2018.05.014
 
 Please file an issue if you have questions or encounter problems.
 
@@ -62,7 +68,7 @@ $ mhcflurry-predict \
        --alleles HLA-A0201 HLA-A0301 \
        --peptides SIINFEKL SIINFEKD SIINFEKQ \
        --out /tmp/predictions.csv
-       
+
 Wrote: /tmp/predictions.csv
 ```
 
@@ -73,8 +79,8 @@ $ mhcflurry-predict-scan \
         --sequences MFVFLVLLPLVSSQCVNLTTRTQLPPAYTNSFTRGVYYPDKVFRSSVLHS \
         --alleles HLA-A*02:01 \
         --out /tmp/predictions.csv
-        
-Wrote: /tmp/predictions.csv  
+
+Wrote: /tmp/predictions.csv
 ```
 
 
@@ -88,7 +94,7 @@ running:
 
 ```
 $ docker run -p 9999:9999 --rm openvax/mhcflurry:latest
-``` 
+```
 
 This will start a [jupyter](https://jupyter.org/) notebook server in an
 environment that has MHCflurry installed. Go to `http://localhost:9999` in a
@@ -131,4 +137,3 @@ Now call `mhcflurry-downloads fetch` with the `--already-downloaded-dir` option 
 ```
 $ mhcflurry-downloads fetch models_class1_presentation --already-downloaded-dir downloads
 ```
-

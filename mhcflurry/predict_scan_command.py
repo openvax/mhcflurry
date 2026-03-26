@@ -37,7 +37,6 @@ mhcflurry-predict-scan \
 '''
 import sys
 import argparse
-import logging
 
 import pandas
 
@@ -201,8 +200,6 @@ def parse_peptide_lengths(value):
 
 
 def run(argv=sys.argv[1:]):
-    logging.getLogger('tensorflow').disabled = True
-
     if not argv:
         parser.print_help()
         parser.exit(1)

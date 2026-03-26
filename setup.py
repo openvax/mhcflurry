@@ -38,7 +38,7 @@ if __name__ == "__main__":
         "appdirs",
         "scikit-learn",
         "mhcgnomes>=3.0.1",
-        "numpy",
+        "numpy>=1.22.4",
         "pyyaml",
         "tqdm",
         "torch>=2.0.0",
@@ -51,7 +51,7 @@ if __name__ == "__main__":
         author="Tim O'Donnell and Alex Rubinsteyn",
         author_email="timodonnell@gmail.com",
         url="https://github.com/openvax/mhcflurry",
-        license_expression="Apache-2.0",
+        license="Apache-2.0",
         entry_points={
             "console_scripts": [
                 "mhcflurry-downloads = mhcflurry.downloads_command:run",

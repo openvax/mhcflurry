@@ -1,17 +1,17 @@
 """
-Compare released-model predictions against master (TF) fixtures.
+Regression tests for released model predictions.
 
-Fixtures are generated from the current master branch and stored under
-test/data. Tests consume these files without importing TensorFlow.
+Expected values were generated from the TF/Keras implementation on the
+published model weights and are stored under test/data/.  These tests
+verify that the current (PyTorch) code reproduces the same predictions.
 """
 import json
 import os
 
 import numpy as np
-import pytest
 
 from mhcflurry import Class1AffinityPredictor
-from mhcflurry.downloads import configure, get_current_release, get_path
+from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import startup, cleanup
 
 
@@ -23,52 +23,47 @@ def teardown_module():
     cleanup()
 
 
-def _load_fixture(name):
+def _load_expected(name):
     data_dir = os.path.join(os.path.dirname(__file__), "data")
-    path = os.path.join(data_dir, name)
-    with open(path, "r") as f:
+    with open(os.path.join(data_dir, name), "r") as f:
         return json.load(f)
 
 
-def test_released_affinity_predictions_match_master():
-    fixture = _load_fixture("master_released_class1_affinity_predictions.json")
-    # Ensure downloads dir reflects current environment before loading models.
-    configure()
-    if fixture.get("release") != get_current_release():
-        pytest.skip(
-            "Fixture was generated from master release "
-            f"{fixture.get('release')}, but current downloads are "
-            f"{get_current_release()}. Update downloads to compare."
-        )
+def test_allele_specific_affinity_predictions():
+    expected = _load_expected(
+        "master_released_class1_affinity_predictions.json")["allele_specific"]
 
-    allele_specific = Class1AffinityPredictor.load(
-        get_path("models_class1", "models")
-    )
-    pan = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined")
-    )
+    predictor = Class1AffinityPredictor.load(
+        get_path("models_class1", "models"))
 
-    spec = fixture["allele_specific"]
-    pan_fx = fixture["pan_allele"]
-
-    preds_specific = allele_specific.predict(
-        peptides=spec["peptides"],
-        alleles=spec["alleles"],
-    )
-    preds_pan = pan.predict(
-        peptides=pan_fx["peptides"],
-        alleles=pan_fx["alleles"],
+    predictions = predictor.predict(
+        peptides=expected["peptides"],
+        alleles=expected["alleles"],
     )
 
     np.testing.assert_allclose(
-        preds_specific,
-        np.array(spec["predictions"], dtype=np.float64),
+        predictions,
+        np.array(expected["predictions"], dtype=np.float64),
         rtol=0.01,
         atol=0.0,
     )
+
+
+def test_pan_allele_affinity_predictions():
+    expected = _load_expected(
+        "master_released_class1_affinity_predictions.json")["pan_allele"]
+
+    predictor = Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.combined"))
+
+    predictions = predictor.predict(
+        peptides=expected["peptides"],
+        alleles=expected["alleles"],
+    )
+
     np.testing.assert_allclose(
-        preds_pan,
-        np.array(pan_fx["predictions"], dtype=np.float64),
+        predictions,
+        np.array(expected["predictions"], dtype=np.float64),
         rtol=0.01,
         atol=0.0,
     )

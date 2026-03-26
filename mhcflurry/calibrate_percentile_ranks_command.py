@@ -110,7 +110,7 @@ parser.add_argument(
     "--prediction-batch-size",
     type=int,
     default=4096,
-    help="Keras batch size for predictions")
+    help="Batch size for predictions")
 parser.add_argument(
     "--alleles-per-work-chunk",
     type=int,
@@ -120,7 +120,7 @@ parser.add_argument(
 parser.add_argument(
     "--verbosity",
     type=int,
-    help="Keras verbosity. Default: %(default)s",
+    help="Verbosity. Default: %(default)s",
     default=0)
 
 add_local_parallelism_args(parser)
@@ -233,8 +233,7 @@ def run_class1_presentation_predictor(args, peptides):
 def run_class1_affinity_predictor(args, peptides):
     global GLOBAL_DATA
 
-    # It's important that we don't trigger a Keras import here since that breaks
-    # local parallelism (tensorflow backend). So we set optimization_level=0.
+    # Load with optimization_level=0 so we can optimize per-worker later.
     predictor = Class1AffinityPredictor.load(
         args.models_dir,
         optimization_level=0,

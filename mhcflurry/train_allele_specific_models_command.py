@@ -37,10 +37,8 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 GLOBAL_DATA = {}
 
 # Note on parallelization:
-# It seems essential currently (tensorflow==1.4.1) that no processes are forked
-# after tensorflow has been used at all, which includes merely importing
-# keras.backend. So we must make sure not to use tensorflow in the main process
-# if we are running in parallel.
+# When running in parallel, avoid using the neural network backend in the main
+# process. Model loading and inference should happen in worker processes.
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -119,7 +117,7 @@ parser.add_argument(
 parser.add_argument(
     "--verbosity",
     type=int,
-    help="Keras verbosity. Default: %(default)s",
+    help="Verbosity. Default: %(default)s",
     default=0)
 
 add_local_parallelism_args(parser)

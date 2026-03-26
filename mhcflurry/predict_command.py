@@ -174,8 +174,6 @@ model_args.add_argument(
 
 
 def run(argv=sys.argv[1:]):
-    logging.getLogger('tensorflow').disabled = True
-
     if not argv:
         parser.print_help()
         parser.exit(1)

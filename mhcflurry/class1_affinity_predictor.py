@@ -837,7 +837,7 @@ class Class1AffinityPredictor(object):
             to the given models dir after each neural network is fit.
 
         verbose : int
-            Keras verbosity
+            Verbosity level for training output
 
         progress_preamble : string
             Optional string of information to include in each progress update
@@ -972,7 +972,7 @@ class Class1AffinityPredictor(object):
             to the given models dir after each neural network is fit.
 
         verbose : int
-            Keras verbosity
+            Verbosity level for training output
 
         progress_preamble : string
             Optional string of information to include in each progress update

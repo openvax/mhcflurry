@@ -17,9 +17,9 @@ cleavage and a "presentation" predictor that integrates processing predictions
 with binding affinity predictions to give a composite "presentation score." Both
 models are trained on mass spec-identified MHC ligands.
 
-MHCflurry supports Python 3.4+. It uses the `keras <https://keras.io>`__
-neural network library via either the Tensorflow or Theano backends. GPUs may
-optionally be used for a modest speed improvement.
+MHCflurry supports Python 3.10+. It uses the `PyTorch <https://pytorch.org/>`__
+neural network library. GPUs and Apple Silicon (MPS) may optionally be used for
+a speed improvement and are auto-detected.
 
 If you find MHCflurry useful in your research, please cite:
 
@@ -27,7 +27,7 @@ If you find MHCflurry useful in your research, please cite:
     I-presented peptides by incorporating antigen processing,"
     *Cell Systems*, 2020. https://doi.org/10.1016/j.cels.2020.06.010
 
-    T. J. O’Donnell, et al., "MHCflurry: Open-Source Class I MHC Binding Affinity
+    T. J. O'Donnell, et al., "MHCflurry: Open-Source Class I MHC Binding Affinity
     Prediction," *Cell Systems*, 2018. https://doi.org/10.1016/j.cels.2018.05.014
 
 If you have questions or encounter problems, please file an issue at the
@@ -61,12 +61,11 @@ Using conda
 -------------
 
 You can alternatively get up and running with a `conda <https://conda.io/docs/>`__
-environment as follows. Some users have reported that this can avoid problems installing
-tensorflow.
+environment as follows.
 
 .. code-block:: shell
 
-    $ conda create -q -n mhcflurry-env python=3.8 tensorflow
+    $ conda create -q -n mhcflurry-env python=3.10
     $ source activate mhcflurry-env
 
 Then continue as above:
@@ -75,4 +74,3 @@ Then continue as above:
 
     $ pip install mhcflurry
     $ mhcflurry-downloads fetch
-
