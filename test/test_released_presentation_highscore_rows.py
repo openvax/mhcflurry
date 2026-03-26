@@ -57,16 +57,6 @@ def _load_fixture():
     return df, metadata
 
 
-def _skip_if_models_not_downloaded():
-    """Skip the test if required models have not been downloaded."""
-    try:
-        configure()
-        get_default_class1_models_dir()
-        get_default_class1_presentation_models_dir()
-    except RuntimeError:
-        pytest.skip("Required models not downloaded")
-
-
 def _assert_fixture_compatible(metadata, presentation_predictor):
     """Fail (not skip) if fixture metadata does not match the loaded models."""
     fixture_release = metadata.get("release")
@@ -119,7 +109,6 @@ def test_presentation_highscore_fixture_has_high_and_low_contexts():
 
 
 def test_released_presentation_predictions_match_highscore_master_fixture():
-    _skip_if_models_not_downloaded()
     fixture_df, metadata = _load_fixture()
     configure()
 

@@ -30,18 +30,7 @@ def _load_fixture(name):
         return json.load(f)
 
 
-def _skip_if_models_not_downloaded():
-    """Skip the test if required models have not been downloaded."""
-    try:
-        configure()
-        get_path("models_class1", "models", test_exists=True)
-        get_path("models_class1_pan", "models.combined", test_exists=True)
-    except RuntimeError:
-        pytest.skip("Required models not downloaded")
-
-
 def test_released_affinity_predictions_match_master():
-    _skip_if_models_not_downloaded()
     fixture = _load_fixture("master_released_class1_affinity_predictions.json")
     configure()
 
