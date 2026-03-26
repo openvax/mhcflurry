@@ -30,16 +30,27 @@ def _load_fixture(name):
         return json.load(f)
 
 
+def _skip_if_models_not_downloaded():
+    """Skip the test if required models have not been downloaded."""
+    try:
+        configure()
+        get_path("models_class1", "models", test_exists=True)
+        get_path("models_class1_pan", "models.combined", test_exists=True)
+    except RuntimeError:
+        pytest.skip("Required models not downloaded")
+
+
 def test_released_affinity_predictions_match_master():
+    _skip_if_models_not_downloaded()
     fixture = _load_fixture("master_released_class1_affinity_predictions.json")
-    # Ensure downloads dir reflects current environment before loading models.
     configure()
-    if fixture.get("release") != get_current_release():
-        pytest.skip(
-            "Fixture was generated from master release "
-            f"{fixture.get('release')}, but current downloads are "
-            f"{get_current_release()}. Update downloads to compare."
-        )
+
+    fixture_release = fixture.get("release")
+    current_release = get_current_release()
+    assert fixture_release == current_release, (
+        "Fixture release %r does not match current downloads release %r. "
+        "Regenerate fixtures or update downloads." % (
+            fixture_release, current_release))
 
     allele_specific = Class1AffinityPredictor.load(
         get_path("models_class1", "models")

@@ -57,27 +57,41 @@ def _load_fixture():
     return df, metadata
 
 
-def _skip_if_fixture_incompatible(metadata, presentation_predictor):
+def _skip_if_models_not_downloaded():
+    """Skip the test if required models have not been downloaded."""
+    try:
+        configure()
+        get_default_class1_models_dir()
+        get_default_class1_presentation_models_dir()
+    except RuntimeError:
+        pytest.skip("Required models not downloaded")
+
+
+def _assert_fixture_compatible(metadata, presentation_predictor):
+    """Fail (not skip) if fixture metadata does not match the loaded models."""
     fixture_release = metadata.get("release")
     current_release = get_current_release()
     if fixture_release and fixture_release != current_release:
-        pytest.skip(
-            "Fixture was generated for release %s, current downloads are %s."
+        raise AssertionError(
+            "Fixture release %r does not match current downloads release %r. "
+            "Regenerate fixtures or update downloads."
             % (fixture_release, current_release)
         )
 
     fixture_prov = metadata.get("presentation_provenance")
     if fixture_prov and fixture_prov != presentation_predictor.provenance_string:
-        pytest.skip(
-            "Fixture presentation provenance is %s, current predictor is %s."
+        raise AssertionError(
+            "Fixture presentation provenance %r does not match current "
+            "predictor %r. Regenerate fixtures or update downloads."
             % (fixture_prov, presentation_predictor.provenance_string)
         )
 
     fixture_aff_prov = metadata.get("presentation_internal_affinity_provenance")
     current_aff_prov = presentation_predictor.affinity_predictor.provenance_string
     if fixture_aff_prov and fixture_aff_prov != current_aff_prov:
-        pytest.skip(
-            "Fixture internal affinity provenance is %s, current predictor is %s."
+        raise AssertionError(
+            "Fixture internal affinity provenance %r does not match current "
+            "predictor %r. Regenerate fixtures or update downloads."
             % (fixture_aff_prov, current_aff_prov)
         )
 
@@ -105,6 +119,7 @@ def test_presentation_highscore_fixture_has_high_and_low_contexts():
 
 
 def test_released_presentation_predictions_match_highscore_master_fixture():
+    _skip_if_models_not_downloaded()
     fixture_df, metadata = _load_fixture()
     configure()
 
@@ -112,7 +127,7 @@ def test_released_presentation_predictions_match_highscore_master_fixture():
     presentation_predictor = Class1PresentationPredictor.load(
         get_default_class1_presentation_models_dir()
     )
-    _skip_if_fixture_incompatible(metadata, presentation_predictor)
+    _assert_fixture_compatible(metadata, presentation_predictor)
 
     peptides = fixture_df["peptide"].tolist()
     alleles = fixture_df["allele"].tolist()
