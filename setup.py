@@ -75,6 +75,7 @@ if __name__ == "__main__":
                 "mhcflurry.train_presentation_models_command:run",
                 "_mhcflurry-cluster-worker-entry-point = "
                 "mhcflurry.cluster_parallelism:worker_entry_point",
+                "mhcflurry-run = mhcflurry.runners._cli:main",
             ]
         },
         python_requires=">=3.10",
@@ -97,5 +98,6 @@ if __name__ == "__main__":
         long_description_content_type="text/markdown",
         packages=[
             "mhcflurry",
+            "mhcflurry.runners",
         ],
     )

@@ -1,0 +1,27 @@
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
+
+LABEL org.opencontainers.image.title="mhcflurry-train"
+LABEL org.opencontainers.image.source="https://github.com/openvax/mhcflurry"
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    MHCFLURRY_DOWNLOADS_DIR=/downloads \
+    MHCFLURRY_OUT=/out
+
+RUN apt-get update -y \
+ && apt-get install -y --no-install-recommends \
+      build-essential git wget ca-certificates bzip2 rsync \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --upgrade pip \
+ && pip install -r /tmp/requirements.txt
+
+COPY . /workspace
+RUN pip install -e /workspace
+
+RUN mkdir -p /downloads /out
+
+ENTRYPOINT ["/bin/bash"]
