@@ -79,3 +79,6 @@ target/
 
 # Runner outputs
 out/
+
+# Claude Code local state
+.claude/
