@@ -22,10 +22,10 @@ NUM_REPLICATES="${SMOKETEST_NUM_REPLICATES:-1}"
 mkdir -p "$MHCFLURRY_OUT"
 cd "$MHCFLURRY_OUT"
 
-# Fetch mhcflurry-downloads if not already available.
-if [ -z "${MHCFLURRY_DOWNLOADS_DIR:-}" ]; then
-    mhcflurry-downloads fetch data_curated allele_sequences
-fi
+# Ensure mhcflurry-downloads data is available. Idempotent: fetch skips
+# anything already on disk. Needed in containers where MHCFLURRY_DOWNLOADS_DIR
+# is set but the directory is empty.
+mhcflurry-downloads fetch data_curated allele_sequences
 
 TRAINING_DATA_SRC="$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2"
 ALLELE_SEQUENCES_SRC="$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv"

@@ -5,7 +5,6 @@ LABEL org.opencontainers.image.source="https://github.com/openvax/mhcflurry"
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    MHCFLURRY_DOWNLOADS_DIR=/downloads \
     MHCFLURRY_OUT=/out
 
 RUN apt-get update -y \
@@ -22,6 +21,5 @@ RUN pip install --upgrade pip \
 COPY . /workspace
 RUN pip install -e /workspace
 
-RUN mkdir -p /downloads /out
+RUN mkdir -p /out
 
-ENTRYPOINT ["/bin/bash"]
