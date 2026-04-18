@@ -22,11 +22,20 @@ REMOTE_REPO_DIR = "mhcflurry"
 REMOTE_OUT_DIR = "mhcflurry-out"
 REMOTE_IMAGE_TAG = "mhcflurry-train:brev"
 
-# Aggressive keepalives so Brev's SSH tunnel doesn't drop the connection
-# during a multi-hour docker run. ServerAliveInterval=30 sends a probe every
-# 30s if the session is idle; ServerAliveCountMax=240 tolerates 2 hours of
-# unacked probes before giving up.
-_SSH_KEEPALIVE = [
+# Brev's ~/.brev/ssh_config sets `ControlMaster auto` (connection
+# multiplexing). That's fast for short repeated calls but catastrophic
+# for our workload: a long-lived `docker logs -f` ssh session holds the
+# master, the underlying TCP goes stale (common on GCP N1/G2 GPU boxes),
+# and every subsequent ssh call — including our `docker inspect` health
+# probe — hangs for ~5 minutes waiting for the dead master to time out.
+# Force a fresh TCP connection per ssh call to sidestep that entirely.
+#
+# ServerAliveInterval=30 + large ServerAliveCountMax keeps each
+# individual session alive during idle stretches (docker image pulls,
+# data downloads, between-epoch pauses).
+_SSH_OPTS = [
+    "-o", "ControlMaster=no",
+    "-o", "ControlPath=none",
     "-o", "ServerAliveInterval=30",
     "-o", "ServerAliveCountMax=240",
     "-o", "TCPKeepAlive=yes",
@@ -138,7 +147,7 @@ def _stream_and_wait(instance: str, container_name: str) -> int:
     while True:
         cmd = f"sudo docker logs -f --tail {tail} {container_name}"
         r = subprocess.run(
-            ["ssh", *_SSH_KEEPALIVE, instance, cmd],
+            ["ssh", *_SSH_OPTS, instance, cmd],
         )
         # Container may have exited cleanly (rc=0) or ssh may have dropped.
         # Either way, check whether the container is still running.
@@ -152,7 +161,7 @@ def _stream_and_wait(instance: str, container_name: str) -> int:
     # Container stopped. Get its exit code (docker wait returns immediately
     # for stopped containers and prints the exit code).
     r = subprocess.run(
-        ["ssh", *_SSH_KEEPALIVE, instance,
+        ["ssh", *_SSH_OPTS, instance,
          f"sudo docker wait {container_name}"],
         capture_output=True, text=True,
     )
@@ -168,7 +177,7 @@ def _container_running(instance: str, container_name: str) -> bool:
     # mid-training, docker wait at the end will return its final exit code.
     try:
         r = subprocess.run(
-            ["ssh", *_SSH_KEEPALIVE, instance,
+            ["ssh", *_SSH_OPTS, instance,
              f"sudo docker inspect --format '{{{{.State.Running}}}}' {container_name}"],
             capture_output=True, text=True, timeout=30,
         )
@@ -181,7 +190,7 @@ def _container_running(instance: str, container_name: str) -> bool:
 
 def _ssh_capture(instance: str, remote_cmd: str) -> str:
     r = subprocess.run(
-        ["ssh", *_SSH_KEEPALIVE, instance, remote_cmd],
+        ["ssh", *_SSH_OPTS, instance, remote_cmd],
         capture_output=True, text=True, timeout=60,
     )
     return r.stdout
@@ -240,7 +249,7 @@ def _ensure_docker(instance: str, timeout_s: int = 420):
         "done; exit 1"
     )
     r = subprocess.run(
-        ["ssh", *_SSH_KEEPALIVE,
+        ["ssh", *_SSH_OPTS,
          "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
          instance, wait_script],
         timeout=timeout_s,
@@ -256,7 +265,7 @@ def _remote_has_nvidia(instance: str) -> bool:
     # the reliable signal is /proc/driver/nvidia, which only exists when the
     # kernel module is loaded against real hardware.
     r = subprocess.run(
-        ["ssh", *_SSH_KEEPALIVE, instance,
+        ["ssh", *_SSH_OPTS, instance,
          "test -d /proc/driver/nvidia && echo y || echo n"],
         capture_output=True, text=True, timeout=30,
     )
@@ -285,7 +294,7 @@ def _ssh(instance: str, remote_cmd: str):
     # (i.e. `set` runs with no args as the -c command, X runs in the outer
     # shell without errexit). Quoting with shlex.quote around the whole
     # command string avoids that.
-    _sh(["ssh", *_SSH_KEEPALIVE, instance, f"bash -lc {shlex.quote(remote_cmd)}"])
+    _sh(["ssh", *_SSH_OPTS, instance, f"bash -lc {shlex.quote(remote_cmd)}"])
 
 
 def _sh(cmd):
