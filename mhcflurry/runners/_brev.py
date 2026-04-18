@@ -3,17 +3,34 @@
 Assumes `brev` CLI is installed and `brev login` has been run. Uses Brev's
 managed SSH config (`brev refresh` populates ~/.brev/ssh_config, which
 ~/.ssh/config Includes).
+
+Long training runs are resilient to SSH disconnects: the remote docker
+container is started detached (`docker run -d`), logs are streamed via
+`docker logs -f` in a reconnect loop, and we wait for the container to
+exit via `docker wait` (which tolerates transient tunnel drops).
 """
 
 import json
 import shlex
 import subprocess
+import time
+import uuid
 from pathlib import Path
 
 
 REMOTE_REPO_DIR = "mhcflurry"
 REMOTE_OUT_DIR = "mhcflurry-out"
 REMOTE_IMAGE_TAG = "mhcflurry-train:brev"
+
+# Aggressive keepalives so Brev's SSH tunnel doesn't drop the connection
+# during a multi-hour docker run. ServerAliveInterval=30 sends a probe every
+# 30s if the session is idle; ServerAliveCountMax=240 tolerates 2 hours of
+# unacked probes before giving up.
+_SSH_KEEPALIVE = [
+    "-o", "ServerAliveInterval=30",
+    "-o", "ServerAliveCountMax=240",
+    "-o", "TCPKeepAlive=yes",
+]
 
 # Brev's CLI hangs on an interactive walkthrough once an instance exists in the
 # org, blocking `brev ls`/`brev refresh`. Overwriting this file with the
@@ -53,20 +70,40 @@ def run(app, function, args, kwargs, *,
 
     rel_script = Path(function.module_file).resolve().relative_to(repo)
     gpu_flag = "--gpus all" if _remote_has_nvidia(instance) else ""
-    remote_cmd = _build_remote_command(
+
+    container_name = f"mhcflurry-{function.name}-{uuid.uuid4().hex[:8]}"
+    _build_image(instance, function.image.dockerfile)
+    _run_container_detached(
+        instance=instance,
+        container_name=container_name,
         function=function,
         rel_script=str(rel_script),
         args=args,
         kwargs=kwargs,
         gpu_flag=gpu_flag,
     )
-    _ssh(instance, remote_cmd)
+    exit_code = _stream_and_wait(instance, container_name)
+    _ssh_capture(instance,
+                 f"sudo docker rm {container_name} >/dev/null 2>&1 || true")
     _rsync_down(instance, host_out)
+    if exit_code != 0:
+        raise RuntimeError(
+            f"Remote container {container_name} exited with status {exit_code}"
+        )
 
 
-def _build_remote_command(*, function, rel_script: str, args, kwargs,
-                          gpu_flag: str) -> str:
-    df = function.image.dockerfile
+def _build_image(instance: str, dockerfile: str):
+    build = (
+        f"set -euo pipefail; "
+        f"cd ~/{REMOTE_REPO_DIR} && "
+        f"sudo docker build -f {shlex.quote(dockerfile)} "
+        f"-t {REMOTE_IMAGE_TAG} ."
+    )
+    _ssh(instance, build)
+
+
+def _run_container_detached(*, instance, container_name, function, rel_script,
+                            args, kwargs, gpu_flag):
     env_flags = " ".join(
         f"-e {shlex.quote(f'{k}={v}')}" for k, v in function.env.items()
     )
@@ -77,16 +114,77 @@ def _build_remote_command(*, function, rel_script: str, args, kwargs,
         f"-e MHCFLURRY_RUNNER_ARGS={shlex.quote(json.dumps(args))} "
         f"-e MHCFLURRY_RUNNER_KWARGS={shlex.quote(json.dumps(kwargs))}"
     )
-    return (
+    start = (
         f"set -euo pipefail; "
-        f"cd ~/{REMOTE_REPO_DIR} && "
-        f"sudo docker build -f {shlex.quote(df)} -t {REMOTE_IMAGE_TAG} . && "
         f"mkdir -p ~/{REMOTE_OUT_DIR} && "
-        f"sudo docker run --rm {gpu_flag} "
+        f"sudo docker run -d --name {container_name} {gpu_flag} "
         f"-v $HOME/{REMOTE_OUT_DIR}:/out "
         f"{runner_env} {env_flags} "
         f"{REMOTE_IMAGE_TAG} python -m mhcflurry.runners._bootstrap"
     )
+    _ssh(instance, start)
+
+
+def _stream_and_wait(instance: str, container_name: str) -> int:
+    """Stream container logs and return its exit code.
+
+    `docker logs -f` exits when the container stops, so we loop across SSH
+    reconnects: if ssh drops mid-stream we re-attach with `--tail 0` to
+    pick up where we left off, then call `docker wait` for the exit code.
+    """
+    print(f"+ streaming logs from {container_name} (resilient to reconnects)",
+          flush=True)
+    tail = "all"
+    while True:
+        cmd = f"sudo docker logs -f --tail {tail} {container_name}"
+        r = subprocess.run(
+            ["ssh", *_SSH_KEEPALIVE, instance, cmd],
+        )
+        # Container may have exited cleanly (rc=0) or ssh may have dropped.
+        # Either way, check whether the container is still running.
+        running = _container_running(instance, container_name)
+        if not running:
+            break
+        print(f"+ ssh disconnected (rc={r.returncode}); container still "
+              f"running, reconnecting log stream", flush=True)
+        tail = "0"
+        time.sleep(2)
+    # Container stopped. Get its exit code (docker wait returns immediately
+    # for stopped containers and prints the exit code).
+    r = subprocess.run(
+        ["ssh", *_SSH_KEEPALIVE, instance,
+         f"sudo docker wait {container_name}"],
+        capture_output=True, text=True,
+    )
+    try:
+        return int(r.stdout.strip() or "1")
+    except ValueError:
+        return 1
+
+
+def _container_running(instance: str, container_name: str) -> bool:
+    # Treat ssh hangs / errors as "assume still running" so the caller keeps
+    # retrying the log stream instead of giving up. If the box really did die
+    # mid-training, docker wait at the end will return its final exit code.
+    try:
+        r = subprocess.run(
+            ["ssh", *_SSH_KEEPALIVE, instance,
+             f"sudo docker inspect --format '{{{{.State.Running}}}}' {container_name}"],
+            capture_output=True, text=True, timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return True
+    if r.returncode != 0:
+        return True
+    return r.stdout.strip() == "true"
+
+
+def _ssh_capture(instance: str, remote_cmd: str) -> str:
+    r = subprocess.run(
+        ["ssh", *_SSH_KEEPALIVE, instance, remote_cmd],
+        capture_output=True, text=True, timeout=60,
+    )
+    return r.stdout
 
 
 def _require_brev_cli():
@@ -142,7 +240,8 @@ def _ensure_docker(instance: str, timeout_s: int = 420):
         "done; exit 1"
     )
     r = subprocess.run(
-        ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
+        ["ssh", *_SSH_KEEPALIVE,
+         "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
          instance, wait_script],
         timeout=timeout_s,
     )
@@ -157,7 +256,8 @@ def _remote_has_nvidia(instance: str) -> bool:
     # the reliable signal is /proc/driver/nvidia, which only exists when the
     # kernel module is loaded against real hardware.
     r = subprocess.run(
-        ["ssh", instance, "test -d /proc/driver/nvidia && echo y || echo n"],
+        ["ssh", *_SSH_KEEPALIVE, instance,
+         "test -d /proc/driver/nvidia && echo y || echo n"],
         capture_output=True, text=True, timeout=30,
     )
     return r.returncode == 0 and r.stdout.strip() == "y"
@@ -185,7 +285,7 @@ def _ssh(instance: str, remote_cmd: str):
     # (i.e. `set` runs with no args as the -c command, X runs in the outer
     # shell without errexit). Quoting with shlex.quote around the whole
     # command string avoids that.
-    _sh(["ssh", instance, f"bash -lc {shlex.quote(remote_cmd)}"])
+    _sh(["ssh", *_SSH_KEEPALIVE, instance, f"bash -lc {shlex.quote(remote_cmd)}"])
 
 
 def _sh(cmd):
