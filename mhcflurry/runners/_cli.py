@@ -11,11 +11,21 @@ and invokes it.
 
 import argparse
 import importlib.util
+import io
 import sys
 from pathlib import Path
 
 
 def main(argv=None):
+    # Line-buffer stdout/stderr so subprocess output and Python prints interleave
+    # correctly when the user is tailing a log file or piping through tee.
+    # Without this, block buffering kicks in under `| tee` or `> file`, and
+    # prints like "+ rsync ..." land minutes late, making logs unreadable.
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+        sys.stderr.reconfigure(line_buffering=True)
+    except (AttributeError, io.UnsupportedOperation):
+        pass
     p = argparse.ArgumentParser(prog="mhcflurry-run",
                                 description="Run an mhcflurry training/prediction job.")
     p.add_argument("backend", choices=["local", "brev", "modal"])

@@ -129,13 +129,15 @@ def _refresh_ssh():
 
 def _ensure_docker(instance: str, timeout_s: int = 420):
     # Brev's own bootstrap installs docker shortly after the instance comes up.
-    # Poll for it (up to ~7 min) before falling back to get-docker.sh.
-    print(f"+ waiting for docker on {instance} (up to {timeout_s}s)")
+    # On GPU boxes the binary appears before dockerd is listening, so poll
+    # `docker info` (daemon reachable) rather than just presence of the binary.
+    print(f"+ waiting for docker daemon on {instance} (up to {timeout_s}s)", flush=True)
     wait_script = (
         "for i in $(seq 1 60); do "
-        "command -v docker >/dev/null 2>&1 && exit 0; "
+        "if command -v docker >/dev/null 2>&1 && "
+        "   sudo docker info >/dev/null 2>&1; then exit 0; fi; "
         "sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 "
-        "  && echo 'apt busy, waiting' || echo 'no docker yet'; "
+        "  && echo 'apt busy, waiting' || echo 'waiting for docker daemon'; "
         "sleep 7; "
         "done; exit 1"
     )
@@ -145,7 +147,8 @@ def _ensure_docker(instance: str, timeout_s: int = 420):
         timeout=timeout_s,
     )
     if r.returncode != 0:
-        print("+ docker still missing — falling back to get-docker.sh")
+        print("+ docker daemon not ready — falling back to get-docker.sh",
+              flush=True)
         _sh(["ssh", instance, "curl -fsSL https://get.docker.com | sudo sh"])
 
 
@@ -175,9 +178,16 @@ def _rsync_down(instance: str, local_out: Path):
 
 
 def _ssh(instance: str, remote_cmd: str):
-    _sh(["ssh", instance, "bash", "-lc", remote_cmd])
+    # Pass the whole pipeline as a SINGLE arg to ssh. If we pass
+    # ["ssh", host, "bash", "-lc", cmd] instead, ssh space-joins the trailing
+    # argv before sending to the remote shell, which then re-parses — turning
+    # `bash -lc 'set -euo pipefail; X'` into `bash -lc set -euo pipefail; X`
+    # (i.e. `set` runs with no args as the -c command, X runs in the outer
+    # shell without errexit). Quoting with shlex.quote around the whole
+    # command string avoids that.
+    _sh(["ssh", instance, f"bash -lc {shlex.quote(remote_cmd)}"])
 
 
 def _sh(cmd):
-    print("+ " + " ".join(shlex.quote(c) for c in cmd))
+    print("+ " + " ".join(shlex.quote(c) for c in cmd), flush=True)
     subprocess.run(cmd, check=True)
