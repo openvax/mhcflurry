@@ -14,6 +14,13 @@ class BrevConfig:
     auto_create: bool = False
     api_key_env: str = "BREV_API_KEY"   # env var name for REST fallback; optional
     auth: str = "cli"                    # "cli" (default) or "rest" (not implemented)
+    # When False, skip docker entirely on the Brev box: install the training
+    # environment natively (apt + python3-venv + pip) and run the user's job
+    # directly over ssh. The Function's `image=` is ignored — the repo is
+    # rsync'd and `pip install -e .` runs inside the venv. Needed because
+    # `docker run --gpus all` kills SSH on Brev GPU boxes after a few min
+    # (nvidia-container-toolkit interaction, likely a Brev-side bug).
+    use_docker: bool = True
 
 
 @dataclass(frozen=True)

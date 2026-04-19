@@ -74,31 +74,101 @@ def run(app, function, args, kwargs, *,
     host_out = (repo / outputs_dir).resolve()
     host_out.mkdir(parents=True, exist_ok=True)
 
-    _ensure_docker(instance)
     _rsync_up(repo, instance)
-
     rel_script = Path(function.module_file).resolve().relative_to(repo)
-    gpu_flag = "--gpus all" if _remote_has_nvidia(instance) else ""
 
-    container_name = f"mhcflurry-{function.name}-{uuid.uuid4().hex[:8]}"
-    _build_image(instance, function.image.dockerfile)
-    _run_container_detached(
-        instance=instance,
-        container_name=container_name,
-        function=function,
-        rel_script=str(rel_script),
-        args=args,
-        kwargs=kwargs,
-        gpu_flag=gpu_flag,
-    )
-    exit_code = _stream_and_wait(instance, container_name)
-    _ssh_capture(instance,
-                 f"sudo docker rm {container_name} >/dev/null 2>&1 || true")
+    if cfg.use_docker:
+        _ensure_docker(instance)
+        gpu_flag = "--gpus all" if _remote_has_nvidia(instance) else ""
+        container_name = f"mhcflurry-{function.name}-{uuid.uuid4().hex[:8]}"
+        _build_image(instance, function.image.dockerfile)
+        _run_container_detached(
+            instance=instance,
+            container_name=container_name,
+            function=function,
+            rel_script=str(rel_script),
+            args=args,
+            kwargs=kwargs,
+            gpu_flag=gpu_flag,
+        )
+        exit_code = _stream_and_wait(instance, container_name)
+        _ssh_capture(
+            instance,
+            f"sudo docker rm {container_name} >/dev/null 2>&1 || true",
+        )
+    else:
+        # Native path. Skips docker; installs python + torch + mhcflurry
+        # into a venv on the box and runs the user's job directly. Use
+        # this on Brev GPU boxes where `docker run --gpus all` kills SSH.
+        exit_code = _run_native(
+            instance=instance,
+            function=function,
+            rel_script=str(rel_script),
+            args=args,
+            kwargs=kwargs,
+            has_nvidia=_remote_has_nvidia(instance),
+        )
+
     _rsync_down(instance, host_out)
     if exit_code != 0:
-        raise RuntimeError(
-            f"Remote container {container_name} exited with status {exit_code}"
-        )
+        raise RuntimeError(f"Remote run exited with status {exit_code}")
+
+
+_NATIVE_VENV = "$HOME/mhcflurry-venv"
+_NATIVE_OUT = f"$HOME/{REMOTE_OUT_DIR}"
+
+
+def _run_native(*, instance, function, rel_script, args, kwargs, has_nvidia):
+    """Install mhcflurry natively and run the job over ssh.
+
+    Two ssh sessions: (1) idempotent setup — wait for Brev's own apt, then
+    apt-get + venv + pip install; (2) actually run the user's function
+    via the bootstrap, with env vars set for this specific invocation.
+    """
+    torch_index = (
+        "https://download.pytorch.org/whl/cu121" if has_nvidia else
+        "https://download.pytorch.org/whl/cpu"
+    )
+    setup = (
+        "set -euo pipefail; "
+        # Wait out Brev's own apt activity (installs docker + nvidia
+        # runtime at first boot even when we don't want them).
+        "for i in $(seq 1 120); do "
+        "  sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 "
+        "    && { echo waiting for apt; sleep 10; } "
+        "    || break; "
+        "done; "
+        "sudo apt-get update -qq; "
+        "sudo apt-get install -y -qq --no-install-recommends "
+        "  python3 python3-venv python3-pip bzip2 wget rsync build-essential; "
+        f"python3 -m venv {_NATIVE_VENV}; "
+        f"source {_NATIVE_VENV}/bin/activate; "
+        "pip install --quiet --upgrade pip; "
+        f"pip install --quiet torch --index-url {torch_index}; "
+        f"pip install --quiet -e $HOME/{REMOTE_REPO_DIR}"
+    )
+    _ssh(instance, setup)
+
+    run_env = {
+        "MHCFLURRY_OUT": _NATIVE_OUT,
+        "MHCFLURRY_RUNNER_SCRIPT": f"$HOME/{REMOTE_REPO_DIR}/{rel_script}",
+        "MHCFLURRY_RUNNER_FUNCTION": function.name,
+        "MHCFLURRY_RUNNER_ARGS": json.dumps(args),
+        "MHCFLURRY_RUNNER_KWARGS": json.dumps(kwargs),
+        **function.env,
+    }
+    exports = " ".join(f"export {k}={shlex.quote(str(v))};" for k, v in run_env.items())
+    remote = (
+        "set -euo pipefail; "
+        f"source {_NATIVE_VENV}/bin/activate; "
+        f"mkdir -p {_NATIVE_OUT}; "
+        f"{exports} "
+        "python -m mhcflurry.runners._bootstrap"
+    )
+    r = subprocess.run(
+        ["ssh", *_SSH_OPTS, instance, f"bash -lc {shlex.quote(remote)}"]
+    )
+    return r.returncode
 
 
 def _build_image(instance: str, dockerfile: str):
