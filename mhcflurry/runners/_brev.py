@@ -16,6 +16,7 @@ import subprocess
 import time
 import uuid
 from pathlib import Path
+from typing import Optional
 
 
 REMOTE_REPO_DIR = "mhcflurry"
@@ -63,7 +64,7 @@ def run(app, function, args, kwargs, *,
     if not _instance_exists(instance):
         if cfg.auto_create:
             _create_instance(instance, cfg.instance_type, cfg=cfg,
-                             image=function.image)
+                             image=function.image, function=function)
         else:
             hint = (
                 f"brev create {instance} --type {cfg.instance_type}"
@@ -455,8 +456,34 @@ def _instance_exists(name: str) -> bool:
     return any(i.get("name") == name for i in instances)
 
 
-def _create_instance(name: str, instance_type: str, *, cfg=None, image=None):
+def _create_instance(name: str, instance_type: str, *,
+                     cfg=None, image=None, function=None):
+    """Provision a Brev instance.
+
+    If `function` carries resource requests (cpu/memory/min_gpu_memory/
+    min_disk/gpu), we translate those into `brev search` filters, pick
+    the cheapest matching instance type, and create with it — overriding
+    the explicit `cfg.instance_type` default. This is the mechanism that
+    makes `@app.function(gpu="T4", memory=26000, cpu=4)` do the same
+    thing on Brev that it does on Modal.
+    """
+    has_resource_request = function is not None and any([
+        function.cpu is not None,
+        function.memory is not None,
+        function.min_gpu_memory is not None,
+        function.min_disk is not None,
+        function.gpu is not None and instance_type is None,
+    ])
+    if has_resource_request:
+        picked = _pick_instance_type(function)
+        if picked:
+            instance_type = picked
+
     cmd = ["brev", "create", name, "--type", instance_type]
+    # Propagate --min-disk from function if set (also controls
+    # actual provisioned disk size on Brev, not just filter).
+    if function is not None and function.min_disk is not None:
+        cmd += ["--min-disk", str(function.min_disk)]
     if cfg is not None and cfg.mode == "container":
         if image is None or image.base is None:
             raise RuntimeError(
@@ -465,6 +492,38 @@ def _create_instance(name: str, instance_type: str, *, cfg=None, image=None):
             )
         cmd += ["--mode", "container", "--container-image", image.base]
     _sh(cmd)
+
+
+def _pick_instance_type(function) -> Optional[str]:
+    """Run `brev search gpu` (or cpu) with filters from `function`'s
+    resource requests; return the cheapest matching TYPE string.
+    Returns None if no match."""
+    mode = "gpu" if function.gpu is not None else "cpu"
+    cmd = ["brev", "search", mode, "--json", "--sort", "price"]
+    if function.gpu:
+        cmd += ["--gpu-name", function.gpu]
+    if function.min_gpu_memory is not None:
+        cmd += ["--min-vram", str(function.min_gpu_memory)]
+    if function.cpu is not None:
+        cmd += ["--min-vcpu", str(int(function.cpu))]
+    if function.memory is not None:
+        # Function.memory is in MB (Modal convention); brev search wants GB.
+        cmd += ["--min-ram", str(function.memory / 1024)]
+    if function.min_disk is not None:
+        cmd += ["--min-disk", str(function.min_disk)]
+    print("+ " + " ".join(shlex.quote(c) for c in cmd), flush=True)
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    if r.returncode != 0:
+        return None
+    try:
+        results = json.loads(r.stdout)
+    except json.JSONDecodeError:
+        return None
+    # `brev search --json` returns a list of matches sorted by $/hr.
+    if not isinstance(results, list) or not results:
+        return None
+    first = results[0]
+    return first.get("type") or first.get("Type") or first.get("name")
 
 
 def _refresh_ssh():

@@ -16,7 +16,10 @@ from mhcflurry.runners import App, BrevConfig, Image
 app = App(
     "pan-allele-dsl",
     brev=BrevConfig(
-        instance_type="g2-standard-4:nvidia-l4:1",
+        # `instance_type` is now a fallback — Brev backend picks via
+        # `brev search` using the resource requests declared on
+        # @app.function when auto_create=True.
+        instance_type="n1-highmem-4:nvidia-tesla-t4:1",
         auto_create=False,
         mode="vm",
     ),
@@ -40,7 +43,14 @@ image = (
 
 @app.function(
     image=image,
-    gpu="L4",
+    # Resource requests — same shape on Brev and Modal. 26 GB RAM avoids
+    # the SIGKILL we hit on 16 GB L4 boxes during full-data peptide
+    # encoding.
+    gpu="T4",
+    cpu=4,
+    memory=26000,          # MB (Modal convention)
+    min_gpu_memory=16,     # GB VRAM
+    min_disk=100,          # GB
     timeout=6 * 60 * 60,
     env={
         "SINGLE_MAX_EPOCHS": "500",

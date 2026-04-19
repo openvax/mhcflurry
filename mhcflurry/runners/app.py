@@ -20,11 +20,21 @@ from mhcflurry.runners.image import Image
 
 class Function:
     def __init__(self, app: "App", fn: Callable, *, image: Image,
-                 gpu: Optional[str], timeout: int, env: dict):
+                 gpu: Optional[str], timeout: int, env: dict,
+                 cpu: Optional[float] = None,
+                 memory: Optional[int] = None,
+                 min_gpu_memory: Optional[int] = None,
+                 min_disk: Optional[int] = None):
         self.app = app
         self.fn = fn
         self.image = image
-        self.gpu = gpu
+        # Resource requests — interpret as *minimums*. Each backend picks a
+        # matching instance (Modal: direct; Brev: via `brev search`).
+        self.gpu = gpu                         # exact GPU name: "T4", "L4", "A100"
+        self.cpu = cpu                         # min vCPUs (float for fractional)
+        self.memory = memory                   # min RAM in MB (Modal convention)
+        self.min_gpu_memory = min_gpu_memory   # min VRAM per GPU in GB
+        self.min_disk = min_disk               # min disk in GB
         self.timeout = timeout
         self.env = dict(env or {})
         self.name = fn.__name__
@@ -59,9 +69,19 @@ class App:
         self._repo_root: Optional[Path] = None
 
     def function(self, *, image: Image, gpu: Optional[str] = None,
+                 cpu: Optional[float] = None,
+                 memory: Optional[int] = None,
+                 min_gpu_memory: Optional[int] = None,
+                 min_disk: Optional[int] = None,
                  timeout: int = 60 * 60, env: Optional[dict] = None):
         def decorator(fn: Callable) -> Function:
-            f = Function(self, fn, image=image, gpu=gpu, timeout=timeout, env=env or {})
+            f = Function(
+                self, fn,
+                image=image,
+                gpu=gpu, cpu=cpu, memory=memory,
+                min_gpu_memory=min_gpu_memory, min_disk=min_disk,
+                timeout=timeout, env=env or {},
+            )
             self.functions[f.name] = f
             return f
         return decorator

@@ -38,6 +38,8 @@ import modal
 
 _APP_NAME = {app_name!r}
 _GPU = {gpu!r}
+_CPU = {cpu!r}
+_MEMORY = {memory!r}
 _TIMEOUT = {timeout!r}
 _OUT_BLOB = {out_blob!r}
 _CONTAINER_ENV = {container_env!r}
@@ -49,7 +51,9 @@ _CONTAINER_ENV = {container_env!r}
 app = modal.App(_APP_NAME)
 
 
-@app.function(image=image, gpu=_GPU, timeout=_TIMEOUT)
+# Modal accepts None for cpu/memory — picks a default. Exact GPU string
+# passed through.
+@app.function(image=image, gpu=_GPU, cpu=_CPU, memory=_MEMORY, timeout=_TIMEOUT)
 def runner() -> bytes:
     os.makedirs("/out", exist_ok=True)
     subprocess.run(
@@ -106,6 +110,8 @@ def run(app, function, args, kwargs, *, outputs_dir: str = "out"):
     entrypoint_src = _ENTRYPOINT_TEMPLATE.format(
         app_name=f"{app.name}-{function.name}",
         gpu=function.gpu,
+        cpu=function.cpu,
+        memory=function.memory,
         timeout=function.timeout,
         out_blob=blob_path,
         container_env=container_env,

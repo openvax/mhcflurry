@@ -87,7 +87,7 @@ mhcflurry-class1-train-pan-allele-models \
     --max-epochs "$MAX_EPOCHS" \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir "$MHCFLURRY_OUT/models.single" \
-    --num-jobs 1 \
+    --num-jobs 0 \
     --gpus "$GPUS"
 
 echo "Single-model training completed. Artifacts in: $MHCFLURRY_OUT/models.single"
