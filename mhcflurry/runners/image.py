@@ -99,32 +99,47 @@ class Image:
     def render_dockerfile(self) -> str:
         """Synthesize a Dockerfile from the layered ops. Used by backends
         that build images (local docker, Brev VM mode, stock `docker build`).
+
+        Uses exec-form `RUN ["cmd", "arg", ...]` for ops that take a
+        package list, so Dockerfile's default /bin/sh -c parsing doesn't
+        mangle version specifiers like `pandas>=2.0` (bash would read
+        `>=` as a redirect operator in shell-form RUN).
         """
         if self.base is None:
             raise ValueError("render_dockerfile() requires from_registry()")
+        import json as _json
         lines = [f"FROM {self.base}", ""]
         lines.append("ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1")
         for op in self.ops:
             if op.kind == "apt_install" and op.args:
-                pkgs = " ".join(op.args)
-                lines.append(
-                    "RUN apt-get update && apt-get install -y --no-install-recommends "
-                    f"{pkgs} && rm -rf /var/lib/apt/lists/*"
+                # apt-get syntax is safe for shell-form, but exec-form keeps
+                # us consistent; use a /bin/sh -c wrapper.
+                cmd = (
+                    "apt-get update && apt-get install -y --no-install-recommends "
+                    + " ".join(op.args)
+                    + " && rm -rf /var/lib/apt/lists/*"
                 )
+                lines.append(f"RUN {_json.dumps(['/bin/sh', '-c', cmd])}")
             elif op.kind == "pip_install" and op.args:
-                pkgs = " ".join(op.args)
                 kw = op.kwargs_dict()
-                idx = f" --index-url {kw['index_url']}" if "index_url" in kw else ""
-                lines.append(f"RUN pip install --no-cache-dir{idx} {pkgs}")
+                argv = ["pip", "install", "--no-cache-dir"]
+                if "index_url" in kw:
+                    argv += ["--index-url", kw["index_url"]]
+                argv += list(op.args)
+                lines.append(f"RUN {_json.dumps(argv)}")
             elif op.kind == "pip_install_local_dir":
                 kw = op.kwargs_dict()
                 path = kw.get("path", ".")
                 editable = kw.get("editable", "1") == "1"
                 lines.append(f"COPY {path} /workspace")
-                lines.append(
-                    f"RUN pip install --no-cache-dir {'-e ' if editable else ''}/workspace"
-                )
+                argv = ["pip", "install", "--no-cache-dir"]
+                if editable:
+                    argv.append("-e")
+                argv.append("/workspace")
+                lines.append(f"RUN {_json.dumps(argv)}")
             elif op.kind == "run" and op.args:
                 for cmd in op.args:
+                    # run_commands() is explicitly shell-form — users may
+                    # use shell features (pipes, &&). That's their choice.
                     lines.append(f"RUN {cmd}")
         return "\n".join(lines) + "\n"

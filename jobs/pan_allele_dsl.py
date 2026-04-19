@@ -18,7 +18,7 @@ app = App(
     brev=BrevConfig(
         instance_type="g2-standard-4:nvidia-l4:1",
         auto_create=False,
-        mode="container",
+        mode="vm",
     ),
 )
 

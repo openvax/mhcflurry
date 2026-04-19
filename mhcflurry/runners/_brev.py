@@ -167,22 +167,26 @@ def _run_container_mode(*, instance, function, rel_script, args, kwargs):
     if ops_script:
         _ssh(instance, ops_script)
 
-    run_env = {
-        "MHCFLURRY_OUT": _NATIVE_OUT,
-        "MHCFLURRY_RUNNER_SCRIPT": f"$HOME/{REMOTE_REPO_DIR}/{rel_script}",
-        "MHCFLURRY_RUNNER_FUNCTION": function.name,
-        "MHCFLURRY_RUNNER_ARGS": json.dumps(args),
-        "MHCFLURRY_RUNNER_KWARGS": json.dumps(kwargs),
-        **function.env,
-    }
-    exports = " ".join(
-        f"export {k}={shlex.quote(str(v))};" for k, v in run_env.items()
+    # Values that contain $HOME must use double-quoted exports so the
+    # remote shell expands them. shlex.quote would wrap in single quotes,
+    # preventing expansion. Non-path values (JSON, name) go through
+    # shlex.quote since they may contain shell metacharacters.
+    user_env_exports = " ".join(
+        f"export {k}={shlex.quote(str(v))};" for k, v in function.env.items()
     )
     remote = (
         "set -euo pipefail; "
-        f"export PATH=/opt/conda/bin:$PATH; "
-        f"mkdir -p {_NATIVE_OUT}; "
-        f"{exports} "
+        "export PATH=/opt/conda/bin:$PATH; "
+        f'export MHCFLURRY_OUT="$HOME/{REMOTE_OUT_DIR}"; '
+        f'export MHCFLURRY_RUNNER_SCRIPT="$HOME/{REMOTE_REPO_DIR}/{rel_script}"; '
+        f"export MHCFLURRY_RUNNER_FUNCTION={shlex.quote(function.name)}; "
+        f"export MHCFLURRY_RUNNER_ARGS={shlex.quote(json.dumps(args))}; "
+        f"export MHCFLURRY_RUNNER_KWARGS={shlex.quote(json.dumps(kwargs))}; "
+        f"{user_env_exports} "
+        'mkdir -p "$MHCFLURRY_OUT"; '
+        # cd to the rsync'd repo so user-level `subprocess.run(["bash",
+        # "scripts/..."])` calls with relative paths find their scripts.
+        f'cd "$HOME/{REMOTE_REPO_DIR}"; '
         "python -m mhcflurry.runners._bootstrap"
     )
     r = subprocess.run(
@@ -282,20 +286,20 @@ def _run_native(*, instance, function, rel_script, args, kwargs, has_nvidia):
     )
     _ssh(instance, setup)
 
-    run_env = {
-        "MHCFLURRY_OUT": _NATIVE_OUT,
-        "MHCFLURRY_RUNNER_SCRIPT": f"$HOME/{REMOTE_REPO_DIR}/{rel_script}",
-        "MHCFLURRY_RUNNER_FUNCTION": function.name,
-        "MHCFLURRY_RUNNER_ARGS": json.dumps(args),
-        "MHCFLURRY_RUNNER_KWARGS": json.dumps(kwargs),
-        **function.env,
-    }
-    exports = " ".join(f"export {k}={shlex.quote(str(v))};" for k, v in run_env.items())
+    user_env_exports = " ".join(
+        f"export {k}={shlex.quote(str(v))};" for k, v in function.env.items()
+    )
     remote = (
         "set -euo pipefail; "
-        f"source {_NATIVE_VENV}/bin/activate; "
-        f"mkdir -p {_NATIVE_OUT}; "
-        f"{exports} "
+        f'source "$HOME/mhcflurry-venv/bin/activate"; '
+        f'export MHCFLURRY_OUT="$HOME/{REMOTE_OUT_DIR}"; '
+        f'export MHCFLURRY_RUNNER_SCRIPT="$HOME/{REMOTE_REPO_DIR}/{rel_script}"; '
+        f"export MHCFLURRY_RUNNER_FUNCTION={shlex.quote(function.name)}; "
+        f"export MHCFLURRY_RUNNER_ARGS={shlex.quote(json.dumps(args))}; "
+        f"export MHCFLURRY_RUNNER_KWARGS={shlex.quote(json.dumps(kwargs))}; "
+        f"{user_env_exports} "
+        'mkdir -p "$MHCFLURRY_OUT"; '
+        f'cd "$HOME/{REMOTE_REPO_DIR}"; '
         "python -m mhcflurry.runners._bootstrap"
     )
     r = subprocess.run(
