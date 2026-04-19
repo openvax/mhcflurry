@@ -124,13 +124,13 @@ def _run_container_detached(*, instance, container_name, function, rel_script,
         f"-e MHCFLURRY_RUNNER_KWARGS={shlex.quote(json.dumps(kwargs))}"
     )
     # --network=host bypasses docker's bridge + iptables NAT machinery for the
-    # container. On Brev GPU boxes this is more than an optimization: docker
-    # bridge NAT + long-running GPU workloads caused SSH to become unreachable
-    # at the banner-exchange stage after 3-15 min on every GPU instance we
-    # tried (5/5, across GCP N1 T4, GCP G2 L4, AWS g4dn). Leading theory is
-    # conntrack-table saturation or an nvidia-container-toolkit netfilter
-    # interaction silently dropping SSH reply packets on port 22. Host
-    # networking sidesteps both.
+    # container. We tried this specifically to see if conntrack saturation
+    # or nvidia-container-toolkit netfilter rules were behind Brev GPU's
+    # SSH-goes-dark-after-a-few-minutes bug; it wasn't (probing showed the
+    # port-22 SYN/ACK still completes but the banner bytes never arrive,
+    # even with host networking). Keeping the flag anyway: simpler
+    # networking, no NAT overhead, and it rules out a whole class of
+    # failure modes if we ever see this again.
     start = (
         f"set -euo pipefail; "
         f"mkdir -p ~/{REMOTE_OUT_DIR} && "
