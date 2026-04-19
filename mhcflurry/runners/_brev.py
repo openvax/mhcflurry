@@ -62,11 +62,18 @@ def run(app, function, args, kwargs, *,
     cfg = app.brev
     if not _instance_exists(instance):
         if cfg.auto_create:
-            _create_instance(instance, cfg.instance_type)
+            _create_instance(instance, cfg.instance_type, cfg=cfg,
+                             image=function.image)
         else:
+            hint = (
+                f"brev create {instance} --type {cfg.instance_type}"
+                if cfg.mode == "vm" else
+                f"brev create {instance} --mode container --type {cfg.instance_type} "
+                f"--container-image {function.image.base or '<base>'}"
+            )
             raise RuntimeError(
                 f"Brev instance {instance!r} not found and auto_create=False. "
-                f"Create it first with `brev create {instance} --type {cfg.instance_type}`."
+                f"Create it first with `{hint}`."
             )
     _refresh_ssh()
 
@@ -77,11 +84,24 @@ def run(app, function, args, kwargs, *,
     _rsync_up(repo, instance)
     rel_script = Path(function.module_file).resolve().relative_to(repo)
 
-    if cfg.use_docker:
+    if cfg.mode == "container":
+        # Brev `--mode container` box IS the user's container image. Apply
+        # our Image DSL ops inline (apt_install, pip_install,
+        # pip_install_local_dir, run_commands) via ssh, then invoke the
+        # bootstrap. No docker-in-docker, no nvidia-container-toolkit,
+        # no Brev VM sidecar stack.
+        exit_code = _run_container_mode(
+            instance=instance,
+            function=function,
+            rel_script=str(rel_script),
+            args=args,
+            kwargs=kwargs,
+        )
+    elif cfg.use_docker:
         _ensure_docker(instance)
         gpu_flag = "--gpus all" if _remote_has_nvidia(instance) else ""
         container_name = f"mhcflurry-{function.name}-{uuid.uuid4().hex[:8]}"
-        _build_image(instance, function.image.dockerfile)
+        _build_image(instance, function.image)
         _run_container_detached(
             instance=instance,
             container_name=container_name,
@@ -97,9 +117,9 @@ def run(app, function, args, kwargs, *,
             f"sudo docker rm {container_name} >/dev/null 2>&1 || true",
         )
     else:
-        # Native path. Skips docker; installs python + torch + mhcflurry
-        # into a venv on the box and runs the user's job directly. Use
-        # this on Brev GPU boxes where `docker run --gpus all` kills SSH.
+        # Legacy native path. Skips docker; installs python + torch +
+        # mhcflurry into a venv on a plain VM-mode Brev box. Use this only
+        # if you can't use mode="container" (e.g. specific provider flow).
         exit_code = _run_native(
             instance=instance,
             function=function,
@@ -116,6 +136,102 @@ def run(app, function, args, kwargs, *,
 
 _NATIVE_VENV = "$HOME/mhcflurry-venv"
 _NATIVE_OUT = f"$HOME/{REMOTE_OUT_DIR}"
+
+
+def _run_container_mode(*, instance, function, rel_script, args, kwargs):
+    """Brev `--mode container`: the SSH box IS the user's container image.
+
+    Runs the user's Image DSL ops (apt_install, pip_install, ...) inline
+    over ssh, then invokes the bootstrap. Because the box is already the
+    user-selected pytorch/cuda image, there's no docker-in-docker, no
+    `--gpus all` nvidia-container-toolkit path, no Brev VM-mode sidecars.
+    """
+    ops_script = _render_ops_script(function.image)
+    if ops_script:
+        _ssh(instance, ops_script)
+
+    run_env = {
+        "MHCFLURRY_OUT": _NATIVE_OUT,
+        "MHCFLURRY_RUNNER_SCRIPT": f"$HOME/{REMOTE_REPO_DIR}/{rel_script}",
+        "MHCFLURRY_RUNNER_FUNCTION": function.name,
+        "MHCFLURRY_RUNNER_ARGS": json.dumps(args),
+        "MHCFLURRY_RUNNER_KWARGS": json.dumps(kwargs),
+        **function.env,
+    }
+    exports = " ".join(
+        f"export {k}={shlex.quote(str(v))};" for k, v in run_env.items()
+    )
+    remote = (
+        "set -euo pipefail; "
+        f"export PATH=/opt/conda/bin:$PATH; "
+        f"mkdir -p {_NATIVE_OUT}; "
+        f"{exports} "
+        "python -m mhcflurry.runners._bootstrap"
+    )
+    r = subprocess.run(
+        ["ssh", *_SSH_OPTS, instance, f"bash -lc {shlex.quote(remote)}"]
+    )
+    return r.returncode
+
+
+def _render_ops_script(image) -> str:
+    """Translate Image DSL ops into a bash script that runs them in
+    sequence on the remote container-mode box. Idempotent: apt/pip on
+    already-present packages is a cheap no-op."""
+    if image.dockerfile is not None:
+        # Dockerfile-based images don't translate to inline ops. Caller
+        # must either switch to Image.from_registry(...) + DSL, or use
+        # mode="vm" with use_docker=True.
+        raise RuntimeError(
+            "BrevConfig(mode='container') requires Image.from_registry(...) "
+            "with DSL ops. Image.from_dockerfile() doesn't translate to "
+            "inline installs."
+        )
+    lines = ["set -euo pipefail"]
+    # Start on an apt-free note: wait for any apt from box bootstrap.
+    lines.append(
+        "for i in $(seq 1 60); do "
+        "  sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 "
+        "    && { echo waiting for apt; sleep 10; } "
+        "    || break; "
+        "done"
+    )
+    lines.append("export DEBIAN_FRONTEND=noninteractive")
+    lines.append("export PATH=/opt/conda/bin:$PATH")
+
+    apt_packages_seen: list[str] = []
+    pip_packages_seen: list[str] = []
+    for op in image.ops:
+        kw = op.kwargs_dict()
+        if op.kind == "apt_install" and op.args:
+            apt_packages_seen.extend(op.args)
+            pkgs = " ".join(shlex.quote(p) for p in op.args)
+            lines.append(
+                f"sudo apt-get update -qq && sudo apt-get install -y -qq "
+                f"--no-install-recommends {pkgs}"
+            )
+        elif op.kind == "pip_install" and op.args:
+            pip_packages_seen.extend(op.args)
+            pkgs = " ".join(shlex.quote(p) for p in op.args)
+            idx = ""
+            if "index_url" in kw:
+                idx = f" --index-url {shlex.quote(kw['index_url'])}"
+            lines.append(f"pip install --quiet{idx} {pkgs}")
+        elif op.kind == "pip_install_local_dir":
+            path = kw.get("path", ".")
+            editable = kw.get("editable", "1") == "1"
+            flags = "-e " if editable else ""
+            # Use the rsync'd repo (we rsync it before running). Keep $HOME
+            # unquoted so the remote shell expands it; only quote `path`.
+            rel = path.lstrip("./")
+            sub = f"/{rel}" if rel else ""
+            lines.append(
+                f'pip install --quiet {flags}"$HOME/{REMOTE_REPO_DIR}{sub}"'
+            )
+        elif op.kind == "run" and op.args:
+            for cmd in op.args:
+                lines.append(cmd)
+    return "; ".join(lines)
 
 
 def _run_native(*, instance, function, rel_script, args, kwargs, has_nvidia):
@@ -171,13 +287,27 @@ def _run_native(*, instance, function, rel_script, args, kwargs, has_nvidia):
     return r.returncode
 
 
-def _build_image(instance: str, dockerfile: str):
-    build = (
-        f"set -euo pipefail; "
-        f"cd ~/{REMOTE_REPO_DIR} && "
-        f"sudo docker build -f {shlex.quote(dockerfile)} "
-        f"-t {REMOTE_IMAGE_TAG} ."
-    )
+def _build_image(instance: str, image):
+    """Build the image on the remote, either from a user Dockerfile or
+    from our Image DSL (by synthesizing a Dockerfile on the fly)."""
+    if image.dockerfile is not None:
+        build = (
+            f"set -euo pipefail; "
+            f"cd ~/{REMOTE_REPO_DIR} && "
+            f"sudo docker build -f {shlex.quote(image.dockerfile)} "
+            f"-t {REMOTE_IMAGE_TAG} ."
+        )
+    else:
+        df = image.render_dockerfile()
+        # Pipe the synthesized Dockerfile to docker build via stdin,
+        # using the repo as context so pip_install_local_dir can COPY it.
+        build = (
+            f"set -euo pipefail; "
+            f"cd ~/{REMOTE_REPO_DIR} && "
+            f"cat <<'__EOF__' | sudo docker build -f - -t {REMOTE_IMAGE_TAG} .\n"
+            f"{df}\n"
+            f"__EOF__"
+        )
     _ssh(instance, build)
 
 
@@ -304,8 +434,16 @@ def _instance_exists(name: str) -> bool:
     return any(i.get("name") == name for i in instances)
 
 
-def _create_instance(name: str, instance_type: str):
-    _sh(["brev", "create", name, "--type", instance_type])
+def _create_instance(name: str, instance_type: str, *, cfg=None, image=None):
+    cmd = ["brev", "create", name, "--type", instance_type]
+    if cfg is not None and cfg.mode == "container":
+        if image is None or image.base is None:
+            raise RuntimeError(
+                "BrevConfig(mode='container') requires Image.from_registry(...) "
+                "so we know which container image to provision the box from."
+            )
+        cmd += ["--mode", "container", "--container-image", image.base]
+    _sh(cmd)
 
 
 def _refresh_ssh():

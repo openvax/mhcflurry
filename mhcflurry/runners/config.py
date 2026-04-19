@@ -14,12 +14,21 @@ class BrevConfig:
     auto_create: bool = False
     api_key_env: str = "BREV_API_KEY"   # env var name for REST fallback; optional
     auth: str = "cli"                    # "cli" (default) or "rest" (not implemented)
-    # When False, skip docker entirely on the Brev box: install the training
+    # Provisioning mode:
+    # - "vm" (default): `brev create` provisions a full VM with Brev's
+    #   sidecar stack (grafana, influxdb, jupyter, cloudflared). User code
+    #   runs inside `docker run --gpus all ...` on top of that.
+    # - "container": `brev create --mode container --container-image <base>`
+    #   where `<base>` comes from Image.from_registry(...). The box *is*
+    #   the user's image; our backend skips docker entirely and runs the
+    #   declared apt/pip layer ops inline over ssh. Lighter host footprint
+    #   and sidesteps the `docker run --gpus all` path that historically
+    #   wedged SSH on Brev GPU boxes (see docs/brev-ssh-bug-report.md).
+    mode: str = "vm"
+    # Legacy escape hatch for VM mode — skip docker, install the training
     # environment natively (apt + python3-venv + pip) and run the user's job
-    # directly over ssh. The Function's `image=` is ignored — the repo is
-    # rsync'd and `pip install -e .` runs inside the venv. Needed because
-    # `docker run --gpus all` kills SSH on Brev GPU boxes after a few min
-    # (nvidia-container-toolkit interaction, likely a Brev-side bug).
+    # directly over ssh. Kept for boxes where mode="container" isn't an
+    # option (different provider / legacy flow).
     use_docker: bool = True
 
 
