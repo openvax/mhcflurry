@@ -164,14 +164,31 @@ starting at the given time, with no recovery in the observation window
 
 ## Leading theory
 
-A Brev-operated component on port 22 (a sidecar proxy, or sshd itself
-routed through a constrained handler) is **starved of scheduling /
-I/O quanta** when the host is under heavy concurrent load. Under light
-load it is fine; under heavy CUDA-training load (many processes, CUDA
-memory allocations, disk I/O, optimizer state writes) it cannot complete
-new banner exchanges. Pre-existing sessions (which already have memory
-allocated for their buffers and a dedicated file descriptor) keep
-functioning.
+The failure is specific to sshd's **new-connection setup path** (or a
+Brev-operated equivalent on port 22). Something on that path blocks
+for extended periods when certain concurrent workloads are running on
+the host; pre-existing sessions sail through because they've already
+cleared that path. Candidate blocking points on a default OpenSSH +
+systemd install: reverse DNS lookup for client (`UseDNS yes` has a
+60 s default timeout), PAM stack init, nsswitch, journald /
+`/var/log/auth.log` writes. Brev may also have custom PAM or ingress
+components here.
+
+Supporting evidence beyond "pre-existing vs new":
+- **The host is not CPU-loaded during the failure.** On the CPU probe
+  we captured `uptime` *while* the watchdog recorded a 70-second SSH
+  response: load average `0.00, 0.05, 0.92`. A 70 s banner delay on
+  a host with load 0.00 points at blocking-I/O or DNS / PAM hangs,
+  not scheduling starvation.
+- Response-time ladder (500 ms → 3 s → 70 s → hard fail) is consistent
+  with something holding a timeout that grows under repeated retries.
+- All failing GPU boxes have **4 vCPUs** (`g2-standard-4`,
+  `n1-standard-4`, `g4dn.xlarge`); the CPU probe with transient glitches
+  had 2 vCPUs. Small boxes aren't the root cause but may make the
+  underlying delay easier to expose.
+- Modal, which runs the identical container and training to completion
+  in ~56 minutes, does not use this SSH path at all. Its workloads don't
+  hit whatever component is timing out.
 
 Supporting evidence:
 - Failure escalates smoothly with workload intensity, not with
@@ -189,9 +206,18 @@ load between epochs).
 
 ## What we could not directly observe
 
-- `sshd` state on the box during the wedge. Could not SSH in to run
-  `journalctl -u ssh`, `ps auxf`, `netstat -tpn`, `lsof -i :22`, or inspect
-  host iptables.
+- `sshd` state on the box during the wedge. Could not SSH in to run:
+  - `journalctl -u ssh --since "5 min ago"` (does sshd log delayed banner
+    production, auth-time stalls, PAM errors?)
+  - `ps auxf | grep sshd` (are there stuck sshd-auth children?)
+  - `cat /proc/<sshd-pid>/stack` (where is the process blocked?)
+  - `netstat -tpn`, `lsof -i :22` (is there a Brev sidecar listening?)
+  - `docker inspect <container>` (any cgroup CPU / PID / IO limits on
+    the user's container we didn't set?)
+  - `cat /etc/pam.d/sshd`, `cat /etc/nsswitch.conf`, `cat /etc/resolv.conf`
+    (is there a custom PAM step or a DNS server that's unreachable?)
+  - `grep -i usedns /etc/ssh/sshd_config` (is reverse DNS enabled,
+    and is the resolver for `<client-ip>` slow?)
 - Whether the failure eventually clears if we wait much longer than 30 min.
 - Whether stopping the offending container restores SSH (`brev exec` also
   hangs during the window, so we couldn't try it).
