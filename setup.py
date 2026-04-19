@@ -75,7 +75,6 @@ if __name__ == "__main__":
                 "mhcflurry.train_presentation_models_command:run",
                 "_mhcflurry-cluster-worker-entry-point = "
                 "mhcflurry.cluster_parallelism:worker_entry_point",
-                "mhcflurry-run = mhcflurry.runners._cli:main",
             ]
         },
         python_requires=">=3.10",
@@ -95,17 +94,16 @@ if __name__ == "__main__":
         },
         install_requires=required_packages,
         extras_require={
-            # Backend-specific optional deps for mhcflurry.runners. The runners
-            # core (local docker + Brev) needs no extra Python packages — only
-            # the system `docker` / `brev` CLIs at runtime. Modal is a Python
-            # dep pinned to 1.x; Modal has no announced 2.0 but the cap future-
-            # proofs us against a major bump.
-            "runners-modal": ["modal>=1.1,<2"],
+            # Job-harness extras: the runplz CLI drives local/Brev/Modal
+            # training runs. Local + Brev only need the runplz core
+            # (system `docker` / `brev` CLIs at runtime); Modal needs the
+            # modal Python client pulled in via runplz[modal].
+            "runners": ["runplz>=1.4.0"],
+            "runners-modal": ["runplz[modal]>=1.4.0"],
         },
         long_description=readme,
         long_description_content_type="text/markdown",
         packages=[
             "mhcflurry",
-            "mhcflurry.runners",
         ],
     )

@@ -1,9 +1,9 @@
 """Pan-allele single-network training using the Modal-shaped Image DSL.
 
 Image layers declared once and reused across backends:
-    mhcflurry-run local  jobs/pan_allele_dsl.py    # docker build locally
-    mhcflurry-run brev   --instance <gpu> jobs/pan_allele_dsl.py   # `brev create --mode container`
-    mhcflurry-run modal  jobs/pan_allele_dsl.py    # modal.Image chain
+    runplz local  jobs/pan_allele_dsl.py    # docker build locally
+    runplz brev   --instance <gpu> jobs/pan_allele_dsl.py   # `brev create --mode container`
+    runplz modal  jobs/pan_allele_dsl.py    # modal.Image chain
 
 On Modal the layers build on Modal's cluster and cache per-hash.
 On Brev with BrevConfig(mode="container") the layers run inline at boot
@@ -11,18 +11,11 @@ on top of the pre-provisioned container image. On local docker, the
 layers synthesize a Dockerfile that `docker build` consumes.
 """
 
-from mhcflurry.runners import App, BrevConfig, Image
+from runplz import App, BrevConfig, Image
 
 app = App(
     "pan-allele-dsl",
-    brev=BrevConfig(
-        # `instance_type` is now a fallback — Brev backend picks via
-        # `brev search` using the resource requests declared on
-        # @app.function when auto_create=True.
-        instance_type="n1-highmem-4:nvidia-tesla-t4:1",
-        auto_create=False,
-        mode="vm",
-    ),
+    brev=BrevConfig(auto_create=False, mode="vm"),
 )
 
 image = (
@@ -53,6 +46,7 @@ image = (
     min_disk=100,          # GB
     timeout=6 * 60 * 60,
     env={
+        "MHCFLURRY_OUT": "/out",
         "SINGLE_MAX_EPOCHS": "500",
         "SINGLE_PATIENCE": "20",
     },

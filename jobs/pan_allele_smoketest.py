@@ -1,15 +1,15 @@
 """Pan-allele training smoketest — Modal-shaped entry point.
 
 Run:
-    mhcflurry-run local jobs/pan_allele_smoketest.py
-    mhcflurry-run brev  --instance my-gpu-box jobs/pan_allele_smoketest.py
+    runplz local jobs/pan_allele_smoketest.py
+    runplz brev  --instance my-gpu-box jobs/pan_allele_smoketest.py
 """
 
-from mhcflurry.runners import App, BrevConfig, Image
+from runplz import App, BrevConfig, Image
 
 app = App(
     "pan-allele-smoketest",
-    brev=BrevConfig(instance_type="a100-40gb", auto_create=False),
+    brev=BrevConfig(auto_create=False),
 )
 
 image = Image.from_dockerfile("docker/Dockerfile.train")
@@ -20,6 +20,7 @@ image = Image.from_dockerfile("docker/Dockerfile.train")
     gpu="A100",
     timeout=60 * 60,
     env={
+        "MHCFLURRY_OUT": "/out",
         "TINY": "1",
         "SMOKETEST_MAX_EPOCHS": "2",
         "SMOKETEST_NUM_FOLDS": "1",
