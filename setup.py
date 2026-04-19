@@ -94,6 +94,14 @@ if __name__ == "__main__":
             "mhcflurry": ["downloads.yml"],
         },
         install_requires=required_packages,
+        extras_require={
+            # Backend-specific optional deps for mhcflurry.runners. The runners
+            # core (local docker + Brev) needs no extra Python packages — only
+            # the system `docker` / `brev` CLIs at runtime. Modal is a Python
+            # dep pinned to 1.x; Modal has no announced 2.0 but the cap future-
+            # proofs us against a major bump.
+            "runners-modal": ["modal>=1.1,<2"],
+        },
         long_description=readme,
         long_description_content_type="text/markdown",
         packages=[

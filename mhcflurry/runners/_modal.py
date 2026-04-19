@@ -14,6 +14,14 @@ Two image shapes supported:
 
 Outputs: the remote function tars `/out` and returns the bytes; the
 local entrypoint writes them to a file we extract to the host.
+
+TODO: Modal function return values are capped at ~256 MB. The tar-
+return pattern works for smoketests, single-model training (~10 MB
+weights + ~50 MB init info), and most pan-allele single runs, but
+will fail on full 4-fold × 4-replicate ensemble runs (>1 GB of
+weights). Switch to `modal.Volume.from_name(..., create_if_missing=
+True)` mounted at /out, then download after the run via
+`volume.batch_iter(...)` before flipping this on for heavy training.
 """
 
 import io

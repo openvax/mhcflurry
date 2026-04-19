@@ -61,6 +61,7 @@ def run(app, function, args, kwargs, *,
     _skip_onboarding()
 
     cfg = app.brev
+    _validate_config(cfg)
     if not _instance_exists(instance):
         if cfg.auto_create:
             _create_instance(instance, cfg.instance_type, cfg=cfg,
@@ -364,16 +365,20 @@ def _run_container_detached(*, instance, container_name, function, rel_script,
     _ssh(instance, start)
 
 
-def _stream_and_wait(instance: str, container_name: str) -> int:
+def _stream_and_wait(instance: str, container_name: str,
+                     max_reconnects: int = 20) -> int:
     """Stream container logs and return its exit code.
 
     `docker logs -f` exits when the container stops, so we loop across SSH
     reconnects: if ssh drops mid-stream we re-attach with `--tail 0` to
     pick up where we left off, then call `docker wait` for the exit code.
+    Gives up after `max_reconnects` consecutive reconnect attempts so we
+    don't loop forever if the box is permanently unreachable.
     """
     print(f"+ streaming logs from {container_name} (resilient to reconnects)",
           flush=True)
     tail = "all"
+    reconnects = 0
     while True:
         cmd = f"sudo docker logs -f --tail {tail} {container_name}"
         r = subprocess.run(
@@ -384,8 +389,20 @@ def _stream_and_wait(instance: str, container_name: str) -> int:
         running = _container_running(instance, container_name)
         if not running:
             break
+        reconnects += 1
+        if reconnects > max_reconnects:
+            print(
+                f"+ ssh reconnected {max_reconnects} times without finishing; "
+                f"giving up on log stream. Container {container_name} may "
+                f"still be running — check with `brev exec {instance} "
+                f"'sudo docker logs {container_name}'`.",
+                flush=True,
+            )
+            break
         print(f"+ ssh disconnected (rc={r.returncode}); container still "
-              f"running, reconnecting log stream", flush=True)
+              f"running, reconnecting log stream "
+              f"({reconnects}/{max_reconnects})",
+              flush=True)
         tail = "0"
         time.sleep(2)
     # Container stopped. Get its exit code (docker wait returns immediately
@@ -426,6 +443,22 @@ def _ssh_capture(instance: str, remote_cmd: str) -> str:
     return r.stdout
 
 
+def _validate_config(cfg):
+    if cfg.mode not in ("vm", "container"):
+        raise ValueError(
+            f"BrevConfig.mode must be 'vm' or 'container'; got {cfg.mode!r}."
+        )
+    if cfg.mode == "container" and not cfg.use_docker:
+        # `use_docker` is meaningless when mode='container' (the box IS the
+        # container — there is no separate docker runtime inside). Flag it so
+        # users don't silently get surprising behavior.
+        raise ValueError(
+            "BrevConfig(mode='container', use_docker=False) is contradictory. "
+            "use_docker only applies to mode='vm'. In mode='container' the "
+            "box itself is the user's image — there's no inner docker to skip."
+        )
+
+
 def _require_brev_cli():
     if subprocess.run(["which", "brev"], capture_output=True).returncode != 0:
         raise RuntimeError(
@@ -438,7 +471,14 @@ def _require_brev_cli():
 def _skip_onboarding():
     try:
         _BREV_ONBOARDING.parent.mkdir(parents=True, exist_ok=True)
+        existed = _BREV_ONBOARDING.exists()
         _BREV_ONBOARDING.write_text(json.dumps(_BREV_ONBOARDING_DONE))
+        if not existed:
+            print(
+                f"+ wrote {_BREV_ONBOARDING} to skip Brev CLI walkthrough "
+                f"(prevents `brev ls` from hanging once instances exist)",
+                flush=True,
+            )
     except OSError:
         pass
 
@@ -565,8 +605,13 @@ def _ensure_docker(instance: str, timeout_s: int = 420):
         timeout=timeout_s,
     )
     if r.returncode != 0:
-        print("+ docker daemon not ready — falling back to get-docker.sh",
-              flush=True)
+        print(
+            f"+ docker daemon not reachable on {instance} after {timeout_s}s "
+            f"(Brev's bootstrap may be stuck — check `brev ls` / "
+            f"`brev exec {instance} 'systemctl status docker'`); "
+            f"falling back to get-docker.sh",
+            flush=True,
+        )
         _sh(["ssh", instance, "curl -fsSL https://get.docker.com | sudo sh"])
 
 
@@ -583,8 +628,12 @@ def _remote_has_nvidia(instance: str) -> bool:
 
 
 def _rsync_up(repo: Path, instance: str):
+    # Intentionally no --delete: a user who sshes in and leaves files under
+    # ~/mhcflurry/ (logs, probe scripts, local edits) shouldn't have those
+    # wiped by the next run. Stale files on the remote are cheap; accidental
+    # user-data loss is not.
     _sh([
-        "rsync", "-az", "--delete",
+        "rsync", "-az",
         "--exclude=.git", "--exclude=.venv", "--exclude=__pycache__",
         "--exclude=*.egg-info", "--exclude=build", "--exclude=dist",
         "--exclude=out",

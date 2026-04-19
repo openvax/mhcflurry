@@ -1,7 +1,7 @@
 # Brev GPU instances: SSH banner-exchange stalls under concurrent host load
 
 > Technical report for NVIDIA Brev support. All observations reproduced
-> between 2026-04-17 and 2026-04-19 on org `hc-db-MHCflurry` with Brev CLI
+> between 2026-04-17 and 2026-04-19 with Brev CLI
 > v0.6.322, running `mhcflurry` training workloads against several Brev
 > instance types.
 
@@ -73,7 +73,7 @@ ssh -o ConnectTimeout=15 reproduce-ssh-bug "uptime"
 |---|---|
 | Brev CLI | v0.6.322 |
 | Client | macOS 26.4 (arm64), OpenSSH 10.2p1 LibreSSL 3.3.6 |
-| Org | `hc-db-MHCflurry` (`org-3BzyyzgyEx1dlEJPyDDq0vYLIuA`) |
+| Org | (provided privately in support ticket) |
 | Workload | [openvax/mhcflurry PR #266](https://github.com/openvax/mhcflurry/pull/266) — PyTorch pan-allele training, full curated dataset (~500 K measurements), `[1024, 512]` dense network |
 
 ## Observed `ssh -vvv` trace during the failure

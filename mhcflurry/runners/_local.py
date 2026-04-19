@@ -70,4 +70,6 @@ def _container_path_for(host_path: str, repo: Path) -> str:
 
 
 def _print_cmd(cmd):
-    print("+ " + " ".join(cmd))
+    # flush=True matches the convention in _brev/_modal — lets users tailing
+    # a log file see status prints land before the subprocess output.
+    print("+ " + " ".join(cmd), flush=True)

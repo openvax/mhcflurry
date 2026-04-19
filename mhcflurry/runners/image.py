@@ -101,9 +101,11 @@ class Image:
         that build images (local docker, Brev VM mode, stock `docker build`).
 
         Uses exec-form `RUN ["cmd", "arg", ...]` for ops that take a
-        package list, so Dockerfile's default /bin/sh -c parsing doesn't
-        mangle version specifiers like `pandas>=2.0` (bash would read
-        `>=` as a redirect operator in shell-form RUN).
+        package list, so Dockerfile's default /bin/sh -c parsing (dash
+        on Debian/Ubuntu base images) doesn't mangle version specifiers
+        like `pandas>=2.0` — sh/dash would read `>=` as a redirect
+        operator in shell-form RUN and silently install the unversioned
+        package while creating a file named `=2.0` in the image.
         """
         if self.base is None:
             raise ValueError("render_dockerfile() requires from_registry()")

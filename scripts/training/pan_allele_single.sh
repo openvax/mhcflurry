@@ -10,12 +10,18 @@
 #   SINGLE_MAX_EPOCHS=N      cap epochs (default: 500; early stopping usually
 #                            ends long before this on full data)
 #   SINGLE_PATIENCE=N        early-stopping patience (default: 20)
+#   SINGLE_NUM_JOBS=N        mhcflurry --num-jobs value (default: 0, inline).
+#                            0 = no multiprocessing.Pool, runs in main process.
+#                            Anything >=1 forks a Pool which has hit
+#                            CUDA-fork interactions on some platforms — stick
+#                            with 0 unless you know you need ensembling.
 set -euo pipefail
 set -x
 
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 MAX_EPOCHS="${SINGLE_MAX_EPOCHS:-500}"
 PATIENCE="${SINGLE_PATIENCE:-20}"
+NUM_JOBS="${SINGLE_NUM_JOBS:-0}"
 
 mkdir -p "$MHCFLURRY_OUT"
 cd "$MHCFLURRY_OUT"
@@ -87,7 +93,7 @@ mhcflurry-class1-train-pan-allele-models \
     --max-epochs "$MAX_EPOCHS" \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir "$MHCFLURRY_OUT/models.single" \
-    --num-jobs 0 \
+    --num-jobs "$NUM_JOBS" \
     --gpus "$GPUS"
 
 echo "Single-model training completed. Artifacts in: $MHCFLURRY_OUT/models.single"

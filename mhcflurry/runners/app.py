@@ -61,7 +61,11 @@ class Function:
 
     def __call__(self, *args, **kwargs):
         raise RuntimeError(
-            f"Call {self.name}.local(...) or {self.name}.remote(...), not {self.name}(...)."
+            f"Plain-calling a runner Function is intentionally disabled. Use "
+            f"`{self.name}.local(*args, **kwargs)` to run it in this process, "
+            f"or `{self.name}.remote(*args, **kwargs)` to dispatch it to the "
+            f"backend selected on the command line "
+            f"(e.g. `mhcflurry-run brev --instance <box> {self.module_file}`)."
         )
 
 
