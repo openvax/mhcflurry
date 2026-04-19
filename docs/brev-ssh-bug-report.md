@@ -114,10 +114,73 @@ Every row was monitored with a 15-second-interval SSH watchdog (standalone
 | 12 | `g2-standard-4:nvidia-l4:1` (l4k control) | ✓ | ✗ | `ubuntu:22.04` | `sleep 1200` | ~30 min | 130 / 0 | n/a |
 | 13 | `n2d-highmem-2` (cpu-train) | ✓ | n/a | our Dockerfile, full pan-allele training (1 epoch cap) | mhcflurry training init + first epoch | ~37 min | 82 / **2** transient; one 70.7 s response | ⚠ stuck at worker init (unrelated hang, no progress to epoch 0) |
 | — | Modal (T4, their own GPU runtime) | ✓ | (Modal-managed) | same image, same training | full single-model training | ~56 min | n/a | ✅ **completed**, 30 epochs, best val loss 0.0467 |
+| 14 | `g2-standard-4:nvidia-l4:1` (mhcflurry-diag, next-day) | ✓ | ✓ | our Dockerfile | full 1-epoch pan-allele training; privileged diag sidecar container (`--privileged --pid=host --network=host`) dumping host state every 15 s | ~15 min training + ~30 min diag | 121 / 0 | ✅ **completed, no SSH fails** |
+| 15 | `g2-standard-8:nvidia-l4:1` (8-vCPU L4) | ✓ | ✓ | our Dockerfile | attempted | ~15 min | 54 / 0 | ❌ never started — Brev `BUILD=CREATE_FAILED`, docker daemon never came up |
+| 16 | `g2-standard-4:nvidia-l4:1` **`--mode container`** | (box *is* the container) | n/a | `pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime` directly as the box | full 1-epoch pan-allele training | ~15 min | 69 / 0 on port 2222 (container); 69 / 0 on port 22 (host) | ✅ **completed, no SSH fails on either endpoint** |
 
 Where we write "**dies**", the ssh watchdog shows permanent `SSH_FAIL`
 starting at the given time, with no recovery in the observation window
 (up to 30 min). TCP `connect()` continues to succeed fast in all cases.
+
+## IMPORTANT revision after day-2 experiments
+
+Rows 14 and 16 are 4-vCPU L4 boxes running the *identical* docker
+`--gpus all` + full pan-allele training workload that killed SSH on
+rows 2–7. **They completed cleanly with zero SSH failures.** That
+forces a significant revision of the theory:
+
+- **5/5 GPU `--gpus all` training attempts failed on 2026-04-18.**
+- **3/3 GPU `--gpus all` training attempts passed on 2026-04-19** —
+  same workload, same instance types, same org.
+
+**Host state during the successful day-2 runs** (captured by the
+privileged diag sidecar on row 14, 15-second cadence, full training
+span):
+
+- `sshd` (pid 1103) was consistently in `do_poll.constprop.0` / `ppoll`
+  — listener cleanly waiting on its socket. Never in uninterruptible
+  sleep.
+- Load average stayed low (peaks around 1–2 on the 4-vCPU box).
+- No D-state sshd child observed. One transient D-state process during
+  Brev's own bootstrap (`apt-key --quiet --readonly verify ...`) —
+  unrelated to ssh.
+- Port 22 listener continuously present (`0.0.0.0:22 users:(("sshd",
+  pid=1103,fd=3))`).
+- DNS stub at `127.0.0.53` unchanged; `/etc/pam.d/sshd` unchanged
+  between baseline and training.
+- **Sidecar inventory on a VM-mode box**: sshd, systemd-resolved,
+  `cloudflared` (127.0.0.1:20241), `jupyter-lab` (127.0.0.1:8888),
+  `grafana` (*:13000), `influxd` (*:8086). None of these showed up as
+  blocked or unusually busy.
+- On `--mode container` boxes, the underlying VM only runs sshd +
+  systemd-resolved — no grafana/influxdb/jupyter-lab/cloudflared.
+
+When `sshd` *does* work, its state looks completely ordinary. **Nothing
+in the host state we captured distinguishes a healthy run from what
+we infer was happening during the failures** — because on day 2 we
+couldn't reproduce the failure.
+
+**Possible explanations for the day-1 / day-2 split:**
+
+1. Brev pushed a platform-side change between 2026-04-18 and
+   2026-04-19.
+2. The bug is environmental (GCP zone load, DNS / control-plane
+   flakiness, a specific transient Brev state) and yesterday happened
+   to hit the bad state consistently.
+3. Something about our provisioning path yesterday (`brev create`
+   churn, a quota-adjacent soft-state on the org) was biasing boxes
+   into a bad state.
+
+We can't distinguish these with client-side measurements. Brev-operator
+logs would.
+
+**What's robust across days:**
+
+- Yesterday's failure signature: TCP accept completes in ~60 ms, no
+  banner, pre-existing sessions survive, `brev exec` also hangs.
+- `BrevConfig(use_docker=False)` workaround (row 8): trained cleanly
+  on a yesterday L4. Still recommended for anyone who hits the bug.
+- Modal: reliably works — different SSH path.
 
 ## Key observations
 
