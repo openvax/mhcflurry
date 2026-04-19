@@ -81,6 +81,11 @@ def run(app, function, args, kwargs, *,
     host_out = (repo / outputs_dir).resolve()
     host_out.mkdir(parents=True, exist_ok=True)
 
+    if cfg.mode == "container":
+        # Pre-built container images (e.g. pytorch/pytorch) don't ship with
+        # rsync. Install it before the first rsync call, otherwise we get
+        # "rsync: command not found" on the remote end.
+        _ensure_remote_rsync(instance)
     _rsync_up(repo, instance)
     rel_script = Path(function.module_file).resolve().relative_to(repo)
 
@@ -136,6 +141,18 @@ def run(app, function, args, kwargs, *,
 
 _NATIVE_VENV = "$HOME/mhcflurry-venv"
 _NATIVE_OUT = f"$HOME/{REMOTE_OUT_DIR}"
+
+
+def _ensure_remote_rsync(instance: str):
+    """Install rsync on the remote if missing (pytorch/pytorch image and
+    similar are slim and don't ship with rsync)."""
+    cmd = (
+        "command -v rsync >/dev/null 2>&1 && exit 0; "
+        "export DEBIAN_FRONTEND=noninteractive; "
+        "sudo apt-get update -qq && "
+        "sudo apt-get install -y -qq --no-install-recommends rsync"
+    )
+    _ssh(instance, cmd)
 
 
 def _run_container_mode(*, instance, function, rel_script, args, kwargs):
