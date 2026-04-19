@@ -468,8 +468,8 @@ def _create_instance(name: str, instance_type: str, *,
     thing on Brev that it does on Modal.
     """
     has_resource_request = function is not None and any([
-        function.cpu is not None,
-        function.memory is not None,
+        function.min_cpu is not None,
+        function.min_memory is not None,
         function.min_gpu_memory is not None,
         function.min_disk is not None,
         function.gpu is not None and instance_type is None,
@@ -494,6 +494,21 @@ def _create_instance(name: str, instance_type: str, *,
     _sh(cmd)
 
 
+def _brev_gpu_name(modal_name: str) -> str:
+    """Translate Modal-style GPU labels to Brev `--gpu-name` filter strings.
+
+    Modal accepts things like "A100-40GB"; brev search wants a base name
+    like "A100" and separately filters by VRAM. Stripping the suffix is
+    good enough for matching.
+    """
+    n = modal_name.upper()
+    # Strip any trailing "-40GB" / "-80GB" etc.
+    for suffix in ("-40GB", "-80GB", "-16GB", "-24GB"):
+        if n.endswith(suffix):
+            return n[: -len(suffix)]
+    return n
+
+
 def _pick_instance_type(function) -> Optional[str]:
     """Run `brev search gpu` (or cpu) with filters from `function`'s
     resource requests; return the cheapest matching TYPE string.
@@ -501,14 +516,13 @@ def _pick_instance_type(function) -> Optional[str]:
     mode = "gpu" if function.gpu is not None else "cpu"
     cmd = ["brev", "search", mode, "--json", "--sort", "price"]
     if function.gpu:
-        cmd += ["--gpu-name", function.gpu]
+        cmd += ["--gpu-name", _brev_gpu_name(function.gpu)]
     if function.min_gpu_memory is not None:
         cmd += ["--min-vram", str(function.min_gpu_memory)]
-    if function.cpu is not None:
-        cmd += ["--min-vcpu", str(int(function.cpu))]
-    if function.memory is not None:
-        # Function.memory is in MB (Modal convention); brev search wants GB.
-        cmd += ["--min-ram", str(function.memory / 1024)]
+    if function.min_cpu is not None:
+        cmd += ["--min-vcpu", str(int(function.min_cpu))]
+    if function.min_memory is not None:
+        cmd += ["--min-ram", str(function.min_memory)]
     if function.min_disk is not None:
         cmd += ["--min-disk", str(function.min_disk)]
     print("+ " + " ".join(shlex.quote(c) for c in cmd), flush=True)

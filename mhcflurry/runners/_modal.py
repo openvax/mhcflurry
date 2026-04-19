@@ -107,11 +107,15 @@ def run(app, function, args, kwargs, *, outputs_dir: str = "out"):
         suffix=".tar.gz", prefix="mhcflurry-modal-", delete=False
     ).name
 
+    # Modal's @app.function accepts memory in MB; our API uses GB. Convert.
+    modal_memory = (
+        int(function.min_memory * 1024) if function.min_memory is not None else None
+    )
     entrypoint_src = _ENTRYPOINT_TEMPLATE.format(
         app_name=f"{app.name}-{function.name}",
         gpu=function.gpu,
-        cpu=function.cpu,
-        memory=function.memory,
+        cpu=function.min_cpu,
+        memory=modal_memory,
         timeout=function.timeout,
         out_blob=blob_path,
         container_env=container_env,

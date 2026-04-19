@@ -21,20 +21,32 @@ from mhcflurry.runners.image import Image
 class Function:
     def __init__(self, app: "App", fn: Callable, *, image: Image,
                  gpu: Optional[str], timeout: int, env: dict,
-                 cpu: Optional[float] = None,
-                 memory: Optional[int] = None,
-                 min_gpu_memory: Optional[int] = None,
-                 min_disk: Optional[int] = None):
+                 min_cpu: Optional[float] = None,
+                 min_memory: Optional[float] = None,
+                 min_gpu_memory: Optional[float] = None,
+                 min_disk: Optional[float] = None):
         self.app = app
         self.fn = fn
         self.image = image
-        # Resource requests — interpret as *minimums*. Each backend picks a
-        # matching instance (Modal: direct; Brev: via `brev search`).
-        self.gpu = gpu                         # exact GPU name: "T4", "L4", "A100"
-        self.cpu = cpu                         # min vCPUs (float for fractional)
-        self.memory = memory                   # min RAM in MB (Modal convention)
-        self.min_gpu_memory = min_gpu_memory   # min VRAM per GPU in GB
-        self.min_disk = min_disk               # min disk in GB
+        # Resource requests — all minimums. Units: vCPUs (float OK), GB for
+        # everything memory/disk-related. Each backend picks a matching
+        # instance (Modal: direct; Brev: via `brev search`).
+        #
+        # `gpu`: exact GPU name (one of Modal's accepted labels). Common:
+        #   - "T4"            Turing,   16 GB,   sm_75
+        #   - "L4"            Ada,      24 GB,   sm_89
+        #   - "L40S"          Ada,      48 GB,   sm_89
+        #   - "A10" / "A10G"  Ampere,   24 GB,   sm_86
+        #   - "A100-40GB"     Ampere,   40 GB,   sm_80
+        #   - "A100-80GB"     Ampere,   80 GB,   sm_80
+        #   - "H100"          Hopper,   80 GB,   sm_90
+        #   - "H200"          Hopper,  141 GB,   sm_90
+        #   - "V100"          Volta,    16 GB,   sm_70
+        self.gpu = gpu
+        self.min_cpu = min_cpu                 # vCPUs (float for fractional on Modal)
+        self.min_memory = min_memory           # GB of RAM
+        self.min_gpu_memory = min_gpu_memory   # GB of VRAM per GPU
+        self.min_disk = min_disk               # GB of disk
         self.timeout = timeout
         self.env = dict(env or {})
         self.name = fn.__name__
@@ -69,16 +81,17 @@ class App:
         self._repo_root: Optional[Path] = None
 
     def function(self, *, image: Image, gpu: Optional[str] = None,
-                 cpu: Optional[float] = None,
-                 memory: Optional[int] = None,
-                 min_gpu_memory: Optional[int] = None,
-                 min_disk: Optional[int] = None,
+                 min_cpu: Optional[float] = None,
+                 min_memory: Optional[float] = None,
+                 min_gpu_memory: Optional[float] = None,
+                 min_disk: Optional[float] = None,
                  timeout: int = 60 * 60, env: Optional[dict] = None):
         def decorator(fn: Callable) -> Function:
             f = Function(
                 self, fn,
                 image=image,
-                gpu=gpu, cpu=cpu, memory=memory,
+                gpu=gpu,
+                min_cpu=min_cpu, min_memory=min_memory,
                 min_gpu_memory=min_gpu_memory, min_disk=min_disk,
                 timeout=timeout, env=env or {},
             )
