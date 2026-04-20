@@ -49,29 +49,20 @@ TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 
 # ---- sub-sampled hyperparameters (2 arches, capped epochs) ----------
 cp "$RECIPE_DIR/generate_hyperparameters.py" .
-python - <<'PY' > hyperparameters.yaml
-import yaml, sys, importlib.util
-spec = importlib.util.spec_from_file_location("genhp", "generate_hyperparameters.py")
-mod  = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-# generate_hyperparameters.py prints yaml to stdout when run as __main__.
-# Capture via exec to get the in-memory hyperparameters list.
-import io, contextlib
-buf = io.StringIO()
-with contextlib.redirect_stdout(buf):
-    # The script's __name__ == "__main__" path is not reentrant-friendly;
-    # re-exec with __name__ swapped.
-    src = open("generate_hyperparameters.py").read()
-    ns  = {"__name__": "__main__"}
-    exec(compile(src, "generate_hyperparameters.py", "exec"), ns)
-raw = buf.getvalue()
-all_hp = yaml.safe_load(raw)
-sub = all_hp[:2]  # first 2 architectures
+# Generate full sweep, then subset to 2 architectures with capped epochs.
+python generate_hyperparameters.py > hyperparameters.full.yaml
+python - <<'PY'
+import yaml
+with open("hyperparameters.full.yaml") as f:
+    all_hp = yaml.safe_load(f)
+sub = all_hp[:2]
 for hp in sub:
-    hp["max_epochs"] = 20  # cap to measure per-epoch time cheaply
+    hp["max_epochs"] = 20
     if "train_data" in hp and isinstance(hp["train_data"], dict):
         if "pretrain_max_epochs" in hp["train_data"]:
             hp["train_data"]["pretrain_max_epochs"] = 5
-print(yaml.dump(sub))
+with open("hyperparameters.yaml", "w") as f:
+    yaml.safe_dump(sub, f)
 PY
 
 ARCH_COUNT=$(python -c "import yaml; print(len(yaml.safe_load(open('hyperparameters.yaml'))))")
