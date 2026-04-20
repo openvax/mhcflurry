@@ -20,6 +20,14 @@ set -x
 
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 
+# CRITICAL: matches GENERATE.sh in the public release. Without this,
+# numpy/MKL in each worker multi-threads to all available cores. With
+# 8 parallel workers on a 120-vCPU box that gave us load avg ~713
+# (6x oversubscription), 20-40x slowdown, and near-idle GPUs. One thread
+# per worker lets the GPU actually be the limiting factor.
+export OMP_NUM_THREADS=1
+export PYTHONUNBUFFERED=1
+
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_ABSOLUTE_PATH")"
 RECIPE_DIR="$SCRIPT_DIR/release_exact"
