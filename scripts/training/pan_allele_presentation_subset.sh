@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+#
+# Subset of the full release-exact pipeline: affinity → processing →
+# presentation end-to-end with a small architecture sweep per variant.
+# Produces a usable Class1PresentationPredictor for Phase D comparison
+# against the public release, and gives us timing / cost signal for
+# extrapolating the full-run budget.
+#
+# Default subset:
+#   Affinity:    4 folds × 8 architectures = 32 networks
+#   Processing:  4 folds × 8 architectures × 2 variants (no_flank,
+#                short_flanks) = 64 networks
+#   Presentation: 1 logistic-regression on top of the above (cheap)
+#
+# Environment:
+#   MHCFLURRY_OUT              required — directory for all artifacts
+#   SUBSET_ARCHS=N             architectures per variant (default 8)
+#   REPO                       path to the rsynced mhcflurry repo (used
+#                              to find downloads-generation recipe files)
+#                              Defaults to $HOME/runplz-repo.
+set -euo pipefail
+set -x
+
+: "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
+
+export OMP_NUM_THREADS=1
+export PYTHONUNBUFFERED=1
+
+SUBSET_ARCHS="${SUBSET_ARCHS:-8}"
+REPO="${REPO:-$HOME/runplz-repo}"
+
+if command -v nvidia-smi >/dev/null 2>&1; then
+    GPUS=$(nvidia-smi -L 2>/dev/null | wc -l | tr -d ' ')
+else
+    GPUS=0
+fi
+echo "Detected GPUS: $GPUS"
+if [ "$GPUS" -eq 0 ]; then
+    NUM_JOBS=1
+else
+    NUM_JOBS="$GPUS"
+fi
+PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1"
+
+mkdir -p "$MHCFLURRY_OUT/affinity" "$MHCFLURRY_OUT/processing" "$MHCFLURRY_OUT/presentation"
+
+# ============================================================
+# STAGE 1 — AFFINITY (Class1AffinityPredictor)
+# ============================================================
+echo "=== STAGE 1: AFFINITY ==="
+STAGE1_START=$(date +%s)
+
+cd "$MHCFLURRY_OUT/affinity"
+mhcflurry-downloads fetch data_curated allele_sequences random_peptide_predictions
+
+cp "$REPO/downloads-generation/models_class1_pan/reassign_mass_spec_training_data.py" .
+cp "$REPO/downloads-generation/models_class1_pan/additional_alleles.txt" .
+python reassign_mass_spec_training_data.py \
+    "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+    --set-measurement-value 100 \
+    --out-csv "$(pwd)/train_data.csv"
+bzip2 -f "$(pwd)/train_data.csv"
+
+cp "$REPO/downloads-generation/models_class1_pan/generate_hyperparameters.py" .
+python generate_hyperparameters.py > hyperparameters.full.yaml
+python - <<PY
+import yaml
+hp = yaml.safe_load(open("hyperparameters.full.yaml"))[:${SUBSET_ARCHS}]
+with open("hyperparameters.yaml", "w") as f:
+    yaml.safe_dump(hp, f)
+print(f"affinity: using {len(hp)} architectures")
+PY
+
+mhcflurry-class1-train-pan-allele-models \
+    --data "$(pwd)/train_data.csv.bz2" \
+    --allele-sequences "$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv" \
+    --pretrain-data "$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2" \
+    --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
+    --num-folds 4 \
+    --hyperparameters hyperparameters.yaml \
+    --out-models-dir "$(pwd)/models.unselected" \
+    --worker-log-dir "$MHCFLURRY_OUT/affinity" \
+    $PARALLELISM_ARGS
+
+mhcflurry-class1-select-pan-allele-models \
+    --data "$(pwd)/models.unselected/train_data.csv.bz2" \
+    --models-dir "$(pwd)/models.unselected" \
+    --out-models-dir "$(pwd)/models.combined" \
+    --min-models 1 \
+    --max-models 4 \
+    $PARALLELISM_ARGS
+cp "$(pwd)/models.unselected/train_data.csv.bz2" "$(pwd)/models.combined/train_data.csv.bz2"
+
+AFFINITY_PREDICTOR="$MHCFLURRY_OUT/affinity/models.combined"
+echo "affinity predictor at: $AFFINITY_PREDICTOR"
+echo "STAGE 1 duration: $(( $(date +%s) - STAGE1_START )) sec"
+
+# ============================================================
+# STAGE 2 — PROCESSING (no_flank + short_flanks)
+# Only those two variants are consumed by the presentation predictor.
+# ============================================================
+echo "=== STAGE 2: PROCESSING ==="
+STAGE2_START=$(date +%s)
+
+cd "$MHCFLURRY_OUT/processing"
+mhcflurry-downloads fetch data_mass_spec_annotated data_references
+
+cp "$REPO/downloads-generation/models_class1_processing/annotate_hits_with_expression.py" .
+cp "$REPO/downloads-generation/models_class1_processing/write_proteome_peptides.py" .
+cp "$REPO/downloads-generation/models_class1_processing/make_train_data.py" make_train_data.processing.py
+cp "$REPO/downloads-generation/models_class1_processing/generate_hyperparameters.base.py" .
+cp "$REPO/downloads-generation/models_class1_processing/generate_hyperparameters.variants.py" .
+
+python annotate_hits_with_expression.py \
+    --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+    --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
+    --out "$(pwd)/hits_with_tpm.csv"
+bzip2 -f "$(pwd)/hits_with_tpm.csv"
+
+python write_proteome_peptides.py \
+    "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+    "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
+    --out "$(pwd)/proteome_peptides.csv"
+bzip2 -f "$(pwd)/proteome_peptides.csv"
+
+python make_train_data.processing.py \
+    --hits "$(pwd)/hits_with_tpm.csv.bz2" \
+    --affinity-predictor "$AFFINITY_PREDICTOR" \
+    --proteome-peptides "$(pwd)/proteome_peptides.csv.bz2" \
+    --ppv-multiplier 100 \
+    --hit-multiplier-to-take 2 \
+    --out "$(pwd)/train_data.csv" \
+    $PARALLELISM_ARGS
+bzip2 -f "$(pwd)/train_data.csv"
+
+python generate_hyperparameters.base.py > hyperparameters.base.yaml
+
+for kind in no_flank short_flanks; do
+    python generate_hyperparameters.variants.py hyperparameters.base.yaml $kind \
+        > hyperparameters.$kind.full.yaml
+    python - <<PY
+import yaml
+hp = yaml.unsafe_load(open("hyperparameters.$kind.full.yaml"))[:${SUBSET_ARCHS}]
+# Avoid python/tuple tags on write so downstream readers can safe_load.
+for d in hp:
+    def _detuple(x):
+        if isinstance(x, tuple): return list(x)
+        if isinstance(x, list):  return [_detuple(e) for e in x]
+        if isinstance(x, dict):  return {k: _detuple(v) for k, v in x.items()}
+        return x
+    hp_list_safe = [_detuple(d) for d in hp]
+with open("hyperparameters.$kind.yaml", "w") as f:
+    yaml.safe_dump([_detuple(d) for d in hp], f)
+print(f"processing.$kind: using {len(hp)} architectures")
+PY
+
+    mhcflurry-class1-train-processing-models \
+        --data "$(pwd)/train_data.csv.bz2" \
+        --held-out-samples 10 \
+        --num-folds 4 \
+        --hyperparameters hyperparameters.$kind.yaml \
+        --out-models-dir "$(pwd)/models.unselected.$kind" \
+        --worker-log-dir "$MHCFLURRY_OUT/processing" \
+        $PARALLELISM_ARGS
+
+    mhcflurry-class1-select-processing-models \
+        --data "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
+        --models-dir "$(pwd)/models.unselected.$kind" \
+        --out-models-dir "$(pwd)/models.selected.$kind" \
+        --min-models 1 \
+        --max-models 2 \
+        $PARALLELISM_ARGS
+    cp "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
+        "$(pwd)/models.selected.$kind/train_data.csv.bz2"
+done
+
+echo "STAGE 2 duration: $(( $(date +%s) - STAGE2_START )) sec"
+
+# ============================================================
+# STAGE 3 — PRESENTATION (Class1PresentationPredictor)
+# ============================================================
+echo "=== STAGE 3: PRESENTATION ==="
+STAGE3_START=$(date +%s)
+
+cd "$MHCFLURRY_OUT/presentation"
+cp "$REPO/downloads-generation/models_class1_presentation/make_train_data.py" \
+    make_train_data.presentation.py
+
+python make_train_data.presentation.py \
+    --hits "$MHCFLURRY_OUT/processing/hits_with_tpm.csv.bz2" \
+    --proteome-peptides "$MHCFLURRY_OUT/processing/proteome_peptides.csv.bz2" \
+    --decoys-per-hit 2 \
+    --exclude-pmid 31844290 31495665 31154438 \
+    --only-format MULTIALLELIC \
+    --sample-fraction 0.1 \
+    --out "$(pwd)/train_data.csv"
+bzip2 -f "$(pwd)/train_data.csv"
+
+time mhcflurry-class1-train-presentation-models \
+    --data "$(pwd)/train_data.csv.bz2" \
+    --affinity-predictor "$AFFINITY_PREDICTOR" \
+    --processing-predictor-with-flanks "$MHCFLURRY_OUT/processing/models.selected.short_flanks" \
+    --processing-predictor-without-flanks "$MHCFLURRY_OUT/processing/models.selected.no_flank" \
+    --out-models-dir "$(pwd)/models"
+
+time mhcflurry-calibrate-percentile-ranks \
+    --models-dir "$(pwd)/models" \
+    --match-amino-acid-distribution-data "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
+    --alleles-file "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
+    --predictor-kind class1_presentation \
+    --num-peptides-per-length 10000 \
+    --alleles-per-genotype 1 \
+    --num-genotypes 50 \
+    --verbosity 1 \
+    $PARALLELISM_ARGS
+
+# Convenience: copy training data into the final bundle like the
+# release does.
+cp "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
+    "$(pwd)/models/affinity_predictor_train_data.csv.bz2"
+cp "$MHCFLURRY_OUT/processing/models.selected.short_flanks/train_data.csv.bz2" \
+    "$(pwd)/models/processing_predictor_with_flanks_train_data.csv.bz2"
+cp "$MHCFLURRY_OUT/processing/models.selected.no_flank/train_data.csv.bz2" \
+    "$(pwd)/models/processing_predictor_no_flank_train_data.csv.bz2"
+
+echo "STAGE 3 duration: $(( $(date +%s) - STAGE3_START )) sec"
+
+echo "=== DONE ==="
+echo "Final presentation predictor: $MHCFLURRY_OUT/presentation/models/"
+ls -la "$MHCFLURRY_OUT/presentation/models" | head -20
