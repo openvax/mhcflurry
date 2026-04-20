@@ -21,7 +21,7 @@ from runplz import App, BrevConfig, Image
 
 app = App(
     "pan-allele-release-exact",
-    brev=BrevConfig(
+    brev_config=BrevConfig(
         mode="container",
         # 8×A100-40GB, 120 vCPUs, 14 TB disk at $12/hr. Denvr has been
         # reliable for us (MassedCompute timed out on SSH earlier). VRAM
@@ -34,7 +34,7 @@ image = (
     Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
     .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
     .pip_install(
-        "runplz>=1.5.0",
+        "runplz>=3.0.0",
         "pandas>=2.0",
         "appdirs",
         "scikit-learn",
