@@ -16,7 +16,6 @@ from runplz import App, BrevConfig, Image
 app = App(
     "pan-allele-dsl",
     brev=BrevConfig(
-        auto_create=True,
         mode="container",
         # Pin Denvr A100 (40GB) — known-reliable provider. The default
         # cheapest match is MassedCompute, whose DGX-class boxes have

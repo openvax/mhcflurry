@@ -20,7 +20,7 @@ from runplz import App, BrevConfig, Image
 
 app = App(
     "pan-allele-omp-smoketest",
-    brev=BrevConfig(auto_create=True, mode="container", instance_type="denvr_A100_sxm4"),
+    brev=BrevConfig(mode="container", instance_type="denvr_A100_sxm4"),
 )
 
 image = (

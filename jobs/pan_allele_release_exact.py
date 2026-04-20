@@ -22,7 +22,6 @@ from runplz import App, BrevConfig, Image
 app = App(
     "pan-allele-release-exact",
     brev=BrevConfig(
-        auto_create=True,
         mode="container",
         # 8×A100-40GB, 120 vCPUs, 14 TB disk at $12/hr. Denvr has been
         # reliable for us (MassedCompute timed out on SSH earlier). VRAM
