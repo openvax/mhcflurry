@@ -15,7 +15,7 @@ from runplz import App, BrevConfig, Image
 
 app = App(
     "pan-allele-dsl",
-    brev=BrevConfig(auto_create=False, mode="vm"),
+    brev=BrevConfig(auto_create=True, mode="container"),
 )
 
 image = (
@@ -39,10 +39,10 @@ image = (
     # Resource requests — GB for everything memory/disk-related.
     # 26 GB RAM avoids the SIGKILL we hit on 16 GB boxes during
     # mhcflurry's full-data peptide encoding.
-    gpu="T4",
+    gpu="A100",
     min_cpu=4,
     min_memory=26,         # GB
-    min_gpu_memory=16,     # GB VRAM
+    min_gpu_memory=40,     # GB VRAM (A100-40GB)
     min_disk=100,          # GB
     timeout=6 * 60 * 60,
     env={
