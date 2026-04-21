@@ -6,6 +6,8 @@ import gc
 import time
 import collections
 import json
+import multiprocessing
+import sys
 import weakref
 import itertools
 import os
@@ -79,6 +81,43 @@ class _FitBatchDataset(torch.utils.data.Dataset):
         return sample
 
 
+_DAEMON_DOWNGRADE_WARNED = False
+
+
+def _effective_num_workers(num_workers):
+    """Downgrade ``num_workers`` to 0 when running inside a daemon process.
+
+    Python's ``multiprocessing`` disallows daemon processes from spawning
+    children — enforced by an ``AssertionError`` deep inside
+    ``DataLoader._MultiProcessingDataLoaderIter``. mhcflurry's training
+    orchestrator runs workers via ``multiprocessing.Pool``, whose workers
+    are daemonic by default. With ``dataloader_num_workers > 0`` that
+    detonates the whole training run at the first epoch's ``for batch
+    in loader`` line.
+
+    The right behavior under that constraint: silently fall back to
+    ``num_workers=0`` so the worker runs correctly (just without prefetch).
+    Orchestrator-level runs (e.g. tests, single-process CLI) keep the
+    configured value.
+
+    See ``test_dataloader_num_workers_downgrades_in_daemon_context`` for
+    the regression test that locks this behavior.
+    """
+    global _DAEMON_DOWNGRADE_WARNED
+    if num_workers > 0 and multiprocessing.current_process().daemon:
+        if not _DAEMON_DOWNGRADE_WARNED:
+            print(
+                f"[warn] dataloader_num_workers={num_workers} requested from a "
+                f"daemon process (mhcflurry Pool worker); downgrading to 0 to "
+                f"avoid 'daemonic processes are not allowed to have children'. "
+                f"Prefetch disabled inside this worker.",
+                file=sys.stderr,
+            )
+            _DAEMON_DOWNGRADE_WARNED = True
+        return 0
+    return num_workers
+
+
 def _make_fit_dataloader(
     dataset,
     batch_size,
@@ -94,6 +133,12 @@ def _make_fit_dataloader(
     prefetch minibatches into pinned host memory, overlapping CPU work
     with GPU compute.
 
+    If called from a daemon process (i.e. inside a
+    ``multiprocessing.Pool`` worker — the standard mhcflurry training
+    path), ``num_workers`` is forced to 0 and ``pin_memory`` to False
+    because daemon processes cannot spawn their own children. See
+    ``_effective_num_workers``.
+
     ``persistent_workers=True`` avoids respawning the worker processes
     between epochs. Currently only useful in narrow cases — ``fit()``
     constructs a new DataLoader per epoch (the x_peptide arrays change
@@ -102,14 +147,19 @@ def _make_fit_dataloader(
     Exposing the knob keeps the API forward-compatible with a Phase-2
     refactor that hoists DataLoader construction out of the epoch loop.
     """
+    effective_workers = _effective_num_workers(num_workers)
+    # pin_memory + non_blocking H2D only makes sense when prefetch workers
+    # exist to fill the pinned staging buffers. In num_workers=0 mode it
+    # just pays the pinning cost with no overlap benefit.
+    effective_pin = use_pinned_memory and effective_workers > 0
     kwargs = dict(
         dataset=dataset,
         batch_size=batch_size,
         shuffle=False,  # Dataset already reflects shuffled train_indices.
-        num_workers=num_workers,
-        pin_memory=use_pinned_memory,
+        num_workers=effective_workers,
+        pin_memory=effective_pin,
     )
-    if num_workers > 0:
+    if effective_workers > 0:
         # CUDA contexts aren't fork-safe. Using 'spawn' avoids copying the
         # training process's CUDA state into workers, at a ~200-500 ms
         # per-worker startup cost. Safe default.

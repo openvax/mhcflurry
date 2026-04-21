@@ -516,3 +516,162 @@ def test_dataloader_persistent_workers_ignored_when_no_workers(
         num_workers=0,
         persistent_workers=True,
     )
+
+
+# ---- Daemon-process compatibility gate ----
+#
+# mhcflurry's training orchestrator runs workers via multiprocessing.Pool.
+# Pool workers are DAEMONIC by default, and Python enforces that daemon
+# processes cannot spawn children — so ``DataLoader(num_workers>0)``
+# inside a Pool worker raises AssertionError: daemonic processes are not
+# allowed to have children. Our _make_fit_dataloader must detect this and
+# transparently downgrade to num_workers=0.
+#
+# Missing this downgrade detonates every 32-work-item pan-allele run at
+# the first epoch. Caught on a live A100 training run, 2026-04-20.
+
+
+def _train_in_daemon_subprocess(result_queue, peptide_list, df_records, allele_encoding_data):
+    """Worker body: reconstruct the minimal training state and call fit().
+
+    Intentionally does NOT import anything pytest-related — this runs in
+    a separate Python process so we need to construct the training inputs
+    from picklable primitives.
+    """
+    import os
+    # Quiet workers in CI output.
+    os.environ["MHCFLURRY_DEFAULT_DEVICE"] = "cpu"
+    try:
+        import multiprocessing as mp
+        import pandas as _pandas
+        from mhcflurry.allele_encoding import AlleleEncoding as _AE
+        from mhcflurry.class1_neural_network import Class1NeuralNetwork as _CNN
+        from mhcflurry.common import configure_pytorch as _configure
+
+        _configure(backend="cpu")
+
+        # Assert we're actually daemonic — the test premise.
+        assert mp.current_process().daemon, \
+            "subprocess expected to be daemonic; test plumbing is broken"
+
+        df = _pandas.DataFrame.from_records(df_records)
+        allele_enc = _AE(
+            alleles=allele_encoding_data["alleles"],
+            allele_to_sequence=allele_encoding_data["allele_to_sequence"],
+        )
+        hp = dict(
+            peptide_encoding={
+                "alignment_method": "left_pad_centered_right_pad",
+                "max_length": 15,
+                "vector_encoding_name": "BLOSUM62",
+            },
+            max_epochs=1,
+            minibatch_size=8,
+            layer_sizes=[8],
+            peptide_dense_layer_sizes=[],
+            allele_dense_layer_sizes=[],
+            locally_connected_layers=[],
+            peptide_allele_merge_method="concatenate",
+            peptide_allele_merge_activation="",
+            peptide_amino_acid_encoding="BLOSUM62",
+            topology="feedforward",
+            dropout_probability=0.0,
+            batch_normalization=False,
+            dense_layer_l1_regularization=0.0,
+            dense_layer_l2_regularization=0.0,
+            validation_split=0.2,
+            early_stopping=False,
+            patience=100,
+            min_delta=0.0,
+            learning_rate=0.001,
+            loss="custom:mse_with_inequalities",
+            optimizer="rmsprop",
+            activation="tanh",
+            output_activation="sigmoid",
+            init="glorot_uniform",
+            data_dependent_initialization_method="lsuv",
+            random_negative_rate=1.0,
+            random_negative_method="by_allele_equalize_nonbinders",
+            random_negative_affinity_min=30000.0,
+            random_negative_affinity_max=50000.0,
+            random_negative_binder_threshold=500.0,
+            random_negative_constant=1,
+            random_negative_distribution_smoothing=0.0,
+            random_negative_match_distribution=True,
+            # THE LOAD-BEARING KNOB: num_workers>0 would crash without the
+            # daemon-context downgrade. A bare DataLoader(num_workers=2)
+            # call raises AssertionError("daemonic processes are not
+            # allowed to have children") deep in torch internals. If this
+            # test crashes, the downgrade in _make_fit_dataloader is
+            # broken.
+            dataloader_num_workers=2,
+        )
+        net = _CNN(**hp)
+        net.fit(
+            peptides=peptide_list,
+            affinities=df["measurement_value"].values,
+            allele_encoding=allele_enc,
+            verbose=0,
+            progress_print_interval=None,
+        )
+        result_queue.put(("ok", len(net.fit_info[-1]["loss"])))
+    except Exception as exc:
+        import traceback as _tb
+        result_queue.put(("error", f"{type(exc).__name__}: {exc}\n{_tb.format_exc()}"))
+
+
+def test_dataloader_num_workers_downgrades_in_daemon_context(
+    training_df, allele_encoding
+):
+    """Regression test: fit(dataloader_num_workers>0) must work in a Pool worker.
+
+    Spawns a daemon subprocess (simulating what multiprocessing.Pool does
+    for its workers) and calls fit() with dataloader_num_workers=2. If
+    _make_fit_dataloader doesn't downgrade to 0 in daemon context, the
+    subprocess crashes with AssertionError. This is THE test that would
+    have caught the 2026-04-20 A100 training crash.
+
+    Uses spawn context for the parent→daemon transition to mirror
+    mhcflurry's actual Pool configuration.
+    """
+    import multiprocessing as mp
+
+    # Serialize inputs as primitives (AlleleEncoding doesn't pickle cleanly
+    # across spawn contexts; the daemon child rebuilds it).
+    ctx = mp.get_context("spawn")
+    result_queue = ctx.Queue()
+
+    # multiprocessing.Process(daemon=True) replicates the Pool-worker
+    # context: child is daemonic, so attempts to spawn its own children
+    # should raise AssertionError in untreated code.
+    peptide_list = list(training_df["peptide"].values)
+    df_records = training_df.to_dict("records")
+    allele_data = {
+        "alleles": list(training_df["allele"].values),
+        "allele_to_sequence": ALLELE_TO_SEQUENCE,
+    }
+
+    p = ctx.Process(
+        target=_train_in_daemon_subprocess,
+        args=(result_queue, peptide_list, df_records, allele_data),
+        daemon=True,
+    )
+    p.start()
+    p.join(timeout=180)
+    if p.is_alive():
+        p.terminate()
+        pytest.fail("daemon-subprocess training did not finish within 3 min")
+
+    assert not result_queue.empty(), (
+        "daemon-subprocess produced no result — likely crashed before "
+        "fit() returned (segfault or non-Python failure)"
+    )
+    status, payload = result_queue.get(timeout=5)
+    assert status == "ok", (
+        f"daemon-subprocess training FAILED. This is the regression that "
+        f"detonated the 2026-04-20 A100 run. Check "
+        f"_effective_num_workers in class1_neural_network.py.\n"
+        f"Subprocess error:\n{payload}"
+    )
+    n_epochs = payload
+    assert n_epochs == 1, f"expected 1 training epoch, got {n_epochs}"
