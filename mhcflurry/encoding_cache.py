@@ -187,10 +187,19 @@ class EncodingCache:
             **self.params.to_kwargs()
         )
         encoded_row_shape = sample_encoded.shape[1:]
-        # Upstream sometimes returns float64. Pin to float32 to match what
-        # class1_neural_network's .float().to(device) cast would produce,
-        # and to halve memmap size on disk.
-        dtype = numpy.float32
+        # Preserve the encoder's native dtype. For BLOSUM62 (our only
+        # vector_encoding_name in practice) upstream returns int8 — the
+        # substitution-matrix values fit tightly in [-4, +6]. Storing as
+        # int8 is LOSSLESS for that encoding and cuts memmap size by 4×
+        # vs float32. At training-step time the batch is cast int8→fp32
+        # on the GPU, which is a free widening op and reduces H2D
+        # bandwidth by the same 4× factor (cold cache slices are int8
+        # from the memmap, not float32).
+        #
+        # If a future encoding returns float values, we preserve those
+        # too — only the storage width shrinks for integer-valued
+        # encoders.
+        dtype = sample_encoded.dtype
 
         n = len(peptides)
         out_path = entry_dir / "encoded.npy"

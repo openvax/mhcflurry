@@ -91,21 +91,38 @@ def cache(tmp_path, default_params):
 
 
 def test_cached_matches_direct_byte_for_byte(cache, default_params):
-    """The cache MUST emit bytes identical to a direct EncodableSequences call.
+    """The cache MUST emit values identical to a direct EncodableSequences call.
 
     This is the semantic-preservation gate. If this fails, downstream
     training will diverge from the un-cached code path and we can no
     longer claim determinism. Every other test below is secondary.
+
+    Dtype note: Phase 4a of #268 stores the encoder's native dtype
+    (int8 for BLOSUM62 — values fit tightly in [-4, +6]) instead of
+    widening to float32 at the cache layer. The downstream GPU cast
+    int8→float32 is a free widening op that preserves values exactly.
+    This test compares values (``assert_array_equal`` across the
+    widened cast) rather than dtype.
     """
-    direct = (
-        EncodableSequences(VALID_PEPTIDES)
-        .variable_length_to_fixed_length_vector_encoding(**default_params.to_kwargs())
-        .astype(numpy.float32)
+    direct = EncodableSequences(VALID_PEPTIDES).variable_length_to_fixed_length_vector_encoding(
+        **default_params.to_kwargs()
     )
     cached, _ = cache.get_or_build(VALID_PEPTIDES)
     assert cached.shape == direct.shape
+    # Dtype preserved exactly: cache stores encoder's native dtype.
     assert cached.dtype == direct.dtype
+    # Values identical byte-for-byte.
     assert_array_equal(cached, direct)
+    # For BLOSUM62 (the public release's only vector_encoding_name)
+    # specifically: native dtype is int8. Guard against silent
+    # regression to fp32 storage (which would 4× the memmap size and
+    # double the H2D bandwidth for no gain).
+    if default_params.vector_encoding_name == "BLOSUM62":
+        assert cached.dtype == numpy.int8, (
+            f"BLOSUM62 cache should store int8 (lossless, 4× smaller); "
+            f"got {cached.dtype}. Check encoding_cache._build's dtype "
+            f"line."
+        )
 
 
 def test_peptide_to_idx_roundtrip(cache):

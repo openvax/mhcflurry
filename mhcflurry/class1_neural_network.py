@@ -1861,9 +1861,13 @@ class Class1NeuralNetwork(object):
                 except StopIteration:
                     break
 
-                # Convert to tensors
-                peptide_tensor = torch.from_numpy(x_dict["peptide"]).float().to(device)
-                allele_tensor = torch.from_numpy(x_dict["allele"]).float().to(device)
+                # GPU-side widening cast (see Phase 4a #268): when the
+                # encoding cache stores int8 (BLOSUM62 native width),
+                # H2D transfer is 4× smaller; widening to fp32 on GPU
+                # is essentially free. For fp32-native encodings this
+                # is a no-op.
+                peptide_tensor = torch.from_numpy(x_dict["peptide"]).to(device).float()
+                allele_tensor = torch.from_numpy(x_dict["allele"]).to(device).float()
                 y_tensor = torch.from_numpy(y.astype(numpy.float32)).to(device)
 
                 optimizer.zero_grad()
@@ -2316,26 +2320,34 @@ class Class1NeuralNetwork(object):
             )
 
             for batch in loader:
-                peptide_batch = batch["peptide"].float().to(
+                # ``.to(device).float()`` (GPU-side widening cast) is
+                # strictly better than ``.float().to(device)``:
+                #   - When the cache stores int8 (BLOSUM62 native width),
+                #     the H2D transfer is 4× smaller.
+                #   - The widening cast on GPU is ~free (wide-warp op,
+                #     often fused into the first Linear's matmul).
+                #   - When the cache already stores fp32 (other
+                #     encodings), the cast is a no-op.
+                peptide_batch = batch["peptide"].to(
                     device, non_blocking=non_blocking_h2d
-                )
+                ).float()
                 y_batch = batch["y"].to(
                     device, non_blocking=non_blocking_h2d
                 )
 
                 inputs = {"peptide": peptide_batch}
                 if "allele" in batch:
-                    inputs["allele"] = batch["allele"].float().to(
+                    inputs["allele"] = batch["allele"].to(
                         device, non_blocking=non_blocking_h2d
-                    )
+                    ).float()
 
                 optimizer.zero_grad()
                 predictions = network(inputs)
                 weights_batch = None
                 if "weight" in batch:
-                    weights_batch = batch["weight"].float().to(
+                    weights_batch = batch["weight"].to(
                         device, non_blocking=non_blocking_h2d
-                    )
+                    ).float()
                 loss = loss_obj(predictions, y_batch, sample_weights=weights_batch)
                 regularization_penalty = self._regularization_penalty(
                     regularization_parameters,
