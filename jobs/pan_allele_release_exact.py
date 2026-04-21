@@ -23,10 +23,16 @@ app = App(
     "pan-allele-release-exact",
     brev_config=BrevConfig(
         mode="container",
-        # 8×A100-40GB, 120 vCPUs, 14 TB disk at $12/hr. Denvr has been
-        # reliable for us (MassedCompute timed out on SSH earlier). VRAM
-        # at 40GB is plenty — individual networks fit comfortably.
-        instance_type="denvr_A100_sxm4x8",
+        # MassedCompute 8×A100-80GB DGXx8, 120 vCPUs, 10 TB disk at
+        # $12.29/hr. Chose over Denvr after 3/3 Denvr failures on
+        # 2026-04-21 (Brev API EOF, mid-boot SSH drop, 1200s SSH
+        # timeout). 80GB cards unlock MAX_WORKERS_PER_GPU=2 for 16
+        # concurrent workers (vs 8 on 40GB Denvr) — halves wall time.
+        # Runplz 3.6.2 brought transient-EOF retry + SIGTERM cleanup
+        # so the earlier MassedCompute shadeform failures should no
+        # longer be as reliable a blocker.
+        instance_type="massedcompute_A100_sxm4_80G_DGXx8",
+        auto_create_instances=True,
     ),
 )
 
@@ -34,7 +40,7 @@ image = (
     Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
     .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
     .pip_install(
-        "runplz>=3.2.0",
+        "runplz>=3.6.2",
         "pandas>=2.0",
         "appdirs",
         "scikit-learn",
@@ -56,15 +62,12 @@ image = (
     min_disk=1000,       # GB — ~140 networks × ~10MB weights + init info
     timeout=60 * 60 * 60,  # 60 hours — safety margin above 28h estimate
     env={
-        # denvr_A100_sxm4x8 is 8× A100-40GB. Per-worker GPU memory on
-        # mhcflurry pan-allele training peaks at 16-22 GB during
-        # pretrain validation inference — tight on a 40 GB card.
-        # MAX_WORKERS_PER_GPU=1 gives us 8 workers across 8 GPUs. The
-        # NonDaemonPool (Phase 2 #268) means each training worker can
-        # still spawn its own DataLoader prefetch workers on top of
-        # that, but those consume CPU + host RAM, not VRAM, so no
-        # additional pressure on the A100.
-        "MAX_WORKERS_PER_GPU": "1",
+        # massedcompute_A100_sxm4_80G_DGXx8 is 8× A100-80GB. 80GB cards
+        # fit 2 workers (each ~20 GB peak VRAM during validation
+        # inference), unlocking 16 concurrent training workers across
+        # 8 GPUs. With Phase 2 NonDaemonPool, each worker's DataLoader
+        # prefetch path is live in production too.
+        "MAX_WORKERS_PER_GPU": "2",
     },
 )
 def train():
