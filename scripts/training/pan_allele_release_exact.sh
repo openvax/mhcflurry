@@ -59,6 +59,16 @@ fi
 echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU)"
 PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu $MAX_WORKERS_PER_GPU"
 
+# Phase 1 (#268): enable the BLOSUM62 encoding cache + DataLoader prefetch
+# by default. USE_ENCODING_CACHE=0 or DATALOADER_NUM_WORKERS=0 restores
+# the pre-#268 legacy path (bit-identical; verified by Phase 1 tests).
+USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
+DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-4}"
+CACHE_ARGS=()
+if [ "$USE_ENCODING_CACHE" = "1" ]; then
+    CACHE_ARGS=(--use-encoding-cache)
+fi
+
 # ---- data ------------------------------------------------------------
 mhcflurry-downloads fetch data_curated allele_sequences random_peptide_predictions
 
@@ -75,7 +85,17 @@ TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 
 # ---- hyperparameters -------------------------------------------------
 cp "$RECIPE_DIR/generate_hyperparameters.py" .
-python generate_hyperparameters.py > hyperparameters.yaml
+python generate_hyperparameters.py > hyperparameters.full.yaml
+# Inject dataloader_num_workers into every arch entry (Phase 1 #268).
+python - <<PY
+import yaml
+hp = yaml.safe_load(open("hyperparameters.full.yaml"))
+for d in hp:
+    d["dataloader_num_workers"] = $DATALOADER_NUM_WORKERS
+with open("hyperparameters.yaml", "w") as f:
+    yaml.safe_dump(hp, f)
+print(f"release_exact: {len(hp)} archs with dataloader_num_workers=$DATALOADER_NUM_WORKERS")
+PY
 ARCH_COUNT=$(python -c "import yaml; print(len(yaml.safe_load(open('hyperparameters.yaml'))))")
 echo "Architectures in sweep: $ARCH_COUNT"
 
@@ -103,6 +123,7 @@ do
         --hyperparameters hyperparameters.yaml \
         --out-models-dir "$(pwd)/$UNSELECTED_DIR" \
         --worker-log-dir "$MHCFLURRY_OUT" \
+        "${CACHE_ARGS[@]}" \
         $PARALLELISM_ARGS $CONTINUE_ARGS
 done
 echo "Done training. Beginning model selection."
