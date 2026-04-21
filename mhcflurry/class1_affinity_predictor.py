@@ -1111,6 +1111,72 @@ class Class1AffinityPredictor(object):
                 sub_df.affinity, allele=allele, throw=throw)
         return df.result.values
 
+    def _prepare_peptides_with_optional_cache(
+            self, peptides, *, encoding_cache_dir=None):
+        """Return an EncodableSequences for the predict path.
+
+        If ``encoding_cache_dir`` is None: identical to
+        ``EncodableSequences.create(peptides)`` — current behavior.
+
+        If set, resolves the peptide_encoding params from the first
+        neural network's hyperparameters, looks up / builds the cache
+        entry for this peptide list, and returns an EncodableSequences
+        with the per-instance ``encoding_cache`` prepopulated.
+        Downstream calls to ``peptides_to_network_input`` in each network
+        hit the prepopulated cache and skip the BLOSUM62 pass.
+
+        When the ensemble's networks have heterogeneous
+        ``peptide_encoding`` configs, only the networks matching the
+        cache params benefit. Other networks fall through to direct
+        encoding — their peptides_to_network_input call misses the
+        cache and runs the encoder normally. No correctness impact.
+        """
+        if encoding_cache_dir is None:
+            return EncodableSequences.create(peptides)
+
+        # Need at least one network to read the encoding config from.
+        if not self.neural_networks:
+            return EncodableSequences.create(peptides)
+
+        # Import locally so module-level import doesn't pull cache deps
+        # into mhcflurry startup for callers who never use the cache.
+        from .encoding_cache import (
+            EncodingCache,
+            EncodingParams,
+            make_preencoded_encodable_sequences,
+        )
+
+        cfg = self.neural_networks[0].hyperparameters.get(
+            "peptide_encoding", {}
+        )
+        try:
+            params = EncodingParams(**cfg)
+        except TypeError:
+            # Unknown kwargs (e.g. a new field we don't support) — fall
+            # back to direct encoding rather than crash the predict call.
+            logging.warning(
+                "encoding_cache_dir was set but peptide_encoding %r "
+                "contains kwargs not accepted by EncodingParams. Falling "
+                "back to uncached encoding.", cfg
+            )
+            return EncodableSequences.create(peptides)
+
+        # Normalize peptide list; EncodingCache hashes list order +
+        # content, so consistent list type matters.
+        if hasattr(peptides, "sequences"):
+            peptide_list = list(peptides.sequences)
+        else:
+            peptide_list = list(peptides)
+
+        if not peptide_list:
+            return EncodableSequences.create(peptides)
+
+        cache = EncodingCache(cache_dir=encoding_cache_dir, params=params)
+        encoded, _peptide_to_idx = cache.get_or_build(peptide_list)
+        return make_preencoded_encodable_sequences(
+            peptide_list, encoded, params
+        )
+
     def predict(
             self,
             peptides,
@@ -1118,7 +1184,8 @@ class Class1AffinityPredictor(object):
             allele=None,
             throw=True,
             centrality_measure=DEFAULT_CENTRALITY_MEASURE,
-            model_kwargs={}):
+            model_kwargs={},
+            encoding_cache_dir=None):
         """
         Predict nM binding affinities.
 
@@ -1144,6 +1211,17 @@ class Class1AffinityPredictor(object):
             ensemble. Options include: mean, median, robust_mean.
         model_kwargs : dict
             Additional keyword arguments to pass to Class1NeuralNetwork.predict
+        encoding_cache_dir : string, optional
+            Directory for a shared BLOSUM62 peptide encoding cache. When set,
+            the peptide encoding is computed once (or memmap-loaded if the
+            cache entry already exists) and all networks in the ensemble hit
+            the prepopulated cache instead of re-encoding. Useful when the
+            same peptide list is scored by multiple predictors (e.g.
+            comparing against a reference model) or across many calls.
+            Uses ``self.neural_networks[0].hyperparameters["peptide_encoding"]``
+            to determine the cache params. Silently falls back to direct
+            encoding if the ensemble contains networks with heterogeneous
+            peptide_encoding configs (none matches would cache-miss anyway).
 
         Returns
         -------
@@ -1157,7 +1235,8 @@ class Class1AffinityPredictor(object):
             include_percentile_ranks=False,
             include_confidence_intervals=False,
             centrality_measure=centrality_measure,
-            model_kwargs=model_kwargs
+            model_kwargs=model_kwargs,
+            encoding_cache_dir=encoding_cache_dir,
         )
         return df.prediction.values
 
@@ -1171,7 +1250,8 @@ class Class1AffinityPredictor(object):
             include_percentile_ranks=True,
             include_confidence_intervals=True,
             centrality_measure=DEFAULT_CENTRALITY_MEASURE,
-            model_kwargs={}):
+            model_kwargs={},
+            encoding_cache_dir=None):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
@@ -1217,7 +1297,9 @@ class Class1AffinityPredictor(object):
         if allele is None and alleles is None:
             raise ValueError("Must specify 'allele' or 'alleles'.")
 
-        peptides = EncodableSequences.create(peptides)
+        peptides = self._prepare_peptides_with_optional_cache(
+            peptides, encoding_cache_dir=encoding_cache_dir
+        )
         df = pandas.DataFrame({
             'peptide': peptides.sequences
         }, copy=False)
