@@ -2216,7 +2216,20 @@ class Class1NeuralNetwork(object):
                 random_negative_peptides
             )
 
-            # Build x_dict with random negatives
+            # Build x_dict with random negatives.
+            #
+            # Drop the previous epoch's x_peptide / x_allele arrays BEFORE
+            # allocating the new concatenated buffers. Without this,
+            # both old and new live simultaneously through the
+            # ``numpy.concatenate`` call — peak RAM doubles on each
+            # epoch boundary. For a 1.85M-row 45-wide BLOSUM62 training
+            # set that's an extra ~7 GB briefly held per worker. On
+            # A100-40GB this is the difference between ``MAX_WORKERS_PER_GPU=1``
+            # and 2. Semantically a no-op: Python would have GC'd the
+            # old array eventually, but not before the concat allocates
+            # the new one.
+            x_peptide = None
+            x_allele = None
             if len(random_negative_peptides) > 0:
                 x_peptide = numpy.concatenate([
                     random_negative_peptides_encoding,
