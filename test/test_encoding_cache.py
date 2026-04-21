@@ -26,7 +26,7 @@ from mhcflurry.encoding_cache import (
     _hash_peptides,
     _vector_encoding_cache_key,
     _verify_cache_key_shape,
-    make_preencoded_encodable_sequences,
+    make_prepopulated_encodable_sequences,
 )
 
 
@@ -469,7 +469,7 @@ def test_default_chunk_size_is_reasonable():
 
 
 def test_prepopulated_hits_existing_cache_path(default_params):
-    """The preencoded EncodableSequences short-circuits the encode path.
+    """The prepopulated EncodableSequences short-circuits the encode path.
 
     This is the load-bearing test for the integration — if upstream
     EncodableSequences rearranges its internal cache key tuple in a
@@ -482,7 +482,7 @@ def test_prepopulated_hits_existing_cache_path(default_params):
         .variable_length_to_fixed_length_vector_encoding(**default_params.to_kwargs())
         .astype(numpy.float32)
     )
-    es = make_preencoded_encodable_sequences(peptides, expected, default_params)
+    es = make_prepopulated_encodable_sequences(peptides, expected, default_params)
 
     # Short-circuit check: if the cache is hit, this call should NOT do any
     # actual encoding work. We detect by snapshotting the cache and
@@ -513,7 +513,7 @@ def test_prepopulated_hits_existing_cache_path(default_params):
 def test_prepopulated_length_mismatch_raises():
     params = EncodingParams(max_length=15, alignment_method="pad_middle")
     with pytest.raises(ValueError, match="does not match peptide count"):
-        make_preencoded_encodable_sequences(
+        make_prepopulated_encodable_sequences(
             ["SIINFEKL", "GILGFVFTL"],
             numpy.zeros((5, 15, 21), dtype=numpy.float32),
             params,
@@ -549,7 +549,7 @@ def test_full_roundtrip_via_prepopulated(tmp_path, default_params):
     )
     encoded_rows, _ = cache.get_or_build(VALID_PEPTIDES)
 
-    es = make_preencoded_encodable_sequences(
+    es = make_prepopulated_encodable_sequences(
         VALID_PEPTIDES, encoded_rows, default_params
     )
     through_cache = es.variable_length_to_fixed_length_vector_encoding(
@@ -681,8 +681,8 @@ def test_verify_cache_key_shape_raises_when_key_wrong(monkeypatch):
     assert encoding_cache_module._CACHE_KEY_SHAPE_VERIFIED is False
 
 
-def test_make_preencoded_triggers_self_test_on_first_call():
-    """make_preencoded_encodable_sequences runs the self-test once.
+def test_make_prepopulated_triggers_self_test_on_first_call():
+    """make_prepopulated_encodable_sequences runs the self-test once.
 
     First call after a fresh process (or after resetting the guard flag)
     must invoke _verify_cache_key_shape. This is the behavior that turns
@@ -695,15 +695,15 @@ def test_make_preencoded_triggers_self_test_on_first_call():
         .variable_length_to_fixed_length_vector_encoding(**params.to_kwargs())
         .astype(numpy.float32)
     )
-    make_preencoded_encodable_sequences(["SIINFEKL"], expected, params)
+    make_prepopulated_encodable_sequences(["SIINFEKL"], expected, params)
     assert encoding_cache_module._CACHE_KEY_SHAPE_VERIFIED is True
 
 
-def test_make_preencoded_raises_if_key_drift_detected(monkeypatch):
+def test_make_prepopulated_raises_if_key_drift_detected(monkeypatch):
     """Orchestrator-level failure mode: key drift blocks cache construction.
 
     Ensures a broken upstream refactor fails fast at the first
-    make_preencoded call rather than silently producing a cache that
+    make_prepopulated call rather than silently producing a cache that
     never gets hit.
     """
     encoding_cache_module._CACHE_KEY_SHAPE_VERIFIED = False
@@ -715,4 +715,4 @@ def test_make_preencoded_raises_if_key_drift_detected(monkeypatch):
     params = EncodingParams()
     fake_encoded = numpy.zeros((1, 15, 21), dtype=numpy.float32)
     with pytest.raises(EncodingCacheKeyMismatchError):
-        make_preencoded_encodable_sequences(["SIINFEKL"], fake_encoded, params)
+        make_prepopulated_encodable_sequences(["SIINFEKL"], fake_encoded, params)

@@ -9,7 +9,7 @@ sampling, minibatch shuffle, validation split).
 
 So: we run actual training on a tiny model, with fixed seeds, via both
 the original code path (fresh ``EncodableSequences``) and the new cached
-path (``make_preencoded_encodable_sequences``). We assert the per-epoch
+path (``make_prepopulated_encodable_sequences``). We assert the per-epoch
 loss trajectories match bit-for-bit AND the final model weights match
 bit-for-bit.
 
@@ -37,7 +37,7 @@ from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.encoding_cache import (
     EncodingCache,
     EncodingParams,
-    make_preencoded_encodable_sequences,
+    make_prepopulated_encodable_sequences,
 )
 
 
@@ -228,7 +228,7 @@ def test_training_bit_identical_cached_vs_uncached(
         [peptide_to_idx[p] for p in training_df.peptide.values], dtype=numpy.int64
     )
     fold_encoded = encoded_all[fold_indices]
-    peptides_cached = make_preencoded_encodable_sequences(
+    peptides_cached = make_prepopulated_encodable_sequences(
         training_df.peptide.values, fold_encoded, params
     )
     fit_info_cached, weights_cached = _train_one_run(
@@ -309,12 +309,10 @@ def _train_with_workers(
     training_df,
     allele_encoding,
     num_workers,
-    persistent_workers=False,
 ):
     """Train identically to _train_one_run but with a configurable num_workers."""
     hp = _tiny_hyperparameters()
     hp["dataloader_num_workers"] = num_workers
-    hp["dataloader_persistent_workers"] = persistent_workers
     network = Class1NeuralNetwork(**hp)
     network.fit(
         peptides=peptides_arg,
@@ -435,7 +433,7 @@ def test_dataloader_cache_plus_workers_still_bit_identical(
         [peptide_to_idx[p] for p in training_df.peptide.values], dtype=numpy.int64
     )
     fold_encoded = encoded_all[fold_indices]
-    peptides_stack = make_preencoded_encodable_sequences(
+    peptides_stack = make_prepopulated_encodable_sequences(
         training_df.peptide.values, fold_encoded, params
     )
     fit_stack, weights_stack = _train_with_workers(
@@ -447,53 +445,6 @@ def test_dataloader_cache_plus_workers_still_bit_identical(
     for k in weights_baseline:
         assert torch.equal(weights_baseline[k], weights_stack[k]), (
             f"encoding-cache + DataLoader-workers stack diverges at key {k!r}"
-        )
-
-
-# ---- dataloader_persistent_workers bit-identity gate ----
-
-
-def test_dataloader_persistent_workers_true_matches_false(
-    training_df, allele_encoding
-):
-    """persistent_workers=True must not change training semantics.
-
-    Currently the DataLoader is constructed per-epoch so the flag is
-    effectively a no-op, but the flag is exposed and threaded through
-    _make_fit_dataloader. If a future Phase 2 change hoists DataLoader
-    construction outside the epoch loop, we want this test in place to
-    catch semantic drift.
-
-    Right now: setting persistent_workers=True with num_workers=2 must
-    produce bit-identical results to persistent_workers=False.
-    """
-    _seed_everything()
-    peptides_nonpersist = EncodableSequences(training_df.peptide.values)
-    fit_nonpersist, weights_nonpersist = _train_with_workers(
-        peptides_nonpersist,
-        training_df,
-        allele_encoding,
-        num_workers=2,
-        persistent_workers=False,
-    )
-
-    _seed_everything()
-    peptides_persist = EncodableSequences(training_df.peptide.values)
-    fit_persist, weights_persist = _train_with_workers(
-        peptides_persist,
-        training_df,
-        allele_encoding,
-        num_workers=2,
-        persistent_workers=True,
-    )
-
-    numpy.testing.assert_array_equal(fit_nonpersist["loss"], fit_persist["loss"])
-    numpy.testing.assert_array_equal(
-        fit_nonpersist["val_loss"], fit_persist["val_loss"]
-    )
-    for k in weights_nonpersist:
-        assert torch.equal(weights_nonpersist[k], weights_persist[k]), (
-            f"persistent_workers=True diverges from False at key {k!r}"
         )
 
 
@@ -625,27 +576,6 @@ def test_fit_generator_validation_tensors_hoisted_once(
         f"Expected ~{expected_max}. If this ballooned, the val-tensor "
         f"hoist regressed — H2D is running per-epoch again, negating the "
         f"Phase 1 fit_generator perf fix."
-    )
-
-
-def test_dataloader_persistent_workers_ignored_when_no_workers(
-    training_df, allele_encoding
-):
-    """persistent_workers=True with num_workers=0 must not crash.
-
-    PyTorch logs a warning when persistent_workers is set with
-    num_workers=0; our _make_fit_dataloader avoids passing the flag in
-    that case to suppress the warning. This test verifies the path.
-    """
-    _seed_everything()
-    peptides = EncodableSequences(training_df.peptide.values)
-    # Should NOT raise, should NOT emit a PyTorch warning.
-    _train_with_workers(
-        peptides,
-        training_df,
-        allele_encoding,
-        num_workers=0,
-        persistent_workers=True,
     )
 
 

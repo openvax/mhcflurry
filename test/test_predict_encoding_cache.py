@@ -131,7 +131,7 @@ def test_predict_with_cache_warm_second_call_no_peptide_reencoding(
         f"with {n_networks} networks in the ensemble. Expected ≤2 "
         f"(just the allele-encoding path). If ≥ {n_networks}+1, the "
         f"peptide cache isn't being hit. Check that "
-        f"make_preencoded_encodable_sequences is producing the right key "
+        f"make_prepopulated_encodable_sequences is producing the right key "
         f"tuple + that the EncodableSequences instance isn't being "
         f"recreated somewhere in predict_to_dataframe."
     )

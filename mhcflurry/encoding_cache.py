@@ -269,7 +269,7 @@ def _as_peptide_list(peptides: list[str] | numpy.ndarray) -> list[str]:
 #
 # LOAD-BEARING COMPATIBILITY SURFACE:
 #
-# ``make_preencoded_encodable_sequences`` writes into the per-instance
+# ``make_prepopulated_encodable_sequences`` writes into the per-instance
 # ``EncodableSequences.encoding_cache`` dict at a key that must match the
 # tuple that ``EncodableSequences.variable_length_to_fixed_length_
 # vector_encoding`` builds internally (encodable_sequences.py around
@@ -337,7 +337,7 @@ def _verify_cache_key_shape() -> None:
 
     Runs once per process (guarded by ``_CACHE_KEY_SHAPE_VERIFIED``).
     Fast: one 8-mer encoded with a 15-length pad. Amortized across all
-    subsequent ``make_preencoded_encodable_sequences`` calls.
+    subsequent ``make_prepopulated_encodable_sequences`` calls.
     """
     global _CACHE_KEY_SHAPE_VERIFIED
     if _CACHE_KEY_SHAPE_VERIFIED:
@@ -375,7 +375,7 @@ def _verify_cache_key_shape() -> None:
     _CACHE_KEY_SHAPE_VERIFIED = True
 
 
-def make_preencoded_encodable_sequences(
+def make_prepopulated_encodable_sequences(
     peptides: list[str] | numpy.ndarray,
     encoded_rows: numpy.ndarray,
     params: EncodingParams,

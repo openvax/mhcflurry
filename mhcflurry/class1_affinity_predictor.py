@@ -1143,7 +1143,7 @@ class Class1AffinityPredictor(object):
         from .encoding_cache import (
             EncodingCache,
             EncodingParams,
-            make_preencoded_encodable_sequences,
+            make_prepopulated_encodable_sequences,
         )
 
         cfg = self.neural_networks[0].hyperparameters.get(
@@ -1173,7 +1173,7 @@ class Class1AffinityPredictor(object):
 
         cache = EncodingCache(cache_dir=encoding_cache_dir, params=params)
         encoded, _peptide_to_idx = cache.get_or_build(peptide_list)
-        return make_preencoded_encodable_sequences(
+        return make_prepopulated_encodable_sequences(
             peptide_list, encoded, params
         )
 

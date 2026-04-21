@@ -4,7 +4,6 @@ Train Class1 pan-allele models.
 import argparse
 import os
 from os.path import join
-from pathlib import Path
 import signal
 import sys
 import time
@@ -36,7 +35,7 @@ from .encodable_sequences import EncodableSequences
 from .encoding_cache import (
     EncodingCache,
     EncodingParams,
-    make_preencoded_encodable_sequences,
+    make_prepopulated_encodable_sequences,
 )
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
@@ -343,7 +342,7 @@ def pretrain_data_iterator(
                 chunk_encoded = numpy.repeat(
                     pretrain_encoded_mmap[indices], len(usable_alleles), axis=0
                 )
-                encodable_peptides = make_preencoded_encodable_sequences(
+                encodable_peptides = make_prepopulated_encodable_sequences(
                     repeated_peptides, chunk_encoded, encoding_params
                 )
 
@@ -576,11 +575,8 @@ def _initialize_encoding_cache(args, all_work_items):
     # that's ~15 min aggregate across 32 work items (the race fix in
     # EncodingCache._build makes this safe but not cheap). Pre-building
     # here amortizes the encoding to a single orchestrator-side pass.
-    #
-    # Guard with isinstance(str): test Mocks return Mock objects for
-    # unset attrs, which are truthy; require a real str/pathlib path.
     pretrain_data_path = getattr(args, "pretrain_data", None)
-    if isinstance(pretrain_data_path, (str, Path)) and pretrain_data_path:
+    if pretrain_data_path:
         pretrain_peptides = _read_pretrain_peptide_list(pretrain_data_path)
         for cfg in configs_seen.values():
             params = EncodingParams(**cfg)
@@ -782,7 +778,7 @@ def _build_train_peptides(peptide_values, hyperparameters, constant_data):
         count=len(peptide_values),
     )
     fold_encoded = encoded_all[fold_indices]
-    return make_preencoded_encodable_sequences(peptide_values, fold_encoded, params)
+    return make_prepopulated_encodable_sequences(peptide_values, fold_encoded, params)
 
 
 def train_model(
