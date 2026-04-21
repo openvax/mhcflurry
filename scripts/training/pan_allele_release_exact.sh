@@ -37,6 +37,32 @@ RECIPE_DIR="$SCRIPT_DIR/release_exact"
 mkdir -p "$MHCFLURRY_OUT"
 cd "$MHCFLURRY_OUT"
 
+# ---- GPU occupancy sampler (background, for later analysis) ----------
+# Sample nvidia-smi every 30 s into a CSV that rsync-down can pull back.
+# Captures per-GPU util, memory, and timestamp so we can answer "what
+# was the steady-state occupancy?" without having to SSH live during
+# the run. Auto-exits when the training process ends (watches its pid).
+if command -v nvidia-smi >/dev/null 2>&1; then
+    GPU_LOG="$MHCFLURRY_OUT/gpu_occupancy.csv"
+    {
+        echo "timestamp,gpu_index,util_percent,mem_used_mib,mem_total_mib"
+        while :; do
+            ts=$(date +%s)
+            nvidia-smi \
+                --query-gpu=index,utilization.gpu,memory.used,memory.total \
+                --format=csv,noheader,nounits 2>/dev/null \
+              | while IFS=',' read -r idx util mem_used mem_total; do
+                  echo "$ts,${idx// /},${util// /},${mem_used// /},${mem_total// /}"
+              done
+            sleep 30
+        done
+    } > "$GPU_LOG" 2>/dev/null &
+    GPU_SAMPLER_PID=$!
+    echo "GPU occupancy sampler PID: $GPU_SAMPLER_PID → $GPU_LOG"
+    # Make sure the sampler dies when the script exits (clean or error).
+    trap "kill $GPU_SAMPLER_PID 2>/dev/null; wait $GPU_SAMPLER_PID 2>/dev/null" EXIT
+fi
+
 # ---- parallelism -----------------------------------------------------
 if command -v nvidia-smi >/dev/null 2>&1; then
     GPUS=$(nvidia-smi -L 2>/dev/null | wc -l | tr -d ' ')

@@ -56,9 +56,15 @@ image = (
     min_disk=1000,       # GB — ~140 networks × ~10MB weights + init info
     timeout=60 * 60 * 60,  # 60 hours — safety margin above 28h estimate
     env={
-        # MHCFLURRY_OUT is wired to RUNPLZ_OUT inside train() so we
-        # don't hard-code a container path that conflicts with the
-        # backend's chosen output dir. Everything else is default.
+        # denvr_A100_sxm4x8 is 8× A100-40GB. Per-worker GPU memory on
+        # mhcflurry pan-allele training peaks at 16-22 GB during
+        # pretrain validation inference — tight on a 40 GB card.
+        # MAX_WORKERS_PER_GPU=1 gives us 8 workers across 8 GPUs. The
+        # NonDaemonPool (Phase 2 #268) means each training worker can
+        # still spawn its own DataLoader prefetch workers on top of
+        # that, but those consume CPU + host RAM, not VRAM, so no
+        # additional pressure on the A100.
+        "MAX_WORKERS_PER_GPU": "1",
     },
 )
 def train():
