@@ -77,11 +77,26 @@ mkdir -p "$MHCFLURRY_OUT/affinity" "$MHCFLURRY_OUT/processing" "$MHCFLURRY_OUT/p
 # ---- optional Nsight Systems profiling wrapper ----------------------
 # Profile only stage 1 (affinity), for a bounded duration. Everything
 # else runs bare so the 4-6 hr full run isn't slowed/ballooned.
+#
+# The pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel image installs nsys at
+# /usr/local/cuda/bin/nsys but does NOT add that dir to the default PATH,
+# so a plain `command -v nsys` misses it (this bit us on the 2026-04-21
+# A100 subset run — profiling silently skipped). Probe both the default
+# PATH and the canonical CUDA bin path before giving up.
 NSYS_WRAP=()
 if [ "${NSYS_PROFILE:-0}" = "1" ]; then
+    NSYS_BIN=""
     if command -v nsys >/dev/null 2>&1; then
+        NSYS_BIN="$(command -v nsys)"
+    elif [ -x /usr/local/cuda/bin/nsys ]; then
+        NSYS_BIN="/usr/local/cuda/bin/nsys"
+    elif [ -x /opt/nvidia/nsight-systems/bin/nsys ]; then
+        NSYS_BIN="/opt/nvidia/nsight-systems/bin/nsys"
+    fi
+
+    if [ -n "$NSYS_BIN" ]; then
         NSYS_WRAP=(
-            nsys profile
+            "$NSYS_BIN" profile
             --duration=180        # 3 min capture window
             --trace=cuda,nvtx,osrt
             --follow-fork=true    # mhcflurry uses multiprocessing.Pool
@@ -91,7 +106,7 @@ if [ "${NSYS_PROFILE:-0}" = "1" ]; then
         )
         echo "NSYS_PROFILE=1: will wrap stage 1 affinity training with: ${NSYS_WRAP[*]}"
     else
-        echo "WARNING: NSYS_PROFILE=1 but 'nsys' not found in PATH; continuing without profiling."
+        echo "WARNING: NSYS_PROFILE=1 but no nsys found in PATH, /usr/local/cuda/bin, or /opt/nvidia/nsight-systems/bin; continuing without profiling. Install with 'apt-get install -y nsight-systems-cli' on Ubuntu images."
     fi
 fi
 
