@@ -4,6 +4,7 @@ Train Class1 pan-allele models.
 import argparse
 import os
 from os.path import join
+from pathlib import Path
 import signal
 import sys
 import time
@@ -568,6 +569,33 @@ def _initialize_encoding_cache(args, all_work_items):
     # (~20 MB for 1M 12-mers) — fine for a single-box Pool. Revisit if this
     # ever ships to a distributed scheduler.
     GLOBAL_DATA["encoding_cache_unique_peptides"] = unique_peptides
+
+    # Pre-build the pretrain cache too if a pretrain file is configured.
+    # Without this, each worker racing to build the pretrain cache on
+    # first use pays a redundant encoding pass — on an A100 subset run
+    # that's ~15 min aggregate across 32 work items (the race fix in
+    # EncodingCache._build makes this safe but not cheap). Pre-building
+    # here amortizes the encoding to a single orchestrator-side pass.
+    #
+    # Guard with isinstance(str): test Mocks return Mock objects for
+    # unset attrs, which are truthy; require a real str/pathlib path.
+    pretrain_data_path = getattr(args, "pretrain_data", None)
+    if isinstance(pretrain_data_path, (str, Path)) and pretrain_data_path:
+        pretrain_peptides = _read_pretrain_peptide_list(pretrain_data_path)
+        for cfg in configs_seen.values():
+            params = EncodingParams(**cfg)
+            cache = EncodingCache(cache_dir=cache_dir, params=params)
+            if cache.is_complete_for(pretrain_peptides):
+                print(f"Pretrain encoding cache hit: "
+                      f"{cache.entry_path(pretrain_peptides)} "
+                      f"({len(pretrain_peptides)} peptides)")
+                continue
+            print(f"Building pretrain encoding cache for params "
+                  f"{params.to_kwargs()} ({len(pretrain_peptides)} peptides) "
+                  f"at {cache.entry_path(pretrain_peptides)}...")
+            t0 = time.time()
+            cache.get_or_build(pretrain_peptides)
+            print(f"Pretrain encoding cache built in {time.time() - t0:.1f}s.")
 
 
 def _deterministic_unique_peptide_list(peptide_values):

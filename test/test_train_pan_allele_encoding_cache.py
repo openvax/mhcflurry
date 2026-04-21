@@ -915,6 +915,122 @@ def test_build_train_peptides_fallback_when_stash_absent(
     )
 
 
+def test_initialize_encoding_cache_prebuilds_pretrain_cache(
+    constant_data_with_cache, hyperparameters, pretrain_csv
+):
+    """Orchestrator pre-builds the pretrain cache too, not just the train cache.
+
+    Before this, each Pool worker on its first ``pretrain_data_iterator``
+    call would race to build the pretrain cache. The Phase 1 race fix
+    made that safe, but every worker still paid the redundant encoding
+    cost. Pre-building here means workers hit a warm cache on first
+    access.
+    """
+    all_work_items = [{"hyperparameters": hyperparameters}]
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=str(pretrain_csv),
+    )
+    GLOBAL_DATA.update(constant_data_with_cache)
+    _initialize_encoding_cache(args, all_work_items)
+
+    # The pretrain cache entry must be complete after orchestrator init.
+    from mhcflurry.encoding_cache import EncodingParams
+    params = EncodingParams(**hyperparameters["peptide_encoding"])
+    cache = EncodingCache(
+        cache_dir=constant_data_with_cache["encoding_cache_dir"], params=params
+    )
+    pretrain_peptides = _read_pretrain_peptide_list(str(pretrain_csv))
+    assert cache.is_complete_for(pretrain_peptides), (
+        "pretrain cache should have been pre-built by the orchestrator"
+    )
+
+
+def test_initialize_encoding_cache_pretrain_skipped_when_no_pretrain_data(
+    constant_data_with_cache, hyperparameters
+):
+    """With pretrain_data=None the orchestrator skips pretrain pre-build silently.
+
+    Some training configs don't have pretraining; the orchestrator
+    should degrade cleanly (only build the train cache, don't crash).
+    """
+    all_work_items = [{"hyperparameters": hyperparameters}]
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
+    )
+    GLOBAL_DATA.update(constant_data_with_cache)
+    # Should NOT raise.
+    _initialize_encoding_cache(args, all_work_items)
+    # Train cache must still be built.
+    assert "encoding_cache_dir" in GLOBAL_DATA
+
+
+def test_pretrain_iterator_hits_orchestrator_prebuilt_cache(
+    constant_data_with_cache, hyperparameters, pretrain_csv,
+    pretrain_allele_encoding,
+):
+    """Worker's first pretrain_data_iterator call should find a warm cache.
+
+    Spy on EncodableSequences.variable_length_to_fixed_length_vector_encoding
+    to verify the worker doesn't re-encode anything — the orchestrator's
+    pre-build already covered the pretrain peptides.
+    """
+    all_work_items = [{"hyperparameters": hyperparameters}]
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=str(pretrain_csv),
+    )
+    GLOBAL_DATA.update(constant_data_with_cache)
+    _initialize_encoding_cache(args, all_work_items)
+
+    from mhcflurry.encoding_cache import (
+        EncodingParams,
+        _verify_cache_key_shape,
+    )
+    params = EncodingParams(**hyperparameters["peptide_encoding"])
+
+    # Prime the module-level cache-key-shape self-test so it doesn't
+    # show up as encode calls under the spy. In production this runs
+    # once per process regardless.
+    _verify_cache_key_shape()
+
+    # Now call pretrain_data_iterator as a worker would — no encoding
+    # should happen since the orchestrator pre-built the cache.
+    calls = []
+    original = EncodableSequences.variable_length_to_fixed_length_vector_encoding
+
+    def spy(self, *a, **kw):
+        calls.append(1)
+        return original(self, *a, **kw)
+
+    EncodableSequences.variable_length_to_fixed_length_vector_encoding = spy
+    try:
+        it = pretrain_data_iterator(
+            str(pretrain_csv),
+            pretrain_allele_encoding,
+            peptides_per_chunk=4,
+            encoding_cache_dir=str(constant_data_with_cache["encoding_cache_dir"]),
+            encoding_params=params,
+        )
+        _consume_iterator(it, n_chunks=1)
+    finally:
+        EncodableSequences.variable_length_to_fixed_length_vector_encoding = original
+
+    # Zero encode calls: the cache is warm from orchestrator pre-build.
+    assert calls == [], (
+        f"worker re-encoded {len(calls)} peptide chunks despite orchestrator "
+        f"pre-build. Either pretrain pre-build isn't running, or the worker "
+        f"is using a different cache path than the orchestrator."
+    )
+
+
 def test_stashed_peptides_match_cache_key_peptides(
     constant_data_with_cache, hyperparameters
 ):
