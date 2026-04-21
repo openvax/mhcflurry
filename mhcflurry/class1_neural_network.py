@@ -80,6 +80,50 @@ class _FitBatchDataset(torch.utils.data.Dataset):
         return sample
 
 
+def _build_epoch_input_arrays(
+    random_negative_peptides_encoding,
+    x_dict_without_random_negatives,
+    *,
+    random_negatives_allele_encoding,
+    allele_encoding_to_input,
+):
+    """Build the per-epoch ``(x_peptide, x_allele)`` arrays for fit().
+
+    Extracted from fit()'s epoch loop so that the previous epoch's
+    arrays go out of scope naturally on the caller's reassignment of
+    x_peptide / x_allele — no explicit ``del`` or ``= None`` needed
+    before the concat to keep peak RAM at 1× rather than 2×. For a
+    1.85M-row × 45-wide BLOSUM62 training set that's an extra ~7 GB
+    briefly held per worker per epoch; on A100-40GB it's the
+    difference between ``MAX_WORKERS_PER_GPU=1`` and 2.
+
+    When there are no random negatives, returns the un-concatenated
+    training arrays directly (no copy). When there are random
+    negatives but no allele encoding, returns x_allele=None.
+    """
+    no_random_negs = random_negatives_allele_encoding is None and len(
+        random_negative_peptides_encoding
+    ) == 0
+    if no_random_negs:
+        return (
+            x_dict_without_random_negatives["peptide"],
+            x_dict_without_random_negatives.get("allele"),
+        )
+
+    x_peptide = numpy.concatenate([
+        random_negative_peptides_encoding,
+        x_dict_without_random_negatives["peptide"],
+    ])
+    if "allele" in x_dict_without_random_negatives:
+        x_allele = numpy.concatenate([
+            allele_encoding_to_input(random_negatives_allele_encoding)[0],
+            x_dict_without_random_negatives["allele"],
+        ])
+    else:
+        x_allele = None
+    return x_peptide, x_allele
+
+
 def _effective_num_workers(num_workers):
     """Downgrade ``num_workers`` to 0 when running inside a daemon process.
 
@@ -124,7 +168,6 @@ def _make_fit_dataloader(
     batch_size,
     num_workers,
     use_pinned_memory,
-    persistent_workers=False,
 ):
     """Construct a DataLoader for fit()'s inner batch loop.
 
@@ -135,18 +178,17 @@ def _make_fit_dataloader(
     with GPU compute.
 
     If called from a daemon process (i.e. inside a
-    ``multiprocessing.Pool`` worker — the standard mhcflurry training
-    path), ``num_workers`` is forced to 0 and ``pin_memory`` to False
-    because daemon processes cannot spawn their own children. See
+    ``multiprocessing.Pool`` worker without the NonDaemonPool override),
+    ``num_workers`` is forced to 0 and ``pin_memory`` to False because
+    daemon processes cannot spawn their own children. See
     ``_effective_num_workers``.
 
-    ``persistent_workers=True`` avoids respawning the worker processes
-    between epochs. Currently only useful in narrow cases — ``fit()``
-    constructs a new DataLoader per epoch (the x_peptide arrays change
-    with each epoch's random negatives), so PyTorch's persistent-worker
-    optimization has nothing to persist across DataLoader instances.
-    Exposing the knob keeps the API forward-compatible with a Phase-2
-    refactor that hoists DataLoader construction out of the epoch loop.
+    Note: PyTorch's ``persistent_workers`` flag isn't exposed here
+    because ``fit()`` rebuilds the DataLoader per epoch (the x_peptide
+    arrays change with each epoch's random negatives) — persistent
+    workers have no DataLoader instance to persist across. If a future
+    refactor hoists DataLoader construction out of the epoch loop, add
+    the flag back then.
     """
     effective_workers = _effective_num_workers(num_workers)
     # pin_memory + non_blocking H2D only makes sense when prefetch workers
@@ -167,9 +209,6 @@ def _make_fit_dataloader(
         kwargs["multiprocessing_context"] = "spawn"
         # prefetch_factor is only valid when num_workers > 0.
         kwargs["prefetch_factor"] = 2
-        # PyTorch emits a warning if persistent_workers is set with
-        # num_workers=0; only pass it when it's meaningful.
-        kwargs["persistent_workers"] = persistent_workers
     return torch.utils.data.DataLoader(**kwargs)
 
 
@@ -883,14 +922,6 @@ class Class1NeuralNetwork(object):
         # each adds one Python process holding ~100-500 MB RSS. Don't
         # exceed (num_cpu_cores - num_training_workers).
         dataloader_num_workers=0,
-        # If True and ``dataloader_num_workers > 0``, DataLoader worker
-        # processes are not respawned between DataLoader instances. Only
-        # meaningful when the same DataLoader is iterated repeatedly — in
-        # the current ``fit()`` flow the DataLoader is rebuilt per epoch
-        # so this is effectively a no-op, but the flag is threaded through
-        # so a future hoisting of DataLoader construction can opt in. Has
-        # no effect when ``dataloader_num_workers == 0``.
-        dataloader_persistent_workers=False,
     ).extend(RandomNegativePeptides.hyperparameter_defaults)
     """
     Hyperparameters for neural network training.
@@ -2216,37 +2247,23 @@ class Class1NeuralNetwork(object):
                 random_negative_peptides
             )
 
-            # Build x_dict with random negatives.
-            #
-            # Drop the previous epoch's x_peptide / x_allele arrays BEFORE
-            # allocating the new concatenated buffers. Without this,
-            # both old and new live simultaneously through the
-            # ``numpy.concatenate`` call — peak RAM doubles on each
-            # epoch boundary. For a 1.85M-row 45-wide BLOSUM62 training
-            # set that's an extra ~7 GB briefly held per worker. On
-            # A100-40GB this is the difference between ``MAX_WORKERS_PER_GPU=1``
-            # and 2. Semantically a no-op: Python would have GC'd the
-            # old array eventually, but not before the concat allocates
-            # the new one.
-            x_peptide = None
-            x_allele = None
-            if len(random_negative_peptides) > 0:
-                x_peptide = numpy.concatenate([
-                    random_negative_peptides_encoding,
-                    x_dict_without_random_negatives["peptide"],
-                ])
-                if "allele" in x_dict_without_random_negatives:
-                    x_allele = numpy.concatenate([
-                        self.allele_encoding_to_network_input(
-                            random_negatives_allele_encoding
-                        )[0],
-                        x_dict_without_random_negatives["allele"],
-                    ])
-                else:
-                    x_allele = None
-            else:
-                x_peptide = x_dict_without_random_negatives["peptide"]
-                x_allele = x_dict_without_random_negatives.get("allele")
+            # Build the per-epoch x arrays. The previous epoch's
+            # x_peptide / x_allele go out of scope on the reassignment
+            # below — Python's refcount-based GC drops them before the
+            # concat inside the helper allocates the new buffers, so
+            # peak RAM is 1× the array size, not 2×. Encapsulating the
+            # concat in a function (rather than an inline block) makes
+            # this reliance on scope-based cleanup explicit.
+            x_peptide, x_allele = _build_epoch_input_arrays(
+                random_negative_peptides_encoding,
+                x_dict_without_random_negatives,
+                random_negatives_allele_encoding=(
+                    random_negatives_allele_encoding
+                    if len(random_negative_peptides) > 0
+                    else None
+                ),
+                allele_encoding_to_input=self.allele_encoding_to_network_input,
+            )
 
             if needs_initialization:
                 x_init = {"peptide": x_peptide}
@@ -2278,9 +2295,6 @@ class Class1NeuralNetwork(object):
             dataloader_num_workers = self.hyperparameters.get(
                 "dataloader_num_workers", 0
             )
-            dataloader_persistent_workers = self.hyperparameters.get(
-                "dataloader_persistent_workers", False
-            )
             use_pinned_memory = (
                 dataloader_num_workers > 0 and device.type == "cuda"
             )
@@ -2299,7 +2313,6 @@ class Class1NeuralNetwork(object):
                 batch_size=batch_size,
                 num_workers=dataloader_num_workers,
                 use_pinned_memory=use_pinned_memory,
-                persistent_workers=dataloader_persistent_workers,
             )
 
             for batch in loader:
