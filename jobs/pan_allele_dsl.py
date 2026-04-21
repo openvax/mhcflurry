@@ -29,7 +29,7 @@ image = (
     Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
     .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
     .pip_install(
-        "runplz>=3.6.2",  # the in-container bootstrap runs `python -m runplz._bootstrap`
+        "runplz>=3.7.2",  # the in-container bootstrap runs `python -m runplz._bootstrap`
         "pandas>=2.0",
         "appdirs",
         "scikit-learn",

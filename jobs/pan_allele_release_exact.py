@@ -28,11 +28,17 @@ app = App(
         # 2026-04-21 (Brev API EOF, mid-boot SSH drop, 1200s SSH
         # timeout). 80GB cards unlock MAX_WORKERS_PER_GPU=2 for 16
         # concurrent workers (vs 8 on 40GB Denvr) — halves wall time.
-        # Runplz 3.6.2 brought transient-EOF retry + SIGTERM cleanup
-        # so the earlier MassedCompute shadeform failures should no
-        # longer be as reliable a blocker.
         instance_type="massedcompute_A100_sxm4_80G_DGXx8",
         auto_create_instances=True,
+        # 8×A100 boots take 20-30 min on some provisioners (Denvr
+        # and MassedCompute DGXx8 both stretched past runplz's old
+        # 1200s default on 2026-04-21). 2400s = 40 min gives us
+        # enough headroom to outlast supply-constrained provisioning
+        # queues without being patient enough to burn a full hour on
+        # a truly dead instance. Runplz 3.7.2's new default is 1800s;
+        # this override is because DGXx8 specifically has been near
+        # the boundary. Closes runplz #34.
+        ssh_ready_wait_seconds=2400,
     ),
 )
 
@@ -40,7 +46,7 @@ image = (
     Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
     .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
     .pip_install(
-        "runplz>=3.6.2",
+        "runplz>=3.7.2",
         "pandas>=2.0",
         "appdirs",
         "scikit-learn",
