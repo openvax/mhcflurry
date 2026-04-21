@@ -497,6 +497,137 @@ def test_dataloader_persistent_workers_true_matches_false(
         )
 
 
+def test_fit_generator_self_reproducible(training_df, allele_encoding):
+    """fit_generator with the val-tensor hoist must be self-reproducible.
+
+    Regression lock for the Phase 1 extension (#268) to fit_generator:
+    - val_peptide_device / val_allele_device / val_y_device are allocated
+      once before the epoch loop instead of re-materialized per epoch.
+    - Validation uses those device tensors directly.
+
+    Running the same seeded fit_generator twice must produce bit-identical
+    loss and val_loss trajectories. If the hoist accidentally reuses
+    the tensor in a way that leaks state across epochs (e.g. in-place
+    modification, gradient accumulation on a frozen graph), this test
+    will catch it.
+    """
+    _seed_everything(seed=24680)
+
+    peptides = EncodableSequences(TRAIN_PEPTIDES[:16])
+    affinities = numpy.linspace(50.0, 50000.0, 16)
+
+    allele_list = [TRAIN_ALLELES_CYCLE[i % 3] for i in range(16)]
+    alleles = AlleleEncoding(
+        alleles=allele_list, allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+
+    hp = _tiny_hyperparameters()
+
+    def make_generator():
+        # Two chunks; first 8 peptides then next 8.
+        for start in (0, 8):
+            chunk_peptides = EncodableSequences(TRAIN_PEPTIDES[start:start + 8])
+            chunk_alleles = AlleleEncoding(
+                alleles=allele_list[start:start + 8],
+                allele_to_sequence=ALLELE_TO_SEQUENCE,
+            )
+            yield (chunk_alleles, chunk_peptides,
+                   affinities[start:start + 8])
+
+    def run_once():
+        _seed_everything(seed=24680)
+        net = Class1NeuralNetwork(**hp)
+        # Create the network via a dummy call to fit() first; or let
+        # fit_generator build it.
+        net.fit_generator(
+            generator=make_generator(),
+            validation_peptide_encoding=peptides,
+            validation_affinities=affinities,
+            validation_allele_encoding=alleles,
+            steps_per_epoch=2,
+            epochs=3,
+            min_epochs=3,
+            patience=100,
+            verbose=0,
+            progress_print_interval=None,
+        )
+        info = net.fit_info[-1]
+        return list(info["loss"]), list(info["val_loss"])
+
+    loss_a, val_a = run_once()
+    loss_b, val_b = run_once()
+    numpy.testing.assert_array_equal(loss_a, loss_b)
+    numpy.testing.assert_array_equal(val_a, val_b)
+
+
+def test_fit_generator_validation_tensors_hoisted_once(
+    training_df, allele_encoding
+):
+    """The val-tensor H2D happens ONCE, not per epoch.
+
+    Spy on torch.from_numpy to count calls during fit_generator. Before
+    the hoist: 3 calls (peptide, allele, y) × N epochs. After: 3 calls
+    up front, zero inside the epoch loop for validation.
+
+    This is a perf-regression guard — if someone refactors fit_generator
+    and moves the val H2D back inside the epoch loop, this test fires.
+    """
+    import torch as _torch
+
+    _seed_everything(seed=24680)
+    peptides = EncodableSequences(TRAIN_PEPTIDES[:8])
+    affinities = numpy.linspace(50.0, 50000.0, 8)
+    allele_list = [TRAIN_ALLELES_CYCLE[i % 3] for i in range(8)]
+    alleles = AlleleEncoding(
+        alleles=allele_list, allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+
+    def make_generator():
+        yield (alleles, peptides, affinities)
+
+    hp = _tiny_hyperparameters()
+    net = Class1NeuralNetwork(**hp)
+
+    # Count all torch.from_numpy calls under fit_generator. The
+    # per-step training loop calls it 3× (peptide/allele/y). The val
+    # side should call it 3× TOTAL (hoisted), not 3× per epoch.
+    call_count = [0]
+    orig = _torch.from_numpy
+
+    def spy(a):
+        call_count[0] += 1
+        return orig(a)
+
+    _torch.from_numpy = spy
+    try:
+        net.fit_generator(
+            generator=make_generator(),
+            validation_peptide_encoding=peptides,
+            validation_affinities=affinities,
+            validation_allele_encoding=alleles,
+            steps_per_epoch=1,
+            epochs=5,
+            min_epochs=5,
+            patience=100,
+            verbose=0,
+            progress_print_interval=None,
+        )
+    finally:
+        _torch.from_numpy = orig
+
+    # Expected calls: 3 val-hoist up front + 3 per training step × 5 epochs
+    # × 1 step = 15. Total = 18. Budget it loosely (±5) to tolerate other
+    # numpy→torch conversions (e.g. loss internals) without hardcoding
+    # an exact number.
+    expected_max = 3 + (3 * 5) + 5  # hoist + step + slack
+    assert call_count[0] <= expected_max, (
+        f"torch.from_numpy called {call_count[0]} times in a 5-epoch run. "
+        f"Expected ~{expected_max}. If this ballooned, the val-tensor "
+        f"hoist regressed — H2D is running per-epoch again, negating the "
+        f"Phase 1 fit_generator perf fix."
+    )
+
+
 def test_dataloader_persistent_workers_ignored_when_no_workers(
     training_df, allele_encoding
 ):

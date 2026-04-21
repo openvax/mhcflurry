@@ -1754,6 +1754,31 @@ class Class1NeuralNetwork(object):
 
         output = loss_obj.encode_y(from_ic50(validation_affinities), **encode_y_kwargs)
 
+        # --- Validation tensors cached on device (Phase 1 #268 for fit_generator) ---
+        # The validation set is constant across pretrain epochs, but the
+        # original code re-ran ``torch.from_numpy(...).float().to(device)``
+        # on every epoch — three H2D copies × many epochs. For large
+        # validation sets that's tens of ms/epoch of pure wasted bandwidth.
+        # Hoist the copy to happen once before the epoch loop. Semantics
+        # are preserved: ``val_peptide_device`` / ``val_allele_device`` /
+        # ``val_y_device`` point at the same bytes the old inline copies
+        # would have produced.
+        val_peptide_device = torch.from_numpy(
+            validation_x_dict["peptide"]
+        ).float().to(device)
+        val_allele_device = torch.from_numpy(
+            validation_x_dict["allele"]
+        ).float().to(device)
+        val_y_device = torch.from_numpy(output.astype(numpy.float32)).to(device)
+
+        # Non-blocking H2D only helps when the source is pinned. For the
+        # training step's per-chunk tensors we allocate fresh each step
+        # from numpy — keep the transfer synchronous (pin_memory on a
+        # one-shot tensor is pure overhead). The prefetcher-style
+        # overlap is the bigger win but requires a DataLoader wrap over
+        # the generator — Phase 2 scope since it changes iteration
+        # semantics.
+
         mutable_generator_state = {
             "yielded_values": 0
         }
@@ -1824,16 +1849,16 @@ class Class1NeuralNetwork(object):
                 optimizer.step()
                 epoch_losses.append(loss.item())
 
-            # Compute validation loss
+            # Compute validation loss — reuse the device tensors hoisted
+            # before the epoch loop (val data is static).
             network.eval()
             with torch.no_grad():
-                val_peptide = torch.from_numpy(validation_x_dict["peptide"]).float().to(device)
-                val_allele = torch.from_numpy(validation_x_dict["allele"]).float().to(device)
-                val_y = torch.from_numpy(output.astype(numpy.float32)).to(device)
-
-                val_inputs = {"peptide": val_peptide, "allele": val_allele}
+                val_inputs = {
+                    "peptide": val_peptide_device,
+                    "allele": val_allele_device,
+                }
                 val_predictions = network(val_inputs)
-                val_loss = loss_obj(val_predictions, val_y)
+                val_loss = loss_obj(val_predictions, val_y_device)
                 regularization_penalty = self._regularization_penalty(
                     regularization_parameters,
                     l1=l1_reg,
