@@ -7,7 +7,6 @@ import time
 import collections
 import json
 import multiprocessing
-import sys
 import weakref
 import itertools
 import os
@@ -81,39 +80,41 @@ class _FitBatchDataset(torch.utils.data.Dataset):
         return sample
 
 
-_DAEMON_DOWNGRADE_WARNED = False
-
-
 def _effective_num_workers(num_workers):
     """Downgrade ``num_workers`` to 0 when running inside a daemon process.
 
-    Python's ``multiprocessing`` disallows daemon processes from spawning
-    children — enforced by an ``AssertionError`` deep inside
-    ``DataLoader._MultiProcessingDataLoaderIter``. mhcflurry's training
-    orchestrator runs workers via ``multiprocessing.Pool``, whose workers
-    are daemonic by default. With ``dataloader_num_workers > 0`` that
-    detonates the whole training run at the first epoch's ``for batch
-    in loader`` line.
+    Safety net for DataLoader's ``num_workers>0`` path, which requires
+    spawning child processes — forbidden from daemon parents. mhcflurry's
+    training orchestrator switched to ``NonDaemonPool`` (see
+    ``local_parallelism.py``) so in production Pool workers are now
+    non-daemonic and this downgrade does NOT fire. It remains as
+    defense-in-depth for:
 
-    The right behavior under that constraint: silently fall back to
-    ``num_workers=0`` so the worker runs correctly (just without prefetch).
-    Orchestrator-level runs (e.g. tests, single-process CLI) keep the
-    configured value.
+      - External callers that wrap ``Class1NeuralNetwork.fit`` in a
+        daemonic process of their own (e.g. ``ProcessPoolExecutor`` is
+        non-daemon by default but ``multiprocessing.Pool`` without the
+        NonDaemonPool subclass is daemonic).
+      - Test suites that explicitly construct daemon subprocesses (our
+        own ``test_dataloader_num_workers_downgrades_in_daemon_context``
+        exercises this path).
 
-    See ``test_dataloader_num_workers_downgrades_in_daemon_context`` for
-    the regression test that locks this behavior.
+    Emits a ``DeprecationWarning`` — it's worth knowing if this fires,
+    since it means the caller is running in a daemon context and
+    DataLoader prefetch is silently disabled. Use ``warnings.filterwarnings``
+    to silence if intentional.
     """
-    global _DAEMON_DOWNGRADE_WARNED
     if num_workers > 0 and multiprocessing.current_process().daemon:
-        if not _DAEMON_DOWNGRADE_WARNED:
-            print(
-                f"[warn] dataloader_num_workers={num_workers} requested from a "
-                f"daemon process (mhcflurry Pool worker); downgrading to 0 to "
-                f"avoid 'daemonic processes are not allowed to have children'. "
-                f"Prefetch disabled inside this worker.",
-                file=sys.stderr,
-            )
-            _DAEMON_DOWNGRADE_WARNED = True
+        import warnings
+        warnings.warn(
+            f"dataloader_num_workers={num_workers} requested from a daemon "
+            f"process; downgrading to 0 because daemon processes cannot "
+            f"spawn children. If this is mhcflurry's Pool worker, switch "
+            f"to NonDaemonPool (mhcflurry/local_parallelism.py); if it's "
+            f"your own caller, use a non-daemonic executor or accept the "
+            f"downgrade (set dataloader_num_workers=0 explicitly to silence).",
+            DeprecationWarning,
+            stacklevel=3,
+        )
         return 0
     return num_workers
 
