@@ -26,6 +26,8 @@ set -x
 # (6x oversubscription), 20-40x slowdown, and near-idle GPUs. One thread
 # per worker lets the GPU actually be the limiting factor.
 export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -46,13 +48,16 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
+# Per-worker peak is 16-22 GB on mhcflurry pan-allele training (observed on
+# A100-80GB). Safe: 2 on 80GB, 1 on 40GB. 4 OOMs on 80GB.
+MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-2}"
 if [ "$GPUS" -eq "0" ]; then
     NUM_JOBS="${NUM_JOBS-1}"
 else
-    NUM_JOBS="${NUM_JOBS-$GPUS}"
+    NUM_JOBS="${NUM_JOBS-$(( GPUS * MAX_WORKERS_PER_GPU ))}"
 fi
-echo "Num jobs: $NUM_JOBS"
-PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1"
+echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU)"
+PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu $MAX_WORKERS_PER_GPU"
 
 # ---- data ------------------------------------------------------------
 mhcflurry-downloads fetch data_curated allele_sequences random_peptide_predictions

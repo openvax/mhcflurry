@@ -24,9 +24,16 @@ set -x
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 
 export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
 SUBSET_ARCHS="${SUBSET_ARCHS:-8}"
+# Per-worker GPU memory during mhcflurry training + validation inference
+# peaks at 16-22 GB (activation tensors, not weights). On A100-80GB, 2
+# workers fit comfortably (~44 GB); 4 workers OOMs deterministically.
+# On A100-40GB, 1 worker is the safe ceiling.
+MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-2}"
 REPO="${REPO:-$HOME/runplz-repo}"
 
 if command -v nvidia-smi >/dev/null 2>&1; then
@@ -38,11 +45,32 @@ echo "Detected GPUS: $GPUS"
 if [ "$GPUS" -eq 0 ]; then
     NUM_JOBS=1
 else
-    NUM_JOBS="$GPUS"
+    NUM_JOBS="$(( GPUS * MAX_WORKERS_PER_GPU ))"
 fi
-PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu 1"
+PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu $MAX_WORKERS_PER_GPU"
 
 mkdir -p "$MHCFLURRY_OUT/affinity" "$MHCFLURRY_OUT/processing" "$MHCFLURRY_OUT/presentation"
+
+# ---- optional Nsight Systems profiling wrapper ----------------------
+# Profile only stage 1 (affinity), for a bounded duration. Everything
+# else runs bare so the 4-6 hr full run isn't slowed/ballooned.
+NSYS_WRAP=()
+if [ "${NSYS_PROFILE:-0}" = "1" ]; then
+    if command -v nsys >/dev/null 2>&1; then
+        NSYS_WRAP=(
+            nsys profile
+            --duration=180        # 3 min capture window
+            --trace=cuda,nvtx,osrt
+            --follow-fork=true    # mhcflurry uses multiprocessing.Pool
+            --sample=none         # cheaper; we care about GPU vs CPU not PC
+            --output="$MHCFLURRY_OUT/nsys_profile_stage1_affinity"
+            --force-overwrite=true
+        )
+        echo "NSYS_PROFILE=1: will wrap stage 1 affinity training with: ${NSYS_WRAP[*]}"
+    else
+        echo "WARNING: NSYS_PROFILE=1 but 'nsys' not found in PATH; continuing without profiling."
+    fi
+fi
 
 # ============================================================
 # STAGE 1 — AFFINITY (Class1AffinityPredictor)
@@ -71,7 +99,7 @@ with open("hyperparameters.yaml", "w") as f:
 print(f"affinity: using {len(hp)} architectures")
 PY
 
-mhcflurry-class1-train-pan-allele-models \
+"${NSYS_WRAP[@]}" mhcflurry-class1-train-pan-allele-models \
     --data "$(pwd)/train_data.csv.bz2" \
     --allele-sequences "$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv" \
     --pretrain-data "$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2" \

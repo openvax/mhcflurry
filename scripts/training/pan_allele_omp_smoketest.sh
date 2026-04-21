@@ -17,6 +17,8 @@ set -x
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 
 export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"

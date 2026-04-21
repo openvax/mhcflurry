@@ -27,15 +27,23 @@ app = App(
     "pan-allele-presentation-subset",
     brev_config=BrevConfig(
         mode="container",
-        instance_type="denvr_A100_sxm4x8",
+        # Single-A100 fallback — org's $30/hr cap blocks GCP 8×A100, and
+        # verda/massedcompute 8×A100 shadeform paths both went STATUS:
+        # FAILURE. MassedCompute 1×A100-80GB is $1.49/hr, 2m30s boot,
+        # reliable historically. Wall time ~8-12 hr vs 4-6 hr on 8×.
+        instance_type="massedcompute_A100_sxm4_80G",
+        auto_create_instances=True,
     ),
 )
 
 image = (
-    Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
+    # devel variant ships `nsys` (Nsight Systems CLI) at
+    # /usr/local/cuda/bin/nsys — needed for the NSYS_PROFILE=1 gate in
+    # scripts/training/pan_allele_presentation_subset.sh.
+    Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel")
     .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
     .pip_install(
-        "runplz>=3.0.0",
+        "runplz>=3.2.0",
         "pandas>=2.0",
         "appdirs",
         "scikit-learn",
@@ -51,11 +59,20 @@ image = (
 @app.function(
     image=image,
     gpu="A100",
-    min_cpu=96,
-    min_memory=400,
+    # Sized for the pinned 1×A100-80GB MassedCompute shape (14 vCPU,
+    # ~80 GB RAM, 625 GB disk, 80 GB VRAM). Overstating min_cpu/min_memory
+    # here has previously blocked `brev search` from matching the shape.
+    min_cpu=14,
+    min_memory=80,
     min_gpu_memory=40,
-    min_disk=1000,
-    timeout=10 * 60 * 60,  # 10h cap; expect 4-6h
+    min_disk=100,
+    timeout=18 * 60 * 60,  # 18h cap; single-GPU wall time ~8-12h
+    env={
+        # Wrap stage 1 affinity training in `nsys profile` for the first
+        # ~3 min to capture a representative slice (startup + pretrain +
+        # first finetune epochs). Rest of the run is uninstrumented.
+        "NSYS_PROFILE": "1",
+    },
 )
 def train():
     env = os.environ.copy()
