@@ -159,6 +159,7 @@ def test_build_train_peptides_cache_enabled_returns_prepopulated(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -187,6 +188,7 @@ def test_build_train_peptides_bit_identical_across_modes(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -227,6 +229,7 @@ def test_build_train_peptides_preserves_fold_order(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -275,6 +278,7 @@ def test_build_train_peptides_different_archs_different_configs(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -302,6 +306,7 @@ def test_initialize_encoding_cache_is_idempotent(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
 
@@ -601,6 +606,7 @@ def test_constant_data_survives_pickle_roundtrip(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -639,6 +645,7 @@ def test_global_data_contains_only_small_primitives(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -677,6 +684,7 @@ def test_memmap_reopens_cleanly_in_fresh_encoding_cache(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -732,6 +740,7 @@ def test_encoding_cache_dir_string_normalizes_through_pickle(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -760,6 +769,7 @@ def test_multiple_workers_simulated_concurrent_lookups(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -830,6 +840,7 @@ def test_initialize_stashes_unique_peptides_in_global_data(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -852,6 +863,7 @@ def test_build_train_peptides_uses_stashed_unique_peptides(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
@@ -1048,6 +1060,7 @@ def test_stashed_peptides_match_cache_key_peptides(
         use_encoding_cache=True,
         encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
         out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
     )
     GLOBAL_DATA.update(constant_data_with_cache)
     _initialize_encoding_cache(args, all_work_items)
