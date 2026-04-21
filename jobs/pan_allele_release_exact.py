@@ -23,21 +23,26 @@ app = App(
     "pan-allele-release-exact",
     brev_config=BrevConfig(
         mode="container",
-        # MassedCompute 8×A100-80GB DGXx8, 120 vCPUs, 10 TB disk at
-        # $12.29/hr. Chose over Denvr after 3/3 Denvr failures on
-        # 2026-04-21 (Brev API EOF, mid-boot SSH drop, 1200s SSH
-        # timeout). 80GB cards unlock MAX_WORKERS_PER_GPU=2 for 16
-        # concurrent workers (vs 8 on 40GB Denvr) — halves wall time.
-        instance_type="massedcompute_A100_sxm4_80G_DGXx8",
+        # OCI 8×A100-80GB via Brev's direct launchpad integration.
+        # $19.30/hr, 128 vCPUs, 27 TB disk, 15 min boot.
+        #
+        # Routes around the shadeform broker entirely. All 5 failed
+        # 2026-04-21 provisioning attempts (3× Denvr, 2× MassedCompute
+        # DGXx8) went through shadeform and failed with
+        # `external nodes: skipping (list failed): not_found` — the
+        # shadeform broker losing track of its own capacity pool.
+        # OCI launchpad is a different provisioning path (direct from
+        # NVIDIA Brev to Oracle) so it's immune to that class of
+        # failure.
+        #
+        # 80GB cards support MAX_WORKERS_PER_GPU=2 = 16 concurrent
+        # workers (vs 8 on 40GB). Cost delta over MassedCompute
+        # ($19.30 vs $12.29/hr, +57%) is acceptable given 5/5
+        # shadeform failures today.
+        instance_type="oci.a100x8.sxm.brev-dgxc",
         auto_create_instances=True,
-        # 8×A100 boots take 20-30 min on some provisioners (Denvr
-        # and MassedCompute DGXx8 both stretched past runplz's old
-        # 1200s default on 2026-04-21). 2400s = 40 min gives us
-        # enough headroom to outlast supply-constrained provisioning
-        # queues without being patient enough to burn a full hour on
-        # a truly dead instance. Runplz 3.7.2's new default is 1800s;
-        # this override is because DGXx8 specifically has been near
-        # the boundary. Closes runplz #34.
+        # OCI boot advertised at 15 min; give 40 min margin against
+        # launchpad's own provisioning queue. Closes runplz #34.
         ssh_ready_wait_seconds=2400,
     ),
 )
