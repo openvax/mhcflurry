@@ -174,6 +174,13 @@ class EncodingCache:
     def _build(self, peptides: list[str], entry_dir: Path) -> None:
         entry_dir.mkdir(parents=True, exist_ok=True)
 
+        # Re-check the sentinel now that entry_dir exists: another process
+        # may have finished building while we were on the is_complete path.
+        # Catches the common race where two workers simultaneously decide
+        # to build; the second wakes up to find the build is done.
+        if self._is_complete(entry_dir):
+            return
+
         # Dry-run one peptide to learn the encoded shape and dtype.
         sample_encoder = EncodableSequences([peptides[0]])
         sample_encoded = sample_encoder.variable_length_to_fixed_length_vector_encoding(
@@ -187,7 +194,16 @@ class EncodingCache:
 
         n = len(peptides)
         out_path = entry_dir / "encoded.npy"
-        tmp_path = entry_dir / "encoded.npy.tmp"
+        # Per-process tmp path. Two workers that simultaneously build the
+        # same cache entry (the orchestrator's single-threaded pre-build
+        # is preferred, but Pool workers can race for entries the
+        # orchestrator didn't pre-build — e.g. the pretrain cache) each
+        # have their own tmp file, so their final ``os.replace`` moves
+        # never compete for the same source file. The writers produce
+        # byte-identical content (the encoding is a pure function of
+        # params+peptides), so whichever rename lands last determines
+        # out_path's content safely.
+        tmp_path = entry_dir / f"encoded.npy.tmp.{os.getpid()}"
         # open_memmap writes a .npy header plus raw bytes that np.load(mmap_mode='r')
         # can consume.
         mm = numpy.lib.format.open_memmap(
@@ -213,9 +229,15 @@ class EncodingCache:
             # and so the OS can coalesce dirty pages. `del` is the conventional
             # way to close a np.memmap.
             del mm
+        # Atomic move of our unique tmp file into place. POSIX ``os.replace``
+        # is atomic — a concurrent reader either sees the old inode or the
+        # new one, never a partial write. If another writer raced us to
+        # produce out_path, our os.replace quietly overwrites their
+        # (identical) bytes.
         os.replace(tmp_path, out_path)
 
-        # Write peptide list and params in parallel (both small).
+        # Write peptide list and params — writes are idempotent across
+        # racing writers since both write the same content.
         (entry_dir / "peptides.txt").write_text("\n".join(peptides) + "\n")
         (entry_dir / "params.json").write_text(
             json.dumps(self.params.to_kwargs(), indent=2, sort_keys=True) + "\n"

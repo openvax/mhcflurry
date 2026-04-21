@@ -30,6 +30,23 @@ from mhcflurry.encoding_cache import (
 )
 
 
+# Module-level function so multiprocessing's spawn context can pickle it.
+# Nested/inline worker functions fail with AttributeError under spawn.
+def _concurrent_build_worker(cache_dir_str, params_kwargs, peptide_list, queue):
+    try:
+        from mhcflurry.encoding_cache import (
+            EncodingCache as _EC,
+            EncodingParams as _EP,
+        )
+        import hashlib as _hashlib
+        cache = _EC(cache_dir=cache_dir_str, params=_EP(**params_kwargs))
+        encoded, _ = cache.get_or_build(peptide_list)
+        queue.put(("ok", _hashlib.sha256(encoded.tobytes()).hexdigest()))
+    except Exception as exc:
+        import traceback as _tb
+        queue.put(("error", f"{type(exc).__name__}: {exc}\n{_tb.format_exc()}"))
+
+
 # A small peptide set that covers 8-15mers (the lengths mhcflurry supports).
 SAMPLE_PEPTIDES = [
     "SIINFEKL",       # 8mer
@@ -255,6 +272,121 @@ def test_concurrent_readers_see_identical_bytes(tmp_path, default_params):
     assert len(results) == 8
     for data in results:
         assert data == expected_bytes
+
+
+def test_concurrent_builders_do_not_collide(tmp_path, default_params):
+    """Multiple processes building the SAME cache entry in parallel must not crash.
+
+    Reproduces the 2026-04-20 A100 training failure: two Pool workers
+    simultaneously calling get_or_build() for the pretrain cache (which
+    the orchestrator doesn't pre-build). The old code used a shared
+    ``encoded.npy.tmp`` path so the second worker's ``os.replace`` failed
+    with ``FileNotFoundError`` after the first worker's rename consumed
+    the tmp file.
+
+    Fix: per-process tmp path (PID-suffixed). Both builders write their
+    own tmp file and atomically rename to the shared out_path; the second
+    rename silently overwrites identical bytes, since the encoding is a
+    pure function of params+peptides.
+
+    Uses multiprocessing (not threading) because the GIL serializes
+    threads inside Python-level code paths and wouldn't reliably trigger
+    the race. Real Pool workers are separate processes.
+    """
+    import multiprocessing as mp
+
+    ctx = mp.get_context("spawn")
+    queue = ctx.Queue()
+
+    n_workers = 4
+    procs = [
+        ctx.Process(
+            target=_concurrent_build_worker,
+            args=(
+                str(tmp_path / "cache"),
+                default_params.to_kwargs(),
+                VALID_PEPTIDES,
+                queue,
+            ),
+        )
+        for _ in range(n_workers)
+    ]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join(timeout=60)
+
+    # Collect results.
+    results = []
+    while not queue.empty():
+        results.append(queue.get(timeout=1))
+
+    assert len(results) == n_workers, (
+        f"expected {n_workers} worker results, got {len(results)}"
+    )
+    # Every worker must succeed (no FileNotFoundError from racing renames).
+    errors = [payload for status, payload in results if status != "ok"]
+    assert not errors, "concurrent builders hit errors:\n" + "\n\n".join(errors)
+
+    # Every worker must see identical encoded bytes.
+    hashes = {payload for _, payload in results}
+    assert len(hashes) == 1, f"concurrent builders produced divergent bytes: {hashes}"
+
+    # Final cache dir must be in a clean state: .complete exists, exactly
+    # one encoded.npy, no leftover tmp files.
+    entry_dir = EncodingCache(
+        cache_dir=tmp_path / "cache", params=default_params
+    ).entry_path(VALID_PEPTIDES)
+    assert (entry_dir / ".complete").exists()
+    assert (entry_dir / "encoded.npy").exists()
+    leftover_tmps = list(entry_dir.glob("encoded.npy.tmp*"))
+    assert not leftover_tmps, (
+        f"per-process tmp files should have been renamed away; got leftovers: "
+        f"{leftover_tmps}"
+    )
+
+
+def test_concurrent_builders_on_pristine_cache_dir(tmp_path, default_params):
+    """Same as above but with zero pre-existing state.
+
+    The orchestrator-builds-first flow in training means workers usually
+    see ``is_complete == True`` on arrival. Occasionally (e.g. the
+    pretrain cache that the orchestrator doesn't pre-build) they hit a
+    pristine entry_dir. This test explicitly exercises that path with
+    multiple concurrent builders starting from zero.
+    """
+    import multiprocessing as mp
+
+    # Don't pre-build anything — cache dir doesn't even exist yet.
+    assert not (tmp_path / "cache").exists()
+
+    ctx = mp.get_context("spawn")
+    queue = ctx.Queue()
+    procs = [
+        ctx.Process(
+            target=_concurrent_build_worker,
+            args=(
+                str(tmp_path / "cache"),
+                default_params.to_kwargs(),
+                VALID_PEPTIDES,
+                queue,
+            ),
+        )
+        for _ in range(3)
+    ]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join(timeout=60)
+
+    results = []
+    while not queue.empty():
+        results.append(queue.get(timeout=1))
+    assert len(results) == 3
+    errors = [payload for status, payload in results if status != "ok"]
+    assert not errors, (
+        "pristine-dir concurrent build hit errors:\n" + "\n\n".join(errors)
+    )
 
 
 def test_encoding_error_propagates_at_build_time(tmp_path, default_params):
