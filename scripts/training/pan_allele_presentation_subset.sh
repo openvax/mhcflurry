@@ -34,7 +34,30 @@ SUBSET_ARCHS="${SUBSET_ARCHS:-8}"
 # workers fit comfortably (~44 GB); 4 workers OOMs deterministically.
 # On A100-40GB, 1 worker is the safe ceiling.
 MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-2}"
+# Phase 1 (#268) encoding cache: pre-encode BLOSUM62 peptide vectors
+# once and share across workers via mmap. Opt-in for safety; set
+# USE_ENCODING_CACHE=0 to run the legacy path. Cache materializes under
+# $MHCFLURRY_OUT/affinity/encoding_cache.
+USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
+# DataLoader prefetch workers per training process. 0 = no prefetch
+# (bit-identical to pre-#268). 4 overlaps CPU data-prep with GPU
+# compute; each adds ~100-500 MB RSS.
+DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-4}"
 REPO="${REPO:-$HOME/runplz-repo}"
+
+# Inject dataloader_num_workers into hyperparameters for all training
+# stages. Applied post-YAML-generation so we don't need to edit
+# generate_hyperparameters.py upstream.
+HYPERPARAMETER_INJECT=(
+    "dataloader_num_workers=$DATALOADER_NUM_WORKERS"
+)
+
+# Extra flags for mhcflurry-class1-train-pan-allele-models to enable the
+# encoding cache.
+CACHE_ARGS=()
+if [ "$USE_ENCODING_CACHE" = "1" ]; then
+    CACHE_ARGS=(--use-encoding-cache)
+fi
 
 if command -v nvidia-smi >/dev/null 2>&1; then
     GPUS=$(nvidia-smi -L 2>/dev/null | wc -l | tr -d ' ')
@@ -94,9 +117,24 @@ python generate_hyperparameters.py > hyperparameters.full.yaml
 python - <<PY
 import yaml
 hp = yaml.safe_load(open("hyperparameters.full.yaml"))[:${SUBSET_ARCHS}]
+# Inject per-run overrides (e.g. dataloader_num_workers from issue #268)
+# without having to edit generate_hyperparameters.py upstream.
+overrides = dict(kv.split("=", 1) for kv in """${HYPERPARAMETER_INJECT[@]}""".split() if "=" in kv)
+for k, v in overrides.items():
+    # Int-typed overrides (dataloader_num_workers) must parse as int;
+    # fall back to string if not numeric.
+    try:
+        parsed = int(v)
+    except ValueError:
+        try:
+            parsed = float(v)
+        except ValueError:
+            parsed = v
+    for d in hp:
+        d[k] = parsed
 with open("hyperparameters.yaml", "w") as f:
     yaml.safe_dump(hp, f)
-print(f"affinity: using {len(hp)} architectures")
+print(f"affinity: using {len(hp)} architectures; overrides={overrides}")
 PY
 
 "${NSYS_WRAP[@]}" mhcflurry-class1-train-pan-allele-models \
@@ -108,6 +146,7 @@ PY
     --hyperparameters hyperparameters.yaml \
     --out-models-dir "$(pwd)/models.unselected" \
     --worker-log-dir "$MHCFLURRY_OUT/affinity" \
+    "${CACHE_ARGS[@]}" \
     $PARALLELISM_ARGS
 
 mhcflurry-class1-select-pan-allele-models \
