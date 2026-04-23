@@ -20,15 +20,16 @@ set -x
 
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 
-# CRITICAL: matches GENERATE.sh in the public release. Without this,
-# numpy/MKL in each worker multi-threads to all available cores. With
-# 8 parallel workers on a 120-vCPU box that gave us load avg ~713
-# (6x oversubscription), 20-40x slowdown, and near-idle GPUs. One thread
-# per worker lets the GPU actually be the limiting factor.
-export OMP_NUM_THREADS=1
-export MKL_NUM_THREADS=1
-export OPENBLAS_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
+# torch.compile on by default after the Phase-4 sweep landed it.
+# Compile cost (~30-60s codegen) is paid once per worker. We deliberately
+# recycle workers after a moderate number of tasks to avoid the mysterious
+# long-lived-worker death mode seen on multi-day runs, while still
+# amortizing compile / CUDA init across several networks.
+export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
+# OMP/MKL/OPENBLAS set via set_cpu_threads helper below — auto-computes
+# from nproc + GPU/worker layout. Manually override any of them before
+# calling this script to pin an explicit value.
 
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_ABSOLUTE_PATH")"
@@ -83,17 +84,34 @@ else
     NUM_JOBS="${NUM_JOBS-$(( GPUS * MAX_WORKERS_PER_GPU ))}"
 fi
 echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU)"
-PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu $MAX_WORKERS_PER_GPU"
+# Recycle after a bounded number of tasks so compile is still amortized
+# but leaks / descriptor creep / orphaned-runtime state cannot accumulate
+# indefinitely inside one worker. Override with MAX_TASKS_PER_WORKER.
+MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
+PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker $MAX_TASKS_PER_WORKER --gpus $GPUS --max-workers-per-gpu $MAX_WORKERS_PER_GPU"
 
 # Phase 1 (#268): enable the BLOSUM62 encoding cache + DataLoader prefetch
 # by default. USE_ENCODING_CACHE=0 or DATALOADER_NUM_WORKERS=0 restores
 # the pre-#268 legacy path (bit-identical; verified by Phase 1 tests).
 USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
-DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-4}"
+# DataLoader prefetch workers per training worker. v11 sweep winner
+# (batch=512, dl=1, wpg=2 on L40S) showed dl=1 marginally beat dl=2;
+# dl=2 added overhead without parallelism benefit at single-item
+# granularity. Default to 1 now.
+DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-1}"
 CACHE_ARGS=()
 if [ "$USE_ENCODING_CACHE" = "1" ]; then
     CACHE_ARGS=(--use-encoding-cache)
 fi
+
+# Auto-configure OMP / MKL / OPENBLAS thread budget uniformly based on
+# nproc, GPU count, worker count, dataloader worker count. User can
+# override any of {OMP,MKL,OPENBLAS}_NUM_THREADS before invoking this
+# script; the helper respects manual settings.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/set_cpu_threads.sh"
+GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
+    DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
 
 # ---- data ------------------------------------------------------------
 mhcflurry-downloads fetch data_curated allele_sequences random_peptide_predictions

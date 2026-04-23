@@ -15,6 +15,7 @@ from mhcflurry.class1_neural_network import (
     Class1NeuralNetworkModel,
     MergedClass1NeuralNetwork,
     _batched_validation_loss,
+    _effective_validation_batch_size,
     _FitBatchDataset,
 )
 from mhcflurry.class1_processing_neural_network import (
@@ -70,6 +71,13 @@ def _seed_all(seed=1):
     np.random.seed(seed)
     random.seed(seed)
     torch.manual_seed(seed)
+
+
+def test_effective_validation_batch_size_uses_larger_cuda_default():
+    assert _effective_validation_batch_size(torch.device("cuda"), None, 512) == 4096
+    assert _effective_validation_batch_size(torch.device("cuda"), None, 2048) == 8192
+    assert _effective_validation_batch_size(torch.device("cpu"), None, 512) == 2048
+    assert _effective_validation_batch_size(torch.device("cuda"), 123, 512) == 123
 
 
 def test_sample_weights_affect_training():

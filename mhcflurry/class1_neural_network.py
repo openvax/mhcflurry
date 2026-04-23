@@ -57,10 +57,24 @@ class _FitBatchDataset(torch.utils.data.Dataset):
     preservation rationale.
     """
 
-    def __init__(self, x_peptide, x_allele, y_encoded,
-                 sample_weights_with_negatives, train_indices):
+    def __init__(
+            self,
+            x_peptide,
+            x_allele,
+            y_encoded,
+            sample_weights_with_negatives,
+            train_indices,
+            *,
+            random_negative_x_peptide=None,
+            random_negative_x_allele=None,
+            num_random_negatives=None):
         self.x_peptide = x_peptide
         self.x_allele = x_allele
+        self.random_negative_x_peptide = random_negative_x_peptide
+        self.random_negative_x_allele = random_negative_x_allele
+        self.num_random_negatives = (
+            None if num_random_negatives is None else int(num_random_negatives)
+        )
         # Pre-cast y to float32 once at dataset construction rather than
         # per ``__getitem__`` call. ``y_encoded`` is a fresh per-epoch
         # numpy array so this is a single allocation of the full
@@ -74,20 +88,79 @@ class _FitBatchDataset(torch.utils.data.Dataset):
         self.sample_weights = sample_weights_with_negatives
         self.train_indices = train_indices
 
+        if self.x_peptide is None and self.random_negative_x_peptide is None:
+            raise ValueError("FitBatchDataset requires peptide features")
+
+    def _lookup_feature_row(self, idx, *, base_array, negative_array):
+        if self.num_random_negatives is None:
+            return base_array[idx]
+        if idx < self.num_random_negatives:
+            return negative_array[idx]
+        return base_array[idx - self.num_random_negatives]
+
+    def _gather_feature_rows(self, indices, *, base_array, negative_array):
+        if base_array is None and negative_array is None:
+            return None
+        indices = numpy.asarray(indices, dtype=numpy.int64)
+        if self.num_random_negatives is None:
+            return base_array[indices]
+        result = numpy.empty(
+            (len(indices),) + base_array.shape[1:],
+            dtype=base_array.dtype,
+        )
+        negative_mask = indices < self.num_random_negatives
+        if negative_mask.any():
+            result[negative_mask] = negative_array[indices[negative_mask]]
+        if (~negative_mask).any():
+            result[~negative_mask] = base_array[
+                indices[~negative_mask] - self.num_random_negatives
+            ]
+        return result
+
     def __len__(self):
         return len(self.train_indices)
 
     def __getitem__(self, i):
         idx = self.train_indices[i]
         sample = {
-            "peptide": self.x_peptide[idx],
+            "peptide": self._lookup_feature_row(
+                idx,
+                base_array=self.x_peptide,
+                negative_array=self.random_negative_x_peptide,
+            ),
             "y": self.y_encoded[idx],
         }
-        if self.x_allele is not None:
-            sample["allele"] = self.x_allele[idx]
+        if self.x_allele is not None or self.random_negative_x_allele is not None:
+            sample["allele"] = self._lookup_feature_row(
+                idx,
+                base_array=self.x_allele,
+                negative_array=self.random_negative_x_allele,
+            )
         if self.sample_weights is not None:
             sample["weight"] = self.sample_weights[idx]
         return sample
+
+    def batch_for_indices(self, indices):
+        """Return a batch dict for the given global row indices."""
+        indices = numpy.asarray(indices, dtype=numpy.int64)
+        batch = {
+            "peptide": self._gather_feature_rows(
+                indices,
+                base_array=self.x_peptide,
+                negative_array=self.random_negative_x_peptide,
+            ),
+            "y": self.y_encoded[indices],
+        }
+        allele_rows = self._gather_feature_rows(
+            indices,
+            base_array=self.x_allele,
+            negative_array=self.random_negative_x_allele,
+        )
+        if allele_rows is not None:
+            batch["allele"] = allele_rows
+        if self.sample_weights is not None:
+            batch["weight"] = self.sample_weights[indices]
+        return batch
 
 
 def _numpy_batch_collate(batch):
@@ -303,9 +376,46 @@ def _batch_value_to_device(value, device, *, non_blocking, cast_float):
     return value
 
 
+def _timing_enabled():
+    """Return True when fine-grained training timing is enabled."""
+    return os.environ.get("MHCFLURRY_ENABLE_TIMING", "0") == "1"
+
+
+def _timing_synchronize(device):
+    """Synchronize asynchronous device work for accurate wall timing."""
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    elif device.type == "mps" and hasattr(torch, "mps"):
+        torch.mps.synchronize()
+
+
+def _timing_start(device, enabled):
+    if enabled:
+        _timing_synchronize(device)
+    return time.perf_counter()
+
+
+def _timing_stop(start, device, enabled):
+    if enabled:
+        _timing_synchronize(device)
+    return time.perf_counter() - start
+
+
 def _uncompiled_network(network):
     """Return the eager module behind ``network``."""
     return network._orig_mod if hasattr(network, "_orig_mod") else network
+
+
+def _effective_validation_batch_size(device, configured_batch_size, minibatch_size):
+    """Return the validation batch size to use for the current device."""
+    if configured_batch_size:
+        return configured_batch_size
+    if device.type == "cuda":
+        # Validation is forward-only and the networks are tiny relative to
+        # modern GPU memory. A much larger default batch dramatically cuts
+        # kernel-launch / Python-loop overhead versus 4 * minibatch_size.
+        return max(4 * minibatch_size, 4096)
+    return 4 * minibatch_size
 
 
 def _move_fit_batch_to_device(batch, device, *, non_blocking):
@@ -1355,13 +1465,12 @@ class Class1NeuralNetwork(object):
         # each adds one Python process holding ~100-500 MB RSS. Don't
         # exceed (num_cpu_cores - num_training_workers).
         dataloader_num_workers=0,
-        # Batch size used for the validation forward pass. ``None`` means
-        # "use 4 × minibatch_size". Separate from minibatch_size because
-        # eval has no backward / optimizer state so VRAM headroom is
-        # much higher; 4× gives better throughput without risking OOM
-        # on the largest pan-allele val splits (~185K rows at 4 × 128 =
-        # 512 rows/batch → ~360 forward passes per epoch). See Phase 4b
-        # of openvax/mhcflurry#268.
+        # Batch size used for the validation forward pass. ``None`` uses a
+        # device-aware heuristic: ``max(4 * minibatch_size, 4096)`` on CUDA
+        # and ``4 * minibatch_size`` elsewhere. Separate from minibatch_size
+        # because eval has no backward / optimizer state so VRAM headroom is
+        # much higher; the larger CUDA default cuts validation-loop overhead
+        # substantially on the small pan-allele networks.
         validation_batch_size=None,
     ).extend(RandomNegativePeptides.hyperparameter_defaults)
     """
@@ -2200,6 +2309,8 @@ class Class1NeuralNetwork(object):
         _configure_matmul_precision(device)
 
         fit_info = collections.defaultdict(list)
+        timing_enabled = _timing_enabled()
+        fit_info["timing_enabled"] = timing_enabled
 
         loss_obj = get_pytorch_loss(self.hyperparameters["loss"])
 
@@ -2274,6 +2385,8 @@ class Class1NeuralNetwork(object):
         dataloader_num_workers = self.hyperparameters.get(
             "dataloader_num_workers", 0
         )
+        fit_info["dataloader_num_workers"] = dataloader_num_workers
+        fit_info["validation_rows"] = len(validation_affinities)
         if dataloader_num_workers > 0 and not generator_batches_are_encoded:
             logging.warning(
                 "fit_generator requested dataloader_num_workers=%s for raw "
@@ -2291,11 +2404,15 @@ class Class1NeuralNetwork(object):
         )
 
         start = time.time()
+        iterator_setup_start = time.perf_counter()
         iterator = iter(
             _make_fit_generator_dataloader(
                 dataset=dataset,
                 num_workers=dataloader_num_workers,
             )
+        )
+        fit_info["iterator_setup_time"] = (
+            time.perf_counter() - iterator_setup_start
         )
 
         # Data dependent init
@@ -2329,6 +2446,7 @@ class Class1NeuralNetwork(object):
         min_val_loss = None
         last_progress_print = 0
         epoch = 1
+        first_batch_time = None
 
         # The first batch establishes the compiled fast-path shape.
         # Non-conforming later batches (most commonly a short final
@@ -2338,14 +2456,20 @@ class Class1NeuralNetwork(object):
 
         while True:
             epoch_start_time = time.time()
+            epoch_wall_start = time.perf_counter()
             network.train()
 
             epoch_losses = []
+            epoch_fetch_time = 0.0
+            epoch_train_time = 0.0
+            epoch_num_train_rows = 0
             for step in range(steps_per_epoch):
+                fetch_start = time.perf_counter()
                 try:
                     batch = next(iterator)
                 except StopIteration:
                     break
+                epoch_fetch_time += time.perf_counter() - fetch_start
 
                 if expected_chunk_shape is None:
                     expected_chunk_shape = batch["peptide"].shape
@@ -2354,6 +2478,7 @@ class Class1NeuralNetwork(object):
                     device,
                     non_blocking=False,
                 )
+                batch_start = _timing_start(device, timing_enabled)
                 loss = _run_training_batch(
                     network=(
                         network
@@ -2369,7 +2494,12 @@ class Class1NeuralNetwork(object):
                     y_batch=y_tensor,
                     weights_batch=weights_batch,
                 )
+                batch_time = _timing_stop(batch_start, device, timing_enabled)
+                epoch_train_time += batch_time
+                if first_batch_time is None:
+                    first_batch_time = batch_time
                 mutable_generator_state["yielded_values"] += len(batch["y"])
+                epoch_num_train_rows += len(batch["y"])
                 epoch_losses.append(loss)
 
             # Compute validation loss in fixed-size batches — reuse the
@@ -2379,11 +2509,15 @@ class Class1NeuralNetwork(object):
             # and defeating shape-stable optimization. See Phase 4b of
             # openvax/mhcflurry#268.
             network.eval()
-            with torch.no_grad():
-                val_batch_size = (
-                    self.hyperparameters["validation_batch_size"]
-                    or 4 * self.hyperparameters["minibatch_size"]
+            validation_time = 0.0
+            with torch.inference_mode():
+                validation_start = _timing_start(device, timing_enabled)
+                val_batch_size = _effective_validation_batch_size(
+                    device,
+                    self.hyperparameters["validation_batch_size"],
+                    self.hyperparameters["minibatch_size"],
                 )
+                fit_info["effective_validation_batch_size"] = val_batch_size
                 val_loss = _batched_validation_loss(
                     network=network,
                     eager_network=eager_network,
@@ -2401,6 +2535,9 @@ class Class1NeuralNetwork(object):
                 )
                 if regularization_penalty is not None:
                     val_loss = val_loss + regularization_penalty.item()
+                validation_time = _timing_stop(
+                    validation_start, device, timing_enabled
+                )
 
             epoch_time = time.time() - epoch_start_time
             # Single GPU→CPU sync per epoch for the accumulated per-step
@@ -2412,6 +2549,18 @@ class Class1NeuralNetwork(object):
             )
             fit_info["loss"].append(train_loss)
             fit_info["val_loss"].append(val_loss)
+            if timing_enabled:
+                fit_info["epoch_fetch_time"].append(epoch_fetch_time)
+                fit_info["epoch_train_time"].append(epoch_train_time)
+                fit_info["epoch_validation_time"].append(validation_time)
+                fit_info["epoch_num_train_batches"].append(len(epoch_losses))
+                fit_info["epoch_num_train_rows"].append(epoch_num_train_rows)
+                fit_info["epoch_num_validation_batches"].append(
+                    int(numpy.ceil(len(validation_affinities) / val_batch_size))
+                )
+                fit_info["epoch_total_time"].append(
+                    time.perf_counter() - epoch_wall_start
+                )
 
             if min_val_loss is None or val_loss < min_val_loss - min_delta:
                 min_val_loss = val_loss
@@ -2454,6 +2603,8 @@ class Class1NeuralNetwork(object):
 
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = mutable_generator_state["yielded_values"]
+        if first_batch_time is not None:
+            fit_info["first_batch_time"] = first_batch_time
         self.fit_info.append(dict(fit_info))
 
     def _create_optimizer(self, network):
@@ -2516,6 +2667,11 @@ class Class1NeuralNetwork(object):
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
         fit_info = collections.defaultdict(list)
+        timing_enabled = _timing_enabled()
+        fit_info["timing_enabled"] = timing_enabled
+        fit_info["dataloader_num_workers"] = self.hyperparameters.get(
+            "dataloader_num_workers", 0
+        )
 
         random_negatives_planner = RandomNegativePeptides(
             **RandomNegativePeptides.hyperparameter_defaults.subselect(
@@ -2686,6 +2842,7 @@ class Class1NeuralNetwork(object):
 
         start = time.time()
         last_progress_print = None
+        first_batch_time = None
 
         # Validation split (fixed across epochs; only training data is reshuffled)
         val_split = self.hyperparameters["validation_split"]
@@ -2699,6 +2856,9 @@ class Class1NeuralNetwork(object):
         else:
             train_indices_base = indices
             val_indices = None
+        fit_info["train_rows"] = int(n_train)
+        fit_info["validation_rows"] = int(n_val)
+        fit_info["num_random_negatives"] = int(num_random_negatives)
 
         regularization_parameters = tuple(self._regularized_parameters(network))
         l1_reg = self.hyperparameters["dense_layer_l1_regularization"]
@@ -2728,6 +2888,7 @@ class Class1NeuralNetwork(object):
             and len(val_indices) > 0
             and bool(numpy.all(val_indices >= num_random_negatives))
         )
+        fit_info["validation_cache_reused"] = _val_cache_safe
         _val_device_tensors = None
         if _val_cache_safe:
             val_training_indices = val_indices - num_random_negatives
@@ -2755,40 +2916,54 @@ class Class1NeuralNetwork(object):
             )
 
         for epoch in range(self.hyperparameters["max_epochs"]):
+            epoch_wall_start = time.perf_counter()
+            input_build_time = 0.0
+            initialization_time = 0.0
+            shuffle_dataset_time = 0.0
+            dataloader_setup_time = 0.0
+            train_loop_time = 0.0
+            validation_materialize_time = 0.0
+            validation_compute_time = 0.0
+            callback_time = 0.0
+            gc_time = 0.0
+
+            build_start = time.perf_counter()
             random_negative_peptides = EncodableSequences.create(
                 random_negatives_planner.get_peptides()
             )
             random_negative_peptides_encoding = self.peptides_to_network_input(
                 random_negative_peptides
             )
-
-            # Build the per-epoch x arrays. The previous epoch's
-            # x_peptide / x_allele go out of scope on the reassignment
-            # below — Python's refcount-based GC drops them before the
-            # concat inside the helper allocates the new buffers, so
-            # peak RAM is 1× the array size, not 2×. Encapsulating the
-            # concat in a function (rather than an inline block) makes
-            # this reliance on scope-based cleanup explicit.
-            x_peptide, x_allele = _build_epoch_input_arrays(
-                random_negative_peptides_encoding,
-                x_dict_without_random_negatives,
-                random_negatives_allele_encoding=(
+            random_negative_x_allele = None
+            if (
+                len(random_negative_peptides) > 0
+                and random_negatives_allele_encoding is not None
+            ):
+                random_negative_x_allele, _ = self.allele_encoding_to_network_input(
                     random_negatives_allele_encoding
-                    if len(random_negative_peptides) > 0
-                    else None
-                ),
-                allele_encoding_to_input=self.allele_encoding_to_network_input,
+                )
+            dataset = _FitBatchDataset(
+                x_peptide=x_dict_without_random_negatives["peptide"],
+                x_allele=x_dict_without_random_negatives.get("allele"),
+                y_encoded=y_encoded,
+                sample_weights_with_negatives=sample_weights_with_negatives,
+                train_indices=None,
+                random_negative_x_peptide=random_negative_peptides_encoding,
+                random_negative_x_allele=random_negative_x_allele,
+                num_random_negatives=num_random_negatives,
             )
+            input_build_time += time.perf_counter() - build_start
 
             if needs_initialization:
-                x_init = {"peptide": x_peptide}
-                if x_allele is not None:
-                    x_init["allele"] = x_allele
+                init_start = _timing_start(device, timing_enabled)
                 self.data_dependent_weights_initialization(
                     network,
-                    x_init,
+                    dataset.batch_for_indices(indices),
                     method=self.hyperparameters["data_dependent_initialization_method"],
                     verbose=verbose,
+                )
+                initialization_time += _timing_stop(
+                    init_start, device, timing_enabled
                 )
                 needs_initialization = False
 
@@ -2801,8 +2976,11 @@ class Class1NeuralNetwork(object):
             eager_network = _uncompiled_network(network)
 
             # Train/val split (keep validation fixed)
+            dataset_start = time.perf_counter()
             train_indices = train_indices_base.copy()
             numpy.random.shuffle(train_indices)
+            dataset.train_indices = train_indices
+            shuffle_dataset_time += time.perf_counter() - dataset_start
 
             # Training
             network.train()
@@ -2824,69 +3002,39 @@ class Class1NeuralNetwork(object):
             non_blocking_h2d = use_pinned_memory
 
             train_losses = []
-            dataset = _FitBatchDataset(
-                x_peptide=x_peptide,
-                x_allele=x_allele,
-                y_encoded=y_encoded,
-                sample_weights_with_negatives=sample_weights_with_negatives,
-                train_indices=train_indices,
-            )
+            epoch_num_train_rows = 0
             full_batch_count = (len(train_indices) // batch_size) * batch_size
             if full_batch_count > 0:
+                dataloader_setup_start = time.perf_counter()
                 loader = _make_fit_dataloader(
                     dataset=_FitBatchDataset(
-                        x_peptide=x_peptide,
-                        x_allele=x_allele,
+                        x_peptide=x_dict_without_random_negatives["peptide"],
+                        x_allele=x_dict_without_random_negatives.get("allele"),
                         y_encoded=dataset.y_encoded,
                         sample_weights_with_negatives=sample_weights_with_negatives,
                         train_indices=train_indices[:full_batch_count],
+                        random_negative_x_peptide=random_negative_peptides_encoding,
+                        random_negative_x_allele=random_negative_x_allele,
+                        num_random_negatives=num_random_negatives,
                     ),
                     batch_size=batch_size,
                     num_workers=dataloader_num_workers,
                     use_pinned_memory=use_pinned_memory,
                     drop_last=False,
                 )
+                dataloader_setup_time += (
+                    time.perf_counter() - dataloader_setup_start
+                )
 
                 for batch in loader:
+                    batch_start = _timing_start(device, timing_enabled)
                     inputs, y_batch, weights_batch = _move_fit_batch_to_device(
                         batch,
                         device,
                         non_blocking=non_blocking_h2d,
                     )
-                    train_losses.append(
-                        _run_training_batch(
-                            network=network,
-                            optimizer=optimizer,
-                            loss_obj=loss_obj,
-                            regularization_parameters=regularization_parameters,
-                            l1_reg=l1_reg,
-                            l2_reg=l2_reg,
-                            inputs=inputs,
-                            y_batch=y_batch,
-                            weights_batch=weights_batch,
-                        )
-                    )
-
-            tail_indices = train_indices[full_batch_count:]
-            if len(tail_indices) > 0:
-                tail_batch = {
-                    "peptide": x_peptide[tail_indices],
-                    "y": dataset.y_encoded[tail_indices],
-                }
-                if x_allele is not None:
-                    tail_batch["allele"] = x_allele[tail_indices]
-                if sample_weights_with_negatives is not None:
-                    tail_batch["weight"] = sample_weights_with_negatives[
-                        tail_indices
-                    ]
-                inputs, y_batch, weights_batch = _move_fit_batch_to_device(
-                    tail_batch,
-                    device,
-                    non_blocking=False,
-                )
-                train_losses.append(
-                    _run_training_batch(
-                        network=eager_network,
+                    loss = _run_training_batch(
+                        network=network,
                         optimizer=optimizer,
                         loss_obj=loss_obj,
                         regularization_parameters=regularization_parameters,
@@ -2896,7 +3044,36 @@ class Class1NeuralNetwork(object):
                         y_batch=y_batch,
                         weights_batch=weights_batch,
                     )
+                    batch_time = _timing_stop(batch_start, device, timing_enabled)
+                    train_loop_time += batch_time
+                    if first_batch_time is None:
+                        first_batch_time = batch_time
+                    epoch_num_train_rows += len(batch["y"])
+                    train_losses.append(loss)
+
+            tail_indices = train_indices[full_batch_count:]
+            if len(tail_indices) > 0:
+                tail_batch = dataset.batch_for_indices(tail_indices)
+                batch_start = _timing_start(device, timing_enabled)
+                inputs, y_batch, weights_batch = _move_fit_batch_to_device(
+                    tail_batch,
+                    device,
+                    non_blocking=False,
                 )
+                loss = _run_training_batch(
+                    network=eager_network,
+                    optimizer=optimizer,
+                    loss_obj=loss_obj,
+                    regularization_parameters=regularization_parameters,
+                    l1_reg=l1_reg,
+                    l2_reg=l2_reg,
+                    inputs=inputs,
+                    y_batch=y_batch,
+                    weights_batch=weights_batch,
+                )
+                train_loop_time += _timing_stop(batch_start, device, timing_enabled)
+                epoch_num_train_rows += len(tail_batch["y"])
+                train_losses.append(loss)
 
             epoch_time = time.time() - epoch_start
             # Single GPU→CPU sync per epoch over accumulated loss tensors.
@@ -2911,7 +3088,7 @@ class Class1NeuralNetwork(object):
             # bounded regardless of n_val. See Phase 4b of #268.
             if val_split > 0:
                 network.eval()
-                with torch.no_grad():
+                with torch.inference_mode():
                     if _val_device_tensors is not None:
                         # Fast path: reuse tensors materialized once before the
                         # epoch loop. Saves ~60 MB+ H2D copy per epoch. Bit-
@@ -2924,29 +3101,46 @@ class Class1NeuralNetwork(object):
                             val_weights,
                         ) = _val_device_tensors
                     else:
-                        val_peptide = torch.from_numpy(
-                            x_peptide[val_indices]
-                        ).to(device).float()
-                        val_y = torch.from_numpy(
-                            y_encoded[val_indices].astype(numpy.float32)
-                        ).to(device)
+                        materialize_start = time.perf_counter()
+                        val_batch = dataset.batch_for_indices(val_indices)
+                        validation_materialize_time += (
+                            time.perf_counter() - materialize_start
+                        )
+                        val_peptide = _batch_value_to_device(
+                            val_batch["peptide"],
+                            device,
+                            non_blocking=False,
+                            cast_float=True,
+                        )
+                        val_y = _batch_value_to_device(
+                            val_batch["y"],
+                            device,
+                            non_blocking=False,
+                            cast_float=False,
+                        )
                         val_allele = None
-                        if x_allele is not None:
-                            val_allele = torch.from_numpy(
-                                x_allele[val_indices]
-                            ).to(device).float()
+                        if "allele" in val_batch:
+                            val_allele = _batch_value_to_device(
+                                val_batch["allele"],
+                                device,
+                                non_blocking=False,
+                                cast_float=True,
+                            )
                         val_weights = None
-                        if sample_weights_with_negatives is not None:
-                            # Cast before transfer: sample_weights can be
-                            # float64 (test fixtures often skip dtype) and
-                            # MPS refuses to host float64.
-                            val_weights = torch.from_numpy(
-                                sample_weights_with_negatives[val_indices]
-                            ).float().to(device)
-                    val_batch_size = (
-                        self.hyperparameters["validation_batch_size"]
-                        or 4 * batch_size
+                        if "weight" in val_batch:
+                            val_weights = _batch_value_to_device(
+                                val_batch["weight"],
+                                device,
+                                non_blocking=False,
+                                cast_float=True,
+                            )
+                    val_batch_size = _effective_validation_batch_size(
+                        device,
+                        self.hyperparameters["validation_batch_size"],
+                        batch_size,
                     )
+                    fit_info["effective_validation_batch_size"] = val_batch_size
+                    validation_start = _timing_start(device, timing_enabled)
                     val_loss = _batched_validation_loss(
                         network=network,
                         eager_network=eager_network,
@@ -2964,6 +3158,9 @@ class Class1NeuralNetwork(object):
                     )
                     if regularization_penalty is not None:
                         val_loss = val_loss + regularization_penalty.item()
+                    validation_compute_time += _timing_stop(
+                        validation_start, device, timing_enabled
+                    )
                 fit_info["val_loss"].append(val_loss)
 
             # Progress printing
@@ -3019,12 +3216,47 @@ class Class1NeuralNetwork(object):
                         break
 
             if progress_callback:
+                callback_start = time.perf_counter()
                 progress_callback()
+                callback_time += time.perf_counter() - callback_start
 
+            gc_start = time.perf_counter()
             gc.collect()
+            gc_time += time.perf_counter() - gc_start
+            if timing_enabled:
+                fit_info["epoch_input_build_time"].append(input_build_time)
+                fit_info["epoch_initialization_time"].append(
+                    initialization_time
+                )
+                fit_info["epoch_shuffle_dataset_time"].append(
+                    shuffle_dataset_time
+                )
+                fit_info["epoch_dataloader_setup_time"].append(
+                    dataloader_setup_time
+                )
+                fit_info["epoch_train_time"].append(train_loop_time)
+                fit_info["epoch_validation_materialize_time"].append(
+                    validation_materialize_time
+                )
+                fit_info["epoch_validation_time"].append(
+                    validation_compute_time
+                )
+                fit_info["epoch_num_train_batches"].append(len(train_losses))
+                fit_info["epoch_num_train_rows"].append(epoch_num_train_rows)
+                fit_info["epoch_tail_train_rows"].append(len(tail_indices))
+                fit_info["epoch_num_validation_batches"].append(
+                    int(numpy.ceil(n_val / val_batch_size)) if n_val > 0 else 0
+                )
+                fit_info["epoch_callback_time"].append(callback_time)
+                fit_info["epoch_gc_time"].append(gc_time)
+                fit_info["epoch_total_time"].append(
+                    time.perf_counter() - epoch_wall_start
+                )
 
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = len(peptides)
+        if first_batch_time is not None:
+            fit_info["first_batch_time"] = first_batch_time
         self.fit_info.append(dict(fit_info))
 
     def predict(

@@ -44,6 +44,10 @@ app = App(
         # OCI boot advertised at 15 min; give 40 min margin against
         # launchpad's own provisioning queue. Closes runplz #34.
         ssh_ready_wait_seconds=2400,
+        # Brev backend kill-switch. runplz only enforces wall caps for Brev
+        # through BrevConfig.max_runtime_seconds; @app.function(timeout=...)
+        # is Modal-only.
+        max_runtime_seconds=60 * 60 * 60,
     ),
 )
 
@@ -53,6 +57,7 @@ image = (
     .pip_install(
         "runplz>=3.7.2",
         "pandas>=2.0",
+        "pyarrow",
         "appdirs",
         "scikit-learn",
         "mhcgnomes>=3.0.1",
@@ -71,7 +76,7 @@ image = (
     min_memory=400,      # GB RAM — full data + pretraining buffer
     min_gpu_memory=40,   # GB VRAM per GPU
     min_disk=1000,       # GB — ~140 networks × ~10MB weights + init info
-    timeout=60 * 60 * 60,  # 60 hours — safety margin above 28h estimate
+    timeout=60 * 60 * 60,  # Modal-only. Brev cap set in BrevConfig above.
     env={
         # massedcompute_A100_sxm4_80G_DGXx8 is 8× A100-80GB. 80GB cards
         # fit 2 workers (each ~20 GB peak VRAM during validation
@@ -79,6 +84,7 @@ image = (
         # 8 GPUs. With Phase 2 NonDaemonPool, each worker's DataLoader
         # prefetch path is live in production too.
         "MAX_WORKERS_PER_GPU": "2",
+        "MAX_TASKS_PER_WORKER": "12",
     },
 )
 def train():

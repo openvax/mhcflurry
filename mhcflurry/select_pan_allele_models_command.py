@@ -226,6 +226,7 @@ def run(argv=sys.argv[1:]):
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
     worker_pool = None
     start = time.time()
+    print(f"TIMING_MARKER selection_start {start:.3f}")
     if serial_run:
         # Serial run
         print("Running in serial.")
@@ -282,6 +283,7 @@ def run(argv=sys.argv[1:]):
     result_predictor.save(args.out_models_dir)
 
     model_selection_time = time.time() - start
+    print(f"TIMING_MARKER selection_done {time.time():.3f}")
 
     if worker_pool:
         worker_pool.close()

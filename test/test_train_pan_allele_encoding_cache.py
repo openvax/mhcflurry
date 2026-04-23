@@ -38,9 +38,11 @@ from mhcflurry.train_pan_allele_models_command import (
     _build_train_peptides,
     _deterministic_unique_peptide_list,
     _initialize_encoding_cache,
+    _pretrain_batch_cache_dir,
     _read_pretrain_peptide_list,
     GLOBAL_DATA,
     pretrain_data_iterator,
+    pretrain_network_input_iterator,
 )
 
 
@@ -422,6 +424,11 @@ def _consume_iterator(iterator, n_chunks):
     return out
 
 
+def _consume_network_input_iterator(iterator, n_chunks):
+    """Pull n_chunks from a pretrain_network_input_iterator generator."""
+    return [next(iterator) for _ in range(n_chunks)]
+
+
 def test_pretrain_iterator_without_cache_yields_normally(
     pretrain_csv, pretrain_allele_encoding
 ):
@@ -498,6 +505,42 @@ def test_pretrain_iterator_with_cache_bit_identical(
             numpy.float32
         )
         assert_array_equal(enc_via_uncached, enc_via_cached)
+
+
+def test_pretrain_network_input_iterator_cached_matches_uncached(
+    pretrain_csv, pretrain_allele_encoding, tmp_path
+):
+    """Training's encoded-batch iterator must stay bit-identical."""
+    params = EncodingParams(**DEFAULT_PEPTIDE_ENCODING)
+    cache_dir = tmp_path / "cache"
+
+    uncached = _consume_network_input_iterator(
+        pretrain_network_input_iterator(
+            str(pretrain_csv),
+            pretrain_allele_encoding,
+            DEFAULT_PEPTIDE_ENCODING,
+            peptides_per_chunk=4,
+        ),
+        n_chunks=2,
+    )
+    cached = _consume_network_input_iterator(
+        pretrain_network_input_iterator(
+            str(pretrain_csv),
+            pretrain_allele_encoding,
+            DEFAULT_PEPTIDE_ENCODING,
+            peptides_per_chunk=4,
+            encoding_cache_dir=str(cache_dir),
+            encoding_params=params,
+        ),
+        n_chunks=2,
+    )
+
+    for (uncached_batch, cached_batch) in zip(uncached, cached):
+        uncached_x, uncached_y = uncached_batch
+        cached_x, cached_y = cached_batch
+        assert_array_equal(uncached_y, cached_y)
+        assert_array_equal(uncached_x["peptide"], cached_x["peptide"])
+        assert_array_equal(uncached_x["allele"], cached_x["allele"])
 
 
 def test_pretrain_iterator_cache_hit_avoids_reencoding(
@@ -958,6 +1001,91 @@ def test_initialize_encoding_cache_prebuilds_pretrain_cache(
     assert cache.is_complete_for(pretrain_peptides), (
         "pretrain cache should have been pre-built by the orchestrator"
     )
+
+
+def test_initialize_encoding_cache_prebuilds_pretrain_batch_cache(
+    constant_data_with_cache, hyperparameters, pretrain_csv, pretrain_allele_encoding
+):
+    """The orchestrator also pre-builds the reusable pretrain chunk manifest."""
+    all_work_items = [
+        {
+            "hyperparameters": {
+                **hyperparameters,
+                "train_data": {
+                    "pretrain": True,
+                    "pretrain_peptides_per_step": 4,
+                },
+            }
+        }
+    ]
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=str(pretrain_csv),
+    )
+    GLOBAL_DATA.update(constant_data_with_cache)
+    GLOBAL_DATA["full_allele_encoding"] = pretrain_allele_encoding
+    _initialize_encoding_cache(args, all_work_items)
+
+    cache_dir = _pretrain_batch_cache_dir(
+        filename=str(pretrain_csv),
+        usable_alleles=PRETRAIN_ALLELES,
+        peptides_per_chunk=4,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        encoding_params=EncodingParams(**hyperparameters["peptide_encoding"]),
+    )
+    assert (Path(cache_dir) / ".complete").exists()
+
+
+def test_pretrain_network_input_iterator_uses_warm_batch_cache_without_chunked_read(
+    constant_data_with_cache,
+    hyperparameters,
+    pretrain_csv,
+    pretrain_allele_encoding,
+    monkeypatch,
+):
+    """Warm-cache replay should avoid the expensive chunked pandas read path."""
+    all_work_items = [
+        {
+            "hyperparameters": {
+                **hyperparameters,
+                "train_data": {
+                    "pretrain": True,
+                    "pretrain_peptides_per_step": 4,
+                },
+            }
+        }
+    ]
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=str(pretrain_csv),
+    )
+    GLOBAL_DATA.update(constant_data_with_cache)
+    GLOBAL_DATA["full_allele_encoding"] = pretrain_allele_encoding
+    _initialize_encoding_cache(args, all_work_items)
+
+    calls = []
+    original_read_csv = pandas.read_csv
+
+    def spy_read_csv(*args, **kwargs):
+        calls.append(dict(kwargs))
+        return original_read_csv(*args, **kwargs)
+
+    monkeypatch.setattr(pandas, "read_csv", spy_read_csv)
+    it = pretrain_network_input_iterator(
+        str(pretrain_csv),
+        pretrain_allele_encoding,
+        DEFAULT_PEPTIDE_ENCODING,
+        peptides_per_chunk=4,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        encoding_params=EncodingParams(**hyperparameters["peptide_encoding"]),
+    )
+    next(it)
+
+    assert not any(kwargs.get("chunksize") for kwargs in calls), calls
 
 
 def test_initialize_encoding_cache_pretrain_skipped_when_no_pretrain_data(
