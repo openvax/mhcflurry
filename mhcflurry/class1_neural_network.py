@@ -197,6 +197,26 @@ class _FitGeneratorBatchIterableDataset(torch.utils.data.IterableDataset):
     The pre-encoded path is what allows worker-side prefetch in
     pretraining: the dataset can be pickled into spawned workers without
     serializing the full ``Class1NeuralNetwork`` instance.
+
+    Picklability contract
+    ---------------------
+    When ``num_workers>0``, PyTorch's DataLoader pickles the dataset via
+    ``ForkingPickler`` to ship it to each spawned worker. Two classes of
+    attributes would break that:
+
+    - Live generator objects (from ``generator=iter(...)``). Generators
+      are intrinsically unpicklable.
+    - Bound methods of ``Class1NeuralNetwork`` (``peptides_to_network_input``,
+      ``allele_encoding_to_network_input``). Pickling a bound method
+      pickles ``self``, i.e. the entire network.
+
+    We sidestep both by dropping those references whenever they're
+    redundant: the factory path never reads ``self.generator`` (always
+    fresh-instantiates per worker), and the pre-encoded path never reads
+    the ``*_to_input`` callbacks. The live-generator / raw-tuple path is
+    single-process by construction — the downgrade lives in
+    ``fit_generator`` — so zeroing these out doesn't remove any
+    functionality.
     """
 
     def __init__(
@@ -208,11 +228,21 @@ class _FitGeneratorBatchIterableDataset(torch.utils.data.IterableDataset):
         allele_encoding_to_input=None,
         peptides_to_network_input=None,
     ):
-        self.generator = generator
+        # Factory takes precedence: every call to ``_iter_source`` will
+        # invoke the factory and ignore ``self.generator``, so don't
+        # retain the live (unpicklable) generator object.
+        self.generator = None if generator_factory is not None else generator
         self.generator_factory = generator_factory
         self.source_batches_are_encoded = source_batches_are_encoded
-        self.allele_encoding_to_input = allele_encoding_to_input
-        self.peptides_to_network_input = peptides_to_network_input
+        # Pre-encoded batches never consume these callbacks. Drop them
+        # to keep ``ForkingPickler`` from dragging the whole
+        # ``Class1NeuralNetwork`` instance into every spawned worker.
+        if source_batches_are_encoded:
+            self.allele_encoding_to_input = None
+            self.peptides_to_network_input = None
+        else:
+            self.allele_encoding_to_input = allele_encoding_to_input
+            self.peptides_to_network_input = peptides_to_network_input
 
     def _iter_source(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -2387,12 +2417,22 @@ class Class1NeuralNetwork(object):
         )
         fit_info["dataloader_num_workers"] = dataloader_num_workers
         fit_info["validation_rows"] = len(validation_affinities)
-        if dataloader_num_workers > 0 and not generator_batches_are_encoded:
+        # Worker-prefetch requires both (a) a picklable ``generator_factory``
+        # so each spawned worker can build its own shard, and (b)
+        # ``generator_batches_are_encoded=True`` so the dataset never
+        # holds bound methods of this ``Class1NeuralNetwork``. Either
+        # missing piece forces a single-process path.
+        if dataloader_num_workers > 0 and (
+            generator_factory is None or not generator_batches_are_encoded
+        ):
             logging.warning(
-                "fit_generator requested dataloader_num_workers=%s for raw "
-                "generator batches; downgrading to 0 because spawned "
-                "workers require a picklable pre-encoded generator_factory.",
+                "fit_generator requested dataloader_num_workers=%s but "
+                "worker-prefetch needs generator_factory + "
+                "generator_batches_are_encoded=True (got factory=%s, "
+                "encoded=%s); downgrading to 0.",
                 dataloader_num_workers,
+                "present" if generator_factory is not None else "missing",
+                generator_batches_are_encoded,
             )
             dataloader_num_workers = 0
         dataset = _FitGeneratorBatchIterableDataset(

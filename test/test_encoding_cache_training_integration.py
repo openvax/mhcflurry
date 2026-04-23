@@ -23,6 +23,7 @@ prove the point — the cache doesn't know or care about the device.
 
 from __future__ import annotations
 
+import pickle
 import random
 
 import numpy
@@ -31,7 +32,10 @@ import pytest
 import torch
 
 from mhcflurry.allele_encoding import AlleleEncoding
-from mhcflurry.class1_neural_network import Class1NeuralNetwork
+from mhcflurry.class1_neural_network import (
+    Class1NeuralNetwork,
+    _FitGeneratorBatchIterableDataset,
+)
 from mhcflurry.common import configure_pytorch
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.encoding_cache import (
@@ -807,6 +811,124 @@ def test_fit_generator_preencoded_batches_support_dataloader_workers():
     assert len(info["loss"]) == 1
     assert len(info["val_loss"]) == 1
     assert info["num_points"] == 8
+
+
+def test_fit_generator_dataset_is_picklable_with_live_generator():
+    """Dataset must pickle cleanly even when caller passes a live generator.
+
+    Regression for the 2026-04-23 8×A100 training crash: the pretrain
+    caller builds ``generator=make_pretrain_generator()`` (a live
+    generator object) alongside ``generator_factory=make_pretrain_generator``.
+    Under ``dataloader_num_workers>0``, PyTorch spawns workers via
+    ``ForkingPickler``, which chokes on the live generator with
+    ``TypeError: cannot pickle 'generator' object``.
+
+    The dataset must drop the live generator when a factory is present
+    so pickling goes through the factory only.
+    """
+    live_generator = _make_preencoded_fit_generator()
+    assert isinstance(live_generator, type((x for x in ()))), \
+        "test premise: _make_preencoded_fit_generator returns a generator"
+
+    dataset = _FitGeneratorBatchIterableDataset(
+        generator=live_generator,
+        generator_factory=_make_preencoded_fit_generator,
+        source_batches_are_encoded=True,
+    )
+
+    # Pickle round-trip must succeed. This is what DataLoader does to
+    # ship the dataset to spawned workers.
+    payload = pickle.dumps(dataset)
+    restored = pickle.loads(payload)
+    assert restored.generator is None
+    assert restored.generator_factory is _make_preencoded_fit_generator
+    assert restored.source_batches_are_encoded is True
+
+
+def test_fit_generator_dataset_drops_bound_methods_on_encoded_path():
+    """Pre-encoded path must not retain bound methods of the network.
+
+    Even after the live-generator fix, if the dataset held
+    ``self.peptides_to_network_input = net.peptides_to_network_input``
+    (a bound method), pickling would drag the whole
+    ``Class1NeuralNetwork`` into every spawned worker — both heavy and
+    sometimes outright unpicklable. The encoded-batch path never reads
+    those callbacks, so the dataset must drop them at construction.
+    """
+    net = Class1NeuralNetwork(**_tiny_hyperparameters())
+
+    dataset = _FitGeneratorBatchIterableDataset(
+        generator=(),
+        generator_factory=_make_preencoded_fit_generator,
+        source_batches_are_encoded=True,
+        allele_encoding_to_input=net.allele_encoding_to_network_input,
+        peptides_to_network_input=net.peptides_to_network_input,
+    )
+    assert dataset.allele_encoding_to_input is None
+    assert dataset.peptides_to_network_input is None
+    # And the dataset pickles cleanly — without a bound-method
+    # reference, there's no path for the network to tag along.
+    pickle.dumps(dataset)
+
+
+def test_fit_generator_dataset_keeps_callbacks_on_raw_path():
+    """Raw-tuple path must retain the encoding callbacks — they're used."""
+    net = Class1NeuralNetwork(**_tiny_hyperparameters())
+
+    dataset = _FitGeneratorBatchIterableDataset(
+        generator=iter(()),  # empty, but live-generator-shaped
+        generator_factory=None,
+        source_batches_are_encoded=False,
+        allele_encoding_to_input=net.allele_encoding_to_network_input,
+        peptides_to_network_input=net.peptides_to_network_input,
+    )
+    assert dataset.allele_encoding_to_input is not None
+    assert dataset.peptides_to_network_input is not None
+
+
+def test_fit_generator_downgrades_num_workers_without_factory(caplog):
+    """No factory → must downgrade to num_workers=0 with a warning.
+
+    Worker-prefetch needs a picklable per-worker source. Without
+    ``generator_factory``, the dataset can only iterate the single
+    main-process generator — which can't be sharded and can't be
+    pickled. fit_generator must detect this and downgrade rather than
+    letting the DataLoader crash at worker spawn.
+    """
+    _seed_everything(seed=13579)
+
+    peptides = EncodableSequences(TRAIN_PEPTIDES[:8])
+    affinities = numpy.linspace(50.0, 50000.0, 8)
+    allele_list = [TRAIN_ALLELES_CYCLE[i % 3] for i in range(8)]
+    alleles = AlleleEncoding(
+        alleles=allele_list, allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+    hp = _tiny_hyperparameters()
+    hp["dataloader_num_workers"] = 2
+
+    net = Class1NeuralNetwork(**hp)
+    with caplog.at_level("WARNING", logger="root"):
+        net.fit_generator(
+            generator=_make_preencoded_fit_generator(),
+            generator_factory=None,  # the load-bearing omission
+            generator_batches_are_encoded=True,
+            validation_peptide_encoding=peptides,
+            validation_affinities=affinities,
+            validation_allele_encoding=alleles,
+            steps_per_epoch=2,
+            epochs=1,
+            min_epochs=1,
+            patience=100,
+            verbose=0,
+            progress_print_interval=None,
+        )
+
+    info = net.fit_info[-1]
+    assert info["dataloader_num_workers"] == 2, \
+        "recorded value reflects the request, not the downgrade"
+    assert any(
+        "downgrading to 0" in rec.message for rec in caplog.records
+    ), "expected a downgrade warning in the log"
 
 
 # ---- Daemon-process compatibility gate ----
