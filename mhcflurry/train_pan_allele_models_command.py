@@ -930,7 +930,6 @@ def _initialize_encoding_cache(args, all_work_items):
     # so workers no longer reparse / stack the wide CSV every epoch.
     pretrain_data_path = getattr(args, "pretrain_data", None)
     if pretrain_data_path:
-        master_allele_encoding = GLOBAL_DATA["full_allele_encoding"]
         pretrain_peptides = _read_pretrain_peptide_list(pretrain_data_path)
         for cfg in configs_seen.values():
             params = EncodingParams(**cfg)
@@ -946,6 +945,12 @@ def _initialize_encoding_cache(args, all_work_items):
             t0 = time.time()
             cache.get_or_build(pretrain_peptides)
             print(f"Pretrain encoding cache built in {time.time() - t0:.1f}s.")
+        master_allele_encoding = GLOBAL_DATA.get("full_allele_encoding")
+        if pretrain_batch_configs and master_allele_encoding is None:
+            raise KeyError(
+                "full_allele_encoding is required to prebuild the pretrain "
+                "batch cache"
+            )
         for batch_cfg in pretrain_batch_configs.values():
             params = EncodingParams(**batch_cfg["peptide_encoding"])
             _get_or_build_pretrain_batch_cache(

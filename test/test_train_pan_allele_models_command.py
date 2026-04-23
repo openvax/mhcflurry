@@ -417,20 +417,23 @@ def test_run_parallel_encoding_cache_warm_reuse():
         _run_with_cache_and_check(n_jobs=2, cache_dir=shared_cache_dir)
         # First run built the cache; capture mtimes to verify they don't
         # change on the second (warm) run.
-        entries_after_first = sorted(os.listdir(shared_cache_dir))
-        complete_mtimes_first = {
-            e: os.path.getmtime(
-                os.path.join(shared_cache_dir, e, ".complete")
+        complete_mtimes_first = {}
+        for (dirpath, _dirnames, filenames) in os.walk(shared_cache_dir):
+            if ".complete" not in filenames:
+                continue
+            rel_dir = os.path.relpath(dirpath, shared_cache_dir)
+            complete_mtimes_first[rel_dir] = os.path.getmtime(
+                os.path.join(dirpath, ".complete")
             )
-            for e in entries_after_first
-            if os.path.isdir(os.path.join(shared_cache_dir, e))
-        }
+        assert complete_mtimes_first, (
+            f"expected at least one completed cache entry in {shared_cache_dir}"
+        )
 
         _run_with_cache_and_check(n_jobs=2, cache_dir=shared_cache_dir)
 
         # Second run should not have rewritten .complete (cache hit path).
-        for e, mtime_first in complete_mtimes_first.items():
-            sentinel_path = os.path.join(shared_cache_dir, e, ".complete")
+        for (entry_dir, mtime_first) in complete_mtimes_first.items():
+            sentinel_path = os.path.join(shared_cache_dir, entry_dir, ".complete")
             mtime_second = os.path.getmtime(sentinel_path)
             assert mtime_second == mtime_first, (
                 f"{sentinel_path} was rewritten between runs "
