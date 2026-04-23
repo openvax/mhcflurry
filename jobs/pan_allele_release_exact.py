@@ -55,7 +55,12 @@ image = (
     Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
     .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
     .pip_install(
-        "runplz>=3.7.2",
+        # 3.11.0: detached remote bootstrap (setsid + nohup + file redirects)
+        # so an SSH drop from the client can no longer SIGPIPE the remote
+        # training process tree. Before this, a wifi hiccup on the laptop
+        # killed the 8×A100 run at 21:09 UTC 2026-04-23 after ~1h36m and
+        # 3/140 tasks. See pirl-unc/runplz#53.
+        "runplz>=3.11.0",
         "pandas>=2.0",
         "pyarrow",
         "appdirs",
