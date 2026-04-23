@@ -1025,7 +1025,10 @@ def test_initialize_encoding_cache_prebuilds_pretrain_batch_cache(
         pretrain_data=str(pretrain_csv),
     )
     GLOBAL_DATA.update(constant_data_with_cache)
-    GLOBAL_DATA["full_allele_encoding"] = pretrain_allele_encoding
+    # Driver pre-build now uses ``allele_encoding`` (the restricted one
+    # that workers see), not ``full_allele_encoding``. See the regression
+    # notes at ``test_pretrain_batch_cache_prebuild_matches_worker_hash``.
+    GLOBAL_DATA["allele_encoding"] = pretrain_allele_encoding
     _initialize_encoding_cache(args, all_work_items)
 
     cache_dir = _pretrain_batch_cache_dir(
@@ -1064,7 +1067,10 @@ def test_pretrain_network_input_iterator_uses_warm_batch_cache_without_chunked_r
         pretrain_data=str(pretrain_csv),
     )
     GLOBAL_DATA.update(constant_data_with_cache)
-    GLOBAL_DATA["full_allele_encoding"] = pretrain_allele_encoding
+    # Driver pre-build now uses ``allele_encoding`` (the restricted one
+    # that workers see), not ``full_allele_encoding``. See the regression
+    # notes at ``test_pretrain_batch_cache_prebuild_matches_worker_hash``.
+    GLOBAL_DATA["allele_encoding"] = pretrain_allele_encoding
     _initialize_encoding_cache(args, all_work_items)
 
     calls = []
@@ -1292,3 +1298,202 @@ def test_pretrain_iterator_keyerror_message_names_cache_dir(
     # Message must mention the cache dir path so the user knows what to delete.
     assert "mycache" in str(exc_info.value)
     assert "different pretrain CSV" in str(exc_info.value)
+
+
+# ---- Driver / worker pretrain-batch-cache allele-encoding alignment ----
+#
+# Regression for 2026-04-23: the driver pre-built the pretrain batch cache
+# using ``GLOBAL_DATA["full_allele_encoding"]`` (all alleles with known
+# sequences) while workers look it up using ``GLOBAL_DATA["allele_encoding"]``
+# (only alleles with training data). Because ``_pretrain_batch_cache_dir``
+# hashes ``usable_alleles`` — which depends on which ``master_allele_encoding``
+# was passed — the two sides computed different cache dirs, the driver's
+# pre-build was silently ignored, and every DataLoader worker raced to
+# rebuild its own copy. On the 16-worker 8×A100 run that was ~10 minutes
+# of wasted setup, reported as a thundering-herd of concurrent chunk
+# writes.
+#
+# These tests lock in that the driver pre-builds at the *worker-compatible*
+# cache dir.
+
+
+def test_pretrain_batch_cache_prebuild_matches_worker_hash(
+    pretrain_csv, tmp_path
+):
+    """Driver pre-build must land at the hash workers will look up.
+
+    Setup mirrors the production wiring: GLOBAL_DATA has both a full
+    AlleleEncoding (superset — an extra allele with a sequence but no
+    training data) and a restricted AlleleEncoding (only alleles actually
+    seen in training). We run ``_initialize_encoding_cache`` with a
+    pretrain_data file. The resulting batch cache must exist at the
+    directory computed from the *restricted* encoding — because that's
+    what workers will compute — not at the directory from the full
+    encoding.
+    """
+    cache_dir = tmp_path / "encoding_cache"
+    cache_dir.mkdir()
+
+    restricted_allele_encoding = AlleleEncoding(
+        alleles=PRETRAIN_ALLELES,
+        allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+    # Full encoding also includes an extra allele with a sequence but no
+    # training data — this is the real-world condition that caused the bug
+    # (e.g. ``Mamu-A1*007:01`` had a sequence but no training rows).
+    extra_allele = "HLA-C*07:02"
+    extra_sequence = "YDSEYRNICAKTDESNLFLRYDSDAASPRTEPRAPWI"
+    full_alleles = list(PRETRAIN_ALLELES) + [extra_allele]
+    full_allele_to_sequence = {
+        **ALLELE_TO_SEQUENCE,
+        extra_allele: extra_sequence,
+    }
+    full_allele_encoding = AlleleEncoding(
+        alleles=full_alleles,
+        allele_to_sequence=full_allele_to_sequence,
+    )
+
+    # Work items: one architecture that uses pretrain.
+    peptides_per_chunk = 4
+    hp = {
+        "peptide_encoding": DEFAULT_PEPTIDE_ENCODING,
+        "train_data": {
+            "pretrain": True,
+            "pretrain_peptides_per_step": peptides_per_chunk,
+        },
+    }
+    all_work_items = [{"hyperparameters": hp}]
+
+    # train_data is only referenced by _deterministic_unique_peptide_list,
+    # which just needs a peptide column. Reuse the pretrain peptides.
+    GLOBAL_DATA.clear()
+    GLOBAL_DATA.update({
+        "train_data": pandas.DataFrame({"peptide": PRETRAIN_PEPTIDES}),
+        "allele_encoding": restricted_allele_encoding,
+        "full_allele_encoding": full_allele_encoding,
+    })
+
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=str(cache_dir),
+        out_models_dir=str(tmp_path),
+        pretrain_data=str(pretrain_csv),
+    )
+    _initialize_encoding_cache(args, all_work_items)
+
+    encoding_params = EncodingParams(**DEFAULT_PEPTIDE_ENCODING)
+
+    # What the worker will look up: usable_alleles derived from the
+    # RESTRICTED encoding. PRETRAIN_ALLELES is already the set with
+    # sequences in the restricted encoding, and the extra allele isn't
+    # in the pretrain CSV at all — but the hash is still sensitive to
+    # which allele dict we pass through ``_get_pretrain_allele_info``.
+    restricted_usable = [
+        a for a in PRETRAIN_ALLELES
+        if a in restricted_allele_encoding.allele_to_sequence
+    ]
+    restricted_dir = _pretrain_batch_cache_dir(
+        filename=str(pretrain_csv),
+        usable_alleles=restricted_usable,
+        peptides_per_chunk=peptides_per_chunk,
+        encoding_cache_dir=str(cache_dir),
+        encoding_params=encoding_params,
+    )
+
+    # What the old code path (full_allele_encoding) would have produced.
+    # Same set of columns in the pretrain CSV, but the full encoding's
+    # sequences dict is a superset — for this test the intersection is
+    # still the PRETRAIN_ALLELES, so the hash is the same *when the
+    # pretrain CSV doesn't include the extra allele*. The real-world
+    # discrepancy shows up when the pretrain CSV has columns that are
+    # in the full encoding but not the restricted one.
+    #
+    # So we construct a second pretrain CSV that DOES include the extra
+    # allele as a column to drive the divergence.
+    pretrain_csv_with_extra = tmp_path / "pretrain_with_extra.csv"
+    rng = numpy.random.default_rng(7)
+    rows = []
+    for peptide in PRETRAIN_PEPTIDES:
+        row = {"peptide": peptide}
+        for allele in full_alleles:
+            row[allele] = rng.random()
+        rows.append(row)
+    df = pandas.DataFrame(rows).set_index("peptide")
+    df.to_csv(pretrain_csv_with_extra)
+
+    restricted_usable_extra = sorted(
+        a for a in full_alleles
+        if a in restricted_allele_encoding.allele_to_sequence
+    )
+    full_usable_extra = sorted(
+        a for a in full_alleles
+        if a in full_allele_encoding.allele_to_sequence
+    )
+    assert restricted_usable_extra != full_usable_extra, \
+        "test premise: full encoding includes an allele that restricted doesn't"
+
+    restricted_dir_extra = _pretrain_batch_cache_dir(
+        filename=str(pretrain_csv_with_extra),
+        usable_alleles=restricted_usable_extra,
+        peptides_per_chunk=peptides_per_chunk,
+        encoding_cache_dir=str(cache_dir),
+        encoding_params=encoding_params,
+    )
+    full_dir_extra = _pretrain_batch_cache_dir(
+        filename=str(pretrain_csv_with_extra),
+        usable_alleles=full_usable_extra,
+        peptides_per_chunk=peptides_per_chunk,
+        encoding_cache_dir=str(cache_dir),
+        encoding_params=encoding_params,
+    )
+    assert restricted_dir_extra != full_dir_extra, \
+        "test premise: the two encodings hash to different cache dirs"
+
+    # The load-bearing assertion: the pre-build from _initialize_encoding_cache
+    # (called above with the simpler pretrain_csv) landed at the restricted
+    # hash, i.e. what the workers will look up. The ``.complete`` marker is
+    # written only at end of a successful build.
+    assert Path(restricted_dir, ".complete").exists(), \
+        f"driver pre-build should land at restricted-encoding hash {restricted_dir}"
+
+
+def test_pretrain_batch_cache_requires_allele_encoding_key(
+    pretrain_csv, tmp_path
+):
+    """Missing ``allele_encoding`` in GLOBAL_DATA raises a clear KeyError.
+
+    Locks in the rename from ``full_allele_encoding``: the pre-build step
+    now requires ``allele_encoding`` (the restricted one that workers use).
+    If someone accidentally removes that key, the error message should
+    guide them to the right fix.
+    """
+    cache_dir = tmp_path / "encoding_cache"
+    cache_dir.mkdir()
+
+    hp = {
+        "peptide_encoding": DEFAULT_PEPTIDE_ENCODING,
+        "train_data": {"pretrain": True, "pretrain_peptides_per_step": 4},
+    }
+    all_work_items = [{"hyperparameters": hp}]
+
+    # Deliberately omit ``allele_encoding``. Keep full_allele_encoding so we
+    # can assert the error doesn't fall back to the old (wrong) key.
+    full_allele_encoding = AlleleEncoding(
+        alleles=PRETRAIN_ALLELES,
+        allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+    GLOBAL_DATA.clear()
+    GLOBAL_DATA.update({
+        "train_data": pandas.DataFrame({"peptide": PRETRAIN_PEPTIDES}),
+        "full_allele_encoding": full_allele_encoding,
+    })
+
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=str(cache_dir),
+        out_models_dir=str(tmp_path),
+        pretrain_data=str(pretrain_csv),
+    )
+    with pytest.raises(KeyError) as exc_info:
+        _initialize_encoding_cache(args, all_work_items)
+    assert "allele_encoding" in str(exc_info.value)

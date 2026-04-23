@@ -945,10 +945,21 @@ def _initialize_encoding_cache(args, all_work_items):
             t0 = time.time()
             cache.get_or_build(pretrain_peptides)
             print(f"Pretrain encoding cache built in {time.time() - t0:.1f}s.")
-        master_allele_encoding = GLOBAL_DATA.get("full_allele_encoding")
+        # Use the same AlleleEncoding the workers will use
+        # (``allele_encoding``, restricted to alleles with training data),
+        # NOT ``full_allele_encoding``. ``_get_pretrain_allele_info``
+        # computes ``usable_alleles`` as the intersection of pretrain CSV
+        # columns with ``master_allele_encoding.allele_to_sequence`` —
+        # so the driver and each worker's DataLoader must pass the same
+        # ``master_allele_encoding`` or they hash to different cache
+        # dirs and the workers race to rebuild. Observed on the
+        # 2026-04-23 8×A100 run: driver built a 97-allele cache that
+        # every worker then discarded to build a parallel 96-allele
+        # cache, thundering-herd writing ~30 GB across the 16-way race.
+        master_allele_encoding = GLOBAL_DATA.get("allele_encoding")
         if pretrain_batch_configs and master_allele_encoding is None:
             raise KeyError(
-                "full_allele_encoding is required to prebuild the pretrain "
+                "allele_encoding is required to prebuild the pretrain "
                 "batch cache"
             )
         for batch_cfg in pretrain_batch_configs.values():
