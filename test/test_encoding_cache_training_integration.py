@@ -62,6 +62,38 @@ DEFAULT_PEPTIDE_ENCODING = {
     "max_length": 15,
     "vector_encoding_name": "BLOSUM62",
 }
+_PREENCODED_BATCHES = [
+    (
+        {
+            "peptide": EncodableSequences(TRAIN_PEPTIDES[:4])
+            .variable_length_to_fixed_length_vector_encoding(
+                **DEFAULT_PEPTIDE_ENCODING
+            ),
+            "allele": numpy.array([0, 1, 2, 0], dtype=numpy.int64),
+        },
+        numpy.array([0.05, 0.25, 0.75, 0.95], dtype=numpy.float32),
+    ),
+    (
+        {
+            "peptide": EncodableSequences(TRAIN_PEPTIDES[4:8])
+            .variable_length_to_fixed_length_vector_encoding(
+                **DEFAULT_PEPTIDE_ENCODING
+            ),
+            "allele": numpy.array([1, 2, 0, 1], dtype=numpy.int64),
+        },
+        numpy.array([0.15, 0.35, 0.65, 0.85], dtype=numpy.float32),
+    ),
+]
+
+
+def _make_preencoded_fit_generator(worker_id=0, num_workers=1):
+    for idx, (x_dict, y) in enumerate(_PREENCODED_BATCHES):
+        if idx % num_workers != worker_id:
+            continue
+        yield (
+            {key: value.copy() for key, value in x_dict.items()},
+            y.copy(),
+        )
 
 
 def _seed_everything(seed=12345):
@@ -251,6 +283,78 @@ def test_training_bit_identical_cached_vs_uncached(
         f"state_dict mismatch at key {bad_key!r}: "
         f"uncached[{bad_key!r}]={weights_uncached[bad_key]} "
         f"cached[{bad_key!r}]={weights_cached[bad_key]}"
+    )
+
+
+def test_training_cached_vs_uncached_on_mps(
+    training_df, allele_encoding, tmp_path
+):
+    """MPS parity gate: cache is a pure no-op on Apple-silicon too.
+
+    The CPU gate above proves the cache doesn't change training *on CPU*.
+    But for macOS dev machines, ``auto`` backend selects MPS — so CPU-only
+    coverage means we never actually exercise what local contributors run
+    daily. This test re-runs the same cache-on / cache-off comparison with
+    ``backend="mps"``. Cache is device-independent by construction (it's
+    disk-resident numpy bytes), so any per-device kernel differences
+    affect both runs identically and the loss/weight trajectories must
+    stay bit-identical.
+
+    Skipped when MPS isn't available (Linux CI, pre-Apple-silicon macOS).
+    """
+    if not (
+        hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+    ):
+        pytest.skip("MPS backend unavailable on this platform")
+
+    # Override the autouse CPU fixture for this test only.
+    configure_pytorch(backend="mps")
+
+    params = EncodingParams(**DEFAULT_PEPTIDE_ENCODING)
+    cache = EncodingCache(cache_dir=tmp_path / "encoding_cache", params=params)
+    unique_peptides = list(
+        pandas.Series(training_df.peptide.values).drop_duplicates()
+    )
+    encoded_all, peptide_to_idx = cache.get_or_build(unique_peptides)
+
+    _seed_everything()
+    peptides_uncached = EncodableSequences(training_df.peptide.values)
+    fit_info_uncached, weights_uncached = _train_one_run(
+        peptides_uncached, training_df, allele_encoding
+    )
+
+    _seed_everything()
+    fold_indices = numpy.array(
+        [peptide_to_idx[p] for p in training_df.peptide.values],
+        dtype=numpy.int64,
+    )
+    fold_encoded = encoded_all[fold_indices]
+    peptides_cached = make_prepopulated_encodable_sequences(
+        training_df.peptide.values, fold_encoded, params
+    )
+    fit_info_cached, weights_cached = _train_one_run(
+        peptides_cached, training_df, allele_encoding
+    )
+
+    numpy.testing.assert_array_equal(
+        fit_info_uncached["loss"], fit_info_cached["loss"]
+    )
+    numpy.testing.assert_array_equal(
+        fit_info_uncached["val_loss"], fit_info_cached["val_loss"]
+    )
+    ok, bad_key = _state_dicts_allclose(weights_uncached, weights_cached)
+    assert ok, (
+        f"MPS cached/uncached weights diverge at {bad_key!r}: "
+        f"uncached={weights_uncached[bad_key]} "
+        f"cached={weights_cached[bad_key]}"
+    )
+
+    # Sanity: losses are finite and training moved. Otherwise the MPS
+    # run could be silently producing NaN both times and the equality
+    # check would pass trivially.
+    losses = fit_info_cached["loss"]
+    assert all(numpy.isfinite(loss) for loss in losses), (
+        f"MPS training produced non-finite loss: {losses}"
     )
 
 
@@ -577,6 +681,132 @@ def test_fit_generator_validation_tensors_hoisted_once(
         f"hoist regressed — H2D is running per-epoch again, negating the "
         f"Phase 1 fit_generator perf fix."
     )
+
+
+def test_fit_generator_supports_allele_specific_mode():
+    """Regression test: fit_generator must work with ``alleles=None``.
+
+    ``fit()`` already supports allele-specific models via
+    ``allele_encoding=None``. ``fit_generator`` should support the same
+    mode; otherwise any caller that pretrains or streams data into an
+    allele-specific model crashes on ``None.indices`` before the first
+    epoch.
+    """
+    _seed_everything(seed=13579)
+
+    peptides = EncodableSequences(TRAIN_PEPTIDES[:16])
+    affinities = numpy.linspace(50.0, 50000.0, 16)
+    hp = _tiny_hyperparameters()
+
+    def make_generator():
+        for start in (0, 8):
+            yield (
+                None,
+                EncodableSequences(TRAIN_PEPTIDES[start:start + 8]),
+                affinities[start:start + 8],
+            )
+
+    net = Class1NeuralNetwork(**hp)
+    net.fit_generator(
+        generator=make_generator(),
+        validation_peptide_encoding=peptides,
+        validation_affinities=affinities,
+        validation_allele_encoding=None,
+        steps_per_epoch=2,
+        epochs=2,
+        min_epochs=2,
+        patience=100,
+        verbose=0,
+        progress_print_interval=None,
+    )
+
+    info = net.fit_info[-1]
+    assert len(info["loss"]) == 2
+    assert len(info["val_loss"]) == 2
+
+
+def test_fit_generator_supports_variable_tail_batches():
+    """Short final generator batches must run instead of being rejected."""
+    _seed_everything(seed=97531)
+
+    peptides = EncodableSequences(TRAIN_PEPTIDES[:13])
+    affinities = numpy.linspace(50.0, 50000.0, 13)
+    allele_list = [TRAIN_ALLELES_CYCLE[i % 3] for i in range(13)]
+    alleles = AlleleEncoding(
+        alleles=allele_list, allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+    hp = _tiny_hyperparameters()
+
+    def make_generator():
+        first = AlleleEncoding(
+            alleles=allele_list[:8], allele_to_sequence=ALLELE_TO_SEQUENCE,
+        )
+        second = AlleleEncoding(
+            alleles=allele_list[8:], allele_to_sequence=ALLELE_TO_SEQUENCE,
+        )
+        yield (
+            first,
+            EncodableSequences(TRAIN_PEPTIDES[:8]),
+            affinities[:8],
+        )
+        yield (
+            second,
+            EncodableSequences(TRAIN_PEPTIDES[8:13]),
+            affinities[8:13],
+        )
+
+    net = Class1NeuralNetwork(**hp)
+    net.fit_generator(
+        generator=make_generator(),
+        validation_peptide_encoding=peptides,
+        validation_affinities=affinities,
+        validation_allele_encoding=alleles,
+        steps_per_epoch=2,
+        epochs=2,
+        min_epochs=2,
+        patience=100,
+        verbose=0,
+        progress_print_interval=None,
+    )
+
+    info = net.fit_info[-1]
+    assert len(info["loss"]) == 2
+    assert len(info["val_loss"]) == 2
+
+
+def test_fit_generator_preencoded_batches_support_dataloader_workers():
+    """Pre-encoded generator batches must work through a worker DataLoader."""
+    _seed_everything(seed=86420)
+
+    peptides = EncodableSequences(TRAIN_PEPTIDES[:8])
+    affinities = numpy.linspace(50.0, 50000.0, 8)
+    allele_list = [TRAIN_ALLELES_CYCLE[i % 3] for i in range(8)]
+    alleles = AlleleEncoding(
+        alleles=allele_list, allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+    hp = _tiny_hyperparameters()
+    hp["dataloader_num_workers"] = 1
+
+    net = Class1NeuralNetwork(**hp)
+    net.fit_generator(
+        generator=(),
+        generator_factory=_make_preencoded_fit_generator,
+        generator_batches_are_encoded=True,
+        validation_peptide_encoding=peptides,
+        validation_affinities=affinities,
+        validation_allele_encoding=alleles,
+        steps_per_epoch=2,
+        epochs=1,
+        min_epochs=1,
+        patience=100,
+        verbose=0,
+        progress_print_interval=None,
+    )
+
+    info = net.fit_info[-1]
+    assert len(info["loss"]) == 1
+    assert len(info["val_loss"]) == 1
+    assert info["num_points"] == 8
 
 
 # ---- Daemon-process compatibility gate ----
