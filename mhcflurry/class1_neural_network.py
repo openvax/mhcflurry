@@ -6,6 +6,7 @@ import gc
 import time
 import collections
 import json
+import multiprocessing
 import weakref
 import itertools
 import os
@@ -39,6 +40,176 @@ KERAS_BATCH_NORM_EPSILON = 1e-3
 # Keras uses moving = moving * 0.99 + batch * 0.01. PyTorch's momentum is the
 # new-batch coefficient, so the equivalent value is 0.01.
 KERAS_BATCH_NORM_MOMENTUM = 0.01
+
+
+class _FitBatchDataset(torch.utils.data.Dataset):
+    """Map-style Dataset backing fit()'s inner batch loop.
+
+    Wraps the already-built per-epoch arrays (x_peptide, x_allele,
+    y_encoded, sample_weights_with_negatives) and the shuffled
+    train_indices. __getitem__ does a single-row fancy-index into each
+    array. With ``shuffle=False`` on the DataLoader, iteration order
+    matches the current (non-DataLoader) code path exactly, which is
+    what the bit-identical integration test requires.
+
+    See issue openvax/mhcflurry#268 for motivation and semantic-
+    preservation rationale.
+    """
+
+    def __init__(self, x_peptide, x_allele, y_encoded,
+                 sample_weights_with_negatives, train_indices):
+        self.x_peptide = x_peptide
+        self.x_allele = x_allele
+        self.y_encoded = y_encoded
+        self.sample_weights = sample_weights_with_negatives
+        self.train_indices = train_indices
+
+    def __len__(self):
+        return len(self.train_indices)
+
+    def __getitem__(self, i):
+        idx = self.train_indices[i]
+        sample = {
+            "peptide": self.x_peptide[idx],
+            "y": self.y_encoded[idx].astype(numpy.float32),
+        }
+        if self.x_allele is not None:
+            sample["allele"] = self.x_allele[idx]
+        if self.sample_weights is not None:
+            sample["weight"] = self.sample_weights[idx]
+        return sample
+
+
+def _build_epoch_input_arrays(
+    random_negative_peptides_encoding,
+    x_dict_without_random_negatives,
+    *,
+    random_negatives_allele_encoding,
+    allele_encoding_to_input,
+):
+    """Build the per-epoch ``(x_peptide, x_allele)`` arrays for fit().
+
+    Extracted from fit()'s epoch loop so that the previous epoch's
+    arrays go out of scope naturally on the caller's reassignment of
+    x_peptide / x_allele — no explicit ``del`` or ``= None`` needed
+    before the concat to keep peak RAM at 1× rather than 2×. For a
+    1.85M-row × 45-wide BLOSUM62 training set that's an extra ~7 GB
+    briefly held per worker per epoch; on A100-40GB it's the
+    difference between ``MAX_WORKERS_PER_GPU=1`` and 2.
+
+    When there are no random negatives, returns the un-concatenated
+    training arrays directly (no copy). When there are random
+    negatives but no allele encoding, returns x_allele=None.
+    """
+    no_random_negs = random_negatives_allele_encoding is None and len(
+        random_negative_peptides_encoding
+    ) == 0
+    if no_random_negs:
+        return (
+            x_dict_without_random_negatives["peptide"],
+            x_dict_without_random_negatives.get("allele"),
+        )
+
+    x_peptide = numpy.concatenate([
+        random_negative_peptides_encoding,
+        x_dict_without_random_negatives["peptide"],
+    ])
+    if "allele" in x_dict_without_random_negatives:
+        x_allele = numpy.concatenate([
+            allele_encoding_to_input(random_negatives_allele_encoding)[0],
+            x_dict_without_random_negatives["allele"],
+        ])
+    else:
+        x_allele = None
+    return x_peptide, x_allele
+
+
+def _effective_num_workers(num_workers):
+    """Downgrade ``num_workers`` to 0 when running inside a daemon process.
+
+    Safety net for DataLoader's ``num_workers>0`` path, which requires
+    spawning child processes — forbidden from daemon parents. mhcflurry's
+    training orchestrator switched to ``NonDaemonPool`` (see
+    ``local_parallelism.py``) so in production Pool workers are now
+    non-daemonic and this downgrade does NOT fire. It remains as
+    defense-in-depth for:
+
+      - External callers that wrap ``Class1NeuralNetwork.fit`` in a
+        daemonic process of their own (e.g. ``ProcessPoolExecutor`` is
+        non-daemon by default but ``multiprocessing.Pool`` without the
+        NonDaemonPool subclass is daemonic).
+      - Test suites that explicitly construct daemon subprocesses (our
+        own ``test_dataloader_num_workers_downgrades_in_daemon_context``
+        exercises this path).
+
+    Emits a ``DeprecationWarning`` — it's worth knowing if this fires,
+    since it means the caller is running in a daemon context and
+    DataLoader prefetch is silently disabled. Use ``warnings.filterwarnings``
+    to silence if intentional.
+    """
+    if num_workers > 0 and multiprocessing.current_process().daemon:
+        import warnings
+        warnings.warn(
+            f"dataloader_num_workers={num_workers} requested from a daemon "
+            f"process; downgrading to 0 because daemon processes cannot "
+            f"spawn children. If this is mhcflurry's Pool worker, switch "
+            f"to NonDaemonPool (mhcflurry/local_parallelism.py); if it's "
+            f"your own caller, use a non-daemonic executor or accept the "
+            f"downgrade (set dataloader_num_workers=0 explicitly to silence).",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return 0
+    return num_workers
+
+
+def _make_fit_dataloader(
+    dataset,
+    batch_size,
+    num_workers,
+    use_pinned_memory,
+):
+    """Construct a DataLoader for fit()'s inner batch loop.
+
+    ``num_workers=0`` path runs everything in the main process — bit-
+    identical to pre-issue-#268 behavior. ``num_workers>0`` spawns worker
+    processes (via 'spawn' to avoid CUDA-context-fork hazards) that
+    prefetch minibatches into pinned host memory, overlapping CPU work
+    with GPU compute.
+
+    If called from a daemon process (i.e. inside a
+    ``multiprocessing.Pool`` worker without the NonDaemonPool override),
+    ``num_workers`` is forced to 0 and ``pin_memory`` to False because
+    daemon processes cannot spawn their own children. See
+    ``_effective_num_workers``.
+
+    Note: PyTorch's ``persistent_workers`` flag isn't exposed here
+    because ``fit()`` rebuilds the DataLoader per epoch (the x_peptide
+    arrays change with each epoch's random negatives) — persistent
+    workers have no DataLoader instance to persist across. If a future
+    refactor hoists DataLoader construction out of the epoch loop, add
+    the flag back then.
+    """
+    effective_workers = _effective_num_workers(num_workers)
+    # pin_memory + non_blocking H2D only makes sense when prefetch workers
+    # exist to fill the pinned staging buffers. In num_workers=0 mode it
+    # just pays the pinning cost with no overlap benefit.
+    effective_pin = use_pinned_memory and effective_workers > 0
+    kwargs = dict(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle=False,  # Dataset already reflects shuffled train_indices.
+        num_workers=effective_workers,
+        pin_memory=effective_pin,
+    )
+    if effective_workers > 0:
+        # CUDA contexts aren't fork-safe. Using 'spawn' avoids copying the
+        # training process's CUDA state into workers, at a ~200-500 ms
+        # per-worker startup cost. Safe default.
+        kwargs["multiprocessing_context"] = "spawn"
+        # prefetch_factor is only valid when num_workers > 0.
+        kwargs["prefetch_factor"] = 2
+    return torch.utils.data.DataLoader(**kwargs)
 
 
 class Class1NeuralNetworkModel(nn.Module):
@@ -743,6 +914,14 @@ class Class1NeuralNetwork(object):
         random_negative_affinity_min=20000.0,
         random_negative_affinity_max=50000.0,
         random_negative_output_indices=None,
+        # Number of DataLoader worker processes for the fit() inner batch
+        # loop. 0 (default) runs everything in the training process —
+        # bit-identical to pre-issue-#268 behavior. >0 spawns worker procs
+        # that prefetch minibatches into pinned host memory, overlapping
+        # CPU data-prep with GPU compute. Per-worker memory + CPU budget:
+        # each adds one Python process holding ~100-500 MB RSS. Don't
+        # exceed (num_cpu_cores - num_training_workers).
+        dataloader_num_workers=0,
     ).extend(RandomNegativePeptides.hyperparameter_defaults)
     """
     Hyperparameters for neural network training.
@@ -1607,6 +1786,31 @@ class Class1NeuralNetwork(object):
 
         output = loss_obj.encode_y(from_ic50(validation_affinities), **encode_y_kwargs)
 
+        # --- Validation tensors cached on device (Phase 1 #268 for fit_generator) ---
+        # The validation set is constant across pretrain epochs, but the
+        # original code re-ran ``torch.from_numpy(...).float().to(device)``
+        # on every epoch — three H2D copies × many epochs. For large
+        # validation sets that's tens of ms/epoch of pure wasted bandwidth.
+        # Hoist the copy to happen once before the epoch loop. Semantics
+        # are preserved: ``val_peptide_device`` / ``val_allele_device`` /
+        # ``val_y_device`` point at the same bytes the old inline copies
+        # would have produced.
+        val_peptide_device = torch.from_numpy(
+            validation_x_dict["peptide"]
+        ).float().to(device)
+        val_allele_device = torch.from_numpy(
+            validation_x_dict["allele"]
+        ).float().to(device)
+        val_y_device = torch.from_numpy(output.astype(numpy.float32)).to(device)
+
+        # Non-blocking H2D only helps when the source is pinned. For the
+        # training step's per-chunk tensors we allocate fresh each step
+        # from numpy — keep the transfer synchronous (pin_memory on a
+        # one-shot tensor is pure overhead). The prefetcher-style
+        # overlap is the bigger win but requires a DataLoader wrap over
+        # the generator — Phase 2 scope since it changes iteration
+        # semantics.
+
         mutable_generator_state = {
             "yielded_values": 0
         }
@@ -1657,9 +1861,13 @@ class Class1NeuralNetwork(object):
                 except StopIteration:
                     break
 
-                # Convert to tensors
-                peptide_tensor = torch.from_numpy(x_dict["peptide"]).float().to(device)
-                allele_tensor = torch.from_numpy(x_dict["allele"]).float().to(device)
+                # GPU-side widening cast (see Phase 4a #268): when the
+                # encoding cache stores int8 (BLOSUM62 native width),
+                # H2D transfer is 4× smaller; widening to fp32 on GPU
+                # is essentially free. For fp32-native encodings this
+                # is a no-op.
+                peptide_tensor = torch.from_numpy(x_dict["peptide"]).to(device).float()
+                allele_tensor = torch.from_numpy(x_dict["allele"]).to(device).float()
                 y_tensor = torch.from_numpy(y.astype(numpy.float32)).to(device)
 
                 optimizer.zero_grad()
@@ -1677,16 +1885,16 @@ class Class1NeuralNetwork(object):
                 optimizer.step()
                 epoch_losses.append(loss.item())
 
-            # Compute validation loss
+            # Compute validation loss — reuse the device tensors hoisted
+            # before the epoch loop (val data is static).
             network.eval()
             with torch.no_grad():
-                val_peptide = torch.from_numpy(validation_x_dict["peptide"]).float().to(device)
-                val_allele = torch.from_numpy(validation_x_dict["allele"]).float().to(device)
-                val_y = torch.from_numpy(output.astype(numpy.float32)).to(device)
-
-                val_inputs = {"peptide": val_peptide, "allele": val_allele}
+                val_inputs = {
+                    "peptide": val_peptide_device,
+                    "allele": val_allele_device,
+                }
                 val_predictions = network(val_inputs)
-                val_loss = loss_obj(val_predictions, val_y)
+                val_loss = loss_obj(val_predictions, val_y_device)
                 regularization_penalty = self._regularization_penalty(
                     regularization_parameters,
                     l1=l1_reg,
@@ -1991,6 +2199,50 @@ class Class1NeuralNetwork(object):
         l1_reg = self.hyperparameters["dense_layer_l1_regularization"]
         l2_reg = self.hyperparameters["dense_layer_l2_regularization"]
 
+        # --- Validation tensors cached on device (issue openvax/mhcflurry#268) ---
+        # The validation set indexes into the concatenated
+        # [random_negs | training] array via val_indices. The training portion
+        # is static across epochs; the random-negative portion changes.
+        # When val_indices points entirely into the training portion (the
+        # common case — with default val_split=0.1 and random_negative_rate=1,
+        # val set is the tail 10% of the ~2x-size concatenated array, all in
+        # training portion), x_peptide[val_indices] and x_allele[val_indices]
+        # are stable across epochs. Materialize them on device once to save
+        # ~60 MB+ H2D per epoch.
+        #
+        # When overlap IS possible (unusual hyperparameter combos), skip the
+        # cache and fall back to per-epoch copy (preserved behavior).
+        _val_cache_safe = (
+            val_indices is not None
+            and len(val_indices) > 0
+            and val_indices[0] >= num_random_negatives
+        )
+        _val_device_tensors = None
+        if _val_cache_safe:
+            val_training_indices = val_indices - num_random_negatives
+            _val_peptide_device = torch.from_numpy(
+                x_dict_without_random_negatives["peptide"][val_training_indices]
+            ).float().to(device)
+            _val_y_device = torch.from_numpy(
+                y_encoded[val_indices].astype(numpy.float32)
+            ).to(device)
+            _val_allele_device = None
+            if "allele" in x_dict_without_random_negatives:
+                _val_allele_device = torch.from_numpy(
+                    x_dict_without_random_negatives["allele"][val_training_indices]
+                ).float().to(device)
+            _val_weights_device = None
+            if sample_weights_with_negatives is not None:
+                _val_weights_device = torch.from_numpy(
+                    sample_weights_with_negatives[val_indices]
+                ).float().to(device)
+            _val_device_tensors = (
+                _val_peptide_device,
+                _val_y_device,
+                _val_allele_device,
+                _val_weights_device,
+            )
+
         for epoch in range(self.hyperparameters["max_epochs"]):
             random_negative_peptides = EncodableSequences.create(
                 random_negatives_planner.get_peptides()
@@ -1999,24 +2251,23 @@ class Class1NeuralNetwork(object):
                 random_negative_peptides
             )
 
-            # Build x_dict with random negatives
-            if len(random_negative_peptides) > 0:
-                x_peptide = numpy.concatenate([
-                    random_negative_peptides_encoding,
-                    x_dict_without_random_negatives["peptide"],
-                ])
-                if "allele" in x_dict_without_random_negatives:
-                    x_allele = numpy.concatenate([
-                        self.allele_encoding_to_network_input(
-                            random_negatives_allele_encoding
-                        )[0],
-                        x_dict_without_random_negatives["allele"],
-                    ])
-                else:
-                    x_allele = None
-            else:
-                x_peptide = x_dict_without_random_negatives["peptide"]
-                x_allele = x_dict_without_random_negatives.get("allele")
+            # Build the per-epoch x arrays. The previous epoch's
+            # x_peptide / x_allele go out of scope on the reassignment
+            # below — Python's refcount-based GC drops them before the
+            # concat inside the helper allocates the new buffers, so
+            # peak RAM is 1× the array size, not 2×. Encapsulating the
+            # concat in a function (rather than an inline block) makes
+            # this reliance on scope-based cleanup explicit.
+            x_peptide, x_allele = _build_epoch_input_arrays(
+                random_negative_peptides_encoding,
+                x_dict_without_random_negatives,
+                random_negatives_allele_encoding=(
+                    random_negatives_allele_encoding
+                    if len(random_negative_peptides) > 0
+                    else None
+                ),
+                allele_encoding_to_input=self.allele_encoding_to_network_input,
+            )
 
             if needs_initialization:
                 x_init = {"peptide": x_peptide}
@@ -2038,28 +2289,65 @@ class Class1NeuralNetwork(object):
             network.train()
             epoch_start = time.time()
 
-            # Create batches
+            # Create batches via DataLoader — with num_workers=0 this is
+            # bit-identical to the old single-process inline-iteration path
+            # (DataLoader wraps the same fancy-indexing logic with no
+            # reordering). With num_workers>0, prefetcher processes build
+            # the next batch while the GPU crunches the current one.
+            # See issue openvax/mhcflurry#268.
             batch_size = self.hyperparameters["minibatch_size"]
+            dataloader_num_workers = self.hyperparameters.get(
+                "dataloader_num_workers", 0
+            )
+            use_pinned_memory = (
+                dataloader_num_workers > 0 and device.type == "cuda"
+            )
+            non_blocking_h2d = use_pinned_memory
+
             train_losses = []
+            dataset = _FitBatchDataset(
+                x_peptide=x_peptide,
+                x_allele=x_allele,
+                y_encoded=y_encoded,
+                sample_weights_with_negatives=sample_weights_with_negatives,
+                train_indices=train_indices,
+            )
+            loader = _make_fit_dataloader(
+                dataset=dataset,
+                batch_size=batch_size,
+                num_workers=dataloader_num_workers,
+                use_pinned_memory=use_pinned_memory,
+            )
 
-            for batch_start in range(0, n_train, batch_size):
-                batch_idx = train_indices[batch_start:batch_start + batch_size]
-
-                peptide_batch = torch.from_numpy(x_peptide[batch_idx]).float().to(device)
-                y_batch = torch.from_numpy(y_encoded[batch_idx].astype(numpy.float32)).to(device)
+            for batch in loader:
+                # ``.to(device).float()`` (GPU-side widening cast) is
+                # strictly better than ``.float().to(device)``:
+                #   - When the cache stores int8 (BLOSUM62 native width),
+                #     the H2D transfer is 4× smaller.
+                #   - The widening cast on GPU is ~free (wide-warp op,
+                #     often fused into the first Linear's matmul).
+                #   - When the cache already stores fp32 (other
+                #     encodings), the cast is a no-op.
+                peptide_batch = batch["peptide"].to(
+                    device, non_blocking=non_blocking_h2d
+                ).float()
+                y_batch = batch["y"].to(
+                    device, non_blocking=non_blocking_h2d
+                )
 
                 inputs = {"peptide": peptide_batch}
-                if x_allele is not None:
-                    allele_batch = torch.from_numpy(x_allele[batch_idx]).float().to(device)
-                    inputs["allele"] = allele_batch
+                if "allele" in batch:
+                    inputs["allele"] = batch["allele"].to(
+                        device, non_blocking=non_blocking_h2d
+                    ).float()
 
                 optimizer.zero_grad()
                 predictions = network(inputs)
                 weights_batch = None
-                if sample_weights_with_negatives is not None:
-                    weights_batch = torch.from_numpy(
-                        sample_weights_with_negatives[batch_idx]
-                    ).float().to(device)
+                if "weight" in batch:
+                    weights_batch = batch["weight"].to(
+                        device, non_blocking=non_blocking_h2d
+                    ).float()
                 loss = loss_obj(predictions, y_batch, sample_weights=weights_batch)
                 regularization_penalty = self._regularization_penalty(
                     regularization_parameters,
@@ -2080,18 +2368,38 @@ class Class1NeuralNetwork(object):
             if val_split > 0:
                 network.eval()
                 with torch.no_grad():
-                    val_peptide = torch.from_numpy(x_peptide[val_indices]).float().to(device)
-                    val_y = torch.from_numpy(y_encoded[val_indices].astype(numpy.float32)).to(device)
+                    if _val_device_tensors is not None:
+                        # Fast path: reuse tensors materialized once before the
+                        # epoch loop. Saves ~60 MB+ H2D copy per epoch. Bit-
+                        # identical because val_indices points entirely into
+                        # the static training portion of x_peptide/x_allele.
+                        (
+                            val_peptide,
+                            val_y,
+                            val_allele,
+                            val_weights,
+                        ) = _val_device_tensors
+                    else:
+                        val_peptide = torch.from_numpy(
+                            x_peptide[val_indices]
+                        ).float().to(device)
+                        val_y = torch.from_numpy(
+                            y_encoded[val_indices].astype(numpy.float32)
+                        ).to(device)
+                        val_allele = None
+                        if x_allele is not None:
+                            val_allele = torch.from_numpy(
+                                x_allele[val_indices]
+                            ).float().to(device)
+                        val_weights = None
+                        if sample_weights_with_negatives is not None:
+                            val_weights = torch.from_numpy(
+                                sample_weights_with_negatives[val_indices]
+                            ).float().to(device)
                     val_inputs = {"peptide": val_peptide}
-                    if x_allele is not None:
-                        val_allele = torch.from_numpy(x_allele[val_indices]).float().to(device)
+                    if val_allele is not None:
                         val_inputs["allele"] = val_allele
                     val_predictions = network(val_inputs)
-                    val_weights = None
-                    if sample_weights_with_negatives is not None:
-                        val_weights = torch.from_numpy(
-                            sample_weights_with_negatives[val_indices]
-                        ).float().to(device)
                     val_loss = loss_obj(
                         val_predictions,
                         val_y,

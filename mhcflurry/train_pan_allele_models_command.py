@@ -32,6 +32,11 @@ from .cluster_parallelism import (
     cluster_results_from_args)
 from .allele_encoding import AlleleEncoding
 from .encodable_sequences import EncodableSequences
+from .encoding_cache import (
+    EncodingCache,
+    EncodingParams,
+    make_prepopulated_encodable_sequences,
+)
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -126,6 +131,22 @@ parser.add_argument(
     default=False,
     help="Do not actually train models. The initialized run can be continued "
     "later with --continue-incomplete.")
+parser.add_argument(
+    "--use-encoding-cache",
+    action="store_true",
+    default=False,
+    help="Precompute BLOSUM62 peptide encodings once per training run and "
+    "share the result across all worker processes via mmap. Preserves bit-"
+    "identical semantics; the cache output matches EncodableSequences."
+    "variable_length_to_fixed_length_vector_encoding exactly. Saves 30-50x "
+    "per-epoch wall-time on the CPU-bound pan-allele training path. See "
+    "mhcflurry/encoding_cache.py.")
+parser.add_argument(
+    "--encoding-cache-dir",
+    metavar="DIR",
+    default=None,
+    help="Directory for the encoding cache. Default: <out-models-dir>/"
+    "encoding_cache/. Only used when --use-encoding-cache is set.")
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
@@ -210,7 +231,9 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
 def pretrain_data_iterator(
         filename,
         master_allele_encoding,
-        peptides_per_chunk=1024):
+        peptides_per_chunk=1024,
+        encoding_cache_dir=None,
+        encoding_params=None):
     """
     Step through a CSV file giving predictions for a large number of peptides
     (rows) and alleles (columns).
@@ -220,6 +243,20 @@ def pretrain_data_iterator(
     filename : string
     master_allele_encoding : AlleleEncoding
     peptides_per_chunk : int
+    encoding_cache_dir : string, optional
+        When set together with ``encoding_params``, the iterator pre-reads
+        the CSV's peptide column, pre-encodes all peptides via
+        ``EncodingCache``, and yields ``EncodableSequences`` instances whose
+        per-instance ``encoding_cache`` is prepopulated with the memmap
+        slice for each chunk's peptides. Downstream
+        ``peptides_to_network_input`` calls hit the prepopulated cache and
+        return the stored array without re-encoding. Bit-identical output
+        to the uncached path (verified in
+        ``test_pretrain_iterator_bit_identical`` in
+        test_train_pan_allele_encoding_cache.py).
+    encoding_params : EncodingParams, optional
+        Required when ``encoding_cache_dir`` is set. Determines which
+        entry in the cache to use / build.
 
     Returns
     -------
@@ -243,6 +280,27 @@ def pretrain_data_iterator(
         numpy.tile(usable_alleles, peptides_per_chunk),
         borrow_from=master_allele_encoding)
 
+    # Optionally pre-encode the full CSV's peptides into a shared memmap.
+    # Workers all hit the same mmap via the OS page cache; the physical
+    # encoded bytes live on disk once regardless of how many training
+    # workers ran. See mhcflurry/encoding_cache.py.
+    pretrain_cache = None
+    pretrain_peptide_to_idx = None
+    pretrain_encoded_mmap = None
+    if encoding_cache_dir is not None and encoding_params is not None:
+        pretrain_peptides = _read_pretrain_peptide_list(filename)
+        pretrain_cache = EncodingCache(
+            cache_dir=encoding_cache_dir, params=encoding_params
+        )
+        t0 = time.time()
+        pretrain_encoded_mmap, pretrain_peptide_to_idx = (
+            pretrain_cache.get_or_build(pretrain_peptides)
+        )
+        print(
+            f"Pretrain encoding cache ready ({len(pretrain_peptides)} peptides, "
+            f"{time.time() - t0:.1f}s)."
+        )
+
     while True:
         synthetic_iter = pandas.read_csv(
             filename, index_col=0, chunksize=peptides_per_chunk)
@@ -252,10 +310,41 @@ def pretrain_data_iterator(
 
             df.columns = empty.columns
             df = df[usable_alleles]
-            encodable_peptides = EncodableSequences(
-                numpy.repeat(
-                    df.index.values,
-                    len(usable_alleles)))
+            repeated_peptides = numpy.repeat(df.index.values, len(usable_alleles))
+
+            if pretrain_encoded_mmap is None:
+                encodable_peptides = EncodableSequences(repeated_peptides)
+            else:
+                # Index into the shared memmap and construct an
+                # EncodableSequences with its cache prepopulated. Semantics
+                # are identical to the fresh-encode path.
+                try:
+                    indices = numpy.fromiter(
+                        (pretrain_peptide_to_idx[p] for p in df.index.values),
+                        dtype=numpy.int64,
+                        count=len(df.index),
+                    )
+                except KeyError as missing:
+                    # Actionable error: the cache was built from a different
+                    # file than the one we're now iterating. Point the user
+                    # at the likely remediation (blow away the cache dir or
+                    # pass a fresh --encoding-cache-dir).
+                    raise KeyError(
+                        f"Peptide {missing.args[0]!r} was not in the encoding "
+                        f"cache built from {filename}. The cache at "
+                        f"{encoding_cache_dir} likely corresponds to a "
+                        f"different pretrain CSV. Delete the cache directory "
+                        f"or pass a fresh --encoding-cache-dir and rerun."
+                    ) from missing
+                # Each unique peptide appears len(usable_alleles) times in
+                # the repeated_peptides array; mirror that with a repeat on
+                # the encoded rows.
+                chunk_encoded = numpy.repeat(
+                    pretrain_encoded_mmap[indices], len(usable_alleles), axis=0
+                )
+                encodable_peptides = make_prepopulated_encodable_sequences(
+                    repeated_peptides, chunk_encoded, encoding_params
+                )
 
             yield (allele_encoding, encodable_peptides, df.stack().values)
 
@@ -421,6 +510,112 @@ def initialize_training(args):
     print("Done initializing training.")
 
 
+def _initialize_encoding_cache(args, all_work_items):
+    """Pre-build BLOSUM62 encoding caches used by training workers.
+
+    Run once in the orchestrator. Distinct ``peptide_encoding`` configs
+    across the hyperparameters sweep each get their own cache keyed by
+    params hash. Workers subsequently call ``EncodingCache.get_or_build``
+    with the same params + peptides and hit the already-built cache.
+
+    Stores the cache_dir plus the orchestrator-computed unique-peptide
+    list in ``GLOBAL_DATA``. The peptide list is small (a ~20 MB Python
+    list of strings for a 1M-peptide training set) compared to the
+    encoded tensor (~1+ GB), and stashing it means workers skip the
+    `drop_duplicates` + `sha256` pass that would otherwise run 140+ times
+    across a full sweep.
+
+    Safe to call repeatedly; cache hits short-circuit.
+    """
+    cache_dir = args.encoding_cache_dir or join(
+        args.out_models_dir, "encoding_cache"
+    )
+    # Group hyperparameters by their peptide_encoding config so we build one
+    # cache per unique config. Most sweeps share the same config, in which
+    # case this loop runs once.
+    configs_seen = {}
+    for work_item in all_work_items:
+        cfg = work_item["hyperparameters"].get("peptide_encoding", {})
+        # dict isn't hashable; use a sorted-kv string key. The config dict
+        # itself is small and we just need de-duplication.
+        key = tuple(sorted(cfg.items()))
+        configs_seen[key] = cfg
+
+    df = GLOBAL_DATA["train_data"]
+    unique_peptides = _deterministic_unique_peptide_list(df.peptide.values)
+
+    for cfg in configs_seen.values():
+        params = EncodingParams(**cfg)
+        cache = EncodingCache(cache_dir=cache_dir, params=params)
+        if cache.is_complete_for(unique_peptides):
+            print(f"Encoding cache hit: {cache.entry_path(unique_peptides)} "
+                  f"({len(unique_peptides)} peptides)")
+            continue
+        print(f"Building encoding cache for params "
+              f"{params.to_kwargs()} ({len(unique_peptides)} peptides) "
+              f"at {cache.entry_path(unique_peptides)}...")
+        t0 = time.time()
+        cache.get_or_build(unique_peptides)
+        print(f"Encoding cache built in {time.time() - t0:.1f}s.")
+
+    GLOBAL_DATA["encoding_cache_dir"] = str(cache_dir)
+    # Per-arch params lookup: hyperparameters dict doesn't change pickle size
+    # meaningfully, so just stash it. Workers use it to pick the right cache.
+    GLOBAL_DATA["encoding_cache_configs"] = list(configs_seen.values())
+    # Stash the orchestrator-built peptide list + its index map so workers
+    # don't re-run drop_duplicates + sha256 over ~1M peptides on every fold.
+    # The list pickles at roughly (8 bytes + avg peptide length) per entry
+    # (~20 MB for 1M 12-mers) — fine for a single-box Pool. Revisit if this
+    # ever ships to a distributed scheduler.
+    GLOBAL_DATA["encoding_cache_unique_peptides"] = unique_peptides
+
+    # Pre-build the pretrain cache too if a pretrain file is configured.
+    # Without this, each worker racing to build the pretrain cache on
+    # first use pays a redundant encoding pass — on an A100 subset run
+    # that's ~15 min aggregate across 32 work items (the race fix in
+    # EncodingCache._build makes this safe but not cheap). Pre-building
+    # here amortizes the encoding to a single orchestrator-side pass.
+    pretrain_data_path = getattr(args, "pretrain_data", None)
+    if pretrain_data_path:
+        pretrain_peptides = _read_pretrain_peptide_list(pretrain_data_path)
+        for cfg in configs_seen.values():
+            params = EncodingParams(**cfg)
+            cache = EncodingCache(cache_dir=cache_dir, params=params)
+            if cache.is_complete_for(pretrain_peptides):
+                print(f"Pretrain encoding cache hit: "
+                      f"{cache.entry_path(pretrain_peptides)} "
+                      f"({len(pretrain_peptides)} peptides)")
+                continue
+            print(f"Building pretrain encoding cache for params "
+                  f"{params.to_kwargs()} ({len(pretrain_peptides)} peptides) "
+                  f"at {cache.entry_path(pretrain_peptides)}...")
+            t0 = time.time()
+            cache.get_or_build(pretrain_peptides)
+            print(f"Pretrain encoding cache built in {time.time() - t0:.1f}s.")
+
+
+def _deterministic_unique_peptide_list(peptide_values):
+    """Return unique peptides in first-seen order.
+
+    Must be stable: orchestrator's list must match what workers compute, or
+    the cache key (which hashes the list) won't match. pandas.Series
+    .drop_duplicates() preserves first-seen order — use it consistently.
+    """
+    return list(pandas.Series(peptide_values).drop_duplicates())
+
+
+def _read_pretrain_peptide_list(filename):
+    """Read only the peptide column (index) from the pretrain CSV.
+
+    The cache build pass needs the full peptide list up front. Reading
+    just the index column avoids parsing the much-wider affinity matrix.
+    For a 1M-row file this takes a few seconds vs minutes for a full read.
+    """
+    # Reading only usecols=[0] makes pandas parse just the peptide column.
+    peptide_series = pandas.read_csv(filename, index_col=0, usecols=[0]).index
+    return list(peptide_series)
+
+
 def train_models(args):
     global GLOBAL_DATA
 
@@ -434,6 +629,12 @@ def train_models(args):
     print("Loaded training init info.")
 
     all_work_items = GLOBAL_DATA["work_items"]
+
+    # Optionally pre-build the shared BLOSUM62 encoding cache. Orchestrator
+    # does the (single-threaded) encoding pass once; workers mmap the result.
+    # See mhcflurry/encoding_cache.py and issue openvax/mhcflurry#268.
+    if getattr(args, "use_encoding_cache", False):
+        _initialize_encoding_cache(args, all_work_items)
     complete_work_item_names = [
         network.fit_info[-1]["training_info"]["work_item_name"] for network in
         predictor.neural_networks
@@ -534,6 +735,52 @@ def train_models(args):
     print("Predictor written to: %s" % args.out_models_dir)
 
 
+def _build_train_peptides(peptide_values, hyperparameters, constant_data):
+    """Construct an EncodableSequences for the fold's training peptides.
+
+    When the encoding cache is enabled (orchestrator set
+    ``encoding_cache_dir`` in constant_data), we look up each peptide in
+    the pre-built memmap and return an EncodableSequences with its
+    ``encoding_cache`` prepopulated — so the subsequent
+    ``peptides_to_network_input`` call inside ``fit()`` is a memmap slice
+    instead of a fresh BLOSUM62 pass.
+
+    When disabled (default), falls through to the old behavior — a plain
+    ``EncodableSequences(peptides)`` whose first
+    ``variable_length_to_fixed_length_vector_encoding`` call does the
+    encoding work inline. Bit-identical to pre-change behavior.
+    """
+    cache_dir = constant_data.get("encoding_cache_dir")
+    if cache_dir is None:
+        return EncodableSequences(peptide_values)
+
+    cfg = hyperparameters.get("peptide_encoding", {})
+    params = EncodingParams(**cfg)
+    cache = EncodingCache(cache_dir=cache_dir, params=params)
+
+    # Prefer the orchestrator-stashed unique-peptide list so every worker
+    # skips the drop_duplicates + sha256 pass over the ~1M-peptide training
+    # set. Fall back to recomputation if the key is absent (older pickle,
+    # manually-constructed constant_data in tests).
+    unique_peptides = constant_data.get("encoding_cache_unique_peptides")
+    if unique_peptides is None:
+        df = constant_data["train_data"]
+        unique_peptides = _deterministic_unique_peptide_list(df.peptide.values)
+    encoded_all, peptide_to_idx = cache.get_or_build(unique_peptides)
+
+    # Lookup each fold-peptide's row in the memmap. Fancy indexing produces
+    # a contiguous in-memory copy sized (len(fold), enc_len, alphabet); that's
+    # the same materialized tensor the old path would have produced on first
+    # encode call.
+    fold_indices = numpy.fromiter(
+        (peptide_to_idx[p] for p in peptide_values),
+        dtype=numpy.int64,
+        count=len(peptide_values),
+    )
+    fold_encoded = encoded_all[fold_indices]
+    return make_prepopulated_encodable_sequences(peptide_values, fold_encoded, params)
+
+
 def train_model(
         work_item_name,
         work_item_num,
@@ -566,7 +813,9 @@ def train_model(
         folds_df["fold_%d" % fold_num]
     ].sample(frac=1.0)
 
-    train_peptides = EncodableSequences(train_data.peptide.values)
+    train_peptides = _build_train_peptides(
+        train_data.peptide.values, hyperparameters, constant_data
+    )
     train_alleles = AlleleEncoding(
         train_data.allele.values, borrow_from=allele_encoding)
 
@@ -634,7 +883,14 @@ def train_model(
             generator = pretrain_data_iterator(
                 pretrain_data_filename,
                 allele_encoding,
-                peptides_per_chunk=pretrain_peptides_per_step)
+                peptides_per_chunk=pretrain_peptides_per_step,
+                encoding_cache_dir=constant_data.get("encoding_cache_dir"),
+                encoding_params=(
+                    EncodingParams(**hyperparameters["peptide_encoding"])
+                    if constant_data.get("encoding_cache_dir")
+                    else None
+                ),
+            )
 
             model.fit_generator(
                 generator,

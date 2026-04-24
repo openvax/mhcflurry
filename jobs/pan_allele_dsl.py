@@ -15,13 +15,21 @@ from runplz import App, BrevConfig, Image
 
 app = App(
     "pan-allele-dsl",
-    brev=BrevConfig(auto_create=False, mode="vm"),
+    brev_config=BrevConfig(
+        mode="container",
+        # Pin Denvr A100 (40GB) — known-reliable provider. The default
+        # cheapest match is MassedCompute, whose DGX-class boxes have
+        # been observed "RUNNING" on Brev's side but unreachable on
+        # port 2222 for extended periods.
+        instance_type="denvr_A100_sxm4",
+    ),
 )
 
 image = (
     Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
     .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
     .pip_install(
+        "runplz>=3.7.2",  # the in-container bootstrap runs `python -m runplz._bootstrap`
         "pandas>=2.0",
         "appdirs",
         "scikit-learn",
@@ -39,10 +47,10 @@ image = (
     # Resource requests — GB for everything memory/disk-related.
     # 26 GB RAM avoids the SIGKILL we hit on 16 GB boxes during
     # mhcflurry's full-data peptide encoding.
-    gpu="T4",
+    gpu="A100",
     min_cpu=4,
     min_memory=26,         # GB
-    min_gpu_memory=16,     # GB VRAM
+    min_gpu_memory=40,     # GB VRAM (A100-40GB)
     min_disk=100,          # GB
     timeout=6 * 60 * 60,
     env={

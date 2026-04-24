@@ -1,0 +1,99 @@
+"""Exact replication of the public mhcflurry pan-allele release training
+recipe (models_class1_pan 2.2.0): same pretraining, same curated data,
+same 4 folds, same 35-architecture sweep, same selection step
+(--min-models 2 --max-models 8), same percentile-rank calibration.
+
+Launch:
+    runplz brev --instance mhcflurry-release-exact jobs/pan_allele_release_exact.py
+
+Compute: ~140 networks × ~90 min each on A100 → ~210 GPU-hours. On the
+pinned 8×A100 box that's ~28 hours wall-clock, ~$336.
+
+If the ssh session drops mid-run, re-launch runplz with the same command;
+the shell script uses `--continue-incomplete` to resume from the
+unselected/ checkpoint directory.
+"""
+
+import os
+import subprocess
+
+from runplz import App, BrevConfig, Image
+
+app = App(
+    "pan-allele-release-exact",
+    brev_config=BrevConfig(
+        mode="container",
+        # OCI 8×A100-80GB via Brev's direct launchpad integration.
+        # $19.30/hr, 128 vCPUs, 27 TB disk, 15 min boot.
+        #
+        # Routes around the shadeform broker entirely. All 5 failed
+        # 2026-04-21 provisioning attempts (3× Denvr, 2× MassedCompute
+        # DGXx8) went through shadeform and failed with
+        # `external nodes: skipping (list failed): not_found` — the
+        # shadeform broker losing track of its own capacity pool.
+        # OCI launchpad is a different provisioning path (direct from
+        # NVIDIA Brev to Oracle) so it's immune to that class of
+        # failure.
+        #
+        # 80GB cards support MAX_WORKERS_PER_GPU=2 = 16 concurrent
+        # workers (vs 8 on 40GB). Cost delta over MassedCompute
+        # ($19.30 vs $12.29/hr, +57%) is acceptable given 5/5
+        # shadeform failures today.
+        instance_type="oci.a100x8.sxm.brev-dgxc",
+        auto_create_instances=True,
+        # OCI boot advertised at 15 min; give 40 min margin against
+        # launchpad's own provisioning queue. Closes runplz #34.
+        ssh_ready_wait_seconds=2400,
+    ),
+)
+
+image = (
+    Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
+    .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
+    .pip_install(
+        "runplz>=3.7.2",
+        "pandas>=2.0",
+        "appdirs",
+        "scikit-learn",
+        "mhcgnomes>=3.0.1",
+        "numpy>=1.22.4",
+        "pyyaml",
+        "tqdm",
+    )
+    .pip_install_local_dir(".", editable=True)
+)
+
+
+@app.function(
+    image=image,
+    gpu="A100",
+    min_cpu=96,          # match the 8-GPU machine's vCPU budget
+    min_memory=400,      # GB RAM — full data + pretraining buffer
+    min_gpu_memory=40,   # GB VRAM per GPU
+    min_disk=1000,       # GB — ~140 networks × ~10MB weights + init info
+    timeout=60 * 60 * 60,  # 60 hours — safety margin above 28h estimate
+    env={
+        # massedcompute_A100_sxm4_80G_DGXx8 is 8× A100-80GB. 80GB cards
+        # fit 2 workers (each ~20 GB peak VRAM during validation
+        # inference), unlocking 16 concurrent training workers across
+        # 8 GPUs. With Phase 2 NonDaemonPool, each worker's DataLoader
+        # prefetch path is live in production too.
+        "MAX_WORKERS_PER_GPU": "2",
+    },
+)
+def train():
+    # In Brev container-mode, RUNPLZ_OUT resolves to $HOME/runplz-out,
+    # which is where the backend will rsync from. The training shell
+    # script reads MHCFLURRY_OUT — point it at the same dir.
+    env = os.environ.copy()
+    env["MHCFLURRY_OUT"] = env["RUNPLZ_OUT"]
+    subprocess.run(
+        ["bash", "scripts/training/pan_allele_release_exact.sh"],
+        check=True,
+        env=env,
+    )
+
+
+@app.local_entrypoint()
+def main():
+    train.remote()
