@@ -45,6 +45,16 @@ base_hyperparameters = {
     'random_negative_rate': 1.0,
     'random_negative_method': 'by_allele_equalize_nonbinders',
     'random_negative_binder_threshold': 500.0,
+    # Phase 1 of issue openvax/mhcflurry#268: amortize the random-negative
+    # generation + BLOSUM62 encoding cost across 100 epochs. The per-epoch
+    # encode was ~17 s on the release_exact 8xA100 run (~44% of epoch
+    # wall-clock); with the pool, each worker pays it once per 100 epochs
+    # and does an O(1) array slice otherwise. Within a cycle the same
+    # peptides recycle in a fixed order — the user has signed off on that
+    # semantic change. Cross-worker diversity is preserved because the
+    # training driver seeds each worker's pool with a SHA1 mix of
+    # (arch, fold, replicate, work_item_name).
+    'random_negative_pool_epochs': 100,
     'train_data': {
         'pretrain': True,
         'pretrain_peptides_per_epoch': 64,

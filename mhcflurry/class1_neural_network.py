@@ -26,7 +26,7 @@ from .common import get_pytorch_device
 from .pytorch_layers import LocallyConnected1D, get_activation
 from .pytorch_losses import get_pytorch_loss
 from .data_dependent_weights_initialization import lsuv_init
-from .random_negative_peptides import RandomNegativePeptides
+from .random_negative_peptides import RandomNegativePeptides, RandomNegativesPool
 
 
 DEFAULT_PREDICT_BATCH_SIZE = 4096
@@ -1536,6 +1536,18 @@ class Class1NeuralNetwork(object):
         random_negative_affinity_min=20000.0,
         random_negative_affinity_max=50000.0,
         random_negative_output_indices=None,
+        # Number of consecutive epochs that share a pre-generated pool of
+        # random-negative peptides. 1 (default) reproduces the pre-Phase-1
+        # "fresh peptides every epoch" semantics exactly. >1 amortizes the
+        # ~17 s/epoch peptide-generation + encoding pair across that many
+        # epochs (Phase 1 of issue #268). Within a pool-cycle, consecutive
+        # epochs see distinct slices of the same pool rather than fresh
+        # samples — a training-time semantics change the user has
+        # explicitly opted into. A new pool is generated at every
+        # ``epoch // random_negative_pool_epochs`` boundary. 100 is the
+        # recommended production value; smaller values preserve more
+        # sample diversity but recover less of the encode cost.
+        random_negative_pool_epochs=1,
         # Number of DataLoader worker processes for the fit() inner batch
         # loop. 0 (default) runs everything in the training process —
         # bit-identical to pre-issue-#268 behavior. >0 spawns worker procs
@@ -2769,7 +2781,8 @@ class Class1NeuralNetwork(object):
             verbose=1,
             progress_callback=None,
             progress_preamble="",
-            progress_print_interval=5.0):
+            progress_print_interval=5.0,
+            random_negative_seed=None):
         """
         Fit the neural network.
 
@@ -2820,6 +2833,39 @@ class Class1NeuralNetwork(object):
                 random_negatives_planner.get_alleles(), borrow_from=allele_encoding
             )
         num_random_negatives = random_negatives_planner.get_total_count()
+
+        # Phase 1 of issue openvax/mhcflurry#268 — pre-generate the random-
+        # negative peptides + encoding once per pool-cycle rather than once
+        # per epoch. At pool_epochs=1 the pool regenerates every epoch and
+        # the behavior is semantically identical to the pre-Phase-1 path.
+        random_negative_pool_epochs = int(
+            self.hyperparameters.get("random_negative_pool_epochs", 1) or 1
+        )
+        if random_negative_pool_epochs < 1:
+            random_negative_pool_epochs = 1
+        random_negatives_pool = RandomNegativesPool(
+            planner=random_negatives_planner,
+            peptide_encoder=self.peptides_to_network_input,
+            pool_epochs=random_negative_pool_epochs,
+            seed=random_negative_seed,
+        )
+        fit_info["random_negative_pool_epochs"] = random_negative_pool_epochs
+
+        # Allele encoding for random negatives is planned once (the allele
+        # list is a deterministic function of the planner's plan_df). Hoist
+        # it out of the epoch loop — prior to Phase 1 this was recomputed
+        # every epoch on a constant input, which was harmless but wasteful.
+        random_negative_x_allele_base = None
+        if (
+            num_random_negatives > 0
+            and random_negatives_allele_encoding is not None
+        ):
+            (
+                random_negative_x_allele_base,
+                _,
+            ) = self.allele_encoding_to_network_input(
+                random_negatives_allele_encoding
+            )
 
         y_values = from_ic50(numpy.asarray(affinities))
         assert numpy.isnan(y_values).sum() == 0, y_values
@@ -3059,20 +3105,14 @@ class Class1NeuralNetwork(object):
             gc_time = 0.0
 
             build_start = time.perf_counter()
-            random_negative_peptides = EncodableSequences.create(
-                random_negatives_planner.get_peptides()
+            # Phase 1 (#268): slice the per-epoch negatives out of a
+            # pre-encoded pool. On pool_epochs=1 this regenerates every
+            # epoch (legacy behavior). On pool_epochs=N the heavy
+            # encoding pass runs once per N epochs; the in-epoch call
+            # here is an O(1) array view.
+            _, random_negative_peptides_encoding = (
+                random_negatives_pool.get_epoch_inputs(epoch)
             )
-            random_negative_peptides_encoding = self.peptides_to_network_input(
-                random_negative_peptides
-            )
-            random_negative_x_allele = None
-            if (
-                len(random_negative_peptides) > 0
-                and random_negatives_allele_encoding is not None
-            ):
-                random_negative_x_allele, _ = self.allele_encoding_to_network_input(
-                    random_negatives_allele_encoding
-                )
             dataset = _FitBatchDataset(
                 x_peptide=x_dict_without_random_negatives["peptide"],
                 x_allele=x_dict_without_random_negatives.get("allele"),
@@ -3080,7 +3120,7 @@ class Class1NeuralNetwork(object):
                 sample_weights_with_negatives=sample_weights_with_negatives,
                 train_indices=None,
                 random_negative_x_peptide=random_negative_peptides_encoding,
-                random_negative_x_allele=random_negative_x_allele,
+                random_negative_x_allele=random_negative_x_allele_base,
                 num_random_negatives=num_random_negatives,
             )
             input_build_time += time.perf_counter() - build_start
@@ -3147,7 +3187,7 @@ class Class1NeuralNetwork(object):
                         sample_weights_with_negatives=sample_weights_with_negatives,
                         train_indices=train_indices[:full_batch_count],
                         random_negative_x_peptide=random_negative_peptides_encoding,
-                        random_negative_x_allele=random_negative_x_allele,
+                        random_negative_x_allele=random_negative_x_allele_base,
                         num_random_negatives=num_random_negatives,
                     ),
                     batch_size=batch_size,

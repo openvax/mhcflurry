@@ -1,10 +1,14 @@
 """Tests for random negative peptide generation."""
 
+import numpy
 import pandas
 import math
 
 from mhcflurry.common import random_peptides
-from mhcflurry.random_negative_peptides import RandomNegativePeptides
+from mhcflurry.random_negative_peptides import (
+    RandomNegativePeptides,
+    RandomNegativesPool,
+)
 
 
 def test_random_negative_peptides_by_allele_equalize_nonbinders():
@@ -117,3 +121,93 @@ def test_random_negative_peptides_by_allele():
     assert (total_nonbinders.loc["HLA-B*44:02"] == 1126).all(), total_nonbinders
 
     assert not total_nonbinders.isnull().any().any()
+
+
+def _planner_for_pool_tests():
+    planner = RandomNegativePeptides(
+        random_negative_rate=1.0,
+        random_negative_constant=0,
+        random_negative_method="by_length",
+        random_negative_lengths=[9],
+    )
+    planner.plan(
+        peptides=[
+            "SIINFEKLA",
+            "GILGFVFTL",
+            "SLYNTVATL",
+            "NLVPMVATV",
+        ],
+        affinities=[10.0, 100.0, 1000.0, 5000.0],
+    )
+    return planner
+
+
+def _tag_encoder(encodable_sequences):
+    # Trivial encoder for the pool tests — we care about slicing/determinism,
+    # not the actual encoding. Treat each peptide string as one row.
+    return numpy.array(list(encodable_sequences.sequences), dtype=object)
+
+
+def test_random_negatives_pool_pool_epochs_one_is_per_epoch():
+    # With pool_epochs=1 every epoch triggers a rebuild, so the slice
+    # returned for each consecutive epoch is a fresh draw (different
+    # peptides on every call) — matching pre-Phase-1 fit() semantics.
+    planner = _planner_for_pool_tests()
+    pool = RandomNegativesPool(planner, _tag_encoder, pool_epochs=1, seed=None)
+    epoch0 = pool.get_epoch_inputs(0)[1]
+    epoch1 = pool.get_epoch_inputs(1)[1]
+    assert len(epoch0) == planner.get_total_count()
+    assert len(epoch1) == planner.get_total_count()
+    # Not a strict guarantee across RNG states, but extremely likely
+    # for 4 9-mers drawn independently.
+    assert not numpy.array_equal(epoch0, epoch1), (
+        "pool_epochs=1 must regenerate every epoch"
+    )
+
+
+def test_random_negatives_pool_within_cycle_slices_are_distinct():
+    planner = _planner_for_pool_tests()
+    pool = RandomNegativesPool(planner, _tag_encoder, pool_epochs=3, seed=1234)
+    total = planner.get_total_count()
+    e0 = pool.get_epoch_inputs(0)[1]
+    e1 = pool.get_epoch_inputs(1)[1]
+    e2 = pool.get_epoch_inputs(2)[1]
+    assert len(e0) == total and len(e1) == total and len(e2) == total
+    # Three slices inside a single cycle must be disjoint sections of the
+    # pool — not duplicates of each other.
+    assert not numpy.array_equal(e0, e1)
+    assert not numpy.array_equal(e1, e2)
+    assert not numpy.array_equal(e0, e2)
+
+
+def test_random_negatives_pool_cycle_boundary_triggers_rebuild():
+    planner = _planner_for_pool_tests()
+    pool = RandomNegativesPool(planner, _tag_encoder, pool_epochs=3, seed=1234)
+    e0 = pool.get_epoch_inputs(0)[1]
+    # Epoch 3 is the first epoch of cycle 1 → new seed → new peptides.
+    e3 = pool.get_epoch_inputs(3)[1]
+    assert not numpy.array_equal(e0, e3)
+
+
+def test_random_negatives_pool_deterministic_with_seed():
+    planner = _planner_for_pool_tests()
+    pool_a = RandomNegativesPool(planner, _tag_encoder, pool_epochs=5, seed=7)
+    pool_b = RandomNegativesPool(planner, _tag_encoder, pool_epochs=5, seed=7)
+    for epoch in [0, 2, 9, 12]:
+        numpy.testing.assert_array_equal(
+            pool_a.get_epoch_inputs(epoch)[1],
+            pool_b.get_epoch_inputs(epoch)[1],
+        )
+
+
+def test_random_negatives_pool_different_seeds_diverge():
+    planner = _planner_for_pool_tests()
+    pool_a = RandomNegativesPool(planner, _tag_encoder, pool_epochs=5, seed=7)
+    pool_b = RandomNegativesPool(planner, _tag_encoder, pool_epochs=5, seed=8)
+    # Two workers with different seeds must see different random-negative
+    # content — preserves cross-worker diversity when the pool is shared
+    # across epochs within a worker.
+    assert not numpy.array_equal(
+        pool_a.get_epoch_inputs(0)[1],
+        pool_b.get_epoch_inputs(0)[1],
+    )

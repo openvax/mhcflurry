@@ -4,6 +4,7 @@ import math
 import numpy
 import pandas
 
+from .encodable_sequences import EncodableSequences
 from .hyperparameters import HyperparameterDefaults
 from .common import amino_acid_distribution, random_peptides
 
@@ -259,10 +260,20 @@ class RandomNegativePeptides(object):
         assert len(alleles) == self.get_total_count()
         return alleles
 
-    def get_peptides(self):
+    def get_peptides(self, rng=None):
         """
         Get the list of random negative peptides. This will be different each
         time the method is called.
+
+        Parameters
+        ----------
+        rng : numpy.random.Generator, optional
+            When supplied, all random draws go through this generator.
+            Lets a caller make the returned peptide list deterministic —
+            used by ``RandomNegativesPool`` to build reproducible
+            multi-epoch pools. When None the numpy global state is used,
+            preserving the historical "fresh peptides every call"
+            behavior.
 
         Returns
         -------
@@ -277,7 +288,8 @@ class RandomNegativePeptides(object):
                     random_peptides(
                         num,
                         length=length,
-                        distribution=self.aa_distribution))
+                        distribution=self.aa_distribution,
+                        rng=rng))
         assert len(peptides) == self.get_total_count()
         return peptides
 
@@ -290,3 +302,107 @@ class RandomNegativePeptides(object):
         int
         """
         return self.plan_df.sum().sum()
+
+
+class RandomNegativesPool(object):
+    """Amortize random-negative generation and encoding across N epochs.
+
+    Pre-issue-#268 Phase 1, ``Class1NeuralNetwork.fit()`` called
+    ``planner.get_peptides()`` followed by ``peptides_to_network_input``
+    at the top of every epoch — profiling on the release-exact 8xA100
+    run showed that pair at ~17 s/epoch (~44% of epoch wall-clock) for
+    the pan-allele default random-negative counts. The peptide strings
+    themselves are tiny; the cost is almost entirely in the
+    BLOSUM62-encoding pass.
+
+    This class generates ``pool_epochs`` worth of random peptides in one
+    call to the planner, encodes the whole pool once, and hands back an
+    O(1) slice per epoch. Setting ``pool_epochs=1`` reproduces the
+    pre-pool semantics exactly (one generation + one encode per epoch).
+    Setting ``pool_epochs=100`` reduces the amortized per-epoch encode
+    cost by ~100x; the trade-off is that within a pool-cycle the
+    negatives no longer *change* every epoch — consecutive epochs in a
+    cycle see distinct slices of the same pool, not freshly-sampled
+    peptides. A new pool is generated at the start of each cycle
+    (epoch // pool_epochs boundary).
+
+    Seeding is optional. When ``seed`` is None the peptides are drawn
+    from the process's numpy global state, matching the pre-pool
+    semantics: workers in a training pool diverge naturally because
+    they are separate processes with independent RNG state. Supplying
+    an explicit seed makes pool contents reproducible — useful for
+    debugging and for regression tests.
+    """
+
+    def __init__(self, planner, peptide_encoder, pool_epochs=1, seed=None):
+        """
+        Parameters
+        ----------
+        planner : RandomNegativePeptides
+            A planner that has already had ``plan(...)`` called on it.
+
+        peptide_encoder : callable
+            Receives an ``EncodableSequences`` and returns an encoded
+            numpy array (typically ``Class1NeuralNetwork
+            .peptides_to_network_input``). Called once per cycle on the
+            full pool.
+
+        pool_epochs : int
+            Number of consecutive epochs that share a pool. 1 is
+            semantically identical to pre-Phase-1 behavior.
+
+        seed : int, optional
+            Seed for the per-cycle RNG. When None, draws go through
+            numpy's global state (same as pre-Phase-1).
+        """
+        assert planner.plan_df is not None, "Call planner.plan() first"
+        self.planner = planner
+        self.peptide_encoder = peptide_encoder
+        self.pool_epochs = max(int(pool_epochs), 1)
+        self.seed = seed
+        self._total_count = int(planner.get_total_count())
+        self._current_cycle = None
+        self._current_encoded = None  # shape: (pool_epochs * total_count, ...)
+        self._current_peptides = None  # list of str, len = pool_epochs * total_count
+
+    def _rng_for_cycle(self, cycle):
+        if self.seed is None:
+            return None
+        seed_seq = numpy.random.SeedSequence(
+            entropy=int(self.seed), spawn_key=(int(cycle),)
+        )
+        return numpy.random.default_rng(seed_seq)
+
+    def _build_cycle(self, cycle):
+        rng = self._rng_for_cycle(cycle)
+        peptides = []
+        for _ in range(self.pool_epochs):
+            peptides.extend(self.planner.get_peptides(rng=rng))
+        assert len(peptides) == self.pool_epochs * self._total_count
+        encoded = self.peptide_encoder(EncodableSequences.create(peptides))
+        self._current_peptides = peptides
+        self._current_encoded = encoded
+        self._current_cycle = cycle
+
+    def get_epoch_inputs(self, epoch):
+        """Return ``(peptides_list, encoded_slice)`` for ``epoch``.
+
+        The returned ``encoded_slice`` is a view into the pool-level
+        encoded array — no copy — so downstream assignments that expect
+        to own the memory should ``.copy()`` it first. The list of raw
+        peptide strings is included for callers that need it (e.g.
+        logging / diagnostics).
+        """
+        cycle = int(epoch) // self.pool_epochs
+        if cycle != self._current_cycle:
+            self._build_cycle(cycle)
+        offset = (int(epoch) % self.pool_epochs) * self._total_count
+        end = offset + self._total_count
+        return (
+            self._current_peptides[offset:end],
+            self._current_encoded[offset:end],
+        )
+
+    @property
+    def total_count(self):
+        return self._total_count

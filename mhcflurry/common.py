@@ -267,7 +267,7 @@ def amino_acid_distribution(peptides, smoothing=0.0):
     return normalized
 
 
-def random_peptides(num, length=9, distribution=None):
+def random_peptides(num, length=9, distribution=None, rng=None):
     """
     Generate random peptides (kmers).
 
@@ -284,6 +284,13 @@ def random_peptides(num, length=9, distribution=None):
         probabilities. If not specified a uniform
         distribution is used.
 
+    rng : numpy.random.Generator, optional
+        If provided, peptides are sampled from this generator instead
+        of the global ``numpy.random`` state. Lets callers make peptide
+        generation deterministic (e.g. for the pre-generated-negative
+        pool in Phase 1 of #268). When None the global state is used,
+        preserving pre-existing call-site semantics.
+
     Returns
     ----------
     list of string
@@ -295,12 +302,17 @@ def random_peptides(num, length=9, distribution=None):
         distribution = pandas.Series(1, index=sorted(amino_acid.COMMON_AMINO_ACIDS))
         distribution /= distribution.sum()
 
-    return [
-        "".join(peptide_sequence)
-        for peptide_sequence in numpy.random.choice(
+    if rng is None:
+        sampled = numpy.random.choice(
             distribution.index, p=distribution.values, size=(int(num), int(length))
         )
-    ]
+    else:
+        sampled = rng.choice(
+            distribution.index.to_numpy(),
+            p=distribution.values,
+            size=(int(num), int(length)),
+        )
+    return ["".join(peptide_sequence) for peptide_sequence in sampled]
 
 
 def positional_frequency_matrix(peptides):

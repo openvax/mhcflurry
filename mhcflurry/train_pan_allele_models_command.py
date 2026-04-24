@@ -1346,6 +1346,25 @@ def train_model(
     else:
         model = Class1NeuralNetwork(**hyperparameters)
 
+    # Derive a per-work-item random-negative seed so each (arch, fold,
+    # replicate) tuple gets its own negative pool. Zeroes out when the
+    # pool hyperparameter is not in use (fit() ignores the seed in that
+    # path), so this doesn't change semantics for pool_epochs=1.
+    # hash() is randomized per-process via PYTHONHASHSEED, so use a
+    # stable mix instead: a SHA1 of the identity tuple truncated to 63
+    # bits (SeedSequence accepts arbitrary non-negative ints).
+    random_negative_seed = int(
+        hashlib.sha1(
+            ("|".join([
+                str(architecture_num),
+                str(fold_num),
+                str(replicate_num),
+                work_item_name or "",
+            ])).encode()
+        ).hexdigest()[:16],
+        16,
+    )
+
     model.fit(
         peptides=train_peptides,
         affinities=train_data.measurement_value.values,
@@ -1356,6 +1375,7 @@ def train_model(
         progress_preamble=progress_preamble,
         progress_callback=progress_callback,
         progress_print_interval=progress_print_interval,
+        random_negative_seed=random_negative_seed,
         verbose=verbose)
 
     # Save model-specific training info

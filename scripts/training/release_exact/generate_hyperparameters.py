@@ -50,6 +50,15 @@ base_hyperparameters = {
     'random_negative_rate': 1.0,
     'random_negative_method': 'by_allele_equalize_nonbinders',
     'random_negative_binder_threshold': 500.0,
+    # Phase 1 of issue openvax/mhcflurry#268: amortize random-negative
+    # generation + BLOSUM62 encoding across 100 epochs instead of
+    # redoing it fresh every epoch. See the matching change in
+    # downloads-generation/models_class1_pan/generate_hyperparameters.py
+    # for the full rationale; the training driver in
+    # train_pan_allele_models_command seeds each worker's pool with a
+    # SHA1 mix of (arch, fold, replicate, work_item_name) so cross-
+    # worker diversity is preserved.
+    'random_negative_pool_epochs': 100,
     'train_data': {
         'pretrain': True,
         'pretrain_peptides_per_epoch': 64,
