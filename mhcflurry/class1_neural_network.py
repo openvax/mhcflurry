@@ -776,23 +776,31 @@ def _effective_validation_batch_size(
         model=None, num_workers_per_gpu=1):
     """Return the validation batch size to use for the current device.
 
-    Validation is pure inference (forward-only), so it should size like
-    prediction — independently of the training minibatch. Defaults to
-    ``compute_prediction_batch_size`` when nothing is configured.
-    ``minibatch_size`` is retained only as a conservative floor on
-    CPU, where the auto-sizer short-circuits to a fixed fallback.
+    Static heuristic. MUST be deterministic across calls — fit() /
+    fit_generator() call this per-epoch, and torch.compile caches
+    specializations by input shape. A validation batch that varies
+    with live free-VRAM (the auto-sized approach) forces the
+    compiled graph to re-codegen every epoch and with 16 training
+    workers × 32 inductor compile workers on a 128-vCPU box pins the
+    CPU at hundreds of concurrent compile jobs — observed to stall
+    training indefinitely. The auto-sized prediction batch size in
+    ``compute_prediction_batch_size`` is fine for mhcflurry-predict
+    where each call is a single forward; training-time validation is
+    not that shape.
+
+    ``model`` and ``num_workers_per_gpu`` kwargs are retained for API
+    compatibility with the call sites but are intentionally unused.
     """
+    del model, num_workers_per_gpu
     if configured_batch_size:
         return int(configured_batch_size)
-    auto = compute_prediction_batch_size(
-        device, model=model, num_workers_per_gpu=num_workers_per_gpu,
-    )
-    if device.type == "cpu":
-        # Keep the old 4× minibatch heuristic as a floor on CPU — the
-        # prediction auto-sizer returns a fixed fallback there and is
-        # agnostic to minibatch choice.
-        return max(auto, 4 * minibatch_size)
-    return auto
+    if device.type == "cuda":
+        # Validation is forward-only and the networks are tiny relative
+        # to modern GPU memory. A much larger default batch dramatically
+        # cuts kernel-launch / Python-loop overhead versus 4 *
+        # minibatch_size, while staying deterministic across epochs.
+        return max(4 * minibatch_size, 4096)
+    return 4 * minibatch_size
 
 
 def _move_fit_batch_to_device(batch, device, *, non_blocking):
