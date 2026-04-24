@@ -2569,6 +2569,7 @@ class Class1NeuralNetwork(object):
 
             epoch_losses = []
             epoch_fetch_time = 0.0
+            epoch_h2d_time = 0.0
             epoch_train_time = 0.0
             epoch_num_train_rows = 0
             for step in range(steps_per_epoch):
@@ -2581,10 +2582,19 @@ class Class1NeuralNetwork(object):
 
                 if expected_chunk_shape is None:
                     expected_chunk_shape = batch["peptide"].shape
+                # Phase 0 timing (#268): measure H2D separately from the
+                # training compute. Both paths pay a cuda.synchronize per
+                # batch when MHCFLURRY_ENABLE_TIMING=1; when disabled the
+                # _timing_start/stop calls are just time.perf_counter and
+                # the two sub-timers collapse into one.
+                h2d_start = _timing_start(device, timing_enabled)
                 inputs, y_tensor, weights_batch = _move_fit_batch_to_device(
                     batch,
                     device,
                     non_blocking=non_blocking_h2d,
+                )
+                epoch_h2d_time += _timing_stop(
+                    h2d_start, device, timing_enabled
                 )
                 batch_start = _timing_start(device, timing_enabled)
                 loss = _run_training_batch(
@@ -2650,16 +2660,27 @@ class Class1NeuralNetwork(object):
             epoch_time = time.time() - epoch_start_time
             # Single GPU→CPU sync per epoch for the accumulated per-step
             # loss tensors. See the ``epoch_losses.append(loss.detach())``
-            # comment inside the step loop above.
+            # comment inside the step loop above. When timing is disabled
+            # this .item() is the first CUDA sync of the epoch and blocks
+            # on the entire queued training pass; when enabled we already
+            # synced per-step so the drain is near-zero. Phase 0 of #268
+            # measures it either way so the fit_info breakdown sums to
+            # the wall clock.
+            loss_sync_start = _timing_start(device, timing_enabled)
             train_loss = (
                 torch.stack(epoch_losses).mean().item()
                 if epoch_losses else float('nan')
+            )
+            epoch_loss_sync_time = _timing_stop(
+                loss_sync_start, device, timing_enabled
             )
             fit_info["loss"].append(train_loss)
             fit_info["val_loss"].append(val_loss)
             if timing_enabled:
                 fit_info["epoch_fetch_time"].append(epoch_fetch_time)
+                fit_info["epoch_h2d_time"].append(epoch_h2d_time)
                 fit_info["epoch_train_time"].append(epoch_train_time)
+                fit_info["epoch_loss_sync_time"].append(epoch_loss_sync_time)
                 fit_info["epoch_validation_time"].append(validation_time)
                 fit_info["epoch_num_train_batches"].append(len(epoch_losses))
                 fit_info["epoch_num_train_rows"].append(epoch_num_train_rows)
@@ -3030,6 +3051,8 @@ class Class1NeuralNetwork(object):
             shuffle_dataset_time = 0.0
             dataloader_setup_time = 0.0
             train_loop_time = 0.0
+            epoch_h2d_time = 0.0
+            epoch_loss_sync_time = 0.0
             validation_materialize_time = 0.0
             validation_compute_time = 0.0
             callback_time = 0.0
@@ -3137,12 +3160,19 @@ class Class1NeuralNetwork(object):
                 )
 
                 for batch in loader:
-                    batch_start = _timing_start(device, timing_enabled)
+                    # Phase 0 timing (#268): H2D timed separately from
+                    # the training compute so the epoch breakdown adds
+                    # up to wall-clock.
+                    h2d_start = _timing_start(device, timing_enabled)
                     inputs, y_batch, weights_batch = _move_fit_batch_to_device(
                         batch,
                         device,
                         non_blocking=non_blocking_h2d,
                     )
+                    epoch_h2d_time += _timing_stop(
+                        h2d_start, device, timing_enabled
+                    )
+                    batch_start = _timing_start(device, timing_enabled)
                     loss = _run_training_batch(
                         network=network,
                         optimizer=optimizer,
@@ -3164,12 +3194,16 @@ class Class1NeuralNetwork(object):
             tail_indices = train_indices[full_batch_count:]
             if len(tail_indices) > 0:
                 tail_batch = dataset.batch_for_indices(tail_indices)
-                batch_start = _timing_start(device, timing_enabled)
+                h2d_start = _timing_start(device, timing_enabled)
                 inputs, y_batch, weights_batch = _move_fit_batch_to_device(
                     tail_batch,
                     device,
                     non_blocking=False,
                 )
+                epoch_h2d_time += _timing_stop(
+                    h2d_start, device, timing_enabled
+                )
+                batch_start = _timing_start(device, timing_enabled)
                 loss = _run_training_batch(
                     network=eager_network,
                     optimizer=optimizer,
@@ -3187,9 +3221,18 @@ class Class1NeuralNetwork(object):
 
             epoch_time = time.time() - epoch_start
             # Single GPU→CPU sync per epoch over accumulated loss tensors.
+            # Without timing, this .item() is the first sync of the
+            # epoch and blocks on the entire queued training pass; with
+            # timing we already synced per-batch so the drain is ~zero.
+            # Phase 0 of #268 captures either regime so the fit_info
+            # breakdown sums to the wall clock.
+            loss_sync_start = _timing_start(device, timing_enabled)
             train_loss = (
                 torch.stack(train_losses).mean().item()
                 if train_losses else float('nan')
+            )
+            epoch_loss_sync_time = _timing_stop(
+                loss_sync_start, device, timing_enabled
             )
             fit_info["loss"].append(train_loss)
 
@@ -3344,7 +3387,9 @@ class Class1NeuralNetwork(object):
                 fit_info["epoch_dataloader_setup_time"].append(
                     dataloader_setup_time
                 )
+                fit_info["epoch_h2d_time"].append(epoch_h2d_time)
                 fit_info["epoch_train_time"].append(train_loop_time)
+                fit_info["epoch_loss_sync_time"].append(epoch_loss_sync_time)
                 fit_info["epoch_validation_materialize_time"].append(
                     validation_materialize_time
                 )

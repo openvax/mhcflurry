@@ -15,7 +15,9 @@ def test_analyze_training_run_summarizes_phases_and_logs(tmp_path):
             "time": 30.0,
             "loss": [0.4, 0.3],
             "epoch_fetch_time": [1.0, 1.5],
+            "epoch_h2d_time": [0.5, 0.4],
             "epoch_train_time": [6.0, 5.0],
+            "epoch_loss_sync_time": [0.05, 0.03],
             "epoch_validation_time": [2.0, 2.5],
             "epoch_total_time": [10.0, 10.5],
             "epoch_num_train_batches": [2, 2],
@@ -99,6 +101,8 @@ def test_analyze_training_run_summarizes_phases_and_logs(tmp_path):
     assert pretrain["num_fits"] == 1
     assert pretrain["train_time_s"] == 11.0
     assert pretrain["fetch_time_s"] == 2.5
+    assert pretrain["h2d_time_s"] == 0.9
+    assert pretrain["loss_sync_time_s"] == 0.08
     assert pretrain["validation_total_time_s"] == 4.5
     assert pretrain["total_train_batches"] == 4
     assert pretrain["validation_rows_seen"] == 64

@@ -92,6 +92,10 @@ def _summarize_fit_records(records):
     total_epochs = sum(len(record["info"].get("loss", [])) for record in records)
     total_train_time = sum(_sum_series(record["info"], "epoch_train_time") for record in records)
     total_fetch_time = sum(_sum_series(record["info"], "epoch_fetch_time") for record in records)
+    total_h2d_time = sum(_sum_series(record["info"], "epoch_h2d_time") for record in records)
+    total_loss_sync_time = sum(
+        _sum_series(record["info"], "epoch_loss_sync_time") for record in records
+    )
     total_input_build_time = sum(
         _sum_series(record["info"], "epoch_input_build_time") for record in records
     )
@@ -173,6 +177,8 @@ def _summarize_fit_records(records):
         "total_epoch_timing_s": total_epoch_time,
         "train_time_s": total_train_time,
         "fetch_time_s": total_fetch_time,
+        "h2d_time_s": total_h2d_time,
+        "loss_sync_time_s": total_loss_sync_time,
         "input_build_time_s": total_input_build_time,
         "initialization_time_s": total_initialization_time,
         "shuffle_time_s": total_shuffle_time,
@@ -187,6 +193,10 @@ def _summarize_fit_records(records):
         "validation_time_fraction_of_epoch_timing": _safe_div(validation_total_time, total_epoch_time),
         "fetch_time_fraction_of_epoch_timing": _safe_div(total_fetch_time, total_epoch_time),
         "input_build_fraction_of_epoch_timing": _safe_div(total_input_build_time, total_epoch_time),
+        "h2d_time_fraction_of_epoch_timing": _safe_div(total_h2d_time, total_epoch_time),
+        "loss_sync_time_fraction_of_epoch_timing": _safe_div(
+            total_loss_sync_time, total_epoch_time
+        ),
         "total_train_batches": total_train_batches,
         "total_train_rows": total_train_rows,
         "total_tail_train_rows": total_tail_rows,
