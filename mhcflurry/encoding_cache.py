@@ -84,15 +84,7 @@ class EncodingParams:
         }
 
     def hash_key(self) -> str:
-        # Canonicalize vector_encoding_name before hashing so the equivalent
-        # compound spellings ``"BLOSUM62+physchem"`` / ``"BLOSUM62/physchem"``
-        # / ``["BLOSUM62", "physchem"]`` all hit the same cache entry.
-        from .amino_acid import canonicalize_encoding_name
-        kwargs = self.to_kwargs()
-        kwargs["vector_encoding_name"] = canonicalize_encoding_name(
-            kwargs["vector_encoding_name"]
-        )
-        payload = json.dumps(kwargs, sort_keys=True).encode("utf-8")
+        payload = json.dumps(self.to_kwargs(), sort_keys=True).encode("utf-8")
         return hashlib.sha256(payload).hexdigest()[:16]
 
 
@@ -336,19 +328,12 @@ def _vector_encoding_cache_key(params: EncodingParams) -> tuple:
     """Construct the cache key tuple EncodableSequences uses internally.
 
     Must exactly match the tuple built inside
-    ``EncodableSequences.variable_length_to_fixed_length_vector_encoding``
-    — including the ``canonicalize_encoding_name`` normalization on
-    ``vector_encoding_name`` that equivalent spellings
-    (``"BLOSUM62+physchem"`` vs ``"blosum62, PHYSCHEM"`` vs the
-    list form) all collapse into. Without matching here the
-    prepopulation path would write one key and the downstream encoder
-    lookup would miss.  Protected by a module-level self-test — see
-    the block comment above.
+    ``EncodableSequences.variable_length_to_fixed_length_vector_encoding``.
+    Protected by a module-level self-test — see the block comment above.
     """
-    from .amino_acid import canonicalize_encoding_name
     return (
         "fixed_length_vector_encoding",
-        canonicalize_encoding_name(params.vector_encoding_name),
+        params.vector_encoding_name,
         params.alignment_method,
         params.left_edge,
         params.right_edge,
