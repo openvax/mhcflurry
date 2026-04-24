@@ -191,6 +191,97 @@ def test_basic_training():
     assert predictions.max() < 100000
 
 
+def test_iterate_tensor_slice_batches_matches_dataloader_semantics():
+    """Phase 4 of openvax/mhcflurry#268: tensor-slice iterator primitive.
+
+    The iterator yields batches by slicing pre-placed tensors under a
+    shuffle permutation. For a given permutation it must produce the
+    same (peptide, y, weights) content as the equivalent numpy-fancy-
+    indexing path that the legacy DataLoader + _FitBatchDataset takes.
+    """
+    import torch
+    from mhcflurry.class1_neural_network import _iterate_tensor_slice_batches
+
+    n = 23
+    batch_size = 8
+    peptide = torch.arange(n * 15 * 21, dtype=torch.float32).reshape(n, 15, 21)
+    allele = torch.arange(n * 7, dtype=torch.float32).reshape(n, 7)
+    y = torch.arange(n, dtype=torch.float32)
+    weights = (torch.arange(n, dtype=torch.float32) + 1.0) * 0.5
+
+    permutation = torch.tensor(
+        [3, 19, 7, 15, 0, 21, 11, 5, 14, 2, 17, 9, 22, 1, 6, 18, 4, 13, 10, 20, 8, 12, 16],
+        dtype=torch.long,
+    )
+    assert int(permutation.shape[0]) == n
+
+    # drop_last=True yields 2 full batches (16 rows); the last 7 are dropped.
+    batches = list(_iterate_tensor_slice_batches(
+        peptide_device=peptide,
+        allele_device=allele,
+        y_device=y,
+        weights_device=weights,
+        batch_size=batch_size,
+        shuffle_permutation=permutation,
+        drop_last=True,
+    ))
+    assert len(batches) == n // batch_size
+    for step, (inputs, y_batch, w_batch) in enumerate(batches):
+        idx = permutation[step * batch_size : (step + 1) * batch_size]
+        testing.assert_array_equal(
+            inputs["peptide"].numpy(), peptide[idx].numpy()
+        )
+        testing.assert_array_equal(inputs["allele"].numpy(), allele[idx].numpy())
+        testing.assert_array_equal(y_batch.numpy(), y[idx].numpy())
+        testing.assert_array_equal(w_batch.numpy(), weights[idx].numpy())
+
+    # drop_last=False yields an additional tail batch of size n % batch_size.
+    batches_with_tail = list(_iterate_tensor_slice_batches(
+        peptide_device=peptide,
+        allele_device=allele,
+        y_device=y,
+        weights_device=weights,
+        batch_size=batch_size,
+        shuffle_permutation=permutation,
+        drop_last=False,
+    ))
+    assert len(batches_with_tail) == (n // batch_size) + 1
+    tail_inputs, tail_y, tail_weights = batches_with_tail[-1]
+    assert int(tail_y.shape[0]) == n % batch_size
+    tail_idx = permutation[(n // batch_size) * batch_size :]
+    testing.assert_array_equal(
+        tail_inputs["peptide"].numpy(), peptide[tail_idx].numpy()
+    )
+    testing.assert_array_equal(tail_y.numpy(), y[tail_idx].numpy())
+
+
+def test_iterate_tensor_slice_batches_handles_missing_optional_tensors():
+    """Allele and weights are optional — iterator must not emit them
+    when they're None."""
+    import torch
+    from mhcflurry.class1_neural_network import _iterate_tensor_slice_batches
+
+    n = 8
+    peptide = torch.arange(n * 5, dtype=torch.float32).reshape(n, 5)
+    y = torch.arange(n, dtype=torch.float32)
+    permutation = torch.arange(n, dtype=torch.long)
+
+    batches = list(_iterate_tensor_slice_batches(
+        peptide_device=peptide,
+        allele_device=None,
+        y_device=y,
+        weights_device=None,
+        batch_size=4,
+        shuffle_permutation=permutation,
+        drop_last=True,
+    ))
+    assert len(batches) == 2
+    inputs, y_batch, w_batch = batches[0]
+    assert "allele" not in inputs
+    assert w_batch is None
+    assert int(y_batch.shape[0]) == 4
+
+
 def test_peptide_amino_acid_encoding_gpu_forward_parity():
     """Phase 2 (openvax/mhcflurry#268): on-device BLOSUM62 forward parity.
 

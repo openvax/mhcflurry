@@ -580,6 +580,60 @@ def _move_fit_batch_to_device(batch, device, *, non_blocking):
     return (inputs, y_batch, weights_batch)
 
 
+def _iterate_tensor_slice_batches(
+    *,
+    peptide_device,
+    allele_device,
+    y_device,
+    weights_device,
+    batch_size,
+    shuffle_permutation,
+    drop_last=True,
+):
+    """Yield ``(inputs, y_batch, weights_batch)`` by slicing pre-placed tensors.
+
+    Phase 4 of openvax/mhcflurry#268: kills the per-step Python overhead
+    of the DataLoader path when all training tensors already live on
+    device. Each yielded batch is a pair of index-slice views into the
+    pre-placed tensors — zero copy, no collate, no gather.
+
+    ``shuffle_permutation`` is an int tensor on the same device as the
+    data tensors. Callers are responsible for building it once per
+    epoch (``torch.randperm`` on the same device is cheap). When
+    ``drop_last=True`` (the default) the tail that doesn't fill a batch
+    is discarded — the caller handles it eagerly, matching the existing
+    DataLoader path where the tail triggers an eager-network forward to
+    preserve torch.compile shape stability.
+
+    This helper intentionally does not run the forward/backward/
+    optimizer step; the caller pairs it with the existing
+    ``_run_training_batch`` so loss / regularization / logging logic
+    stays single-sourced with the DataLoader path.
+    """
+    n = int(shuffle_permutation.shape[0])
+    full_batches = n // batch_size
+    for step in range(full_batches):
+        idx = shuffle_permutation[step * batch_size : (step + 1) * batch_size]
+        inputs = {"peptide": peptide_device.index_select(0, idx)}
+        if allele_device is not None:
+            inputs["allele"] = allele_device.index_select(0, idx)
+        y_batch = y_device.index_select(0, idx)
+        weights_batch = None
+        if weights_device is not None:
+            weights_batch = weights_device.index_select(0, idx)
+        yield inputs, y_batch, weights_batch
+    if not drop_last and n % batch_size != 0:
+        tail_idx = shuffle_permutation[full_batches * batch_size :]
+        inputs = {"peptide": peptide_device.index_select(0, tail_idx)}
+        if allele_device is not None:
+            inputs["allele"] = allele_device.index_select(0, tail_idx)
+        y_batch = y_device.index_select(0, tail_idx)
+        weights_batch = None
+        if weights_device is not None:
+            weights_batch = weights_device.index_select(0, tail_idx)
+        yield inputs, y_batch, weights_batch
+
+
 def _run_training_batch(
     *,
     network,
@@ -1634,6 +1688,16 @@ class Class1NeuralNetwork(object):
         # recommended production value; smaller values preserve more
         # sample diversity but recover less of the encode cost.
         random_negative_pool_epochs=1,
+        # Phase 4 of issue openvax/mhcflurry#268: in-device tensor-slice
+        # iteration for fit()'s inner training loop. When True, the
+        # concatenated [random_negs | training] array is materialized on
+        # device once per epoch shuffle; the per-step "get a batch" is a
+        # pair of index-slice ops on pre-placed GPU tensors instead of
+        # a DataLoader → gather_feature_rows → collate → H2D chain —
+        # cuts the per-step Python-dispatch overhead substantially on
+        # the 4096-batch CUDA path. Default False preserves the
+        # pre-Phase-4 DataLoader semantics.
+        fit_tensor_slice=False,
         # Number of DataLoader worker processes for the fit() inner batch
         # loop. 0 (default) runs everything in the training process —
         # bit-identical to pre-issue-#268 behavior. >0 spawns worker procs
