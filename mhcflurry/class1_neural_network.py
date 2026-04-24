@@ -458,7 +458,18 @@ def _maybe_compile_loss(loss_obj, device):
     """
     if device.type != "cuda":
         return loss_obj
-    if os.environ.get("MHCFLURRY_TORCH_COMPILE", "0") != "1":
+    # Gated on a SEPARATE env var from the network compile. Setting
+    # ``MHCFLURRY_TORCH_COMPILE=1`` no longer implicitly compiles the
+    # loss — opt in with ``MHCFLURRY_TORCH_COMPILE_LOSS=1``. Caught on
+    # the 2026-04-24 release_exact launch: compiling ``MSEWithInequalities``
+    # on the 4096-batch CUDA path crashed every training worker with
+    # ``RuntimeError: Triton Error [CUDA]: invalid device context`` inside
+    # the fused backward kernel (``triton_poi_fused__to_copy_add_ge_gt_le_lt_mul_pow_sub``).
+    # Likely a torch.compile x loss-module x dynamic-batch interaction;
+    # turning the loss compile off keeps the much bigger network-compile
+    # win intact. Revisit once the upstream Triton / torch bug is known
+    # or after we build a smoke-test harness to catch regressions.
+    if os.environ.get("MHCFLURRY_TORCH_COMPILE_LOSS", "0") != "1":
         return loss_obj
     if hasattr(loss_obj, "_orig_mod"):
         return loss_obj
