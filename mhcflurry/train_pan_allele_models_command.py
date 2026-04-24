@@ -1346,24 +1346,30 @@ def train_model(
     else:
         model = Class1NeuralNetwork(**hyperparameters)
 
-    # Derive a per-work-item random-negative seed so each (arch, fold,
-    # replicate) tuple gets its own negative pool. Zeroes out when the
-    # pool hyperparameter is not in use (fit() ignores the seed in that
-    # path), so this doesn't change semantics for pool_epochs=1.
+    # Derive a per-work-item random-negative seed ONLY when the pool
+    # feature is actually in use. fit() has its own bypass for
+    # pool_epochs=1 (Codex review on #270), but defense in depth: if
+    # we don't pass a seed in the first place, a future refactor of
+    # fit() that drops the bypass still can't silently flip training
+    # to deterministic-per-work-item.
+    #
     # hash() is randomized per-process via PYTHONHASHSEED, so use a
-    # stable mix instead: a SHA1 of the identity tuple truncated to 63
-    # bits (SeedSequence accepts arbitrary non-negative ints).
-    random_negative_seed = int(
-        hashlib.sha1(
-            ("|".join([
-                str(architecture_num),
-                str(fold_num),
-                str(replicate_num),
-                work_item_name or "",
-            ])).encode()
-        ).hexdigest()[:16],
-        16,
-    )
+    # stable mix: SHA1 of the identity tuple truncated to 63 bits
+    # (numpy.random.SeedSequence accepts arbitrary non-negative ints).
+    pool_epochs = int(hyperparameters.get("random_negative_pool_epochs", 1) or 1)
+    random_negative_seed = None
+    if pool_epochs > 1:
+        random_negative_seed = int(
+            hashlib.sha1(
+                ("|".join([
+                    str(architecture_num),
+                    str(fold_num),
+                    str(replicate_num),
+                    work_item_name or "",
+                ])).encode()
+            ).hexdigest()[:16],
+            16,
+        )
 
     model.fit(
         peptides=train_peptides,

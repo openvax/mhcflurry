@@ -859,27 +859,35 @@ def _iterate_tensor_slice_batches(
     shuffle_permutation,
     drop_last=True,
 ):
-    """Yield ``(inputs, y_batch, weights_batch)`` by slicing pre-placed tensors.
+    """**PARKED** — primitive for issue openvax/mhcflurry#268 Phase 4.
 
-    Phase 4 of openvax/mhcflurry#268 **primitive only** — the in-device
-    tensor-slice iteration path it enables has not been wired into
-    ``fit()`` yet, so this helper is unused by production training at
-    head. Kept with tests because the wiring is expected to land in a
-    focused follow-up commit (swapping ``_make_fit_dataloader`` + the
-    DataLoader-based epoch loop for a ``torch.randperm`` + this
-    iterator when training tensors already live on device).
+    Intentionally NOT used by production training at head. The in-
+    ``fit()`` DataLoader replacement that would call this helper was
+    deferred during the #270 review: after Phase 1 (negative pool) +
+    #272 auto-batching landed, most of the Python-dispatch savings
+    this primitive would deliver are already captured upstream, so
+    the implementation risk of rewiring ``fit()``'s inner loop
+    (interacting with torch.compile shape stability, val-tensor
+    hoist, tail-batch handling, training OOM guard) wasn't worth
+    the marginal remaining win.
 
-    Each yielded batch is a pair of index-slice views into the pre-
-    placed tensors — zero copy, no collate, no gather. When
+    Preserved here, with its own test coverage, so that if the
+    broader hyperparameter sweep in #271 exposes a regime where
+    the remaining per-step overhead matters, the integration diff
+    is small (caller-side only, no helper-API churn).
+
+    Yields ``(inputs, y_batch, weights_batch)`` tuples by index-
+    slicing pre-placed device tensors under a caller-supplied
+    permutation. Zero copy, no collate, no gather. When
     ``drop_last=True`` (the default) the tail that doesn't fill a
-    batch is discarded — integrator handles it eagerly, matching the
-    existing DataLoader path where the tail triggers an eager-network
-    forward to preserve torch.compile shape stability.
+    batch is discarded — the caller handles it eagerly, matching
+    the current DataLoader path where the tail triggers an eager-
+    network forward.
 
-    This helper intentionally does not run the forward/backward/
-    optimizer step; the caller pairs it with the existing
-    ``_run_training_batch`` so loss / regularization / logging logic
-    stays single-sourced with the DataLoader path.
+    This helper does NOT run the forward/backward/optimizer step;
+    any integrator pairs it with ``_run_training_batch`` so loss /
+    regularization / logging logic stays single-sourced with the
+    DataLoader path.
     """
     n = int(shuffle_permutation.shape[0])
     full_batches = n // batch_size
