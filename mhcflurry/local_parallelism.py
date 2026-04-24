@@ -281,7 +281,10 @@ def worker_init_kwargs_for_scheduler(
         max_workers_per_gpu=max_workers_per_gpu)
 
     if not num_gpus:
-        return [{"backend": backend} for _ in range(num_jobs)]
+        return [
+            {"backend": backend, "max_workers_per_gpu": max_workers_per_gpu}
+            for _ in range(num_jobs)
+        ]
 
     gpu_assignments = list(itertools.chain.from_iterable(
         range(num_gpus) for _ in range(max_workers_per_gpu)))
@@ -292,11 +295,13 @@ def worker_init_kwargs_for_scheduler(
             worker_kwargs.append({
                 "backend": "gpu",
                 "gpu_device_nums": [gpu_assignments[worker_num]],
+                "max_workers_per_gpu": max_workers_per_gpu,
             })
         else:
             worker_kwargs.append({
                 "backend": "cpu",
                 "gpu_device_nums": [],
+                "max_workers_per_gpu": max_workers_per_gpu,
             })
     return worker_kwargs
 
@@ -402,7 +407,7 @@ def worker_init_entry_point(
 
 def worker_init(
         keras_backend=None, backend=None, gpu_device_nums=None,
-        worker_log_dir=None):
+        worker_log_dir=None, max_workers_per_gpu=None):
     del keras_backend  # legacy argument retained for API compatibility
     if worker_log_dir:
         sys.stderr = sys.stdout = open(os.path.join(
@@ -418,6 +423,13 @@ def worker_init(
         configure_pytorch(backend=backend, gpu_device_nums=gpu_device_nums)
     else:
         configure_pytorch(backend=backend)
+    # Propagate workers-per-GPU into the process env so auto-sized
+    # batching (Class1NeuralNetwork.predict / fit's
+    # check_training_batch_fits) can partition VRAM correctly when
+    # multiple fit()/predict() calls are co-resident on one GPU.
+    # See issue openvax/mhcflurry#272.
+    if max_workers_per_gpu is not None:
+        os.environ["MHCFLURRY_MAX_WORKERS_PER_GPU"] = str(int(max_workers_per_gpu))
 
 
 # Solution suggested in https://bugs.python.org/issue13831

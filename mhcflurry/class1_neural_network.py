@@ -167,6 +167,22 @@ def compute_prediction_batch_size(
     return int(max(min_rows, min(rows, max_rows)))
 
 
+def _env_workers_per_gpu(default=1):
+    """Read the ``MHCFLURRY_MAX_WORKERS_PER_GPU`` env var.
+
+    The local_parallelism pool sets this in each training worker so
+    auto-sized batching + training-memory checks can partition VRAM
+    across co-resident workers without the caller wiring it explicitly.
+    """
+    value = os.environ.get("MHCFLURRY_MAX_WORKERS_PER_GPU")
+    if value:
+        try:
+            return max(int(value), 1)
+        except ValueError:
+            pass
+    return default
+
+
 def resolve_prediction_batch_size(
         value, device, model=None, num_workers_per_gpu=1):
     """Resolve an explicit int or ``"auto"`` to a concrete batch size.
@@ -182,6 +198,83 @@ def resolve_prediction_batch_size(
             num_workers_per_gpu=num_workers_per_gpu,
         )
     return int(value)
+
+
+# Training-time memory multiplier: inference keeps only activations of
+# the current layer alive (input + output), training keeps the whole
+# forward-pass activation stack for backward plus gradients plus
+# optimizer state. RMSProp/Adam each store 1-2× weights in moving
+# averages on top. 4× the inference peak is a conservative floor that
+# leaves headroom for cuDNN workspace + Python-side torch overhead.
+_TRAINING_PEAK_MULTIPLIER = 4
+
+
+def check_training_batch_fits(
+        requested_batch_size,
+        device,
+        model,
+        num_workers_per_gpu=1,
+        free_memory_fraction=0.5,
+        min_batch=64,
+        logger=None):
+    """Verify that ``requested_batch_size`` will fit on ``device``.
+
+    Training peak memory = activations kept alive across the forward
+    pass (for backward), plus gradients, plus optimizer state. That's
+    roughly ``4 × _estimate_peak_bytes_per_row`` (inference peak).
+
+    Returns ``(effective_batch_size, shrunk: bool)``. When the
+    requested batch is too large for the available VRAM — partitioned
+    across co-resident workers — the batch is shrunk to the largest
+    power-of-two that fits (floored at ``min_batch``) and a loud
+    warning is emitted via ``logger`` / stderr explaining that the
+    training dynamics (BN running stats, gradient noise scale) now
+    differ from what the caller configured.
+
+    CPU short-circuits — no OOM risk there that a size-based heuristic
+    can catch. Returns ``(requested_batch_size, False)`` in that case.
+    """
+    import sys
+    if device.type == "cpu" or requested_batch_size <= min_batch:
+        return int(requested_batch_size), False
+    peak_bytes = _estimate_peak_bytes_per_row(model) * _TRAINING_PEAK_MULTIPLIER
+    free = _free_device_memory_bytes(device)
+    workers = max(int(num_workers_per_gpu), 1)
+    budget = int(free * float(free_memory_fraction) / workers)
+    max_rows = max(budget // peak_bytes, min_batch)
+    requested_batch_size = int(requested_batch_size)
+    if requested_batch_size <= max_rows:
+        return requested_batch_size, False
+    shrunk = 1
+    while shrunk * 2 <= max_rows:
+        shrunk *= 2
+    shrunk = max(shrunk, min_batch)
+    message = (
+        "!!! TRAINING BATCH WILL NOT FIT !!!  "
+        "Requested minibatch_size=%d on %s with %d worker(s)/GPU. "
+        "Estimated need ~%.1f GB of %.1f GB free VRAM (per-worker budget "
+        "~%.1f GB). Shrinking to %d.  "
+        "This CHANGES TRAINING DYNAMICS: batch-norm running stats, "
+        "gradient noise scale, and effective learning-rate schedule "
+        "all depend on batch size. Re-check convergence before "
+        "trusting the trained model. To pin an explicit size and "
+        "silence this guard, set a minibatch_size the caller knows "
+        "fits." % (
+            requested_batch_size, device, workers,
+            requested_batch_size * peak_bytes / 1e9,
+            free / 1e9,
+            budget / 1e9,
+            shrunk,
+        )
+    )
+    if logger is not None:
+        logger.warning(message)
+    else:
+        logging.warning(message)
+    # Also scream to stderr so it's loud in the job log regardless of
+    # which logger config the caller uses.
+    print("\n" + message + "\n", file=sys.stderr, flush=True)
+    return int(shrunk), True
 
 
 KERAS_BATCH_NORM_EPSILON = 1e-3
@@ -661,16 +754,28 @@ def _maybe_compile_loss(loss_obj, device):
     return torch.compile(loss_obj, mode=mode, dynamic=dynamic)
 
 
-def _effective_validation_batch_size(device, configured_batch_size, minibatch_size):
-    """Return the validation batch size to use for the current device."""
+def _effective_validation_batch_size(
+        device, configured_batch_size, minibatch_size,
+        model=None, num_workers_per_gpu=1):
+    """Return the validation batch size to use for the current device.
+
+    Validation is pure inference (forward-only), so it should size like
+    prediction — independently of the training minibatch. Defaults to
+    ``compute_prediction_batch_size`` when nothing is configured.
+    ``minibatch_size`` is retained only as a conservative floor on
+    CPU, where the auto-sizer short-circuits to a fixed fallback.
+    """
     if configured_batch_size:
-        return configured_batch_size
-    if device.type == "cuda":
-        # Validation is forward-only and the networks are tiny relative to
-        # modern GPU memory. A much larger default batch dramatically cuts
-        # kernel-launch / Python-loop overhead versus 4 * minibatch_size.
-        return max(4 * minibatch_size, 4096)
-    return 4 * minibatch_size
+        return int(configured_batch_size)
+    auto = compute_prediction_batch_size(
+        device, model=model, num_workers_per_gpu=num_workers_per_gpu,
+    )
+    if device.type == "cpu":
+        # Keep the old 4× minibatch heuristic as a floor on CPU — the
+        # prediction auto-sizer returns a fixed fallback there and is
+        # agnostic to minibatch choice.
+        return max(auto, 4 * minibatch_size)
+    return auto
 
 
 def _move_fit_batch_to_device(batch, device, *, non_blocking):
@@ -3091,6 +3196,9 @@ class Class1NeuralNetwork(object):
                     device,
                     self.hyperparameters["validation_batch_size"],
                     self.hyperparameters["minibatch_size"],
+                    model=eager_network,
+                    num_workers_per_gpu=dataloader_num_workers + 1
+                    if dataloader_num_workers else 1,
                 )
                 fit_info["effective_validation_batch_size"] = val_batch_size
                 val_loss = _batched_validation_loss(
@@ -3388,6 +3496,28 @@ class Class1NeuralNetwork(object):
 
         if allele_representations is not None:
             self.set_allele_representations(allele_representations)
+
+        # Guard against silent training-time OOMs. When many workers
+        # share one GPU (pan-allele default max_workers_per_gpu=2 on
+        # A100-80GB), the naive minibatch_size from the hyperparameters
+        # YAML may not fit per-worker. Shrink loudly instead of
+        # crashing the whole fit halfway through an epoch.
+        # Issue openvax/mhcflurry#272.
+        _requested_minibatch = int(self.hyperparameters["minibatch_size"])
+        _checked_minibatch, _shrunk = check_training_batch_fits(
+            _requested_minibatch,
+            device,
+            network,
+            num_workers_per_gpu=_env_workers_per_gpu(1),
+        )
+        if _shrunk:
+            # Override for the remainder of this fit() call. We don't
+            # write back to self.hyperparameters so the config saved
+            # alongside the model preserves the user's original intent
+            # — the fit_info record captures what actually ran.
+            self.hyperparameters["minibatch_size"] = _checked_minibatch
+            fit_info["minibatch_size_shrunk_from"] = _requested_minibatch
+            fit_info["minibatch_size_shrunk_to"] = _checked_minibatch
 
         optimizer = self._create_optimizer(network)
         if self.hyperparameters["learning_rate"] is not None:
@@ -3785,6 +3915,9 @@ class Class1NeuralNetwork(object):
                         device,
                         self.hyperparameters["validation_batch_size"],
                         batch_size,
+                        model=eager_network,
+                        num_workers_per_gpu=dataloader_num_workers + 1
+                        if dataloader_num_workers else 1,
                     )
                     fit_info["effective_validation_batch_size"] = val_batch_size
                     validation_start = _timing_start(device, timing_enabled)
