@@ -142,6 +142,72 @@ def test_calibrate_fast_parity_with_motif_summary():
         assert len(sub_l) == len(sub_f)
 
 
+def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
+    """``check_training_batch_fits`` shrinks an oversized batch and logs
+    a loud warning explaining the training-dynamics drift."""
+    import logging
+
+    from mhcflurry.class1_neural_network import (
+        check_training_batch_fits,
+        _TRAINING_PEAK_MULTIPLIER,
+        _estimate_peak_bytes_per_row,
+    )
+
+    class FakeCUDA:
+        """Pretend we're on CUDA with 8 GB free, 2 workers per GPU."""
+        def __init__(self):
+            self.type = "cuda"
+        def __str__(self):
+            return "cuda:0"
+
+    # Swap out _free_device_memory_bytes for the duration of this test.
+    from mhcflurry import class1_neural_network as cnn
+    saved = cnn._free_device_memory_bytes
+    try:
+        cnn._free_device_memory_bytes = lambda device: 8 * (1 << 30)
+
+        class TinyModel:
+            # Pretend peak row = 1 KB; 8 GB / 2 workers / 2 (0.5 fraction)
+            # / (1024 * 4) = 1 M rows max — so 500k fits, 4M doesn't.
+            peptide_encoding_shape = (15, 21)
+            lc_layers = []
+            peptide_dense_layers = []
+            allele_embedding = None
+            allele_dense_layers = []
+            class _Layer:
+                out_features = 128
+            dense_layers = [_Layer]
+
+        model = TinyModel()
+        peak = _estimate_peak_bytes_per_row(model) * _TRAINING_PEAK_MULTIPLIER
+        assert peak > 0
+        device = FakeCUDA()
+
+        # Small batch — fits easily, no shrink, no warning.
+        with caplog.at_level(logging.WARNING, logger="root"):
+            fits, shrunk = check_training_batch_fits(
+                128, device, model, num_workers_per_gpu=2,
+            )
+        assert not shrunk
+        assert fits == 128
+
+        # Huge batch — definitely exceeds budget, must shrink + warn.
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="root"):
+            fits, shrunk = check_training_batch_fits(
+                10_000_000, device, model, num_workers_per_gpu=2,
+            )
+        assert shrunk
+        assert 64 <= fits < 10_000_000
+        # Power-of-two floor.
+        assert fits & (fits - 1) == 0
+        joined = " ".join(r.message for r in caplog.records)
+        assert "TRAINING BATCH WILL NOT FIT" in joined
+        assert "CHANGES TRAINING DYNAMICS" in joined
+    finally:
+        cnn._free_device_memory_bytes = saved
+
+
 def test_compute_prediction_batch_size_scales_with_memory_and_workers():
     """``compute_prediction_batch_size`` respects free VRAM and the
     workers-per-GPU partition."""
