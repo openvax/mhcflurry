@@ -337,6 +337,78 @@ def test_shared_pool_mismatched_planner_raises(tmp_path):
         RandomNegativesPool.from_shared_mmap(str(tmp_path), loader_planner)
 
 
+def test_fit_end_to_end_pool_epochs_one_draws_from_global_rng(monkeypatch):
+    """End-to-end behavioral: calling ``Class1NeuralNetwork.fit`` with
+    ``random_negative_pool_epochs=1`` must draw random negatives from
+    numpy's global state regardless of the ``random_negative_seed``
+    kwarg. This is the guarantee that the Phase 1 default path is
+    bit-identical to pre-Phase-1 behavior — without it, the training
+    driver's SHA1-mixed seed would silently flip default training to
+    deterministic-per-work-item.
+    """
+    import numpy as np
+    from mhcflurry.class1_neural_network import Class1NeuralNetwork
+    from mhcflurry.common import random_peptides as random_peptides_fn
+
+    # Spy on the planner's get_peptides to capture the ``rng`` kwarg.
+    captured_rngs = []
+
+    from mhcflurry.random_negative_peptides import RandomNegativePeptides
+    real_get_peptides = RandomNegativePeptides.get_peptides
+
+    def spy_get_peptides(self, rng=None):
+        captured_rngs.append(rng)
+        return real_get_peptides(self, rng=rng)
+
+    monkeypatch.setattr(
+        RandomNegativePeptides, "get_peptides", spy_get_peptides,
+    )
+
+    hp = dict(
+        activation="tanh",
+        layer_sizes=[8],
+        max_epochs=1,
+        early_stopping=False,
+        validation_split=0.0,
+        locally_connected_layers=[],
+        dense_layer_l1_regularization=0.0,
+        dropout_probability=0.0,
+        random_negative_rate=1.0,
+        random_negative_constant=0,
+        random_negative_method="by_length",
+        random_negative_lengths=[9],
+        # Default path.
+        random_negative_pool_epochs=1,
+    )
+    peptides = random_peptides_fn(16, length=9)
+    affinities = np.random.uniform(10, 50000, 16)
+
+    predictor = Class1NeuralNetwork(**hp)
+    try:
+        predictor.fit(
+            peptides, affinities,
+            random_negative_seed=424242,  # driver passed a seed
+            verbose=0,
+        )
+    except Exception:
+        # Downstream may hiccup on this tiny harness — the seed
+        # bypass happens BEFORE training, so the planner call we're
+        # spying on has already fired.
+        pass
+
+    # At least one get_peptides call must have happened.
+    assert captured_rngs, "spy never saw a planner.get_peptides call"
+    # Every rng must be None — pool_epochs=1 path bypasses the seed
+    # and routes through numpy's global RNG. If any is a
+    # default_rng instance, the bypass is broken.
+    non_none = [r for r in captured_rngs if r is not None]
+    assert not non_none, (
+        "fit() with pool_epochs=1 must call planner.get_peptides(rng=None) "
+        "to preserve pre-Phase-1 global-RNG semantics, but saw "
+        f"{len(non_none)} seeded calls: {non_none[:2]}"
+    )
+
+
 def test_fit_ignores_random_negative_seed_when_pool_epochs_is_one():
     """Codex review #270 issue 1: when ``random_negative_pool_epochs=1``
     the default-path pool must stay on numpy's global RNG stream

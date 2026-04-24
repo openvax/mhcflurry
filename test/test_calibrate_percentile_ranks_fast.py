@@ -208,6 +208,128 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
         cnn._free_device_memory_bytes = saved
 
 
+def test_fit_end_to_end_shrinks_minibatch_when_vram_too_small(caplog):
+    """End-to-end: a tiny fit() on a mocked small-VRAM device should
+    invoke ``check_training_batch_fits``, shrink the configured
+    minibatch, record it in fit_info, and *not* mutate the predictor's
+    saved hyperparameters dict.
+
+    Exercises MPS (the only non-CPU device reliably available in the
+    test env); MPS's guard path is identical to CUDA's, modulo the
+    dtype fallback tested elsewhere.
+    """
+    import logging
+    if not torch.backends.mps.is_available():
+        pytest.skip("MPS not available — guard end-to-end test needs a non-CPU device")
+
+    from mhcflurry import class1_neural_network as cnn
+    from mhcflurry.class1_neural_network import Class1NeuralNetwork
+    from mhcflurry.common import random_peptides
+
+    # Override MPS free-memory to be tiny so the shrink fires.
+    saved_free = cnn._free_device_memory_bytes
+    try:
+        cnn._free_device_memory_bytes = lambda device: (
+            128 * (1 << 20) if device.type == "mps" else saved_free(device)
+        )
+
+        hyperparameters = dict(
+            activation="tanh",
+            layer_sizes=[16],
+            max_epochs=1,
+            early_stopping=False,
+            validation_split=0.0,
+            locally_connected_layers=[],
+            dense_layer_l1_regularization=0.0,
+            dropout_probability=0.0,
+            minibatch_size=524288,  # absurdly big for 128MB — must shrink
+        )
+
+        peptides = random_peptides(128, length=9)
+        affinities = numpy.random.uniform(10, 50000, 128)
+
+        predictor = Class1NeuralNetwork(**hyperparameters)
+        with caplog.at_level(logging.WARNING, logger="root"):
+            try:
+                predictor.fit(peptides, affinities, verbose=0)
+            except Exception:
+                # Downstream eagerness may fail on the tiny harness;
+                # the guard runs BEFORE any training work so fit_info
+                # captures it regardless.
+                pass
+
+        joined = " ".join(r.message for r in caplog.records)
+        assert "TRAINING BATCH WILL NOT FIT" in joined, (
+            "expected the loud shrink warning in the log. Captured: "
+            + joined[:400]
+        )
+        assert predictor.fit_info, "fit_info should be populated even on early failure"
+        info = predictor.fit_info[-1]
+        assert info.get("minibatch_size_shrunk_from") == 524288
+        effective = info.get("minibatch_size_shrunk_to")
+        assert effective is not None and 64 <= effective < 524288, (
+            "shrunk minibatch must be between the floor (64) and the "
+            "requested size, got %r" % effective
+        )
+        assert info.get("effective_minibatch_size") == effective
+        # Hyperparameters dict must NOT be mutated — the saved config
+        # preserves the user's original intent. This is the fix for
+        # the code/comment mismatch called out in the code review.
+        assert predictor.hyperparameters["minibatch_size"] == 524288, (
+            "hyperparameters were mutated during fit(); the saved model "
+            "config would no longer reflect the user's configured value"
+        )
+    finally:
+        cnn._free_device_memory_bytes = saved_free
+
+
+def test_processing_nn_auto_batch_matches_explicit_size():
+    """``Class1ProcessingNeuralNetwork.predict_encoded`` with
+    ``batch_size="auto"`` must produce bit-identical predictions to a
+    pinned integer batch. The auto-size resolves device+model at call
+    time; the only thing that should change is how many rows go
+    through each forward, not the output.
+    """
+    try:
+        from mhcflurry.downloads import get_path
+        from mhcflurry import Class1ProcessingPredictor
+    except Exception as exc:
+        pytest.skip(f"mhcflurry processing predictor imports unavailable: {exc}")
+    # Public release ships multiple flank-mode variants under
+    # models_class1_processing/; pick the with-flanks flavor since
+    # the test passes explicit flanks.
+    try:
+        models_dir = get_path(
+            "models_class1_processing", "models.selected.with_flanks",
+        )
+    except Exception as exc:
+        pytest.skip(f"public processing predictor not available: {exc}")
+
+    processing = Class1ProcessingPredictor.load(models_dir)
+    # Small dataset — correctness check, not perf.
+    peptides = [
+        "SIINFEKL", "GILGFVFTL", "SLYNTVATL", "NLVPMVATV",
+        "ELAGIGILTV", "KVAELVHFL", "TLDSQVMSL", "YVDPVITSI",
+    ]
+    n_flanks = ["" for _ in peptides]
+    c_flanks = ["" for _ in peptides]
+
+    # Pinned batch
+    pinned = processing.predict(
+        peptides=peptides, n_flanks=n_flanks, c_flanks=c_flanks,
+        batch_size=2,
+    )
+    # Auto batch
+    auto = processing.predict(
+        peptides=peptides, n_flanks=n_flanks, c_flanks=c_flanks,
+        batch_size="auto",
+    )
+    numpy.testing.assert_allclose(
+        pinned, auto, rtol=0, atol=1e-6,
+        err_msg="auto-sized processing predict must match pinned-size output",
+    )
+
+
 def test_compute_prediction_batch_size_scales_with_memory_and_workers():
     """``compute_prediction_batch_size`` respects free VRAM and the
     workers-per-GPU partition."""

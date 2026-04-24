@@ -34,6 +34,7 @@ _AUTO_BATCH_MAX_ROWS = 1_000_000  # cap past which kernel-launch savings flatten
 _AUTO_BATCH_MIN_ROWS = 1024       # floor: avoid pathologically tiny batches
 _AUTO_BATCH_CPU_FALLBACK = 32_768 # CPU: large batches thrash L3 — stay modest
 _AUTO_BATCH_FREE_FRACTION = 0.5   # half of free VRAM is the working-set budget
+_MPS_PSUTIL_WARNED = False        # one-shot warning if psutil is missing on MPS
 if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
     DEFAULT_PREDICT_BATCH_SIZE = int(os.environ["MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"])
     logging.info(
@@ -132,7 +133,23 @@ def _free_device_memory_bytes(device):
         try:
             import psutil
             free = min(free, int(psutil.virtual_memory().available))
+        except ImportError:
+            # psutil isn't a hard dep. Log once per process so the
+            # skip is visible rather than silent — without this cap
+            # the MPS driver's "recommended max" can exceed what's
+            # actually safe to claim alongside other apps.
+            global _MPS_PSUTIL_WARNED
+            if not _MPS_PSUTIL_WARNED:
+                logging.warning(
+                    "psutil not available; MPS free-memory estimate "
+                    "will use torch.mps.recommended_max_memory alone, "
+                    "which may overshoot actual available RAM. "
+                    "`pip install psutil` to enable the OS-level cap."
+                )
+                _MPS_PSUTIL_WARNED = True
         except Exception:
+            # Any other psutil failure (broken install, etc.) — skip
+            # the cap but don't fail the whole batch-size query.
             pass
         return free if free > 0 else 4 * (1 << 30)
     return 2 * (1 << 30)
@@ -3505,24 +3522,22 @@ class Class1NeuralNetwork(object):
         # Guard against silent training-time OOMs. When many workers
         # share one GPU (pan-allele default max_workers_per_gpu=2 on
         # A100-80GB), the naive minibatch_size from the hyperparameters
-        # YAML may not fit per-worker. Shrink loudly instead of
-        # crashing the whole fit halfway through an epoch.
+        # YAML may not fit per-worker. Shrink loudly for the duration
+        # of this fit() call only — DO NOT mutate self.hyperparameters,
+        # so the saved model config preserves the user's original
+        # intent. fit_info carries the actual value used at run time.
         # Issue openvax/mhcflurry#272.
         _requested_minibatch = int(self.hyperparameters["minibatch_size"])
-        _checked_minibatch, _shrunk = check_training_batch_fits(
+        _effective_minibatch, _shrunk = check_training_batch_fits(
             _requested_minibatch,
             device,
             network,
             num_workers_per_gpu=_env_workers_per_gpu(1),
         )
         if _shrunk:
-            # Override for the remainder of this fit() call. We don't
-            # write back to self.hyperparameters so the config saved
-            # alongside the model preserves the user's original intent
-            # — the fit_info record captures what actually ran.
-            self.hyperparameters["minibatch_size"] = _checked_minibatch
             fit_info["minibatch_size_shrunk_from"] = _requested_minibatch
-            fit_info["minibatch_size_shrunk_to"] = _checked_minibatch
+            fit_info["minibatch_size_shrunk_to"] = _effective_minibatch
+        fit_info["effective_minibatch_size"] = _effective_minibatch
 
         optimizer = self._create_optimizer(network)
         if self.hyperparameters["learning_rate"] is not None:
@@ -3754,7 +3769,7 @@ class Class1NeuralNetwork(object):
             # reordering). With num_workers>0, prefetcher processes build
             # the next batch while the GPU crunches the current one.
             # See issue openvax/mhcflurry#268.
-            batch_size = self.hyperparameters["minibatch_size"]
+            batch_size = _effective_minibatch
             dataloader_num_workers = self.hyperparameters.get(
                 "dataloader_num_workers", 0
             )

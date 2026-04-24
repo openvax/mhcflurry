@@ -931,6 +931,76 @@ def test_fit_generator_downgrades_num_workers_without_factory(caplog):
     ), "expected a downgrade warning in the log"
 
 
+def test_fit_generator_downgrades_num_workers_on_raw_batches(caplog):
+    """Raw-batch (non-encoded) source + factory → must still downgrade.
+
+    Second downgrade trigger (the ``generator_batches_are_encoded=False``
+    side). The dataset on the raw path stores bound methods of the
+    ``Class1NeuralNetwork`` instance (``peptides_to_network_input``,
+    ``allele_encoding_to_network_input``), and pickling those drags
+    the whole network into every worker — which is wrong. Worker-
+    prefetch must only activate when batches are pre-encoded AND a
+    factory is present. See a286d51 (``_FitGeneratorBatchIterableDataset``
+    downgrade check).
+    """
+    _seed_everything(seed=13580)
+
+    peptides = EncodableSequences(TRAIN_PEPTIDES[:8])
+    affinities = numpy.linspace(50.0, 50000.0, 8)
+    allele_list = [TRAIN_ALLELES_CYCLE[i % 3] for i in range(8)]
+    alleles = AlleleEncoding(
+        alleles=allele_list, allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+    hp = _tiny_hyperparameters()
+    hp["dataloader_num_workers"] = 2
+
+    # Build a raw-batch generator + factory. The factory is picklable,
+    # but the source says "batches arrive unencoded" — so the dataset
+    # would store network bound-method references that the worker
+    # pickler couldn't ship safely. The downgrade must fire BEFORE
+    # that pickle would be attempted.
+    def raw_batch_factory(worker_id=0, num_workers=1):
+        del worker_id, num_workers  # shard-agnostic for this tiny test
+        for _ in range(2):
+            yield {
+                "peptide": list(TRAIN_PEPTIDES[:4]),
+                "allele": [TRAIN_ALLELES_CYCLE[i % 3] for i in range(4)],
+                "affinity": numpy.linspace(50.0, 50000.0, 4),
+            }
+
+    net = Class1NeuralNetwork(**hp)
+    # The downgrade happens BEFORE any actual training work — we only
+    # care that the log is emitted. The raw-batch path can legitimately
+    # fail downstream in this minimal scaffolding (the test peptide /
+    # allele shapes aren't the raw decoder's expected format), but
+    # that's orthogonal to the assertion here.
+    with caplog.at_level("WARNING", logger="root"):
+        try:
+            net.fit_generator(
+                generator=raw_batch_factory(),
+                generator_factory=raw_batch_factory,
+                generator_batches_are_encoded=False,  # the trigger
+                validation_peptide_encoding=peptides,
+                validation_affinities=affinities,
+                validation_allele_encoding=alleles,
+                steps_per_epoch=2,
+                epochs=1,
+                min_epochs=1,
+                patience=100,
+                verbose=0,
+                progress_print_interval=None,
+            )
+        except Exception:
+            # Downstream raw-path failure is acceptable — we're
+            # asserting the downgrade fires, not that the raw path
+            # works end-to-end in this tiny harness.
+            pass
+
+    assert any(
+        "downgrading to 0" in rec.message for rec in caplog.records
+    ), "expected a downgrade warning for raw-batch path"
+
+
 # ---- Daemon-process compatibility gate ----
 #
 # mhcflurry's training orchestrator runs workers via multiprocessing.Pool.
