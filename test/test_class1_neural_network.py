@@ -282,6 +282,59 @@ def test_iterate_tensor_slice_batches_handles_missing_optional_tensors():
     assert int(y_batch.shape[0]) == 4
 
 
+def test_split_forward_matches_full_forward():
+    """forward_peptide_stage + forward_from_peptide_stage = forward (bit-identical).
+
+    The calibration fast path (#272) precomputes peptide-side activations
+    once and reuses them across many alleles. For it to be a valid
+    speedup (not a silent behavior change) the split must compose to
+    the same numerical output as the monolithic ``forward``.
+    """
+    import torch
+
+    base_hparams = dict(
+        activation="tanh",
+        layer_sizes=[16, 8],
+        validation_split=0.0,
+        early_stopping=False,
+        locally_connected_layers=[
+            {"filters": 4, "activation": "tanh", "kernel_size": 3}
+        ],
+        peptide_allele_merge_method="concatenate",
+        dense_layer_l1_regularization=0.0,
+        dropout_probability=0.0,
+    )
+    predictor = Class1NeuralNetwork(**base_hparams)
+    # Fake allele_representations so has_allele=True
+    alle_reps = numpy.random.rand(3, 37, 21).astype(numpy.float32)
+    predictor._network = predictor.make_network(
+        allele_representations=alle_reps,
+        **predictor.network_hyperparameter_defaults.subselect(
+            predictor.hyperparameters),
+    )
+    predictor._network.eval()
+
+    peptides = random_peptides(12, length=9)
+    peptide_encoded = predictor.peptides_to_network_input(peptides)
+    peptide_tensor = torch.from_numpy(peptide_encoded.astype(numpy.float32))
+    allele_idx = torch.tensor([0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2], dtype=torch.long)
+
+    with torch.no_grad():
+        full_out = predictor._network({
+            "peptide": peptide_tensor,
+            "allele": allele_idx,
+        })
+        stage = predictor._network.forward_peptide_stage(peptide_tensor)
+        split_out = predictor._network.forward_from_peptide_stage(
+            stage, allele_idx,
+        )
+
+    testing.assert_allclose(
+        full_out.numpy(), split_out.numpy(), rtol=0, atol=1e-6,
+        err_msg="split-forward must match monolithic forward bit-identically",
+    )
+
+
 def test_peptide_amino_acid_encoding_gpu_forward_parity():
     """Phase 2 (openvax/mhcflurry#268): on-device BLOSUM62 forward parity.
 

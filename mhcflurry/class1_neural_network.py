@@ -1150,6 +1150,99 @@ class Class1NeuralNetworkModel(nn.Module):
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
 
+    def forward_peptide_stage(self, peptide):
+        """Run only the peptide-side of the network.
+
+        Ends at the point where the allele information enters — just
+        before the merge step. Used by the calibration fast path
+        (#272) to compute the peptide-dependent activations once and
+        reuse them across thousands of alleles.
+
+        Parameters
+        ----------
+        peptide : torch.Tensor
+            (N, L, 21) fp32 BLOSUM62-encoded, or (N, L) int indices
+            when ``peptide_input_is_indices`` is True.
+
+        Returns
+        -------
+        torch.Tensor of shape (N, peptide_representation_dim) — the
+        input the ``forward_from_peptide_stage`` fast path expects.
+        """
+        if (
+            self.peptide_input_is_indices
+            and peptide.dim() == 2
+        ):
+            peptide = torch.nn.functional.embedding(
+                peptide.long(), self.blosum62_table
+            )
+        x = peptide
+        for lc_layer in self.lc_layers:
+            x = lc_layer(x)
+        x = x.reshape(x.size(0), -1)
+        for layer in self.peptide_dense_layers:
+            x = layer(x)
+            if self.activation is not None:
+                x = self.activation(x)
+        if self.batch_norm_early is not None:
+            x = self.batch_norm_early(x)
+        return x
+
+    def forward_from_peptide_stage(self, peptide_stage, allele_idx):
+        """Run the allele-merge + main dense path from cached peptide reps.
+
+        ``peptide_stage`` must be the output of
+        ``forward_peptide_stage``. ``allele_idx`` has shape matching
+        ``peptide_stage``'s batch dim — typical calibration usage
+        tiles one allele across many peptides or the cross-product
+        of (peptide_chunk, allele_chunk).
+
+        This path skips all peptide-side ops, which for pan-allele
+        calibration lets a single precomputed activation be reused
+        across tens of thousands of allele forwards.
+        """
+        if not self.has_allele:
+            raise RuntimeError(
+                "forward_from_peptide_stage called on a has_allele=False "
+                "model — just call forward() directly"
+            )
+        x = peptide_stage
+        allele_idx = allele_idx.long()
+        if allele_idx.dim() > 1:
+            allele_idx = allele_idx.squeeze(-1)
+        allele_embed = self.allele_embedding(allele_idx)
+        for layer in self.allele_dense_layers:
+            allele_embed = layer(allele_embed)
+            if self.activation is not None:
+                allele_embed = self.activation(allele_embed)
+        allele_embed = allele_embed.reshape(allele_embed.size(0), -1)
+        if self.peptide_allele_merge_method == "concatenate":
+            x = torch.cat([x, allele_embed], dim=-1)
+        elif self.peptide_allele_merge_method == "multiply":
+            x = x * allele_embed
+        if self.merge_activation is not None:
+            x = self.merge_activation(x)
+        prev_outputs = []
+        merged_input = x
+        for i, layer in enumerate(self.dense_layers):
+            if self.topology == "with-skip-connections" and i > 0:
+                if i == 1:
+                    x = torch.cat([merged_input, prev_outputs[-1]], dim=-1)
+                else:
+                    x = torch.cat([prev_outputs[-2], prev_outputs[-1]], dim=-1)
+            x = layer(x)
+            if self.activation is not None:
+                x = self.activation(x)
+            if self.batch_norms[i] is not None:
+                x = self.batch_norms[i](x)
+            if self.dropouts[i] is not None:
+                x = self.dropouts[i](x)
+            prev_outputs.append(x)
+        output = self.output_layer(x)
+        if self.output_activation is not None:
+            output = self.output_activation(output)
+        return output
+
     def forward(self, inputs):
         """
         Forward pass.
