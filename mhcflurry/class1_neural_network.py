@@ -90,7 +90,17 @@ def _estimate_peak_bytes_per_row(model):
 
 def _free_device_memory_bytes(device):
     """Best-effort free-memory query. Returns a conservative value when
-    the device doesn't expose a direct free-memory API."""
+    the device doesn't expose a direct free-memory API.
+
+    CUDA: ``torch.cuda.mem_get_info`` (exposed free + reserved tracking).
+    MPS: Apple's ``recommended_max_memory`` on unified memory,
+        minus whatever the MPS driver has already handed us. Cap by
+        ``psutil`` available RAM when present so other apps aren't
+        evicted. Falls back to 4 GB if neither API is reachable.
+    CPU / unknown: 2 GB conservative budget (the helper short-circuits
+        for CPU anyway, but keep a sensible value in case callers pass
+        a foreign device).
+    """
     import torch
     if device.type == "cuda":
         try:
@@ -101,8 +111,31 @@ def _free_device_memory_bytes(device):
             reserved = torch.cuda.memory_reserved(device)
             return max(int(props.total_memory) - int(reserved), 0)
     if device.type == "mps":
-        return 4 * (1 << 30)  # no unified free-memory API, assume 4 GB usable
-    return 2 * (1 << 30)  # CPU (or unknown): 2 GB conservative budget
+        # Apple Silicon: unified memory, so "free VRAM" is better
+        # estimated from the MPS driver's recommended ceiling minus
+        # whatever it's already allocated. Ceiling is typically
+        # ~75-80% of total system RAM on M-series chips.
+        try:
+            ceiling = int(torch.mps.recommended_max_memory())
+        except Exception:
+            ceiling = 4 * (1 << 30)
+        allocated = 0
+        try:
+            allocated = int(torch.mps.driver_allocated_memory())
+        except Exception:
+            pass
+        free = max(ceiling - allocated, 0)
+        # Don't evict other apps: also cap by the OS-reported free
+        # RAM when psutil is available. This gets us a realistic
+        # "what's safe to claim right now" rather than the MPS
+        # driver's peak permission.
+        try:
+            import psutil
+            free = min(free, int(psutil.virtual_memory().available))
+        except Exception:
+            pass
+        return free if free > 0 else 4 * (1 << 30)
+    return 2 * (1 << 30)
 
 
 def compute_prediction_batch_size(
