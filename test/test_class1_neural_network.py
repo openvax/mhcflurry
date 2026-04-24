@@ -191,6 +191,70 @@ def test_basic_training():
     assert predictions.max() < 100000
 
 
+def test_peptide_amino_acid_encoding_gpu_forward_parity():
+    """Phase 2 (openvax/mhcflurry#268): on-device BLOSUM62 forward parity.
+
+    With weights fixed and identical between a legacy (BLOSUM-encoded
+    input) model and an index-encoded model, both forward passes must
+    produce bit-identical outputs — the on-device embedding lookup is
+    mathematically the same op as the CPU-side BLOSUM table multiply.
+    """
+    import torch
+    from mhcflurry.amino_acid import BLOSUM62_MATRIX
+
+    base_hparams = dict(
+        activation="tanh",
+        layer_sizes=[8],
+        validation_split=0.0,
+        early_stopping=False,
+        locally_connected_layers=[
+            {"filters": 4, "activation": "tanh", "kernel_size": 3}
+        ],
+        dense_layer_l1_regularization=0.0,
+        dropout_probability=0.0,
+    )
+
+    peptides = random_peptides(16, length=9)
+
+    # Legacy path (flag off) — peptides encoded as (N, L, 21) BLOSUM62.
+    legacy = Class1NeuralNetwork(**base_hparams)
+    legacy._network = legacy.make_network(
+        allele_representations=None,
+        **legacy.network_hyperparameter_defaults.subselect(legacy.hyperparameters),
+    )
+    legacy_input = legacy.peptides_to_network_input(peptides)
+    assert legacy_input.ndim == 3
+    assert legacy_input.shape[-1] == len(BLOSUM62_MATRIX)
+
+    # On-device path (flag on) — peptides encoded as (N, L) int indices.
+    onpath = Class1NeuralNetwork(peptide_amino_acid_encoding_gpu=True, **base_hparams)
+    onpath._network = onpath.make_network(
+        allele_representations=None,
+        **onpath.network_hyperparameter_defaults.subselect(onpath.hyperparameters),
+    )
+    onpath_input = onpath.peptides_to_network_input(peptides)
+    assert onpath_input.ndim == 2
+    assert numpy.issubdtype(onpath_input.dtype, numpy.integer)
+
+    # Copy legacy weights into onpath so the only difference is the
+    # embedding expansion — forward outputs must match bit-identically.
+    onpath._network.load_state_dict(legacy._network.state_dict(), strict=False)
+
+    with torch.no_grad():
+        legacy_out = legacy._network({
+            "peptide": torch.from_numpy(legacy_input.astype(numpy.float32))
+        })
+        onpath_out = onpath._network({
+            "peptide": torch.from_numpy(onpath_input)
+        })
+
+    testing.assert_allclose(
+        legacy_out.numpy(), onpath_out.numpy(), rtol=0, atol=1e-6,
+        err_msg="Phase 2 on-device BLOSUM62 forward must match the "
+                "legacy CPU-side BLOSUM62-encoded forward bit-identically",
+    )
+
+
 def test_serialization():
     """Test that network weights can be serialized and deserialized."""
     hyperparameters = dict(

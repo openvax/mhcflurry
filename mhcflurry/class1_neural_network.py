@@ -395,6 +395,12 @@ def _batch_value_to_device(value, device, *, non_blocking, cast_float):
     transferring fp64 just to narrow it on-device wastes bandwidth anyway.
     int8 / float32 inputs skip the CPU-side cast so the Phase 4a (#268)
     pattern of shipping int8 and widening on GPU stays intact.
+
+    When ``cast_float=False`` the value is shipped through in its source
+    dtype — used by the Phase 2 on-device BLOSUM62 path (#268) where
+    peptide tensors are (N, L) int indices that get widened to (N, L, 21)
+    fp32 via embedding lookup inside the network's forward pass, not via
+    an integer→float cast here.
     """
     if isinstance(value, numpy.ndarray):
         value = torch.from_numpy(value)
@@ -404,6 +410,29 @@ def _batch_value_to_device(value, device, *, non_blocking, cast_float):
     if cast_float:
         value = value.float()
     return value
+
+
+# BLOSUM62 weight table cached per device — one copy per CUDA GPU. Used
+# by the Phase 2 on-device embedding path below (#268). Populated lazily
+# on first use because the model can span multiple CUDA contexts in
+# multi-GPU setups even though a single fit() call runs on one.
+_BLOSUM62_DEVICE_CACHE = {}
+
+
+def _blosum62_table_for_device(device):
+    """Return a (21, 21) float32 torch tensor of BLOSUM62 on ``device``.
+
+    The values are integers in [-4, +11], so fp32 is lossless. Indexed by
+    ``amino_acid.AMINO_ACID_INDEX`` (same ordering as ``AMINO_ACIDS``).
+    Cached per device so it's materialized exactly once per process.
+    """
+    # device can be torch.device or str; build a stable dict key.
+    key = (str(device.type), getattr(device, "index", None))
+    if key not in _BLOSUM62_DEVICE_CACHE:
+        from .amino_acid import BLOSUM62_MATRIX
+        table = BLOSUM62_MATRIX.to_numpy().astype(numpy.float32)
+        _BLOSUM62_DEVICE_CACHE[key] = torch.from_numpy(table).to(device)
+    return _BLOSUM62_DEVICE_CACHE[key]
 
 
 def _timing_enabled():
@@ -498,12 +527,33 @@ def _effective_validation_batch_size(device, configured_batch_size, minibatch_si
 
 
 def _move_fit_batch_to_device(batch, device, *, non_blocking):
-    """Move a fit()/fit_generator batch dict to ``device``."""
+    """Move a fit()/fit_generator batch dict to ``device``.
+
+    When ``batch["peptide"]`` is a 2D integer array the Phase 2 (#268)
+    on-device BLOSUM62 path is active — keep it as int so the network's
+    embedding lookup can consume it. A 3D integer array is the Phase 4a
+    (#268) int8 BLOSUM-encoded cache payload; still widen that to fp32
+    on device. Float arrays flow through as before.
+    """
+    peptide_source = batch["peptide"]
+    if isinstance(peptide_source, numpy.ndarray):
+        _peptide_is_indices = (
+            peptide_source.ndim == 2
+            and numpy.issubdtype(peptide_source.dtype, numpy.integer)
+        )
+    else:
+        _peptide_is_indices = (
+            hasattr(peptide_source, "dim")
+            and peptide_source.dim() == 2
+            and peptide_source.dtype in (
+                torch.int8, torch.int16, torch.int32, torch.int64, torch.uint8
+            )
+        )
     peptide_batch = _batch_value_to_device(
-        batch["peptide"],
+        peptide_source,
         device,
         non_blocking=non_blocking,
-        cast_float=True,
+        cast_float=not _peptide_is_indices,
     )
     y_batch = _batch_value_to_device(
         batch["y"],
@@ -850,10 +900,26 @@ class Class1NeuralNetworkModel(nn.Module):
             dense_layer_l2_regularization=0.0,
             topology="feedforward",
             num_outputs=1,
-            init="glorot_uniform"):
+            init="glorot_uniform",
+            peptide_input_is_indices=False):
         super(Class1NeuralNetworkModel, self).__init__()
 
         self.peptide_encoding_shape = peptide_encoding_shape
+        self.peptide_input_is_indices = peptide_input_is_indices
+        # Phase 2 (#268) on-device BLOSUM62: when enabled, peptide input is
+        # (N, L) int indices and the first step of ``forward`` widens to
+        # (N, L, 21) fp32 via embedding. Ship the table as a registered
+        # buffer so it moves with ``.to(device)`` and is serialized by
+        # ``state_dict`` like a normal non-learnable tensor.
+        if peptide_input_is_indices:
+            from .amino_acid import BLOSUM62_MATRIX
+            self.register_buffer(
+                "blosum62_table",
+                torch.from_numpy(
+                    BLOSUM62_MATRIX.to_numpy().astype(numpy.float32)
+                ),
+                persistent=False,
+            )
         self.has_allele = allele_representations is not None
         self.peptide_allele_merge_method = peptide_allele_merge_method
         self.peptide_allele_merge_activation = peptide_allele_merge_activation
@@ -1052,6 +1118,16 @@ class Class1NeuralNetworkModel(nn.Module):
             )
 
         peptide = inputs['peptide']
+
+        # Phase 2 (#268) on-device BLOSUM62: (N, L) int indices → (N, L, 21)
+        # fp32. Skipped when the input is already the BLOSUM-encoded 3D
+        # tensor. ``torch.nn.functional.embedding`` is a pure gather so
+        # the op cost is comparable to the int8→fp32 widening cast it
+        # replaces; the saving is 21× less H2D and 21× less cache size.
+        if self.peptide_input_is_indices and peptide.dim() == 2:
+            peptide = torch.nn.functional.embedding(
+                peptide.long(), self.blosum62_table
+            )
 
         # Locally connected layers
         x = peptide
@@ -1512,6 +1588,16 @@ class Class1NeuralNetwork(object):
         ],
         topology="feedforward",
         num_outputs=1,
+        # Phase 2 of issue openvax/mhcflurry#268: feed the network (N, L)
+        # int amino-acid indices and widen to (N, L, 21) BLOSUM62 fp32 via
+        # an on-device embedding lookup, instead of shipping the (N, L, 21)
+        # int8-or-fp32 BLOSUM tensor directly. Cuts cache size and H2D
+        # bandwidth for the peptide path by a further 21× on top of the
+        # Phase 4a int8 storage win. False (default) preserves the
+        # pre-Phase-2 behavior byte-for-byte — the model still serializes
+        # the same weights, same shapes, same forward output given the
+        # same inputs.
+        peptide_amino_acid_encoding_gpu=False,
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -1873,6 +1959,20 @@ class Class1NeuralNetwork(object):
         # Create a temporary instance to get encoding shape
         temp = cls(**hyperparameters)
         peptide_encoding_shape = temp.peptides_to_network_input([]).shape[1:]
+        # Phase 2 (#268) on-device BLOSUM62: peptides_to_network_input
+        # returns (N, L) int indices when the flag is on, but the dense
+        # layers are still sized against the post-embedding (L, 21) shape.
+        # Expand here so the rest of the network-builder sees the same
+        # encoding shape regardless of which path is active.
+        if (
+            hyperparameters.get("peptide_amino_acid_encoding_gpu", False)
+            and len(peptide_encoding_shape) == 1
+        ):
+            from .amino_acid import AMINO_ACIDS
+            peptide_encoding_shape = (
+                peptide_encoding_shape[0],
+                len(AMINO_ACIDS),
+            )
 
         # Get allele representations if present
         allele_representations = config.get('allele_representations')
@@ -1923,6 +2023,8 @@ class Class1NeuralNetwork(object):
             topology=hyperparameters.get('topology', 'feedforward'),
             num_outputs=hyperparameters.get('num_outputs', 1),
             init=hyperparameters.get('init', 'glorot_uniform'),
+            peptide_input_is_indices=hyperparameters.get(
+                'peptide_amino_acid_encoding_gpu', False),
         )
 
         # Store keras metadata and config for weight loading
@@ -2260,6 +2362,12 @@ class Class1NeuralNetwork(object):
         Encode peptides to the fixed-length encoding expected by the neural
         network (which depends on the architecture).
 
+        When ``peptide_amino_acid_encoding_gpu`` is True (Phase 2 of
+        openvax/mhcflurry#268), the returned array is (N, L) int8 amino-
+        acid indices — the network's forward pass widens it to (N, L, 21)
+        BLOSUM62 fp32 on device. Otherwise the returned array is the
+        traditional (N, L, 21) vector encoding.
+
         Parameters
         ----------
         peptides : EncodableSequences or list of string
@@ -2269,11 +2377,36 @@ class Class1NeuralNetwork(object):
         numpy.array
         """
         encoder = EncodableSequences.create(peptides)
-        encoded = encoder.variable_length_to_fixed_length_vector_encoding(
-            **self.hyperparameters["peptide_encoding"]
-        )
+        if self.hyperparameters.get("peptide_amino_acid_encoding_gpu", False):
+            encoded = self._peptides_to_indices_raw(encoder)
+        else:
+            encoded = encoder.variable_length_to_fixed_length_vector_encoding(
+                **self.hyperparameters["peptide_encoding"]
+            )
         assert len(encoded) == len(peptides)
         return encoded
+
+    def _peptides_to_indices_raw(self, encoder):
+        """Produce (N, L) int8 amino-acid indices for ``encoder``.
+
+        Shares alignment_method/left_edge/right_edge/max_length with the
+        configured vector encoding but drops the vector_encoding_name /
+        trim / allow_unsupported_amino_acids kwargs that only apply to
+        the BLOSUM62 path. Phase 2 of #268.
+        """
+        categorical_kwargs = {
+            key: value
+            for key, value in self.hyperparameters["peptide_encoding"].items()
+            if key in (
+                "alignment_method", "left_edge", "right_edge", "max_length"
+            )
+        }
+        return (
+            encoder.variable_length_to_fixed_length_categorical(
+                **categorical_kwargs
+            )
+            .astype("int8", copy=False)
+        )
 
     @property
     def supported_peptide_lengths(self):
@@ -2457,9 +2590,17 @@ class Class1NeuralNetwork(object):
         # of #268): when the encoding cache stores int8 (BLOSUM62 native
         # width), H2D transfer is 4× smaller; widening to fp32 on GPU is
         # essentially free. For fp32-native encodings it's a no-op.
-        val_peptide_device = torch.from_numpy(
-            validation_x_dict["peptide"]
-        ).to(device).float()
+        # Phase 2 (#268): 2D int → index-encoded; keep dtype intact so
+        # the embedding lookup inside forward() sees int indices. 3D int
+        # is the Phase 4a int8 BLOSUM cache payload; widen as before.
+        _val_peptide_np = validation_x_dict["peptide"]
+        if (
+            _val_peptide_np.ndim == 2
+            and numpy.issubdtype(_val_peptide_np.dtype, numpy.integer)
+        ):
+            val_peptide_device = torch.from_numpy(_val_peptide_np).to(device)
+        else:
+            val_peptide_device = torch.from_numpy(_val_peptide_np).to(device).float()
         val_allele_device = None
         if "allele" in validation_x_dict:
             val_allele_device = torch.from_numpy(
@@ -3067,9 +3208,18 @@ class Class1NeuralNetwork(object):
         _val_device_tensors = None
         if _val_cache_safe:
             val_training_indices = val_indices - num_random_negatives
-            _val_peptide_device = torch.from_numpy(
-                x_dict_without_random_negatives["peptide"][val_training_indices]
-            ).float().to(device)
+            # Phase 2 (#268): 2D int is index-encoded (keep dtype); 3D int
+            # is the Phase 4a BLOSUM int8 cache payload (widen to fp32).
+            _val_peptide_np = x_dict_without_random_negatives["peptide"][
+                val_training_indices
+            ]
+            if (
+                _val_peptide_np.ndim == 2
+                and numpy.issubdtype(_val_peptide_np.dtype, numpy.integer)
+            ):
+                _val_peptide_device = torch.from_numpy(_val_peptide_np).to(device)
+            else:
+                _val_peptide_device = torch.from_numpy(_val_peptide_np).float().to(device)
             _val_y_device = torch.from_numpy(
                 y_encoded[val_indices].astype(numpy.float32)
             ).to(device)
@@ -3502,10 +3652,26 @@ class Class1NeuralNetwork(object):
         n_samples = len(x_dict["peptide"])
         all_predictions = []
 
+        peptide_is_indices = self.hyperparameters.get(
+            "peptide_amino_acid_encoding_gpu", False
+        )
+
         def prediction_tensor(batch_array):
-            batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
+            batch_array = numpy.asarray(batch_array)
             if not batch_array.flags.writeable:
                 batch_array = batch_array.copy()
+            # Phase 2 (#268): keep integer dtype only on the index-encoded
+            # peptide path. Allele inputs and Phase-4a 3D int8 BLOSUM
+            # arrays still widen to fp32 as before — the flag only
+            # governs the peptide tensor, not allele IDs or legacy
+            # BLOSUM-int8 payloads.
+            keep_int = (
+                peptide_is_indices
+                and batch_array.ndim == 2
+                and numpy.issubdtype(batch_array.dtype, numpy.integer)
+            )
+            if not keep_int:
+                batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
             return torch.from_numpy(batch_array).to(device)
 
         with torch.no_grad():
@@ -3597,11 +3763,22 @@ class Class1NeuralNetwork(object):
             locally_connected_layers,
             topology,
             num_outputs=1,
-            allele_representations=None):
+            allele_representations=None,
+            peptide_amino_acid_encoding_gpu=False):
         """
         Helper function to make a PyTorch network for class 1 affinity prediction.
         """
         peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
+        # Phase 2 (#268): index-encoded peptides probe as 1D (L,), but the
+        # network's dense layers still size against the post-embedding
+        # (L, 21) shape — widen the shape here so the constructor sees
+        # the same dims regardless of path.
+        if peptide_amino_acid_encoding_gpu and len(peptide_encoding_shape) == 1:
+            from .amino_acid import AMINO_ACIDS
+            peptide_encoding_shape = (
+                peptide_encoding_shape[0],
+                len(AMINO_ACIDS),
+            )
 
         return Class1NeuralNetworkModel(
             peptide_encoding_shape=peptide_encoding_shape,
@@ -3621,6 +3798,7 @@ class Class1NeuralNetwork(object):
             topology=topology,
             num_outputs=num_outputs,
             init=init,
+            peptide_input_is_indices=peptide_amino_acid_encoding_gpu,
         )
 
     def clear_allele_representations(self):
