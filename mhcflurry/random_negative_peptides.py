@@ -1,5 +1,7 @@
+import json
 import logging
 import math
+import os
 
 import numpy
 import pandas
@@ -392,17 +394,203 @@ class RandomNegativesPool(object):
         to own the memory should ``.copy()`` it first. The list of raw
         peptide strings is included for callers that need it (e.g.
         logging / diagnostics).
+
+        Phase 3 (#268) shared-mmap path: when the pool was built via
+        ``from_shared_mmap`` with a ``permutation_seed``, the slice is
+        reordered by a per-worker permutation seeded by that value mixed
+        with the epoch counter. Diversity is preserved even though all
+        workers read from the same byte-identical encoded array.
         """
         cycle = int(epoch) // self.pool_epochs
         if cycle != self._current_cycle:
             self._build_cycle(cycle)
         offset = (int(epoch) % self.pool_epochs) * self._total_count
         end = offset + self._total_count
-        return (
-            self._current_peptides[offset:end],
-            self._current_encoded[offset:end],
-        )
+        peptides_slice = self._current_peptides[offset:end]
+        encoded_slice = self._current_encoded[offset:end]
+        permutation = self._epoch_permutation(epoch)
+        if permutation is not None:
+            peptides_slice = [peptides_slice[i] for i in permutation]
+            encoded_slice = numpy.asarray(encoded_slice)[permutation]
+        return peptides_slice, encoded_slice
 
     @property
     def total_count(self):
         return self._total_count
+
+    # --- Phase 3 (#268): shared-mmap pool primitive ---
+    #
+    # In a multi-worker training pool (the pan-allele release_exact run
+    # spins up 16 training workers), each worker currently holds its own
+    # copy of the pool-epoch encoded array: ~17 MB × 16 = ~272 MB of RSS
+    # duplicated across processes. Workers shouldn't need distinct
+    # peptides — cross-worker diversity comes from the per-worker
+    # permutation over the pool, not from the pool contents themselves
+    # (see the ``random_negative_seed`` threaded from work_item identity
+    # in train_pan_allele_models_command).
+    #
+    # The API below lets a coordinator (typically the training driver
+    # before it forks workers) encode the pool once and persist it as
+    # an int8 memmap + JSON manifest. Workers then load the pool with
+    # ``from_shared_mmap`` — the OS page cache backs all of them with
+    # a single resident copy, cutting RSS ~N× across a pool of size N.
+    # Within a worker, ``get_epoch_inputs`` continues to return an
+    # ordinary numpy view into the encoded array; optional
+    # ``permutation_seed`` shuffles that view deterministically per
+    # worker so diversity is preserved.
+    #
+    # Not yet wired into ``local_parallelism`` / ``fit()`` — this
+    # change just delivers the IPC primitive. Wiring it up needs a
+    # coordinator hook inside the NonDaemonPool that runs once per
+    # worker spawn; that's a follow-up PR.
+
+    _MANIFEST_NAME = "random_negatives_pool.json"
+    _ENCODED_NAME = "random_negatives_encoded.int8.mmap"
+    _PEPTIDES_NAME = "random_negatives_peptides.json"
+
+    @classmethod
+    def write_shared_pool(
+            cls,
+            output_dir,
+            planner,
+            peptide_encoder,
+            pool_epochs,
+            seed):
+        """Generate a deterministic pool and persist it under ``output_dir``.
+
+        Creates three files:
+          - ``random_negatives_encoded.int8.mmap`` — the (pool_epochs *
+            total_count, ...) encoded array, stored int8 (values are in
+            [-128, 127]; BLOSUM62 fits tightly in that range, index
+            payloads trivially so). Callers that need a non-int8
+            encoding can skip ``write_shared_pool`` and use the
+            in-process ``RandomNegativesPool`` directly.
+          - ``random_negatives_peptides.json`` — the raw peptide strings
+            in the same row order; kept for debugging/logging.
+          - ``random_negatives_pool.json`` — manifest (shape, dtype,
+            pool_epochs, total_count, seed, encoded_file, peptides_file).
+
+        Workers load the pool via ``from_shared_mmap`` and read the
+        encoded array as mmap — one page-cache copy shared across the
+        worker pool instead of N per-process copies.
+        """
+        if seed is None:
+            raise ValueError(
+                "write_shared_pool requires seed to be set — the whole "
+                "point is deterministic content that workers share."
+            )
+        builder = cls(
+            planner=planner,
+            peptide_encoder=peptide_encoder,
+            pool_epochs=pool_epochs,
+            seed=seed,
+        )
+        builder._build_cycle(0)
+        encoded = numpy.asarray(builder._current_encoded)
+        peptides = list(builder._current_peptides)
+
+        os.makedirs(output_dir, exist_ok=True)
+        encoded_path = os.path.join(output_dir, cls._ENCODED_NAME)
+        peptides_path = os.path.join(output_dir, cls._PEPTIDES_NAME)
+        manifest_path = os.path.join(output_dir, cls._MANIFEST_NAME)
+
+        encoded_int8 = encoded.astype("int8", copy=False)
+        mm = numpy.memmap(
+            encoded_path, dtype="int8", mode="w+", shape=encoded_int8.shape
+        )
+        mm[:] = encoded_int8
+        mm.flush()
+        del mm
+
+        with open(peptides_path, "w", encoding="utf-8") as fd:
+            json.dump(peptides, fd)
+
+        manifest = {
+            "shape": list(encoded_int8.shape),
+            "dtype": "int8",
+            "pool_epochs": int(pool_epochs),
+            "total_count": int(builder._total_count),
+            "seed": int(seed),
+            "encoded_file": cls._ENCODED_NAME,
+            "peptides_file": cls._PEPTIDES_NAME,
+        }
+        with open(manifest_path, "w", encoding="utf-8") as fd:
+            json.dump(manifest, fd, indent=2, sort_keys=True)
+        return manifest_path
+
+    @classmethod
+    def from_shared_mmap(
+            cls,
+            output_dir,
+            planner,
+            peptide_encoder=None,
+            permutation_seed=None):
+        """Load a pool written by ``write_shared_pool`` as a shared mmap.
+
+        Parameters
+        ----------
+        output_dir : str
+            Directory containing the files written by ``write_shared_pool``.
+        planner : RandomNegativePeptides
+            The worker's planner. Must match the planner used to write
+            the pool (same ``get_total_count()``); otherwise the slice
+            bounds misalign.
+        peptide_encoder : callable, optional
+            Kept for API symmetry with ``__init__``. Never called on
+            this path because the pool is already encoded.
+        permutation_seed : int, optional
+            When provided, each epoch's slice is reordered by a
+            per-worker permutation seeded with this value mixed into
+            the epoch counter. Preserves cross-worker diversity when
+            many workers share the same pool contents.
+        """
+        manifest_path = os.path.join(output_dir, cls._MANIFEST_NAME)
+        with open(manifest_path, "r", encoding="utf-8") as fd:
+            manifest = json.load(fd)
+
+        encoded_path = os.path.join(output_dir, manifest["encoded_file"])
+        peptides_path = os.path.join(output_dir, manifest["peptides_file"])
+        with open(peptides_path, "r", encoding="utf-8") as fd:
+            peptides = json.load(fd)
+
+        shape = tuple(manifest["shape"])
+        pool_epochs = int(manifest["pool_epochs"])
+        expected_total = int(manifest["total_count"])
+        worker_total = int(planner.get_total_count())
+        if expected_total != worker_total:
+            raise ValueError(
+                "Shared pool total_count=%d does not match worker "
+                "planner total_count=%d — regenerate the pool or "
+                "align the planner hyperparameters." % (
+                    expected_total, worker_total,
+                )
+            )
+        encoded = numpy.memmap(
+            encoded_path, dtype=manifest["dtype"], mode="r", shape=shape
+        )
+
+        instance = cls(
+            planner=planner,
+            peptide_encoder=peptide_encoder
+            or (lambda _e: (_ for _ in ()).throw(RuntimeError(
+                "from_shared_mmap pool should never need to re-encode"
+            ))),
+            pool_epochs=pool_epochs,
+            seed=None,  # content is already deterministic in the mmap
+        )
+        instance._current_peptides = peptides
+        instance._current_encoded = encoded
+        instance._current_cycle = 0  # single cycle — mmap covers it all
+        instance._permutation_seed = permutation_seed
+        return instance
+
+    def _epoch_permutation(self, epoch):
+        seed = getattr(self, "_permutation_seed", None)
+        if seed is None:
+            return None
+        rng = numpy.random.default_rng(
+            numpy.random.SeedSequence(
+                entropy=int(seed), spawn_key=(int(epoch),)
+            )
+        )
+        return rng.permutation(self._total_count)

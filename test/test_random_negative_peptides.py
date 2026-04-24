@@ -211,3 +211,136 @@ def test_random_negatives_pool_different_seeds_diverge():
         pool_a.get_epoch_inputs(0)[1],
         pool_b.get_epoch_inputs(0)[1],
     )
+
+
+# ---- Phase 3 of openvax/mhcflurry#268: shared-mmap pool ----
+
+def _int8_encoder(encodable_sequences):
+    # Deterministic int8 encoder — good enough to verify the shared-mmap
+    # API preserves byte-for-byte content.
+    seqs = list(encodable_sequences.sequences)
+    if not seqs:
+        return numpy.zeros((0, 9), dtype="int8")
+    length = len(seqs[0])
+    arr = numpy.zeros((len(seqs), length), dtype="int8")
+    for i, pep in enumerate(seqs):
+        for j, aa in enumerate(pep[:length]):
+            arr[i, j] = ord(aa) % 127
+    return arr
+
+
+def _planner_with_ten_peptides():
+    planner = RandomNegativePeptides(
+        random_negative_rate=1.0,
+        random_negative_constant=0,
+        random_negative_method="by_length",
+        random_negative_lengths=[9],
+    )
+    peptides = [
+        c * 9 for c in "ABCDEFGHIJ"
+    ]
+    planner.plan(peptides=peptides, affinities=[10.0] * len(peptides))
+    return planner
+
+
+def test_shared_pool_round_trip_preserves_content(tmp_path):
+    planner = _planner_with_ten_peptides()
+    RandomNegativesPool.write_shared_pool(
+        str(tmp_path),
+        planner,
+        _int8_encoder,
+        pool_epochs=3,
+        seed=101,
+    )
+    # Loading a mmap pool without a permutation_seed must yield the
+    # same bytes the writer produced.
+    loaded = RandomNegativesPool.from_shared_mmap(
+        str(tmp_path), planner, permutation_seed=None
+    )
+    reference = RandomNegativesPool(
+        planner, _int8_encoder, pool_epochs=3, seed=101
+    )
+    for epoch in range(3):
+        numpy.testing.assert_array_equal(
+            numpy.asarray(loaded.get_epoch_inputs(epoch)[1]),
+            numpy.asarray(reference.get_epoch_inputs(epoch)[1]),
+        )
+
+
+def test_shared_pool_permutation_preserves_content_across_workers(tmp_path):
+    planner = _planner_with_ten_peptides()
+    RandomNegativesPool.write_shared_pool(
+        str(tmp_path),
+        planner,
+        _int8_encoder,
+        pool_epochs=3,
+        seed=42,
+    )
+    worker_a = RandomNegativesPool.from_shared_mmap(
+        str(tmp_path), planner, permutation_seed=111
+    )
+    worker_b = RandomNegativesPool.from_shared_mmap(
+        str(tmp_path), planner, permutation_seed=222
+    )
+    for epoch in range(3):
+        a_pep, a_enc = worker_a.get_epoch_inputs(epoch)
+        b_pep, b_enc = worker_b.get_epoch_inputs(epoch)
+        # Permutations must diverge — otherwise we've lost worker diversity.
+        assert not numpy.array_equal(numpy.asarray(a_enc), numpy.asarray(b_enc))
+        # But the multisets must match — both workers read the same mmap.
+        assert sorted(a_pep) == sorted(b_pep)
+
+
+def test_shared_pool_same_permutation_seed_reproducible(tmp_path):
+    planner = _planner_with_ten_peptides()
+    RandomNegativesPool.write_shared_pool(
+        str(tmp_path), planner, _int8_encoder, pool_epochs=3, seed=42,
+    )
+    a = RandomNegativesPool.from_shared_mmap(
+        str(tmp_path), planner, permutation_seed=7
+    )
+    b = RandomNegativesPool.from_shared_mmap(
+        str(tmp_path), planner, permutation_seed=7
+    )
+    for epoch in range(3):
+        numpy.testing.assert_array_equal(
+            numpy.asarray(a.get_epoch_inputs(epoch)[1]),
+            numpy.asarray(b.get_epoch_inputs(epoch)[1]),
+        )
+
+
+def test_shared_pool_mismatched_planner_raises(tmp_path):
+    writer_planner = _planner_with_ten_peptides()
+    RandomNegativesPool.write_shared_pool(
+        str(tmp_path),
+        writer_planner,
+        _int8_encoder,
+        pool_epochs=3,
+        seed=42,
+    )
+
+    # Loader planner has a different total_count — must refuse to load
+    # rather than silently slice into garbage.
+    loader_planner = RandomNegativePeptides(
+        random_negative_rate=1.0,
+        random_negative_constant=5,
+        random_negative_method="by_length",
+        random_negative_lengths=[9],
+    )
+    loader_planner.plan(
+        peptides=["A" * 9, "B" * 9],
+        affinities=[10.0, 100.0],
+    )
+
+    import pytest
+    with pytest.raises(ValueError, match="total_count"):
+        RandomNegativesPool.from_shared_mmap(str(tmp_path), loader_planner)
+
+
+def test_shared_pool_write_requires_seed(tmp_path):
+    planner = _planner_with_ten_peptides()
+    import pytest
+    with pytest.raises(ValueError, match="seed"):
+        RandomNegativesPool.write_shared_pool(
+            str(tmp_path), planner, _int8_encoder, pool_epochs=3, seed=None,
+        )
