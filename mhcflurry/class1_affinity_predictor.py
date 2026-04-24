@@ -1693,6 +1693,34 @@ class Class1AffinityPredictor(object):
             }
         return {}
 
+    @staticmethod
+    def _auto_size_calibration_batches(
+            model, device, n_peptides, n_alleles,
+            num_workers_per_gpu=1,
+            free_memory_fraction=0.5):
+        """Split the auto-sized batch budget between peptide and allele axes.
+
+        Wraps ``compute_prediction_batch_size`` (the single source of
+        truth for GPU-memory-aware batch sizing) and splits the budget
+        so the peptide axis is ≥10 k (amortizing dispatch) and the
+        allele axis uses whatever remains (capped at 256 since dispatch
+        savings flatten out past that point).
+        """
+        from .class1_neural_network import compute_prediction_batch_size
+        total_rows = compute_prediction_batch_size(
+            device,
+            model=model,
+            num_workers_per_gpu=num_workers_per_gpu,
+            free_memory_fraction=free_memory_fraction,
+        )
+        if n_peptides == 0 or n_alleles == 0:
+            return max(n_peptides, 1), max(n_alleles, 1)
+        peptide_batch = min(n_peptides, max(10_000, total_rows // 64))
+        allele_batch = min(n_alleles, max(1, total_rows // peptide_batch), 256)
+        while allele_batch * peptide_batch > total_rows and peptide_batch > 10_000:
+            peptide_batch = max(10_000, peptide_batch // 2)
+        return int(peptide_batch), int(allele_batch)
+
     def calibrate_percentile_ranks_fast(
             self,
             peptides,
@@ -1700,8 +1728,9 @@ class Class1AffinityPredictor(object):
             bins=None,
             motif_summary=False,
             summary_top_peptide_fractions=(0.001,),
-            allele_batch_size=64,
-            peptide_batch_size=100_000,
+            allele_batch_size="auto",
+            peptide_batch_size="auto",
+            num_workers_per_gpu=1,
             device=None,
             verbose=False):
         """GPU-hoisted calibration for many alleles sharing a peptide set.
@@ -1813,6 +1842,29 @@ class Class1AffinityPredictor(object):
         # move the eager (uncompiled) model to device, cache the
         # peptide-stage output.
         networks = self.class1_pan_allele_models
+        if allele_batch_size in (None, "auto") or peptide_batch_size in (None, "auto"):
+            # Resolve once, using the first network as the architecture
+            # probe — all ensembles we serve have homogeneous layer
+            # sizing, so one probe is sufficient.
+            probe_net = networks[0].network(borrow=True)
+            probe_net.to(device)
+            auto_peptide, auto_allele = self._auto_size_calibration_batches(
+                probe_net, device, n_peptides, len(alleles),
+                num_workers_per_gpu=num_workers_per_gpu,
+            )
+            if peptide_batch_size in (None, "auto"):
+                peptide_batch_size = auto_peptide
+            if allele_batch_size in (None, "auto"):
+                allele_batch_size = auto_allele
+            if verbose:
+                print(
+                    "calibrate_percentile_ranks_fast auto-sized: "
+                    f"peptide_batch={peptide_batch_size}, "
+                    f"allele_batch={allele_batch_size} "
+                    f"(workers_per_gpu={num_workers_per_gpu})"
+                )
+        peptide_batch_size = int(peptide_batch_size)
+        allele_batch_size = int(allele_batch_size)
         cached_stages = []  # list of (net_obj, model, peptide_stage on device)
         for net_obj in networks:
             (_, allele_reps) = net_obj.allele_encoding_to_network_input(

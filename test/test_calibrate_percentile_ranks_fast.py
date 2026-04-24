@@ -7,6 +7,8 @@ slow legacy path; the smoke test anchors that it actually runs end to
 end against a downloaded pan-allele release.
 """
 
+import torch
+
 import numpy
 import pandas
 import pytest
@@ -138,3 +140,40 @@ def test_calibrate_fast_parity_with_motif_summary():
             & (ff.cutoff_fraction == cutoff)
         ]
         assert len(sub_l) == len(sub_f)
+
+
+def test_compute_prediction_batch_size_scales_with_memory_and_workers():
+    """``compute_prediction_batch_size`` respects free VRAM and the
+    workers-per-GPU partition."""
+    from mhcflurry.class1_neural_network import (
+        compute_prediction_batch_size,
+        _AUTO_BATCH_CPU_FALLBACK,
+        _AUTO_BATCH_MAX_ROWS,
+        _AUTO_BATCH_MIN_ROWS,
+    )
+
+    cpu = torch.device("cpu")
+    # CPU short-circuit: fixed fallback regardless of workers / memory.
+    # Large batches on CPU thrash L3 and don't help the small networks
+    # mhcflurry trains.
+    assert compute_prediction_batch_size(cpu) == _AUTO_BATCH_CPU_FALLBACK
+    assert compute_prediction_batch_size(
+        cpu, num_workers_per_gpu=16,
+    ) == _AUTO_BATCH_CPU_FALLBACK
+
+    # Model=None (fallback estimate) still produces a within-bounds
+    # batch on MPS/CUDA if either is available locally.
+    if torch.backends.mps.is_available() or torch.cuda.is_available():
+        dev = (
+            torch.device("cuda") if torch.cuda.is_available()
+            else torch.device("mps")
+        )
+        single = compute_prediction_batch_size(dev)
+        shared = compute_prediction_batch_size(dev, num_workers_per_gpu=8)
+        assert _AUTO_BATCH_MIN_ROWS <= single <= _AUTO_BATCH_MAX_ROWS
+        assert _AUTO_BATCH_MIN_ROWS <= shared <= _AUTO_BATCH_MAX_ROWS
+        # Sharing the GPU with 8 workers partitions the budget — each
+        # worker's batch is no larger than the unshared case. Equality
+        # is allowed because the min_rows floor clamps both cases
+        # when free memory is tight.
+        assert shared <= single

@@ -29,12 +29,126 @@ from .data_dependent_weights_initialization import lsuv_init
 from .random_negative_peptides import RandomNegativePeptides, RandomNegativesPool
 
 
-DEFAULT_PREDICT_BATCH_SIZE = 4096
+DEFAULT_PREDICT_BATCH_SIZE = "auto"
+_AUTO_BATCH_MAX_ROWS = 1_000_000  # cap past which kernel-launch savings flatten
+_AUTO_BATCH_MIN_ROWS = 1024       # floor: avoid pathologically tiny batches
+_AUTO_BATCH_CPU_FALLBACK = 32_768 # CPU: large batches thrash L3 — stay modest
+_AUTO_BATCH_FREE_FRACTION = 0.5   # half of free VRAM is the working-set budget
 if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
     DEFAULT_PREDICT_BATCH_SIZE = int(os.environ["MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"])
     logging.info(
-        "Configured default predict batch size: %d" % DEFAULT_PREDICT_BATCH_SIZE
+        "Configured default predict batch size: %s" % DEFAULT_PREDICT_BATCH_SIZE
     )
+
+
+def _estimate_peak_bytes_per_row(model):
+    """Worst-case peak activation bytes per sample during a forward.
+
+    Walks the model's configured layers and returns the maximum hidden-
+    layer width (in fp32 bytes) × 2 (one input + one output of the
+    current layer stay live under torch's eval-time no_grad reuse). A
+    4× multiplier covers framework overhead, cuDNN scratch buffers,
+    and Python-side tensor bookkeeping. Used by ``compute_prediction_batch_size``.
+    """
+    if model is None:
+        return 32 * 1024  # conservative 32 KB/row fallback
+    widths = []
+    try:
+        lc_out_len = int(model.peptide_encoding_shape[0])
+        lc_out_ch = int(model.peptide_encoding_shape[1])
+        for lc_layer in model.lc_layers:
+            lc_out_ch = getattr(lc_layer, "out_channels", lc_out_ch)
+            try:
+                lc_out_len = int(lc_layer.output_length)
+            except AttributeError:
+                pass
+        widths.append(lc_out_len * lc_out_ch)
+        prev = lc_out_len * lc_out_ch
+        for layer in model.peptide_dense_layers:
+            prev = layer.out_features
+            widths.append(prev)
+    except AttributeError:
+        widths.append(1024)
+    try:
+        allele_out = None
+        if getattr(model, "allele_embedding", None) is not None:
+            allele_out = int(model.allele_embedding.weight.shape[1])
+        for layer in getattr(model, "allele_dense_layers", []):
+            allele_out = layer.out_features
+        if allele_out is not None:
+            widths.append(allele_out)
+    except AttributeError:
+        pass
+    try:
+        for layer in model.dense_layers:
+            widths.append(int(layer.out_features))
+    except AttributeError:
+        widths.append(1024)
+    peak = max(widths) if widths else 1024
+    return int(peak * 4 * 2 * 4)  # fp32 × 2 buffers × 4x safety
+
+
+def _free_device_memory_bytes(device):
+    """Best-effort free-memory query. Returns a conservative value when
+    the device doesn't expose a direct free-memory API."""
+    import torch
+    if device.type == "cuda":
+        try:
+            free, _ = torch.cuda.mem_get_info(device)
+            return int(free)
+        except Exception:
+            props = torch.cuda.get_device_properties(device)
+            reserved = torch.cuda.memory_reserved(device)
+            return max(int(props.total_memory) - int(reserved), 0)
+    if device.type == "mps":
+        return 4 * (1 << 30)  # no unified free-memory API, assume 4 GB usable
+    return 2 * (1 << 30)  # CPU (or unknown): 2 GB conservative budget
+
+
+def compute_prediction_batch_size(
+        device,
+        model=None,
+        num_workers_per_gpu=1,
+        free_memory_fraction=_AUTO_BATCH_FREE_FRACTION,
+        max_rows=_AUTO_BATCH_MAX_ROWS,
+        min_rows=_AUTO_BATCH_MIN_ROWS,
+        cpu_fallback=_AUTO_BATCH_CPU_FALLBACK):
+    """Auto-size a prediction batch for ``device`` and ``model``.
+
+    Divides free VRAM by the per-row peak activation estimate for the
+    model, scales by 1/``num_workers_per_gpu`` so co-resident workers
+    don't step on each other's budget, caps at ``max_rows`` (past which
+    kernel-launch savings flatten out), floors at ``min_rows``.
+
+    CPU: returns ``cpu_fallback`` — large batches on CPU thrash L3
+    cache and rarely help for the small networks mhcflurry trains.
+    """
+    if device.type == "cpu":
+        return cpu_fallback
+    peak_bytes = _estimate_peak_bytes_per_row(model)
+    free = _free_device_memory_bytes(device)
+    workers = max(int(num_workers_per_gpu), 1)
+    budget = int(free * float(free_memory_fraction) / workers)
+    budget = max(budget, peak_bytes * min_rows)
+    rows = budget // peak_bytes
+    return int(max(min_rows, min(rows, max_rows)))
+
+
+def resolve_prediction_batch_size(
+        value, device, model=None, num_workers_per_gpu=1):
+    """Resolve an explicit int or ``"auto"`` to a concrete batch size.
+
+    Accepts ``None`` as a synonym for ``"auto"``. Propagates an
+    explicit int through unchanged so callers can always pin the size
+    when they know better than the heuristic.
+    """
+    if value in (None, "auto"):
+        return compute_prediction_batch_size(
+            device,
+            model=model,
+            num_workers_per_gpu=num_workers_per_gpu,
+        )
+    return int(value)
 
 
 KERAS_BATCH_NORM_EPSILON = 1e-3
@@ -3766,7 +3880,8 @@ class Class1NeuralNetwork(object):
             peptides,
             allele_encoding=None,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE,
-            output_index=0):
+            output_index=0,
+            num_workers_per_gpu=1):
         """
         Predict affinities.
 
@@ -3774,8 +3889,16 @@ class Class1NeuralNetwork(object):
         ----------
         peptides : EncodableSequences or list of string
         allele_encoding : AlleleEncoding, optional
-        batch_size : int
+        batch_size : int or ``"auto"``
+            ``"auto"`` (the default) sizes batches to the available GPU
+            memory at call time — see ``compute_prediction_batch_size``.
+            Pass an explicit int to pin the size.
         output_index : int or None
+        num_workers_per_gpu : int
+            When multiple training/calibration workers are co-resident on
+            the same CUDA device, pass the worker count so the auto-
+            sizer partitions the VRAM budget. Ignored for explicit int
+            batch_size.
 
         Returns
         -------
@@ -3804,6 +3927,15 @@ class Class1NeuralNetwork(object):
 
         network.to(device)
         network.eval()
+
+        # Resolve ``"auto"`` once the network is on device so the
+        # heuristic has final visibility into VRAM + architecture.
+        batch_size = resolve_prediction_batch_size(
+            batch_size,
+            device,
+            model=network,
+            num_workers_per_gpu=num_workers_per_gpu,
+        )
 
         # Batch prediction
         n_samples = len(x_dict["peptide"])
