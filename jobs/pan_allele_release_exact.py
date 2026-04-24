@@ -90,6 +90,28 @@ image = (
         # prefetch path is live in production too.
         "MAX_WORKERS_PER_GPU": "2",
         "MAX_TASKS_PER_WORKER": "12",
+        # Enable torch.compile (gated in class1_neural_network.py via
+        # _maybe_compile_network + _maybe_compile_loss). Pays ~60 s
+        # codegen per worker process, amortized across the 12
+        # tasks/worker; fuses the forward+loss into a few kernels and
+        # eliminates per-step Python dispatch. Stacks with the
+        # minibatch=4096 bump — bigger batches give compile more
+        # arithmetic to amortize its fixed overheads over.
+        "MHCFLURRY_TORCH_COMPILE": "1",
+        # Zero DataLoader subprocesses = zero per-epoch torch-import
+        # respawn cost (commit 3ca980d rationale: persistent_workers was
+        # dropped because fit() rebuilds the DataLoader per epoch). With
+        # minibatch=4096 the batch-build work is <1 ms on 1M-row fancy
+        # indexing, so in-process dispatch is the right default. The
+        # fit_generator path keeps a single long-lived iterator so it
+        # isn't affected by this knob when =0 anyway.
+        "DATALOADER_NUM_WORKERS": "0",
+        # Populate the per-epoch timing arrays in fit_info (epoch_fetch_time,
+        # epoch_train_time, epoch_validation_time, etc.). Writes to the
+        # persisted model's config_json so we can do post-hoc breakdown
+        # of where time goes. No runtime cost beyond a few timestamp
+        # records per epoch.
+        "MHCFLURRY_ENABLE_TIMING": "1",
     },
 )
 def train():

@@ -436,6 +436,44 @@ def _uncompiled_network(network):
     return network._orig_mod if hasattr(network, "_orig_mod") else network
 
 
+def _maybe_compile_loss(loss_obj, device):
+    """Wrap a loss module with ``torch.compile`` when the env asks for it.
+
+    Gated on ``MHCFLURRY_TORCH_COMPILE=1`` and a CUDA device — same
+    criteria as ``_maybe_compile_network``. ``MSEWithInequalities``
+    issues ~10 small elementwise kernels per step in eager mode
+    (reshape → subtract → compare → cast → multiply → compare → cast →
+    multiply → square → sum), each with its own launch overhead that
+    adds up to meaningful wall-clock on A100 with a sub-ms compute
+    budget. Dynamo fuses those into a couple of kernels and cuts the
+    loss's share of step time to near-zero.
+
+    Dispatch via ``MHCFLURRY_TORCH_COMPILE_LOSS_MODE`` (falls back to
+    ``MHCFLURRY_TORCH_COMPILE_MODE``) so the loss's compile mode can
+    be tuned independently of the network's — loss ops are tiny and
+    "reduce-overhead" makes less sense than on the full forward pass.
+
+    Idempotent: a second call on an already-wrapped loss returns it
+    unchanged.
+    """
+    if device.type != "cuda":
+        return loss_obj
+    if os.environ.get("MHCFLURRY_TORCH_COMPILE", "0") != "1":
+        return loss_obj
+    if hasattr(loss_obj, "_orig_mod"):
+        return loss_obj
+    mode = os.environ.get(
+        "MHCFLURRY_TORCH_COMPILE_LOSS_MODE",
+        os.environ.get("MHCFLURRY_TORCH_COMPILE_MODE", "default"),
+    )
+    # Loss takes (y_pred, y_true) and optionally sample_weights with
+    # dynamic-batch shapes that mirror the network's forward. Match the
+    # network's dynamic/static policy via the same env knob.
+    dynamic = os.environ.get("MHCFLURRY_TORCH_COMPILE_DYNAMIC", "1") != "0"
+    logging.info("torch.compile applied to loss (mode=%s, dynamic=%s)", mode, dynamic)
+    return torch.compile(loss_obj, mode=mode, dynamic=dynamic)
+
+
 def _effective_validation_batch_size(device, configured_batch_size, minibatch_size):
     """Return the validation batch size to use for the current device."""
     if configured_batch_size:
@@ -2415,6 +2453,20 @@ class Class1NeuralNetwork(object):
         dataloader_num_workers = self.hyperparameters.get(
             "dataloader_num_workers", 0
         )
+        # Non-blocking H2D transfers only meaningfully overlap with
+        # compute when the source CPU tensor is pinned, which in turn
+        # requires DataLoader workers to do the pinning before the IPC
+        # hand-off. With num_workers=0 the copy path runs in the
+        # training worker itself on unpinned numpy-backed tensors, so
+        # ``non_blocking=True`` is a no-op hint that PyTorch ignores.
+        # Mirror ``fit()``'s gating here so future num_workers>0
+        # configurations pick up the async path automatically. (This
+        # was previously a hardcoded ``non_blocking=False`` which wasn't
+        # wrong but masked the intent.)
+        use_pinned_memory = (
+            dataloader_num_workers > 0 and device.type == "cuda"
+        )
+        non_blocking_h2d = use_pinned_memory
         fit_info["dataloader_num_workers"] = dataloader_num_workers
         fit_info["validation_rows"] = len(validation_affinities)
         # Worker-prefetch requires both (a) a picklable ``generator_factory``
@@ -2481,6 +2533,11 @@ class Class1NeuralNetwork(object):
         # hook state to specialize on.
         network = _maybe_compile_network(network, device)
         eager_network = _uncompiled_network(network)
+        # Compile the loss alongside the network — see _maybe_compile_loss
+        # docstring. MSEWithInequalities eager-dispatches ~10 kernels
+        # per step; fusing them matters more as batch size grows (less
+        # compute to amortize launch overhead against).
+        loss_obj = _maybe_compile_loss(loss_obj, device)
 
         min_val_loss_iteration = None
         min_val_loss = None
@@ -2516,7 +2573,7 @@ class Class1NeuralNetwork(object):
                 inputs, y_tensor, weights_batch = _move_fit_batch_to_device(
                     batch,
                     device,
-                    non_blocking=False,
+                    non_blocking=non_blocking_h2d,
                 )
                 batch_start = _timing_start(device, timing_enabled)
                 loss = _run_training_batch(
@@ -3014,6 +3071,8 @@ class Class1NeuralNetwork(object):
             # first batch pays the codegen cost; rest runs compiled.
             network = _maybe_compile_network(network, device)
             eager_network = _uncompiled_network(network)
+            # Same rationale as fit_generator's loss-compile call.
+            loss_obj = _maybe_compile_loss(loss_obj, device)
 
             # Train/val split (keep validation fixed)
             dataset_start = time.perf_counter()

@@ -21,7 +21,9 @@ base_hyperparameters = {
     'topology': 'feedfoward',
     'loss': 'custom:mse_with_inequalities',
     'max_epochs': 5000,
-    'minibatch_size': 128,
+    # See scripts/training/release_exact/generate_hyperparameters.py for
+    # the rationale on this bump.
+    'minibatch_size': 4096,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
     "patience": 20,

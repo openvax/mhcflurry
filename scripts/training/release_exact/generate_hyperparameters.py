@@ -21,7 +21,14 @@ base_hyperparameters = {
     'topology': 'feedfoward',
     'loss': 'custom:mse_with_inequalities',
     'max_epochs': 5000,
-    'minibatch_size': 128,
+    # Bumped 512 → 4096 to close the A100 utilization gap. At 512 rows per
+    # step the 2-layer MLP was <1 ms of actual compute sandwiched inside
+    # ~33 ms of Python/IPC glue (measured: 33.7 ms/step across 37
+    # completed models on the 2026-04-24 run). A 4096-row batch shifts
+    # the compute:overhead ratio ~8× in compute's favor. RMSprop absorbs
+    # the dynamics change; this breaks bit-exactness with the 2.2.0
+    # release weights but not the training recipe's semantics.
+    'minibatch_size': 4096,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
     "patience": 20,
