@@ -401,6 +401,17 @@ class RandomNegativesPool(object):
         with the epoch counter. Diversity is preserved even though all
         workers read from the same byte-identical encoded array.
         """
+        max_epoch = getattr(self, "_mmap_max_epoch", None)
+        if max_epoch is not None and int(epoch) > max_epoch:
+            raise ValueError(
+                "Shared-mmap RandomNegativesPool was sized for "
+                "pool_epochs=%d (epochs 0-%d); caller requested "
+                "epoch=%d. Size the pool to max_epochs before "
+                "launching workers, or switch to an in-process "
+                "RandomNegativesPool that can rebuild per cycle." % (
+                    self.pool_epochs, max_epoch, int(epoch),
+                )
+            )
         cycle = int(epoch) // self.pool_epochs
         if cycle != self._current_cycle:
             self._build_cycle(cycle)
@@ -569,12 +580,20 @@ class RandomNegativesPool(object):
             encoded_path, dtype=manifest["dtype"], mode="r", shape=shape
         )
 
+        def _refuse_reencode(_encodable_sequences):
+            raise RuntimeError(
+                "Shared-mmap RandomNegativesPool only holds cycle 0. "
+                "Training has advanced to a cycle >= pool_epochs=%d, but "
+                "the mmap pool cannot regenerate (no encoder available). "
+                "Size the shared pool's ``pool_epochs`` to at least the "
+                "training run's ``max_epochs`` so cycle 0 covers every "
+                "epoch, or switch this worker to an in-process "
+                "RandomNegativesPool that can rebuild." % pool_epochs
+            )
+
         instance = cls(
             planner=planner,
-            peptide_encoder=peptide_encoder
-            or (lambda _e: (_ for _ in ()).throw(RuntimeError(
-                "from_shared_mmap pool should never need to re-encode"
-            ))),
+            peptide_encoder=peptide_encoder or _refuse_reencode,
             pool_epochs=pool_epochs,
             seed=None,  # content is already deterministic in the mmap
         )
@@ -582,6 +601,11 @@ class RandomNegativesPool(object):
         instance._current_encoded = encoded
         instance._current_cycle = 0  # single cycle — mmap covers it all
         instance._permutation_seed = permutation_seed
+        # Pool-epoch cap the caller must respect. ``get_epoch_inputs``
+        # checks this and raises with a useful message instead of
+        # blowing up with the generic _refuse_reencode RuntimeError
+        # when crossed.
+        instance._mmap_max_epoch = pool_epochs - 1
         return instance
 
     def _epoch_permutation(self, epoch):

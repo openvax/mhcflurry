@@ -844,18 +844,20 @@ def _iterate_tensor_slice_batches(
 ):
     """Yield ``(inputs, y_batch, weights_batch)`` by slicing pre-placed tensors.
 
-    Phase 4 of openvax/mhcflurry#268: kills the per-step Python overhead
-    of the DataLoader path when all training tensors already live on
-    device. Each yielded batch is a pair of index-slice views into the
-    pre-placed tensors — zero copy, no collate, no gather.
+    Phase 4 of openvax/mhcflurry#268 **primitive only** — the in-device
+    tensor-slice iteration path it enables has not been wired into
+    ``fit()`` yet, so this helper is unused by production training at
+    head. Kept with tests because the wiring is expected to land in a
+    focused follow-up commit (swapping ``_make_fit_dataloader`` + the
+    DataLoader-based epoch loop for a ``torch.randperm`` + this
+    iterator when training tensors already live on device).
 
-    ``shuffle_permutation`` is an int tensor on the same device as the
-    data tensors. Callers are responsible for building it once per
-    epoch (``torch.randperm`` on the same device is cheap). When
-    ``drop_last=True`` (the default) the tail that doesn't fill a batch
-    is discarded — the caller handles it eagerly, matching the existing
-    DataLoader path where the tail triggers an eager-network forward to
-    preserve torch.compile shape stability.
+    Each yielded batch is a pair of index-slice views into the pre-
+    placed tensors — zero copy, no collate, no gather. When
+    ``drop_last=True`` (the default) the tail that doesn't fill a
+    batch is discarded — integrator handles it eagerly, matching the
+    existing DataLoader path where the tail triggers an eager-network
+    forward to preserve torch.compile shape stability.
 
     This helper intentionally does not run the forward/backward/
     optimizer step; the caller pairs it with the existing
@@ -2033,16 +2035,6 @@ class Class1NeuralNetwork(object):
         # recommended production value; smaller values preserve more
         # sample diversity but recover less of the encode cost.
         random_negative_pool_epochs=1,
-        # Phase 4 of issue openvax/mhcflurry#268: in-device tensor-slice
-        # iteration for fit()'s inner training loop. When True, the
-        # concatenated [random_negs | training] array is materialized on
-        # device once per epoch shuffle; the per-step "get a batch" is a
-        # pair of index-slice ops on pre-placed GPU tensors instead of
-        # a DataLoader → gather_feature_rows → collate → H2D chain —
-        # cuts the per-step Python-dispatch overhead substantially on
-        # the 4096-batch CUDA path. Default False preserves the
-        # pre-Phase-4 DataLoader semantics.
-        fit_tensor_slice=False,
         # Number of DataLoader worker processes for the fit() inner batch
         # loop. 0 (default) runs everything in the training process —
         # bit-identical to pre-issue-#268 behavior. >0 spawns worker procs
@@ -3396,11 +3388,24 @@ class Class1NeuralNetwork(object):
         )
         if random_negative_pool_epochs < 1:
             random_negative_pool_epochs = 1
+        # Semantics: ``random_negative_seed`` is the pool's cross-cycle
+        # determinism knob — ignore it when pool_epochs == 1 so the
+        # default path stays on numpy's global RNG stream (the pre-
+        # Phase-1 behavior). Only actually seed the pool when pooling
+        # is enabled; otherwise a seed passed by the training driver
+        # would silently change default-path training semantics to
+        # deterministic-per-work-item, which is a prediction-affecting
+        # change. See openvax/mhcflurry#270 code review.
+        pool_seed = (
+            random_negative_seed
+            if random_negative_pool_epochs > 1
+            else None
+        )
         random_negatives_pool = RandomNegativesPool(
             planner=random_negatives_planner,
             peptide_encoder=self.peptides_to_network_input,
             pool_epochs=random_negative_pool_epochs,
-            seed=random_negative_seed,
+            seed=pool_seed,
         )
         fit_info["random_negative_pool_epochs"] = random_negative_pool_epochs
 

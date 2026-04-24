@@ -84,7 +84,15 @@ class EncodingParams:
         }
 
     def hash_key(self) -> str:
-        payload = json.dumps(self.to_kwargs(), sort_keys=True).encode("utf-8")
+        # Canonicalize vector_encoding_name before hashing so the equivalent
+        # compound spellings ``"BLOSUM62+physchem"`` / ``"BLOSUM62/physchem"``
+        # / ``["BLOSUM62", "physchem"]`` all hit the same cache entry.
+        from .amino_acid import canonicalize_encoding_name
+        kwargs = self.to_kwargs()
+        kwargs["vector_encoding_name"] = canonicalize_encoding_name(
+            kwargs["vector_encoding_name"]
+        )
+        payload = json.dumps(kwargs, sort_keys=True).encode("utf-8")
         return hashlib.sha256(payload).hexdigest()[:16]
 
 
@@ -221,29 +229,43 @@ class EncodingCache:
             dtype=dtype,
             shape=(n, *encoded_row_shape),
         )
+        tmp_needs_cleanup = True
         try:
-            for start in range(0, n, self.chunk_size):
-                chunk = peptides[start : start + self.chunk_size]
-                encoded = (
-                    EncodableSequences(chunk)
-                    .variable_length_to_fixed_length_vector_encoding(
-                        **self.params.to_kwargs()
+            try:
+                for start in range(0, n, self.chunk_size):
+                    chunk = peptides[start : start + self.chunk_size]
+                    encoded = (
+                        EncodableSequences(chunk)
+                        .variable_length_to_fixed_length_vector_encoding(
+                            **self.params.to_kwargs()
+                        )
+                        .astype(dtype, copy=False)
                     )
-                    .astype(dtype, copy=False)
-                )
-                mm[start : start + len(chunk)] = encoded
-            mm.flush()
+                    mm[start : start + len(chunk)] = encoded
+                mm.flush()
+            finally:
+                # Release the memmap so the rename below isn't blocked on Windows
+                # and so the OS can coalesce dirty pages. `del` is the conventional
+                # way to close a np.memmap.
+                del mm
+            # Atomic move of our unique tmp file into place. POSIX ``os.replace``
+            # is atomic — a concurrent reader either sees the old inode or the
+            # new one, never a partial write. If another writer raced us to
+            # produce out_path, our os.replace quietly overwrites their
+            # (identical) bytes.
+            os.replace(tmp_path, out_path)
+            tmp_needs_cleanup = False
         finally:
-            # Release the memmap so the rename below isn't blocked on Windows
-            # and so the OS can coalesce dirty pages. `del` is the conventional
-            # way to close a np.memmap.
-            del mm
-        # Atomic move of our unique tmp file into place. POSIX ``os.replace``
-        # is atomic — a concurrent reader either sees the old inode or the
-        # new one, never a partial write. If another writer raced us to
-        # produce out_path, our os.replace quietly overwrites their
-        # (identical) bytes.
-        os.replace(tmp_path, out_path)
+            # If we raised mid-write (disk full, permission denied during
+            # rename, interrupt), the per-pid tmp file is dead weight:
+            # our PID will rarely reissue it (os.getpid() is stable per
+            # process), and subsequent runs leak it permanently. Remove
+            # it so failed builds don't accumulate garbage.
+            if tmp_needs_cleanup:
+                try:
+                    tmp_path.unlink()
+                except FileNotFoundError:
+                    pass
 
         # Write peptide list and params — writes are idempotent across
         # racing writers since both write the same content.
@@ -314,12 +336,19 @@ def _vector_encoding_cache_key(params: EncodingParams) -> tuple:
     """Construct the cache key tuple EncodableSequences uses internally.
 
     Must exactly match the tuple built inside
-    ``EncodableSequences.variable_length_to_fixed_length_vector_encoding``.
-    Protected by a module-level self-test — see the block comment above.
+    ``EncodableSequences.variable_length_to_fixed_length_vector_encoding``
+    — including the ``canonicalize_encoding_name`` normalization on
+    ``vector_encoding_name`` that equivalent spellings
+    (``"BLOSUM62+physchem"`` vs ``"blosum62, PHYSCHEM"`` vs the
+    list form) all collapse into. Without matching here the
+    prepopulation path would write one key and the downstream encoder
+    lookup would miss.  Protected by a module-level self-test — see
+    the block comment above.
     """
+    from .amino_acid import canonicalize_encoding_name
     return (
         "fixed_length_vector_encoding",
-        params.vector_encoding_name,
+        canonicalize_encoding_name(params.vector_encoding_name),
         params.alignment_method,
         params.left_edge,
         params.right_edge,

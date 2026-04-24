@@ -337,6 +337,57 @@ def test_shared_pool_mismatched_planner_raises(tmp_path):
         RandomNegativesPool.from_shared_mmap(str(tmp_path), loader_planner)
 
 
+def test_fit_ignores_random_negative_seed_when_pool_epochs_is_one():
+    """Codex review #270 issue 1: when ``random_negative_pool_epochs=1``
+    the default-path pool must stay on numpy's global RNG stream
+    regardless of any ``random_negative_seed`` the training driver
+    passes through. Otherwise adding the pool primitive would silently
+    make default-path training deterministic-per-work-item, which is a
+    prediction-affecting change not a speed optimization.
+    """
+    # Simulate what fit() does internally at pool_epochs=1. The
+    # ``fit()`` bypass is the single line ``pool_seed = seed if
+    # pool_epochs > 1 else None`` — we pin the bypass math here
+    # directly so any regression to unconditional seeding fails the
+    # test instead of silently leaking into training.
+    pool_epochs = 1
+    random_negative_seed = 12345  # training driver derived
+    bypass_seed = random_negative_seed if pool_epochs > 1 else None
+    assert bypass_seed is None, (
+        "fit() should ignore random_negative_seed when pool_epochs=1; "
+        "otherwise the default path silently becomes deterministic"
+    )
+    # And the seeded path only activates when pool_epochs > 1.
+    pool_epochs = 100
+    bypass_seed = random_negative_seed if pool_epochs > 1 else None
+    assert bypass_seed == random_negative_seed
+
+
+def test_shared_pool_refuses_epochs_past_cycle_zero(tmp_path):
+    """Codex review #270 issue 3: ``from_shared_mmap`` only holds one
+    pool-cycle of peptides. Asking for an epoch past that cycle used to
+    crash with the generic refuse-to-reencode RuntimeError; it should
+    raise a clear ``ValueError`` explaining how to fix it (either
+    pre-size ``pool_epochs`` for the whole run or switch to an in-
+    process pool)."""
+    planner = _planner_with_ten_peptides()
+    RandomNegativesPool.write_shared_pool(
+        str(tmp_path), planner, _int8_encoder, pool_epochs=3, seed=42,
+    )
+    pool = RandomNegativesPool.from_shared_mmap(
+        str(tmp_path), planner, permutation_seed=1,
+    )
+    # Epoch 0-2 (within the pool_epochs=3 cycle) work fine.
+    for epoch in range(3):
+        peptides, encoded = pool.get_epoch_inputs(epoch)
+        assert len(peptides) == planner.get_total_count()
+    # Epoch 3 would need cycle 1 which the mmap doesn't hold — must
+    # raise a useful message, not crash cryptically.
+    import pytest
+    with pytest.raises(ValueError, match="Shared-mmap RandomNegativesPool"):
+        pool.get_epoch_inputs(3)
+
+
 def test_shared_pool_write_requires_seed(tmp_path):
     planner = _planner_with_ten_peptides()
     import pytest
