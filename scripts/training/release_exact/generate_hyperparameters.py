@@ -50,15 +50,18 @@ base_hyperparameters = {
     'random_negative_rate': 1.0,
     'random_negative_method': 'by_allele_equalize_nonbinders',
     'random_negative_binder_threshold': 500.0,
-    # Phase 1 of issue openvax/mhcflurry#268: amortize random-negative
-    # generation + BLOSUM62 encoding across 100 epochs instead of
-    # redoing it fresh every epoch. See the matching change in
-    # downloads-generation/models_class1_pan/generate_hyperparameters.py
-    # for the full rationale; the training driver in
-    # train_pan_allele_models_command seeds each worker's pool with a
-    # SHA1 mix of (arch, fold, replicate, work_item_name) so cross-
-    # worker diversity is preserved.
-    'random_negative_pool_epochs': 100,
+    # Phase 1 of issue openvax/mhcflurry#268: random-negative pool
+    # framework. ``pool_epochs=1`` preserves the pre-Phase-1 memory
+    # profile (one epoch of encoded negatives in heap at a time) and
+    # is the production-safe default. Setting >1 amortizes the
+    # generation+encoding cost across that many epochs but materializes
+    # ``pool_epochs × per_epoch_count`` peptides simultaneously per
+    # worker — at ``100`` on the 8xA100 release_exact run that was
+    # ~7.5 GB int8 per worker theoretically, but in practice ballooned
+    # to ~199 GB/worker (tooling overhead + intermediate Series) and
+    # OOM'd the 944 GB box. Hold at 1 until a streaming-rebuild fix
+    # lands that doesn't materialize the full N-epoch buffer at once.
+    'random_negative_pool_epochs': 1,
     'train_data': {
         'pretrain': True,
         'pretrain_peptides_per_epoch': 64,
