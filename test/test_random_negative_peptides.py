@@ -267,6 +267,25 @@ def test_shared_pool_round_trip_preserves_content(tmp_path):
         )
 
 
+def test_shared_pool_writer_encodes_one_epoch_at_a_time(tmp_path):
+    planner = _planner_with_ten_peptides()
+    calls = []
+
+    def tracking_encoder(encodable_sequences):
+        calls.append(len(encodable_sequences.sequences))
+        return _int8_encoder(encodable_sequences)
+
+    RandomNegativesPool.write_shared_pool(
+        str(tmp_path),
+        planner,
+        tracking_encoder,
+        pool_epochs=4,
+        seed=101,
+    )
+
+    assert calls == [planner.get_total_count()] * 4
+
+
 def test_shared_pool_permutation_preserves_content_across_workers(tmp_path):
     planner = _planner_with_ten_peptides()
     RandomNegativesPool.write_shared_pool(

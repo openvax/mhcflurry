@@ -48,7 +48,7 @@ image = (
     Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
     .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
     .pip_install(
-        "runplz>=3.9.0",
+        "runplz>=3.9.2",
         "pandas>=2.0",
         "pyarrow",
         "appdirs",
@@ -75,6 +75,7 @@ image = (
         "MAX_TASKS_PER_WORKER": "12",
         "DATALOADER_NUM_WORKERS": "1",
         "MHCFLURRY_TORCH_COMPILE": "1",
+        "TORCHINDUCTOR_COMPILE_THREADS": "2",
         # OMP/MKL/OPENBLAS auto-computed by set_cpu_threads inside
         # pan_allele_release_exact.sh based on nproc + worker layout.
         # No manual override here → script auto-tunes.

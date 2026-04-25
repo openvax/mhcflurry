@@ -410,9 +410,17 @@ def worker_init(
         worker_log_dir=None, max_workers_per_gpu=None):
     del keras_backend  # legacy argument retained for API compatibility
     if worker_log_dir:
+        # Line buffering (buffering=1) ensures every print/traceback flushes
+        # to disk immediately. Without it, Python defaults to ~8 KB block
+        # buffering on a regular file, which silently swallows worker
+        # output if the worker is killed (OOM, signal) before the buffer
+        # fills. That made debugging the openvax/mhcflurry#270 OOM nearly
+        # impossible — workers spun at 99% CPU and the LOG files stayed
+        # 0 bytes because no flush ever fired before the worker died.
         sys.stderr = sys.stdout = open(os.path.join(
             worker_log_dir,
-            "LOG-worker.%d.%d.txt" % (os.getpid(), int(time.time()))), "w")
+            "LOG-worker.%d.%d.txt" % (os.getpid(), int(time.time()))),
+            "w", buffering=1)
 
     # Each worker needs distinct random numbers
     numpy.random.seed()

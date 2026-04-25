@@ -16,7 +16,10 @@ from mhcflurry.class1_neural_network import (
     MergedClass1NeuralNetwork,
     _batched_validation_loss,
     _effective_validation_batch_size,
+    _effective_fit_dataloader_num_workers,
     _FitBatchDataset,
+    _make_fit_dataloader,
+    _numpy_batch_collate,
 )
 from mhcflurry.class1_processing_neural_network import (
     Class1ProcessingModel,
@@ -71,6 +74,67 @@ def _seed_all(seed=1):
     np.random.seed(seed)
     random.seed(seed)
     torch.manual_seed(seed)
+
+
+def test_fit_dataloader_worker_path_keeps_numpy_collate():
+    """Worker collate must avoid PyTorch CPU tensor allocation/pinning."""
+    dataset = [
+        {
+            "peptide": np.zeros((2, 3), dtype=np.int8),
+            "y": np.float32(0.0),
+        },
+        {
+            "peptide": np.ones((2, 3), dtype=np.int8),
+            "y": np.float32(1.0),
+        },
+    ]
+    loader = _make_fit_dataloader(
+        dataset=dataset,
+        batch_size=2,
+        num_workers=1,
+        use_pinned_memory=True,
+    )
+    assert loader.collate_fn is _numpy_batch_collate
+    assert loader.pin_memory is False
+
+
+def test_fit_dataloader_workers_disabled_for_large_spawn_payload(monkeypatch):
+    """Large fit() arrays should not be spawn-pickled into worker children."""
+    from mhcflurry import class1_neural_network as cnn
+
+    monkeypatch.setattr(cnn, "_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES", 32)
+    monkeypatch.setattr(cnn, "_FIT_DATALOADER_DOWNGRADE_WARNED", False)
+    dataset = _FitBatchDataset(
+        x_peptide=np.zeros((8, 2, 3), dtype=np.float32),
+        x_allele=None,
+        y_encoded=np.zeros(8, dtype=np.float32),
+        sample_weights_with_negatives=None,
+        train_indices=np.arange(8),
+    )
+
+    effective, reason = _effective_fit_dataloader_num_workers(4, dataset)
+
+    assert effective == 0
+    assert "spawn workers would pickle a copy" in reason
+
+
+def test_fit_dataloader_worker_downgrade_has_explicit_escape_hatch(monkeypatch):
+    from mhcflurry import class1_neural_network as cnn
+
+    monkeypatch.setattr(cnn, "_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES", 32)
+    monkeypatch.setenv("MHCFLURRY_FORCE_FIT_DATALOADER_WORKERS", "1")
+    dataset = _FitBatchDataset(
+        x_peptide=np.zeros((8, 2, 3), dtype=np.float32),
+        x_allele=None,
+        y_encoded=np.zeros(8, dtype=np.float32),
+        sample_weights_with_negatives=None,
+        train_indices=np.arange(8),
+    )
+
+    effective, reason = _effective_fit_dataloader_num_workers(4, dataset)
+
+    assert effective == 4
+    assert reason is None
 
 
 def test_effective_validation_batch_size_uses_larger_cuda_default():
@@ -262,6 +326,58 @@ def test_mse_with_inequalities_rejects_invalid_inequality():
 def test_multiallelic_mass_spec_encode_y_validates_values():
     with pytest.raises(AssertionError):
         MultiallelicMassSpecLoss.encode_y([0.5])
+
+
+@pytest.mark.parametrize("merge_method", ["concatenate", "multiply"])
+def test_forward_cartesian_from_peptide_stage_matches_expanded_path(merge_method):
+    _seed_all(270)
+    model = Class1NeuralNetwork(
+        activation="tanh",
+        layer_sizes=[4],
+        allele_dense_layer_sizes=[6],
+        peptide_dense_layer_sizes=[6],
+        locally_connected_layers=[],
+        peptide_allele_merge_method=merge_method,
+        peptide_allele_merge_activation="",
+        batch_normalization=False,
+        dropout_probability=0.0,
+        dense_layer_l1_regularization=0.0,
+        dense_layer_l2_regularization=0.0,
+    )
+    network = model.make_network(
+        allele_representations=_make_allele_representations(num_alleles=4),
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters),
+    )
+    network.eval()
+
+    peptide = torch.randn(3, *network.peptide_encoding_shape)
+    allele_idx = torch.tensor([1, 3])
+    with torch.no_grad():
+        peptide_stage = network.forward_peptide_stage(peptide)
+        compact = network.forward_cartesian_from_peptide_stage(
+            peptide_stage,
+            allele_idx,
+        )
+        expanded_peptide_stage = peptide_stage.unsqueeze(0).expand(
+            len(allele_idx),
+            peptide_stage.shape[0],
+            peptide_stage.shape[-1],
+        ).reshape(len(allele_idx) * peptide_stage.shape[0], peptide_stage.shape[-1])
+        expanded_alleles = allele_idx.unsqueeze(1).expand(
+            len(allele_idx),
+            peptide_stage.shape[0],
+        ).reshape(-1)
+        expanded = network.forward_from_peptide_stage(
+            expanded_peptide_stage,
+            expanded_alleles,
+        ).reshape(len(allele_idx), peptide_stage.shape[0], -1)
+
+    np.testing.assert_allclose(
+        compact.detach().cpu().numpy(),
+        expanded.detach().cpu().numpy(),
+        rtol=0,
+        atol=1e-6,
+    )
 
 
 def test_merge_allele_specific_raises_not_implemented():

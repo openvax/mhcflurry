@@ -19,11 +19,11 @@ def test_worker_init_kwargs_round_robin_across_gpus():
         backend="auto",
         max_workers_per_gpu=2,
     ) == [
-        {"backend": "gpu", "gpu_device_nums": [0]},
-        {"backend": "gpu", "gpu_device_nums": [1]},
-        {"backend": "gpu", "gpu_device_nums": [0]},
-        {"backend": "gpu", "gpu_device_nums": [1]},
-        {"backend": "cpu", "gpu_device_nums": []},
+        {"backend": "gpu", "gpu_device_nums": [0], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": [1], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": [0], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": [1], "max_workers_per_gpu": 2},
+        {"backend": "cpu", "gpu_device_nums": [], "max_workers_per_gpu": 2},
     ]
 
 
@@ -34,9 +34,9 @@ def test_worker_init_kwargs_without_gpu_scheduling_uses_backend():
         backend="mps",
         max_workers_per_gpu=2,
     ) == [
-        {"backend": "mps"},
-        {"backend": "mps"},
-        {"backend": "mps"},
+        {"backend": "mps", "max_workers_per_gpu": 2},
+        {"backend": "mps", "max_workers_per_gpu": 2},
+        {"backend": "mps", "max_workers_per_gpu": 2},
     ]
 
 
@@ -47,8 +47,8 @@ def test_worker_init_kwargs_normalizes_default_backend_alias():
         backend="default",
         max_workers_per_gpu=2,
     ) == [
-        {"backend": "auto"},
-        {"backend": "auto"},
+        {"backend": "auto", "max_workers_per_gpu": 2},
+        {"backend": "auto", "max_workers_per_gpu": 2},
     ]
 
 
@@ -59,9 +59,9 @@ def test_worker_init_kwargs_with_gpus_normalizes_default_backend_alias():
         backend="default",
         max_workers_per_gpu=2,
     ) == [
-        {"backend": "gpu", "gpu_device_nums": [0]},
-        {"backend": "gpu", "gpu_device_nums": [0]},
-        {"backend": "cpu", "gpu_device_nums": []},
+        {"backend": "gpu", "gpu_device_nums": [0], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": [0], "max_workers_per_gpu": 2},
+        {"backend": "cpu", "gpu_device_nums": [], "max_workers_per_gpu": 2},
     ]
 
 

@@ -29,6 +29,7 @@ image = (
     .pip_install(
         "runplz>=3.7.2",
         "pandas>=2.0",
+        "pyarrow",
         "appdirs",
         "scikit-learn",
         "mhcgnomes>=3.0.1",

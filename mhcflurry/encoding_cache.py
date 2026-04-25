@@ -40,6 +40,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -135,16 +136,38 @@ class EncodingCache:
         """Return (encoded_memmap_array, peptide_to_row_idx).
 
         Builds the cache if not present. Safe to call from multiple processes;
-        the atomic-rename + sentinel-file pattern makes concurrent readers
-        never see a partial write (they just rebuild into a separate tmp
-        path, and the last writer wins the rename; both produce identical
-        bytes).
+        a per-entry build lock avoids redundant builders, and the
+        atomic-rename + sentinel-file pattern makes concurrent readers never
+        see a partial write.
+        """
+        entry_dir = self.ensure_built(peptides)
+        return self._load(entry_dir)
+
+    def ensure_built(self, peptides: list[str] | numpy.ndarray) -> Path:
+        """Build the cache entry if needed and return its directory.
+
+        Unlike ``get_or_build``, this intentionally does not load
+        ``peptides.txt`` or construct the peptide-to-row dict. Orchestrator
+        prebuild paths use it when they only need the encoded memmap to exist
+        on disk; loading the index map for million-row peptide files can be a
+        large, useless memory spike.
         """
         peptides = _as_peptide_list(peptides)
         entry_dir = self._entry_dir(peptides)
-        if not self._is_complete(entry_dir):
-            self._build(peptides, entry_dir)
-        return self._load(entry_dir)
+        if self._is_complete(entry_dir):
+            return entry_dir
+
+        entry_dir.mkdir(parents=True, exist_ok=True)
+        lock_path = entry_dir / ".build.lock"
+        held_lock = self._acquire_build_lock(lock_path, entry_dir / ".complete")
+        if held_lock is None:
+            return entry_dir
+        try:
+            if not self._is_complete(entry_dir):
+                self._build(peptides, entry_dir)
+        finally:
+            self._release_build_lock(held_lock)
+        return entry_dir
 
     def entry_path(self, peptides: list[str] | numpy.ndarray) -> Path:
         """Return the directory path for the cache entry for these peptides."""
@@ -171,9 +194,37 @@ class EncodingCache:
     def _is_complete(entry_dir: Path) -> bool:
         return (entry_dir / ".complete").exists()
 
-    def _build(self, peptides: list[str], entry_dir: Path) -> None:
-        entry_dir.mkdir(parents=True, exist_ok=True)
+    @staticmethod
+    def _acquire_build_lock(
+            lock_path: Path,
+            complete_path: Path,
+            stale_seconds: int = 6 * 60 * 60) -> Path | None:
+        while True:
+            if complete_path.exists():
+                return None
+            try:
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(fd)
+                return lock_path
+            except FileExistsError:
+                try:
+                    if time.time() - lock_path.stat().st_mtime > stale_seconds:
+                        lock_path.unlink()
+                        continue
+                except FileNotFoundError:
+                    continue
+                time.sleep(1.0)
 
+    @staticmethod
+    def _release_build_lock(lock_path: Path | None) -> None:
+        if lock_path is None:
+            return
+        try:
+            lock_path.unlink()
+        except FileNotFoundError:
+            pass
+
+    def _build(self, peptides: list[str], entry_dir: Path) -> None:
         # Re-check the sentinel now that entry_dir exists: another process
         # may have finished building while we were on the is_complete path.
         # Catches the common race where two workers simultaneously decide
@@ -203,15 +254,8 @@ class EncodingCache:
 
         n = len(peptides)
         out_path = entry_dir / "encoded.npy"
-        # Per-process tmp path. Two workers that simultaneously build the
-        # same cache entry (the orchestrator's single-threaded pre-build
-        # is preferred, but Pool workers can race for entries the
-        # orchestrator didn't pre-build — e.g. the pretrain cache) each
-        # have their own tmp file, so their final ``os.replace`` moves
-        # never compete for the same source file. The writers produce
-        # byte-identical content (the encoding is a pure function of
-        # params+peptides), so whichever rename lands last determines
-        # out_path's content safely.
+        # Per-process tmp path. The build lock should leave only one builder,
+        # but unique tmp names keep interrupted stale builders from colliding.
         tmp_path = entry_dir / f"encoded.npy.tmp.{os.getpid()}"
         # open_memmap writes a .npy header plus raw bytes that np.load(mmap_mode='r')
         # can consume.
@@ -259,8 +303,7 @@ class EncodingCache:
                 except FileNotFoundError:
                     pass
 
-        # Write peptide list and params — writes are idempotent across
-        # racing writers since both write the same content.
+        # Write peptide list and params.
         (entry_dir / "peptides.txt").write_text("\n".join(peptides) + "\n")
         (entry_dir / "params.json").write_text(
             json.dumps(self.params.to_kwargs(), indent=2, sort_keys=True) + "\n"

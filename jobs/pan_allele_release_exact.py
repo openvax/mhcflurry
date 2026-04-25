@@ -98,6 +98,7 @@ image = (
         # minibatch=4096 bump — bigger batches give compile more
         # arithmetic to amortize its fixed overheads over.
         "MHCFLURRY_TORCH_COMPILE": "1",
+        "TORCHINDUCTOR_COMPILE_THREADS": "2",
         # Zero DataLoader subprocesses = zero per-epoch torch-import
         # respawn cost (commit 3ca980d rationale: persistent_workers was
         # dropped because fit() rebuilds the DataLoader per epoch). With
