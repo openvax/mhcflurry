@@ -2389,6 +2389,13 @@ class Class1NeuralNetwork(object):
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
         patience=20,
         min_delta=0.0,
+        # Run the validation pass every N epochs in fit() / fit_generator().
+        # Default 1 preserves pre-existing behavior (validate every epoch).
+        # Setting to >1 trades resolution-of-early-stop-decision for
+        # epoch-level throughput; the fit() loop forces a final validation
+        # pass before reporting min_val_loss / breaking on patience so the
+        # saved model still reflects an up-to-date val_loss measurement.
+        validation_interval=1,
     )
     """
     Hyperparameters for early stopping.
@@ -4206,7 +4213,35 @@ class Class1NeuralNetwork(object):
             # Validation — batched so every GPU invocation is
             # fixed-size (torch.compile-friendly) and peak VRAM stays
             # bounded regardless of n_val. See Phase 4b of #268.
-            if val_split > 0:
+            #
+            # ``validation_interval`` >1 skips the val pass on
+            # off-interval epochs to save the GPU-sync barrier and
+            # ~150 ms of forward-pass time. The skipped epochs reuse
+            # the most recent measured val_loss so fit_info["val_loss"]
+            # stays one-entry-per-epoch for downstream plotting tools.
+            # The final epoch (max_epochs - 1) is always measured so
+            # the saved model reflects an up-to-date val_loss.
+            validation_interval = max(
+                1, int(self.hyperparameters.get("validation_interval", 1) or 1)
+            )
+            is_last_epoch = epoch == self.hyperparameters["max_epochs"] - 1
+            should_validate_this_epoch = (
+                val_split > 0
+                and (epoch % validation_interval == 0 or is_last_epoch)
+            )
+            if val_split > 0 and not should_validate_this_epoch:
+                # Pad val_loss with the previous measurement so fit_info
+                # arrays stay aligned with epoch index. ``val_loss`` is
+                # also reused for the early-stop check below — since it
+                # equals the previous measurement, min_val_loss won't
+                # spuriously update on a skipped epoch.
+                prev_val_loss = (
+                    fit_info["val_loss"][-1]
+                    if fit_info["val_loss"] else float("nan")
+                )
+                fit_info["val_loss"].append(prev_val_loss)
+                val_loss = prev_val_loss
+            if should_validate_this_epoch:
                 network.eval()
                 with torch.inference_mode():
                     if _val_device_tensors is not None:
@@ -4309,10 +4344,17 @@ class Class1NeuralNetwork(object):
                 )
                 last_progress_print = time.time()
 
-            # Early stopping
+            # Early stopping. ``min_val_loss`` / ``min_val_loss_iteration``
+            # only update on epochs where validation actually ran — on
+            # skipped epochs ``val_loss`` is the carried-forward previous
+            # measurement and would never beat the current min anyway, so
+            # restricting the update is for clarity (the patience counter
+            # is anchored to the epoch the measurement was taken, not a
+            # later epoch that copied the same value).
             if val_split > 0:
-                if min_val_loss is None or (
-                    val_loss < min_val_loss - self.hyperparameters["min_delta"]
+                if should_validate_this_epoch and (
+                    min_val_loss is None
+                    or val_loss < min_val_loss - self.hyperparameters["min_delta"]
                 ):
                     min_val_loss = val_loss
                     min_val_loss_iteration = epoch
