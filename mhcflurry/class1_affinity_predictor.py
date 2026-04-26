@@ -1926,30 +1926,19 @@ class Class1AffinityPredictor(object):
             )
 
             for (_, model, peptide_stage) in cached_stages:
-                d = peptide_stage.shape[-1]
                 with torch.no_grad():
                     for start in range(0, n_peptides, peptide_batch_size):
                         end = min(start + peptide_batch_size, n_peptides)
-                        chunk_n = end - start
                         p_chunk = peptide_stage[start:end]  # (chunk_n, d)
-                        # Tile peptide_stage across alleles: (a_size, chunk_n, d).
-                        # expand returns a view — no new memory.
-                        expanded = p_chunk.unsqueeze(0).expand(
-                            a_size, chunk_n, d,
-                        ).reshape(a_size * chunk_n, d)
-                        # Repeat allele idx across peptides:
-                        # (a_size,) → (a_size, chunk_n) → (a_size * chunk_n,).
-                        allele_ids = batch_idx.unsqueeze(1).expand(
-                            a_size, chunk_n,
-                        ).reshape(-1)
-                        network_output = model.forward_from_peptide_stage(
-                            expanded, allele_ids,
+                        network_output = (
+                            model.forward_cartesian_from_peptide_stage(
+                                p_chunk,
+                                batch_idx,
+                            )
                         )
-                        # shape (a_size * chunk_n, num_outputs) — take the
-                        # first output (matches existing predict default).
-                        network_output = network_output.reshape(
-                            a_size, chunk_n, -1,
-                        )[..., 0]
+                        # shape (a_size, chunk_n, num_outputs) — take the first
+                        # output (matches existing predict default).
+                        network_output = network_output[..., 0]
                         # log(IC50) = (1 - network_output) * log(50000).
                         # Network output ∈ [0,1] from sigmoid — never
                         # negative, so the log(0) edge is avoided without

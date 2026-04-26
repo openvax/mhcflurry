@@ -27,6 +27,11 @@ export PYTHONUNBUFFERED=1
 # long-lived-worker death mode seen on multi-day runs, while still
 # amortizing compile / CUDA init across several networks.
 export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
+# Inductor defaults to a large compile helper pool per training process.
+# With 8-16 concurrent mhcflurry workers that multiplies into thousands of
+# short-lived subprocesses and can stall the box. Keep the default bounded;
+# callers can override upward when running fewer workers.
+export TORCHINDUCTOR_COMPILE_THREADS="${TORCHINDUCTOR_COMPILE_THREADS:-2}"
 # OMP/MKL/OPENBLAS set via set_cpu_threads helper below — auto-computes
 # from nproc + GPU/worker layout. Manually override any of them before
 # calling this script to pin an explicit value.
@@ -37,6 +42,144 @@ RECIPE_DIR="$SCRIPT_DIR/release_exact"
 
 mkdir -p "$MHCFLURRY_OUT"
 cd "$MHCFLURRY_OUT"
+
+RELEASE_LOG="$MHCFLURRY_OUT/release_driver.log"
+HEARTBEAT_LOG="$MHCFLURRY_OUT/release_heartbeat.log"
+TRAIN_LOG="$MHCFLURRY_OUT/train.log"
+SELECT_LOG="$MHCFLURRY_OUT/select.log"
+CALIBRATE_LOG="$MHCFLURRY_OUT/calibrate.log"
+
+: > "$RELEASE_LOG"
+: > "$HEARTBEAT_LOG"
+: > "$TRAIN_LOG"
+: > "$SELECT_LOG"
+: > "$CALIBRATE_LOG"
+
+CURRENT_PHASE="bootstrap"
+GPU_SAMPLER_PID=""
+HEARTBEAT_PID=""
+
+timestamp_utc() {
+    date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+format_command() {
+    printf '%q ' "$@"
+}
+
+log_release_event() {
+    local event="$1"
+    shift || true
+    printf '%s event=%s phase=%s %s\n' \
+        "$(timestamp_utc)" \
+        "$event" \
+        "$CURRENT_PHASE" \
+        "$*" | tee -a "$RELEASE_LOG" >&2
+}
+
+write_snapshot() {
+    local reason="$1"
+    {
+        printf '=== snapshot timestamp=%s reason=%s phase=%s pid=%s ppid=%s ===\n' \
+            "$(timestamp_utc)" \
+            "$reason" \
+            "$CURRENT_PHASE" \
+            "$$" \
+            "$PPID"
+        printf 'host=%s cwd=%s script=%s\n' \
+            "$(hostname)" \
+            "$(pwd)" \
+            "$SCRIPT_ABSOLUTE_PATH"
+        df -h . 2>/dev/null || true
+        ps -Ao pid,ppid,etime,%cpu,%mem,command --sort=-%cpu 2>/dev/null | head -n 25 || true
+        if command -v nvidia-smi >/dev/null 2>&1; then
+            nvidia-smi \
+                --query-gpu=index,utilization.gpu,memory.used,memory.total \
+                --format=csv,noheader,nounits 2>/dev/null || true
+        fi
+        printf '\n'
+    } >> "$HEARTBEAT_LOG" 2>&1 || true
+}
+
+start_heartbeat() {
+    local interval="${RELEASE_HEARTBEAT_SECONDS:-60}"
+    (
+        while :; do
+            write_snapshot heartbeat
+            sleep "$interval"
+        done
+    ) &
+    HEARTBEAT_PID=$!
+    log_release_event heartbeat_started "pid=$HEARTBEAT_PID interval_seconds=$interval"
+}
+
+stop_background_loggers() {
+    local pid
+    for pid in "${HEARTBEAT_PID:-}" "${GPU_SAMPLER_PID:-}"; do
+        if [ -n "$pid" ]; then
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+        fi
+    done
+}
+
+on_error() {
+    local status="$1"
+    local line="$2"
+    local command="$3"
+    log_release_event error "status=$status line=$line command=$(printf '%q' "$command")"
+    write_snapshot error
+}
+
+on_signal() {
+    local signal_name="$1"
+    log_release_event signal "name=$signal_name"
+    write_snapshot "signal_$signal_name"
+    case "$signal_name" in
+        INT) exit 130 ;;
+        TERM) exit 143 ;;
+        *) exit 1 ;;
+    esac
+}
+
+cleanup_release_logging() {
+    local status="$?"
+    log_release_event script_exit "status=$status"
+    write_snapshot exit
+    stop_background_loggers
+}
+
+run_logged_step() {
+    local phase="$1"
+    local log_file="$2"
+    shift 2
+
+    CURRENT_PHASE="$phase"
+    log_release_event phase_start "log=$log_file command=$(format_command "$@")"
+    write_snapshot "phase_start_$phase"
+
+    set +e
+    (
+        set -o pipefail
+        "$@" 2>&1 | tee -a "$log_file"
+    )
+    local status="$?"
+    set -e
+
+    log_release_event phase_end "status=$status log=$log_file"
+    write_snapshot "phase_end_$phase"
+    return "$status"
+}
+
+trap 'on_error "$?" "$LINENO" "$BASH_COMMAND"' ERR
+trap 'on_signal INT' INT
+trap 'on_signal TERM' TERM
+trap cleanup_release_logging EXIT
+
+log_release_event script_start \
+    "pid=$$ out_dir=$MHCFLURRY_OUT pythonunbuffered=$PYTHONUNBUFFERED torch_compile=$MHCFLURRY_TORCH_COMPILE inductor_threads=$TORCHINDUCTOR_COMPILE_THREADS"
+write_snapshot startup
+start_heartbeat
 
 # ---- GPU occupancy sampler (background, for later analysis) ----------
 # Sample nvidia-smi every 30 s into a CSV that rsync-down can pull back.
@@ -59,9 +202,7 @@ if command -v nvidia-smi >/dev/null 2>&1; then
         done
     } > "$GPU_LOG" 2>/dev/null &
     GPU_SAMPLER_PID=$!
-    echo "GPU occupancy sampler PID: $GPU_SAMPLER_PID → $GPU_LOG"
-    # Make sure the sampler dies when the script exits (clean or error).
-    trap "kill $GPU_SAMPLER_PID 2>/dev/null; wait $GPU_SAMPLER_PID 2>/dev/null" EXIT
+    log_release_event gpu_sampler_started "pid=$GPU_SAMPLER_PID log=$GPU_LOG"
 fi
 
 # ---- parallelism -----------------------------------------------------
@@ -88,7 +229,12 @@ echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU)"
 # but leaks / descriptor creep / orphaned-runtime state cannot accumulate
 # indefinitely inside one worker. Override with MAX_TASKS_PER_WORKER.
 MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
-PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker $MAX_TASKS_PER_WORKER --gpus $GPUS --max-workers-per-gpu $MAX_WORKERS_PER_GPU"
+PARALLELISM_ARGS=(
+    --num-jobs "$NUM_JOBS"
+    --max-tasks-per-worker "$MAX_TASKS_PER_WORKER"
+    --gpus "$GPUS"
+    --max-workers-per-gpu "$MAX_WORKERS_PER_GPU"
+)
 
 # Phase 1 (#268): enable the BLOSUM62 encoding cache + DataLoader prefetch
 # by default. USE_ENCODING_CACHE=0 or DATALOADER_NUM_WORKERS=0 restores
@@ -114,6 +260,8 @@ GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
     DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
 
 # ---- data ------------------------------------------------------------
+CURRENT_PHASE="data_setup"
+log_release_event phase_info "starting data download and preprocessing"
 mhcflurry-downloads fetch data_curated allele_sequences random_peptide_predictions
 
 # Reassign mass-spec training rows per release recipe.
@@ -128,6 +276,7 @@ bzip2 -f "$(pwd)/train_data.csv"
 TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 
 # ---- hyperparameters -------------------------------------------------
+CURRENT_PHASE="hyperparameters"
 cp "$RECIPE_DIR/generate_hyperparameters.py" .
 python generate_hyperparameters.py > hyperparameters.full.yaml
 # Inject dataloader_num_workers into every arch entry (Phase 1 #268).
@@ -152,13 +301,14 @@ for kind in combined
 do
     UNSELECTED_DIR="models.unselected.${kind}"
 
-    CONTINUE_ARGS=""
+    CONTINUE_ARGS=()
     if [ -d "$UNSELECTED_DIR" ]; then
-        echo "Found existing $UNSELECTED_DIR — continuing incomplete run"
-        CONTINUE_ARGS="--continue-incomplete"
+        log_release_event continue_incomplete "models_dir=$UNSELECTED_DIR"
+        CONTINUE_ARGS=(--continue-incomplete)
     fi
 
-    mhcflurry-class1-train-pan-allele-models \
+    run_logged_step "train_${kind}" "$TRAIN_LOG" \
+        mhcflurry-class1-train-pan-allele-models \
         --data "$TRAINING_DATA" \
         --allele-sequences "$ALLELE_SEQUENCES" \
         --pretrain-data "$PRETRAIN_DATA" \
@@ -168,9 +318,10 @@ do
         --out-models-dir "$(pwd)/$UNSELECTED_DIR" \
         --worker-log-dir "$MHCFLURRY_OUT" \
         "${CACHE_ARGS[@]}" \
-        $PARALLELISM_ARGS $CONTINUE_ARGS
+        "${PARALLELISM_ARGS[@]}" \
+        "${CONTINUE_ARGS[@]}"
 done
-echo "Done training. Beginning model selection."
+log_release_event phase_info "training_complete beginning_model_selection"
 
 # ---- select ---------------------------------------------------------
 for kind in combined
@@ -178,26 +329,32 @@ do
     UNSELECTED_DIR="models.unselected.${kind}"
     SELECTED_DIR="models.${kind}"
 
-    mhcflurry-class1-select-pan-allele-models \
+    run_logged_step "select_${kind}" "$SELECT_LOG" \
+        mhcflurry-class1-select-pan-allele-models \
         --data "$UNSELECTED_DIR/train_data.csv.bz2" \
         --models-dir "$UNSELECTED_DIR" \
         --out-models-dir "$SELECTED_DIR" \
         --min-models 2 \
         --max-models 8 \
-        $PARALLELISM_ARGS
+        "${PARALLELISM_ARGS[@]}"
     cp "$UNSELECTED_DIR/train_data.csv.bz2" "$SELECTED_DIR/train_data.csv.bz2"
 
     # ---- percentile rank calibration (matches release) ---------------
-    time mhcflurry-calibrate-percentile-ranks \
+    run_logged_step "calibrate_${kind}" "$CALIBRATE_LOG" \
+        mhcflurry-calibrate-percentile-ranks \
         --models-dir "$SELECTED_DIR" \
         --match-amino-acid-distribution-data "$UNSELECTED_DIR/train_data.csv.bz2" \
         --motif-summary \
         --num-peptides-per-length 100000 \
         --alleles-per-work-chunk 10 \
         --verbosity 1 \
-        $PARALLELISM_ARGS
+        "${PARALLELISM_ARGS[@]}"
 done
 
-echo "Full release-exact training completed."
-echo "Final ensemble: $MHCFLURRY_OUT/models.combined/"
-ls -la "$MHCFLURRY_OUT/models.combined" | head -30
+CURRENT_PHASE="complete"
+log_release_event complete "final_dir=$MHCFLURRY_OUT/models.combined"
+{
+    echo "Full release-exact training completed."
+    echo "Final ensemble: $MHCFLURRY_OUT/models.combined/"
+    ls -la "$MHCFLURRY_OUT/models.combined" | head -30
+} | tee -a "$RELEASE_LOG"

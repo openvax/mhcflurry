@@ -45,6 +45,7 @@ image = (
     .pip_install(
         "runplz>=3.7.2",
         "pandas>=2.0",
+        "pyarrow",
         "appdirs",
         "scikit-learn",
         "mhcgnomes>=3.0.1",
@@ -68,6 +69,8 @@ image = (
     min_disk=100,
     timeout=18 * 60 * 60,  # 18h cap; single-GPU wall time ~8-12h
     env={
+        "DATALOADER_NUM_WORKERS": "1",
+        "TORCHINDUCTOR_COMPILE_THREADS": "2",
         # Wrap stage 1 affinity training in `nsys profile` for the first
         # ~3 min to capture a representative slice (startup + pretrain +
         # first finetune epochs). Rest of the run is uninstrumented.

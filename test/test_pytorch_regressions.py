@@ -16,7 +16,17 @@ from mhcflurry.class1_neural_network import (
     MergedClass1NeuralNetwork,
     _batched_validation_loss,
     _effective_validation_batch_size,
+    _effective_fit_dataloader_num_workers,
     _FitBatchDataset,
+    _make_fit_dataloader,
+)
+from mhcflurry.shared_memory import (
+    array_nbytes,
+    numpy_batch_collate,
+    share_like,
+    share_tensor,
+    tensor_batch_collate,
+    update_shared,
 )
 from mhcflurry.class1_processing_neural_network import (
     Class1ProcessingModel,
@@ -71,6 +81,222 @@ def _seed_all(seed=1):
     np.random.seed(seed)
     random.seed(seed)
     torch.manual_seed(seed)
+
+
+def test_fit_dataloader_numpy_backed_uses_numpy_collate_no_pin():
+    """Numpy-backed dataset → numpy collate + no pinning.
+
+    The numpy invariant that matters for openvax/mhcflurry#270:
+    keep inter-process transport on the standard pickling path and
+    avoid PyTorch's default-collate ``torch.tensor(numpy_array)``
+    allocator growth. Pin policy is derived from dataset type, not
+    a caller-passed flag.
+    """
+    dataset = [
+        {"peptide": np.zeros((2, 3), dtype=np.int8), "y": np.float32(0.0)},
+        {"peptide": np.ones((2, 3), dtype=np.int8), "y": np.float32(1.0)},
+    ]
+    loader = _make_fit_dataloader(dataset=dataset, batch_size=2, num_workers=1)
+    assert loader.collate_fn is numpy_batch_collate
+    assert loader.pin_memory is False
+
+
+def test_fit_dataloader_tensor_backed_uses_tensor_collate_and_pins():
+    """Tensor-backed dataset → tensor collate + pinning."""
+    x_peptide = share_tensor(np.zeros((4, 2, 3), dtype=np.float32))
+    y = share_tensor(np.zeros(4, dtype=np.float32))
+    dataset = _FitBatchDataset(
+        x_peptide=x_peptide,
+        x_allele=None,
+        y_encoded=y,
+        sample_weights_with_negatives=None,
+        train_indices=np.arange(4),
+    )
+    assert dataset.tensor_backed
+    loader = _make_fit_dataloader(dataset=dataset, batch_size=2, num_workers=0)
+    assert loader.collate_fn is tensor_batch_collate
+    assert loader.pin_memory is True
+
+
+def test_share_tensor_round_trip():
+    """``share_tensor`` returns a SHM tensor with the same content."""
+    arr = np.arange(12, dtype=np.float32).reshape(3, 4)
+    shared = share_tensor(arr)
+    assert isinstance(shared, torch.Tensor)
+    assert shared.is_shared()
+    assert torch.equal(shared, torch.from_numpy(arr))
+    assert share_tensor(None) is None
+
+
+def test_share_like_and_update_shared():
+    """``share_like`` allocates a shared buffer; ``update_shared`` fills it."""
+    src = np.arange(8, dtype=np.float32).reshape(4, 2)
+    buf = share_like(src)
+    assert buf.is_shared()
+    assert buf.shape == src.shape
+    update_shared(buf, src)
+    assert torch.equal(buf, torch.from_numpy(src))
+    update_shared(buf, src * 2)
+    assert torch.equal(buf, torch.from_numpy(src * 2))
+
+
+def test_effective_fit_dataloader_num_workers_skips_size_guard_for_tensor_backed(
+    monkeypatch,
+):
+    """Tensor-backed dataset bypasses the spawn-pickle byte-size guard."""
+    from mhcflurry import class1_neural_network as cnn
+
+    monkeypatch.setattr(cnn, "_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES", 32)
+    monkeypatch.setattr(cnn, "_FIT_DATALOADER_DOWNGRADE_WARNED", False)
+    x_peptide = share_tensor(np.zeros((8, 2, 3), dtype=np.float32))
+    dataset = _FitBatchDataset(
+        x_peptide=x_peptide,
+        x_allele=None,
+        y_encoded=share_tensor(np.zeros(8, dtype=np.float32)),
+        sample_weights_with_negatives=None,
+        train_indices=np.arange(8),
+    )
+    effective, reason = _effective_fit_dataloader_num_workers(4, dataset)
+    assert effective == 4
+    assert reason is None
+
+
+def test_fit_dataloader_workers_disabled_for_large_spawn_payload(monkeypatch):
+    """Large fit() arrays should not be spawn-pickled into worker children."""
+    from mhcflurry import class1_neural_network as cnn
+
+    monkeypatch.setattr(cnn, "_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES", 32)
+    monkeypatch.setattr(cnn, "_FIT_DATALOADER_DOWNGRADE_WARNED", False)
+    dataset = _FitBatchDataset(
+        x_peptide=np.zeros((8, 2, 3), dtype=np.float32),
+        x_allele=None,
+        y_encoded=np.zeros(8, dtype=np.float32),
+        sample_weights_with_negatives=None,
+        train_indices=np.arange(8),
+    )
+
+    effective, reason = _effective_fit_dataloader_num_workers(4, dataset)
+
+    assert effective == 0
+    assert "spawn workers would pickle a copy" in reason
+
+
+def test_fit_dataloader_worker_downgrade_has_explicit_escape_hatch(monkeypatch):
+    from mhcflurry import class1_neural_network as cnn
+
+    monkeypatch.setattr(cnn, "_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES", 32)
+    monkeypatch.setenv("MHCFLURRY_FORCE_FIT_DATALOADER_WORKERS", "1")
+    dataset = _FitBatchDataset(
+        x_peptide=np.zeros((8, 2, 3), dtype=np.float32),
+        x_allele=None,
+        y_encoded=np.zeros(8, dtype=np.float32),
+        sample_weights_with_negatives=None,
+        train_indices=np.arange(8),
+    )
+
+    effective, reason = _effective_fit_dataloader_num_workers(4, dataset)
+
+    assert effective == 4
+    assert reason is None
+
+
+def test_fit_with_shm_env_override_trains_and_predicts(monkeypatch):
+    """fit() with the SHM env override on trains end-to-end.
+
+    Smoke test — exercises the FitBacking.share() materialization, the
+    refill-in-place random-negative buffer, the polymorphic
+    _FitBatchDataset, tensor_batch_collate, and pin_memory=True path
+    using num_workers=0 (so no spawn). Asserts fit_info reports
+    SHM-on, training completed, and predict() returns finite values.
+    """
+    monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "1")
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(11)
+    model = _make_simple_affinity_model(
+        max_epochs=3,
+        random_negative_rate=1.0,
+        random_negative_constant=0,
+    )
+    model.fit(peptides, affinities)
+
+    last_info = model.fit_info[-1]
+    assert last_info.get("fit_dataloader_shm_enabled") is True
+
+    preds = model.predict(peptides)
+    assert preds.shape == (len(peptides),)
+    assert np.all(np.isfinite(preds))
+
+
+def test_fit_shm_auto_enables_when_dataloader_workers_requested(monkeypatch):
+    """SHM auto-enables when ``dataloader_num_workers > 0`` (no env var)."""
+    monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(11)
+    model = _make_simple_affinity_model(
+        max_epochs=2,
+        random_negative_rate=1.0,
+        random_negative_constant=0,
+        dataloader_num_workers=2,
+    )
+    model.fit(peptides, affinities)
+    assert model.fit_info[-1].get("fit_dataloader_shm_enabled") is True
+
+
+def test_fit_shm_off_by_default_when_no_workers(monkeypatch):
+    """SHM stays off when ``dataloader_num_workers=0`` and no env override."""
+    monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(11)
+    model = _make_simple_affinity_model(max_epochs=2)
+    model.fit(peptides, affinities)
+    assert model.fit_info[-1].get("fit_dataloader_shm_enabled") is False
+
+
+def test_fit_validation_interval_skips_off_interval_epochs():
+    """validation_interval > 1 measures only on-interval + final epoch."""
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(13)
+    model = _make_simple_affinity_model(
+        max_epochs=10,
+        validation_split=0.5,
+        early_stopping=False,
+        validation_interval=3,
+    )
+    model.fit(peptides, affinities)
+
+    val_loss = model.fit_info[-1]["val_loss"]
+    assert len(val_loss) == 10
+    # Epochs measured: 0, 3, 6, 9 (last epoch always measured).
+    # Off-interval epochs carry forward the previous measurement, so
+    # consecutive equal triples appear at (1, 2) repeating epoch 0's
+    # loss, (4, 5) repeating epoch 3, (7, 8) repeating epoch 6.
+    assert val_loss[1] == val_loss[0]
+    assert val_loss[2] == val_loss[0]
+    assert val_loss[4] == val_loss[3]
+    assert val_loss[5] == val_loss[3]
+    assert val_loss[7] == val_loss[6]
+    assert val_loss[8] == val_loss[6]
+
+
+def test_fit_validation_interval_default_runs_every_epoch():
+    """Default validation_interval=1 measures every epoch (legacy)."""
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(17)
+    model = _make_simple_affinity_model(
+        max_epochs=4, validation_split=0.5, early_stopping=False,
+    )
+    model.fit(peptides, affinities)
+    val_loss = model.fit_info[-1]["val_loss"]
+    assert len(val_loss) == 4
+    # With per-epoch validation under the simple training data here, at
+    # least some epochs differ from epoch 0; this is the most we can
+    # assert without depending on exact per-step numerics.
+    assert any(v != val_loss[0] for v in val_loss[1:])
 
 
 def test_effective_validation_batch_size_uses_larger_cuda_default():
@@ -262,6 +488,58 @@ def test_mse_with_inequalities_rejects_invalid_inequality():
 def test_multiallelic_mass_spec_encode_y_validates_values():
     with pytest.raises(AssertionError):
         MultiallelicMassSpecLoss.encode_y([0.5])
+
+
+@pytest.mark.parametrize("merge_method", ["concatenate", "multiply"])
+def test_forward_cartesian_from_peptide_stage_matches_expanded_path(merge_method):
+    _seed_all(270)
+    model = Class1NeuralNetwork(
+        activation="tanh",
+        layer_sizes=[4],
+        allele_dense_layer_sizes=[6],
+        peptide_dense_layer_sizes=[6],
+        locally_connected_layers=[],
+        peptide_allele_merge_method=merge_method,
+        peptide_allele_merge_activation="",
+        batch_normalization=False,
+        dropout_probability=0.0,
+        dense_layer_l1_regularization=0.0,
+        dense_layer_l2_regularization=0.0,
+    )
+    network = model.make_network(
+        allele_representations=_make_allele_representations(num_alleles=4),
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters),
+    )
+    network.eval()
+
+    peptide = torch.randn(3, *network.peptide_encoding_shape)
+    allele_idx = torch.tensor([1, 3])
+    with torch.no_grad():
+        peptide_stage = network.forward_peptide_stage(peptide)
+        compact = network.forward_cartesian_from_peptide_stage(
+            peptide_stage,
+            allele_idx,
+        )
+        expanded_peptide_stage = peptide_stage.unsqueeze(0).expand(
+            len(allele_idx),
+            peptide_stage.shape[0],
+            peptide_stage.shape[-1],
+        ).reshape(len(allele_idx) * peptide_stage.shape[0], peptide_stage.shape[-1])
+        expanded_alleles = allele_idx.unsqueeze(1).expand(
+            len(allele_idx),
+            peptide_stage.shape[0],
+        ).reshape(-1)
+        expanded = network.forward_from_peptide_stage(
+            expanded_peptide_stage,
+            expanded_alleles,
+        ).reshape(len(allele_idx), peptide_stage.shape[0], -1)
+
+    np.testing.assert_allclose(
+        compact.detach().cpu().numpy(),
+        expanded.detach().cpu().numpy(),
+        rtol=0,
+        atol=1e-6,
+    )
 
 
 def test_merge_allele_specific_raises_not_implemented():

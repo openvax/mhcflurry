@@ -132,6 +132,87 @@ def test_peptide_to_idx_roundtrip(cache):
         assert peptide_to_idx[p] == i
 
 
+# ---- ensure_built() — index-map-free build path ----
+#
+# ensure_built exists specifically because constructing the peptide-to-row
+# dict in _load() materializes a Python str→int dict for every peptide
+# in the cache; on a 5M-peptide pretrain CSV that's a ~250-400 MB anonymous
+# heap allocation per call. Orchestrator + per-worker prebuild paths only
+# need the cache directory on disk, so they must use ensure_built rather
+# than get_or_build to avoid that allocation. These tests pin the
+# contract.
+
+
+def test_ensure_built_returns_entry_dir(cache):
+    """ensure_built returns the cache entry directory and creates the cache."""
+    entry_dir = cache.ensure_built(VALID_PEPTIDES)
+    assert entry_dir == cache.entry_path(VALID_PEPTIDES)
+    assert (entry_dir / ".complete").exists()
+    assert (entry_dir / "encoded.npy").exists()
+    assert (entry_dir / "peptides.txt").exists()
+
+
+def test_ensure_built_does_not_load_peptides_txt(cache, monkeypatch):
+    """ensure_built must NOT read peptides.txt or build the index dict.
+
+    Loading peptides.txt + building the dict is the OOM source on large
+    pretrain peptide files (5M peptides → ~250-400 MB Python dict per
+    call). Pin this here so a future refactor can't silently regress
+    by routing ensure_built through _load.
+    """
+    # Pre-build the cache so ensure_built hits the cache-already-built
+    # branch (the production-relevant path).
+    cache.ensure_built(VALID_PEPTIDES)
+
+    real_read_text = Path.read_text
+
+    def fail_if_peptides_txt(self, *args, **kwargs):
+        if self.name == "peptides.txt":
+            raise AssertionError(
+                "ensure_built must not read peptides.txt; that triggers "
+                "the index-map allocation we removed in #270 fix"
+            )
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", fail_if_peptides_txt)
+    # Should not raise.
+    entry_dir = cache.ensure_built(VALID_PEPTIDES)
+    assert entry_dir == cache.entry_path(VALID_PEPTIDES)
+
+
+def test_ensure_built_after_get_or_build_returns_same_entry_dir(cache):
+    """ensure_built and get_or_build agree on the cache entry directory.
+
+    The orchestrator uses ensure_built; downstream callers use the
+    returned path to mmap encoded.npy. If these two methods ever
+    disagree on the directory layout the workers would mmap the
+    wrong file.
+    """
+    cache.get_or_build(VALID_PEPTIDES)
+    entry_dir = cache.ensure_built(VALID_PEPTIDES)
+    assert entry_dir == cache.entry_path(VALID_PEPTIDES)
+
+
+def test_ensure_built_idempotent_on_cache_hit(cache, monkeypatch):
+    """Second ensure_built call on a complete cache must skip _build entirely."""
+    cache.ensure_built(VALID_PEPTIDES)
+    # Spy on the encoder; cache-hit path must not re-encode.
+    calls = []
+    original = EncodableSequences.variable_length_to_fixed_length_vector_encoding
+
+    def spy(self, *args, **kwargs):
+        calls.append(1)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(
+        EncodableSequences,
+        "variable_length_to_fixed_length_vector_encoding",
+        spy,
+    )
+    cache.ensure_built(VALID_PEPTIDES)
+    assert calls == [], "expected no re-encoding on cache hit"
+
+
 def test_cache_hit_second_call_does_not_reencode(cache, monkeypatch):
     """Second call with same params+peptides should skip the encoding pass."""
     cache.get_or_build(VALID_PEPTIDES)

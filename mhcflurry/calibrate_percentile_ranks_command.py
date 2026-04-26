@@ -184,6 +184,11 @@ def run(argv=sys.argv[1:]):
 
     configure_logging(verbose=args.verbosity > 1)
 
+    # Resolve --max-workers-per-gpu='auto' to an int now, before any
+    # downstream consumer reads it (model_kwargs below + pool creation).
+    from .local_parallelism import resolve_max_workers_per_gpu
+    resolve_max_workers_per_gpu(args)
+
     aa_distribution = None
     if args.match_amino_acid_distribution_data:
         distribution_peptides = pandas.read_csv(

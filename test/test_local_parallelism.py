@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentTypeError, Namespace
 
 import multiprocessing
 import pytest
@@ -6,7 +6,10 @@ import pytest
 from mhcflurry.local_parallelism import (
     NonDaemonPool,
     NonDaemonProcess,
+    _max_workers_per_gpu_arg,
     add_local_parallelism_args,
+    auto_max_workers_per_gpu,
+    resolve_max_workers_per_gpu,
     validate_worker_pool_args,
     worker_init_kwargs_for_scheduler,
 )
@@ -19,11 +22,11 @@ def test_worker_init_kwargs_round_robin_across_gpus():
         backend="auto",
         max_workers_per_gpu=2,
     ) == [
-        {"backend": "gpu", "gpu_device_nums": [0]},
-        {"backend": "gpu", "gpu_device_nums": [1]},
-        {"backend": "gpu", "gpu_device_nums": [0]},
-        {"backend": "gpu", "gpu_device_nums": [1]},
-        {"backend": "cpu", "gpu_device_nums": []},
+        {"backend": "gpu", "gpu_device_nums": [0], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": [1], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": [0], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": [1], "max_workers_per_gpu": 2},
+        {"backend": "cpu", "gpu_device_nums": [], "max_workers_per_gpu": 2},
     ]
 
 
@@ -34,9 +37,9 @@ def test_worker_init_kwargs_without_gpu_scheduling_uses_backend():
         backend="mps",
         max_workers_per_gpu=2,
     ) == [
-        {"backend": "mps"},
-        {"backend": "mps"},
-        {"backend": "mps"},
+        {"backend": "mps", "max_workers_per_gpu": 2},
+        {"backend": "mps", "max_workers_per_gpu": 2},
+        {"backend": "mps", "max_workers_per_gpu": 2},
     ]
 
 
@@ -47,8 +50,8 @@ def test_worker_init_kwargs_normalizes_default_backend_alias():
         backend="default",
         max_workers_per_gpu=2,
     ) == [
-        {"backend": "auto"},
-        {"backend": "auto"},
+        {"backend": "auto", "max_workers_per_gpu": 2},
+        {"backend": "auto", "max_workers_per_gpu": 2},
     ]
 
 
@@ -59,9 +62,9 @@ def test_worker_init_kwargs_with_gpus_normalizes_default_backend_alias():
         backend="default",
         max_workers_per_gpu=2,
     ) == [
-        {"backend": "gpu", "gpu_device_nums": [0]},
-        {"backend": "gpu", "gpu_device_nums": [0]},
-        {"backend": "cpu", "gpu_device_nums": []},
+        {"backend": "gpu", "gpu_device_nums": [0], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": [0], "max_workers_per_gpu": 2},
+        {"backend": "cpu", "gpu_device_nums": [], "max_workers_per_gpu": 2},
     ]
 
 
@@ -155,6 +158,89 @@ def _spawn_child_from_pool_worker(_):
     child.start()
     child.join(timeout=10)
     return child.exitcode
+
+
+def test_max_workers_per_gpu_arg_parses_auto_and_int():
+    assert _max_workers_per_gpu_arg("auto") == "auto"
+    assert _max_workers_per_gpu_arg("AUTO") == "auto"
+    assert _max_workers_per_gpu_arg("3") == 3
+    assert _max_workers_per_gpu_arg(5) == 5
+
+
+def test_max_workers_per_gpu_arg_rejects_garbage():
+    with pytest.raises(ArgumentTypeError):
+        _max_workers_per_gpu_arg("hello")
+    with pytest.raises(ArgumentTypeError):
+        _max_workers_per_gpu_arg("0")
+    with pytest.raises(ArgumentTypeError):
+        _max_workers_per_gpu_arg("-1")
+
+
+def test_add_local_parallelism_args_default_is_auto():
+    parser = ArgumentParser()
+    add_local_parallelism_args(parser)
+    args = parser.parse_args([])
+    assert args.max_workers_per_gpu == "auto"
+    args = parser.parse_args(["--max-workers-per-gpu", "3"])
+    assert args.max_workers_per_gpu == 3
+
+
+def test_auto_max_workers_per_gpu_cpu_only_returns_one():
+    """No GPUs → 1 worker (CPU)."""
+    assert auto_max_workers_per_gpu(num_jobs=8, num_gpus=0) == 1
+    assert auto_max_workers_per_gpu(num_jobs=8, num_gpus=4, backend="cpu") == 1
+
+
+def test_auto_max_workers_per_gpu_caps_at_jobs_per_gpu(monkeypatch):
+    """``num_jobs // num_gpus`` is the natural ceiling per GPU."""
+    # 16 jobs, 8 GPUs, abundant VRAM → 2 (jobs/gpus, not VRAM-bound).
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "1")
+    assert auto_max_workers_per_gpu(num_jobs=16, num_gpus=8) == 2
+    # 32 jobs, 8 GPUs → 4 (hits the hard cap, not jobs/gpus).
+    assert auto_max_workers_per_gpu(num_jobs=32, num_gpus=8) == 4
+
+
+def test_auto_max_workers_per_gpu_caps_at_vram(monkeypatch):
+    """Per-worker VRAM upper bound caps when jobs/gpus would oversubscribe."""
+    # 32 jobs, 8 GPUs, large per-worker VRAM, low free-VRAM fallback (16 GB)
+    # → by_jobs=4, by_vram=floor(16*0.6/16)=0 → max(1,...) = 1.
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "16")
+    assert auto_max_workers_per_gpu(num_jobs=32, num_gpus=8) == 1
+
+
+def test_auto_max_workers_per_gpu_respects_hard_cap(monkeypatch):
+    """Hard cap clamps even when jobs/gpus and VRAM allow more."""
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "0.1")
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "3")
+    # 32 jobs/8 gpus = 4 by_jobs, vram unbounded → hard_cap clamps to 3.
+    assert auto_max_workers_per_gpu(num_jobs=32, num_gpus=8) == 3
+
+
+def test_resolve_max_workers_per_gpu_passes_through_int():
+    args = Namespace(max_workers_per_gpu=4, num_jobs=16, gpus=8, backend="auto")
+    assert resolve_max_workers_per_gpu(args) == 4
+    assert args.max_workers_per_gpu == 4
+
+
+def test_resolve_max_workers_per_gpu_resolves_auto(monkeypatch):
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "1")
+    args = Namespace(
+        max_workers_per_gpu="auto", num_jobs=16, gpus=8, backend="auto"
+    )
+    resolved = resolve_max_workers_per_gpu(args)
+    assert isinstance(resolved, int)
+    assert resolved >= 1
+    assert args.max_workers_per_gpu == resolved
+
+
+def test_resolve_max_workers_per_gpu_is_idempotent(monkeypatch):
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "1")
+    args = Namespace(
+        max_workers_per_gpu="auto", num_jobs=16, gpus=8, backend="auto"
+    )
+    first = resolve_max_workers_per_gpu(args)
+    second = resolve_max_workers_per_gpu(args)
+    assert first == second
 
 
 def test_nondaemonpool_worker_can_spawn_children():

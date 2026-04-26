@@ -441,8 +441,10 @@ class RandomNegativesPool(object):
     # in train_pan_allele_models_command).
     #
     # The API below lets a coordinator (typically the training driver
-    # before it forks workers) encode the pool once and persist it as
-    # an int8 memmap + JSON manifest. Workers then load the pool with
+    # before it forks workers) encode a deterministic pool and persist it as
+    # an int8 memmap + JSON manifest. The writer streams one epoch-slice at
+    # a time so the coordinator never has to hold the full pool in RAM.
+    # Workers then load the pool with
     # ``from_shared_mmap`` — the OS page cache backs all of them with
     # a single resident copy, cutting RSS ~N× across a pool of size N.
     # Within a worker, ``get_epoch_inputs`` continues to return an
@@ -496,37 +498,90 @@ class RandomNegativesPool(object):
             pool_epochs=pool_epochs,
             seed=seed,
         )
-        builder._build_cycle(0)
-        encoded = numpy.asarray(builder._current_encoded)
-        peptides = list(builder._current_peptides)
+        pool_epochs = builder.pool_epochs
+        total_count = builder._total_count
 
         os.makedirs(output_dir, exist_ok=True)
         encoded_path = os.path.join(output_dir, cls._ENCODED_NAME)
+        encoded_tmp_path = f"{encoded_path}.tmp.{os.getpid()}"
         peptides_path = os.path.join(output_dir, cls._PEPTIDES_NAME)
+        peptides_tmp_path = f"{peptides_path}.tmp.{os.getpid()}"
         manifest_path = os.path.join(output_dir, cls._MANIFEST_NAME)
+        manifest_tmp_path = f"{manifest_path}.tmp.{os.getpid()}"
 
-        encoded_int8 = encoded.astype("int8", copy=False)
-        mm = numpy.memmap(
-            encoded_path, dtype="int8", mode="w+", shape=encoded_int8.shape
-        )
-        mm[:] = encoded_int8
-        mm.flush()
-        del mm
+        rng = builder._rng_for_cycle(0)
+        mm = None
+        shape = None
+        tmp_paths = [encoded_tmp_path, peptides_tmp_path, manifest_tmp_path]
+        try:
+            with open(peptides_tmp_path, "w", encoding="utf-8") as peptides_fd:
+                peptides_fd.write("[")
+                first_peptide = True
+                for epoch_offset in range(pool_epochs):
+                    peptides = planner.get_peptides(rng=rng)
+                    assert len(peptides) == total_count
+                    encoded = numpy.asarray(
+                        peptide_encoder(EncodableSequences.create(peptides))
+                    )
+                    if len(encoded) != total_count:
+                        raise ValueError(
+                            "Random negative encoder returned %d rows for %d "
+                            "peptides" % (len(encoded), total_count)
+                        )
+                    encoded_int8 = encoded.astype("int8", copy=False)
+                    if mm is None:
+                        shape = (
+                            pool_epochs * total_count,
+                            *encoded_int8.shape[1:],
+                        )
+                        mm = numpy.memmap(
+                            encoded_tmp_path,
+                            dtype="int8",
+                            mode="w+",
+                            shape=shape,
+                        )
+                    elif encoded_int8.shape[1:] != shape[1:]:
+                        raise ValueError(
+                            "Random negative encoder shape changed from %r "
+                            "to %r" % (shape[1:], encoded_int8.shape[1:])
+                        )
+                    start = epoch_offset * total_count
+                    mm[start : start + total_count] = encoded_int8
+                    for peptide in peptides:
+                        if not first_peptide:
+                            peptides_fd.write(",")
+                        json.dump(peptide, peptides_fd)
+                        first_peptide = False
+                    del encoded, encoded_int8, peptides
+                peptides_fd.write("]")
+            if mm is not None:
+                mm.flush()
+                del mm
+                mm = None
 
-        with open(peptides_path, "w", encoding="utf-8") as fd:
-            json.dump(peptides, fd)
-
-        manifest = {
-            "shape": list(encoded_int8.shape),
-            "dtype": "int8",
-            "pool_epochs": int(pool_epochs),
-            "total_count": int(builder._total_count),
-            "seed": int(seed),
-            "encoded_file": cls._ENCODED_NAME,
-            "peptides_file": cls._PEPTIDES_NAME,
-        }
-        with open(manifest_path, "w", encoding="utf-8") as fd:
-            json.dump(manifest, fd, indent=2, sort_keys=True)
+            manifest = {
+                "shape": list(shape),
+                "dtype": "int8",
+                "pool_epochs": int(pool_epochs),
+                "total_count": int(total_count),
+                "seed": int(seed),
+                "encoded_file": cls._ENCODED_NAME,
+                "peptides_file": cls._PEPTIDES_NAME,
+            }
+            with open(manifest_tmp_path, "w", encoding="utf-8") as fd:
+                json.dump(manifest, fd, indent=2, sort_keys=True)
+            os.replace(encoded_tmp_path, encoded_path)
+            os.replace(peptides_tmp_path, peptides_path)
+            os.replace(manifest_tmp_path, manifest_path)
+            tmp_paths = []
+        finally:
+            if mm is not None:
+                del mm
+            for path in tmp_paths:
+                try:
+                    os.unlink(path)
+                except FileNotFoundError:
+                    pass
         return manifest_path
 
     @classmethod
