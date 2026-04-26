@@ -118,6 +118,20 @@ real measurement:
 3. when patience would trigger this epoch (so the saved val_loss
    reflects the actual stop state, not a stale carried-forward value).
 
+### Encoding cache lives outside `MHCFLURRY_OUT`
+
+`scripts/training/pan_allele_release_exact.sh` now places the
+encoding cache at `$HOME/runplz-cache/encoding_cache/` (override
+with `MHCFLURRY_ENCODING_CACHE_DIR`) instead of inside
+`$MHCFLURRY_OUT`. Two upsides: the ~7 GB BLOSUM62 mmap doesn't ride
+back on the post-run rsync, and the cache persists on the box so a
+second run on the same instance hits a warm cache.
+
+A new helper, `scripts/dev/relocate_run_outputs.sh`, moves
+`brev_runs/` and `results/` outside the repo (with symlinks) so
+runplz's rsync_up doesn't ship 15+ GB of stale prior-run artifacts
+to the box on every launch. Run with `--apply` once per workstation.
+
 ### Layer-2 SHM auto-detects /dev/shm capacity
 
 When the orchestrator detects insufficient `/dev/shm` for

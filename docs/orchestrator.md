@@ -215,6 +215,29 @@ Per-fit footprint estimate is tuned via
 `MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB` (default 4.0 GB, sized for
 pan-allele MLP at standard data scale).
 
+## rsync hygiene (laptop ↔ remote training box)
+
+`runplz` rsyncs the working tree up to the box on every launch, and
+the run's `out/` directory back to the laptop on completion. Two
+asymmetries to know about:
+
+- **Up direction:** runplz's hardcoded exclude list (`.git`, `.venv`,
+  `__pycache__`, etc.) doesn't anticipate per-project output dirs.
+  In mhcflurry, `brev_runs/` accumulates 7-15 GB of past-run
+  artifacts that ride along on every launch unless relocated. Run
+  `bash scripts/dev/relocate_run_outputs.sh --apply` once to move
+  `brev_runs/` and `results/` to `~/mhcflurry-brev-runs/` and
+  `~/mhcflurry-results/`, with symlinks back into the repo. After
+  that, rsync ships ~tiny symlinks instead of multi-GB directories.
+- **Down direction:** the post-run rsync has NO excludes — everything
+  under `out/` returns. The orchestrator script
+  (`scripts/training/pan_allele_release_exact.sh`) places the
+  encoding cache OUTSIDE `$MHCFLURRY_OUT` (default
+  `$HOME/runplz-cache/encoding_cache/`) so the ~7 GB BLOSUM62 mmap
+  doesn't ride back. Override with `MHCFLURRY_ENCODING_CACHE_DIR`.
+  Bonus: cache persists across runs on the same box, so the second
+  run hits a warm cache.
+
 ## Pointers to code
 
 - Layer 1 + Layer 2 helpers: `mhcflurry/shared_memory.py`

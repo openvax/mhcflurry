@@ -253,7 +253,16 @@ USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-1}"
 CACHE_ARGS=()
 if [ "$USE_ENCODING_CACHE" = "1" ]; then
-    CACHE_ARGS=(--use-encoding-cache)
+    # Place the encoding cache OUTSIDE $MHCFLURRY_OUT so it
+    #   (a) doesn't ride back on the post-run rsync (~7 GB of mmap
+    #       BLOSUM62 we can rebuild locally in seconds), and
+    #   (b) persists across runs on the same box — the second run on a
+    #       reused instance hits a warm cache.
+    # Override with MHCFLURRY_ENCODING_CACHE_DIR=/path/to/dir.
+    ENCODING_CACHE_DIR="${MHCFLURRY_ENCODING_CACHE_DIR:-$HOME/runplz-cache/encoding_cache}"
+    mkdir -p "$ENCODING_CACHE_DIR"
+    CACHE_ARGS=(--use-encoding-cache --encoding-cache-dir "$ENCODING_CACHE_DIR")
+    log_release_event phase_info "encoding cache dir: $ENCODING_CACHE_DIR"
 fi
 
 # Auto-configure OMP / MKL / OPENBLAS thread budget uniformly based on
