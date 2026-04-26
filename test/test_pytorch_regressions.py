@@ -14,12 +14,18 @@ from mhcflurry.class1_neural_network import (
     Class1NeuralNetwork,
     Class1NeuralNetworkModel,
     MergedClass1NeuralNetwork,
+    _allocate_shared_neg_buffer,
+    _array_nbytes,
     _batched_validation_loss,
+    _dataset_uses_shared_tensors,
     _effective_validation_batch_size,
     _effective_fit_dataloader_num_workers,
     _FitBatchDataset,
     _make_fit_dataloader,
     _numpy_batch_collate,
+    _refill_shared_neg_buffer,
+    _to_shared_tensor,
+    _torch_batch_collate,
 )
 from mhcflurry.class1_processing_neural_network import (
     Class1ProcessingModel,
@@ -77,7 +83,14 @@ def _seed_all(seed=1):
 
 
 def test_fit_dataloader_worker_path_keeps_numpy_collate():
-    """Worker collate must avoid PyTorch CPU tensor allocation/pinning."""
+    """A numpy-backed dataset gets the numpy collate regardless of pin flag.
+
+    Pin policy is now caller-controlled (post-SHM commit); the legacy
+    invariant that mattered for the openvax/mhcflurry#270 OOM is
+    "numpy backing → numpy collate", which keeps inter-process transport
+    on the standard pickling path and avoids PyTorch's default-collate
+    ``torch.tensor(numpy_array)`` allocator growth.
+    """
     dataset = [
         {
             "peptide": np.zeros((2, 3), dtype=np.int8),
@@ -92,10 +105,89 @@ def test_fit_dataloader_worker_path_keeps_numpy_collate():
         dataset=dataset,
         batch_size=2,
         num_workers=1,
-        use_pinned_memory=True,
+        use_pinned_memory=False,
     )
     assert loader.collate_fn is _numpy_batch_collate
     assert loader.pin_memory is False
+
+
+def test_fit_dataloader_pins_when_caller_requests():
+    """``use_pinned_memory=True`` propagates to the DataLoader."""
+    dataset = [
+        {"peptide": np.zeros((2, 3), dtype=np.float32), "y": np.float32(0.0)},
+        {"peptide": np.ones((2, 3), dtype=np.float32), "y": np.float32(1.0)},
+    ]
+    loader = _make_fit_dataloader(
+        dataset=dataset,
+        batch_size=2,
+        num_workers=0,
+        use_pinned_memory=True,
+    )
+    assert loader.pin_memory is True
+
+
+def test_fit_dataloader_shm_dataset_uses_torch_collate():
+    """SHM-backed dataset (tensor x_peptide) gets torch_batch_collate."""
+    x_peptide = _to_shared_tensor(np.zeros((4, 2, 3), dtype=np.float32))
+    y = _to_shared_tensor(np.zeros(4, dtype=np.float32))
+    dataset = _FitBatchDataset(
+        x_peptide=x_peptide,
+        x_allele=None,
+        y_encoded=y,
+        sample_weights_with_negatives=None,
+        train_indices=np.arange(4),
+    )
+    assert _dataset_uses_shared_tensors(dataset)
+    loader = _make_fit_dataloader(
+        dataset=dataset,
+        batch_size=2,
+        num_workers=0,
+        use_pinned_memory=False,
+    )
+    assert loader.collate_fn is _torch_batch_collate
+
+
+def test_to_shared_tensor_round_trip_is_value_equivalent_and_shared():
+    """``_to_shared_tensor`` produces a SHM tensor with the same content."""
+    arr = np.arange(12, dtype=np.float32).reshape(3, 4)
+    shared = _to_shared_tensor(arr)
+    assert isinstance(shared, torch.Tensor)
+    assert shared.is_shared()
+    assert torch.equal(shared, torch.from_numpy(arr))
+    # None → None
+    assert _to_shared_tensor(None) is None
+
+
+def test_allocate_and_refill_shared_neg_buffer():
+    """Refill in place mutates the buffer the workers see."""
+    src = np.arange(8, dtype=np.float32).reshape(4, 2)
+    buf = _allocate_shared_neg_buffer(src)
+    assert buf.is_shared()
+    assert torch.equal(buf, torch.from_numpy(src))
+    next_src = src * 2
+    _refill_shared_neg_buffer(buf, next_src)
+    assert torch.equal(buf, torch.from_numpy(next_src))
+
+
+def test_effective_fit_dataloader_num_workers_skips_size_guard_for_shm(monkeypatch):
+    """SHM-backed dataset bypasses the spawn-pickle byte-size guard."""
+    from mhcflurry import class1_neural_network as cnn
+
+    monkeypatch.setattr(cnn, "_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES", 32)
+    monkeypatch.setattr(cnn, "_FIT_DATALOADER_DOWNGRADE_WARNED", False)
+    x_peptide = _to_shared_tensor(np.zeros((8, 2, 3), dtype=np.float32))
+    dataset = _FitBatchDataset(
+        x_peptide=x_peptide,
+        x_allele=None,
+        y_encoded=_to_shared_tensor(np.zeros(8, dtype=np.float32)),
+        sample_weights_with_negatives=None,
+        train_indices=np.arange(8),
+    )
+
+    effective, reason = _effective_fit_dataloader_num_workers(4, dataset)
+
+    assert effective == 4
+    assert reason is None
 
 
 def test_fit_dataloader_workers_disabled_for_large_spawn_payload(monkeypatch):
@@ -135,6 +227,79 @@ def test_fit_dataloader_worker_downgrade_has_explicit_escape_hatch(monkeypatch):
 
     assert effective == 4
     assert reason is None
+
+
+def test_fit_with_shm_dataloader_trains_and_predicts(monkeypatch):
+    """fit() with MHCFLURRY_FIT_DATALOADER_SHM=1 trains a tiny network end-to-end.
+
+    Smoke test — exercises the SHM tensor materialization, the
+    refill-in-place random-negative buffer, the polymorphic
+    _FitBatchDataset, _torch_batch_collate, and pin_memory=True path
+    using num_workers=0 (so no spawn). Asserts fit_info reports
+    SHM-on, training completed without exceptions, and predict()
+    returns finite values.
+    """
+    monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "1")
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(11)
+    model = _make_simple_affinity_model(
+        max_epochs=3,
+        random_negative_rate=1.0,
+        random_negative_constant=0,
+    )
+    model.fit(peptides, affinities)
+
+    last_info = model.fit_info[-1]
+    assert last_info.get("fit_dataloader_shm_enabled") is True
+
+    preds = model.predict(peptides)
+    assert preds.shape == (len(peptides),)
+    assert np.all(np.isfinite(preds))
+
+
+def test_fit_validation_interval_skips_off_interval_epochs():
+    """validation_interval > 1 measures only on-interval + final epoch."""
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(13)
+    model = _make_simple_affinity_model(
+        max_epochs=10,
+        validation_split=0.5,
+        early_stopping=False,
+        validation_interval=3,
+    )
+    model.fit(peptides, affinities)
+
+    val_loss = model.fit_info[-1]["val_loss"]
+    assert len(val_loss) == 10
+    # Epochs measured: 0, 3, 6, 9 (last epoch always measured).
+    # Off-interval epochs carry forward the previous measurement, so
+    # consecutive equal triples appear at (1, 2) repeating epoch 0's
+    # loss, (4, 5) repeating epoch 3, (7, 8) repeating epoch 6.
+    assert val_loss[1] == val_loss[0]
+    assert val_loss[2] == val_loss[0]
+    assert val_loss[4] == val_loss[3]
+    assert val_loss[5] == val_loss[3]
+    assert val_loss[7] == val_loss[6]
+    assert val_loss[8] == val_loss[6]
+
+
+def test_fit_validation_interval_default_runs_every_epoch():
+    """Default validation_interval=1 measures every epoch (legacy)."""
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(17)
+    model = _make_simple_affinity_model(
+        max_epochs=4, validation_split=0.5, early_stopping=False,
+    )
+    model.fit(peptides, affinities)
+    val_loss = model.fit_info[-1]["val_loss"]
+    assert len(val_loss) == 4
+    # With per-epoch validation under the simple training data here, at
+    # least some epochs differ from epoch 0; this is the most we can
+    # assert without depending on exact per-step numerics.
+    assert any(v != val_loss[0] for v in val_loss[1:])
 
 
 def test_effective_validation_batch_size_uses_larger_cuda_default():

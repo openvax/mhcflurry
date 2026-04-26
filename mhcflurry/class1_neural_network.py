@@ -231,6 +231,97 @@ _FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES = int(
 _FIT_DATALOADER_DOWNGRADE_WARNED = False
 
 
+def _fit_dataloader_shm_enabled():
+    """Return True when the SHM-backed fit() DataLoader path is enabled.
+
+    Gated on env var ``MHCFLURRY_FIT_DATALOADER_SHM=1``. When on, fit()'s
+    backing arrays (x_peptide, x_allele, y_encoded, sample_weights, and
+    the random-negative buffers) are materialized as CPU torch tensors
+    in shared memory before the epoch loop. DataLoader workers spawned
+    with ``num_workers>0`` then receive only storage handles via
+    ``torch.multiprocessing.reductions`` — no per-worker pickle-copy of
+    the dataset bytes — so the spawn-copy budget that otherwise forces
+    ``num_workers=0`` (see ``_effective_fit_dataloader_num_workers``)
+    no longer applies. Workers can prefetch CPU batch prep in parallel
+    with the parent's GPU compute, closing the GPU-utilization gap.
+
+    Off by default (the legacy numpy path stays bit-identical) until
+    the SHM path has soaked in production.
+    """
+    return os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM", "0") == "1"
+
+
+def _to_shared_tensor(value):
+    """Materialize ``value`` as a CPU torch tensor in shared memory.
+
+    Accepts numpy arrays or torch tensors; returns ``None`` for ``None``.
+    The returned tensor's storage is in POSIX shared memory (via
+    ``Tensor.share_memory_()``), so when the dataset is pickled to a
+    DataLoader spawn worker the storage handle is forwarded over the
+    socket and the worker materializes a tensor pointing at the same
+    bytes — no per-worker copy.
+
+    Always allocates a fresh storage (clones from the source) before
+    sharing so that callers retain their original (non-shared) buffer.
+    The freshly-cloned storage is what gets shared. This costs one
+    full-size memcpy per call but happens once per fit() call rather
+    than once per epoch / worker.
+    """
+    if value is None:
+        return None
+    if isinstance(value, torch.Tensor):
+        tensor = value.detach().contiguous().clone()
+    else:
+        tensor = torch.from_numpy(numpy.ascontiguousarray(value)).clone()
+    if not tensor.is_shared():
+        tensor.share_memory_()
+    return tensor
+
+
+def _allocate_shared_neg_buffer(template_array):
+    """Allocate a fresh shared-memory tensor with ``template_array``'s shape/dtype.
+
+    Used for the random-negative peptide buffer in fit(). The buffer is
+    allocated ONCE before the epoch loop and refilled in place each
+    epoch with the current cycle's encoding. Workers see the latest
+    contents without needing the dataset to be re-pickled.
+    """
+    src = (
+        torch.from_numpy(numpy.ascontiguousarray(template_array))
+        if not isinstance(template_array, torch.Tensor) else template_array
+    )
+    tensor = torch.empty(src.shape, dtype=src.dtype)
+    tensor.share_memory_()
+    tensor.copy_(src)
+    return tensor
+
+
+def _refill_shared_neg_buffer(buffer_tensor, source_array):
+    """Copy ``source_array`` into ``buffer_tensor`` in place.
+
+    The buffer's storage is shared with worker processes; in-place
+    overwrite is safe between epochs because PyTorch's DataLoader joins
+    its workers when the parent's iter exhausts (i.e., before the next
+    epoch's refill).
+    """
+    src = (
+        torch.from_numpy(numpy.ascontiguousarray(source_array))
+        if not isinstance(source_array, torch.Tensor) else source_array
+    )
+    buffer_tensor.copy_(src)
+
+
+def _array_nbytes(value):
+    """Approximate bytes backing ``value`` (numpy array or tensor)."""
+    if value is None:
+        return 0
+    if isinstance(value, numpy.ndarray):
+        return int(value.nbytes)
+    if isinstance(value, torch.Tensor):
+        return int(value.element_size() * value.numel())
+    return int(getattr(value, "nbytes", 0))
+
+
 def check_training_batch_fits(
         requested_batch_size,
         device,
@@ -344,8 +435,16 @@ class _FitBatchDataset(torch.utils.data.Dataset):
         # Without this pre-cast, fit() paid a tiny per-batch astype() —
         # millions of one-element allocs per epoch on large pan-allele
         # training sets.
-        if y_encoded.dtype != numpy.float32:
-            y_encoded = y_encoded.astype(numpy.float32)
+        #
+        # SHM path: ``y_encoded`` may arrive as a torch.Tensor (already
+        # cast and shared) — preserve it as-is and use the tensor dtype
+        # check instead of numpy's.
+        if isinstance(y_encoded, torch.Tensor):
+            if y_encoded.dtype != torch.float32:
+                y_encoded = y_encoded.to(torch.float32)
+        else:
+            if y_encoded.dtype != numpy.float32:
+                y_encoded = y_encoded.astype(numpy.float32)
         self.y_encoded = y_encoded
         self.sample_weights = sample_weights_with_negatives
         self.train_indices = train_indices
@@ -363,6 +462,32 @@ class _FitBatchDataset(torch.utils.data.Dataset):
     def _gather_feature_rows(self, indices, *, base_array, negative_array):
         if base_array is None and negative_array is None:
             return None
+        # Polymorphic: keep numpy results when backing arrays are numpy
+        # (the legacy path), produce torch tensors when backing arrays
+        # are tensors (the SHM path). Downstream consumers
+        # (``_move_fit_batch_to_device`` / ``_batch_value_to_device``)
+        # already handle both.
+        is_tensor = isinstance(base_array, torch.Tensor) or isinstance(
+            negative_array, torch.Tensor
+        )
+        if is_tensor:
+            indices_t = torch.as_tensor(
+                numpy.asarray(indices, dtype=numpy.int64)
+            )
+            if self.num_random_negatives is None:
+                return base_array[indices_t]
+            result = torch.empty(
+                (len(indices_t),) + tuple(base_array.shape[1:]),
+                dtype=base_array.dtype,
+            )
+            negative_mask = indices_t < self.num_random_negatives
+            if negative_mask.any():
+                result[negative_mask] = negative_array[indices_t[negative_mask]]
+            if (~negative_mask).any():
+                result[~negative_mask] = base_array[
+                    indices_t[~negative_mask] - self.num_random_negatives
+                ]
+            return result
         indices = numpy.asarray(indices, dtype=numpy.int64)
         if self.num_random_negatives is None:
             return base_array[indices]
@@ -442,6 +567,40 @@ def _numpy_batch_collate(batch):
         key: numpy.stack([sample[key] for sample in batch], axis=0)
         for key in batch[0]
     }
+
+
+def _torch_batch_collate(batch):
+    """Collate a list of tensor sample dicts into stacked tensors.
+
+    Counterpart to ``_numpy_batch_collate`` for the SHM path: when the
+    dataset's backing arrays are torch tensors (in shared memory), each
+    sample's per-key value is already a tensor view, so stacking with
+    ``torch.stack`` keeps the path tensor-native end-to-end. Skips
+    PyTorch's default collate (which would do a ``torch.tensor`` copy
+    of any non-tensor leaf and re-introduce the allocator-growth issue
+    that ``_numpy_batch_collate`` was written to dodge).
+
+    Returns CPU tensors. The caller (``_move_fit_batch_to_device``)
+    handles the H2D copy.
+    """
+    return {
+        key: torch.stack([sample[key] for sample in batch], dim=0)
+        for key in batch[0]
+    }
+
+
+def _dataset_uses_shared_tensors(dataset):
+    """True when ``dataset``'s backing peptide array is a torch.Tensor.
+
+    Used by ``_make_fit_dataloader`` to pick the right collate, and by
+    ``_effective_fit_dataloader_num_workers`` to skip the spawn-pickle
+    size guard (since shared-tensor backing pickles to a small handle
+    rather than the full bytes).
+    """
+    backing = getattr(dataset, "x_peptide", None)
+    if backing is None:
+        backing = getattr(dataset, "random_negative_x_peptide", None)
+    return isinstance(backing, torch.Tensor)
 
 
 def _identity_collate(sample):
@@ -1109,14 +1268,21 @@ def _make_fit_dataloader(
     the flag back then.
     """
     effective_workers = _effective_num_workers(num_workers)
-    # Keep worker-produced batches as numpy arrays on every platform. PyTorch's
-    # default worker collate allocates fresh CPU tensors (and, with
-    # ``pin_memory=True``, pinned staging buffers) for every batch; on the
-    # pan-allele release job those allocator caches were the dominant anonymous
-    # RSS growth. Parent-side numpy->torch conversion is a little less fancy
-    # than pinned prefetch, but it has bounded host memory and still overlaps
-    # worker numpy slicing with GPU compute.
-    effective_pin = False
+    # Pin-memory policy:
+    #   * Legacy numpy path: keep ``pin_memory=False``. PyTorch's default
+    #     worker collate allocates fresh CPU tensors and (with
+    #     ``pin_memory=True``) pinned staging buffers per batch; on the
+    #     pan-allele release job those allocator caches were the
+    #     dominant anonymous RSS growth driver. Parent-side numpy→torch
+    #     conversion is a little less fancy but has bounded host memory
+    #     and still overlaps worker numpy slicing with GPU compute.
+    #   * SHM tensor path (``use_pinned_memory=True``): the dataset's
+    #     backing storage lives in shared memory, so the per-batch
+    #     payload is just a stack of small tensor views. Pinning the
+    #     stacked CPU tensor for one batch at a time is cheap and gives
+    #     us non-blocking H2D in the fit() loop, overlapping worker
+    #     compute with parent's GPU step.
+    effective_pin = bool(use_pinned_memory)
     kwargs = dict(
         dataset=dataset,
         batch_size=batch_size,
@@ -1125,16 +1291,18 @@ def _make_fit_dataloader(
         pin_memory=effective_pin,
         drop_last=drop_last,
     )
-    # Always use the numpy collate path. PyTorch's default_collate calls
-    # ``torch.tensor(numpy_array)`` for every batch, allocating new CPU
-    # tensors through ``c10::CPUAllocator`` on every step. That allocator
-    # caches in libc malloc and on a 16-worker pan-allele run accumulates
-    # ~16 GB per fit() per worker over a 30-epoch run, which is a major
-    # contributor to the OOM tracked in openvax/mhcflurry#270. Returning
-    # numpy arrays keeps the H2D conversion in ``_move_fit_batch_to_device``
-    # where ``torch.from_numpy`` shares the buffer (no extra alloc) and the
-    # ``.to(device)`` copy releases the host side immediately afterward.
-    kwargs["collate_fn"] = _numpy_batch_collate
+    # Pick the collate to match the dataset's backing-array type:
+    #   * SHM path (tensors) → ``_torch_batch_collate`` keeps the
+    #     payload tensor-native end-to-end, sidestepping PyTorch's
+    #     default-collate ``torch.tensor(numpy_array)`` allocator
+    #     growth (the pre-Phase-1 OOM seen on 16-worker runs).
+    #   * Legacy path (numpy) → ``_numpy_batch_collate`` keeps inter-
+    #     process transport on the standard pickling path, also
+    #     dodging the same allocator growth.
+    if _dataset_uses_shared_tensors(dataset):
+        kwargs["collate_fn"] = _torch_batch_collate
+    else:
+        kwargs["collate_fn"] = _numpy_batch_collate
     if effective_workers > 0:
         # CUDA contexts aren't fork-safe. Using 'spawn' avoids copying the
         # training process's CUDA state into workers, at a ~200-500 ms
@@ -1146,7 +1314,15 @@ def _make_fit_dataloader(
 
 
 def _dataset_backing_nbytes(dataset):
-    """Approximate bytes that spawn-based DataLoader workers would pickle."""
+    """Approximate bytes that spawn-based DataLoader workers would pickle.
+
+    Counts each unique storage once. Numpy arrays use ``.nbytes``; torch
+    tensors use ``element_size * numel`` via ``_array_nbytes``. SHM-
+    backed tensors are still bytes the *parent* allocated, but the
+    pickle that ships them to workers is just a storage handle, so this
+    helper is paired with ``_dataset_uses_shared_tensors`` in
+    ``_effective_fit_dataloader_num_workers`` to bypass the size guard.
+    """
     total = 0
     seen = set()
     for value in (
@@ -1164,7 +1340,7 @@ def _dataset_backing_nbytes(dataset):
         if ident in seen:
             continue
         seen.add(ident)
-        total += int(getattr(value, "nbytes", 0))
+        total += _array_nbytes(value)
     return total
 
 
@@ -1174,6 +1350,11 @@ def _effective_fit_dataloader_num_workers(num_workers, dataset):
     if num_workers <= 0:
         return int(num_workers), None
     if os.environ.get("MHCFLURRY_FORCE_FIT_DATALOADER_WORKERS", "0") == "1":
+        return int(num_workers), None
+    # SHM path: backing arrays are torch tensors in shared memory, so
+    # the pickle ships only a small storage handle per array rather
+    # than the full bytes. Skip the size guard.
+    if _dataset_uses_shared_tensors(dataset):
         return int(num_workers), None
 
     backing_bytes = _dataset_backing_nbytes(dataset)
@@ -4008,6 +4189,53 @@ class Class1NeuralNetwork(object):
                 _val_weights_device,
             )
 
+        # --- Shared-memory DataLoader path (issue openvax/mhcflurry#268) ---
+        # When MHCFLURRY_FIT_DATALOADER_SHM=1 is set, materialize the
+        # dataset's static backing arrays as CPU torch tensors in shared
+        # memory once. The per-epoch random-negative buffer is allocated
+        # once at full-cycle size and refilled in place each epoch.
+        # DataLoader workers spawned for the inner training loop receive
+        # storage handles via PyTorch's IPC reductions instead of
+        # per-array byte copies — closing the
+        # ``_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES`` guard that
+        # previously forced ``num_workers=0``. See
+        # ``_fit_dataloader_shm_enabled`` for the env-flag rationale.
+        _shm_enabled = _fit_dataloader_shm_enabled()
+        _shm_x_peptide = None
+        _shm_x_allele = None
+        _shm_y_encoded = None
+        _shm_sample_weights = None
+        _shm_random_neg_peptide = None
+        _shm_random_neg_allele = None
+        if _shm_enabled:
+            _shm_x_peptide = _to_shared_tensor(
+                x_dict_without_random_negatives["peptide"]
+            )
+            _shm_x_allele = _to_shared_tensor(
+                x_dict_without_random_negatives.get("allele")
+            )
+            _shm_y_encoded = _to_shared_tensor(y_encoded)
+            _shm_sample_weights = _to_shared_tensor(
+                sample_weights_with_negatives
+            )
+            _shm_random_neg_allele = _to_shared_tensor(
+                random_negative_x_allele_base
+            )
+            if num_random_negatives > 0:
+                # Allocate the per-epoch random-negative buffer at the
+                # shape of cycle-0's first encoding. ``get_epoch_inputs(0)``
+                # primes the pool builder if needed; subsequent epochs
+                # refill in place.
+                _, _initial_random_neg_encoding = (
+                    random_negatives_pool.get_epoch_inputs(0)
+                )
+                _shm_random_neg_peptide = _allocate_shared_neg_buffer(
+                    _initial_random_neg_encoding
+                )
+            fit_info["fit_dataloader_shm_enabled"] = True
+        else:
+            fit_info["fit_dataloader_shm_enabled"] = False
+
         for epoch in range(self.hyperparameters["max_epochs"]):
             epoch_wall_start = time.perf_counter()
             input_build_time = 0.0
@@ -4031,14 +4259,47 @@ class Class1NeuralNetwork(object):
             _, random_negative_peptides_encoding = (
                 random_negatives_pool.get_epoch_inputs(epoch)
             )
+            if _shm_enabled and _shm_random_neg_peptide is not None:
+                # Refill the shared random-neg buffer in place. PyTorch's
+                # DataLoader joins workers when the previous epoch's
+                # iter exhausted, so this overwrite is race-free.
+                _refill_shared_neg_buffer(
+                    _shm_random_neg_peptide, random_negative_peptides_encoding
+                )
+            dataset_x_peptide = (
+                _shm_x_peptide
+                if _shm_enabled
+                else x_dict_without_random_negatives["peptide"]
+            )
+            dataset_x_allele = (
+                _shm_x_allele
+                if _shm_enabled
+                else x_dict_without_random_negatives.get("allele")
+            )
+            dataset_y_encoded = _shm_y_encoded if _shm_enabled else y_encoded
+            dataset_sample_weights = (
+                _shm_sample_weights
+                if _shm_enabled
+                else sample_weights_with_negatives
+            )
+            dataset_random_neg_peptide = (
+                _shm_random_neg_peptide
+                if _shm_enabled
+                else random_negative_peptides_encoding
+            )
+            dataset_random_neg_allele = (
+                _shm_random_neg_allele
+                if _shm_enabled
+                else random_negative_x_allele_base
+            )
             dataset = _FitBatchDataset(
-                x_peptide=x_dict_without_random_negatives["peptide"],
-                x_allele=x_dict_without_random_negatives.get("allele"),
-                y_encoded=y_encoded,
-                sample_weights_with_negatives=sample_weights_with_negatives,
+                x_peptide=dataset_x_peptide,
+                x_allele=dataset_x_allele,
+                y_encoded=dataset_y_encoded,
+                sample_weights_with_negatives=dataset_sample_weights,
                 train_indices=None,
-                random_negative_x_peptide=random_negative_peptides_encoding,
-                random_negative_x_allele=random_negative_x_allele_base,
+                random_negative_x_peptide=dataset_random_neg_peptide,
+                random_negative_x_allele=dataset_random_neg_allele,
                 num_random_negatives=num_random_negatives,
             )
             input_build_time += time.perf_counter() - build_start
@@ -4090,8 +4351,18 @@ class Class1NeuralNetwork(object):
             # _make_fit_dataloader keeps worker batches as numpy arrays to
             # avoid PyTorch CPU tensor/pinned-memory allocator growth. These
             # sources are pageable, so H2D copies must remain blocking.
-            use_pinned_memory = False
-            non_blocking_h2d = False
+            #
+            # SHM path: backing is shared tensors, so we can flip on
+            # ``pin_memory=True`` (DataLoader's pinning thread allocates
+            # pinned staging buffers per batch) and ``non_blocking=True``
+            # on the H2D copy — a meaningful win because async copies let
+            # the parent's compute on batch N overlap with the worker's
+            # prep + pin of batch N+1. The pinning-thread allocator is
+            # bounded (one pinned buffer per pre-fetched batch) and
+            # doesn't have the unbounded-growth pathology that motivated
+            # the legacy numpy path.
+            use_pinned_memory = bool(_shm_enabled)
+            non_blocking_h2d = bool(_shm_enabled)
 
             train_losses = []
             epoch_num_train_rows = 0
@@ -4099,13 +4370,13 @@ class Class1NeuralNetwork(object):
             if full_batch_count > 0:
                 dataloader_setup_start = time.perf_counter()
                 fit_dataset = _FitBatchDataset(
-                    x_peptide=x_dict_without_random_negatives["peptide"],
-                    x_allele=x_dict_without_random_negatives.get("allele"),
+                    x_peptide=dataset_x_peptide,
+                    x_allele=dataset_x_allele,
                     y_encoded=dataset.y_encoded,
-                    sample_weights_with_negatives=sample_weights_with_negatives,
+                    sample_weights_with_negatives=dataset_sample_weights,
                     train_indices=train_indices[:full_batch_count],
-                    random_negative_x_peptide=random_negative_peptides_encoding,
-                    random_negative_x_allele=random_negative_x_allele_base,
+                    random_negative_x_peptide=dataset_random_neg_peptide,
+                    random_negative_x_allele=dataset_random_neg_allele,
                     num_random_negatives=num_random_negatives,
                 )
                 (
