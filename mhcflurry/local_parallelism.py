@@ -4,6 +4,7 @@ compute node.
 """
 
 import itertools
+import logging
 import multiprocessing
 import multiprocessing.pool
 import traceback
@@ -19,6 +20,154 @@ import random
 import numpy
 
 from .common import configure_pytorch, normalize_pytorch_backend
+
+
+# Per-worker VRAM upper bound (gigabytes) used by ``auto_max_workers_per_gpu``
+# to budget how many workers fit on each GPU. The pan-allele MLP at the
+# default minibatch=4096 + RMSprop optimizer state + activations was measured
+# at ~5.5 GB on the 2026-04-25 8xA100 run; rounded up to 8 GB to leave
+# headroom for the largest architecture in the sweep + per-batch peaks.
+# Override with ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` if a
+# different model family or batch size lands.
+_AUTO_MWPG_PER_WORKER_GB_DEFAULT = 8.0
+
+# SM-scheduler ceiling. Beyond ~4 workers/GPU the kernel queue serializes
+# behind a single SM scheduler, so per-worker throughput drops faster than
+# you gain from more parallelism. Tunable via env, but the empirical sweet
+# spot is 2-4 for small MLP workloads.
+_AUTO_MWPG_HARD_CAP_DEFAULT = 4
+
+# Fallback free-VRAM estimate per GPU (gigabytes) when ``torch.cuda.mem_get_info``
+# isn't callable yet (e.g. we're picking the pool size before any worker has
+# initialized CUDA). 16 GB is the common-denominator across A100-40GB / V100 /
+# L40S / A100-80GB at full freshness — conservative; real runs will see more.
+_AUTO_MWPG_FREE_VRAM_FALLBACK_GB = 16.0
+
+
+def _max_workers_per_gpu_arg(value):
+    """argparse type for ``--max-workers-per-gpu``. Accepts ``"auto"`` or int>=1."""
+    import argparse
+    if isinstance(value, str) and value.lower() == "auto":
+        return "auto"
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "--max-workers-per-gpu must be 'auto' or an integer >= 1, got %r"
+            % (value,)
+        )
+    if v < 1:
+        raise argparse.ArgumentTypeError(
+            "--max-workers-per-gpu must be >= 1, got %d" % (v,)
+        )
+    return v
+
+
+def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
+    """Pick ``max_workers_per_gpu`` based on detected hardware.
+
+    Returns an int ≥ 1. Logic:
+
+      * ``num_gpus == 0`` (CPU-only) → 1.
+      * Otherwise: take the minimum of three caps:
+          - ``num_jobs // num_gpus`` — don't oversubscribe a GPU beyond the
+            jobs that actually exist.
+          - ``floor(0.6 × free_vram_gb / per_worker_gb)`` — VRAM headroom
+            with 40% slack for activation peaks and the auto-sized
+            validation batch.
+          - ``hard_cap`` (default 4) — SM-scheduler kernel-serialization
+            wall.
+
+    Free VRAM is read live from ``torch.cuda.mem_get_info`` per GPU when
+    CUDA is initialized; falls back to a conservative 16 GB estimate
+    otherwise. Per-worker VRAM upper bound and the hard cap are both
+    overridable via the env vars
+    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` and
+    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP``.
+
+    The result is logged so the chosen value is visible in the worker
+    log alongside the reasoning.
+    """
+    if not num_gpus or num_gpus < 1 or backend == "cpu":
+        return 1
+
+    per_worker_gb = float(os.environ.get(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB",
+        str(_AUTO_MWPG_PER_WORKER_GB_DEFAULT),
+    ))
+    hard_cap = int(os.environ.get(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP",
+        str(_AUTO_MWPG_HARD_CAP_DEFAULT),
+    ))
+
+    free_vram_gb = None
+    try:
+        import torch
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            mins = []
+            for i in range(min(int(num_gpus), torch.cuda.device_count())):
+                try:
+                    free, _total = torch.cuda.mem_get_info(i)
+                    mins.append(free / (1024 ** 3))
+                except (RuntimeError, AssertionError):
+                    # mem_get_info can raise before the device is selected.
+                    pass
+            if mins:
+                free_vram_gb = min(mins)
+    except Exception:  # pragma: no cover — diagnostic fallback
+        free_vram_gb = None
+
+    free_vram_gb_used = (
+        free_vram_gb
+        if free_vram_gb is not None
+        else _AUTO_MWPG_FREE_VRAM_FALLBACK_GB
+    )
+
+    by_jobs = max(1, int(num_jobs) // max(int(num_gpus), 1))
+    by_vram = max(1, int(free_vram_gb_used * 0.6 / per_worker_gb))
+    chosen = max(1, min(by_jobs, by_vram, hard_cap))
+
+    logging.info(
+        "auto_max_workers_per_gpu: chose %d "
+        "(num_jobs=%d, num_gpus=%d, by_jobs=%d, by_vram=%d at "
+        "free_vram=%.1f GB%s / %.1f GB/worker, hard_cap=%d)",
+        chosen,
+        int(num_jobs),
+        int(num_gpus),
+        by_jobs,
+        by_vram,
+        free_vram_gb_used,
+        "" if free_vram_gb is not None else " (fallback)",
+        per_worker_gb,
+        hard_cap,
+    )
+    return chosen
+
+
+def resolve_max_workers_per_gpu(args):
+    """Resolve ``args.max_workers_per_gpu`` to an int, mutating ``args``.
+
+    Accepts the literal string ``"auto"`` (the default) or an int. When
+    ``"auto"``, calls ``auto_max_workers_per_gpu`` with the rest of the
+    args' parallelism config to pick a value. Idempotent — calling
+    twice on the same args is a no-op the second time.
+
+    Returns the resolved int (also stored on ``args.max_workers_per_gpu``
+    so subsequent consumers see the int).
+    """
+    value = getattr(args, "max_workers_per_gpu", None)
+    if value is None:
+        value = "auto"
+    if isinstance(value, str) and value.lower() == "auto":
+        resolved = auto_max_workers_per_gpu(
+            num_jobs=getattr(args, "num_jobs", 0),
+            num_gpus=getattr(args, "gpus", 0) or 0,
+            backend=getattr(args, "backend", "auto"),
+        )
+    else:
+        resolved = int(value)
+    args.max_workers_per_gpu = resolved
+    return resolved
 
 
 # ---- Non-daemonic worker pool --------------------------------------------
@@ -126,11 +275,14 @@ def add_local_parallelism_args(parser):
              "on CPU.")
     group.add_argument(
         "--max-workers-per-gpu",
-        type=int,
+        type=_max_workers_per_gpu_arg,
         metavar="N",
-        default=1000,
-        help="Maximum number of workers to assign to a GPU. Additional tasks will "
-             "run on CPU.")
+        default="auto",
+        help="Maximum number of workers to assign to a GPU. Pass 'auto' "
+             "(default) to pick a value based on detected free VRAM, the "
+             "per-worker VRAM upper bound, and a 4-worker hard cap "
+             "(see ``auto_max_workers_per_gpu``). Pass an integer to pin. "
+             "Workers beyond ``--gpus * --max-workers-per-gpu`` run on CPU.")
     group.add_argument(
         "--max-tasks-per-worker",
         type=int,
@@ -149,6 +301,9 @@ def worker_pool_with_gpu_assignments_from_args(args):
     Create a multiprocessing.Pool where each worker uses its own GPU.
 
     Uses commandline arguments. See `worker_pool_with_gpu_assignments`.
+    Resolves ``args.max_workers_per_gpu="auto"`` to an int (mutating
+    ``args`` so downstream consumers — e.g. inference batch sizing in
+    calibrate — observe the same value).
 
     Parameters
     ----------
@@ -158,6 +313,7 @@ def worker_pool_with_gpu_assignments_from_args(args):
     -------
     multiprocessing.Pool
     """
+    resolve_max_workers_per_gpu(args)
 
     return worker_pool_with_gpu_assignments(
         num_jobs=args.num_jobs,
