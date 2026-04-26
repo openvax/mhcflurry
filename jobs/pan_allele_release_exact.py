@@ -99,14 +99,21 @@ image = (
         # arithmetic to amortize its fixed overheads over.
         "MHCFLURRY_TORCH_COMPILE": "1",
         "TORCHINDUCTOR_COMPILE_THREADS": "2",
-        # Zero DataLoader subprocesses = zero per-epoch torch-import
-        # respawn cost (commit 3ca980d rationale: persistent_workers was
-        # dropped because fit() rebuilds the DataLoader per epoch). With
-        # minibatch=4096 the batch-build work is <1 ms on 1M-row fancy
-        # indexing, so in-process dispatch is the right default. The
-        # fit_generator path keeps a single long-lived iterator so it
-        # isn't affected by this knob when =0 anyway.
-        "DATALOADER_NUM_WORKERS": "0",
+        # 4 DataLoader subprocesses per training worker. Was "0" pre-2.3.0
+        # because spawning workers would have OOM'd: the dataset's backing
+        # arrays were ~600 MB and the spawn-pickle cost per worker was
+        # ~10 GB anonymous RSS growth across an epoch on the 16-worker
+        # release run. PR #273's Layer-2 SHM (per-fit() torch shared
+        # tensors via Tensor.share_memory_()) eliminated that cost — the
+        # spawn pickle now ships only POSIX-shm storage handles, not
+        # bytes. With ``dataloader_num_workers > 0``, fit() auto-enables
+        # the SHM path (no env override needed; see
+        # ``mhcflurry/shared_memory.py``). Closes the GPU starvation
+        # gap (workers prefetch CPU batch prep in parallel with GPU
+        # compute; 0% -> 60-80% expected GPU util on A100). Stacks
+        # with pin_memory=True + non_blocking H2D, also auto-on in
+        # the SHM path.
+        "DATALOADER_NUM_WORKERS": "4",
         # Populate the per-epoch timing arrays in fit_info (epoch_fetch_time,
         # epoch_train_time, epoch_validation_time, etc.). Writes to the
         # persisted model's config_json so we can do post-hoc breakdown
