@@ -109,6 +109,30 @@ def test_filter_canonicalizable_alleles_passthrough_when_all_valid():
     assert kept == raw
 
 
+def test_filter_canonicalizable_alleles_call_sites_cover_both_predictor_kinds():
+    """Both run_class1_presentation_predictor and run_class1_affinity_predictor
+    invoke the filter on supported_alleles.
+
+    Without coverage on both, a presentation-predictor calibration with a
+    pseudogene allele in its coverage map would crash partway through the
+    same way the affinity path used to. Reading the source is the
+    cheapest regression test we can write here — running calibrate
+    end-to-end on a synthetic presentation predictor is too heavy for
+    a unit test.
+    """
+    import inspect
+    from mhcflurry import calibrate_percentile_ranks_command as mod
+
+    affinity_src = inspect.getsource(mod.run_class1_affinity_predictor)
+    presentation_src = inspect.getsource(mod.run_class1_presentation_predictor)
+    assert "_filter_canonicalizable_alleles" in affinity_src, (
+        "affinity calibration path must call the filter helper"
+    )
+    assert "_filter_canonicalizable_alleles" in presentation_src, (
+        "presentation calibration path must call the filter helper"
+    )
+
+
 def test_filter_canonicalizable_alleles_memoizes_repeats():
     """Duplicate alleles in the input each get evaluated once."""
     from mhcflurry.calibrate_percentile_ranks_command import (
