@@ -75,15 +75,20 @@ def share_tensor(value):
 def share_like(template):
     """Allocate a fresh shared-memory tensor with ``template``'s shape/dtype.
 
-    Contents are uninitialized; the caller fills them via
-    ``update_shared``. Used for per-epoch buffers that are refilled in
-    place each iteration (e.g. fit()'s random-negative payload).
+    Contents are uninitialized; the caller MUST fill via ``update_shared``
+    before any consumer reads. Used for per-epoch buffers that are
+    refilled in place each iteration (e.g. fit()'s random-negative
+    payload).
     """
+    if template is None:
+        raise TypeError("share_like: template cannot be None")
     if isinstance(template, torch.Tensor):
         shape, dtype = template.shape, template.dtype
     else:
-        arr = numpy.asarray(template)
-        shape, dtype = arr.shape, torch.from_numpy(arr.reshape(-1)[:0]).dtype
+        # ``torch.from_numpy`` is a zero-copy view, so ``.dtype`` lookup
+        # is O(1) and doesn't allocate the full tensor data.
+        arr = numpy.ascontiguousarray(template)
+        shape, dtype = arr.shape, torch.from_numpy(arr).dtype
     tensor = torch.empty(shape, dtype=dtype)
     tensor.share_memory_()
     return tensor
@@ -296,6 +301,27 @@ def setup_shared_random_negative_pools(
                     item.get("work_item_name"),
                     hp.get("random_negative_pool_epochs"),
                     pool_epochs,
+                )
+            )
+        # The shared mmap pool holds exactly ``pool_epochs`` cycles
+        # (cycle 0 only — see RandomNegativesPool.from_shared_mmap).
+        # If a work item's ``max_epochs`` would advance training past
+        # epoch ``pool_epochs - 1``, the worker's
+        # ``RandomNegativesPool.get_epoch_inputs`` raises mid-training.
+        # Caught here so the orchestrator fails before forking workers
+        # rather than at random points hours into the run.
+        max_epochs = int(hp.get("max_epochs", 0) or 0)
+        if max_epochs > pool_epochs:
+            raise ValueError(
+                "setup_shared_random_negative_pools: work item %r has "
+                "max_epochs=%d > pool_epochs=%d. The shared mmap pool "
+                "covers epochs 0..pool_epochs-1; training would crash "
+                "at epoch %d. Either raise random_negative_pool_epochs "
+                "to >= max_epochs, lower max_epochs, or omit "
+                "--random-negative-shared-pool-dir to fall back to "
+                "the in-process pool." % (
+                    item.get("work_item_name"),
+                    max_epochs, pool_epochs, pool_epochs,
                 )
             )
         cfg_key = _random_negative_config_key(hp)

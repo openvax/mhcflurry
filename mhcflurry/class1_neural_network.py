@@ -1129,6 +1129,15 @@ def _make_fit_dataloader(
     # motivated openvax/mhcflurry#270. Both paths pick the collate
     # that matches their backing type for the same reason.
     tensor_backed = bool(getattr(dataset, "tensor_backed", False))
+    # NOTE: ``persistent_workers`` is intentionally NOT enabled here.
+    # fit() rebuilds the DataLoader per epoch and refills the SHM
+    # random-negative buffer between iterations; persistent workers
+    # would hold a stale view of the dataset (their pickle is taken
+    # at first iter and not refreshed) and would race with the
+    # parent's in-place ``update_shared`` refill. If a future
+    # refactor hoists DataLoader construction outside the epoch
+    # loop, the refill semantics need to change too — re-evaluate
+    # before flipping this on.
     kwargs = dict(
         dataset=dataset,
         batch_size=batch_size,

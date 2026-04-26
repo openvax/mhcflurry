@@ -130,6 +130,66 @@ def test_setup_shared_random_negative_pools_builds_files(tmp_path):
     assert os.path.exists(os.path.join(pool_dir, "random_negatives_peptides.json"))
 
 
+def test_setup_shared_random_negative_pools_rejects_max_epochs_exceeds_pool(tmp_path):
+    """Reject when ``max_epochs > pool_epochs`` — would crash mid-training.
+
+    The shared mmap pool covers only epochs 0..pool_epochs-1. If
+    ``max_epochs`` exceeds that, the worker's ``get_epoch_inputs``
+    would raise mid-training. Caught at orchestrator time so users
+    don't waste hours of training on a doomed run.
+    """
+    df, folds_df = _make_minimal_train_data(num_rows=20)
+    hp = {
+        "random_negative_rate": 1.0,
+        "random_negative_constant": 0,
+        "random_negative_method": "by_allele",
+        "random_negative_lengths": [9],
+        "random_negative_match_distribution": False,
+        "random_negative_pool_epochs": 3,
+        "max_epochs": 100,  # > pool_epochs=3 → must reject
+    }
+    work_items = [
+        {"fold_num": 0, "hyperparameters": hp, "work_item_name": "wi"},
+    ]
+    with pytest.raises(ValueError, match="max_epochs"):
+        shm.setup_shared_random_negative_pools(
+            output_root_dir=str(tmp_path),
+            work_items=work_items,
+            train_data_df=df,
+            folds_df=folds_df,
+            peptide_encoder=_trivial_peptide_encoder,
+            pool_epochs=3,
+            seed=1,
+        )
+
+
+def test_setup_shared_random_negative_pools_accepts_max_epochs_equals_pool(tmp_path):
+    """Boundary: ``max_epochs == pool_epochs`` is fine (epochs 0..N-1 covered)."""
+    df, folds_df = _make_minimal_train_data(num_rows=20)
+    hp = {
+        "random_negative_rate": 1.0,
+        "random_negative_constant": 0,
+        "random_negative_method": "by_allele",
+        "random_negative_lengths": [9],
+        "random_negative_match_distribution": False,
+        "random_negative_pool_epochs": 5,
+        "max_epochs": 5,  # equal to pool_epochs → epochs 0..4 are covered
+    }
+    work_items = [
+        {"fold_num": 0, "hyperparameters": hp, "work_item_name": "wi"},
+    ]
+    fold_pool_dirs = shm.setup_shared_random_negative_pools(
+        output_root_dir=str(tmp_path),
+        work_items=work_items,
+        train_data_df=df,
+        folds_df=folds_df,
+        peptide_encoder=_trivial_peptide_encoder,
+        pool_epochs=5,
+        seed=1,
+    )
+    assert len(fold_pool_dirs) == 1
+
+
 def test_setup_shared_random_negative_pools_rejects_pool_epochs_mismatch(tmp_path):
     """All work items must share the same pool_epochs."""
     df, folds_df = _make_minimal_train_data(num_rows=20)
