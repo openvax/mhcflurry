@@ -48,6 +48,7 @@ HEARTBEAT_LOG="$MHCFLURRY_OUT/release_heartbeat.log"
 TRAIN_LOG="$MHCFLURRY_OUT/train.log"
 SELECT_LOG="$MHCFLURRY_OUT/select.log"
 CALIBRATE_LOG="$MHCFLURRY_OUT/calibrate.log"
+FETCH_LOG="$MHCFLURRY_OUT/fetch_eval_data.log"
 EVAL_LOG="$MHCFLURRY_OUT/eval.log"
 PLOT_LOG="$MHCFLURRY_OUT/plot_loss_curves.log"
 
@@ -56,6 +57,7 @@ PLOT_LOG="$MHCFLURRY_OUT/plot_loss_curves.log"
 : > "$TRAIN_LOG"
 : > "$SELECT_LOG"
 : > "$CALIBRATE_LOG"
+: > "$FETCH_LOG"
 : > "$EVAL_LOG"
 : > "$PLOT_LOG"
 
@@ -359,11 +361,20 @@ done
 # Compares the freshly-trained ensemble vs the published 2.2.0 ensemble
 # on the data_evaluation hit/decoy benchmark. Per-allele ROC-AUC,
 # PR-AUC, PPV@N. Skip cleanly with SKIP_EVAL=1.
+#
+# CURRENT_PHASE is set unconditionally so the heartbeat / error trap
+# logs the right phase even when the stage is skipped (otherwise the
+# preceding ``calibrate_combined`` would leak through).
+CURRENT_PHASE="eval"
 SKIP_EVAL="${SKIP_EVAL:-0}"
-if [ "$SKIP_EVAL" != "1" ]; then
-    CURRENT_PHASE="eval"
+if [ "$SKIP_EVAL" = "1" ]; then
+    log_release_event phase_skipped "SKIP_EVAL=1"
+else
     log_release_event phase_info "starting eval against public release"
-    run_logged_step "fetch_eval_data" "$EVAL_LOG" \
+    # ``mhcflurry-downloads fetch`` accepts multiple targets via nargs="*"
+    # (see mhcflurry/downloads_command.py:74). Both go to FETCH_LOG so
+    # the per-allele eval output stays unpolluted by extraction progress.
+    run_logged_step "fetch_eval_data" "$FETCH_LOG" \
         mhcflurry-downloads fetch data_evaluation models_class1_pan
     PUBLIC_MODELS_DIR="$(mhcflurry-downloads path models_class1_pan)/models.combined"
     DATA_EVAL_DIR="$(mhcflurry-downloads path data_evaluation)"
@@ -386,9 +397,11 @@ fi
 # Reads fit_info from the candidate-pool + selected manifests; emits
 # loss_curves_by_model.png, loss_curves_by_arch.png, per_fold_summary.png,
 # summary.csv. Skip cleanly with SKIP_PLOTS=1.
+CURRENT_PHASE="plot"
 SKIP_PLOTS="${SKIP_PLOTS:-0}"
-if [ "$SKIP_PLOTS" != "1" ]; then
-    CURRENT_PHASE="plot"
+if [ "$SKIP_PLOTS" = "1" ]; then
+    log_release_event phase_skipped "SKIP_PLOTS=1"
+else
     PLOT_SCRIPT="$SCRIPT_DIR/plot_loss_curves.py"
     PLOT_OUT="$MHCFLURRY_OUT/loss_plots"
     if [ ! -f "$PLOT_SCRIPT" ]; then
