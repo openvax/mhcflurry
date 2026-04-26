@@ -3840,7 +3840,9 @@ class Class1NeuralNetwork(object):
             progress_callback=None,
             progress_preamble="",
             progress_print_interval=5.0,
-            random_negative_seed=None):
+            random_negative_seed=None,
+            random_negative_shared_pool_dir=None,
+            random_negative_permutation_seed=None):
         """
         Fit the neural network.
 
@@ -3860,6 +3862,21 @@ class Class1NeuralNetwork(object):
         progress_callback : function
         progress_preamble : string
         progress_print_interval : float
+        random_negative_shared_pool_dir : str, optional
+            Path to a directory containing a pre-built mmap random-
+            negative pool (see ``shared_memory.py`` Layer 1). When
+            set, ``RandomNegativesPool.from_shared_mmap`` is used in
+            place of the in-process constructor — workers consume an
+            OS-page-cache-shared encoded pool instead of regenerating
+            and re-encoding their own each cycle. The orchestrator is
+            responsible for matching the pool's ``pool_epochs`` /
+            random-negative config to this fit() call.
+        random_negative_permutation_seed : int, optional
+            Cross-worker diversity seed when reading from the shared
+            pool. Each fit() worker permutes its slice of the pool by
+            this seed mixed with the epoch counter, so identical pool
+            bytes still produce per-worker-distinct negative orderings.
+            Ignored when ``random_negative_shared_pool_dir`` is None.
         """
         device = self.get_device()
         _configure_matmul_precision(device)
@@ -3914,12 +3931,29 @@ class Class1NeuralNetwork(object):
             if random_negative_pool_epochs > 1
             else None
         )
-        random_negatives_pool = RandomNegativesPool(
-            planner=random_negatives_planner,
-            peptide_encoder=self.peptides_to_network_input,
-            pool_epochs=random_negative_pool_epochs,
-            seed=pool_seed,
-        )
+        # Layer-1 SHM path (see shared_memory.py): when the orchestrator
+        # has pre-built an mmap pool for this work item's (fold, random-
+        # negative-config), construct via ``from_shared_mmap`` and let
+        # the OS page cache hold a single resident copy across all the
+        # outer training Pool's workers. Otherwise the in-process
+        # constructor regenerates + re-encodes per worker per cycle.
+        if random_negative_shared_pool_dir is not None:
+            random_negatives_pool = RandomNegativesPool.from_shared_mmap(
+                output_dir=random_negative_shared_pool_dir,
+                planner=random_negatives_planner,
+                peptide_encoder=self.peptides_to_network_input,
+                permutation_seed=random_negative_permutation_seed,
+            )
+            fit_info["random_negative_pool_shared_dir"] = (
+                random_negative_shared_pool_dir
+            )
+        else:
+            random_negatives_pool = RandomNegativesPool(
+                planner=random_negatives_planner,
+                peptide_encoder=self.peptides_to_network_input,
+                pool_epochs=random_negative_pool_epochs,
+                seed=pool_seed,
+            )
         fit_info["random_negative_pool_epochs"] = random_negative_pool_epochs
 
         # Allele encoding for random negatives is planned once (the allele

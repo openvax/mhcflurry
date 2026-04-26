@@ -200,6 +200,21 @@ parser.add_argument(
     default=None,
     help="Directory for the encoding cache. Default: <out-models-dir>/"
     "encoding_cache/. Only used when --use-encoding-cache is set.")
+parser.add_argument(
+    "--random-negative-shared-pool-dir",
+    metavar="DIR",
+    default=None,
+    help="Directory under which the orchestrator pre-builds per-fold "
+    "mmap-backed random-negative pools (see mhcflurry/shared_memory.py "
+    "Layer 1). When set, training workers consume an OS-page-cache-"
+    "shared encoded pool instead of regenerating + re-encoding their "
+    "own each cycle. Requires the hyperparameters' "
+    "``random_negative_pool_epochs`` to be > 1 (otherwise each epoch "
+    "regenerates and there's nothing to share). The directory is "
+    "populated by ``shared_memory.setup_shared_random_negative_pools`` "
+    "and written before any training worker is forked, so workers fault "
+    "in pages on first read. Default: None (each worker builds its own "
+    "in-process pool, the legacy behavior).")
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
@@ -962,6 +977,105 @@ def initialize_training(args):
     print(f"TIMING_MARKER setup_done {time.time():.3f}")
 
 
+def _initialize_shared_random_negative_pools(args, all_work_items):
+    """Pre-build per-fold mmap random-negative pools (Layer 1 SHM).
+
+    Wraps ``shared_memory.setup_shared_random_negative_pools`` with the
+    orchestrator-side glue: instantiates a sentinel
+    ``Class1NeuralNetwork`` from the first work item's hyperparameters
+    (so we can use its ``peptides_to_network_input`` as the encoder),
+    derives a deterministic per-run seed, and parks the resulting
+    ``(fold, cfg_key) -> pool_dir`` mapping in
+    ``GLOBAL_DATA["random_negative_shared_pool_dirs"]``. Workers look
+    their own pool up in ``train_model`` via
+    ``shared_memory.lookup_pool_dir_for_work_item``.
+
+    Validates that all work items share the same
+    ``random_negative_pool_epochs`` and the same ``peptide_encoding``
+    config — required for one encoder + one pool-epoch count to apply
+    across the whole sweep.
+    """
+    from .class1_neural_network import Class1NeuralNetwork
+    from .shared_memory import setup_shared_random_negative_pools
+
+    # Validate uniform pool_epochs across the whole sweep. Mixed values
+    # would need separate pools per (fold, pool_epochs); not supported
+    # in this orchestrator hook (no caller has needed it).
+    pool_epochs_seen = set()
+    encoding_seen = {}
+    for item in all_work_items:
+        hp = item["hyperparameters"]
+        pe = int(hp.get("random_negative_pool_epochs", 1) or 1)
+        pool_epochs_seen.add(pe)
+        cfg = tuple(sorted(hp.get("peptide_encoding", {}).items()))
+        encoding_seen[cfg] = hp.get("peptide_encoding", {})
+    if len(pool_epochs_seen) != 1:
+        raise ValueError(
+            "shared random-negative pool requires uniform "
+            "random_negative_pool_epochs across all work items; saw %r"
+            % (sorted(pool_epochs_seen),)
+        )
+    pool_epochs = pool_epochs_seen.pop()
+    if pool_epochs <= 1:
+        print(
+            "shared random-negative pool: skipping orchestrator build "
+            "(pool_epochs=%d means each epoch regenerates anyway). Set "
+            "random_negative_pool_epochs > 1 in hyperparameters to use "
+            "the shared mmap path." % pool_epochs
+        )
+        GLOBAL_DATA["random_negative_shared_pool_dirs"] = {}
+        return
+    if len(encoding_seen) != 1:
+        raise ValueError(
+            "shared random-negative pool requires uniform "
+            "peptide_encoding across all work items; saw %d distinct "
+            "configs" % len(encoding_seen)
+        )
+
+    # Sentinel network for its peptides_to_network_input. Instantiated
+    # only for the encoder closure; never trained.
+    sentinel_hp = all_work_items[0]["hyperparameters"]
+    sentinel = Class1NeuralNetwork(**{
+        k: v for k, v in sentinel_hp.items()
+        if k in Class1NeuralNetwork.hyperparameter_defaults.defaults
+    })
+    encoder = sentinel.peptides_to_network_input
+
+    # Per-run seed: deterministic across resumes of the same out_dir.
+    # Combine a short hash of args.out_models_dir with a fixed salt.
+    import hashlib
+    seed = int(
+        hashlib.sha256(
+            ("mhcflurry-shared-pool::" + args.out_models_dir).encode("utf-8")
+        ).hexdigest()[:8],
+        16,
+    )
+
+    output_root = os.path.abspath(args.random_negative_shared_pool_dir)
+    os.makedirs(output_root, exist_ok=True)
+    print(
+        "shared random-negative pool: building under %s "
+        "(pool_epochs=%d, num_work_items=%d, seed=%d)" % (
+            output_root, pool_epochs, len(all_work_items), seed,
+        )
+    )
+    t0 = time.time()
+    fold_pool_dirs = setup_shared_random_negative_pools(
+        output_root_dir=output_root,
+        work_items=all_work_items,
+        train_data_df=GLOBAL_DATA["train_data"],
+        folds_df=GLOBAL_DATA["folds_df"],
+        peptide_encoder=encoder,
+        pool_epochs=pool_epochs,
+        seed=seed,
+    )
+    print(
+        "shared random-negative pool: built %d (fold, cfg) pool(s) in "
+        "%.1f sec" % (len(fold_pool_dirs), time.time() - t0)
+    )
+    GLOBAL_DATA["random_negative_shared_pool_dirs"] = fold_pool_dirs
+
+
 def _initialize_encoding_cache(args, all_work_items):
     """Pre-build BLOSUM62 encoding caches used by training workers.
 
@@ -1159,6 +1273,13 @@ def train_models(args):
     # See mhcflurry/encoding_cache.py and issue openvax/mhcflurry#268.
     if getattr(args, "use_encoding_cache", False):
         _initialize_encoding_cache(args, all_work_items)
+
+    # Layer-1 SHM (per-run, mmap, read-only): pre-build per-fold random-
+    # negative pools and stash the lookup table in GLOBAL_DATA. Each
+    # work item's fit() will look up its own pool dir at task start.
+    # See mhcflurry/shared_memory.py for the layered SHM design.
+    if getattr(args, "random_negative_shared_pool_dir", None):
+        _initialize_shared_random_negative_pools(args, all_work_items)
     complete_work_item_names = [
         network.fit_info[-1]["training_info"]["work_item_name"] for network in
         predictor.neural_networks
@@ -1543,6 +1664,26 @@ def train_model(
             16,
         )
 
+    # Layer-1 SHM lookup: if the orchestrator pre-built a per-fold
+    # random-negative pool for this work item's (fold, random-negative
+    # config), pass the dir through so fit() uses from_shared_mmap.
+    # Otherwise the kwarg defaults to None and fit() falls back to the
+    # in-process pool. See mhcflurry/shared_memory.py.
+    fold_pool_dirs = constant_data.get("random_negative_shared_pool_dirs") or {}
+    if fold_pool_dirs:
+        from .shared_memory import lookup_pool_dir_for_work_item
+        pool_dir = lookup_pool_dir_for_work_item(
+            fold_pool_dirs,
+            {"fold_num": fold_num, "hyperparameters": hyperparameters},
+        )
+    else:
+        pool_dir = None
+    # Cross-worker permutation diversity: distinct seed per work item so
+    # workers reading the same pool see distinct orderings.
+    pool_permutation_seed = (
+        random_negative_seed if pool_dir is not None else None
+    )
+
     model.fit(
         peptides=train_peptides,
         affinities=train_data.measurement_value.values,
@@ -1554,6 +1695,8 @@ def train_model(
         progress_callback=progress_callback,
         progress_print_interval=progress_print_interval,
         random_negative_seed=random_negative_seed,
+        random_negative_shared_pool_dir=pool_dir,
+        random_negative_permutation_seed=pool_permutation_seed,
         verbose=verbose)
 
     # Save model-specific training info
