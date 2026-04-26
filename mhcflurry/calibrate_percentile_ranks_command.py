@@ -295,6 +295,33 @@ def run_class1_affinity_predictor(args, peptides):
     else:
         alleles = predictor.supported_alleles
 
+    # Drop alleles that mhcgnomes refuses to canonicalize (pseudogenes,
+    # null alleles, questionable annotations). They appear in
+    # ``predictor.supported_alleles`` because allele_sequences.csv
+    # aims to be exhaustive, but ``predict_to_dataframe`` raises when
+    # asked to score them — so calibration would crash partway
+    # through. Filter once up front and log what we dropped so the
+    # missing rows in the percent-rank table are explainable.
+    filtered = []
+    dropped = []
+    for allele in alleles:
+        try:
+            normalize_allele_name(allele)
+        except (ValueError, TypeError):
+            dropped.append(allele)
+            continue
+        filtered.append(allele)
+    if dropped:
+        sample = ", ".join(dropped[:5]) + (
+            ", ..." if len(dropped) > 5 else ""
+        )
+        print(
+            "Skipping %d allele(s) that fail canonicalization "
+            "(pseudogene/null/questionable): %s"
+            % (len(dropped), sample)
+        )
+    alleles = filtered
+
     allele_set = set(alleles)
 
     if predictor.allele_to_sequence:
