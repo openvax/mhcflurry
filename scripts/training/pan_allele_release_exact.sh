@@ -222,13 +222,26 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
-# Per-worker peak is 16-22 GB on mhcflurry pan-allele training (observed on
-# A100-80GB). Safe: 2 on 80GB, 1 on 40GB. 4 OOMs on 80GB.
-MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-2}"
+# Default to "auto" so the orchestrator's auto_max_workers_per_gpu
+# picks based on detected free VRAM. Per-worker peak is 16-22 GB on
+# mhcflurry pan-allele training: ``auto`` lands at 2 on 80GB cards
+# and 1 on 40GB cards. Override with MAX_WORKERS_PER_GPU=N (or
+# explicitly "auto") to pin.
+MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
+# NUM_JOBS arithmetic: bash can't multiply "auto", so fall back to a
+# conservative 2 for the Pool size when the user picked auto. The Python
+# orchestrator still applies the actual auto_max_workers_per_gpu cap to
+# the GPU-assignment side, so an over-sized Pool just leaves some workers
+# idle — never oversubscribed VRAM.
+if [ "$MAX_WORKERS_PER_GPU" = "auto" ]; then
+    _MWPG_FOR_NUM_JOBS=2
+else
+    _MWPG_FOR_NUM_JOBS="$MAX_WORKERS_PER_GPU"
+fi
 if [ "$GPUS" -eq "0" ]; then
     NUM_JOBS="${NUM_JOBS-1}"
 else
-    NUM_JOBS="${NUM_JOBS-$(( GPUS * MAX_WORKERS_PER_GPU ))}"
+    NUM_JOBS="${NUM_JOBS-$(( GPUS * _MWPG_FOR_NUM_JOBS ))}"
 fi
 echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU)"
 # Recycle after a bounded number of tasks so compile is still amortized
