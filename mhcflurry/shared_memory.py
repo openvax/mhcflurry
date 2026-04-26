@@ -1,80 +1,43 @@
 """Shared-memory primitives used by mhcflurry training.
 
-This module is the consolidated location for shared-memory
-infrastructure used across mhcflurry. There are two distinct shared-
-memory layers in production training, with different lifecycles and
-different OS mechanisms:
+mhcflurry has two shared-memory layers, both implementing the same
+"build once, share with many readers" pattern but using different OS
+mechanisms because the lifecycles differ.
 
-Layer 1 — per-run mmap (orchestrator-built, read-only)
-    Random-negative pool, encoding cache, and any other large blob
-    that is identical across many work items but expensive to
-    rebuild. Built ONCE by the training orchestrator before workers
-    are forked, then accessed read-only from worker processes via
-    ``numpy.memmap`` or equivalent. The OS page cache holds a single
-    resident copy; spawning N workers does not multiply RSS.
+Layer 1 — per-run, file-mmap, orchestrator-built, read-only.
+    Random-negative pool, encoding cache. Built ONCE before any
+    training worker is forked; workers ``numpy.memmap`` the file and
+    the OS page cache holds a single resident copy across N workers.
+    Persists to disk so it can be reused across runs.
 
-    Mechanism: filesystem-backed mmap. Persists to disk so it can be
-    reused across runs (warm cache).
+    Mechanism: ``numpy.memmap`` of files written by the orchestrator.
 
-    Helpers exposed here:
-      * ``setup_shared_random_negative_pools(...)`` — orchestrator-side
-        write of per-fold pools.
-      * ``RandomNegativesPool.write_shared_pool`` /
-        ``.from_shared_mmap`` (in ``random_negative_peptides.py``) —
-        the underlying primitive.
+Layer 2 — per-fit(), POSIX shm, fit()-built, read+write.
+    Dataset backing arrays for a single fit() inner DataLoader.
+    Lifetime is one ``fit()`` call. Tensors are allocated in
+    ``/dev/shm`` so the DataLoader's spawn workers receive storage
+    handles instead of byte copies.
 
-Layer 2 — per-fit() torch shared tensors (worker-built, read+write)
-    Inside a single ``Class1NeuralNetwork.fit()`` call, the dataset's
-    backing arrays are materialized as ``torch.Tensor`` instances in
-    POSIX shared memory (``/dev/shm``) so the inner DataLoader's
-    spawn workers receive storage handles instead of byte copies.
-    Lifetime is one ``fit()`` call (one work item).
+    Mechanism: ``torch.Tensor.share_memory_()``.
 
-    Mechanism: ``torch.Tensor.share_memory_()`` (POSIX shm, in-memory).
-    Per-fit allocation; no on-disk persistence.
-
-    Helpers exposed here (re-exported from ``class1_neural_network``):
-      * ``to_shared_tensor`` — clone an array into a SHM tensor.
-      * ``allocate_shared_neg_buffer`` — fixed-size SHM buffer for the
-        random-negative payload (refilled in place each epoch).
-      * ``refill_shared_neg_buffer`` — in-place copy from new source.
-      * ``array_nbytes`` — type-polymorphic size helper.
-
-Why two mechanisms?
-    Layer 1 is per-run / cross-worker / read-only — file-backed mmap
-    is the natural fit (persists across runs; no need to keep the
-    encoded blob alive in any single process). Layer 2 is per-fit /
-    intra-worker / mutated each epoch — POSIX shm via torch is the
-    natural fit (in-memory, fast refill, auto-cleanup on process
-    teardown). Forcing both onto one mechanism would either lose
-    cross-run persistence (Layer 1 → torch shm = re-encode every run)
-    or add disk-journal overhead per epoch (Layer 2 → mmap = write
-    random-neg buffer to disk every epoch). The asymmetry is
-    intentional; both layers conceptually do the same thing
-    (one-resident-copy, many-readers).
-
-This module is the canonical place to add new shared-memory helpers.
-Per-fit tensor helpers live in ``class1_neural_network`` for backward
-compatibility but are re-exported here for callers that want a single
-import surface.
+Both layers share one resident copy across many readers; both are
+controlled by the same idea ("the orchestrator owns the resource;
+workers consume it"). The mechanism asymmetry is intentional —
+file-mmap fits Layer 1's persist-across-runs property, torch shm fits
+Layer 2's mutate-per-epoch property — but the API surface is uniform:
+a ``setup_*`` factory and a small set of generic helpers.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
-from typing import Any, Dict, Iterable, Optional
+from dataclasses import dataclass, field, replace
+from typing import Any, Callable, Dict, List, Optional
 
-# Re-export Layer-2 (per-fit tensor SHM) helpers. Defined in
-# class1_neural_network for historical reasons; aliasing them here so
-# callers can ``from mhcflurry.shared_memory import to_shared_tensor``.
-from .class1_neural_network import (
-    _allocate_shared_neg_buffer as allocate_shared_neg_buffer,
-    _array_nbytes as array_nbytes,
-    _fit_dataloader_shm_enabled as fit_dataloader_shm_enabled,
-    _refill_shared_neg_buffer as refill_shared_neg_buffer,
-    _to_shared_tensor as to_shared_tensor,
-)
+import numpy
+import torch
 
 from .random_negative_peptides import (
     RandomNegativePeptides,
@@ -82,23 +45,184 @@ from .random_negative_peptides import (
 )
 
 
-__all__ = [
-    "allocate_shared_neg_buffer",
-    "array_nbytes",
-    "fit_dataloader_shm_enabled",
-    "refill_shared_neg_buffer",
-    "setup_shared_random_negative_pools",
-    "to_shared_tensor",
-]
+# ---- Layer 2: per-fit() torch shared tensors ----------------------------
 
+def share_tensor(value):
+    """Return ``value`` as a CPU ``torch.Tensor`` in shared memory.
+
+    Accepts a ``numpy.ndarray`` or ``torch.Tensor``; passes ``None``
+    through. The returned tensor's storage lives in POSIX shm
+    (``/dev/shm``), so when the dataset is pickled to a DataLoader
+    spawn worker the storage handle is forwarded over the socket and
+    the worker materializes a tensor pointing at the same bytes — no
+    per-worker byte copy.
+
+    Always allocates a fresh storage (clones from the source) before
+    sharing so that callers retain their original buffer. The clone is
+    a one-time per-fit() memcpy; far cheaper than the per-epoch /
+    per-worker copy it eliminates.
+    """
+    if value is None:
+        return None
+    if isinstance(value, torch.Tensor):
+        tensor = value.detach().contiguous().clone()
+    else:
+        tensor = torch.from_numpy(numpy.ascontiguousarray(value)).clone()
+    tensor.share_memory_()
+    return tensor
+
+
+def share_like(template):
+    """Allocate a fresh shared-memory tensor with ``template``'s shape/dtype.
+
+    Contents are uninitialized; the caller fills them via
+    ``update_shared``. Used for per-epoch buffers that are refilled in
+    place each iteration (e.g. fit()'s random-negative payload).
+    """
+    if isinstance(template, torch.Tensor):
+        shape, dtype = template.shape, template.dtype
+    else:
+        arr = numpy.asarray(template)
+        shape, dtype = arr.shape, torch.from_numpy(arr.reshape(-1)[:0]).dtype
+    tensor = torch.empty(shape, dtype=dtype)
+    tensor.share_memory_()
+    return tensor
+
+
+def update_shared(target, source):
+    """Copy ``source`` into ``target`` in place.
+
+    ``target`` is a shared tensor whose storage workers can already
+    see; mutating its contents propagates immediately. Safe between
+    DataLoader epochs because the parent's iter exhausts before any
+    refill, joining all workers.
+    """
+    if not isinstance(source, torch.Tensor):
+        source = torch.from_numpy(numpy.ascontiguousarray(source))
+    target.copy_(source)
+
+
+def array_nbytes(value):
+    """Return the byte size of ``value`` (numpy array or torch tensor)."""
+    if value is None:
+        return 0
+    if isinstance(value, numpy.ndarray):
+        return int(value.nbytes)
+    if isinstance(value, torch.Tensor):
+        return int(value.element_size() * value.numel())
+    raise TypeError(
+        "array_nbytes: unsupported type %s" % type(value).__name__
+    )
+
+
+def numpy_batch_collate(batch):
+    """Stack a list of numpy sample dicts into per-key numpy arrays.
+
+    Used by fit()'s DataLoader on the legacy numpy backing path.
+    Skipping PyTorch's default-collate ``torch.tensor(numpy_array)``
+    call avoids the CPU tensor allocator growth that motivated
+    openvax/mhcflurry#270.
+    """
+    return {
+        key: numpy.stack([sample[key] for sample in batch], axis=0)
+        for key in batch[0]
+    }
+
+
+def tensor_batch_collate(batch):
+    """Stack a list of tensor sample dicts into per-key tensors.
+
+    Used by fit()'s DataLoader on the SHM backing path. Each sample's
+    per-key value is a tensor view into shared memory; ``torch.stack``
+    materializes a contiguous CPU tensor that the parent then pins
+    and copies to device.
+    """
+    return {
+        key: torch.stack([sample[key] for sample in batch], dim=0)
+        for key in batch[0]
+    }
+
+
+@dataclass
+class FitBacking:
+    """Backing arrays for one fit() call, common to numpy and SHM modes.
+
+    A single bundle replaces the parallel ``_shm_x_peptide`` /
+    ``dataset_x_peptide`` scaffolding the fit() loop used to maintain.
+    ``tensor_backed`` is true when the underlying storage is shared
+    torch tensors (Layer 2 SHM); false when it's plain numpy.
+    """
+
+    x_peptide: Any
+    x_allele: Any = None
+    y_encoded: Any = None
+    sample_weights: Any = None
+    random_negative_x_peptide: Any = None
+    random_negative_x_allele: Any = None
+    tensor_backed: bool = False
+
+    @classmethod
+    def from_numpy(
+        cls,
+        *,
+        x_peptide,
+        x_allele,
+        y_encoded,
+        sample_weights,
+        random_negative_x_peptide,
+        random_negative_x_allele,
+    ):
+        return cls(
+            x_peptide=x_peptide,
+            x_allele=x_allele,
+            y_encoded=y_encoded,
+            sample_weights=sample_weights,
+            random_negative_x_peptide=random_negative_x_peptide,
+            random_negative_x_allele=random_negative_x_allele,
+            tensor_backed=False,
+        )
+
+    @classmethod
+    def share(
+        cls,
+        *,
+        x_peptide,
+        x_allele,
+        y_encoded,
+        sample_weights,
+        random_negative_x_peptide_template,
+        random_negative_x_allele,
+    ):
+        """Materialize a SHM-backed bundle.
+
+        Static arrays (x_peptide, x_allele, y_encoded, sample_weights,
+        random_negative_x_allele) are cloned into shared memory once.
+        ``random_negative_x_peptide`` is allocated as a fixed-shape
+        buffer the size of one cycle's encoding; the caller refills it
+        in place each epoch via ``update_shared``.
+        """
+        return cls(
+            x_peptide=share_tensor(x_peptide),
+            x_allele=share_tensor(x_allele),
+            y_encoded=share_tensor(y_encoded),
+            sample_weights=share_tensor(sample_weights),
+            random_negative_x_peptide=(
+                share_like(random_negative_x_peptide_template)
+                if random_negative_x_peptide_template is not None else None
+            ),
+            random_negative_x_allele=share_tensor(random_negative_x_allele),
+            tensor_backed=True,
+        )
+
+
+# ---- Layer 1: per-run mmap random-negative pool -------------------------
 
 def _planner_from_hyperparameters(hyperparameters):
     """Build a ``RandomNegativePeptides`` planner from a hyperparameter dict.
 
-    Reads only the random-negative subset of hyperparameters; ignores
-    everything else. The orchestrator uses this to construct planners
-    keyed on (fold, random-negative config tuple) before forking
-    workers.
+    Reads only the random-negative subset; ignores everything else.
+    The orchestrator uses this to build planners keyed on
+    (fold, random-negative config) before forking workers.
     """
     rn_keys = RandomNegativePeptides.hyperparameter_defaults.defaults.keys()
     sub = {k: hyperparameters[k] for k in rn_keys if k in hyperparameters}
@@ -106,12 +230,11 @@ def _planner_from_hyperparameters(hyperparameters):
 
 
 def _random_negative_config_key(hyperparameters):
-    """Stable tuple key over the random-negative hyperparameter subset.
+    """Stable tuple over the random-negative hyperparameter subset.
 
     Two work items whose plans would be identical (given the same
     training data) share the same key. The orchestrator builds one
-    pool per (fold, key); work items look up their pool by their own
-    (fold, key).
+    pool per (fold, key); workers look their pool up by their own key.
     """
     rn_keys = sorted(
         RandomNegativePeptides.hyperparameter_defaults.defaults.keys()
@@ -119,11 +242,20 @@ def _random_negative_config_key(hyperparameters):
     items = []
     for k in rn_keys:
         v = hyperparameters.get(k)
-        # Lists (e.g. random_negative_lengths) need to be hashable.
         if isinstance(v, list):
             v = tuple(v)
         items.append((k, v))
     return tuple(items)
+
+
+def _per_run_seed(out_dir):
+    """Deterministic per-run seed derived from the output directory."""
+    return int(
+        hashlib.sha256(
+            ("mhcflurry-shared-pool::" + out_dir).encode("utf-8")
+        ).hexdigest()[:8],
+        16,
+    )
 
 
 def setup_shared_random_negative_pools(
@@ -140,57 +272,18 @@ def setup_shared_random_negative_pools(
     """Build per-(fold, random-negative-config) shared mmap pools.
 
     Run once by the orchestrator BEFORE forking training workers. For
-    each unique (fold, random-negative-config) tuple present in
-    ``work_items``, computes the plan against that fold's training
-    data and writes a Phase-3 mmap pool under
+    each unique (fold, random-negative-config) tuple in ``work_items``,
+    computes the plan against that fold's training data and writes a
+    Phase-3 mmap pool under
     ``output_root_dir/fold_{fold}/cfg_{idx}/``.
 
-    Parameters
-    ----------
-    output_root_dir : str
-        Directory under which per-fold subdirectories are written. The
-        caller is responsible for cleanup at run end (typically the
-        run output dir, so it gets archived alongside models).
-    work_items : list of dict
-        Same structure as ``train_pan_allele_models_command``'s
-        ``work_items``. Reads ``fold_num`` and ``hyperparameters``.
-    train_data_df : pandas.DataFrame
-        Full training data. Must have columns: peptide, allele,
-        measurement_value, optionally measurement_inequality.
-    folds_df : pandas.DataFrame
-        Per-row fold-membership boolean columns (``fold_0``,
-        ``fold_1``, ...). Same row index as ``train_data_df``.
-    peptide_encoder : callable
-        Receives an ``EncodableSequences`` and returns an encoded
-        numpy array. Pass
-        ``Class1NeuralNetwork.peptides_to_network_input`` from a
-        sentinel network configured with the run's peptide-encoding
-        hyperparameters.
-    pool_epochs : int
-        Number of epochs of random negatives to encode into each
-        pool. Larger = lower per-epoch generation cost but bigger
-        on-disk pool. Must equal the work items'
-        ``random_negative_pool_epochs`` hyperparameter.
-    seed : int
-        Cross-cycle determinism seed. The orchestrator typically
-        passes a per-run seed; per-worker permutation diversity comes
-        from the ``permutation_seed`` passed to
-        ``RandomNegativesPool.from_shared_mmap`` at worker time.
-    log : callable, optional
-        ``log("...")`` is called at each pool boundary. Defaults to
-        ``logging.info``.
-
-    Returns
-    -------
-    dict
-        ``{(fold_num, config_key): pool_dir_path}`` — workers look
-        their pool up by ``(work_item['fold_num'],
-        _random_negative_config_key(work_item['hyperparameters']))``.
+    Returns ``{(fold_num, config_key): pool_dir}`` for worker-side
+    lookup via ``lookup_pool_dir``.
     """
     if log is None:
         log = logging.info
 
-    by_fold_and_cfg = {}
+    by_fold_and_cfg: Dict[Any, Any] = {}
     for item in work_items:
         fold_num = int(item["fold_num"])
         hp = item["hyperparameters"]
@@ -199,8 +292,7 @@ def setup_shared_random_negative_pools(
                 "setup_shared_random_negative_pools: work item %r has "
                 "random_negative_pool_epochs=%r but caller asked for "
                 "pool_epochs=%d. All work items must share the same "
-                "pool_epochs to use the shared mmap path."
-                % (
+                "pool_epochs to use the shared mmap path." % (
                     item.get("work_item_name"),
                     hp.get("random_negative_pool_epochs"),
                     pool_epochs,
@@ -217,8 +309,6 @@ def setup_shared_random_negative_pools(
             output_root_dir, "fold_%d" % fold_num, "cfg_%d" % cfg_idx
         )
         os.makedirs(fold_dir, exist_ok=True)
-
-        # Build planner against this fold's training data.
         fold_col = "fold_%d" % fold_num
         if fold_col not in folds_df.columns:
             raise KeyError(
@@ -242,17 +332,11 @@ def setup_shared_random_negative_pools(
                 else None
             ),
         )
-
         log(
             "shared_memory: writing fold=%d cfg=%d pool to %s "
-            "(pool_epochs=%d, total_count=%d, seed=%d)"
-            % (
-                fold_num,
-                cfg_idx,
-                fold_dir,
-                pool_epochs,
-                planner.get_total_count(),
-                seed,
+            "(pool_epochs=%d, total_count=%d, seed=%d)" % (
+                fold_num, cfg_idx, fold_dir, pool_epochs,
+                planner.get_total_count(), seed,
             )
         )
         RandomNegativesPool.write_shared_pool(
@@ -260,25 +344,34 @@ def setup_shared_random_negative_pools(
             planner=planner,
             peptide_encoder=peptide_encoder,
             pool_epochs=pool_epochs,
-            seed=seed + fold_num,  # distinct seed per fold
+            seed=seed + fold_num,
         )
         fold_pool_dirs[(fold_num, cfg_key)] = fold_dir
 
     return fold_pool_dirs
 
 
-def lookup_pool_dir_for_work_item(fold_pool_dirs, work_item):
-    """Look up the shared-pool dir for a work item.
+def lookup_pool_dir(fold_pool_dirs, *, fold_num, hyperparameters):
+    """Worker-side O(1) lookup. Returns dir or None if no match.
 
-    Returns the path string when the orchestrator has registered a
-    pool for this work item's (fold, random-negative-config), or
-    ``None`` when the work item should fall back to in-process
-    ``RandomNegativesPool`` construction.
+    ``None`` is the signal for the worker's fit() to fall back to the
+    in-process pool — same surface area as "Layer 1 not enabled."
     """
     if not fold_pool_dirs:
         return None
-    key = (
-        int(work_item["fold_num"]),
-        _random_negative_config_key(work_item["hyperparameters"]),
+    return fold_pool_dirs.get(
+        (int(fold_num), _random_negative_config_key(hyperparameters))
     )
-    return fold_pool_dirs.get(key)
+
+
+__all__ = [
+    "FitBacking",
+    "array_nbytes",
+    "lookup_pool_dir",
+    "numpy_batch_collate",
+    "setup_shared_random_negative_pools",
+    "share_like",
+    "share_tensor",
+    "tensor_batch_collate",
+    "update_shared",
+]

@@ -23,13 +23,15 @@ def setup_teardown():
     cleanup()
 
 
-def test_layer2_helpers_reexport_from_shared_memory():
-    """Tensor-SHM helpers can be imported from the new module."""
-    assert callable(shm.to_shared_tensor)
-    assert callable(shm.allocate_shared_neg_buffer)
-    assert callable(shm.refill_shared_neg_buffer)
+def test_layer2_public_api():
+    """All Layer-2 helpers are importable by their canonical names."""
+    assert callable(shm.share_tensor)
+    assert callable(shm.share_like)
+    assert callable(shm.update_shared)
     assert callable(shm.array_nbytes)
-    assert callable(shm.fit_dataloader_shm_enabled)
+    assert callable(shm.numpy_batch_collate)
+    assert callable(shm.tensor_batch_collate)
+    assert hasattr(shm, "FitBacking")
 
 
 def test_random_negative_config_key_stable_across_dict_order():
@@ -156,7 +158,7 @@ def test_setup_shared_random_negative_pools_rejects_pool_epochs_mismatch(tmp_pat
         )
 
 
-def test_lookup_pool_dir_for_work_item_round_trip(tmp_path):
+def test_lookup_pool_dir_round_trip(tmp_path):
     """Workers find their own (fold, cfg) pool via the lookup helper."""
     df, folds_df = _make_minimal_train_data(num_rows=20)
     hp = {
@@ -179,22 +181,32 @@ def test_lookup_pool_dir_for_work_item_round_trip(tmp_path):
         pool_epochs=2,
         seed=1,
     )
-    found = shm.lookup_pool_dir_for_work_item(fold_pool_dirs, work_items[0])
+    found = shm.lookup_pool_dir(
+        fold_pool_dirs,
+        fold_num=work_items[0]["fold_num"],
+        hyperparameters=work_items[0]["hyperparameters"],
+    )
     assert found is not None
     assert os.path.isdir(found)
 
 
-def test_lookup_pool_dir_for_work_item_returns_none_when_no_pools():
+def test_lookup_pool_dir_returns_none_when_no_pools():
     """Empty/None pool dirs map -> caller falls back to in-process pool."""
     work_item = {
         "fold_num": 0,
         "hyperparameters": {"random_negative_rate": 1.0},
     }
-    assert shm.lookup_pool_dir_for_work_item(None, work_item) is None
-    assert shm.lookup_pool_dir_for_work_item({}, work_item) is None
+    assert shm.lookup_pool_dir(
+        None, fold_num=work_item["fold_num"],
+        hyperparameters=work_item["hyperparameters"],
+    ) is None
+    assert shm.lookup_pool_dir(
+        {}, fold_num=work_item["fold_num"],
+        hyperparameters=work_item["hyperparameters"],
+    ) is None
 
 
-def test_lookup_pool_dir_for_work_item_returns_none_when_unmatched(tmp_path):
+def test_lookup_pool_dir_returns_none_when_unmatched(tmp_path):
     """A work item whose (fold, cfg) was not pre-built returns None."""
     df, folds_df = _make_minimal_train_data(num_rows=20)
     hp_built = {
@@ -220,4 +232,8 @@ def test_lookup_pool_dir_for_work_item_returns_none_when_unmatched(tmp_path):
     # Different config (different rate) → no match.
     hp_other = dict(hp_built, random_negative_rate=2.0)
     other_work_item = {"fold_num": 0, "hyperparameters": hp_other}
-    assert shm.lookup_pool_dir_for_work_item(fold_pool_dirs, other_work_item) is None
+    assert shm.lookup_pool_dir(
+        fold_pool_dirs,
+        fold_num=other_work_item["fold_num"],
+        hyperparameters=other_work_item["hyperparameters"],
+    ) is None

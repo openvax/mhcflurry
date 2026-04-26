@@ -988,7 +988,7 @@ def _initialize_shared_random_negative_pools(args, all_work_items):
     ``(fold, cfg_key) -> pool_dir`` mapping in
     ``GLOBAL_DATA["random_negative_shared_pool_dirs"]``. Workers look
     their own pool up in ``train_model`` via
-    ``shared_memory.lookup_pool_dir_for_work_item``.
+    ``shared_memory.lookup_pool_dir``.
 
     Validates that all work items share the same
     ``random_negative_pool_epochs`` and the same ``peptide_encoding``
@@ -1671,10 +1671,11 @@ def train_model(
     # in-process pool. See mhcflurry/shared_memory.py.
     fold_pool_dirs = constant_data.get("random_negative_shared_pool_dirs") or {}
     if fold_pool_dirs:
-        from .shared_memory import lookup_pool_dir_for_work_item
-        pool_dir = lookup_pool_dir_for_work_item(
+        from .shared_memory import lookup_pool_dir
+        pool_dir = lookup_pool_dir(
             fold_pool_dirs,
-            {"fold_num": fold_num, "hyperparameters": hyperparameters},
+            fold_num=fold_num,
+            hyperparameters=hyperparameters,
         )
     else:
         pool_dir = None

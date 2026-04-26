@@ -14,18 +14,19 @@ from mhcflurry.class1_neural_network import (
     Class1NeuralNetwork,
     Class1NeuralNetworkModel,
     MergedClass1NeuralNetwork,
-    _allocate_shared_neg_buffer,
-    _array_nbytes,
     _batched_validation_loss,
-    _dataset_uses_shared_tensors,
     _effective_validation_batch_size,
     _effective_fit_dataloader_num_workers,
     _FitBatchDataset,
     _make_fit_dataloader,
-    _numpy_batch_collate,
-    _refill_shared_neg_buffer,
-    _to_shared_tensor,
-    _torch_batch_collate,
+)
+from mhcflurry.shared_memory import (
+    array_nbytes,
+    numpy_batch_collate,
+    share_like,
+    share_tensor,
+    tensor_batch_collate,
+    update_shared,
 )
 from mhcflurry.class1_processing_neural_network import (
     Class1ProcessingModel,
@@ -82,54 +83,28 @@ def _seed_all(seed=1):
     torch.manual_seed(seed)
 
 
-def test_fit_dataloader_worker_path_keeps_numpy_collate():
-    """A numpy-backed dataset gets the numpy collate regardless of pin flag.
+def test_fit_dataloader_numpy_backed_uses_numpy_collate_no_pin():
+    """Numpy-backed dataset → numpy collate + no pinning.
 
-    Pin policy is now caller-controlled (post-SHM commit); the legacy
-    invariant that mattered for the openvax/mhcflurry#270 OOM is
-    "numpy backing → numpy collate", which keeps inter-process transport
-    on the standard pickling path and avoids PyTorch's default-collate
-    ``torch.tensor(numpy_array)`` allocator growth.
+    The numpy invariant that matters for openvax/mhcflurry#270:
+    keep inter-process transport on the standard pickling path and
+    avoid PyTorch's default-collate ``torch.tensor(numpy_array)``
+    allocator growth. Pin policy is derived from dataset type, not
+    a caller-passed flag.
     """
     dataset = [
-        {
-            "peptide": np.zeros((2, 3), dtype=np.int8),
-            "y": np.float32(0.0),
-        },
-        {
-            "peptide": np.ones((2, 3), dtype=np.int8),
-            "y": np.float32(1.0),
-        },
+        {"peptide": np.zeros((2, 3), dtype=np.int8), "y": np.float32(0.0)},
+        {"peptide": np.ones((2, 3), dtype=np.int8), "y": np.float32(1.0)},
     ]
-    loader = _make_fit_dataloader(
-        dataset=dataset,
-        batch_size=2,
-        num_workers=1,
-        use_pinned_memory=False,
-    )
-    assert loader.collate_fn is _numpy_batch_collate
+    loader = _make_fit_dataloader(dataset=dataset, batch_size=2, num_workers=1)
+    assert loader.collate_fn is numpy_batch_collate
     assert loader.pin_memory is False
 
 
-def test_fit_dataloader_pins_when_caller_requests():
-    """``use_pinned_memory=True`` propagates to the DataLoader."""
-    dataset = [
-        {"peptide": np.zeros((2, 3), dtype=np.float32), "y": np.float32(0.0)},
-        {"peptide": np.ones((2, 3), dtype=np.float32), "y": np.float32(1.0)},
-    ]
-    loader = _make_fit_dataloader(
-        dataset=dataset,
-        batch_size=2,
-        num_workers=0,
-        use_pinned_memory=True,
-    )
-    assert loader.pin_memory is True
-
-
-def test_fit_dataloader_shm_dataset_uses_torch_collate():
-    """SHM-backed dataset (tensor x_peptide) gets torch_batch_collate."""
-    x_peptide = _to_shared_tensor(np.zeros((4, 2, 3), dtype=np.float32))
-    y = _to_shared_tensor(np.zeros(4, dtype=np.float32))
+def test_fit_dataloader_tensor_backed_uses_tensor_collate_and_pins():
+    """Tensor-backed dataset → tensor collate + pinning."""
+    x_peptide = share_tensor(np.zeros((4, 2, 3), dtype=np.float32))
+    y = share_tensor(np.zeros(4, dtype=np.float32))
     dataset = _FitBatchDataset(
         x_peptide=x_peptide,
         x_allele=None,
@@ -137,55 +112,51 @@ def test_fit_dataloader_shm_dataset_uses_torch_collate():
         sample_weights_with_negatives=None,
         train_indices=np.arange(4),
     )
-    assert _dataset_uses_shared_tensors(dataset)
-    loader = _make_fit_dataloader(
-        dataset=dataset,
-        batch_size=2,
-        num_workers=0,
-        use_pinned_memory=False,
-    )
-    assert loader.collate_fn is _torch_batch_collate
+    assert dataset.tensor_backed
+    loader = _make_fit_dataloader(dataset=dataset, batch_size=2, num_workers=0)
+    assert loader.collate_fn is tensor_batch_collate
+    assert loader.pin_memory is True
 
 
-def test_to_shared_tensor_round_trip_is_value_equivalent_and_shared():
-    """``_to_shared_tensor`` produces a SHM tensor with the same content."""
+def test_share_tensor_round_trip():
+    """``share_tensor`` returns a SHM tensor with the same content."""
     arr = np.arange(12, dtype=np.float32).reshape(3, 4)
-    shared = _to_shared_tensor(arr)
+    shared = share_tensor(arr)
     assert isinstance(shared, torch.Tensor)
     assert shared.is_shared()
     assert torch.equal(shared, torch.from_numpy(arr))
-    # None → None
-    assert _to_shared_tensor(None) is None
+    assert share_tensor(None) is None
 
 
-def test_allocate_and_refill_shared_neg_buffer():
-    """Refill in place mutates the buffer the workers see."""
+def test_share_like_and_update_shared():
+    """``share_like`` allocates a shared buffer; ``update_shared`` fills it."""
     src = np.arange(8, dtype=np.float32).reshape(4, 2)
-    buf = _allocate_shared_neg_buffer(src)
+    buf = share_like(src)
     assert buf.is_shared()
+    assert buf.shape == src.shape
+    update_shared(buf, src)
     assert torch.equal(buf, torch.from_numpy(src))
-    next_src = src * 2
-    _refill_shared_neg_buffer(buf, next_src)
-    assert torch.equal(buf, torch.from_numpy(next_src))
+    update_shared(buf, src * 2)
+    assert torch.equal(buf, torch.from_numpy(src * 2))
 
 
-def test_effective_fit_dataloader_num_workers_skips_size_guard_for_shm(monkeypatch):
-    """SHM-backed dataset bypasses the spawn-pickle byte-size guard."""
+def test_effective_fit_dataloader_num_workers_skips_size_guard_for_tensor_backed(
+    monkeypatch,
+):
+    """Tensor-backed dataset bypasses the spawn-pickle byte-size guard."""
     from mhcflurry import class1_neural_network as cnn
 
     monkeypatch.setattr(cnn, "_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES", 32)
     monkeypatch.setattr(cnn, "_FIT_DATALOADER_DOWNGRADE_WARNED", False)
-    x_peptide = _to_shared_tensor(np.zeros((8, 2, 3), dtype=np.float32))
+    x_peptide = share_tensor(np.zeros((8, 2, 3), dtype=np.float32))
     dataset = _FitBatchDataset(
         x_peptide=x_peptide,
         x_allele=None,
-        y_encoded=_to_shared_tensor(np.zeros(8, dtype=np.float32)),
+        y_encoded=share_tensor(np.zeros(8, dtype=np.float32)),
         sample_weights_with_negatives=None,
         train_indices=np.arange(8),
     )
-
     effective, reason = _effective_fit_dataloader_num_workers(4, dataset)
-
     assert effective == 4
     assert reason is None
 
@@ -229,15 +200,14 @@ def test_fit_dataloader_worker_downgrade_has_explicit_escape_hatch(monkeypatch):
     assert reason is None
 
 
-def test_fit_with_shm_dataloader_trains_and_predicts(monkeypatch):
-    """fit() with MHCFLURRY_FIT_DATALOADER_SHM=1 trains a tiny network end-to-end.
+def test_fit_with_shm_env_override_trains_and_predicts(monkeypatch):
+    """fit() with the SHM env override on trains end-to-end.
 
-    Smoke test — exercises the SHM tensor materialization, the
+    Smoke test — exercises the FitBacking.share() materialization, the
     refill-in-place random-negative buffer, the polymorphic
-    _FitBatchDataset, _torch_batch_collate, and pin_memory=True path
+    _FitBatchDataset, tensor_batch_collate, and pin_memory=True path
     using num_workers=0 (so no spawn). Asserts fit_info reports
-    SHM-on, training completed without exceptions, and predict()
-    returns finite values.
+    SHM-on, training completed, and predict() returns finite values.
     """
     monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "1")
     peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
@@ -256,6 +226,33 @@ def test_fit_with_shm_dataloader_trains_and_predicts(monkeypatch):
     preds = model.predict(peptides)
     assert preds.shape == (len(peptides),)
     assert np.all(np.isfinite(preds))
+
+
+def test_fit_shm_auto_enables_when_dataloader_workers_requested(monkeypatch):
+    """SHM auto-enables when ``dataloader_num_workers > 0`` (no env var)."""
+    monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(11)
+    model = _make_simple_affinity_model(
+        max_epochs=2,
+        random_negative_rate=1.0,
+        random_negative_constant=0,
+        dataloader_num_workers=2,
+    )
+    model.fit(peptides, affinities)
+    assert model.fit_info[-1].get("fit_dataloader_shm_enabled") is True
+
+
+def test_fit_shm_off_by_default_when_no_workers(monkeypatch):
+    """SHM stays off when ``dataloader_num_workers=0`` and no env override."""
+    monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(11)
+    model = _make_simple_affinity_model(max_epochs=2)
+    model.fit(peptides, affinities)
+    assert model.fit_info[-1].get("fit_dataloader_shm_enabled") is False
 
 
 def test_fit_validation_interval_skips_off_interval_epochs():
