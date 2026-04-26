@@ -39,10 +39,15 @@ base_hyperparameters = {
     "patience": 20,
     # ``min_delta=0.0`` lets a 1e-9 RMSprop noise improvement reset the
     # patience counter, which on the 2026-04-25 run caused tasks to
-    # stretch to 174 epochs against a median of 67. 1e-6 is below any
-    # plausible signal floor (val_loss range observed: 0.04-0.30) and
-    # cuts noise-driven patience resets cleanly.
-    "min_delta": 1e-6,
+    # stretch to 174 epochs against a median of 67. 1e-7 sits two
+    # orders above the observed noise-floor improvement rate
+    # (~4e-9 per epoch) so it cuts that pattern cleanly, while still
+    # preserving genuine late-escape trajectories — when an escape is
+    # real, the per-epoch val_loss drop is ≥1e-3, four orders above
+    # this threshold. 1e-6 (the prior draft) was more aggressive and
+    # would have killed the late-escape tasks visible on the live
+    # cohort (~3 of 16 workers at any given moment).
+    "min_delta": 1e-7,
     # Run the validation pass every N epochs instead of every epoch.
     # Validation is ~150 ms on a 244K-row val set with bs=16384 and
     # represents a per-epoch GPU-sync barrier that prevents pipelining
