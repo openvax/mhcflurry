@@ -289,6 +289,91 @@ def fit_shm_capacity_check(num_workers, per_fit_gb=None, shm_dir="/dev/shm"):
     }
 
 
+def configure_torch_sharing_strategy_for_capacity(
+    num_workers,
+    per_fit_gb=None,
+    shm_dir="/dev/shm",
+):
+    """Switch torch's tensor-sharing strategy to ``file_descriptor`` when
+    ``/dev/shm`` is too small for the default ``file_system`` strategy.
+
+    Background: torch's default ``file_system`` strategy backs shared
+    tensors with POSIX-shm files in ``/dev/shm``. With many fit() workers
+    × multi-GB tensors, an 8 GB Docker-default ``/dev/shm`` runs out and
+    ``share_memory_()`` crashes with ``OSError [Errno 28]``. The
+    ``file_descriptor`` strategy passes anonymous FDs over Unix sockets
+    instead — no ``/dev/shm`` use at all, just an FD per shared tensor.
+
+    Returns one of:
+      * ``"unchanged"`` — capacity is fine OR no torch available; default
+        strategy retained.
+      * ``"file_descriptor"`` — capacity tight, switched. Layer-2 SHM
+        works without ``/dev/shm`` headroom.
+      * ``"failed"`` — capacity tight but switch failed (e.g. torch
+        already initialized sharing); caller should fall back to
+        disabling Layer-2 SHM.
+
+    Idempotent. Safe to call multiple times. Bumps ``RLIMIT_NOFILE`` to
+    cover the FDs the file_descriptor strategy needs (typically a few
+    hundred for 16-worker configs).
+
+    Should be called BEFORE any worker spawns or any tensor is shared,
+    typically from the orchestrator's pre-flight + from
+    ``class1_neural_network`` at module import time so fit() workers
+    that don't go through the orchestrator hook (tests, allele-specific
+    training, etc.) still benefit.
+    """
+    result = fit_shm_capacity_check(num_workers, per_fit_gb, shm_dir)
+    if result["safe"]:
+        return "unchanged"
+
+    try:
+        import torch.multiprocessing as torch_mp
+    except ImportError:
+        return "unchanged"
+
+    try:
+        current = torch_mp.get_sharing_strategy()
+    except RuntimeError:
+        # Torch unable to query; bail.
+        return "unchanged"
+
+    if current == "file_descriptor":
+        # Already switched (idempotent path).
+        return "file_descriptor"
+
+    try:
+        torch_mp.set_sharing_strategy("file_descriptor")
+    except (RuntimeError, ValueError, AssertionError):
+        # Strategy may be locked once any tensor has been shared, or the
+        # platform may not support file_descriptor (e.g. macOS torch
+        # only ships file_system). Fall through to caller's fallback.
+        return "failed"
+
+    # file_descriptor needs ~num_workers × num_dataloader_workers × N FDs
+    # per fit. Default ulimit -n is 1024 on most Linux distros, which is
+    # close to the line for 16-worker configs. Raise to 16384 if the
+    # hard cap allows.
+    try:
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        target = min(16384, hard)
+        if soft < target:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+    except (ValueError, OSError, ImportError):
+        # macOS sometimes refuses RLIMIT_NOFILE bumps; that's fine,
+        # macOS doesn't have /dev/shm and won't hit this path anyway.
+        pass
+
+    print(
+        "torch.multiprocessing: switched sharing strategy to "
+        "'file_descriptor' (was '%s'). Layer-2 SHM tensors will now use "
+        "anonymous FDs instead of /dev/shm; the capacity guard above is "
+        "no longer load-bearing." % current
+    )
+    return "file_descriptor"
+
+
 def hoist_torchinductor_compile_threads(args):
     """Cap ``TORCHINDUCTOR_COMPILE_THREADS`` based on parallel-worker count.
 

@@ -183,7 +183,8 @@ def test_shm_capacity_check_no_shm_dir_returns_safe(monkeypatch):
 
 
 def test_preflight_shm_auto_disables_on_tight_tmpfs(monkeypatch, capsys):
-    """When /dev/shm is too small, orchestrator should set
+    """When /dev/shm is too small AND the file_descriptor strategy switch
+    is unavailable, the orchestrator should set
     MHCFLURRY_FIT_DATALOADER_SHM=0 unless the user has pinned it."""
     from mhcflurry import train_pan_allele_models_command as cmd
     from mhcflurry import local_parallelism as lp
@@ -191,12 +192,47 @@ def test_preflight_shm_auto_disables_on_tight_tmpfs(monkeypatch, capsys):
     monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
     monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
     monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
+    # Disable the file_descriptor switch so the test exercises the
+    # disable fallback path explicitly.
+    monkeypatch.setenv("MHCFLURRY_TORCH_SHM_AUTO", "0")
 
     args = argparse.Namespace(num_jobs=16)
     cmd._preflight_shm_capacity(args)
     assert os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM") == "0"
     out = capsys.readouterr().out
     assert "TIGHT" in out and "Auto-disabling Layer-2 SHM" in out
+
+
+def test_preflight_shm_prefers_file_descriptor_switch(monkeypatch, capsys):
+    """When /dev/shm is tight AND file_descriptor switch succeeds, the
+    orchestrator should NOT disable Layer-2 SHM — the strategy switch
+    bypasses /dev/shm entirely so L2 SHM stays useful."""
+    import torch.multiprocessing as torch_mp
+    from mhcflurry import train_pan_allele_models_command as cmd
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
+    monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
+    monkeypatch.delenv("MHCFLURRY_TORCH_SHM_AUTO", raising=False)
+
+    def fake_get():
+        return "file_system"
+
+    set_calls = []
+
+    def fake_set(name):
+        set_calls.append(name)
+
+    monkeypatch.setattr(torch_mp, "get_sharing_strategy", fake_get)
+    monkeypatch.setattr(torch_mp, "set_sharing_strategy", fake_set)
+
+    args = argparse.Namespace(num_jobs=16)
+    cmd._preflight_shm_capacity(args)
+    # L2 SHM stays ON because the strategy switch bypassed the /dev/shm
+    # constraint entirely.
+    assert "MHCFLURRY_FIT_DATALOADER_SHM" not in os.environ
+    assert set_calls == ["file_descriptor"]
 
 
 def test_preflight_shm_respects_force_pinned_off(monkeypatch, capsys):
@@ -237,6 +273,92 @@ def test_preflight_shm_skipped_for_serial_run(monkeypatch):
     cmd._preflight_shm_capacity(args)
     # Serial run: orchestrator should not touch the env.
     assert "MHCFLURRY_FIT_DATALOADER_SHM" not in os.environ
+
+
+def test_torch_sharing_strategy_unchanged_when_capacity_safe(monkeypatch):
+    """When /dev/shm is plenty, don't touch torch's sharing strategy."""
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 250.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 256.0)
+    result = lp.configure_torch_sharing_strategy_for_capacity(
+        num_workers=16, per_fit_gb=4.0
+    )
+    assert result == "unchanged"
+
+
+def test_torch_sharing_strategy_switches_when_tight(monkeypatch):
+    """When /dev/shm is tight, switch to file_descriptor strategy."""
+    import torch.multiprocessing as torch_mp
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
+
+    set_calls = []
+
+    def fake_get():
+        return "file_system"
+
+    def fake_set(name):
+        set_calls.append(name)
+
+    monkeypatch.setattr(torch_mp, "get_sharing_strategy", fake_get)
+    monkeypatch.setattr(torch_mp, "set_sharing_strategy", fake_set)
+    result = lp.configure_torch_sharing_strategy_for_capacity(
+        num_workers=16, per_fit_gb=4.0
+    )
+    assert result == "file_descriptor"
+    assert set_calls == ["file_descriptor"]
+
+
+def test_torch_sharing_strategy_idempotent(monkeypatch):
+    """Calling twice is a no-op the second time."""
+    import torch.multiprocessing as torch_mp
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
+
+    set_calls = []
+
+    def fake_get():
+        return "file_descriptor"
+
+    def fake_set(name):
+        set_calls.append(name)
+
+    monkeypatch.setattr(torch_mp, "get_sharing_strategy", fake_get)
+    monkeypatch.setattr(torch_mp, "set_sharing_strategy", fake_set)
+    result = lp.configure_torch_sharing_strategy_for_capacity(
+        num_workers=16, per_fit_gb=4.0
+    )
+    # Already on file_descriptor; helper returns the strategy without
+    # calling set_sharing_strategy again.
+    assert result == "file_descriptor"
+    assert set_calls == []
+
+
+def test_torch_sharing_strategy_failed_falls_through(monkeypatch):
+    """When set_sharing_strategy raises (e.g. macOS), return 'failed'."""
+    import torch.multiprocessing as torch_mp
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
+
+    def fake_get():
+        return "file_system"
+
+    def fake_set(name):
+        raise AssertionError("file_descriptor not in supported strategies")
+
+    monkeypatch.setattr(torch_mp, "get_sharing_strategy", fake_get)
+    monkeypatch.setattr(torch_mp, "set_sharing_strategy", fake_set)
+    result = lp.configure_torch_sharing_strategy_for_capacity(
+        num_workers=16, per_fit_gb=4.0
+    )
+    assert result == "failed"
 
 
 def test_cluster_l1shm_warns(monkeypatch, capsys):

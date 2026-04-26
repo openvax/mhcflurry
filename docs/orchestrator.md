@@ -182,19 +182,30 @@ Layer-2 SHM allocates per-fit() backing tensors in POSIX shm
 many fit() workers, the allocator runs out mid-fit and the worker
 crashes with `OSError: [Errno 28] No space left on device`.
 
-The orchestrator handles this in three layers:
+The orchestrator handles this in **four** layers, ordered from "best
+recovery" to "conservative fallback":
 
 1. **Pre-fork advisory** — `_preflight_shm_capacity` runs before
    workers fork. It computes
    `num_workers × per_fit_gb × 1.5` (50% margin), compares to
    `df /dev/shm`, and prints a one-line summary every run.
-2. **Auto-fallback** — when capacity is tight AND the user hasn't
+2. **Auto-switch torch sharing strategy** — when capacity is tight,
+   the orchestrator first tries
+   `torch.multiprocessing.set_sharing_strategy('file_descriptor')`,
+   which passes anonymous FDs over Unix sockets instead of using
+   `/dev/shm`. This **fully recovers L2 SHM speedup** without needing
+   container resizing. Bumps `RLIMIT_NOFILE` automatically. Triggered
+   by default; disable with `MHCFLURRY_TORCH_SHM_AUTO=0`. Also fires
+   at `mhcflurry.class1_neural_network` import time so paths that
+   bypass the orchestrator (tests, allele-specific train) inherit it.
+3. **Auto-disable Layer-2 SHM** — when the strategy switch fails
+   (some platforms only ship `file_system`) AND the user hasn't
    force-pinned `MHCFLURRY_FIT_DATALOADER_SHM`, the orchestrator sets
    it to `"0"` so workers use the numpy DataLoader path instead.
    Throughput hit is ~10–30% vs the SHM path; better than crashing.
-3. **Per-fit defensive catch** — even if the orchestrator estimate
-   underran the actual need, `fit()` catches `OSError(ENOSPC)` and
-   falls back to numpy mode for that one fit() call, with a loud
+4. **Per-fit defensive catch** — even if the pre-flight estimate
+   underran the actual need, `fit()` catches `OSError(ENOSPC|ENOMEM)`
+   and falls back to numpy mode for that one fit() call, with a loud
    warning.
 
 To force-on (despite tight `/dev/shm`):
@@ -205,10 +216,12 @@ To force-off:
 `MHCFLURRY_FIT_DATALOADER_SHM=0`. Skips both Layer-2 SHM and the
 capacity check.
 
-To resize `/dev/shm` on a Docker-based runtime:
-* relaunch the container with `--shm-size=64g` (or more) — this is
-  the recommended fix; remount in-place requires `CAP_SYS_ADMIN`
-  which most container runtimes drop.
+To resize `/dev/shm` on a Docker-based runtime (rarely needed, since
+the file_descriptor strategy switch above handles tight tmpfs
+automatically):
+* relaunch the container with `--shm-size=64g` (or more); remount
+  in-place requires `CAP_SYS_ADMIN` which most container runtimes
+  drop.
 * On a bare host: `sudo mount -o remount,size=64g /dev/shm`.
 
 Per-fit footprint estimate is tuned via

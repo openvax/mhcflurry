@@ -245,6 +245,33 @@ from .shared_memory import (  # noqa: E402,F401
 )
 
 
+# Auto-switch torch's tensor sharing strategy when /dev/shm is small
+# (Docker default 8 GB, etc.). Done at module-import time so any code
+# path that calls fit() — pan-allele training, allele-specific
+# training, tests, ad-hoc scripts — gets the right strategy without
+# having to remember to call the orchestrator pre-flight. Runs once
+# per process; idempotent. Override with MHCFLURRY_TORCH_SHM_AUTO=0
+# to disable the auto-switch (e.g. to test the legacy file_system path).
+if os.environ.get("MHCFLURRY_TORCH_SHM_AUTO", "1") != "0":
+    try:
+        from .local_parallelism import (  # noqa: E402
+            configure_torch_sharing_strategy_for_capacity,
+        )
+        # Best-effort estimate: use MHCFLURRY_MAX_WORKERS_PER_GPU × NUM_JOBS
+        # if exposed, else fall back to a conservative 8 workers. Worst
+        # case here is "switched when not strictly needed" — harmless.
+        _shm_estimated_workers = int(
+            os.environ.get("MHCFLURRY_NUM_JOBS_HINT")
+            or os.environ.get("NUM_JOBS")
+            or 8
+        )
+        configure_torch_sharing_strategy_for_capacity(
+            num_workers=_shm_estimated_workers
+        )
+    except Exception:  # pragma: no cover — best-effort, never fatal
+        pass
+
+
 def check_training_batch_fits(
         requested_batch_size,
         device,

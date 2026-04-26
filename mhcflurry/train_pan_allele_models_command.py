@@ -29,6 +29,7 @@ from .common import configure_logging, normalize_allele_name
 from .local_parallelism import (
     add_local_parallelism_args,
     call_wrapped_kwargs,
+    configure_torch_sharing_strategy_for_capacity,
     fit_shm_capacity_check,
     hoist_torchinductor_compile_threads,
     worker_pool_with_gpu_assignments_from_args,
@@ -1262,7 +1263,18 @@ def _preflight_shm_capacity(args):
     if pinned == "0":
         # User force-off — already disabled; nothing to do.
         return
-    # Auto-disable Layer-2 SHM for this run.
+    # Tight /dev/shm with no user pin: try torch's file_descriptor sharing
+    # strategy first. That bypasses /dev/shm entirely (anonymous FDs over
+    # Unix sockets), preserving Layer-2 SHM on small-tmpfs containers like
+    # the Docker default (8 GB). Only fall back to disabling Layer-2 SHM
+    # when the strategy switch fails.
+    if os.environ.get("MHCFLURRY_TORCH_SHM_AUTO", "1") != "0":
+        switch = configure_torch_sharing_strategy_for_capacity(
+            num_workers=num_jobs
+        )
+        if switch == "file_descriptor":
+            return
+    # Auto-disable Layer-2 SHM as the conservative fallback.
     os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] = "0"
     print(
         "Auto-disabling Layer-2 SHM for this run "

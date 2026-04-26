@@ -135,15 +135,26 @@ to the box on every launch. Run with `--apply` once per workstation.
 ### Layer-2 SHM auto-detects /dev/shm capacity
 
 When the orchestrator detects insufficient `/dev/shm` for
-`num_workers × ~4 GB/fit × 1.5 margin`, it auto-disables Layer-2 SHM
-for the run (sets `MHCFLURRY_FIT_DATALOADER_SHM=0`) and prints a
-remediation hint (typically: relaunch the container with
-`--shm-size=64g`). The Docker-default 8 GB `/dev/shm` is too small for
-a 16-worker pan-allele run; without this guard the run would crash
-mid-fit with `OSError: [Errno 28] No space left on device`. With the
-guard, it falls back to the numpy DataLoader path (10–30% slower
-than SHM, but functional). Force-pin with
-`MHCFLURRY_FIT_DATALOADER_SHM=1` to override the auto-fallback.
+`num_workers × ~4 GB/fit × 1.5 margin`, it now follows a four-layer
+recovery cascade:
+
+1. Print a one-line capacity summary every run.
+2. **Try torch's `file_descriptor` sharing strategy first** — this
+   bypasses `/dev/shm` entirely (anonymous FDs over Unix sockets) and
+   fully recovers Layer-2 SHM throughput on Docker-default 8 GB
+   tmpfs. Auto-bumps `RLIMIT_NOFILE`. Disable with
+   `MHCFLURRY_TORCH_SHM_AUTO=0`.
+3. If the strategy switch fails (rare; some platforms only ship the
+   default `file_system` strategy), auto-disable Layer-2 SHM
+   (`MHCFLURRY_FIT_DATALOADER_SHM=0`) and continue with the numpy
+   DataLoader path (10–30% slower but functional).
+4. As a final defense, `fit()` catches `OSError(ENOSPC|ENOMEM)` from
+   `share_memory_()` and falls back to numpy for that one fit() call.
+
+Result: on the Docker-default 8 GB `/dev/shm` the typical 16-worker
+pan-allele run now keeps the full Layer-2 SHM speedup automatically;
+no container reprovisioning needed. Force-pin with
+`MHCFLURRY_FIT_DATALOADER_SHM=1` to override the auto-recovery.
 
 ### Layered SHM is auto-on with workers
 
