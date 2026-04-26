@@ -29,6 +29,7 @@ from .common import configure_logging, normalize_allele_name
 from .local_parallelism import (
     add_local_parallelism_args,
     call_wrapped_kwargs,
+    fit_shm_capacity_check,
     hoist_torchinductor_compile_threads,
     worker_pool_with_gpu_assignments_from_args,
 )
@@ -1224,6 +1225,55 @@ def _read_pretrain_peptide_list(filename):
 _hoist_torchinductor_compile_threads = hoist_torchinductor_compile_threads
 
 
+def _preflight_shm_capacity(args):
+    """Pre-fork advisory + auto-fallback for /dev/shm capacity.
+
+    Runs once in the orchestrator before workers are spawned. Computes
+    the expected Layer-2 SHM footprint from ``--num-jobs`` and a
+    per-fit estimate, compares to ``/dev/shm`` free space, and:
+
+    * Always prints a one-line summary (free, total, required).
+    * If insufficient AND the user hasn't force-pinned
+      ``MHCFLURRY_FIT_DATALOADER_SHM``, sets it to ``"0"`` so workers
+      fall back to the numpy DataLoader path. Loud-warn naming the
+      remediation (resize tmpfs, reduce concurrency).
+    * If the user has force-pinned to ``"1"``, leaves the env alone but
+      escalates the warning so the OOM is at least expected.
+
+    Skipped entirely when ``num_jobs == 0`` (serial run; no DataLoader
+    workers; no Layer-2 SHM relevant).
+    """
+    num_jobs = int(getattr(args, "num_jobs", 0) or 0)
+    if num_jobs <= 0:
+        return  # serial / cluster — capacity check is per-node and not actionable here.
+    result = fit_shm_capacity_check(num_workers=num_jobs)
+    print(result["message"])
+    if result["safe"]:
+        return
+    pinned = os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
+    if pinned == "1":
+        # User force-on. Escalate warning; respect their choice.
+        print(
+            "WARNING: MHCFLURRY_FIT_DATALOADER_SHM=1 is force-pinned despite "
+            "tight /dev/shm. Workers WILL crash partway through fit() with "
+            "OSError [Errno 28]. Unset the env var to enable auto-fallback."
+        )
+        return
+    if pinned == "0":
+        # User force-off — already disabled; nothing to do.
+        return
+    # Auto-disable Layer-2 SHM for this run.
+    os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] = "0"
+    print(
+        "Auto-disabling Layer-2 SHM for this run "
+        "(MHCFLURRY_FIT_DATALOADER_SHM=0). Per-fit DataLoader will use the "
+        "numpy backing path; per-worker pickling cost is paid once per "
+        "epoch instead of being amortized via shared tensors. Throughput "
+        "impact: roughly 10-30%% slower than the SHM path on a "
+        "large-/dev/shm box."
+    )
+
+
 def _local_pool_workers_inherit_global_data(worker_pool=None):
     """Return True when local Pool workers inherit GLOBAL_DATA by fork."""
     context = getattr(worker_pool, "_ctx", None)
@@ -1257,6 +1307,13 @@ def train_models(args):
     # threads and thrash the box. Set BEFORE forking workers so each
     # inherits the value. See docs/orchestrator.md.
     hoist_torchinductor_compile_threads(args)
+
+    # Layer-2 SHM capacity pre-flight. With small /dev/shm (8 GB Docker
+    # default) + many workers, share_memory_() will OOM mid-fit with a
+    # cryptic OSError. Check up front and (a) print a loud advisory,
+    # (b) auto-disable Layer-2 SHM unless the user has force-pinned
+    # MHCFLURRY_FIT_DATALOADER_SHM=1. See docs/orchestrator.md.
+    _preflight_shm_capacity(args)
 
     # Optionally pre-build the shared BLOSUM62 encoding cache. Orchestrator
     # does the (single-threaded) encoding pass once; workers mmap the result.

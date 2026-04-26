@@ -178,6 +178,117 @@ def resolve_max_workers_per_gpu(args):
 _INDUCTOR_THREAD_HARD_CAP = 4
 
 
+# Estimated per-fit() Layer-2 SHM footprint. Empirically ~2–3 GB for the
+# pan-allele MLP at the standard data scale (x_peptide + x_allele +
+# y_encoded + sample_weights + random_negative buffers). We round up to
+# 4 GB so the safety check has margin for outliers (longer max_length,
+# bigger random-negative pool, future hyperparameter shifts).
+_PER_FIT_SHM_FOOTPRINT_GB_DEFAULT = 4.0
+
+
+def shm_free_gb(shm_dir="/dev/shm"):
+    """Return free space (gigabytes) on ``shm_dir`` tmpfs, or ``None`` if unknown.
+
+    Returns ``None`` (not 0) on platforms without ``/dev/shm`` so callers
+    can distinguish "no /dev/shm" from "/dev/shm is full". macOS has no
+    /dev/shm; container runtimes always do.
+    """
+    if not os.path.isdir(shm_dir):
+        return None
+    try:
+        st = os.statvfs(shm_dir)
+    except OSError:
+        return None
+    return (st.f_bavail * st.f_frsize) / (1024 ** 3)
+
+
+def shm_total_gb(shm_dir="/dev/shm"):
+    """Return total size (gigabytes) of ``shm_dir`` tmpfs, or ``None``."""
+    if not os.path.isdir(shm_dir):
+        return None
+    try:
+        st = os.statvfs(shm_dir)
+    except OSError:
+        return None
+    return (st.f_blocks * st.f_frsize) / (1024 ** 3)
+
+
+def fit_shm_capacity_check(num_workers, per_fit_gb=None, shm_dir="/dev/shm"):
+    """Decide whether Layer-2 SHM is safe at this concurrency.
+
+    Returns a dict::
+
+        {"safe": bool,
+         "shm_total_gb": float | None,
+         "shm_free_gb": float | None,
+         "estimated_required_gb": float,
+         "message": str}
+
+    Used by the orchestrator pre-fork (loud warning) and by fit()'s
+    per-worker auto-detect (silent fallback). The threshold:
+    ``num_workers * per_fit_gb * 1.5`` (50% margin for transient peaks,
+    DataLoader semaphores, OpenMP per-process registrations).
+
+    On platforms without /dev/shm (macOS), returns ``safe=True`` —
+    PyTorch's file_descriptor sharing strategy bypasses the tmpfs so
+    no capacity check applies.
+    """
+    if per_fit_gb is None:
+        per_fit_gb = float(
+            os.environ.get(
+                "MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB",
+                _PER_FIT_SHM_FOOTPRINT_GB_DEFAULT,
+            )
+        )
+    free_gb = shm_free_gb(shm_dir)
+    total_gb = shm_total_gb(shm_dir)
+    required_gb = max(int(num_workers), 1) * per_fit_gb * 1.5
+    if free_gb is None:
+        # No /dev/shm visible; assume PyTorch's file_descriptor strategy
+        # will handle sharing. Caller treats as safe.
+        return {
+            "safe": True,
+            "shm_total_gb": total_gb,
+            "shm_free_gb": free_gb,
+            "estimated_required_gb": required_gb,
+            "message": (
+                "%s not present; skipping Layer-2 SHM capacity check"
+                % shm_dir
+            ),
+        }
+    safe = free_gb >= required_gb
+    if safe:
+        message = (
+            "Layer-2 SHM capacity OK: %s has %.1f GB free / %.1f GB total, "
+            "estimated need %.1f GB (%d workers × %.1f GB/fit × 1.5 margin)"
+            % (
+                shm_dir, free_gb, total_gb or 0.0, required_gb,
+                num_workers, per_fit_gb,
+            )
+        )
+    else:
+        message = (
+            "Layer-2 SHM capacity TIGHT: %s has %.1f GB free / %.1f GB "
+            "total, estimated need %.1f GB (%d workers × %.1f GB/fit × "
+            "1.5 margin). Workers will fall back to numpy DataLoader path "
+            "(slower, no per-worker share). To re-enable: bump tmpfs "
+            "(e.g. relaunch the container with --shm-size=64g) or reduce "
+            "--num-jobs / --max-workers-per-gpu. Force-on with "
+            "MHCFLURRY_FIT_DATALOADER_SHM=1 (will OOM mid-fit)."
+            % (
+                shm_dir, free_gb, total_gb or 0.0, required_gb,
+                num_workers, per_fit_gb,
+            )
+        )
+    return {
+        "safe": safe,
+        "shm_total_gb": total_gb,
+        "shm_free_gb": free_gb,
+        "estimated_required_gb": required_gb,
+        "message": message,
+    }
+
+
 def hoist_torchinductor_compile_threads(args):
     """Cap ``TORCHINDUCTOR_COMPILE_THREADS`` based on parallel-worker count.
 

@@ -175,6 +175,46 @@ N workers don't each spawn `cpu_count()` compile threads.
    The 2.3.0 application sites are calibrate (affinity + presentation
    paths) and select (pan-allele + allele-specific paths).
 
+## /dev/shm capacity and Layer-2 SHM auto-fallback
+
+Layer-2 SHM allocates per-fit() backing tensors in POSIX shm
+(`/dev/shm`). With small `/dev/shm` (the Docker default is 8 GB) and
+many fit() workers, the allocator runs out mid-fit and the worker
+crashes with `OSError: [Errno 28] No space left on device`.
+
+The orchestrator handles this in three layers:
+
+1. **Pre-fork advisory** — `_preflight_shm_capacity` runs before
+   workers fork. It computes
+   `num_workers × per_fit_gb × 1.5` (50% margin), compares to
+   `df /dev/shm`, and prints a one-line summary every run.
+2. **Auto-fallback** — when capacity is tight AND the user hasn't
+   force-pinned `MHCFLURRY_FIT_DATALOADER_SHM`, the orchestrator sets
+   it to `"0"` so workers use the numpy DataLoader path instead.
+   Throughput hit is ~10–30% vs the SHM path; better than crashing.
+3. **Per-fit defensive catch** — even if the orchestrator estimate
+   underran the actual need, `fit()` catches `OSError(ENOSPC)` and
+   falls back to numpy mode for that one fit() call, with a loud
+   warning.
+
+To force-on (despite tight `/dev/shm`):
+`MHCFLURRY_FIT_DATALOADER_SHM=1`. The pre-flight will warn but
+respect the pin; workers will OOM if the estimate is correct.
+
+To force-off:
+`MHCFLURRY_FIT_DATALOADER_SHM=0`. Skips both Layer-2 SHM and the
+capacity check.
+
+To resize `/dev/shm` on a Docker-based runtime:
+* relaunch the container with `--shm-size=64g` (or more) — this is
+  the recommended fix; remount in-place requires `CAP_SYS_ADMIN`
+  which most container runtimes drop.
+* On a bare host: `sudo mount -o remount,size=64g /dev/shm`.
+
+Per-fit footprint estimate is tuned via
+`MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB` (default 4.0 GB, sized for
+pan-allele MLP at standard data scale).
+
 ## Pointers to code
 
 - Layer 1 + Layer 2 helpers: `mhcflurry/shared_memory.py`
@@ -186,7 +226,9 @@ N workers don't each spawn `cpu_count()` compile threads.
 - Worker pool sizing: `mhcflurry/local_parallelism.py`
   (`auto_max_workers_per_gpu`, `resolve_max_workers_per_gpu`)
 - Compile-thread hoist:
-  `mhcflurry/train_pan_allele_models_command._hoist_torchinductor_compile_threads`
+  `mhcflurry/local_parallelism.hoist_torchinductor_compile_threads`
+- /dev/shm capacity: `mhcflurry/local_parallelism.fit_shm_capacity_check`
+  + `mhcflurry/train_pan_allele_models_command._preflight_shm_capacity`
 - Cluster fork point:
   `mhcflurry/cluster_parallelism.cluster_results`
 

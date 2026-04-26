@@ -4090,15 +4090,33 @@ class Class1NeuralNetwork(object):
             # epoch loop reads the same cycle 0 below as a no-op.
             _, random_neg_template = random_negatives_pool.get_epoch_inputs(0)
         if shm_enabled:
-            backing = FitBacking.share(
-                x_peptide=x_dict_without_random_negatives["peptide"],
-                x_allele=x_dict_without_random_negatives.get("allele"),
-                y_encoded=y_encoded,
-                sample_weights=sample_weights_with_negatives,
-                random_negative_x_peptide_template=random_neg_template,
-                random_negative_x_allele=random_negative_x_allele_base,
-            )
-        else:
+            try:
+                backing = FitBacking.share(
+                    x_peptide=x_dict_without_random_negatives["peptide"],
+                    x_allele=x_dict_without_random_negatives.get("allele"),
+                    y_encoded=y_encoded,
+                    sample_weights=sample_weights_with_negatives,
+                    random_negative_x_peptide_template=random_neg_template,
+                    random_negative_x_allele=random_negative_x_allele_base,
+                )
+            except OSError as exc:
+                # /dev/shm exhaustion mid-fit (e.g. ENOSPC). The
+                # orchestrator should have caught this in pre-flight, but
+                # in case the per-worker estimate underran the actual
+                # need, fall back instead of crashing the task. Logged
+                # loudly so the operator can resize tmpfs.
+                import errno
+                if exc.errno not in (errno.ENOSPC, errno.ENOMEM):
+                    raise
+                logging.warning(
+                    "fit(): Layer-2 SHM allocation failed with %s — "
+                    "falling back to numpy DataLoader path for THIS fit() "
+                    "call. Resize /dev/shm or reduce concurrency to "
+                    "avoid the fallback. See docs/orchestrator.md.",
+                    exc,
+                )
+                shm_enabled = False
+        if not shm_enabled:
             backing = FitBacking.from_numpy(
                 x_peptide=x_dict_without_random_negatives["peptide"],
                 x_allele=x_dict_without_random_negatives.get("allele"),

@@ -148,6 +148,97 @@ def test_hoist_torchinductor_sizes_against_num_jobs(monkeypatch):
     assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "1"
 
 
+def test_shm_capacity_check_safe_when_plenty_free(monkeypatch):
+    from mhcflurry import local_parallelism as lp
+
+    # Fake /dev/shm: 256 GB total, 250 GB free.
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 250.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 256.0)
+    result = lp.fit_shm_capacity_check(num_workers=16, per_fit_gb=4.0)
+    # 16 * 4 * 1.5 = 96 GB needed, 250 free.
+    assert result["safe"] is True
+    assert result["estimated_required_gb"] == 96.0
+
+
+def test_shm_capacity_check_unsafe_when_tmpfs_tight(monkeypatch):
+    from mhcflurry import local_parallelism as lp
+
+    # Docker default: 8 GB total, ~7.9 free.
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.9)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
+    result = lp.fit_shm_capacity_check(num_workers=16, per_fit_gb=4.0)
+    assert result["safe"] is False
+    assert "TIGHT" in result["message"]
+    assert "shm-size" in result["message"]
+
+
+def test_shm_capacity_check_no_shm_dir_returns_safe(monkeypatch):
+    """macOS / no-/dev/shm platforms should return safe=True."""
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: None)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: None)
+    result = lp.fit_shm_capacity_check(num_workers=8, per_fit_gb=4.0)
+    assert result["safe"] is True
+
+
+def test_preflight_shm_auto_disables_on_tight_tmpfs(monkeypatch, capsys):
+    """When /dev/shm is too small, orchestrator should set
+    MHCFLURRY_FIT_DATALOADER_SHM=0 unless the user has pinned it."""
+    from mhcflurry import train_pan_allele_models_command as cmd
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
+    monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
+
+    args = argparse.Namespace(num_jobs=16)
+    cmd._preflight_shm_capacity(args)
+    assert os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM") == "0"
+    out = capsys.readouterr().out
+    assert "TIGHT" in out and "Auto-disabling Layer-2 SHM" in out
+
+
+def test_preflight_shm_respects_force_pinned_off(monkeypatch, capsys):
+    from mhcflurry import train_pan_allele_models_command as cmd
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
+    monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "0")
+
+    args = argparse.Namespace(num_jobs=16)
+    cmd._preflight_shm_capacity(args)
+    # User pinned off; orchestrator should leave it.
+    assert os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] == "0"
+
+
+def test_preflight_shm_warns_loud_on_force_pinned_on(monkeypatch, capsys):
+    from mhcflurry import train_pan_allele_models_command as cmd
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
+    monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "1")
+
+    args = argparse.Namespace(num_jobs=16)
+    cmd._preflight_shm_capacity(args)
+    # User pinned on despite tight tmpfs — env unchanged but loud warn.
+    assert os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] == "1"
+    out = capsys.readouterr().out
+    assert "WARNING" in out and "force-pinned" in out
+
+
+def test_preflight_shm_skipped_for_serial_run(monkeypatch):
+    from mhcflurry import train_pan_allele_models_command as cmd
+
+    monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
+    args = argparse.Namespace(num_jobs=0)  # serial
+    cmd._preflight_shm_capacity(args)
+    # Serial run: orchestrator should not touch the env.
+    assert "MHCFLURRY_FIT_DATALOADER_SHM" not in os.environ
+
+
 def test_cluster_l1shm_warns(monkeypatch, capsys):
     """When --cluster-parallelism + --random-negative-shared-pool-dir
     are both passed, the orchestrator must loud-warn that the dir

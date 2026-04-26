@@ -118,6 +118,19 @@ real measurement:
 3. when patience would trigger this epoch (so the saved val_loss
    reflects the actual stop state, not a stale carried-forward value).
 
+### Layer-2 SHM auto-detects /dev/shm capacity
+
+When the orchestrator detects insufficient `/dev/shm` for
+`num_workers × ~4 GB/fit × 1.5 margin`, it auto-disables Layer-2 SHM
+for the run (sets `MHCFLURRY_FIT_DATALOADER_SHM=0`) and prints a
+remediation hint (typically: relaunch the container with
+`--shm-size=64g`). The Docker-default 8 GB `/dev/shm` is too small for
+a 16-worker pan-allele run; without this guard the run would crash
+mid-fit with `OSError: [Errno 28] No space left on device`. With the
+guard, it falls back to the numpy DataLoader path (10–30% slower
+than SHM, but functional). Force-pin with
+`MHCFLURRY_FIT_DATALOADER_SHM=1` to override the auto-fallback.
+
 ### Layered SHM is auto-on with workers
 
 When `hyperparameters["dataloader_num_workers"] > 0`, fit() materializes
