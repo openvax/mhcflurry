@@ -106,6 +106,48 @@ parser.add_argument(
     nargs=2,
     help="Min and max peptide length to calibrate, inclusive. "
     "Default: %(default)s")
+def _filter_canonicalizable_alleles(alleles, log_label="alleles"):
+    """Drop alleles that ``normalize_allele_name`` refuses to canonicalize.
+
+    ``predictor.supported_alleles`` (and any user-supplied
+    ``--alleles-file``) can contain pseudogenes / null alleles /
+    questionable annotations — those are real entries in the public
+    ``allele_sequences.csv`` (which aims to be exhaustive), but
+    ``predict_to_dataframe`` raises on them mid-iteration. Filter
+    once up front so calibration doesn't crash partway through, and
+    log the dropped sample so the missing rows in the resulting
+    percent-rank table are explainable.
+
+    A local memo keeps the per-allele ``normalize_allele_name`` cost
+    bounded — the predictor's allele set is ~20K entries and
+    mhcgnomes' parse is millisecond-scale, so without caching this
+    pre-pass alone would add ~20 sec of single-threaded startup.
+    """
+    seen = {}
+
+    def _ok(allele):
+        if allele not in seen:
+            try:
+                normalize_allele_name(allele)
+                seen[allele] = True
+            except (ValueError, TypeError):
+                seen[allele] = False
+        return seen[allele]
+
+    filtered = [a for a in alleles if _ok(a)]
+    dropped = [a for a in alleles if not _ok(a)]
+    if dropped:
+        sample = ", ".join(dropped[:5]) + (
+            ", ..." if len(dropped) > 5 else ""
+        )
+        print(
+            "Skipping %d %s that fail canonicalization "
+            "(pseudogene/null/questionable): %s"
+            % (len(dropped), log_label, sample)
+        )
+    return filtered
+
+
 def _batch_size_arg(value):
     """Accept either an int or the literal string 'auto' for --prediction-batch-size.
 
@@ -224,11 +266,14 @@ def run_class1_presentation_predictor(args, peptides):
     predictor = Class1PresentationPredictor.load(args.models_dir)
 
     if args.allele:
+        # Already canonicalized via normalize_allele_name above.
         alleles = [normalize_allele_name(a) for a in args.allele]
     elif args.alleles_file:
-        alleles = pandas.read_csv(args.alleles_file).allele.unique()
+        alleles = _filter_canonicalizable_alleles(
+            pandas.read_csv(args.alleles_file).allele.unique()
+        )
     else:
-        alleles = predictor.supported_alleles
+        alleles = _filter_canonicalizable_alleles(predictor.supported_alleles)
 
     print("Num alleles", len(alleles))
 
@@ -289,11 +334,15 @@ def run_class1_affinity_predictor(args, peptides):
     )
 
     if args.allele:
+        # Already canonicalized via normalize_allele_name above — pass
+        # through without re-filtering.
         alleles = [normalize_allele_name(a) for a in args.allele]
     elif args.alleles_file:
-        alleles = pandas.read_csv(args.alleles_file).allele.unique()
+        alleles = _filter_canonicalizable_alleles(
+            pandas.read_csv(args.alleles_file).allele.unique()
+        )
     else:
-        alleles = predictor.supported_alleles
+        alleles = _filter_canonicalizable_alleles(predictor.supported_alleles)
 
     allele_set = set(alleles)
 
