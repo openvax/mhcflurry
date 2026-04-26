@@ -110,8 +110,10 @@ def filter_canonicalizable_alleles(alleles, log_label="alleles"):
                 seen[allele] = False
         return seen[allele]
 
-    filtered = [a for a in alleles if _ok(a)]
-    dropped = [a for a in alleles if not _ok(a)]
+    filtered = []
+    dropped = []
+    for a in alleles:
+        (filtered if _ok(a) else dropped).append(a)
     if dropped:
         sample = ", ".join(dropped[:5]) + (
             ", ..." if len(dropped) > 5 else ""

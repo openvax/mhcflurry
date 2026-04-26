@@ -47,6 +47,7 @@ from typing import Any
 
 import numpy
 import numpy.lib.format
+import pandas
 
 from .encodable_sequences import EncodableSequences
 
@@ -449,7 +450,6 @@ def deterministic_unique_peptide_list(peptide_values) -> list[str]:
     .drop_duplicates()`` preserves first-seen order — use it consistently
     in every caller.
     """
-    import pandas
     return list(pandas.Series(peptide_values).drop_duplicates())
 
 

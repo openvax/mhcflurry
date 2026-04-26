@@ -170,6 +170,56 @@ def resolve_max_workers_per_gpu(args):
     return resolved
 
 
+# Inductor's compile worker pool defaults to ``os.cpu_count()``; that's
+# fine for one process but stacks badly when N fit() workers each spawn
+# their own pool. Match the same SM-scheduler-style cap used for
+# ``auto_max_workers_per_gpu``: 4 is enough compile parallelism to keep
+# Inductor useful without amplifying jitter across N workers.
+_INDUCTOR_THREAD_HARD_CAP = 4
+
+
+def hoist_torchinductor_compile_threads(args):
+    """Cap ``TORCHINDUCTOR_COMPILE_THREADS`` based on parallel-worker count.
+
+    ``torch.compile`` (when enabled via ``MHCFLURRY_TORCH_COMPILE=1``)
+    spins up an inductor compile worker pool that defaults to
+    ``os.cpu_count()`` threads. With N fit() workers each running
+    their own compile pool, an 8-job × 64-core box would spawn 512
+    compile threads — orders of magnitude over-subscribed.
+
+    The orchestrator owns "how many workers will exist", so it owns
+    the env knob too: set once before forking, every worker inherits.
+    Skips the hoist when the user has already pinned the value or when
+    ``MHCFLURRY_TORCH_COMPILE`` isn't on. Cluster workers running on
+    other hosts inherit nothing — but they share the same kernel cache
+    via inductor's content-addressed FX cache, so per-worker compile
+    counts there are bounded by cache hits, not by env.
+
+    Lives here (not in any one ``train_*_command`` module) so processing,
+    allele-specific, and any future train command can call it the same
+    way.
+    """
+    if os.environ.get("MHCFLURRY_TORCH_COMPILE", "0") != "1":
+        # No compile = no compile pool to size; leave env untouched.
+        return
+    if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ:
+        # User pinned explicitly; don't second-guess.
+        print(
+            "torch.compile: TORCHINDUCTOR_COMPILE_THREADS=%s "
+            "(user-pinned, orchestrator hoist skipped)"
+            % os.environ["TORCHINDUCTOR_COMPILE_THREADS"]
+        )
+        return
+    num_jobs = max(int(getattr(args, "num_jobs", 0) or 0), 1)
+    cpu_count_ = os.cpu_count() or 1
+    threads = max(1, min(_INDUCTOR_THREAD_HARD_CAP, cpu_count_ // num_jobs))
+    os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = str(threads)
+    print(
+        "torch.compile: hoisted TORCHINDUCTOR_COMPILE_THREADS=%d "
+        "(num_jobs=%d, cpu_count=%d)" % (threads, num_jobs, cpu_count_)
+    )
+
+
 # ---- Non-daemonic worker pool --------------------------------------------
 #
 # By default ``multiprocessing.Pool`` spawns daemon workers, and daemon

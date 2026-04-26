@@ -18,6 +18,17 @@ import inspect
 import os
 
 
+def test_hoist_helper_lives_in_local_parallelism():
+    """``hoist_torchinductor_compile_threads`` belongs in the parallelism
+    module so processing/allele-specific commands can use it without
+    importing from train_pan_allele."""
+    from mhcflurry.local_parallelism import hoist_torchinductor_compile_threads
+    from mhcflurry.train_pan_allele_models_command import (
+        _hoist_torchinductor_compile_threads,
+    )
+    assert _hoist_torchinductor_compile_threads is hoist_torchinductor_compile_threads
+
+
 def test_filter_helper_lives_in_common():
     from mhcflurry.common import filter_canonicalizable_alleles
     from mhcflurry.calibrate_percentile_ranks_command import (
@@ -81,8 +92,8 @@ def test_prebuild_encoding_caches_idempotent(tmp_path):
 
 def test_hoist_torchinductor_no_op_when_compile_disabled(monkeypatch):
     """If MHCFLURRY_TORCH_COMPILE!=1 the hoist must not touch the env."""
-    from mhcflurry.train_pan_allele_models_command import (
-        _hoist_torchinductor_compile_threads,
+    from mhcflurry.local_parallelism import (
+        hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
     )
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
     monkeypatch.delenv("TORCHINDUCTOR_COMPILE_THREADS", raising=False)
@@ -92,8 +103,8 @@ def test_hoist_torchinductor_no_op_when_compile_disabled(monkeypatch):
 
 
 def test_hoist_torchinductor_respects_user_pin(monkeypatch):
-    from mhcflurry.train_pan_allele_models_command import (
-        _hoist_torchinductor_compile_threads,
+    from mhcflurry.local_parallelism import (
+        hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
     )
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
     monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "12")
@@ -104,8 +115,8 @@ def test_hoist_torchinductor_respects_user_pin(monkeypatch):
 
 
 def test_hoist_torchinductor_sizes_against_num_jobs(monkeypatch):
-    from mhcflurry.train_pan_allele_models_command import (
-        _hoist_torchinductor_compile_threads,
+    from mhcflurry.local_parallelism import (
+        hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
     )
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
     monkeypatch.delenv("TORCHINDUCTOR_COMPILE_THREADS", raising=False)

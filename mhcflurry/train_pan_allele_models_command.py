@@ -28,8 +28,10 @@ from .class1_neural_network import Class1NeuralNetwork
 from .common import configure_logging, normalize_allele_name
 from .local_parallelism import (
     add_local_parallelism_args,
+    call_wrapped_kwargs,
+    hoist_torchinductor_compile_threads,
     worker_pool_with_gpu_assignments_from_args,
-    call_wrapped_kwargs)
+)
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -1217,44 +1219,9 @@ def _read_pretrain_peptide_list(filename):
     return list(peptide_series)
 
 
-def _hoist_torchinductor_compile_threads(args):
-    """Cap ``TORCHINDUCTOR_COMPILE_THREADS`` based on parallel-worker count.
-
-    ``torch.compile`` (when enabled via ``MHCFLURRY_TORCH_COMPILE=1``)
-    spins up an inductor compile worker pool that defaults to
-    ``os.cpu_count()`` threads. With N fit() workers each running
-    their own compile pool, an 8-job × 64-core box would spawn 512
-    compile threads — orders of magnitude over-subscribed.
-
-    The orchestrator owns "how many workers will exist", so it owns
-    the env knob too: set once before forking, every worker inherits.
-    Skips the hoist when the user has already pinned the value or when
-    ``MHCFLURRY_TORCH_COMPILE`` isn't on. Cluster workers running on
-    other hosts inherit nothing — but they share the same kernel cache
-    via inductor's content-addressed FX cache, so per-worker compile
-    counts there are bounded by cache hits, not by env.
-    """
-    if os.environ.get("MHCFLURRY_TORCH_COMPILE", "0") != "1":
-        # No compile = no compile pool to size; leave env untouched.
-        return
-    if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ:
-        # User pinned explicitly; don't second-guess.
-        print(
-            "torch.compile: TORCHINDUCTOR_COMPILE_THREADS=%s "
-            "(user-pinned, orchestrator hoist skipped)"
-            % os.environ["TORCHINDUCTOR_COMPILE_THREADS"]
-        )
-        return
-    num_jobs = max(int(getattr(args, "num_jobs", 0) or 0), 1)
-    cpu_count = os.cpu_count() or 1
-    # Reserve at least 1 thread per worker; cap at 4 to keep compile
-    # parallelism useful without amplifying jitter.
-    threads = max(1, min(4, cpu_count // num_jobs))
-    os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = str(threads)
-    print(
-        "torch.compile: hoisted TORCHINDUCTOR_COMPILE_THREADS=%d "
-        "(num_jobs=%d, cpu_count=%d)" % (threads, num_jobs, cpu_count)
-    )
+# Back-compat alias for any callers / tests that imported the helper from
+# this module before it was hoisted to ``local_parallelism``.
+_hoist_torchinductor_compile_threads = hoist_torchinductor_compile_threads
 
 
 def _local_pool_workers_inherit_global_data(worker_pool=None):
@@ -1289,7 +1256,7 @@ def train_models(args):
     # N concurrent fit() workers don't each spawn os.cpu_count() compile
     # threads and thrash the box. Set BEFORE forking workers so each
     # inherits the value. See docs/orchestrator.md.
-    _hoist_torchinductor_compile_threads(args)
+    hoist_torchinductor_compile_threads(args)
 
     # Optionally pre-build the shared BLOSUM62 encoding cache. Orchestrator
     # does the (single-threaded) encoding pass once; workers mmap the result.
