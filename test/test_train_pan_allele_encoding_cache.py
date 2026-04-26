@@ -7,7 +7,7 @@ in ``train_pan_allele_models_command``:
         EncodableSequences either directly (cache disabled, old behavior)
         or via the pre-built memmap (cache enabled, new behavior).
 
-    _deterministic_unique_peptide_list() — both orchestrator and workers
+    deterministic_unique_peptide_list() — both orchestrator and workers
         must derive identical peptide lists from the same train_data, or
         the cache key won't match.
 
@@ -41,7 +41,7 @@ from mhcflurry.encoding_cache import EncodingCache, EncodingParams
 from mhcflurry.regression_target import from_ic50
 from mhcflurry.train_pan_allele_models_command import (
     _build_train_peptides,
-    _deterministic_unique_peptide_list,
+    deterministic_unique_peptide_list,
     _get_or_build_pretrain_batch_cache,
     _initialize_encoding_cache,
     _pretrain_batch_cache_dir,
@@ -114,11 +114,11 @@ def hyperparameters():
     return {"peptide_encoding": DEFAULT_PEPTIDE_ENCODING}
 
 
-# ---- _deterministic_unique_peptide_list ----
+# ---- deterministic_unique_peptide_list ----
 
 
 def test_unique_peptide_list_is_first_seen_order(train_data):
-    got = _deterministic_unique_peptide_list(train_data.peptide.values)
+    got = deterministic_unique_peptide_list(train_data.peptide.values)
     # Order of first appearance, no duplicates.
     assert got == [
         "SIINFEKL",
@@ -135,8 +135,8 @@ def test_unique_peptide_list_is_first_seen_order(train_data):
 
 def test_unique_peptide_list_stable_across_calls(train_data):
     """Must be deterministic — orchestrator and worker must agree."""
-    first = _deterministic_unique_peptide_list(train_data.peptide.values)
-    second = _deterministic_unique_peptide_list(train_data.peptide.values)
+    first = deterministic_unique_peptide_list(train_data.peptide.values)
+    second = deterministic_unique_peptide_list(train_data.peptide.values)
     assert first == second
 
 
@@ -876,7 +876,7 @@ def test_memmap_reopens_cleanly_in_fresh_encoding_cache(
 
     # Same unique-peptides list as orchestrator would have built.
     df = GLOBAL_DATA["train_data"]
-    unique_peptides = _deterministic_unique_peptide_list(df.peptide.values)
+    unique_peptides = deterministic_unique_peptide_list(df.peptide.values)
 
     # Should be a cache HIT — the entry exists from orchestrator's build.
     entry_dir = worker_cache.entry_path(unique_peptides)
@@ -1026,9 +1026,9 @@ def test_initialize_stashes_unique_peptides_in_global_data(
     assert "encoding_cache_unique_peptides" in GLOBAL_DATA
     stashed = GLOBAL_DATA["encoding_cache_unique_peptides"]
     assert isinstance(stashed, list)
-    # Should equal what _deterministic_unique_peptide_list returns.
+    # Should equal what deterministic_unique_peptide_list returns.
     df = GLOBAL_DATA["train_data"]
-    expected = _deterministic_unique_peptide_list(df.peptide.values)
+    expected = deterministic_unique_peptide_list(df.peptide.values)
     assert stashed == expected
 
 
@@ -1047,16 +1047,16 @@ def test_build_train_peptides_uses_stashed_unique_peptides(
     _initialize_encoding_cache(args, all_work_items)
     constant_data = dict(GLOBAL_DATA)
 
-    # Spy on _deterministic_unique_peptide_list to verify it's NOT called.
+    # Spy on deterministic_unique_peptide_list to verify it's NOT called.
     from mhcflurry import train_pan_allele_models_command as cmd
     calls = []
-    original = cmd._deterministic_unique_peptide_list
+    original = cmd.deterministic_unique_peptide_list
 
     def spy(*a, **kw):
         calls.append(1)
         return original(*a, **kw)
 
-    monkeypatch.setattr(cmd, "_deterministic_unique_peptide_list", spy)
+    monkeypatch.setattr(cmd, "deterministic_unique_peptide_list", spy)
 
     # Call from "worker" side with the pickled constant_data.
     worker_dict = pickle.loads(pickle.dumps(constant_data))
@@ -1121,13 +1121,13 @@ def test_build_train_peptides_fallback_when_stash_absent(
         "encoding_cache_dir": str(cache_dir),
     }
     calls = []
-    original = cmd._deterministic_unique_peptide_list
+    original = cmd.deterministic_unique_peptide_list
 
     def spy(*a, **kw):
         calls.append(1)
         return original(*a, **kw)
 
-    monkeypatch.setattr(cmd, "_deterministic_unique_peptide_list", spy)
+    monkeypatch.setattr(cmd, "deterministic_unique_peptide_list", spy)
 
     got = _build_train_peptides(
         train_data.peptide.values, hyperparameters, constant_data
@@ -1135,7 +1135,7 @@ def test_build_train_peptides_fallback_when_stash_absent(
     assert isinstance(got, EncodableSequences)
     assert len(got.encoding_cache) == 1
     assert len(calls) == 1, (
-        f"expected exactly 1 fallback call to _deterministic_unique_peptide_list, "
+        f"expected exactly 1 fallback call to deterministic_unique_peptide_list, "
         f"got {len(calls)}"
     )
 
@@ -1729,7 +1729,7 @@ def test_pretrain_batch_cache_prebuild_matches_worker_hash(
     }
     all_work_items = [{"hyperparameters": hp}]
 
-    # train_data is only referenced by _deterministic_unique_peptide_list,
+    # train_data is only referenced by deterministic_unique_peptide_list,
     # which just needs a peptide column. Reuse the pretrain peptides.
     GLOBAL_DATA.clear()
     GLOBAL_DATA.update({

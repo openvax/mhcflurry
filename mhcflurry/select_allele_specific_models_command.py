@@ -20,9 +20,13 @@ from sklearn.metrics import roc_auc_score
 import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .common import normalize_allele_name
+from .common import (
+    configure_logging,
+    filter_canonicalizable_alleles,
+    normalize_allele_name,
+    random_peptides,
+)
 from .encodable_sequences import EncodableSequences
-from .common import configure_logging, random_peptides
 from .local_parallelism import worker_pool_with_gpu_assignments_from_args, add_local_parallelism_args
 from .regression_target import from_ic50
 
@@ -199,9 +203,15 @@ def run(argv=sys.argv[1:]):
     print("Loaded: %s" % input_predictor)
 
     if args.allele:
+        # User-supplied alleles must canonicalize; mismatch is a config error.
         alleles = [normalize_allele_name(a) for a in args.allele]
     else:
-        alleles = input_predictor.supported_alleles
+        # Pre-filter pseudogene / null / questionable supported_alleles so a
+        # single bad row doesn't crash the parallel selection mid-fold.
+        alleles = filter_canonicalizable_alleles(
+            input_predictor.supported_alleles,
+            log_label="supported_alleles",
+        )
 
     metadata_dfs = {}
     if args.data:

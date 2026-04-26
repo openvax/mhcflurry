@@ -23,7 +23,7 @@ import tqdm  # progress bar
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .encodable_sequences import EncodableSequences
 from .allele_encoding import AlleleEncoding
-from .common import configure_logging
+from .common import configure_logging, filter_canonicalizable_alleles
 from .local_parallelism import (
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)
@@ -151,7 +151,13 @@ def run(argv=sys.argv[1:]):
         args.models_dir, optimization_level=0)
     print("Loaded: %s" % input_predictor)
 
-    alleles = input_predictor.supported_alleles
+    # Filter pseudogene / null / questionable alleles up front so a single
+    # bad row in ``input_predictor.supported_alleles`` doesn't crash the
+    # parallel selection pass mid-fold. Same helper that calibrate uses.
+    alleles = filter_canonicalizable_alleles(
+        input_predictor.supported_alleles,
+        log_label="supported_alleles",
+    )
     (min_peptide_length, max_peptide_length) = (
         input_predictor.supported_peptide_lengths)
 

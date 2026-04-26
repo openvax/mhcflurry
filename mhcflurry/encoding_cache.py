@@ -441,6 +441,63 @@ def _verify_cache_key_shape() -> None:
     _CACHE_KEY_SHAPE_VERIFIED = True
 
 
+def deterministic_unique_peptide_list(peptide_values) -> list[str]:
+    """Return unique peptides in first-seen order.
+
+    Stable: the orchestrator's list must match what workers compute, or
+    the cache entry's content-addressed key won't match. ``pandas.Series
+    .drop_duplicates()`` preserves first-seen order — use it consistently
+    in every caller.
+    """
+    import pandas
+    return list(pandas.Series(peptide_values).drop_duplicates())
+
+
+def prebuild_encoding_caches(
+    *,
+    cache_dir: str | os.PathLike,
+    peptides: list[str],
+    encoding_configs: list[dict],
+    label: str = "peptides",
+    log=print,
+) -> None:
+    """Pre-encode ``peptides`` for each of ``encoding_configs``.
+
+    Generic orchestrator-side helper: write one encoding cache entry per
+    (config, peptides) pair under ``cache_dir``. Run this BEFORE forking
+    training workers so each worker's first cache lookup is a hit
+    instead of triggering N workers to race-build the same entry.
+
+    The pan-allele orchestrator (``train_pan_allele_models_command``)
+    wraps this with its own pretrain/folds/master-allele-encoding glue;
+    other orchestrators (``train_processing_models_command``,
+    ``train_allele_specific_models_command``) can call it directly when
+    their datasets grow large enough to make encoding a bottleneck.
+
+    Idempotent: cache hits short-circuit. Caller is responsible for
+    de-duplicating ``encoding_configs`` (typically by hashing each
+    config dict's items) — duplicates here only cost a no-op cache
+    check, not a re-encode.
+    """
+    for cfg in encoding_configs:
+        params = EncodingParams(**cfg)
+        cache = EncodingCache(cache_dir=str(cache_dir), params=params)
+        if cache.is_complete_for(peptides):
+            log(
+                f"Encoding cache hit ({label}): {cache.entry_path(peptides)} "
+                f"({len(peptides)} peptides)"
+            )
+            continue
+        log(
+            f"Building encoding cache ({label}) for params "
+            f"{params.to_kwargs()} ({len(peptides)} peptides) "
+            f"at {cache.entry_path(peptides)}..."
+        )
+        t0 = time.time()
+        cache.ensure_built(peptides)
+        log(f"Encoding cache built ({label}) in {time.time() - t0:.1f}s.")
+
+
 def make_prepopulated_encodable_sequences(
     peptides: list[str] | numpy.ndarray,
     encoded_rows: numpy.ndarray,

@@ -12,6 +12,11 @@ the patience-reset noise tail, and the post-training pipeline
 (select → calibrate → eval → plot) is unified into a single
 resumable script. Calibration is ~10–20× faster.
 
+The orchestrator-as-locus-of-control architecture is documented in
+[docs/orchestrator.md](docs/orchestrator.md) — read that for the
+"who owns what" picture across parallelism, shared memory, and env
+knobs.
+
 No changes to the prediction interface. **Saved 2.2.x model bundles
 load and predict identically — the changes are entirely in how new
 models are trained.**

@@ -21,7 +21,6 @@ from mhcflurry.class1_neural_network import (
     _make_fit_dataloader,
 )
 from mhcflurry.shared_memory import (
-    array_nbytes,
     numpy_batch_collate,
     share_like,
     share_tensor,

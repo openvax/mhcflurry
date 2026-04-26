@@ -38,7 +38,9 @@ from .encodable_sequences import EncodableSequences
 from .encoding_cache import (
     EncodingCache,
     EncodingParams,
+    deterministic_unique_peptide_list,
     make_prepopulated_encodable_sequences,
+    prebuild_encoding_caches,
 )
 from .regression_target import from_ic50
 
@@ -1125,7 +1127,7 @@ def _initialize_encoding_cache(args, all_work_items):
             }
 
     df = GLOBAL_DATA["train_data"]
-    unique_peptides = _deterministic_unique_peptide_list(df.peptide.values)
+    unique_peptides = deterministic_unique_peptide_list(df.peptide.values)
     unique_peptide_to_idx = {
         peptide: i for i, peptide in enumerate(unique_peptides)
     }
@@ -1139,19 +1141,12 @@ def _initialize_encoding_cache(args, all_work_items):
     )
     del unique_peptide_to_idx
 
-    for cfg in configs_seen.values():
-        params = EncodingParams(**cfg)
-        cache = EncodingCache(cache_dir=cache_dir, params=params)
-        if cache.is_complete_for(unique_peptides):
-            print(f"Encoding cache hit: {cache.entry_path(unique_peptides)} "
-                  f"({len(unique_peptides)} peptides)")
-            continue
-        print(f"Building encoding cache for params "
-              f"{params.to_kwargs()} ({len(unique_peptides)} peptides) "
-              f"at {cache.entry_path(unique_peptides)}...")
-        t0 = time.time()
-        cache.ensure_built(unique_peptides)
-        print(f"Encoding cache built in {time.time() - t0:.1f}s.")
+    prebuild_encoding_caches(
+        cache_dir=cache_dir,
+        peptides=unique_peptides,
+        encoding_configs=list(configs_seen.values()),
+        label="train",
+    )
 
     GLOBAL_DATA["encoding_cache_dir"] = str(cache_dir)
     # Per-arch params lookup: hyperparameters dict doesn't change pickle size
@@ -1175,20 +1170,12 @@ def _initialize_encoding_cache(args, all_work_items):
     pretrain_data_path = getattr(args, "pretrain_data", None)
     if pretrain_data_path:
         pretrain_peptides = _read_pretrain_peptide_list(pretrain_data_path)
-        for cfg in configs_seen.values():
-            params = EncodingParams(**cfg)
-            cache = EncodingCache(cache_dir=cache_dir, params=params)
-            if cache.is_complete_for(pretrain_peptides):
-                print(f"Pretrain encoding cache hit: "
-                      f"{cache.entry_path(pretrain_peptides)} "
-                      f"({len(pretrain_peptides)} peptides)")
-                continue
-            print(f"Building pretrain encoding cache for params "
-                  f"{params.to_kwargs()} ({len(pretrain_peptides)} peptides) "
-                  f"at {cache.entry_path(pretrain_peptides)}...")
-            t0 = time.time()
-            cache.ensure_built(pretrain_peptides)
-            print(f"Pretrain encoding cache built in {time.time() - t0:.1f}s.")
+        prebuild_encoding_caches(
+            cache_dir=cache_dir,
+            peptides=pretrain_peptides,
+            encoding_configs=list(configs_seen.values()),
+            label="pretrain",
+        )
         # Use the same AlleleEncoding the workers will use
         # (``allele_encoding``, restricted to alleles with training data),
         # NOT ``full_allele_encoding``. ``_get_pretrain_allele_info``
@@ -1218,16 +1205,6 @@ def _initialize_encoding_cache(args, all_work_items):
             )
 
 
-def _deterministic_unique_peptide_list(peptide_values):
-    """Return unique peptides in first-seen order.
-
-    Must be stable: orchestrator's list must match what workers compute, or
-    the cache key (which hashes the list) won't match. pandas.Series
-    .drop_duplicates() preserves first-seen order — use it consistently.
-    """
-    return list(pandas.Series(peptide_values).drop_duplicates())
-
-
 def _read_pretrain_peptide_list(filename):
     """Read only the peptide column (index) from the pretrain CSV.
 
@@ -1238,6 +1215,46 @@ def _read_pretrain_peptide_list(filename):
     # Reading only usecols=[0] makes pandas parse just the peptide column.
     peptide_series = pandas.read_csv(filename, index_col=0, usecols=[0]).index
     return list(peptide_series)
+
+
+def _hoist_torchinductor_compile_threads(args):
+    """Cap ``TORCHINDUCTOR_COMPILE_THREADS`` based on parallel-worker count.
+
+    ``torch.compile`` (when enabled via ``MHCFLURRY_TORCH_COMPILE=1``)
+    spins up an inductor compile worker pool that defaults to
+    ``os.cpu_count()`` threads. With N fit() workers each running
+    their own compile pool, an 8-job × 64-core box would spawn 512
+    compile threads — orders of magnitude over-subscribed.
+
+    The orchestrator owns "how many workers will exist", so it owns
+    the env knob too: set once before forking, every worker inherits.
+    Skips the hoist when the user has already pinned the value or when
+    ``MHCFLURRY_TORCH_COMPILE`` isn't on. Cluster workers running on
+    other hosts inherit nothing — but they share the same kernel cache
+    via inductor's content-addressed FX cache, so per-worker compile
+    counts there are bounded by cache hits, not by env.
+    """
+    if os.environ.get("MHCFLURRY_TORCH_COMPILE", "0") != "1":
+        # No compile = no compile pool to size; leave env untouched.
+        return
+    if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ:
+        # User pinned explicitly; don't second-guess.
+        print(
+            "torch.compile: TORCHINDUCTOR_COMPILE_THREADS=%s "
+            "(user-pinned, orchestrator hoist skipped)"
+            % os.environ["TORCHINDUCTOR_COMPILE_THREADS"]
+        )
+        return
+    num_jobs = max(int(getattr(args, "num_jobs", 0) or 0), 1)
+    cpu_count = os.cpu_count() or 1
+    # Reserve at least 1 thread per worker; cap at 4 to keep compile
+    # parallelism useful without amplifying jitter.
+    threads = max(1, min(4, cpu_count // num_jobs))
+    os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = str(threads)
+    print(
+        "torch.compile: hoisted TORCHINDUCTOR_COMPILE_THREADS=%d "
+        "(num_jobs=%d, cpu_count=%d)" % (threads, num_jobs, cpu_count)
+    )
 
 
 def _local_pool_workers_inherit_global_data(worker_pool=None):
@@ -1268,6 +1285,12 @@ def train_models(args):
 
     all_work_items = GLOBAL_DATA["work_items"]
 
+    # Orchestrator-level env tuning: cap inductor's compile worker pool so
+    # N concurrent fit() workers don't each spawn os.cpu_count() compile
+    # threads and thrash the box. Set BEFORE forking workers so each
+    # inherits the value. See docs/orchestrator.md.
+    _hoist_torchinductor_compile_threads(args)
+
     # Optionally pre-build the shared BLOSUM62 encoding cache. Orchestrator
     # does the (single-threaded) encoding pass once; workers mmap the result.
     # See mhcflurry/encoding_cache.py and issue openvax/mhcflurry#268.
@@ -1279,6 +1302,22 @@ def train_models(args):
     # work item's fit() will look up its own pool dir at task start.
     # See mhcflurry/shared_memory.py for the layered SHM design.
     if getattr(args, "random_negative_shared_pool_dir", None):
+        # Cluster mode: workers run on (possibly) other nodes. The mmap
+        # pool dir must be reachable from every worker's filesystem, or
+        # they will silently fall through to the in-process fallback.
+        # Loud-warn here rather than gating: NFS is the common cluster
+        # shape and gating would surprise users running on shared FS.
+        if getattr(args, "cluster_parallelism", False):
+            print(
+                "WARNING: --random-negative-shared-pool-dir is set with "
+                "--cluster-parallelism. The pool dir (%s) MUST be on a "
+                "filesystem reachable from every cluster worker (typically "
+                "the same NFS as --cluster-results-workdir) or workers will "
+                "fail to mmap and fall back to the in-process pool, "
+                "negating the speedup." % os.path.abspath(
+                    args.random_negative_shared_pool_dir
+                )
+            )
         _initialize_shared_random_negative_pools(args, all_work_items)
     complete_work_item_names = [
         network.fit_info[-1]["training_info"]["work_item_name"] for network in
@@ -1418,7 +1457,7 @@ def _build_train_peptides(
     unique_peptides = constant_data.get("encoding_cache_unique_peptides")
     if unique_peptides is None:
         df = constant_data["train_data"]
-        unique_peptides = _deterministic_unique_peptide_list(df.peptide.values)
+        unique_peptides = deterministic_unique_peptide_list(df.peptide.values)
     cache_entry_path = cache.ensure_built(unique_peptides)
     encoded_all = numpy.load(
         join(str(cache_entry_path), "encoded.npy"),

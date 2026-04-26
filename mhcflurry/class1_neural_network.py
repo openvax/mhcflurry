@@ -234,7 +234,7 @@ _FIT_DATALOADER_DOWNGRADE_WARNED = False
 # Layer-2 SHM helpers + collation are defined in mhcflurry/shared_memory.py
 # (the canonical home). Re-exporting at module-level so callers that
 # already import them from class1_neural_network keep working.
-from .shared_memory import (  # noqa: E402
+from .shared_memory import (  # noqa: E402,F401
     FitBacking,
     array_nbytes,
     numpy_batch_collate,
