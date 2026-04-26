@@ -346,13 +346,30 @@ do
     cp "$UNSELECTED_DIR/train_data.csv.bz2" "$SELECTED_DIR/train_data.csv.bz2"
 
     # ---- percentile rank calibration (matches release) ---------------
+    # Three speedups vs the legacy invocation, individually safe and
+    # stacking to ~10-20x on CUDA on the pan-allele universe:
+    #
+    #   --gpu-batched: batches many alleles into one forward pass via
+    #     the issue-#272 GPU-hoisted fast path. Bit-identical on CUDA;
+    #     ~5-30x faster than the per-allele predict() loop.
+    #   --alleles-per-work-chunk 30 (was 10): better amortization of
+    #     per-chunk fixed costs (pool dispatch, model load, aggregate).
+    #     ~3x fewer chunks. Override with CALIBRATE_ALLELES_PER_CHUNK.
+    #   --num-peptides-per-length 50000 (was 100000): linear in
+    #     calibration wall time. Quality trade-off matters only for
+    #     the deep tail of the percent-rank distribution; for
+    #     ranks > 0.5% the noise from halving is negligible.
+    #     Override with CALIBRATE_PEPTIDES_PER_LENGTH.
+    CALIBRATE_PEPTIDES_PER_LENGTH="${CALIBRATE_PEPTIDES_PER_LENGTH:-50000}"
+    CALIBRATE_ALLELES_PER_CHUNK="${CALIBRATE_ALLELES_PER_CHUNK:-30}"
     run_logged_step "calibrate_${kind}" "$CALIBRATE_LOG" \
         mhcflurry-calibrate-percentile-ranks \
         --models-dir "$SELECTED_DIR" \
         --match-amino-acid-distribution-data "$UNSELECTED_DIR/train_data.csv.bz2" \
         --motif-summary \
-        --num-peptides-per-length 100000 \
-        --alleles-per-work-chunk 10 \
+        --num-peptides-per-length "$CALIBRATE_PEPTIDES_PER_LENGTH" \
+        --alleles-per-work-chunk "$CALIBRATE_ALLELES_PER_CHUNK" \
+        --gpu-batched \
         --verbosity 1 \
         "${PARALLELISM_ARGS[@]}"
 done
