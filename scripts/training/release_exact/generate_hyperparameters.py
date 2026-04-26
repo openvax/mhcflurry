@@ -20,7 +20,12 @@ base_hyperparameters = {
     'locally_connected_layers': [],
     'topology': 'feedfoward',
     'loss': 'custom:mse_with_inequalities',
-    'max_epochs': 5000,
+    # Hard absolute cap (down from 5000). Median per-task epoch count
+    # observed on the 2026-04-25 verda_a100x8 run was 67 with max=174;
+    # 500 leaves comfortable headroom while preventing the runaway
+    # "patience-reset" tail where tiny noise improvements could keep a
+    # task alive for thousands of epochs.
+    'max_epochs': 500,
     # Bumped 512 → 4096 to close the A100 utilization gap. At 512 rows per
     # step the 2-layer MLP was <1 ms of actual compute sandwiched inside
     # ~33 ms of Python/IPC glue (measured: 33.7 ms/step across 37
@@ -32,7 +37,20 @@ base_hyperparameters = {
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
     "patience": 20,
-    "min_delta": 0.0,
+    # ``min_delta=0.0`` lets a 1e-9 RMSprop noise improvement reset the
+    # patience counter, which on the 2026-04-25 run caused tasks to
+    # stretch to 174 epochs against a median of 67. 1e-6 is below any
+    # plausible signal floor (val_loss range observed: 0.04-0.30) and
+    # cuts noise-driven patience resets cleanly.
+    "min_delta": 1e-6,
+    # Run the validation pass every N epochs instead of every epoch.
+    # Validation is ~150 ms on a 244K-row val set with bs=16384 and
+    # represents a per-epoch GPU-sync barrier that prevents pipelining
+    # the next epoch's CPU prep with the current epoch's training tail.
+    # Early-stop check still fires reliably because patience=20 is far
+    # larger than ``validation_interval=5``. A final validation pass is
+    # forced before any patience-triggered break (see fit() loop).
+    "validation_interval": 5,
     'peptide_encoding': {
         'vector_encoding_name': 'BLOSUM62',
         'alignment_method': 'left_pad_centered_right_pad',
