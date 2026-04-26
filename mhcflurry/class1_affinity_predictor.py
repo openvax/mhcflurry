@@ -1693,6 +1693,319 @@ class Class1AffinityPredictor(object):
             }
         return {}
 
+    @staticmethod
+    def _auto_size_calibration_batches(
+            model, device, n_peptides, n_alleles,
+            num_workers_per_gpu=1,
+            free_memory_fraction=0.5):
+        """Split the auto-sized batch budget between peptide and allele axes.
+
+        Wraps ``compute_prediction_batch_size`` (the single source of
+        truth for GPU-memory-aware batch sizing) and splits the budget
+        so the peptide axis is ≥10 k (amortizing dispatch) and the
+        allele axis uses whatever remains (capped at 256 since dispatch
+        savings flatten out past that point).
+        """
+        from .class1_neural_network import compute_prediction_batch_size
+        total_rows = compute_prediction_batch_size(
+            device,
+            model=model,
+            num_workers_per_gpu=num_workers_per_gpu,
+            free_memory_fraction=free_memory_fraction,
+        )
+        if n_peptides == 0 or n_alleles == 0:
+            return max(n_peptides, 1), max(n_alleles, 1)
+        peptide_batch = min(n_peptides, max(10_000, total_rows // 64))
+        allele_batch = min(n_alleles, max(1, total_rows // peptide_batch), 256)
+        while allele_batch * peptide_batch > total_rows and peptide_batch > 10_000:
+            peptide_batch = max(10_000, peptide_batch // 2)
+        return int(peptide_batch), int(allele_batch)
+
+    def calibrate_percentile_ranks_fast(
+            self,
+            peptides,
+            alleles,
+            bins=None,
+            motif_summary=False,
+            summary_top_peptide_fractions=(0.001,),
+            allele_batch_size="auto",
+            peptide_batch_size="auto",
+            num_workers_per_gpu=1,
+            device=None,
+            verbose=False):
+        """GPU-hoisted calibration for many alleles sharing a peptide set.
+
+        Drop-in replacement for the bulk of ``calibrate_percentile_ranks``
+        when calibration is dominated by per-allele Python dispatch (the
+        pan-allele full-universe calibration workload, which sweeps
+        ~20k alleles across the same peptide set). Two structural changes:
+
+        1. **Precompute peptide-stage activations once per network.** The
+           network's locally-connected + peptide-dense + early-batchnorm
+           layers are identity across alleles; we forward the calibration
+           peptides through that stage exactly once per network and
+           cache the output tensor on device.
+        2. **Batch ``allele_batch_size`` alleles per forward.** A single
+           ``forward_from_peptide_stage`` call replaces
+           ``allele_batch_size`` separate ``model.predict`` calls —
+           amortizing all the small kernel-launch + Python-dispatch
+           overhead that was dominating wall-clock time on the pan-allele
+           full-universe calibration. Effective batch size per forward:
+           ``allele_batch_size * peptide_batch_size``, sized so it fits
+           comfortably in an A100's 80 GB.
+
+        Semantics-preserving w.r.t. ``calibrate_percentile_ranks``: same
+        peptides → same per-network IC50 predictions (bit-identical when
+        the network is deterministic) → same geometric-mean ensemble
+        aggregation → same ``PercentRankTransform.fit`` per allele.
+        Only the schedule of Python dispatch and GPU kernel launches
+        changes.
+
+        Only handles pan-allele models. Mass-spec-only models and
+        ``class1_presentation_predictor`` should keep using the slower
+        per-allele path.
+
+        Parameters
+        ----------
+        peptides : sequence of string or EncodableSequences
+        alleles : sequence of string — already-normalized allele names
+            (canonicalization is the caller's responsibility for speed).
+        bins : argument to ``numpy.histogram`` (default: 999 bin edges
+            in IC50 space, matching ``calibrate_percentile_ranks``).
+        motif_summary : bool — populate frequency matrices + length
+            distributions, same format as ``calibrate_percentile_ranks``.
+        summary_top_peptide_fractions : iterable of float — only used
+            when ``motif_summary=True``.
+        allele_batch_size : int — how many alleles share a single forward
+            through the merge + main dense. 64 is a reasonable default
+            on an A100-80GB with the release pan-allele arch + the 800k
+            peptide calibration set (peak VRAM ~ allele_batch_size *
+            peptide_batch_size * 4 bytes per hidden unit).
+        peptide_batch_size : int — peptide chunk size on device.
+        device : str or torch.device — defaults to CUDA if available.
+        verbose : bool — per-batch timing to stdout.
+
+        Returns
+        -------
+        dict (same schema as ``calibrate_percentile_ranks``). Also
+        populates ``self.allele_to_percent_rank_transform[allele]`` for
+        every allele in ``alleles``.
+        """
+        import torch
+
+        from .class1_neural_network import Class1NeuralNetwork  # noqa
+        from .encodable_sequences import EncodableSequences
+        from .allele_encoding import AlleleEncoding
+        from .regression_target import to_ic50
+        from .percent_rank_transform import PercentRankTransform
+        from .common import positional_frequency_matrix
+
+        if not self.class1_pan_allele_models:
+            raise ValueError(
+                "calibrate_percentile_ranks_fast is pan-allele-only; "
+                "this predictor has no pan-allele models."
+            )
+
+        if bins is None:
+            bins = to_ic50(numpy.linspace(1, 0, 1000))
+
+        if device is None:
+            device = (
+                torch.device("cuda") if torch.cuda.is_available()
+                else torch.device("cpu")
+            )
+        else:
+            device = torch.device(device)
+
+        encoded_peptides = EncodableSequences.create(peptides)
+        n_peptides = len(encoded_peptides.sequences)
+        if n_peptides == 0:
+            raise ValueError("No peptides supplied for calibration")
+        alleles = list(alleles)
+        if not alleles:
+            raise ValueError("No alleles supplied for calibration")
+
+        master = self.master_allele_encoding
+        unknown = [a for a in alleles if a not in master.allele_to_index]
+        if unknown:
+            raise KeyError(
+                "calibrate_percentile_ranks_fast: %d allele(s) not in the "
+                "predictor's master encoding (first 5: %s)" % (
+                    len(unknown), unknown[:5],
+                )
+            )
+        allele_idx_np = numpy.array(
+            [master.allele_to_index[a] for a in alleles], dtype=numpy.int64,
+        )
+
+        # Per-network prep: ensure allele representations are wired up,
+        # move the eager (uncompiled) model to device, cache the
+        # peptide-stage output.
+        networks = self.class1_pan_allele_models
+        if allele_batch_size in (None, "auto") or peptide_batch_size in (None, "auto"):
+            # Resolve once, using the first network as the architecture
+            # probe — all ensembles we serve have homogeneous layer
+            # sizing, so one probe is sufficient.
+            probe_net = networks[0].network(borrow=True)
+            probe_net.to(device)
+            auto_peptide, auto_allele = self._auto_size_calibration_batches(
+                probe_net, device, n_peptides, len(alleles),
+                num_workers_per_gpu=num_workers_per_gpu,
+            )
+            if peptide_batch_size in (None, "auto"):
+                peptide_batch_size = auto_peptide
+            if allele_batch_size in (None, "auto"):
+                allele_batch_size = auto_allele
+            if verbose:
+                print(
+                    "calibrate_percentile_ranks_fast auto-sized: "
+                    f"peptide_batch={peptide_batch_size}, "
+                    f"allele_batch={allele_batch_size} "
+                    f"(workers_per_gpu={num_workers_per_gpu})"
+                )
+        peptide_batch_size = int(peptide_batch_size)
+        allele_batch_size = int(allele_batch_size)
+        cached_stages = []  # list of (net_obj, model, peptide_stage on device)
+        for net_obj in networks:
+            (_, allele_reps) = net_obj.allele_encoding_to_network_input(
+                AlleleEncoding(alleles=[], borrow_from=master),
+            )
+            net_obj.set_allele_representations(allele_reps)
+            model = net_obj.network(borrow=True)
+            model.to(device)
+            model.eval()
+            peptide_input = net_obj.peptides_to_network_input(encoded_peptides)
+            peptide_is_indices = net_obj.hyperparameters.get(
+                "peptide_amino_acid_encoding_gpu", False,
+            )
+            stage_parts = []
+            with torch.no_grad():
+                for start in range(0, n_peptides, peptide_batch_size):
+                    end = min(start + peptide_batch_size, n_peptides)
+                    chunk = peptide_input[start:end]
+                    keep_int = (
+                        peptide_is_indices
+                        and chunk.ndim == 2
+                        and numpy.issubdtype(chunk.dtype, numpy.integer)
+                    )
+                    if keep_int:
+                        tensor = torch.from_numpy(chunk).to(device)
+                    else:
+                        tensor = torch.from_numpy(
+                            numpy.asarray(chunk, dtype=numpy.float32),
+                        ).to(device)
+                    stage_parts.append(model.forward_peptide_stage(tensor))
+            cached_stages.append((net_obj, model, torch.cat(stage_parts, dim=0)))
+            del peptide_input
+
+        log50000 = float(numpy.log(50000.0))
+        n_alleles = len(alleles)
+        frequency_matrices = [] if motif_summary else None
+        length_distributions = [] if motif_summary else None
+
+        for abatch_start in range(0, n_alleles, allele_batch_size):
+            abatch_end = min(abatch_start + allele_batch_size, n_alleles)
+            a_size = abatch_end - abatch_start
+            batch_alleles = alleles[abatch_start:abatch_end]
+            batch_idx = torch.from_numpy(
+                allele_idx_np[abatch_start:abatch_end],
+            ).to(device)
+
+            # log-space accumulator across networks: (a_size, n_peptides).
+            # Same aggregation scheme as the existing ensemble code:
+            # arithmetic mean of per-network log(IC50) = geometric mean
+            # of per-network IC50. Use fp64 where supported so the
+            # aggregation matches the legacy path bit-for-bit; fall
+            # back to fp32 on MPS (which has no fp64) — drift there is
+            # ~1e-6 in log-IC50, well below histogram-bin resolution.
+            accum_dtype = (
+                torch.float32 if device.type == "mps" else torch.float64
+            )
+            log_ic50_sum = torch.zeros(
+                a_size, n_peptides, dtype=accum_dtype, device=device,
+            )
+
+            for (_, model, peptide_stage) in cached_stages:
+                with torch.no_grad():
+                    for start in range(0, n_peptides, peptide_batch_size):
+                        end = min(start + peptide_batch_size, n_peptides)
+                        p_chunk = peptide_stage[start:end]  # (chunk_n, d)
+                        network_output = (
+                            model.forward_cartesian_from_peptide_stage(
+                                p_chunk,
+                                batch_idx,
+                            )
+                        )
+                        # shape (a_size, chunk_n, num_outputs) — take the first
+                        # output (matches existing predict default).
+                        network_output = network_output[..., 0]
+                        # log(IC50) = (1 - network_output) * log(50000).
+                        # Network output ∈ [0,1] from sigmoid — never
+                        # negative, so the log(0) edge is avoided without
+                        # clamping.
+                        log_ic50_sum[:, start:end] += (
+                            (1.0 - network_output).to(accum_dtype) * log50000
+                        )
+
+            log_mean = log_ic50_sum / float(len(cached_stages))
+            ic50 = torch.exp(log_mean).to("cpu").numpy()  # (a_size, n_peptides)
+            for local_i, allele in enumerate(batch_alleles):
+                predictions = ic50[local_i]
+                transform = PercentRankTransform()
+                transform.fit(predictions, bins=bins)
+                self.allele_to_percent_rank_transform[allele] = transform
+                if motif_summary:
+                    df = pandas.DataFrame({
+                        "peptide": encoded_peptides.sequences,
+                        "prediction": predictions,
+                    }).drop_duplicates("peptide").set_index("peptide")
+                    df["length"] = df.index.str.len()
+                    for (length, sub_df) in df.groupby("length"):
+                        for cutoff_fraction in summary_top_peptide_fractions:
+                            k = max(int(len(sub_df) * cutoff_fraction), 1)
+                            selected = sub_df.prediction.nsmallest(k).index.values
+                            matrix = positional_frequency_matrix(selected).reset_index()
+                            original_columns = list(matrix.columns)
+                            matrix["allele"] = allele
+                            matrix["length"] = length
+                            matrix["cutoff_fraction"] = cutoff_fraction
+                            matrix["cutoff_count"] = len(selected)
+                            matrix = matrix[
+                                ["allele", "length", "cutoff_fraction", "cutoff_count"]
+                                + original_columns
+                            ]
+                            frequency_matrices.append(matrix)
+                    for cutoff_fraction in summary_top_peptide_fractions:
+                        k = max(int(len(df) * cutoff_fraction), 1)
+                        ld = df.prediction.nsmallest(k).index.str.len().value_counts()
+                        ld.index.name = "length"
+                        ld = ld / ld.sum()
+                        ld = ld.to_frame(name="fraction").reset_index()
+                        ld["allele"] = allele
+                        ld["cutoff_fraction"] = cutoff_fraction
+                        ld["cutoff_count"] = k
+                        ld = ld[[
+                            "allele", "cutoff_fraction", "cutoff_count",
+                            "length", "fraction",
+                        ]].sort_values(["cutoff_fraction", "length"])
+                        length_distributions.append(ld)
+            if verbose:
+                print(
+                    "calibrate_percentile_ranks_fast: "
+                    f"{abatch_end}/{n_alleles} alleles done"
+                )
+
+        if motif_summary:
+            return {
+                "frequency_matrices": pandas.concat(
+                    frequency_matrices, ignore_index=True,
+                ),
+                "length_distributions": pandas.concat(
+                    length_distributions, ignore_index=True,
+                ),
+            }
+        return {}
+
     def model_select(
             self,
             score_function,

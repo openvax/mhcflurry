@@ -106,11 +106,26 @@ parser.add_argument(
     nargs=2,
     help="Min and max peptide length to calibrate, inclusive. "
     "Default: %(default)s")
+def _batch_size_arg(value):
+    """Accept either an int or the literal string 'auto' for --prediction-batch-size.
+
+    ``auto`` (the default) delegates sizing to
+    ``mhcflurry.class1_neural_network.compute_prediction_batch_size``,
+    which picks a per-GPU-memory batch, reserving the VRAM partition
+    across co-resident workers.
+    """
+    if isinstance(value, str) and value.strip().lower() in ("auto", ""):
+        return "auto"
+    return int(value)
+
+
 parser.add_argument(
     "--prediction-batch-size",
-    type=int,
-    default=4096,
-    help="Batch size for predictions")
+    type=_batch_size_arg,
+    default="auto",
+    help="Batch size for predictions. Pass an int to pin, or 'auto' "
+         "(default) to size per GPU free memory / workers-per-GPU — see "
+         "mhcflurry.class1_neural_network.compute_prediction_batch_size.")
 parser.add_argument(
     "--alleles-per-work-chunk",
     type=int,
@@ -122,6 +137,35 @@ parser.add_argument(
     type=int,
     help="Verbosity. Default: %(default)s",
     default=0)
+parser.add_argument(
+    "--gpu-batched",
+    default=False,
+    action="store_true",
+    help="[class1 affinity predictors only] Use the GPU-hoisted "
+         "calibration fast path (issue openvax/mhcflurry#272): "
+         "precompute peptide-side activations per network and batch "
+         "--gpu-allele-batch-size alleles into a single forward through "
+         "the merge + main dense path. Same output as the default path "
+         "(bit-identical on CUDA, ~1e-6 log-IC50 drift on MPS due to "
+         "missing fp64 support), typically 5-30x faster on CUDA for the "
+         "full pan-allele universe. Ignored when running a presentation "
+         "predictor or serial/cluster mode.")
+parser.add_argument(
+    "--gpu-allele-batch-size",
+    type=_batch_size_arg,
+    default="auto",
+    help="Alleles per GPU forward when --gpu-batched. Pass an int to "
+         "pin; 'auto' (default) partitions the VRAM budget with "
+         "--max-workers-per-gpu. Larger values trade off more VRAM for "
+         "fewer kernel launches.")
+parser.add_argument(
+    "--gpu-peptide-batch-size",
+    type=_batch_size_arg,
+    default="auto",
+    help="Peptide chunk size on device when --gpu-batched. Pass an int "
+         "to pin; 'auto' (default) picks the peptide axis of the "
+         "auto-sized budget. Reducing keeps peak VRAM down on smaller "
+         "GPUs but adds kernel-launch overhead.")
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
@@ -139,6 +183,11 @@ def run(argv=sys.argv[1:]):
     args.models_dir = os.path.abspath(args.models_dir)
 
     configure_logging(verbose=args.verbosity > 1)
+
+    # Resolve --max-workers-per-gpu='auto' to an int now, before any
+    # downstream consumer reads it (model_kwargs below + pool creation).
+    from .local_parallelism import resolve_max_workers_per_gpu
+    resolve_max_workers_per_gpu(args)
 
     aa_distribution = None
     if args.match_amino_acid_distribution_data:
@@ -285,13 +334,24 @@ def run_class1_affinity_predictor(args, peptides):
     # after fork, instead of needing to be pickled (when doing a parallel run).
     GLOBAL_DATA["calibration_peptides"] = encoded_peptides
     GLOBAL_DATA["predictor"] = predictor
+    model_kwargs = {
+        'batch_size': args.prediction_batch_size,
+    }
+    # Thread workers-per-GPU into the auto-size budget. The VRAM
+    # partition across co-resident workers matters only when the
+    # underlying predict path resolves ``"auto"`` — but it's cheap to
+    # always pass it through.
+    if getattr(args, 'max_workers_per_gpu', None):
+        model_kwargs['num_workers_per_gpu'] = int(args.max_workers_per_gpu)
     GLOBAL_DATA["args"] = {
         'motif_summary': args.motif_summary,
         'summary_top_peptide_fractions': args.summary_top_peptide_fraction,
         'verbose': args.verbosity > 0,
-        'model_kwargs': {
-            'batch_size': args.prediction_batch_size,
-        }
+        'model_kwargs': model_kwargs,
+        'gpu_batched': getattr(args, 'gpu_batched', False),
+        'gpu_allele_batch_size': getattr(args, 'gpu_allele_batch_size', 'auto'),
+        'gpu_peptide_batch_size': getattr(args, 'gpu_peptide_batch_size', 'auto'),
+        'num_workers_per_gpu': int(getattr(args, 'max_workers_per_gpu', 1) or 1),
     }
     del encoded_peptides
 
@@ -368,6 +428,34 @@ def do_class1_affinity_calibrate_percentile_ranks(
     if 'predictor' not in constant_data:
         raise ValueError("No predictor provided: " + str(constant_data))
 
+    args = dict(constant_data["args"])
+    gpu_batched = args.pop('gpu_batched', False)
+    gpu_allele_batch_size = args.pop('gpu_allele_batch_size', "auto")
+    gpu_peptide_batch_size = args.pop('gpu_peptide_batch_size', "auto")
+    num_workers_per_gpu = args.pop('num_workers_per_gpu', 1)
+
+    if gpu_batched:
+        # Single fast-path call over the whole chunk — see
+        # Class1AffinityPredictor.calibrate_percentile_ranks_fast. The
+        # worker's chunk size (--alleles-per-work-chunk) gates the
+        # outer partition; within a chunk the allele sweep runs as
+        # fewer larger GPU forwards. num_workers_per_gpu narrows the
+        # VRAM partition the fast path claims so co-resident workers
+        # don't race each other into OOM.
+        return [
+            class1_affinity_calibrate_percentile_ranks_fast(
+                alleles=alleles,
+                predictor=constant_data['predictor'],
+                peptides=constant_data['calibration_peptides'],
+                motif_summary=args['motif_summary'],
+                summary_top_peptide_fractions=args['summary_top_peptide_fractions'],
+                verbose=args['verbose'],
+                gpu_allele_batch_size=gpu_allele_batch_size,
+                gpu_peptide_batch_size=gpu_peptide_batch_size,
+                num_workers_per_gpu=num_workers_per_gpu,
+            )
+        ]
+
     result_list = []
     for (i, allele) in enumerate(alleles):
         print("Processing allele", i + 1, "of", len(alleles))
@@ -375,9 +463,52 @@ def do_class1_affinity_calibrate_percentile_ranks(
             allele,
             constant_data['predictor'],
             peptides=constant_data['calibration_peptides'],
-            **constant_data["args"])
+            **args)
         result_list.append(result_item)
     return result_list
+
+
+def class1_affinity_calibrate_percentile_ranks_fast(
+        alleles,
+        predictor,
+        peptides,
+        motif_summary=False,
+        summary_top_peptide_fractions=(0.001,),
+        verbose=False,
+        gpu_allele_batch_size="auto",
+        gpu_peptide_batch_size="auto",
+        num_workers_per_gpu=1):
+    """Worker-side fast-path wrapper for the GPU-batched calibration path.
+
+    Returns the same ``(transforms_dict, summary_results)`` tuple the
+    per-allele wrapper produces so the surrounding result-aggregation
+    code doesn't need to know which path ran.
+    """
+    predictor.optimize()
+    start = time.time()
+    summary_results = predictor.calibrate_percentile_ranks_fast(
+        peptides=peptides,
+        alleles=alleles,
+        motif_summary=motif_summary,
+        summary_top_peptide_fractions=tuple(summary_top_peptide_fractions),
+        allele_batch_size=gpu_allele_batch_size,
+        peptide_batch_size=gpu_peptide_batch_size,
+        num_workers_per_gpu=num_workers_per_gpu,
+        verbose=verbose,
+    )
+    if verbose:
+        print(
+            "Done calibrating %d alleles in %0.2f sec via fast path" % (
+                len(alleles), time.time() - start,
+            )
+        )
+    transforms = {
+        allele: predictor.allele_to_percent_rank_transform[allele]
+        for allele in alleles
+    }
+    # Motif summary comes back pre-concatenated when fast path is used;
+    # mirror the legacy per-allele wrapper's return shape.
+    return (transforms, summary_results if motif_summary else None)
 
 
 def class1_affinity_calibrate_percentile_ranks(

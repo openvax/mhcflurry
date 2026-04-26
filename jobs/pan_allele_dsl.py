@@ -31,6 +31,7 @@ image = (
     .pip_install(
         "runplz>=3.7.2",  # the in-container bootstrap runs `python -m runplz._bootstrap`
         "pandas>=2.0",
+        "pyarrow",
         "appdirs",
         "scikit-learn",
         "mhcgnomes>=3.0.1",

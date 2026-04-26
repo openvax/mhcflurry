@@ -44,6 +44,10 @@ app = App(
         # OCI boot advertised at 15 min; give 40 min margin against
         # launchpad's own provisioning queue. Closes runplz #34.
         ssh_ready_wait_seconds=2400,
+        # Brev backend kill-switch. runplz only enforces wall caps for Brev
+        # through BrevConfig.max_runtime_seconds; @app.function(timeout=...)
+        # is Modal-only.
+        max_runtime_seconds=60 * 60 * 60,
     ),
 )
 
@@ -51,8 +55,14 @@ image = (
     Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
     .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
     .pip_install(
-        "runplz>=3.7.2",
+        # 3.11.0: detached remote bootstrap (setsid + nohup + file redirects)
+        # so an SSH drop from the client can no longer SIGPIPE the remote
+        # training process tree. Before this, a wifi hiccup on the laptop
+        # killed the 8×A100 run at 21:09 UTC 2026-04-23 after ~1h36m and
+        # 3/140 tasks. See pirl-unc/runplz#53.
+        "runplz>=3.11.0",
         "pandas>=2.0",
+        "pyarrow",
         "appdirs",
         "scikit-learn",
         "mhcgnomes>=3.0.1",
@@ -71,7 +81,7 @@ image = (
     min_memory=400,      # GB RAM — full data + pretraining buffer
     min_gpu_memory=40,   # GB VRAM per GPU
     min_disk=1000,       # GB — ~140 networks × ~10MB weights + init info
-    timeout=60 * 60 * 60,  # 60 hours — safety margin above 28h estimate
+    timeout=60 * 60 * 60,  # Modal-only. Brev cap set in BrevConfig above.
     env={
         # massedcompute_A100_sxm4_80G_DGXx8 is 8× A100-80GB. 80GB cards
         # fit 2 workers (each ~20 GB peak VRAM during validation
@@ -79,6 +89,30 @@ image = (
         # 8 GPUs. With Phase 2 NonDaemonPool, each worker's DataLoader
         # prefetch path is live in production too.
         "MAX_WORKERS_PER_GPU": "2",
+        "MAX_TASKS_PER_WORKER": "12",
+        # Enable torch.compile (gated in class1_neural_network.py via
+        # _maybe_compile_network + _maybe_compile_loss). Pays ~60 s
+        # codegen per worker process, amortized across the 12
+        # tasks/worker; fuses the forward+loss into a few kernels and
+        # eliminates per-step Python dispatch. Stacks with the
+        # minibatch=4096 bump — bigger batches give compile more
+        # arithmetic to amortize its fixed overheads over.
+        "MHCFLURRY_TORCH_COMPILE": "1",
+        "TORCHINDUCTOR_COMPILE_THREADS": "2",
+        # Zero DataLoader subprocesses = zero per-epoch torch-import
+        # respawn cost (commit 3ca980d rationale: persistent_workers was
+        # dropped because fit() rebuilds the DataLoader per epoch). With
+        # minibatch=4096 the batch-build work is <1 ms on 1M-row fancy
+        # indexing, so in-process dispatch is the right default. The
+        # fit_generator path keeps a single long-lived iterator so it
+        # isn't affected by this knob when =0 anyway.
+        "DATALOADER_NUM_WORKERS": "0",
+        # Populate the per-epoch timing arrays in fit_info (epoch_fetch_time,
+        # epoch_train_time, epoch_validation_time, etc.). Writes to the
+        # persisted model's config_json so we can do post-hoc breakdown
+        # of where time goes. No runtime cost beyond a few timestamp
+        # records per epoch.
+        "MHCFLURRY_ENABLE_TIMING": "1",
     },
 )
 def train():

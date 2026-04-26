@@ -476,7 +476,7 @@ class Class1ProcessingNeuralNetwork(object):
         max_epochs=500,
         validation_split=0.1,
         early_stopping=True,
-        minibatch_size=256,
+        minibatch_size=512,
     )
     """
     Hyperparameters for neural network training.
@@ -902,19 +902,27 @@ class Class1ProcessingNeuralNetwork(object):
             Peptides and flanking sequences
         throw : boolean
             Whether to throw exception on unsupported peptides
-        batch_size : int
-            Prediction batch size.
+        batch_size : int or ``"auto"``
+            Prediction batch size. ``"auto"`` (the default) auto-sizes
+            per the current device — see
+            ``mhcflurry.class1_neural_network.compute_prediction_batch_size``.
 
         Returns
         -------
         numpy.array
         """
+        from .class1_neural_network import resolve_prediction_batch_size
+
         device = self.get_device()
 
         x_dict = self.network_input(sequences, throw=throw)
         network = self.network()
         network.to(device)
         network.eval()
+
+        batch_size = resolve_prediction_batch_size(
+            batch_size, device, model=network,
+        )
 
         n_samples = len(x_dict["sequence"])
         all_predictions = []
