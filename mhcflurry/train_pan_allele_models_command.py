@@ -1264,17 +1264,16 @@ def _preflight_shm_capacity(args):
     if pinned == "0":
         # User force-off — already disabled; nothing to do.
         return
-    # Tight /dev/shm with no user pin: try torch's file_descriptor sharing
-    # strategy first. That bypasses /dev/shm entirely (anonymous FDs over
-    # Unix sockets), preserving Layer-2 SHM on small-tmpfs containers like
-    # the Docker default (8 GB). Only fall back to disabling Layer-2 SHM
-    # when the strategy switch fails.
+    # Tight /dev/shm with no user pin: prefer torch's file_descriptor
+    # sharing strategy when available. It avoids torch_shm_manager/name
+    # cleanup issues, but it still allocates POSIX shared memory via
+    # shm_open and therefore does NOT solve tmpfs capacity. Disable
+    # Layer-2 SHM after the best-effort switch so auto-backed component
+    # models take the numpy path instead of stampeding into ENOSPC.
     if os.environ.get("MHCFLURRY_TORCH_SHM_AUTO", "1") != "0":
-        switch = configure_torch_sharing_strategy_for_capacity(
+        configure_torch_sharing_strategy_for_capacity(
             num_workers=num_jobs
         )
-        if switch == "file_descriptor":
-            return
     # Auto-disable Layer-2 SHM as the conservative fallback.
     os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] = "0"
     print(

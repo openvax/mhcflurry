@@ -223,17 +223,15 @@ def test_shm_capacity_check_no_shm_dir_returns_safe(monkeypatch):
 
 
 def test_preflight_shm_auto_disables_on_tight_tmpfs(monkeypatch, capsys):
-    """When /dev/shm is too small AND the file_descriptor strategy switch
-    is unavailable, the orchestrator should set
-    MHCFLURRY_FIT_DATALOADER_SHM=0 unless the user has pinned it."""
+    """When /dev/shm is too small, auto-backed fits should disable L2 SHM."""
     from mhcflurry import train_pan_allele_models_command as cmd
     from mhcflurry import local_parallelism as lp
 
     monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
     monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
     monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
-    # Disable the file_descriptor switch so the test exercises the
-    # disable fallback path explicitly.
+    # Disable the best-effort strategy switch so this exercises only
+    # the disable path.
     monkeypatch.setenv("MHCFLURRY_TORCH_SHM_AUTO", "0")
 
     args = argparse.Namespace(num_jobs=16)
@@ -243,10 +241,8 @@ def test_preflight_shm_auto_disables_on_tight_tmpfs(monkeypatch, capsys):
     assert "TIGHT" in out and "Auto-disabling Layer-2 SHM" in out
 
 
-def test_preflight_shm_prefers_file_descriptor_switch(monkeypatch, capsys):
-    """When /dev/shm is tight AND file_descriptor switch succeeds, the
-    orchestrator should NOT disable Layer-2 SHM — the strategy switch
-    bypasses /dev/shm entirely so L2 SHM stays useful."""
+def test_preflight_shm_file_descriptor_does_not_override_capacity(monkeypatch, capsys):
+    """file_descriptor helps handles, but tight tmpfs still disables L2 SHM."""
     import torch.multiprocessing as torch_mp
     from mhcflurry import train_pan_allele_models_command as cmd
     from mhcflurry import local_parallelism as lp
@@ -269,10 +265,10 @@ def test_preflight_shm_prefers_file_descriptor_switch(monkeypatch, capsys):
 
     args = argparse.Namespace(num_jobs=16)
     cmd._preflight_shm_capacity(args)
-    # L2 SHM stays ON because the strategy switch bypassed the /dev/shm
-    # constraint entirely.
-    assert "MHCFLURRY_FIT_DATALOADER_SHM" not in os.environ
+    assert os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM") == "0"
     assert set_calls == ["file_descriptor"]
+    out = capsys.readouterr().out
+    assert "TIGHT" in out and "Auto-disabling Layer-2 SHM" in out
 
 
 def test_preflight_shm_respects_force_pinned_off(monkeypatch, capsys):
@@ -328,7 +324,7 @@ def test_torch_sharing_strategy_unchanged_when_capacity_safe(monkeypatch):
 
 
 def test_torch_sharing_strategy_switches_when_tight(monkeypatch):
-    """When /dev/shm is tight, switch to file_descriptor strategy."""
+    """When /dev/shm is tight, prefer file_descriptor handles if possible."""
     import torch.multiprocessing as torch_mp
     from mhcflurry import local_parallelism as lp
 

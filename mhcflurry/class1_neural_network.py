@@ -1332,9 +1332,10 @@ def _make_fit_dataloader(
 
     If called from a daemon process (i.e. inside a
     ``multiprocessing.Pool`` worker without the NonDaemonPool override),
-    ``num_workers`` is forced to 0 and ``pin_memory`` to False because
-    daemon processes cannot spawn their own children. See
-    ``_effective_num_workers``.
+    ``num_workers`` is forced to 0 because daemon processes cannot spawn
+    their own children. Pinning is still derived from the dataset backing:
+    tensor-backed batches may request pinning, while numpy-backed batches do
+    not. See ``_effective_num_workers``.
 
     Note: PyTorch's ``persistent_workers`` flag isn't exposed here
     because ``fit()`` rebuilds the DataLoader per epoch (the x_peptide

@@ -321,14 +321,15 @@ def fit_shm_capacity_check(num_workers, per_fit_gb=None, shm_dir="/dev/shm"):
          "estimated_required_gb": float,
          "message": str}
 
-    Used by the orchestrator pre-fork (loud warning) and by fit()'s
-    per-worker auto-detect (silent fallback). The threshold:
+    Used by the orchestrator pre-fork for a loud warning and optional
+    auto-disable of Layer-2 SHM. The threshold:
     ``num_workers * per_fit_gb * 1.5`` (50% margin for transient peaks,
     DataLoader semaphores, OpenMP per-process registrations).
 
-    On platforms without /dev/shm (macOS), returns ``safe=True`` —
-    PyTorch's file_descriptor sharing strategy bypasses the tmpfs so
-    no capacity check applies.
+    On platforms without /dev/shm (macOS), returns ``safe=True`` because
+    the Linux tmpfs capacity check is not meaningful there. The actual
+    torch sharing operation is still probed by ``torch_shared_memory_status``
+    before fit() attempts shared-tensor backing.
     """
     if per_fit_gb is None:
         per_fit_gb = float(
@@ -368,10 +369,12 @@ def fit_shm_capacity_check(num_workers, per_fit_gb=None, shm_dir="/dev/shm"):
             "Layer-2 SHM capacity TIGHT: %s has %.1f GB free / %.1f GB "
             "total, estimated need %.1f GB (%d workers × %.1f GB/fit × "
             "1.5 margin). Workers will fall back to numpy DataLoader path "
-            "(slower, no per-worker share). To re-enable: bump tmpfs "
-            "(e.g. relaunch the container with --shm-size=64g) or reduce "
+            "(slower, no per-worker share) unless shared-tensor backing is "
+            "explicitly force-pinned. To re-enable: bump tmpfs (e.g. "
+            "relaunch the container with --shm-size=64g) or reduce "
             "--num-jobs / --max-workers-per-gpu. Force-on with "
-            "MHCFLURRY_FIT_DATALOADER_SHM=1 (will OOM mid-fit)."
+            "MHCFLURRY_FIT_DATALOADER_SHM=1 or fit_dataloader_backing="
+            "shared_tensor (will likely fail mid-fit)."
             % (
                 shm_dir, free_gb, total_gb or 0.0, required_gb,
                 num_workers, per_fit_gb,
@@ -387,25 +390,27 @@ def fit_shm_capacity_check(num_workers, per_fit_gb=None, shm_dir="/dev/shm"):
 
 
 def configure_torch_sharing_strategy_for_capacity(
-    num_workers,
-    per_fit_gb=None,
-    shm_dir="/dev/shm",
+        num_workers,
+        per_fit_gb=None,
+        shm_dir="/dev/shm",
 ):
-    """Switch torch's tensor-sharing strategy to ``file_descriptor`` when
-    ``/dev/shm`` is too small for the default ``file_system`` strategy.
+    """Prefer torch's ``file_descriptor`` CPU tensor sharing strategy.
 
-    Background: torch's default ``file_system`` strategy backs shared
-    tensors with POSIX-shm files in ``/dev/shm``. With many fit() workers
-    × multi-GB tensors, an 8 GB Docker-default ``/dev/shm`` runs out and
-    ``share_memory_()`` crashes with ``OSError [Errno 28]``. The
-    ``file_descriptor`` strategy passes anonymous FDs over Unix sockets
-    instead — no ``/dev/shm`` use at all, just an FD per shared tensor.
+    Background: both torch CPU sharing strategies allocate POSIX shared
+    memory via ``shm_open``. The difference is handle transport:
+    ``file_descriptor`` keeps and passes FDs, while ``file_system`` passes
+    shm names and relies on ``torch_shm_manager`` for cleanup. Switching to
+    ``file_descriptor`` can avoid ``torch_shm_manager`` permission problems
+    and leaked shm names, but it does **not** fix a too-small ``/dev/shm``.
+    The orchestrator must still disable Layer-2 SHM when the capacity check
+    says the tmpfs is tight.
 
     Returns one of:
       * ``"unchanged"`` — capacity is fine OR no torch available; default
         strategy retained.
-      * ``"file_descriptor"`` — capacity tight, switched. Layer-2 SHM
-        works without ``/dev/shm`` headroom.
+      * ``"file_descriptor"`` — capacity tight and the strategy is now
+        file_descriptor. This may help cleanup/permissions, but callers
+        must still respect the capacity check.
       * ``"failed"`` — capacity tight but switch failed (e.g. torch
         already initialized sharing); caller should fall back to
         disabling Layer-2 SHM.
@@ -464,9 +469,9 @@ def configure_torch_sharing_strategy_for_capacity(
 
     print(
         "torch.multiprocessing: switched sharing strategy to "
-        "'file_descriptor' (was '%s'). Layer-2 SHM tensors will now use "
-        "anonymous FDs instead of /dev/shm; the capacity guard above is "
-        "no longer load-bearing." % current
+        "'file_descriptor' (was '%s'). Layer-2 SHM tensors still require "
+        "shared-memory capacity, but handles will be passed as file "
+        "descriptors instead of shm names." % current
     )
     return "file_descriptor"
 

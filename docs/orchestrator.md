@@ -101,10 +101,11 @@ backends. Only the orchestrator branches on `args.cluster_parallelism`.
 
 The 2.3.0 modernization concentrates on the pan-allele affinity
 training + percentile calibration paths. Other components inherit
-parts of the stack (Layer-2 SHM is automatic for any `fit()` call;
-the pseudogene filter is now shared) but their orchestrators don't
-yet drive Layer-1 SHM or encoding-cache prefetch — those are
-opt-in, not on by default.
+parts of the stack (Layer-2 SHM is automatic for affinity `fit()` calls
+that use `fit_dataloader_backing="auto"` with `dataloader_num_workers > 0`;
+the pseudogene filter is now shared) but their orchestrators don't yet
+drive Layer-1 SHM or encoding-cache prefetch — those are opt-in, not on
+by default.
 
 | | pretrain | finetune | select | calibrate |
 |---|---|---|---|---|
@@ -197,19 +198,21 @@ recovery" to "conservative fallback":
    workers fork. It computes
    `num_workers × per_fit_gb × 1.5` (50% margin), compares to
    `df /dev/shm`, and prints a one-line summary every run.
-2. **Auto-switch torch sharing strategy** — when capacity is tight,
-   the orchestrator first tries
-   `torch.multiprocessing.set_sharing_strategy('file_descriptor')`,
-   which passes anonymous FDs over Unix sockets instead of using
-   `/dev/shm`. This **fully recovers L2 SHM speedup** without needing
-   container resizing. Bumps `RLIMIT_NOFILE` automatically. Triggered
-   by default; disable with `MHCFLURRY_TORCH_SHM_AUTO=0`. Also fires
-   at `mhcflurry.class1_neural_network` import time so paths that
-   bypass the orchestrator (tests, allele-specific train) inherit it.
+2. **Prefer torch's file-descriptor handle strategy** — when capacity
+   is tight, the orchestrator first tries
+   `torch.multiprocessing.set_sharing_strategy('file_descriptor')`.
+   This changes how torch passes shared-memory handles and avoids some
+   `torch_shm_manager` cleanup/permission failures. It does **not**
+   bypass `/dev/shm` capacity: both torch CPU sharing strategies still
+   allocate POSIX shared memory. Bumps `RLIMIT_NOFILE` automatically.
+   Triggered by default; disable with `MHCFLURRY_TORCH_SHM_AUTO=0`.
+   Also fires at `mhcflurry.class1_neural_network` import time so paths
+   that bypass the orchestrator (tests, allele-specific train) inherit it.
 3. **Auto-disable Layer-2 SHM** — when the strategy switch fails
-   (some platforms only ship `file_system`) AND the user hasn't
-   force-pinned `MHCFLURRY_FIT_DATALOADER_SHM`, the orchestrator sets
-   it to `"0"` so workers use the numpy DataLoader path instead.
+   (some platforms only ship `file_system`) OR the tmpfs remains too
+   small, and the user hasn't force-pinned
+   `MHCFLURRY_FIT_DATALOADER_SHM`, the orchestrator sets it to `"0"`
+   so auto-backed workers use the numpy DataLoader path instead.
    Throughput hit is ~10–30% vs the SHM path; better than crashing.
 4. **Per-fit defensive catch** — even if the pre-flight estimate
    underran the actual need, `fit()` catches resource-exhaustion
@@ -229,9 +232,7 @@ For `fit_dataloader_backing="auto"`, force-off with
 component-model `fit_dataloader_backing` hyperparameter wins over this
 diagnostic env var.
 
-To resize `/dev/shm` on a Docker-based runtime (rarely needed, since
-the file_descriptor strategy switch above handles tight tmpfs
-automatically):
+To resize `/dev/shm` on a Docker-based runtime:
 * relaunch the container with `--shm-size=64g` (or more); remount
   in-place requires `CAP_SYS_ADMIN` which most container runtimes
   drop.
