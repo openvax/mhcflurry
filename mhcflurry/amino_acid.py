@@ -133,7 +133,7 @@ def _lower_triangular_matrix(values, amino_acids):
     return pandas.DataFrame(matrix, index=amino_acids, columns=amino_acids)
 
 
-SIMK990103_MATRIX = _matrix_with_unknown(_lower_triangular_matrix("""
+CONTACT_MATRIX = _matrix_with_unknown(_lower_triangular_matrix("""
 -0.06711
 0.06154 -0.08474
 0.09263 -0.15773 -0.17967
@@ -155,7 +155,7 @@ SIMK990103_MATRIX = _matrix_with_unknown(_lower_triangular_matrix("""
 0.03904 0.02232 -0.01661 -0.05851 -0.01389 -0.04713 -0.08186 0.04000 -0.03306 0.02135 0.00677 0.06447 -0.00096 -0.02173 -0.05590 0.00139 0.00633 -0.09071 -0.03925
 -0.07279 0.17288 0.10802 0.14779 0.00772 0.11813 0.11895 0.02340 0.07075 -0.13605 -0.06701 0.12223 -0.01508 -0.04855 0.11169 0.03754 0.01024 0.01594 0.03319 -0.10756
 """, list("ARNDCQEGHILKMFPSTWYV")))
-assert numpy.allclose(SIMK990103_MATRIX, SIMK990103_MATRIX.T)
+assert numpy.allclose(CONTACT_MATRIX, CONTACT_MATRIX.T)
 
 # Five Atchley physicochemical factors from Atchley et al. 2005
 # (PNAS 102:6395-6400). Columns are, respectively: polarity /
@@ -281,7 +281,9 @@ ENCODING_DATA_FRAMES = {
     ], index=AMINO_ACIDS, columns=AMINO_ACIDS),
     "PMBEC": PMBEC_MATRIX,
     "pmbec": PMBEC_MATRIX,
-    "SIMK990103": SIMK990103_MATRIX,
+    "contact": CONTACT_MATRIX,
+    "simons1999-contact": CONTACT_MATRIX,
+    "SIMK990103": CONTACT_MATRIX,
     "physchem": PHYSICOCHEMICAL_PROPERTIES,
     "atchley": ATCHLEY_FACTORS,
 }
@@ -293,10 +295,11 @@ def get_vector_encoding_df(name):
     Return the amino-acid vector encoding table for ``name``.
 
     ``name`` may be a base encoding such as ``"BLOSUM62"``, ``"PMBEC"``,
-    ``"SIMK990103"``, ``"physchem"``, or ``"atchley"``, or a ``+``-joined
-    composite such as ``"BLOSUM62+physchem"``. Composite encodings
-    concatenate the component columns in order and keep the same amino-acid
-    row order.
+    ``"contact"``, ``"physchem"``, or ``"atchley"``. The aliases
+    ``"simons1999-contact"`` and the AAindex id ``"SIMK990103"`` both refer
+    to ``"contact"``. ``+``-joined composites such as
+    ``"BLOSUM62+physchem"`` concatenate the component columns in order and
+    keep the same amino-acid row order.
     """
     if name in ENCODING_DATA_FRAMES:
         return ENCODING_DATA_FRAMES[name]

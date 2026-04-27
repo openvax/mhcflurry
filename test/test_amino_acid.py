@@ -112,17 +112,19 @@ def test_substitution_matrix_encodings_extend_unknown():
     assert pmbec.loc["E", "R"] == numpy.float32(-0.0697402405064)
     assert amino_acid.get_vector_encoding_df("pmbec") is pmbec
 
-    simk = amino_acid.get_vector_encoding_df("SIMK990103")
-    assert simk.shape == (21, 21)
-    assert_equal(simk.loc["X"].values, [0.0] * 21)
-    assert_equal(simk["X"].values, [0.0] * 21)
-    assert_equal(simk.values, simk.values.T)
-    assert simk.loc["A", "A"] == numpy.float32(-0.06711)
-    assert simk.loc["V", "Y"] == numpy.float32(0.03319)
+    contact = amino_acid.get_vector_encoding_df("contact")
+    assert contact.shape == (21, 21)
+    assert_equal(contact.loc["X"].values, [0.0] * 21)
+    assert_equal(contact["X"].values, [0.0] * 21)
+    assert_equal(contact.values, contact.values.T)
+    assert contact.loc["A", "A"] == numpy.float32(-0.06711)
+    assert contact.loc["V", "Y"] == numpy.float32(0.03319)
+    assert amino_acid.get_vector_encoding_df("simons1999-contact") is contact
+    assert amino_acid.get_vector_encoding_df("SIMK990103") is contact
 
-    composite = amino_acid.get_vector_encoding_df("PMBEC+SIMK990103")
+    composite = amino_acid.get_vector_encoding_df("PMBEC+contact")
     assert composite.shape == (21, 42)
-    assert amino_acid.vector_encoding_length("PMBEC+SIMK990103") == 42
+    assert amino_acid.vector_encoding_length("PMBEC+contact") == 42
 
 
 def test_index_encoding_no_downcast_futurewarning():

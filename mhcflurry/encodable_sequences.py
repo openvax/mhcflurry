@@ -141,8 +141,8 @@ class EncodableSequences(object):
         ----------
         vector_encoding_name : string
             How to represent amino acids. Registered names include
-            "BLOSUM62", "one-hot", "PMBEC", "SIMK990103", "physchem",
-            and "atchley"; ``+``-joined composites such as
+            "BLOSUM62", "one-hot", "PMBEC", "contact", "physchem", and
+            "atchley"; ``+``-joined composites such as
             "BLOSUM62+physchem" are also accepted.
         alignment_method : string
             One of "pad_middle" or "left_pad_right_pad"

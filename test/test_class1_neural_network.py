@@ -342,9 +342,9 @@ def test_split_forward_matches_full_forward():
         "one-hot",
         "physchem",
         "PMBEC",
-        "SIMK990103",
+        "contact",
         "BLOSUM62+physchem",
-        "PMBEC+SIMK990103",
+        "PMBEC+contact",
     ],
 )
 def test_peptide_amino_acid_encoding_gpu_forward_parity(encoding_name):
