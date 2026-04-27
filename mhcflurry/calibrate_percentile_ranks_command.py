@@ -198,8 +198,13 @@ def run(argv=sys.argv[1:]):
 
     # Resolve --max-workers-per-gpu='auto' to an int now, before any
     # downstream consumer reads it (model_kwargs below + pool creation).
-    from .local_parallelism import resolve_max_workers_per_gpu
-    resolve_max_workers_per_gpu(args)
+    # The shared helper also caps auto-sized local Pools to GPU capacity and
+    # hoists torch.compile worker-thread defaults before forking.
+    from .local_parallelism import resolve_local_parallelism_args
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+    )
 
     aa_distribution = None
     if args.match_amino_acid_distribution_data:

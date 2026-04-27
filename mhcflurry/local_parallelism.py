@@ -12,6 +12,7 @@ import sys
 import os
 import time
 import queue
+import subprocess
 from multiprocessing import Queue, cpu_count
 from multiprocessing.util import Finalize
 from pprint import pprint
@@ -23,13 +24,13 @@ from .common import configure_pytorch, normalize_pytorch_backend
 
 
 # Per-worker VRAM upper bound (gigabytes) used by ``auto_max_workers_per_gpu``
-# to budget how many workers fit on each GPU. The pan-allele MLP at the
-# default minibatch=4096 + RMSprop optimizer state + activations was measured
-# at ~5.5 GB on the 2026-04-25 8xA100 run; rounded up to 8 GB to leave
-# headroom for the largest architecture in the sweep + per-batch peaks.
+# to budget how many workers fit on each GPU. The pan-allele MLP's steady-state
+# VRAM is lower than this, but first-epoch compile / validation / allocator
+# transients vary across hardware and torch versions. Use a conservative
+# default that gives 2 workers on 80 GB cards and 1 worker on 40 GB cards.
 # Override with ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` if a
 # different model family or batch size lands.
-_AUTO_MWPG_PER_WORKER_GB_DEFAULT = 8.0
+_AUTO_MWPG_PER_WORKER_GB_DEFAULT = 16.0
 
 # SM-scheduler ceiling. Beyond ~4 workers/GPU the kernel queue serializes
 # behind a single SM scheduler, so per-worker throughput drops faster than
@@ -37,10 +38,10 @@ _AUTO_MWPG_PER_WORKER_GB_DEFAULT = 8.0
 # spot is 2-4 for small MLP workloads.
 _AUTO_MWPG_HARD_CAP_DEFAULT = 4
 
-# Fallback free-VRAM estimate per GPU (gigabytes) when ``torch.cuda.mem_get_info``
-# isn't callable yet (e.g. we're picking the pool size before any worker has
-# initialized CUDA). 16 GB is the common-denominator across A100-40GB / V100 /
-# L40S / A100-80GB at full freshness — conservative; real runs will see more.
+# Fallback free-VRAM estimate per GPU (gigabytes) when ``nvidia-smi`` is not
+# available. This path deliberately does not import torch: local pools use fork
+# on Linux, and touching the CUDA runtime in the parent before forking causes
+# CUDA re-initialization failures in children.
 _AUTO_MWPG_FREE_VRAM_FALLBACK_GB = 16.0
 
 
@@ -63,6 +64,62 @@ def _max_workers_per_gpu_arg(value):
     return v
 
 
+def _free_vram_override_gb(num_gpus):
+    """Return env-pinned free VRAM in GB, or ``None``.
+
+    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB`` accepts either one
+    value applied to every GPU or a comma/space-separated list. It exists for
+    tests and unusual launchers where ``nvidia-smi`` is hidden but the caller
+    knows the device budget.
+    """
+    value = os.environ.get("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB")
+    if not value:
+        return None
+    parts = [p for p in value.replace(",", " ").split() if p]
+    if not parts:
+        return None
+    vals = [float(p) for p in parts]
+    return min(vals[:max(int(num_gpus), 1)])
+
+
+def _free_vram_from_nvidia_smi_gb(num_gpus):
+    """Return minimum free VRAM across visible GPUs using ``nvidia-smi``.
+
+    This is intentionally a subprocess call instead of ``torch.cuda`` so the
+    orchestrator can size a fork-based worker pool without initializing CUDA in
+    the parent process.
+    """
+    try:
+        output = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except (
+            OSError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired):
+        return None
+
+    vals = []
+    for line in output.decode("utf-8", errors="ignore").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            # nvidia-smi reports MiB for memory.free with nounits.
+            vals.append(float(line.split()[0]) / 1024.0)
+        except (ValueError, IndexError):
+            continue
+    if not vals:
+        return None
+    return min(vals[:max(int(num_gpus), 1)])
+
+
 def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
     """Pick ``max_workers_per_gpu`` based on detected hardware.
 
@@ -78,10 +135,11 @@ def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
           - ``hard_cap`` (default 4) — SM-scheduler kernel-serialization
             wall.
 
-    Free VRAM is read live from ``torch.cuda.mem_get_info`` per GPU when
-    CUDA is initialized; falls back to a conservative 16 GB estimate
-    otherwise. Per-worker VRAM upper bound and the hard cap are both
-    overridable via the env vars
+    Free VRAM is read from ``nvidia-smi`` (or from
+    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB``). It deliberately
+    avoids ``torch.cuda`` so resolving local parallelism before forking does
+    not initialize CUDA in the parent process. Per-worker VRAM upper bound and
+    the hard cap are overridable via
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` and
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP``.
 
@@ -100,22 +158,10 @@ def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
         str(_AUTO_MWPG_HARD_CAP_DEFAULT),
     ))
 
-    free_vram_gb = None
-    try:
-        import torch
-        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-            mins = []
-            for i in range(min(int(num_gpus), torch.cuda.device_count())):
-                try:
-                    free, _total = torch.cuda.mem_get_info(i)
-                    mins.append(free / (1024 ** 3))
-                except (RuntimeError, AssertionError):
-                    # mem_get_info can raise before the device is selected.
-                    pass
-            if mins:
-                free_vram_gb = min(mins)
-    except Exception:  # pragma: no cover — diagnostic fallback
-        free_vram_gb = None
+    free_vram_gb = (
+        _free_vram_override_gb(num_gpus)
+        or _free_vram_from_nvidia_smi_gb(num_gpus)
+    )
 
     free_vram_gb_used = (
         free_vram_gb
@@ -168,6 +214,57 @@ def resolve_max_workers_per_gpu(args):
         resolved = int(value)
     args.max_workers_per_gpu = resolved
     return resolved
+
+
+def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
+    """Resolve and normalize local parallelism arguments in one place.
+
+    This is the single pre-fork normalization point for local worker pools:
+
+    * resolves ``--max-workers-per-gpu=auto`` without touching CUDA;
+    * when that value was auto, caps ``--num-jobs`` to the resolved GPU
+      capacity so an oversized planning value does not silently create CPU
+      overflow workers;
+    * hoists torch.compile's worker-thread cap before the Pool forks.
+
+    Explicit numeric ``--max-workers-per-gpu`` keeps the historical scheduler
+    behavior: if ``num_jobs`` exceeds GPU capacity, overflow workers run on CPU.
+    """
+    if getattr(args, "_local_parallelism_args_resolved", False):
+        return args
+
+    original = getattr(args, "max_workers_per_gpu", None)
+    was_auto = (
+        original is None
+        or (isinstance(original, str) and original.lower() == "auto")
+    )
+    resolved = resolve_max_workers_per_gpu(args)
+    args.max_workers_per_gpu_was_auto = was_auto
+
+    num_jobs = int(getattr(args, "num_jobs", 0) or 0)
+    num_gpus = int(getattr(args, "gpus", 0) or 0)
+    backend = normalize_pytorch_backend(getattr(args, "backend", "auto") or "auto")
+    if (
+            cap_auto_num_jobs
+            and was_auto
+            and num_jobs > 0
+            and num_gpus > 0
+            and backend in ("auto", "gpu")):
+        gpu_capacity = num_gpus * int(resolved)
+        if num_jobs > gpu_capacity:
+            print(
+                "Local parallelism: capping num_jobs from %d to %d because "
+                "--max-workers-per-gpu=auto resolved to %d across %d GPU(s). "
+                "Set MAX_WORKERS_PER_GPU=N / --max-workers-per-gpu N to allow "
+                "explicit CPU overflow workers." % (
+                    num_jobs, gpu_capacity, resolved, num_gpus,
+                )
+            )
+            args.num_jobs = gpu_capacity
+
+    hoist_torchinductor_compile_threads(args)
+    args._local_parallelism_args_resolved = True
+    return args
 
 
 # Inductor's compile worker pool defaults to ``os.cpu_count()``; that's
@@ -398,7 +495,10 @@ def hoist_torchinductor_compile_threads(args):
     if os.environ.get("MHCFLURRY_TORCH_COMPILE", "0") != "1":
         # No compile = no compile pool to size; leave env untouched.
         return
-    if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ:
+    auto_owned = (
+        os.environ.get("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO") == "1"
+    )
+    if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ and not auto_owned:
         # User pinned explicitly; don't second-guess.
         print(
             "torch.compile: TORCHINDUCTOR_COMPILE_THREADS=%s "
@@ -409,7 +509,10 @@ def hoist_torchinductor_compile_threads(args):
     num_jobs = max(int(getattr(args, "num_jobs", 0) or 0), 1)
     cpu_count_ = os.cpu_count() or 1
     threads = max(1, min(_INDUCTOR_THREAD_HARD_CAP, cpu_count_ // num_jobs))
+    if auto_owned and os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") == str(threads):
+        return
     os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = str(threads)
+    os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] = "1"
     print(
         "torch.compile: hoisted TORCHINDUCTOR_COMPILE_THREADS=%d "
         "(num_jobs=%d, cpu_count=%d)" % (threads, num_jobs, cpu_count_)
@@ -559,7 +662,7 @@ def worker_pool_with_gpu_assignments_from_args(args):
     -------
     multiprocessing.Pool
     """
-    resolve_max_workers_per_gpu(args)
+    resolve_local_parallelism_args(args)
 
     return worker_pool_with_gpu_assignments(
         num_jobs=args.num_jobs,

@@ -1875,9 +1875,7 @@ class Class1AffinityPredictor(object):
             model.to(device)
             model.eval()
             peptide_input = net_obj.peptides_to_network_input(encoded_peptides)
-            peptide_is_indices = net_obj.hyperparameters.get(
-                "peptide_amino_acid_encoding_gpu", False,
-            )
+            peptide_is_indices = net_obj.uses_peptide_torch_encoding()
             stage_parts = []
             with torch.no_grad():
                 for start in range(0, n_peptides, peptide_batch_size):

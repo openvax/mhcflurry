@@ -61,15 +61,17 @@ base_hyperparameters = {
         'alignment_method': 'left_pad_centered_right_pad',
         'max_length': 15,
     },
-    # Phase 2 of issue openvax/mhcflurry#268: BLOSUM62 expansion as a
-    # frozen ``nn.Embedding(21, 21)`` layer in the network's forward
-    # pass instead of a numpy lookup at peptide-encoding time.
+    # Phase 2 of issue openvax/mhcflurry#268: fixed peptide vector
+    # expansion as a frozen torch embedding table in the network's
+    # forward pass instead of a numpy lookup at peptide-encoding time.
     # ``peptides_to_network_input`` returns int8 indices (cheap dict
-    # lookup) and the GPU widens to fp32 BLOSUM62 vectors via the
-    # embedding lookup. Eliminates the ~17 sec/epoch CPU bottleneck
-    # in random-negative regeneration (with random_negative_pool_epochs=1
-    # the CPU encoding fires every epoch). Forward parity vs numpy path
-    # verified by ``test_peptide_amino_acid_encoding_gpu_forward_parity``.
+    # lookup) and torch widens to the configured fp32 vectors on CUDA,
+    # MPS, or CPU via the embedding lookup. Works for BLOSUM62, one-hot,
+    # physchem, and +joined composites. Eliminates the ~17 sec/epoch CPU
+    # bottleneck in random-negative regeneration (with
+    # random_negative_pool_epochs=1 the CPU encoding fires every epoch).
+    # Forward parity vs numpy path verified by
+    # ``test_peptide_amino_acid_encoding_gpu_forward_parity``.
     'peptide_amino_acid_encoding_gpu': True,
     'peptide_allele_merge_activation': '',
     'peptide_allele_merge_method': 'concatenate',

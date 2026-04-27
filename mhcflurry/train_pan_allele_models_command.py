@@ -32,6 +32,7 @@ from .local_parallelism import (
     configure_torch_sharing_strategy_for_capacity,
     fit_shm_capacity_check,
     hoist_torchinductor_compile_threads,
+    resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
 )
 from .cluster_parallelism import (
@@ -1314,11 +1315,15 @@ def train_models(args):
 
     all_work_items = GLOBAL_DATA["work_items"]
 
-    # Orchestrator-level env tuning: cap inductor's compile worker pool so
-    # N concurrent fit() workers don't each spawn os.cpu_count() compile
-    # threads and thrash the box. Set BEFORE forking workers so each
-    # inherits the value. See docs/orchestrator.md.
-    hoist_torchinductor_compile_threads(args)
+    # Resolve local parallelism once before any pre-fork resource sizing. This
+    # caps auto-sized Pools to GPU capacity and hoists env knobs such as
+    # TORCHINDUCTOR_COMPILE_THREADS before workers inherit the environment.
+    if not getattr(args, "cluster_parallelism", False):
+        resolve_local_parallelism_args(args)
+    else:
+        # Cluster launchers do not use the local worker Pool, but the submitter
+        # can still hoist compile-thread defaults into the worker environment.
+        hoist_torchinductor_compile_threads(args)
 
     # Layer-2 SHM capacity pre-flight. With small /dev/shm (8 GB Docker
     # default) + many workers, share_memory_() will OOM mid-fit with a

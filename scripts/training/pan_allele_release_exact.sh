@@ -29,9 +29,10 @@ export PYTHONUNBUFFERED=1
 export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
 # Inductor defaults to a large compile helper pool per training process.
 # With 8-16 concurrent mhcflurry workers that multiplies into thousands of
-# short-lived subprocesses and can stall the box. Keep the default bounded;
-# callers can override upward when running fewer workers.
-export TORCHINDUCTOR_COMPILE_THREADS="${TORCHINDUCTOR_COMPILE_THREADS:-2}"
+# short-lived subprocesses and can stall the box. Leave the env unset by
+# default: mhcflurry.local_parallelism resolves it from the final NUM_JOBS
+# in the same place that resolves Pool/GPU concurrency. Callers can still
+# export TORCHINDUCTOR_COMPILE_THREADS before invoking this script to pin.
 # OMP/MKL/OPENBLAS set via set_cpu_threads helper below — auto-computes
 # from nproc + GPU/worker layout. Manually override any of them before
 # calling this script to pin an explicit value.
@@ -183,7 +184,7 @@ trap 'on_signal TERM' TERM
 trap cleanup_release_logging EXIT
 
 log_release_event script_start \
-    "pid=$$ out_dir=$MHCFLURRY_OUT pythonunbuffered=$PYTHONUNBUFFERED torch_compile=$MHCFLURRY_TORCH_COMPILE inductor_threads=$TORCHINDUCTOR_COMPILE_THREADS"
+    "pid=$$ out_dir=$MHCFLURRY_OUT pythonunbuffered=$PYTHONUNBUFFERED torch_compile=$MHCFLURRY_TORCH_COMPILE inductor_threads=${TORCHINDUCTOR_COMPILE_THREADS:-auto}"
 write_snapshot startup
 start_heartbeat
 
@@ -222,28 +223,36 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
-# Default to "auto" so the orchestrator's auto_max_workers_per_gpu
-# picks based on detected free VRAM. Per-worker peak is 16-22 GB on
-# mhcflurry pan-allele training: ``auto`` lands at 2 on 80GB cards
-# and 1 on 40GB cards. Override with MAX_WORKERS_PER_GPU=N (or
-# explicitly "auto") to pin.
-MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
-# NUM_JOBS arithmetic: bash can't multiply "auto", so fall back to a
-# conservative 2 for the Pool size when the user picked auto. The Python
-# orchestrator still applies the actual auto_max_workers_per_gpu cap to
-# the GPU-assignment side, so an over-sized Pool just leaves some workers
-# idle — never oversubscribed VRAM.
-if [ "$MAX_WORKERS_PER_GPU" = "auto" ]; then
-    _MWPG_FOR_NUM_JOBS=2
-else
-    _MWPG_FOR_NUM_JOBS="$MAX_WORKERS_PER_GPU"
-fi
+# Default to "auto" so the shared Python resolver picks from the actual
+# hardware budget. Resolve it here before shell arithmetic so every downstream
+# consumer (Pool size, BLAS thread budget, CLI args) sees one numeric plan.
+MAX_WORKERS_PER_GPU_REQUESTED="${MAX_WORKERS_PER_GPU:-auto}"
 if [ "$GPUS" -eq "0" ]; then
     NUM_JOBS="${NUM_JOBS-1}"
+    MAX_WORKERS_PER_GPU=1
+elif [ "$MAX_WORKERS_PER_GPU_REQUESTED" = "auto" ]; then
+    _NUM_JOBS_FOR_AUTO="${NUM_JOBS:-$(( GPUS * 2 ))}"
+    MAX_WORKERS_PER_GPU="$(
+        NUM_JOBS="$_NUM_JOBS_FOR_AUTO" GPUS="$GPUS" python - <<'PY'
+import os
+from mhcflurry.local_parallelism import auto_max_workers_per_gpu
+print(auto_max_workers_per_gpu(
+    num_jobs=int(os.environ["NUM_JOBS"]),
+    num_gpus=int(os.environ["GPUS"]),
+    backend="auto",
+))
+PY
+    )"
+    _GPU_WORKER_CAP=$(( GPUS * MAX_WORKERS_PER_GPU ))
+    if [ -z "${NUM_JOBS+x}" ] || [ "$NUM_JOBS" -gt "$_GPU_WORKER_CAP" ]; then
+        NUM_JOBS="$_GPU_WORKER_CAP"
+    fi
+    echo "Resolved MAX_WORKERS_PER_GPU=auto to $MAX_WORKERS_PER_GPU; NUM_JOBS=$NUM_JOBS"
 else
-    NUM_JOBS="${NUM_JOBS-$(( GPUS * _MWPG_FOR_NUM_JOBS ))}"
+    MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU_REQUESTED"
+    NUM_JOBS="${NUM_JOBS-$(( GPUS * MAX_WORKERS_PER_GPU ))}"
 fi
-echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU)"
+echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU; requested=$MAX_WORKERS_PER_GPU_REQUESTED)"
 # Recycle after a bounded number of tasks so compile is still amortized
 # but leaks / descriptor creep / orphaned-runtime state cannot accumulate
 # indefinitely inside one worker. Override with MAX_TASKS_PER_WORKER.
@@ -284,7 +293,7 @@ fi
 # script; the helper respects manual settings.
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/set_cpu_threads.sh"
-GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
+NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
     DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
 
 # ---- data ------------------------------------------------------------

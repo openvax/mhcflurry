@@ -335,20 +335,31 @@ def test_split_forward_matches_full_forward():
     )
 
 
-def test_peptide_amino_acid_encoding_gpu_forward_parity():
-    """Phase 2 (openvax/mhcflurry#268): on-device BLOSUM62 forward parity.
+@pytest.mark.parametrize(
+    "encoding_name",
+    ["BLOSUM62", "one-hot", "physchem", "BLOSUM62+physchem"],
+)
+def test_peptide_amino_acid_encoding_gpu_forward_parity(encoding_name):
+    """Torch-side fixed peptide encoding must match CPU-side encoding.
 
     With weights fixed and identical between a legacy (BLOSUM-encoded
     input) model and an index-encoded model, both forward passes must
-    produce bit-identical outputs — the on-device embedding lookup is
-    mathematically the same op as the CPU-side BLOSUM table multiply.
+    produce bit-identical outputs — the torch embedding lookup is
+    mathematically the same op as the CPU-side fixed-vector table lookup.
     """
     import torch
-    from mhcflurry.amino_acid import BLOSUM62_MATRIX
+    from mhcflurry.amino_acid import get_vector_encoding_df
 
     base_hparams = dict(
         activation="tanh",
         layer_sizes=[8],
+        peptide_encoding={
+            "vector_encoding_name": encoding_name,
+            "alignment_method": "pad_middle",
+            "left_edge": 4,
+            "right_edge": 4,
+            "max_length": 15,
+        },
         validation_split=0.0,
         early_stopping=False,
         locally_connected_layers=[
@@ -360,7 +371,7 @@ def test_peptide_amino_acid_encoding_gpu_forward_parity():
 
     peptides = random_peptides(16, length=9)
 
-    # Legacy path (flag off) — peptides encoded as (N, L, 21) BLOSUM62.
+    # Legacy path (flag off) — peptides encoded as (N, L, V) vectors.
     legacy = Class1NeuralNetwork(**base_hparams)
     legacy._network = legacy.make_network(
         allele_representations=None,
@@ -368,7 +379,7 @@ def test_peptide_amino_acid_encoding_gpu_forward_parity():
     )
     legacy_input = legacy.peptides_to_network_input(peptides)
     assert legacy_input.ndim == 3
-    assert legacy_input.shape[-1] == len(BLOSUM62_MATRIX)
+    assert legacy_input.shape[-1] == get_vector_encoding_df(encoding_name).shape[1]
 
     # On-device path (flag on) — peptides encoded as (N, L) int indices.
     onpath = Class1NeuralNetwork(peptide_amino_acid_encoding_gpu=True, **base_hparams)
@@ -376,9 +387,14 @@ def test_peptide_amino_acid_encoding_gpu_forward_parity():
         allele_representations=None,
         **onpath.network_hyperparameter_defaults.subselect(onpath.hyperparameters),
     )
+    assert onpath._network.peptide_input_vector_encoding_name == encoding_name
     onpath_input = onpath.peptides_to_network_input(peptides)
     assert onpath_input.ndim == 2
     assert numpy.issubdtype(onpath_input.dtype, numpy.integer)
+    assert "peptide_embedding_table" not in onpath._network.state_dict()
+    assert len(onpath._network.get_weights_list()) == len(
+        legacy._network.get_weights_list()
+    )
 
     # Copy legacy weights into onpath so the only difference is the
     # embedding expansion — forward outputs must match bit-identically.
@@ -394,9 +410,35 @@ def test_peptide_amino_acid_encoding_gpu_forward_parity():
 
     testing.assert_allclose(
         legacy_out.numpy(), onpath_out.numpy(), rtol=0, atol=1e-6,
-        err_msg="Phase 2 on-device BLOSUM62 forward must match the "
-                "legacy CPU-side BLOSUM62-encoded forward bit-identically",
+        err_msg="Torch-side fixed peptide encoding must match the "
+                "legacy CPU-side vector-encoded forward bit-identically",
     )
+
+
+def test_peptide_torch_encoding_preserves_index_encoding_options():
+    """Index path must preserve trim / unsupported-amino-acid semantics."""
+    from mhcflurry.amino_acid import get_vector_encoding_df
+
+    base_encoding = {
+        "vector_encoding_name": "BLOSUM62",
+        "alignment_method": "right_pad",
+        "max_length": 5,
+        "trim": True,
+        "allow_unsupported_amino_acids": True,
+    }
+    peptides = ["ACDZFGH"]
+    legacy = Class1NeuralNetwork(peptide_encoding=base_encoding)
+    onpath = Class1NeuralNetwork(
+        peptide_encoding=base_encoding,
+        peptide_amino_acid_encoding_gpu=True,
+    )
+
+    legacy_input = legacy.peptides_to_network_input(peptides)
+    onpath_indices = onpath.peptides_to_network_input(peptides)
+    table = get_vector_encoding_df("BLOSUM62").to_numpy()
+    expanded = table[onpath_indices]
+
+    testing.assert_allclose(legacy_input, expanded)
 
 
 def test_serialization():

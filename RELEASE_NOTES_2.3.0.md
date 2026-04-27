@@ -59,8 +59,8 @@ validation run completes.
 | `max_epochs` | 5000 | 500 | Median observed was 67; max 174. The 5000 ceiling was theatrical and let pathological patience-reset tasks burn unbounded compute. 500 leaves comfortable headroom. |
 | `min_delta` | 0.0 | 1e-7 | With `min_delta=0`, a 1e-9 RMSprop noise-floor improvement resets the 20-epoch patience counter, stretching some tasks to 174+ epochs at val_loss ~0.28 with no real signal. 1e-7 is two orders of magnitude above the observed noise rate; preserves real escape trajectories (typically ≥1e-3/epoch). |
 | `validation_interval` | 1 (always validated) | 5 | Skip the validation forward pass on 4 of 5 epochs; saves ~150 ms/epoch + a GPU sync barrier. The final epoch and any patience-trigger epoch are always measured (the saved model reflects an up-to-date val_loss). |
-| `dataloader_num_workers` (job-env default) | 0 | 4 | Was 0 because spawn workers OOM'd on the 600 MB per-fit dataset. Layer-2 SHM eliminated that cost; auto-enables when `dataloader_num_workers > 0`. |
-| `peptide_amino_acid_encoding_gpu` | `false` | `true` | Phase 2 of #268. BLOSUM62 expansion moves from a numpy lookup at encode time to a frozen `nn.Embedding(21, 21)` in the network's forward pass. `peptides_to_network_input` now returns int8 indices (cheap dict lookup); GPU widens to fp32. Eliminates the ~17 sec/epoch CPU bottleneck in random-negative regeneration with `random_negative_pool_epochs=1`. Forward parity vs numpy path verified by `test_peptide_amino_acid_encoding_gpu_forward_parity`. |
+| `dataloader_num_workers` (job-env default) | 0 | 1 | Was 0 because spawn workers OOM'd on the 600 MB per-fit dataset. Layer-2 SHM eliminated that cost; auto-enables when `dataloader_num_workers > 0`. One worker per fit is the release wrapper default; tune upward only when CPU headroom and measurements justify it. |
+| `peptide_amino_acid_encoding_gpu` | `false` | `true` | Phase 2 of #268. Fixed peptide vector expansion moves from a numpy lookup at encode time to a frozen torch embedding table in the network's forward pass. `peptides_to_network_input` now returns int8 amino-acid indices; CUDA/MPS/CPU widens to the configured fixed vector encoding (`BLOSUM62`, `one-hot`, `physchem`, or composites such as `BLOSUM62+physchem`). Eliminates the ~17 sec/epoch CPU bottleneck in random-negative regeneration with `random_negative_pool_epochs=1`. Forward parity vs numpy path verified by `test_peptide_amino_acid_encoding_gpu_forward_parity`. |
 
 `patience` stays at 20.
 
@@ -69,10 +69,11 @@ validation run completes.
 - **`mhcflurry-class1-train-pan-allele-models --max-workers-per-gpu`**
   default changed from `1000` (effectively unlimited per-GPU) to
   `auto`. Auto-detect picks `min(num_jobs/num_gpus,
-  0.6×free_vram/8GB, hard_cap=4)`.
+  0.6×free_vram/16GB, hard_cap=4)` without importing torch or
+  initializing CUDA in the parent process.
 
   Cross-checks: 8×A100-80GB + 16 jobs → 2 (matches old production
-  setting); 8×A100-40GB + 16 jobs → 2; 1×A100-80GB + 8 jobs → 4;
+  setting); 8×A100-40GB + 16 jobs → 1; 1×A100-80GB + 8 jobs → 3;
   CPU-only → 1.
 
   `MAX_WORKERS_PER_GPU=N` env var still pins explicitly.
@@ -124,7 +125,7 @@ real measurement:
 `scripts/training/pan_allele_release_exact.sh` now places the
 encoding cache at `$HOME/runplz-cache/encoding_cache/` (override
 with `MHCFLURRY_ENCODING_CACHE_DIR`) instead of inside
-`$MHCFLURRY_OUT`. Two upsides: the ~7 GB BLOSUM62 mmap doesn't ride
+`$MHCFLURRY_OUT`. Two upsides: the ~7 GB fixed-encoding mmap doesn't ride
 back on the post-run rsync, and the cache persists on the box so a
 second run on the same instance hits a warm cache.
 
@@ -149,8 +150,10 @@ recovery cascade:
    default `file_system` strategy), auto-disable Layer-2 SHM
    (`MHCFLURRY_FIT_DATALOADER_SHM=0`) and continue with the numpy
    DataLoader path (10–30% slower but functional).
-4. As a final defense, `fit()` catches `OSError(ENOSPC|ENOMEM)` from
-   `share_memory_()` and falls back to numpy for that one fit() call.
+4. As a final defense, `fit()` catches resource-exhaustion errors from
+   torch tensor sharing and DataLoader setup (including FD exhaustion
+   sandbox/permission failures and torch RuntimeError variants) and
+   falls back to numpy / single-process mode for that one fit() call.
 
 Result: on the Docker-default 8 GB `/dev/shm` the typical 16-worker
 pan-allele run now keeps the full Layer-2 SHM speedup automatically;

@@ -70,18 +70,93 @@ X  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  1
 """), sep=r'\s+').loc[AMINO_ACIDS, AMINO_ACIDS].astype("int8")
 assert (BLOSUM62_MATRIX == BLOSUM62_MATRIX.T).all().all()
 
+# Five Atchley physicochemical factors from Atchley et al. 2005
+# (PNAS 102:6395-6400). Columns are, respectively: polarity /
+# accessibility / hydrophobicity, secondary-structure propensity,
+# molecular size, codon composition, and electrostatic charge. X is
+# represented as zeros, matching the "unknown/no signal" convention
+# used by the BLOSUM62 X row.
+ATCHLEY_FACTORS = pandas.DataFrame.from_dict({
+    "A": [-0.591, -1.302, -0.733, 1.570, -0.146],
+    "R": [1.538, -0.055, 1.502, 0.440, 2.897],
+    "N": [0.945, 0.828, 1.299, -0.169, 0.933],
+    "D": [1.050, 0.302, -3.656, -0.259, -3.242],
+    "C": [-1.343, 0.465, -0.862, -1.020, -0.255],
+    "E": [1.357, -1.453, 1.477, 0.113, -0.837],
+    "Q": [0.931, -0.179, -3.005, -0.503, -1.853],
+    "G": [-0.384, 1.652, 1.330, 1.045, 2.064],
+    "H": [0.336, -0.417, -1.673, -1.474, -0.078],
+    "I": [-1.239, -0.547, 2.131, 0.393, 0.816],
+    "L": [-1.019, -0.987, -1.505, 1.266, -0.912],
+    "K": [1.831, -0.561, 0.533, -0.277, 1.648],
+    "M": [-0.663, -1.524, 2.219, -1.005, 1.212],
+    "F": [-1.006, -0.590, 1.891, -0.397, 0.412],
+    "P": [0.189, 2.081, -1.628, 0.421, -1.392],
+    "S": [-0.228, 1.399, -4.760, 0.670, -2.647],
+    "T": [-0.032, 0.326, 2.213, 0.908, 1.313],
+    "W": [-0.595, 0.009, 0.672, -2.128, -0.184],
+    "Y": [0.260, 0.830, 3.097, -0.838, 1.512],
+    "V": [-1.337, -0.279, -0.544, 1.242, -1.262],
+    "X": [0.0, 0.0, 0.0, 0.0, 0.0],
+}, orient="index", columns=[
+    "atchley_polarity",
+    "atchley_secondary_structure",
+    "atchley_molecular_size",
+    "atchley_codon_composition",
+    "atchley_electrostatic_charge",
+]).loc[AMINO_ACIDS].astype("float32")
+
 ENCODING_DATA_FRAMES = {
     "BLOSUM62": BLOSUM62_MATRIX,
     "one-hot": pandas.DataFrame([
         [1 if i == j else 0 for i in range(len(AMINO_ACIDS))]
         for j in range(len(AMINO_ACIDS))
-    ], index=AMINO_ACIDS, columns=AMINO_ACIDS)
+    ], index=AMINO_ACIDS, columns=AMINO_ACIDS),
+    "physchem": ATCHLEY_FACTORS,
+    "atchley": ATCHLEY_FACTORS,
 }
+_COMPOSITE_ENCODING_DATA_FRAMES = {}
+
+
+def get_vector_encoding_df(name):
+    """
+    Return the amino-acid vector encoding table for ``name``.
+
+    ``name`` may be a base encoding such as ``"BLOSUM62"`` or
+    ``"physchem"``, or a ``+``-joined composite such as
+    ``"BLOSUM62+physchem"``. Composite encodings concatenate the component
+    columns in order and keep the same amino-acid row order.
+    """
+    if name in ENCODING_DATA_FRAMES:
+        return ENCODING_DATA_FRAMES[name]
+    if not isinstance(name, str) or "+" not in name:
+        raise KeyError(name)
+    if name not in _COMPOSITE_ENCODING_DATA_FRAMES:
+        parts = [part.strip() for part in name.split("+") if part.strip()]
+        if len(parts) < 2:
+            raise KeyError(name)
+        frames = [
+            get_vector_encoding_df(part).loc[AMINO_ACIDS].add_prefix(
+                "%s:" % part
+            )
+            for part in parts
+        ]
+        composite = pandas.concat(
+            frames,
+            axis=1,
+        )
+        if any(frame.values.dtype.kind == "f" for frame in frames):
+            composite = composite.astype("float32")
+        _COMPOSITE_ENCODING_DATA_FRAMES[name] = composite
+    return _COMPOSITE_ENCODING_DATA_FRAMES[name]
 
 
 def available_vector_encodings():
     """
-    Return list of supported amino acid vector encodings.
+    Return list of registered amino acid vector encodings.
+
+    ``get_vector_encoding_df`` also accepts ``+``-joined composites of
+    these names, for example ``"BLOSUM62+physchem"``.
 
     Returns
     -------
@@ -103,7 +178,7 @@ def vector_encoding_length(name):
     -------
     int
     """
-    return ENCODING_DATA_FRAMES[name].shape[1]
+    return get_vector_encoding_df(name).shape[1]
 
 
 def index_encoding(sequences, letter_to_index_dict):
@@ -155,7 +230,7 @@ def fixed_vectors_encoding(index_encoded_sequences, letter_to_vector_df):
     """
     (num_sequences, sequence_length) = index_encoded_sequences.shape
     target_shape = (
-        num_sequences, sequence_length, letter_to_vector_df.shape[0])
+        num_sequences, sequence_length, letter_to_vector_df.shape[1])
     result = letter_to_vector_df.iloc[
         index_encoded_sequences.reshape((-1,))  # reshape() avoids copy
     ].values.reshape(target_shape)

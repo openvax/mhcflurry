@@ -51,6 +51,42 @@ def test_index_and_one_hot_encoding():
         ])
 
 
+def test_fixed_vectors_encoding_allows_non_square_vector_tables():
+    letter_to_vector_df = pandas.DataFrame(
+        [
+            [1, 10],
+            [2, 20],
+            [3, 30],
+        ],
+        columns=["small", "large"],
+    )
+    index_encoding = amino_acid.index_encoding(
+        ["ABCA"], letter_to_index_dict)
+    encoded = amino_acid.fixed_vectors_encoding(
+        index_encoding,
+        letter_to_vector_df)
+    assert encoded.shape == (1, 4, 2)
+    assert_equal(encoded[0], [[1, 10], [2, 20], [3, 30], [1, 10]])
+
+
+def test_physchem_and_composite_vector_encodings():
+    physchem = amino_acid.get_vector_encoding_df("physchem")
+    assert physchem.shape == (21, 5)
+    assert physchem.loc["X"].tolist() == [0.0, 0.0, 0.0, 0.0, 0.0]
+
+    composite = amino_acid.get_vector_encoding_df("BLOSUM62+physchem")
+    assert composite.shape == (21, 26)
+    assert amino_acid.vector_encoding_length("BLOSUM62+physchem") == 26
+    assert_equal(
+        composite.loc["A"].values[:21],
+        amino_acid.get_vector_encoding_df("BLOSUM62").loc["A"].values,
+    )
+    assert_equal(
+        composite.loc["A"].values[21:],
+        physchem.loc["A"].values,
+    )
+
+
 def test_index_encoding_no_downcast_futurewarning():
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)

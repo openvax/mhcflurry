@@ -7,8 +7,10 @@
 
 The orchestrator owns the **shared resources** (parallel workers,
 shared-memory layers, encoding caches, env tuning); workers consume
-them. Workers never spawn other workers, never build shared state,
-never set env knobs that affect other workers.
+them. Workers never build shared state and never set env knobs that
+affect other workers. The one intentional child-process exception is
+fit-local DataLoader prefetch workers, which are bounded by the
+orchestrator's CPU-thread plan.
 
 If you find yourself adding orchestrator-shaped logic inside
 `fit()`, `train_model()`, or any worker function, stop and think
@@ -53,7 +55,7 @@ differ.
 | | Layer 1 | Layer 2 |
 |---|---|---|
 | **Lifetime** | per-run (persists to disk; survives across runs) | per-`fit()` call |
-| **Mechanism** | `numpy.memmap` of files | `torch.Tensor.share_memory_()` (POSIX shm in `/dev/shm`) |
+| **Mechanism** | `numpy.memmap` of files | `torch.Tensor.share_memory_()` (POSIX shm or file descriptors) |
 | **Built by** | orchestrator | the `fit()` call inside a worker |
 | **Read by** | every training worker | DataLoader spawn workers inside one `fit()` |
 | **Mutability** | read-only | mutable (random-neg buffer refilled per epoch) |
@@ -79,7 +81,12 @@ Two backends, one CLI surface:
 - **Local** (`local_parallelism.py`): `multiprocessing.Pool` of
   non-daemon workers. Workers can spawn DataLoader children. SHM
   layers both work — workers inherit GLOBAL_DATA via fork, mmap pool
-  paths are local-process-visible.
+  paths are local-process-visible. `resolve_local_parallelism_args`
+  is the single pre-fork normalization point: it resolves
+  `--max-workers-per-gpu=auto` without touching CUDA, caps local
+  `--num-jobs` to GPU capacity when auto was requested, and hoists
+  torch.compile's thread cap before the Pool forks. Explicit numeric
+  `--max-workers-per-gpu` keeps the historical CPU-overflow behavior.
 - **Cluster** (`cluster_parallelism.py`): one job per work-item
   submitted via `bsub` / `sbatch` / `sh`. Workers serialize
   GLOBAL_DATA to NFS, deserialize on the worker side. Layer-1 SHM
@@ -129,9 +136,10 @@ the environment?
 
 The orchestrator may **hoist** env vars: read its own args, compute a
 sensible default, and `os.environ.setdefault(...)` so workers
-inherit. `_hoist_torchinductor_compile_threads` is the canonical
-example — it sizes the inductor compile pool against `--num-jobs` so
-N workers don't each spawn `cpu_count()` compile threads.
+inherit. `resolve_local_parallelism_args` calls
+`hoist_torchinductor_compile_threads` for local runs — it sizes the
+inductor compile pool against the resolved `--num-jobs` so N workers
+don't each spawn `cpu_count()` compile threads.
 
 ## What is NOT the orchestrator's job
 
@@ -204,9 +212,12 @@ recovery" to "conservative fallback":
    it to `"0"` so workers use the numpy DataLoader path instead.
    Throughput hit is ~10–30% vs the SHM path; better than crashing.
 4. **Per-fit defensive catch** — even if the pre-flight estimate
-   underran the actual need, `fit()` catches `OSError(ENOSPC|ENOMEM)`
-   and falls back to numpy mode for that one fit() call, with a loud
-   warning.
+   underran the actual need, `fit()` catches resource-exhaustion
+   errors from both torch tensor sharing and DataLoader setup
+   (`ENOSPC`, `ENOMEM`, FD exhaustion, sandbox/permission failures, and
+   torch RuntimeError variants)
+   and falls back to the numpy / single-process path for that fit()
+   call, with a loud warning.
 
 To force-on (despite tight `/dev/shm`):
 `MHCFLURRY_FIT_DATALOADER_SHM=1`. The pre-flight will warn but
@@ -246,7 +257,7 @@ asymmetries to know about:
   under `out/` returns. The orchestrator script
   (`scripts/training/pan_allele_release_exact.sh`) places the
   encoding cache OUTSIDE `$MHCFLURRY_OUT` (default
-  `$HOME/runplz-cache/encoding_cache/`) so the ~7 GB BLOSUM62 mmap
+  `$HOME/runplz-cache/encoding_cache/`) so the ~7 GB fixed-encoding mmap
   doesn't ride back. Override with `MHCFLURRY_ENCODING_CACHE_DIR`.
   Bonus: cache persists across runs on the same box, so the second
   run hits a warm cache.

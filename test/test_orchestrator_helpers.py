@@ -16,6 +16,8 @@ All tests are pure-Python; no GPU, no subprocess, no models on disk.
 import argparse
 import inspect
 import os
+import pathlib
+import subprocess
 
 
 def test_hoist_helper_lives_in_local_parallelism():
@@ -97,6 +99,7 @@ def test_hoist_torchinductor_no_op_when_compile_disabled(monkeypatch):
     )
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
     monkeypatch.delenv("TORCHINDUCTOR_COMPILE_THREADS", raising=False)
+    monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
     args = argparse.Namespace(num_jobs=8)
     _hoist_torchinductor_compile_threads(args)
     assert "TORCHINDUCTOR_COMPILE_THREADS" not in os.environ
@@ -108,6 +111,7 @@ def test_hoist_torchinductor_respects_user_pin(monkeypatch):
     )
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
     monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "12")
+    monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
     args = argparse.Namespace(num_jobs=8)
     _hoist_torchinductor_compile_threads(args)
     # User-pinned value must survive.
@@ -120,6 +124,7 @@ def test_hoist_torchinductor_sizes_against_num_jobs(monkeypatch):
     )
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
     monkeypatch.delenv("TORCHINDUCTOR_COMPILE_THREADS", raising=False)
+    monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
     # 8 jobs on a 64-core box → 64/8=8, capped at 4.
     monkeypatch.setattr(os, "cpu_count", lambda: 64)
     args = argparse.Namespace(num_jobs=8)
@@ -128,6 +133,7 @@ def test_hoist_torchinductor_sizes_against_num_jobs(monkeypatch):
 
     # 1 job on 4-core box → 4/1=4, hits cap.
     monkeypatch.delenv("TORCHINDUCTOR_COMPILE_THREADS", raising=False)
+    monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
     monkeypatch.setattr(os, "cpu_count", lambda: 4)
     args = argparse.Namespace(num_jobs=1)
     _hoist_torchinductor_compile_threads(args)
@@ -135,6 +141,7 @@ def test_hoist_torchinductor_sizes_against_num_jobs(monkeypatch):
 
     # 16 jobs on 32-core box → 32/16=2.
     monkeypatch.delenv("TORCHINDUCTOR_COMPILE_THREADS", raising=False)
+    monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
     monkeypatch.setattr(os, "cpu_count", lambda: 32)
     args = argparse.Namespace(num_jobs=16)
     _hoist_torchinductor_compile_threads(args)
@@ -142,10 +149,43 @@ def test_hoist_torchinductor_sizes_against_num_jobs(monkeypatch):
 
     # Always at least 1 thread even with absurd over-subscription.
     monkeypatch.delenv("TORCHINDUCTOR_COMPILE_THREADS", raising=False)
+    monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
     monkeypatch.setattr(os, "cpu_count", lambda: 4)
     args = argparse.Namespace(num_jobs=64)
     _hoist_torchinductor_compile_threads(args)
     assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "1"
+
+
+def test_hoist_torchinductor_recomputes_auto_owned_value(monkeypatch):
+    from mhcflurry.local_parallelism import (
+        hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
+    )
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
+    monkeypatch.setenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", "1")
+    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "1")
+    monkeypatch.setattr(os, "cpu_count", lambda: 16)
+    args = argparse.Namespace(num_jobs=4)
+    _hoist_torchinductor_compile_threads(args)
+    assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "4"
+
+
+def test_set_cpu_threads_accepts_auto_when_num_jobs_is_provided():
+    script = pathlib.Path(__file__).resolve().parents[1] / (
+        "scripts/training/set_cpu_threads.sh"
+    )
+    command = (
+        "source %s; "
+        "NUM_JOBS=16 GPUS=8 MAX_WORKERS_PER_GPU=auto "
+        "DATALOADER_NUM_WORKERS=1 set_cpu_threads"
+    ) % script
+    result = subprocess.run(
+        ["bash", "-lc", command],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "total_workers=16" in result.stderr
 
 
 def test_shm_capacity_check_safe_when_plenty_free(monkeypatch):

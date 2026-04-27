@@ -17,6 +17,7 @@ from mhcflurry.class1_neural_network import (
     _batched_validation_loss,
     _effective_validation_batch_size,
     _effective_fit_dataloader_num_workers,
+    _is_resource_exhaustion_error,
     _FitBatchDataset,
     _make_fit_dataloader,
 )
@@ -82,6 +83,13 @@ def _seed_all(seed=1):
     torch.manual_seed(seed)
 
 
+def _skip_if_torch_shared_memory_unavailable():
+    try:
+        torch.empty(1).share_memory_()
+    except RuntimeError as exc:
+        pytest.skip("torch shared memory unavailable: %s" % exc)
+
+
 def test_fit_dataloader_numpy_backed_uses_numpy_collate_no_pin():
     """Numpy-backed dataset → numpy collate + no pinning.
 
@@ -102,6 +110,7 @@ def test_fit_dataloader_numpy_backed_uses_numpy_collate_no_pin():
 
 def test_fit_dataloader_tensor_backed_uses_tensor_collate_and_pins():
     """Tensor-backed dataset → tensor collate + pinning."""
+    _skip_if_torch_shared_memory_unavailable()
     x_peptide = share_tensor(np.zeros((4, 2, 3), dtype=np.float32))
     y = share_tensor(np.zeros(4, dtype=np.float32))
     dataset = _FitBatchDataset(
@@ -119,6 +128,7 @@ def test_fit_dataloader_tensor_backed_uses_tensor_collate_and_pins():
 
 def test_share_tensor_round_trip():
     """``share_tensor`` returns a SHM tensor with the same content."""
+    _skip_if_torch_shared_memory_unavailable()
     arr = np.arange(12, dtype=np.float32).reshape(3, 4)
     shared = share_tensor(arr)
     assert isinstance(shared, torch.Tensor)
@@ -129,6 +139,7 @@ def test_share_tensor_round_trip():
 
 def test_share_like_and_update_shared():
     """``share_like`` allocates a shared buffer; ``update_shared`` fills it."""
+    _skip_if_torch_shared_memory_unavailable()
     src = np.arange(8, dtype=np.float32).reshape(4, 2)
     buf = share_like(src)
     assert buf.is_shared()
@@ -147,6 +158,7 @@ def test_effective_fit_dataloader_num_workers_skips_size_guard_for_tensor_backed
 
     monkeypatch.setattr(cnn, "_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES", 32)
     monkeypatch.setattr(cnn, "_FIT_DATALOADER_DOWNGRADE_WARNED", False)
+    _skip_if_torch_shared_memory_unavailable()
     x_peptide = share_tensor(np.zeros((8, 2, 3), dtype=np.float32))
     dataset = _FitBatchDataset(
         x_peptide=x_peptide,
@@ -199,6 +211,24 @@ def test_fit_dataloader_worker_downgrade_has_explicit_escape_hatch(monkeypatch):
     assert reason is None
 
 
+def test_resource_exhaustion_error_detection():
+    import errno
+
+    assert _is_resource_exhaustion_error(
+        OSError(errno.ENOSPC, "No space left on device")
+    )
+    assert _is_resource_exhaustion_error(
+        RuntimeError("unable to mmap storage: too many open files")
+    )
+    assert _is_resource_exhaustion_error(
+        RuntimeError("torch_shm_manager: Cannot allocate memory")
+    )
+    assert _is_resource_exhaustion_error(
+        RuntimeError("torch_shm_manager: Operation not permitted")
+    )
+    assert not _is_resource_exhaustion_error(ValueError("shape mismatch"))
+
+
 def test_fit_with_shm_env_override_trains_and_predicts(monkeypatch):
     """fit() with the SHM env override on trains end-to-end.
 
@@ -220,7 +250,10 @@ def test_fit_with_shm_env_override_trains_and_predicts(monkeypatch):
     model.fit(peptides, affinities)
 
     last_info = model.fit_info[-1]
-    assert last_info.get("fit_dataloader_shm_enabled") is True
+    if last_info.get("fit_dataloader_shm_enabled") is False:
+        assert "fit_dataloader_shm_fallback_reason" in last_info
+    else:
+        assert last_info.get("fit_dataloader_shm_enabled") is True
 
     preds = model.predict(peptides)
     assert preds.shape == (len(peptides),)
@@ -240,7 +273,11 @@ def test_fit_shm_auto_enables_when_dataloader_workers_requested(monkeypatch):
         dataloader_num_workers=2,
     )
     model.fit(peptides, affinities)
-    assert model.fit_info[-1].get("fit_dataloader_shm_enabled") is True
+    last_info = model.fit_info[-1]
+    if last_info.get("fit_dataloader_shm_enabled") is False:
+        assert "fit_dataloader_shm_fallback_reason" in last_info
+    else:
+        assert last_info.get("fit_dataloader_shm_enabled") is True
 
 
 def test_fit_shm_off_by_default_when_no_workers(monkeypatch):
