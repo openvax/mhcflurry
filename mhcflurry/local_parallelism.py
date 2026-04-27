@@ -275,12 +275,15 @@ def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
 _INDUCTOR_THREAD_HARD_CAP = 4
 
 
-# Estimated per-fit() Layer-2 SHM footprint. Empirically ~2–3 GB for the
-# pan-allele MLP at the standard data scale (x_peptide + x_allele +
-# y_encoded + sample_weights + random_negative buffers). We round up to
-# 4 GB so the safety check has margin for outliers (longer max_length,
-# bigger random-negative pool, future hyperparameter shifts).
-_PER_FIT_SHM_FOOTPRINT_GB_DEFAULT = 4.0
+# Estimated per-fit() Layer-2 SHM footprint for the current default affinity
+# path, where peptide features are stored as int amino-acid indices and widened
+# through the torch-side fixed encoding table. Observed release_exact folds are
+# ~150 MB of backing arrays; 0.25 GB leaves headroom for labels, weights,
+# random negatives, and shared-memory allocator overhead while allowing the
+# normal 16-worker release run to fit in Docker's default 8 GB /dev/shm. Legacy
+# numpy-expanded peptide vectors can be much larger; override with
+# MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB for such non-default runs.
+_PER_FIT_SHM_FOOTPRINT_GB_DEFAULT = 0.25
 
 
 def shm_free_gb(shm_dir="/dev/shm"):

@@ -212,6 +212,18 @@ def test_shm_capacity_check_unsafe_when_tmpfs_tight(monkeypatch):
     assert "shm-size" in result["message"]
 
 
+def test_shm_capacity_default_allows_release_workers_on_docker_tmpfs(monkeypatch):
+    """Current torch-index fit backing should fit 16 workers in 8 GB shm."""
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
+    monkeypatch.delenv("MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB", raising=False)
+    result = lp.fit_shm_capacity_check(num_workers=16)
+    assert result["safe"] is True
+    assert result["estimated_required_gb"] == 6.0
+
+
 def test_shm_capacity_check_no_shm_dir_returns_safe(monkeypatch):
     """macOS / no-/dev/shm platforms should return safe=True."""
     from mhcflurry import local_parallelism as lp
@@ -227,7 +239,7 @@ def test_preflight_shm_auto_disables_on_tight_tmpfs(monkeypatch, capsys):
     from mhcflurry import train_pan_allele_models_command as cmd
     from mhcflurry import local_parallelism as lp
 
-    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 1.0)
     monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
     monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
     # Disable the best-effort strategy switch so this exercises only
@@ -247,7 +259,7 @@ def test_preflight_shm_file_descriptor_does_not_override_capacity(monkeypatch, c
     from mhcflurry import train_pan_allele_models_command as cmd
     from mhcflurry import local_parallelism as lp
 
-    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 1.0)
     monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
     monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
     monkeypatch.delenv("MHCFLURRY_TORCH_SHM_AUTO", raising=False)
@@ -275,7 +287,7 @@ def test_preflight_shm_respects_force_pinned_off(monkeypatch, capsys):
     from mhcflurry import train_pan_allele_models_command as cmd
     from mhcflurry import local_parallelism as lp
 
-    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 1.0)
     monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
     monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "0")
 
@@ -289,7 +301,7 @@ def test_preflight_shm_warns_loud_on_force_pinned_on(monkeypatch, capsys):
     from mhcflurry import train_pan_allele_models_command as cmd
     from mhcflurry import local_parallelism as lp
 
-    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 7.0)
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 1.0)
     monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
     monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "1")
 

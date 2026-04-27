@@ -239,8 +239,10 @@ To resize `/dev/shm` on a Docker-based runtime:
 * On a bare host: `sudo mount -o remount,size=64g /dev/shm`.
 
 Per-fit footprint estimate is tuned via
-`MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB` (default 4.0 GB, sized for
-pan-allele MLP at standard data scale).
+`MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB` (default 0.25 GB, sized for the
+current pan-allele affinity path with torch-side peptide index encoding).
+Legacy/non-default runs that disable torch peptide encoding may need a
+larger override because numpy-expanded peptide vectors are much larger.
 
 ## Fit-time data flow
 
