@@ -790,6 +790,22 @@ _DEVICE_PEPTIDE_ENCODING_FALSE_VALUES = {
 }
 
 
+_FIT_DATALOADER_BACKING_MODES = {
+    "auto",
+    "numpy",
+    "shared_tensor",
+}
+_FIT_DATALOADER_BACKING_ALIASES = {
+    "shm": "shared_tensor",
+    "shared": "shared_tensor",
+    "shared-tensor": "shared_tensor",
+    "torch": "shared_tensor",
+    "tensor": "shared_tensor",
+}
+_FIT_DATALOADER_SHM_TRUE_VALUES = {"1", "true", "yes", "on"}
+_FIT_DATALOADER_SHM_FALSE_VALUES = {"0", "false", "no", "off"}
+
+
 def _peptide_torch_encoding_name(hyperparameters):
     """Return the fixed amino-acid encoding to materialize in torch.
 
@@ -836,6 +852,79 @@ def _peptide_torch_encoding_name(hyperparameters):
 def _peptide_uses_torch_encoding(hyperparameters):
     """Return True when peptide vectors are produced by torch embedding."""
     return _peptide_torch_encoding_name(hyperparameters) is not None
+
+
+def _normalize_fit_dataloader_backing(value):
+    """Return canonical fit() DataLoader backing mode.
+
+    ``fit_dataloader_backing`` controls how the parent fit() process exposes
+    the per-fit backing arrays to the inner DataLoader. It is deliberately
+    separate from ``dataloader_num_workers``:
+
+    * ``dataloader_num_workers`` is process parallelism.
+    * ``fit_dataloader_backing`` is data transport/storage.
+
+    The public, documented values are ``"auto"``, ``"numpy"``, and
+    ``"shared_tensor"``. Short aliases are accepted for developer diagnostics,
+    but configs are normalized before use.
+    """
+    if value is None:
+        value = "auto"
+    if not isinstance(value, str):
+        raise ValueError(
+            "fit_dataloader_backing must be one of %s; got %r"
+            % (sorted(_FIT_DATALOADER_BACKING_MODES), value)
+        )
+    normalized = value.strip().lower()
+    normalized = _FIT_DATALOADER_BACKING_ALIASES.get(normalized, normalized)
+    if normalized not in _FIT_DATALOADER_BACKING_MODES:
+        raise ValueError(
+            "Unsupported fit_dataloader_backing %r. Expected one of %s."
+            % (value, sorted(_FIT_DATALOADER_BACKING_MODES))
+        )
+    return normalized
+
+
+def _resolve_fit_dataloader_backing(value, dataloader_num_workers, environ=None):
+    """Resolve ``fit_dataloader_backing`` to ``numpy`` or ``shared_tensor``.
+
+    ``"auto"`` preserves the historical policy: use shared-memory tensors when
+    DataLoader worker processes are requested, otherwise use numpy arrays in the
+    training process. The legacy diagnostic env var
+    ``MHCFLURRY_FIT_DATALOADER_SHM`` remains supported, but only influences
+    ``"auto"``; an explicit hyperparameter wins.
+
+    Returns
+    -------
+    (requested, resolved, reason) : tuple[str, str, str]
+        ``requested`` is the canonical hyperparameter value. ``resolved`` is the
+        backing to attempt. ``reason`` is recorded in fit_info for debugging.
+    """
+    requested = _normalize_fit_dataloader_backing(value)
+    if requested != "auto":
+        return requested, requested, "explicit hyperparameter"
+
+    if environ is None:
+        environ = os.environ
+    env_value = environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
+    if env_value is not None:
+        normalized_env = env_value.strip().lower()
+        if normalized_env in _FIT_DATALOADER_SHM_TRUE_VALUES:
+            return requested, "shared_tensor", "MHCFLURRY_FIT_DATALOADER_SHM=1"
+        if normalized_env in _FIT_DATALOADER_SHM_FALSE_VALUES:
+            return requested, "numpy", "MHCFLURRY_FIT_DATALOADER_SHM=0"
+        raise ValueError(
+            "MHCFLURRY_FIT_DATALOADER_SHM must be one of %s or %s; got %r"
+            % (
+                sorted(_FIT_DATALOADER_SHM_TRUE_VALUES),
+                sorted(_FIT_DATALOADER_SHM_FALSE_VALUES),
+                env_value,
+            )
+        )
+
+    if int(dataloader_num_workers or 0) > 0:
+        return requested, "shared_tensor", "auto: dataloader_num_workers > 0"
+    return requested, "numpy", "auto: dataloader_num_workers == 0"
 
 
 def _peptide_torch_encoding_table(encoding_name):
@@ -2543,6 +2632,15 @@ class Class1NeuralNetwork(object):
         # each adds one Python process holding ~100-500 MB RSS. Don't
         # exceed (num_cpu_cores - num_training_workers).
         dataloader_num_workers=0,
+        # Transport/storage backing for fit()'s inner DataLoader dataset.
+        # "auto" preserves the historical policy: numpy arrays when
+        # dataloader_num_workers=0; shared torch tensors when workers are
+        # requested. "numpy" forces single-process/pickle-friendly backing.
+        # "shared_tensor" forces Layer-2 SHM backing even if worker count is
+        # zero, which is useful only for diagnostics. This does NOT control
+        # peptide amino-acid vector lookup; see
+        # peptide_amino_acid_encoding_torch for that model-side behavior.
+        fit_dataloader_backing="auto",
         # Batch size used for the validation forward pass. ``None`` uses a
         # device-aware heuristic: ``max(4 * minibatch_size, 4096)`` on CUDA
         # and ``4 * minibatch_size`` elsewhere. Separate from minibatch_size
@@ -2649,6 +2747,11 @@ class Class1NeuralNetwork(object):
     def __init__(self, **hyperparameters):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
             self.apply_hyperparameter_renames(hyperparameters)
+        )
+        self.hyperparameters["fit_dataloader_backing"] = (
+            _normalize_fit_dataloader_backing(
+                self.hyperparameters.get("fit_dataloader_backing", "auto")
+            )
         )
 
         self._network = None
@@ -4233,26 +4336,36 @@ class Class1NeuralNetwork(object):
                 _val_weights_device,
             )
 
-        # --- Layer-2 SHM (per-fit() torch shared tensors) ---
-        # The DataLoader's spawn workers can't pickle ~600 MB of
-        # backing arrays per worker per epoch. To enable
-        # ``dataloader_num_workers > 0`` we materialize the static
-        # backing once as shared tensors; workers then receive storage
-        # handles instead of byte copies. See mhcflurry/shared_memory.py
-        # for the layered SHM design.
+        # --- Fit() DataLoader backing (Layer-2 SHM or numpy) ---
+        # Keep the two concerns separate:
         #
-        # Auto-enabled whenever ``dataloader_num_workers > 0`` (the only
-        # case where it matters; without workers there's nothing to
-        # share). Force-on / force-off via MHCFLURRY_FIT_DATALOADER_SHM
-        # env override for diagnostics.
+        # * ``dataloader_num_workers`` controls process parallelism.
+        # * ``fit_dataloader_backing`` controls how the parent exposes
+        #   per-fit arrays to those processes.
+        #
+        # In ``auto`` mode (the default), shared tensor backing is used
+        # when worker processes are requested and numpy backing is used
+        # for single-process batching. Explicit ``numpy`` /
+        # ``shared_tensor`` modes are available for diagnostics and are
+        # serialized with each component model. This transport choice
+        # does NOT control peptide amino-acid encoding; the model-side
+        # torch embedding path is ``peptide_amino_acid_encoding_torch``.
         dataloader_num_workers_requested = int(
             self.hyperparameters.get("dataloader_num_workers", 0) or 0
         )
-        _shm_env = os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
-        if _shm_env is not None:
-            shm_enabled = _shm_env == "1"
-        else:
-            shm_enabled = dataloader_num_workers_requested > 0
+        (
+            fit_dataloader_backing_requested,
+            fit_dataloader_backing,
+            fit_dataloader_backing_reason,
+        ) = _resolve_fit_dataloader_backing(
+            self.hyperparameters.get("fit_dataloader_backing", "auto"),
+            dataloader_num_workers_requested,
+        )
+        fit_info["fit_dataloader_backing_requested"] = (
+            fit_dataloader_backing_requested
+        )
+        fit_info["fit_dataloader_backing_reason"] = fit_dataloader_backing_reason
+        shm_enabled = fit_dataloader_backing == "shared_tensor"
         random_neg_template = None
         if shm_enabled and num_random_negatives > 0:
             # Prime cycle 0 once so we know the encoding shape; the
@@ -4272,6 +4385,7 @@ class Class1NeuralNetwork(object):
                     "torch shared memory unavailable: %s" % shm_status["reason"]
                 )
                 shm_enabled = False
+                fit_dataloader_backing = "numpy"
         if shm_enabled:
             try:
                 backing = FitBacking.share(
@@ -4298,6 +4412,7 @@ class Class1NeuralNetwork(object):
                 )
                 fit_info["fit_dataloader_shm_fallback_reason"] = str(exc)
                 shm_enabled = False
+                fit_dataloader_backing = "numpy"
         if not shm_enabled:
             backing = FitBacking.from_numpy(
                 x_peptide=x_dict_without_random_negatives["peptide"],
@@ -4308,6 +4423,7 @@ class Class1NeuralNetwork(object):
                 random_negative_x_allele=random_negative_x_allele_base,
             )
         fit_info["fit_dataloader_shm_enabled"] = shm_enabled
+        fit_info["fit_dataloader_backing"] = fit_dataloader_backing
 
         for epoch in range(self.hyperparameters["max_epochs"]):
             epoch_wall_start = time.perf_counter()

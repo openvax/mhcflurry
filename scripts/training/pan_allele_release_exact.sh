@@ -266,8 +266,9 @@ PARALLELISM_ARGS=(
 
 # Phase 1 (#268): enable the BLOSUM62 encoding cache + fit() DataLoader
 # prefetch by default. USE_ENCODING_CACHE=0 disables the global peptide
-# encoding cache. DATALOADER_NUM_WORKERS=0 disables Layer-2 SHM/prefetch for
-# fit() batching and runs the same DataLoader dataset in the training process.
+# encoding cache. DATALOADER_NUM_WORKERS controls only process parallelism;
+# fit_dataloader_backing remains "auto" so the component model resolves
+# numpy vs shared_tensor backing consistently in fit().
 USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
 # DataLoader prefetch workers per training worker. Default to 1 as the
 # conservative SHM/prefetch-on setting: it avoids the legacy no-prefetch path
@@ -275,7 +276,7 @@ USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
 # release runs. Prior L40S sweeps at smaller minibatches did not show a win
 # from dl>=2, but the 8xA100 / minibatch=4096 operating point may differ.
 # Override DATALOADER_NUM_WORKERS=2+ only when intentionally re-benchmarking
-# that regime; use 0 for single-process/no-SHM fit() batching.
+# that regime; use 0 for single-process fit() batching.
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-1}"
 CACHE_ARGS=()
 if [ "$USE_ENCODING_CACHE" = "1" ]; then

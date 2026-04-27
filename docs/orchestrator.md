@@ -219,13 +219,15 @@ recovery" to "conservative fallback":
    and falls back to the numpy / single-process path for that fit()
    call, with a loud warning.
 
-To force-on (despite tight `/dev/shm`):
-`MHCFLURRY_FIT_DATALOADER_SHM=1`. The pre-flight will warn but
-respect the pin; workers will OOM if the estimate is correct.
+For `fit_dataloader_backing="auto"`, force-on despite tight `/dev/shm`
+with `MHCFLURRY_FIT_DATALOADER_SHM=1`. The pre-flight will warn but
+respect the pin; workers will OOM or fall back inside `fit()` if the
+estimate is correct.
 
-To force-off:
-`MHCFLURRY_FIT_DATALOADER_SHM=0`. Skips both Layer-2 SHM and the
-capacity check.
+For `fit_dataloader_backing="auto"`, force-off with
+`MHCFLURRY_FIT_DATALOADER_SHM=0`. This skips Layer-2 SHM. An explicit
+component-model `fit_dataloader_backing` hyperparameter wins over this
+diagnostic env var.
 
 To resize `/dev/shm` on a Docker-based runtime (rarely needed, since
 the file_descriptor strategy switch above handles tight tmpfs
@@ -238,6 +240,88 @@ automatically):
 Per-fit footprint estimate is tuned via
 `MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB` (default 4.0 GB, sized for
 pan-allele MLP at standard data scale).
+
+## Fit-time data flow
+
+Affinity training has three distinct mechanisms that are deliberately
+configured separately. Do not collapse these into one knob.
+
+### 1. Peptide amino-acid vector lookup
+
+Controlled by the model hyperparameter
+`peptide_amino_acid_encoding_torch`.
+
+When enabled (the default), peptide strings are encoded as `(N, L)`
+integer amino-acid indices. The model owns a frozen torch buffer for
+the configured vector encoding (`BLOSUM62`, `PMBEC`, `simons1999_contact`,
+or combinations), moves that buffer with `.to(device)`, and widens
+indices to `(N, L, V)` inside `forward()` using
+`torch.nn.functional.embedding`.
+
+This path is device agnostic: CUDA, MPS, and CPU all execute the same
+torch embedding operation on the active device. It is model semantics,
+not DataLoader behavior. `dataloader_num_workers=0` does **not** turn
+this off.
+
+Disable it only with `peptide_amino_acid_encoding_torch=False`, which
+restores the old path where numpy expands peptide strings into
+`(N, L, V)` vectors before they are moved to the device.
+
+### 2. Fit DataLoader process parallelism
+
+Controlled by the model hyperparameter `dataloader_num_workers`.
+
+This is pure process-count policy for the `fit()` inner batch loop:
+
+| value | meaning |
+|---|---|
+| `0` | build batches in the training worker process |
+| `>0` | spawn that many DataLoader child processes per training worker |
+
+Release recipes set only this knob. On a local 8-GPU run with
+`NUM_JOBS=16`, `dataloader_num_workers=1` means up to 16 extra
+fit-local DataLoader children while epochs are active; `2` means up to
+32. The thread-budget helper accounts for this when sizing
+`OMP_NUM_THREADS`, `MKL_NUM_THREADS`, and `OPENBLAS_NUM_THREADS`.
+
+### 3. Fit DataLoader backing storage
+
+Controlled by the model hyperparameter
+`fit_dataloader_backing="auto|numpy|shared_tensor"`.
+
+This is data transport/storage for one affinity `fit()` call. It does
+not alter model architecture, peptide vector lookup, loss, or training
+semantics.
+
+| value | behavior |
+|---|---|
+| `auto` | default; use `shared_tensor` when `dataloader_num_workers > 0`, otherwise `numpy` |
+| `numpy` | keep `FitBacking` arrays as numpy arrays; no Layer-2 SHM |
+| `shared_tensor` | clone `FitBacking` arrays into torch shared-memory tensors and use tensor-backed batches |
+
+`FitBacking` is a small internal bundle for one `fit()` call:
+`x_peptide`, `x_allele`, `y_encoded`, optional weights, and
+random-negative buffers. It exists so the fit loop can treat numpy and
+shared-tensor backing uniformly.
+
+The legacy diagnostic env var `MHCFLURRY_FIT_DATALOADER_SHM=0|1` still
+works, but only for `fit_dataloader_backing="auto"`. An explicit
+component-model hyperparameter wins. This keeps component models
+self-describing: configs serialize the backing policy with each
+`Class1NeuralNetwork`, while release orchestrators can stay simple and
+only choose `dataloader_num_workers`.
+
+### Component consistency
+
+The `Class1NeuralNetwork` affinity component model owns all three
+hyperparameters above, so allele-specific affinity models,
+pan-allele affinity models, and affinity ensembles resolve the same
+internal rules after config load. Missing keys in old component
+configs are filled from defaults (`peptide_amino_acid_encoding_torch=True`,
+`dataloader_num_workers=0`, `fit_dataloader_backing="auto"`).
+
+Processing models do not use this affinity `fit()` DataLoader path and
+therefore do not have `FitBacking` or `fit_dataloader_backing`.
 
 ## rsync hygiene (laptop ↔ remote training box)
 

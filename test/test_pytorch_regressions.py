@@ -20,6 +20,7 @@ from mhcflurry.class1_neural_network import (
     _is_resource_exhaustion_error,
     _FitBatchDataset,
     _make_fit_dataloader,
+    _resolve_fit_dataloader_backing,
 )
 from mhcflurry.shared_memory import (
     numpy_batch_collate,
@@ -253,6 +254,59 @@ def test_resource_exhaustion_error_detection():
     assert not _is_resource_exhaustion_error(ValueError("shape mismatch"))
 
 
+def test_fit_dataloader_backing_auto_resolves_from_worker_count():
+    """Auto backing keeps worker count and storage mode separate."""
+    assert _resolve_fit_dataloader_backing(
+        "auto", 0, environ={}
+    ) == (
+        "auto",
+        "numpy",
+        "auto: dataloader_num_workers == 0",
+    )
+    assert _resolve_fit_dataloader_backing(
+        "auto", 2, environ={}
+    ) == (
+        "auto",
+        "shared_tensor",
+        "auto: dataloader_num_workers > 0",
+    )
+
+
+def test_fit_dataloader_backing_explicit_modes_ignore_worker_count():
+    """Explicit backing mode is not inferred from process parallelism."""
+    assert _resolve_fit_dataloader_backing(
+        "numpy", 4, environ={}
+    ) == ("numpy", "numpy", "explicit hyperparameter")
+    assert _resolve_fit_dataloader_backing(
+        "shared_tensor", 0, environ={}
+    ) == ("shared_tensor", "shared_tensor", "explicit hyperparameter")
+    assert _resolve_fit_dataloader_backing(
+        "shm", 0, environ={}
+    ) == ("shared_tensor", "shared_tensor", "explicit hyperparameter")
+
+
+def test_fit_dataloader_backing_env_only_affects_auto():
+    """Legacy SHM env override remains a diagnostic for auto mode only."""
+    assert _resolve_fit_dataloader_backing(
+        "auto", 0, environ={"MHCFLURRY_FIT_DATALOADER_SHM": "1"}
+    ) == ("auto", "shared_tensor", "MHCFLURRY_FIT_DATALOADER_SHM=1")
+    assert _resolve_fit_dataloader_backing(
+        "auto", 2, environ={"MHCFLURRY_FIT_DATALOADER_SHM": "0"}
+    ) == ("auto", "numpy", "MHCFLURRY_FIT_DATALOADER_SHM=0")
+    assert _resolve_fit_dataloader_backing(
+        "numpy", 2, environ={"MHCFLURRY_FIT_DATALOADER_SHM": "1"}
+    ) == ("numpy", "numpy", "explicit hyperparameter")
+
+
+def test_fit_dataloader_backing_rejects_invalid_values():
+    with pytest.raises(ValueError, match="Unsupported fit_dataloader_backing"):
+        Class1NeuralNetwork(fit_dataloader_backing="banana")
+    with pytest.raises(ValueError, match="MHCFLURRY_FIT_DATALOADER_SHM"):
+        _resolve_fit_dataloader_backing(
+            "auto", 0, environ={"MHCFLURRY_FIT_DATALOADER_SHM": "maybe"}
+        )
+
+
 def test_fit_with_shm_env_override_trains_and_predicts(monkeypatch):
     """fit() with the SHM env override on trains end-to-end.
 
@@ -285,7 +339,7 @@ def test_fit_with_shm_env_override_trains_and_predicts(monkeypatch):
 
 
 def test_fit_shm_auto_enables_when_dataloader_workers_requested(monkeypatch):
-    """SHM auto-enables when ``dataloader_num_workers > 0`` (no env var)."""
+    """Auto backing uses SHM when ``dataloader_num_workers > 0``."""
     monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
     peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
     affinities = np.array([50.0, 30.0, 100.0, 5000.0])
@@ -300,12 +354,19 @@ def test_fit_shm_auto_enables_when_dataloader_workers_requested(monkeypatch):
     last_info = model.fit_info[-1]
     if last_info.get("fit_dataloader_shm_enabled") is False:
         assert "fit_dataloader_shm_fallback_reason" in last_info
+        assert last_info.get("fit_dataloader_backing") == "numpy"
     else:
         assert last_info.get("fit_dataloader_shm_enabled") is True
+        assert last_info.get("fit_dataloader_backing") == "shared_tensor"
+    assert last_info.get("fit_dataloader_backing_requested") == "auto"
+    assert (
+        last_info.get("fit_dataloader_backing_reason")
+        == "auto: dataloader_num_workers > 0"
+    )
 
 
 def test_fit_shm_off_by_default_when_no_workers(monkeypatch):
-    """SHM stays off when ``dataloader_num_workers=0`` and no env override."""
+    """Auto backing uses numpy when ``dataloader_num_workers=0``."""
     monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
     peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
     affinities = np.array([50.0, 30.0, 100.0, 5000.0])
@@ -313,6 +374,43 @@ def test_fit_shm_off_by_default_when_no_workers(monkeypatch):
     model = _make_simple_affinity_model(max_epochs=2)
     model.fit(peptides, affinities)
     assert model.fit_info[-1].get("fit_dataloader_shm_enabled") is False
+    assert model.fit_info[-1].get("fit_dataloader_backing_requested") == "auto"
+    assert model.fit_info[-1].get("fit_dataloader_backing") == "numpy"
+    assert (
+        model.fit_info[-1].get("fit_dataloader_backing_reason")
+        == "auto: dataloader_num_workers == 0"
+    )
+
+
+def test_fit_dataloader_backing_explicit_shared_tensor_with_no_workers(monkeypatch):
+    """Explicit shared_tensor backing is independent of DataLoader workers."""
+    monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(23)
+    model = _make_simple_affinity_model(
+        max_epochs=2,
+        fit_dataloader_backing="shared_tensor",
+    )
+    model.fit(peptides, affinities)
+    last_info = model.fit_info[-1]
+    assert last_info.get("fit_dataloader_backing_requested") == "shared_tensor"
+    assert last_info.get("fit_dataloader_backing_reason") == "explicit hyperparameter"
+    if last_info.get("fit_dataloader_shm_enabled") is False:
+        assert "fit_dataloader_shm_fallback_reason" in last_info
+        assert last_info.get("fit_dataloader_backing") == "numpy"
+    else:
+        assert last_info.get("fit_dataloader_shm_enabled") is True
+        assert last_info.get("fit_dataloader_backing") == "shared_tensor"
+
+
+def test_fit_dataloader_backing_serializes_with_component_model():
+    """Component model configs carry the explicit fit transport policy."""
+    model = _make_simple_affinity_model(fit_dataloader_backing="shared-tensor")
+    config = model.get_config()
+    assert config["hyperparameters"]["fit_dataloader_backing"] == "shared_tensor"
+    restored = Class1NeuralNetwork.from_config(config)
+    assert restored.hyperparameters["fit_dataloader_backing"] == "shared_tensor"
 
 
 def test_fit_validation_interval_skips_off_interval_epochs():
@@ -1088,9 +1186,10 @@ def test_old_model_config_loads_with_new_features_added():
 
     Simulates a 2.2.0-vintage model config that does NOT carry any of
     the Phase-4 additions (``validation_batch_size``,
-    ``dataloader_num_workers``) and uses the atomic ``"BLOSUM62"``
-    encoding. Loading must succeed and produce a network whose
-    hyperparameters populate the new fields from defaults.
+    ``dataloader_num_workers``, ``fit_dataloader_backing``) and uses
+    the atomic ``"BLOSUM62"`` encoding. Loading must succeed and
+    produce a network whose hyperparameters populate the new fields
+    from defaults.
 
     If this test ever fails, something broke the
     ``HyperparameterDefaults.with_defaults`` fallback chain OR a newly-
@@ -1099,7 +1198,7 @@ def test_old_model_config_loads_with_new_features_added():
     """
     # Minimal legacy-style config — only the fields that existed in the
     # public 2.2.0 training hyperparameters. No validation_batch_size,
-    # no dataloader_num_workers, no compile flags.
+    # no dataloader_num_workers, no fit_dataloader_backing, no compile flags.
     legacy_config = {
         "hyperparameters": {
             "layer_sizes": [4],
@@ -1137,6 +1236,7 @@ def test_old_model_config_loads_with_new_features_added():
     # New fields populated by defaults:
     assert "validation_batch_size" in net.hyperparameters
     assert "dataloader_num_workers" in net.hyperparameters
+    assert net.hyperparameters["fit_dataloader_backing"] == "auto"
 
     # Legacy-renamed key dropped, not raised:
     assert "peptide_amino_acid_encoding" not in net.hyperparameters

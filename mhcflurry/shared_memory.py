@@ -198,6 +198,12 @@ class FitBacking:
     ``dataset_x_peptide`` scaffolding the fit() loop used to maintain.
     ``tensor_backed`` is true when the underlying storage is shared
     torch tensors (Layer 2 SHM); false when it's plain numpy.
+
+    This is an internal transport container, not a model feature. The
+    model-side peptide encoding decision is controlled separately by
+    ``peptide_amino_acid_encoding_torch``; ``FitBacking`` only decides
+    whether already-encoded fit() arrays are exposed to the DataLoader as
+    numpy arrays or shared CPU tensors.
     """
 
     x_peptide: Any
