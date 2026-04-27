@@ -264,14 +264,18 @@ PARALLELISM_ARGS=(
     --max-workers-per-gpu "$MAX_WORKERS_PER_GPU"
 )
 
-# Phase 1 (#268): enable the BLOSUM62 encoding cache + DataLoader prefetch
-# by default. USE_ENCODING_CACHE=0 or DATALOADER_NUM_WORKERS=0 restores
-# the pre-#268 legacy path (bit-identical; verified by Phase 1 tests).
+# Phase 1 (#268): enable the BLOSUM62 encoding cache + fit() DataLoader
+# prefetch by default. USE_ENCODING_CACHE=0 disables the global peptide
+# encoding cache. DATALOADER_NUM_WORKERS=0 disables Layer-2 SHM/prefetch for
+# fit() batching and runs the same DataLoader dataset in the training process.
 USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
-# DataLoader prefetch workers per training worker. v11 sweep winner
-# (batch=512, dl=1, wpg=2 on L40S) showed dl=1 marginally beat dl=2;
-# dl=2 added overhead without parallelism benefit at single-item
-# granularity. Default to 1 now.
+# DataLoader prefetch workers per training worker. Default to 1 as the
+# conservative SHM/prefetch-on setting: it avoids the legacy no-prefetch path
+# while keeping process count and /dev/shm pressure bounded on high-concurrency
+# release runs. Prior L40S sweeps at smaller minibatches did not show a win
+# from dl>=2, but the 8xA100 / minibatch=4096 operating point may differ.
+# Override DATALOADER_NUM_WORKERS=2+ only when intentionally re-benchmarking
+# that regime; use 0 for single-process/no-SHM fit() batching.
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-1}"
 CACHE_ARGS=()
 if [ "$USE_ENCODING_CACHE" = "1" ]; then

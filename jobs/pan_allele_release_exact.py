@@ -99,11 +99,13 @@ image = (
         # arithmetic to amortize its fixed overheads over.
         "MHCFLURRY_TORCH_COMPILE": "1",
         "TORCHINDUCTOR_COMPILE_THREADS": "2",
-        # One DataLoader subprocess per training worker is the measured
-        # sweep winner and matches scripts/training/pan_allele_release_exact.sh.
-        # It keeps the SHM/prefetch path active without multiplying process
-        # count and /dev/shm pressure. Use 0 for the legacy numpy/no-SHM
-        # fallback; avoid >=2 unless re-benchmarking on new hardware.
+        # One DataLoader subprocess per training worker matches the shell
+        # recipe's conservative default: SHM/prefetch remains active without
+        # multiplying process count and /dev/shm pressure. Prior L40S sweeps
+        # at smaller minibatches did not show a win from dl>=2, but the
+        # 8xA100 / minibatch=4096 operating point may differ. Use 0 for
+        # single-process/no-SHM fit() batching; set 2+ only when
+        # intentionally re-benchmarking that regime.
         "DATALOADER_NUM_WORKERS": "1",
         # Populate the per-epoch timing arrays in fit_info (epoch_fetch_time,
         # epoch_train_time, epoch_validation_time, etc.). Writes to the
