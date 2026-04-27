@@ -30,14 +30,14 @@ hoist env knobs              │
   TORCHINDUCTOR_COMPILE_THREADS
                              │
 prebuild encoding cache      │     fit():
-  (Layer-1, mmap)            │       look up encoding cache
+  (run mmap cache)           │       look up encoding cache
                              │       (mmap hit, no rebuild)
 prebuild random-neg pool     │
-  (Layer-1, mmap)            │       look up random-neg pool
+  (run mmap cache)           │       look up random-neg pool
                              │       (mmap hit, no replan)
 fork worker pool             ─┘
                                     fit() materializes
-                                      Layer-2 SHM (per-fit)
+                                      fit DataLoader SHM (per-fit)
                                       DataLoader workers see
                                       shared tensor handles
 collect results  ◀──────────────────  return predictor
@@ -52,7 +52,7 @@ mhcflurry uses two SHM layers. They share the "build once, share with
 many readers" idea but use different OS mechanisms because lifetimes
 differ.
 
-| | Layer 1 | Layer 2 |
+| | run mmap cache | fit DataLoader SHM |
 |---|---|---|
 | **Lifetime** | per-run (persists to disk; survives across runs) | per-`fit()` call |
 | **Mechanism** | `numpy.memmap` of files | `torch.Tensor.share_memory_()` (POSIX shm or file descriptors) |
@@ -61,18 +61,20 @@ differ.
 | **Mutability** | read-only | mutable (random-neg buffer refilled per epoch) |
 | **Holds** | encoded peptides, random-neg peptides | x_peptide, x_allele, y_encoded, sample_weights, random_negative_x_peptide buffer, random_negative_x_allele |
 
-**Why two layers?** Layer 1's persist-across-runs property fits file
-mmap; Layer 2's mutate-per-epoch property fits torch shm. The split is
-intentional, but the API surface is uniform: each has a `setup_*`
-factory and a small set of generic helpers — see `mhcflurry/shared_memory.py`.
+**Why two layers?** The run mmap cache's persist-across-runs property
+fits file mmap; the fit DataLoader SHM's mutate-per-epoch property fits
+torch shm. The split is intentional, but the API surface is uniform:
+each has a `setup_*` factory and a small set of generic helpers — see
+`mhcflurry/shared_memory.py`.
 
-**Why not "always Layer 2"?** Layer 2 doesn't survive process exit;
-encoding the ~1 M training peptides takes ~30 sec, and we'd pay it
-every run. Layer 1's mmap files live on disk, so a re-run hits cache.
+**Why not "always fit DataLoader SHM"?** It doesn't survive process
+exit; encoding the ~1 M training peptides takes ~30 sec, and we'd pay
+it every run. The run mmap cache's mmap files live on disk, so a re-run
+hits cache.
 
-**Why not "always Layer 1"?** Layer 1 is read-only; the per-epoch
-random-negative buffer needs in-place updates. Layer 2 is the right
-tool for that.
+**Why not "always run mmap cache"?** It's read-only; the per-epoch
+random-negative buffer needs in-place updates. The fit DataLoader SHM
+is the right tool for that.
 
 ## Parallelism backends
 
@@ -89,10 +91,10 @@ Two backends, one CLI surface:
   `--max-workers-per-gpu` keeps the historical CPU-overflow behavior.
 - **Cluster** (`cluster_parallelism.py`): one job per work-item
   submitted via `bsub` / `sbatch` / `sh`. Workers serialize
-  GLOBAL_DATA to NFS, deserialize on the worker side. Layer-1 SHM
-  works ONLY when the pool dir is on a shared filesystem reachable
-  from every worker node — orchestrator emits a loud warning when both
-  flags are set so the user can verify.
+  GLOBAL_DATA to NFS, deserialize on the worker side. The run mmap
+  cache works ONLY when the pool dir is on a shared filesystem
+  reachable from every worker node — orchestrator emits a loud warning
+  when both flags are set so the user can verify.
 
 Worker-side code (`train_model()`, etc.) is identical between
 backends. Only the orchestrator branches on `args.cluster_parallelism`.
@@ -101,11 +103,11 @@ backends. Only the orchestrator branches on `args.cluster_parallelism`.
 
 The 2.3.0 modernization concentrates on the pan-allele affinity
 training + percentile calibration paths. Other components inherit
-parts of the stack (Layer-2 SHM is automatic for affinity `fit()` calls
-that use `fit_dataloader_backing="auto"` with `dataloader_num_workers > 0`;
-the pseudogene filter is now shared) but their orchestrators don't yet
-drive Layer-1 SHM or encoding-cache prefetch — those are opt-in, not on
-by default.
+parts of the stack (fit DataLoader SHM is automatic for affinity
+`fit()` calls that use `fit_dataloader_backing="auto"` with
+`dataloader_num_workers > 0`; the pseudogene filter is now shared) but
+their orchestrators don't yet drive the run mmap cache or
+encoding-cache prefetch — those are opt-in, not on by default.
 
 | | pretrain | finetune | select | calibrate |
 |---|---|---|---|---|
@@ -115,10 +117,11 @@ by default.
 | **presentation** | n/a | serial only (single-process; no orchestration story today) | n/a | filter ✓ (shares calibrate command) |
 
 "Opt-in" cells aren't *broken* — they just inherit the worker-side
-Layer-2 SHM (free with `dataloader_num_workers > 0`) and don't yet
-have orchestrator-side Layer-1 prebuild. When their datasets grow
-to where prebuild matters, call `prebuild_encoding_caches` from the
-relevant `train_*_command` after `add_local_parallelism_args(...)`.
+fit DataLoader SHM (free with `dataloader_num_workers > 0`) and don't
+yet have orchestrator-side run mmap cache prebuild. When their
+datasets grow to where prebuild matters, call `prebuild_encoding_caches`
+from the relevant `train_*_command` after
+`add_local_parallelism_args(...)`.
 
 ## Env knobs vs CLI flags
 
@@ -184,12 +187,12 @@ don't each spawn `cpu_count()` compile threads.
    The 2.3.0 application sites are calibrate (affinity + presentation
    paths) and select (pan-allele + allele-specific paths).
 
-## /dev/shm capacity and Layer-2 SHM auto-fallback
+## /dev/shm capacity and fit DataLoader SHM auto-fallback
 
-Layer-2 SHM allocates per-fit() backing tensors in POSIX shm
-(`/dev/shm`). With small `/dev/shm` (the Docker default is 8 GB) and
-many fit() workers, the allocator runs out mid-fit and the worker
-crashes with `OSError: [Errno 28] No space left on device`.
+The fit DataLoader SHM path allocates per-fit() backing tensors in
+POSIX shm (`/dev/shm`). With small `/dev/shm` (the Docker default is
+8 GB) and many fit() workers, the allocator runs out mid-fit and the
+worker crashes with `OSError: [Errno 28] No space left on device`.
 
 The orchestrator handles this in **four** layers, ordered from "best
 recovery" to "conservative fallback":
@@ -208,9 +211,9 @@ recovery" to "conservative fallback":
    Triggered by default; disable with `MHCFLURRY_TORCH_SHM_AUTO=0`.
    Also fires at `mhcflurry.class1_neural_network` import time so paths
    that bypass the orchestrator (tests, allele-specific train) inherit it.
-3. **Auto-disable Layer-2 SHM** — when the strategy switch fails
-   (some platforms only ship `file_system`) OR the tmpfs remains too
-   small, and the user hasn't force-pinned
+3. **Auto-disable fit DataLoader SHM** — when the strategy switch
+   fails (some platforms only ship `file_system`) OR the tmpfs remains
+   too small, and the user hasn't force-pinned
    `MHCFLURRY_FIT_DATALOADER_SHM`, the orchestrator sets it to `"0"`
    so auto-backed workers use the numpy DataLoader path instead.
    Throughput hit is ~10–30% vs the SHM path; better than crashing.
@@ -228,9 +231,9 @@ respect the pin; workers will OOM or fall back inside `fit()` if the
 estimate is correct.
 
 For `fit_dataloader_backing="auto"`, force-off with
-`MHCFLURRY_FIT_DATALOADER_SHM=0`. This skips Layer-2 SHM. An explicit
-component-model `fit_dataloader_backing` hyperparameter wins over this
-diagnostic env var.
+`MHCFLURRY_FIT_DATALOADER_SHM=0`. This skips the fit DataLoader SHM
+path. An explicit component-model `fit_dataloader_backing`
+hyperparameter wins over this diagnostic env var.
 
 To resize `/dev/shm` on a Docker-based runtime:
 * relaunch the container with `--shm-size=64g` (or more); remount
@@ -238,11 +241,16 @@ To resize `/dev/shm` on a Docker-based runtime:
   drop.
 * On a bare host: `sudo mount -o remount,size=64g /dev/shm`.
 
-Per-fit footprint estimate is tuned via
-`MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB` (default 0.25 GB, sized for the
-current pan-allele affinity path with torch-side peptide index encoding).
-Legacy/non-default runs that disable torch peptide encoding may need a
-larger override because numpy-expanded peptide vectors are much larger.
+The per-fit footprint estimate is computed live in
+`_preflight_shm_capacity` from the actual work-item bundle:
+`estimate_fit_dataloader_shm_gb` reads `peptide_encoding`
+(alignment, max_length), `peptide_amino_acid_encoding_torch`
+(int8 indices vs fp32 expansion), `random_negative_rate`, and the
+loaded train-row count, then prints the breakdown alongside the
+capacity headline. Override with `MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB`
+when invoking the helper outside the orchestrator (tests, ad-hoc
+scripts); it falls back to a 0.25 GB constant when no work items are
+visible.
 
 ## Fit-time data flow
 
@@ -299,7 +307,7 @@ semantics.
 | value | behavior |
 |---|---|
 | `auto` | default; use `shared_tensor` when `dataloader_num_workers > 0`, otherwise `numpy` |
-| `numpy` | keep `FitBacking` arrays as numpy arrays; no Layer-2 SHM |
+| `numpy` | keep `FitBacking` arrays as numpy arrays; no fit DataLoader SHM |
 | `shared_tensor` | clone `FitBacking` arrays into torch shared-memory tensors and use tensor-backed batches |
 
 `FitBacking` is a small internal bundle for one `fit()` call:
@@ -351,7 +359,7 @@ asymmetries to know about:
 
 ## Pointers to code
 
-- Layer 1 + Layer 2 helpers: `mhcflurry/shared_memory.py`
+- Run mmap cache + fit DataLoader SHM helpers: `mhcflurry/shared_memory.py`
 - Encoding cache: `mhcflurry/encoding_cache.py` (generic
   `prebuild_encoding_caches`; pan-allele wrapper in
   `train_pan_allele_models_command._initialize_encoding_cache`)
@@ -377,10 +385,11 @@ and adding it would be feature work, not a fix":
   prebuild to matter at current scale. The shared helper
   (`prebuild_encoding_caches`) makes adoption a one-line call when
   this changes.
-- **Layer-1 random-negative pool** is pan-allele-only because only
-  pan-allele training does the per-epoch random-negative regeneration
-  at the scale where mmap-share is meaningful. Allele-specific
-  training does similar work but at smaller per-allele scale.
+- **Run mmap cache for the random-negative pool** is pan-allele-only
+  because only pan-allele training does the per-epoch random-negative
+  regeneration at the scale where mmap-share is meaningful.
+  Allele-specific training does similar work but at smaller per-allele
+  scale.
 - **`torch.compile`** is off by default everywhere; opt-in via
   `MHCFLURRY_TORCH_COMPILE=1`. The thread-count hoist is in the
   pan-allele orchestrator only because that's where worker oversub
@@ -390,7 +399,7 @@ and adding it would be feature work, not a fix":
 
 ## Future tightening (not in 2.3.0)
 
-- **Layer-1 SHM for allele-specific training.** Wire
+- **Run mmap cache for allele-specific training.** Wire
   `--random-negative-shared-pool-dir` through
   `train_allele_specific_models_command`.
 - **Encoding-cache prebuild for processing/allele-specific.** When

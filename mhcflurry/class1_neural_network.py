@@ -258,9 +258,10 @@ def _is_resource_exhaustion_error(exc):
     ))
 
 
-# Layer-2 SHM helpers + collation are defined in mhcflurry/shared_memory.py
-# (the canonical home). Re-exporting at module-level so callers that
-# already import them from class1_neural_network keep working.
+# fit DataLoader SHM helpers + collation are defined in
+# mhcflurry/shared_memory.py (the canonical home). Re-exporting at
+# module-level so callers that already import them from
+# class1_neural_network keep working.
 from .shared_memory import (  # noqa: E402,F401
     FitBacking,
     array_nbytes,
@@ -2637,8 +2638,8 @@ class Class1NeuralNetwork(object):
         # "auto" preserves the historical policy: numpy arrays when
         # dataloader_num_workers=0; shared torch tensors when workers are
         # requested. "numpy" forces single-process/pickle-friendly backing.
-        # "shared_tensor" forces Layer-2 SHM backing even if worker count is
-        # zero, which is useful only for diagnostics. This does NOT control
+        # "shared_tensor" forces fit DataLoader SHM backing even if worker
+        # count is zero, which is useful only for diagnostics. This does NOT control
         # peptide amino-acid vector lookup; see
         # peptide_amino_acid_encoding_torch for that model-side behavior.
         fit_dataloader_backing="auto",
@@ -3019,8 +3020,11 @@ class Class1NeuralNetwork(object):
             encoding_name = hyperparameters['allele_amino_acid_encoding']
             try:
                 encoding_df = get_vector_encoding_df(encoding_name)
-                # Standard allele pseudosequence length is 37 amino acids
-                allele_seq_length = 37
+                # Production pan-allele models ship the 39-residue extended
+                # pseudosequence in `allele_sequences.csv` (loaded via
+                # `Class1AffinityPredictor.load`). The legacy 34-residue
+                # `class1_pseudosequences.csv` is no longer used at fit time.
+                allele_seq_length = 39
                 embedding_dim = allele_seq_length * len(encoding_df.columns)
                 allele_representations = numpy.zeros((1, embedding_dim), dtype=numpy.float32)
             except KeyError:
@@ -3978,8 +3982,8 @@ class Class1NeuralNetwork(object):
         progress_print_interval : float
         random_negative_shared_pool_dir : str, optional
             Path to a directory containing a pre-built mmap random-
-            negative pool (see ``shared_memory.py`` Layer 1). When
-            set, ``RandomNegativesPool.from_shared_mmap`` is used in
+            negative pool (the run mmap cache; see ``shared_memory.py``).
+            When set, ``RandomNegativesPool.from_shared_mmap`` is used in
             place of the in-process constructor — workers consume an
             OS-page-cache-shared encoded pool instead of regenerating
             and re-encoding their own each cycle. The orchestrator is
@@ -4045,9 +4049,10 @@ class Class1NeuralNetwork(object):
             if random_negative_pool_epochs > 1
             else None
         )
-        # Layer-1 SHM path (see shared_memory.py): when the orchestrator
-        # has pre-built an mmap pool for this work item's (fold, random-
-        # negative-config), construct via ``from_shared_mmap`` and let
+        # Run mmap cache path (see shared_memory.py): when the
+        # orchestrator has pre-built an mmap pool for this work item's
+        # (fold, random-negative-config), construct via
+        # ``from_shared_mmap`` and let
         # the OS page cache hold a single resident copy across all the
         # outer training Pool's workers. Otherwise the in-process
         # constructor regenerates + re-encodes per worker per cycle.
@@ -4337,7 +4342,7 @@ class Class1NeuralNetwork(object):
                 _val_weights_device,
             )
 
-        # --- Fit() DataLoader backing (Layer-2 SHM or numpy) ---
+        # --- Fit() DataLoader backing (fit DataLoader SHM or numpy) ---
         # Keep the two concerns separate:
         #
         # * ``dataloader_num_workers`` controls process parallelism.
@@ -4371,7 +4376,7 @@ class Class1NeuralNetwork(object):
             shm_status = torch_shared_memory_status()
             if not shm_status["available"]:
                 logging.warning(
-                    "fit(): Layer-2 SHM unavailable with torch sharing "
+                    "fit(): fit DataLoader SHM unavailable with torch sharing "
                     "strategy %r (%s); falling back to numpy DataLoader "
                     "path for THIS fit() call.",
                     shm_status["strategy"],
@@ -4407,7 +4412,7 @@ class Class1NeuralNetwork(object):
                 if not _is_resource_exhaustion_error(exc):
                     raise
                 logging.warning(
-                    "fit(): Layer-2 SHM allocation failed with %r — "
+                    "fit(): fit DataLoader SHM allocation failed with %r — "
                     "falling back to numpy DataLoader path for THIS fit() "
                     "call. Resize /dev/shm or reduce concurrency to "
                     "avoid the fallback. See docs/orchestrator.md.",

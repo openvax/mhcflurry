@@ -275,15 +275,161 @@ def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
 _INDUCTOR_THREAD_HARD_CAP = 4
 
 
-# Estimated per-fit() Layer-2 SHM footprint for the current default affinity
-# path, where peptide features are stored as int amino-acid indices and widened
-# through the torch-side fixed encoding table. Observed release_exact folds are
-# ~150 MB of backing arrays; 0.25 GB leaves headroom for labels, weights,
-# random negatives, and shared-memory allocator overhead while allowing the
-# normal 16-worker release run to fit in Docker's default 8 GB /dev/shm. Legacy
-# numpy-expanded peptide vectors can be much larger; override with
-# MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB for such non-default runs.
+# Conservative fallback estimate for per-fit() fit DataLoader SHM footprint
+# used when no work-item bundle is available (tests, ad-hoc helper calls).
+# Reflects the current default affinity path: int amino-acid indices widened
+# in torch and ~1.5 M-row Class I training set. ``estimate_fit_dataloader_shm_gb``
+# replaces this with a live computation when work_items + train_row_count are
+# available. Override with MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB for non-default
+# runs that bypass the orchestrator estimator.
 _PER_FIT_SHM_FOOTPRINT_GB_DEFAULT = 0.25
+
+# Bytes per row used by the SHM-footprint estimator for the non-peptide parts
+# of FitBacking. y_encoded is fp32 of shape (N, 2) for the inequality-aware
+# loss → 8 B; sample_weights is fp32 → 4 B; allele indices are int64 → 8 B.
+# Treat as constants — they are stable across the affinity training stack
+# and changing them requires a corresponding fit() change.
+_FIT_BACKING_LABEL_BYTES_PER_ROW = 8
+_FIT_BACKING_WEIGHT_BYTES_PER_ROW = 4
+_FIT_BACKING_ALLELE_BYTES_PER_ROW = 8
+
+# Padding factor applied to the raw byte estimate to account for shared-memory
+# allocator overhead (POSIX shm rounds up to page boundaries; torch shm
+# allocator sometimes over-reserves) and FitBacking transient buffers like
+# ``random_neg_template`` cloned during cycle-0 priming. 1.1 = 10% margin.
+_FIT_BACKING_OVERHEAD_FACTOR = 1.1
+
+
+def _peptide_bytes_per_row(peptide_encoding, peptide_amino_acid_encoding_torch):
+    """Return per-row bytes for one fit's encoded peptide array.
+
+    The torch-indices path stores ``(N, L_total)`` int8; the legacy numpy
+    expansion stores ``(N, L_total, V)`` fp32. ``L_total`` depends on the
+    alignment method (``left_pad_centered_right_pad`` triples, ``left_pad
+    _right_pad`` doubles, ``pad_middle`` keeps ``max_length``).
+    """
+    encoding = peptide_encoding or {}
+    max_length = int(encoding.get("max_length", 15))
+    alignment = encoding.get("alignment_method", "pad_middle")
+    if alignment == "left_pad_centered_right_pad":
+        l_total = 3 * max_length
+    elif alignment == "left_pad_right_pad":
+        l_total = 2 * max_length
+    else:
+        l_total = max_length
+    if peptide_amino_acid_encoding_torch:
+        return l_total  # int8
+    # Legacy numpy expansion: (L, V) fp32. V defaults to 21 (BLOSUM62
+    # column count); fall back to that since the planner here doesn't
+    # need to import amino_acid for an estimate.
+    vocab = 21
+    return l_total * vocab * 4
+
+
+def _fit_population_estimate(item, train_row_count, num_folds):
+    """Approximate rows in one fit's FitBacking arrays.
+
+    The fit() pipeline concatenates ``num_random_negatives`` random rows
+    onto the per-fold training population; both blocks live in shared
+    memory. ``random_negative_rate`` defaults to 1.0 in the release recipe
+    (one random negative per real row). Pretrain fits use a fixed
+    ``pretrain_steps_per_epoch * pretrain_peptides_per_epoch`` count that
+    is much smaller than the main population, so the per-fold estimate
+    dominates.
+    """
+    if train_row_count is None or train_row_count <= 0:
+        return None
+    folds = max(int(num_folds or 1), 1)
+    fold_population = int(train_row_count * (folds - 1) / folds) if folds > 1 else int(train_row_count)
+    hp = item.get("hyperparameters", {}) or {}
+    rate = float(hp.get("random_negative_rate", 1.0) or 1.0)
+    return fold_population * (1.0 + max(rate, 0.0))
+
+
+def estimate_fit_dataloader_shm_gb(
+        work_items=None,
+        *,
+        train_row_count=None,
+        num_folds=4):
+    """Estimate worst-case per-fit fit DataLoader SHM footprint.
+
+    Reads peptide encoding and random-negative settings from each work
+    item's hyperparameters, computes per-row bytes for the FitBacking
+    bundle (``x_peptide``, ``x_allele``, ``y_encoded``, ``sample_weights``
+    plus the random-negative twins), and returns the maximum across work
+    items so the orchestrator's tmpfs check covers the heaviest fold.
+    A 10% overhead factor accounts for SHM allocator rounding and the
+    cycle-0 random-negative template clone.
+
+    Returns ``(gb_per_fit, description)``. Returns ``(None, reason)`` when
+    the inputs are too sparse to compute a real estimate (no work items,
+    or no row count); the caller falls back to ``_PER_FIT_SHM_FOOTPRINT
+    _GB_DEFAULT``.
+    """
+    if not work_items:
+        return None, "no work items provided; using fallback constant"
+    if train_row_count is None or train_row_count <= 0:
+        return None, "no train_row_count provided; using fallback constant"
+
+    best_gb = 0.0
+    best_breakdown = None
+    for item in work_items:
+        hp = (item.get("hyperparameters") or {})
+        peptide_encoding = hp.get("peptide_encoding") or {}
+        torch_indices = bool(
+            hp.get("peptide_amino_acid_encoding_torch", True)
+        )
+        peptide_b = _peptide_bytes_per_row(
+            peptide_encoding, torch_indices
+        )
+        per_row_b = (
+            peptide_b
+            + _FIT_BACKING_ALLELE_BYTES_PER_ROW
+            + _FIT_BACKING_LABEL_BYTES_PER_ROW
+            + _FIT_BACKING_WEIGHT_BYTES_PER_ROW
+        )
+        rows = _fit_population_estimate(item, train_row_count, num_folds)
+        if rows is None:
+            continue
+        raw_bytes = rows * per_row_b
+        padded_bytes = raw_bytes * _FIT_BACKING_OVERHEAD_FACTOR
+        gb = padded_bytes / (1024 ** 3)
+        if gb > best_gb:
+            best_gb = gb
+            best_breakdown = {
+                "rows_per_fit": rows,
+                "peptide_bytes_per_row": peptide_b,
+                "per_row_bytes": per_row_b,
+                "torch_indices": torch_indices,
+                "alignment_method": peptide_encoding.get(
+                    "alignment_method", "pad_middle"),
+                "max_length": int(peptide_encoding.get("max_length", 15)),
+                "random_negative_rate": float(
+                    hp.get("random_negative_rate", 1.0) or 1.0),
+            }
+
+    if best_breakdown is None:
+        return None, "no usable work-item hyperparameters; using fallback constant"
+
+    description = (
+        "fit DataLoader SHM estimate: %.3f GB/fit (%s peptide encoding, "
+        "alignment=%s, max_length=%d → %d B/row peptide; %.0f rows/fit "
+        "[(folds-1)/folds × train_rows × (1 + rn_rate=%.2f)]; "
+        "+%d B/row labels/weights/allele; ×%.2f SHM overhead)"
+    ) % (
+        best_gb,
+        "torch int8 indices" if best_breakdown["torch_indices"] else "numpy fp32 expansion",
+        best_breakdown["alignment_method"],
+        best_breakdown["max_length"],
+        best_breakdown["peptide_bytes_per_row"],
+        best_breakdown["rows_per_fit"],
+        best_breakdown["random_negative_rate"],
+        _FIT_BACKING_LABEL_BYTES_PER_ROW
+        + _FIT_BACKING_WEIGHT_BYTES_PER_ROW
+        + _FIT_BACKING_ALLELE_BYTES_PER_ROW,
+        _FIT_BACKING_OVERHEAD_FACTOR,
+    )
+    return best_gb, description
 
 
 def shm_free_gb(shm_dir="/dev/shm"):
@@ -314,7 +460,7 @@ def shm_total_gb(shm_dir="/dev/shm"):
 
 
 def fit_shm_capacity_check(num_workers, per_fit_gb=None, shm_dir="/dev/shm"):
-    """Decide whether Layer-2 SHM is safe at this concurrency.
+    """Decide whether the fit DataLoader SHM path is safe at this concurrency.
 
     Returns a dict::
 
@@ -325,7 +471,7 @@ def fit_shm_capacity_check(num_workers, per_fit_gb=None, shm_dir="/dev/shm"):
          "message": str}
 
     Used by the orchestrator pre-fork for a loud warning and optional
-    auto-disable of Layer-2 SHM. The threshold:
+    auto-disable of the fit DataLoader SHM path. The threshold:
     ``num_workers * per_fit_gb * 1.5`` (50% margin for transient peaks,
     DataLoader semaphores, OpenMP per-process registrations).
 
@@ -353,15 +499,15 @@ def fit_shm_capacity_check(num_workers, per_fit_gb=None, shm_dir="/dev/shm"):
             "shm_free_gb": free_gb,
             "estimated_required_gb": required_gb,
             "message": (
-                "%s not present; skipping Layer-2 SHM capacity check"
+                "%s not present; skipping fit DataLoader SHM capacity check"
                 % shm_dir
             ),
         }
     safe = free_gb >= required_gb
     if safe:
         message = (
-            "Layer-2 SHM capacity OK: %s has %.1f GB free / %.1f GB total, "
-            "estimated need %.1f GB (%d workers × %.1f GB/fit × 1.5 margin)"
+            "fit DataLoader SHM capacity OK: %s has %.1f GB free / %.1f GB "
+            "total, estimated need %.1f GB (%d workers × %.2f GB/fit × 1.5 margin)"
             % (
                 shm_dir, free_gb, total_gb or 0.0, required_gb,
                 num_workers, per_fit_gb,
@@ -369,15 +515,15 @@ def fit_shm_capacity_check(num_workers, per_fit_gb=None, shm_dir="/dev/shm"):
         )
     else:
         message = (
-            "Layer-2 SHM capacity TIGHT: %s has %.1f GB free / %.1f GB "
-            "total, estimated need %.1f GB (%d workers × %.1f GB/fit × "
-            "1.5 margin). Workers will fall back to numpy DataLoader path "
-            "(slower, no per-worker share) unless shared-tensor backing is "
-            "explicitly force-pinned. To re-enable: bump tmpfs (e.g. "
-            "relaunch the container with --shm-size=64g) or reduce "
-            "--num-jobs / --max-workers-per-gpu. Force-on with "
-            "MHCFLURRY_FIT_DATALOADER_SHM=1 or fit_dataloader_backing="
-            "shared_tensor (will likely fail mid-fit)."
+            "fit DataLoader SHM capacity TIGHT: %s has %.1f GB free / "
+            "%.1f GB total, estimated need %.1f GB (%d workers × %.2f "
+            "GB/fit × 1.5 margin). Workers will fall back to numpy "
+            "DataLoader path (slower, no per-worker share) unless "
+            "shared-tensor backing is explicitly force-pinned. To "
+            "re-enable: bump tmpfs (e.g. relaunch the container with "
+            "--shm-size=64g) or reduce --num-jobs / --max-workers-per-gpu. "
+            "Force-on with MHCFLURRY_FIT_DATALOADER_SHM=1 or "
+            "fit_dataloader_backing=shared_tensor (will likely fail mid-fit)."
             % (
                 shm_dir, free_gb, total_gb or 0.0, required_gb,
                 num_workers, per_fit_gb,
@@ -405,8 +551,8 @@ def configure_torch_sharing_strategy_for_capacity(
     shm names and relies on ``torch_shm_manager`` for cleanup. Switching to
     ``file_descriptor`` can avoid ``torch_shm_manager`` permission problems
     and leaked shm names, but it does **not** fix a too-small ``/dev/shm``.
-    The orchestrator must still disable Layer-2 SHM when the capacity check
-    says the tmpfs is tight.
+    The orchestrator must still disable the fit DataLoader SHM path when
+    the capacity check says the tmpfs is tight.
 
     Returns one of:
       * ``"unchanged"`` — capacity is fine OR no torch available; default
@@ -416,7 +562,7 @@ def configure_torch_sharing_strategy_for_capacity(
         must still respect the capacity check.
       * ``"failed"`` — capacity tight but switch failed (e.g. torch
         already initialized sharing); caller should fall back to
-        disabling Layer-2 SHM.
+        disabling the fit DataLoader SHM path.
 
     Idempotent. Safe to call multiple times. Bumps ``RLIMIT_NOFILE`` to
     cover the FDs the file_descriptor strategy needs (typically a few
@@ -472,9 +618,9 @@ def configure_torch_sharing_strategy_for_capacity(
 
     print(
         "torch.multiprocessing: switched sharing strategy to "
-        "'file_descriptor' (was '%s'). Layer-2 SHM tensors still require "
-        "shared-memory capacity, but handles will be passed as file "
-        "descriptors instead of shm names." % current
+        "'file_descriptor' (was '%s'). fit DataLoader SHM tensors still "
+        "require shared-memory capacity, but handles will be passed as "
+        "file descriptors instead of shm names." % current
     )
     return "file_descriptor"
 

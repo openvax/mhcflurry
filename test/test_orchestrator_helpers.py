@@ -190,6 +190,100 @@ def test_set_cpu_threads_accepts_auto_when_num_jobs_is_provided():
     assert "total_workers=16" in result.stderr
 
 
+def test_estimate_fit_dataloader_shm_gb_returns_none_without_inputs():
+    """Without work items / row count, estimator falls back to constant."""
+    from mhcflurry.local_parallelism import estimate_fit_dataloader_shm_gb
+
+    gb, msg = estimate_fit_dataloader_shm_gb(
+        work_items=None, train_row_count=None
+    )
+    assert gb is None
+    assert "fallback" in msg
+
+    gb, msg = estimate_fit_dataloader_shm_gb(
+        work_items=[{"hyperparameters": {}}], train_row_count=None
+    )
+    assert gb is None
+    assert "fallback" in msg
+
+
+def test_estimate_fit_dataloader_shm_gb_torch_indices_release_recipe():
+    """Default release_exact recipe should land near 0.15-0.25 GB/fit."""
+    from mhcflurry.local_parallelism import estimate_fit_dataloader_shm_gb
+
+    work_items = [{
+        "hyperparameters": {
+            "peptide_encoding": {
+                "max_length": 15,
+                "alignment_method": "left_pad_centered_right_pad",
+            },
+            "peptide_amino_acid_encoding_torch": True,
+            "random_negative_rate": 1.0,
+        }
+    }]
+    gb, msg = estimate_fit_dataloader_shm_gb(
+        work_items=work_items,
+        train_row_count=1_500_000,
+        num_folds=4,
+    )
+    assert gb is not None
+    # 1.125M rows * 2 (with random negs) * (45 int8 + 8 + 8 + 4) = 146 MB
+    # → with 1.1× overhead ~0.15 GB; assert in a stable band.
+    assert 0.10 < gb < 0.30, (gb, msg)
+    assert "torch int8 indices" in msg
+    assert "left_pad_centered_right_pad" in msg
+    assert "max_length=15" in msg
+
+
+def test_estimate_fit_dataloader_shm_gb_numpy_expansion_much_larger():
+    """Disabling torch peptide indices should produce a much bigger estimate."""
+    from mhcflurry.local_parallelism import estimate_fit_dataloader_shm_gb
+
+    base_hp = {
+        "peptide_encoding": {
+            "max_length": 15,
+            "alignment_method": "left_pad_centered_right_pad",
+        },
+        "random_negative_rate": 1.0,
+    }
+    indices_gb, _ = estimate_fit_dataloader_shm_gb(
+        work_items=[{"hyperparameters": dict(base_hp, peptide_amino_acid_encoding_torch=True)}],
+        train_row_count=1_500_000,
+    )
+    expanded_gb, msg = estimate_fit_dataloader_shm_gb(
+        work_items=[{"hyperparameters": dict(base_hp, peptide_amino_acid_encoding_torch=False)}],
+        train_row_count=1_500_000,
+    )
+    # int8 indices → 45 B/row peptide; fp32 expansion → 45*21*4 = 3780 B/row.
+    # Expected ratio ~ (3780 + 20) / (45 + 20) ≈ 58×; allow a generous band.
+    assert expanded_gb / indices_gb > 30
+    assert "numpy fp32 expansion" in msg
+
+
+def test_estimate_fit_dataloader_shm_gb_takes_max_across_work_items():
+    """Estimator should take the worst-case work item, not an average."""
+    from mhcflurry.local_parallelism import estimate_fit_dataloader_shm_gb
+
+    work_items = [
+        {"hyperparameters": {
+            "peptide_encoding": {"max_length": 15, "alignment_method": "pad_middle"},
+            "peptide_amino_acid_encoding_torch": True,
+            "random_negative_rate": 0.5,
+        }},
+        {"hyperparameters": {
+            "peptide_encoding": {"max_length": 15, "alignment_method": "left_pad_centered_right_pad"},
+            "peptide_amino_acid_encoding_torch": True,
+            "random_negative_rate": 1.0,
+        }},
+    ]
+    gb, msg = estimate_fit_dataloader_shm_gb(
+        work_items=work_items,
+        train_row_count=1_000_000,
+    )
+    assert "left_pad_centered_right_pad" in msg
+    assert "1.00" in msg  # picked the rn_rate=1.0 item
+
+
 def test_shm_capacity_check_safe_when_plenty_free(monkeypatch):
     from mhcflurry import local_parallelism as lp
 
@@ -237,7 +331,7 @@ def test_shm_capacity_check_no_shm_dir_returns_safe(monkeypatch):
 
 
 def test_preflight_shm_auto_disables_on_tight_tmpfs(monkeypatch, capsys):
-    """When /dev/shm is too small, auto-backed fits should disable L2 SHM."""
+    """When /dev/shm is too small, auto-backed fits should disable fit DataLoader SHM."""
     from mhcflurry import train_pan_allele_models_command as cmd
     from mhcflurry import local_parallelism as lp
 
@@ -252,11 +346,11 @@ def test_preflight_shm_auto_disables_on_tight_tmpfs(monkeypatch, capsys):
     cmd._preflight_shm_capacity(args)
     assert os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM") == "0"
     out = capsys.readouterr().out
-    assert "TIGHT" in out and "Auto-disabling Layer-2 SHM" in out
+    assert "TIGHT" in out and "Auto-disabling fit DataLoader SHM" in out
 
 
 def test_preflight_shm_file_descriptor_does_not_override_capacity(monkeypatch, capsys):
-    """file_descriptor helps handles, but tight tmpfs still disables L2 SHM."""
+    """file_descriptor helps handles, but tight tmpfs still disables fit DataLoader SHM."""
     import torch.multiprocessing as torch_mp
     from mhcflurry import train_pan_allele_models_command as cmd
     from mhcflurry import local_parallelism as lp
@@ -282,7 +376,7 @@ def test_preflight_shm_file_descriptor_does_not_override_capacity(monkeypatch, c
     assert os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM") == "0"
     assert set_calls == ["file_descriptor"]
     out = capsys.readouterr().out
-    assert "TIGHT" in out and "Auto-disabling Layer-2 SHM" in out
+    assert "TIGHT" in out and "Auto-disabling fit DataLoader SHM" in out
 
 
 def test_preflight_shm_respects_force_pinned_off(monkeypatch, capsys):
@@ -436,6 +530,6 @@ def test_cluster_l1shm_warns(monkeypatch, capsys):
         "random-negative-shared-pool-dir" in src
         or "random_negative_shared_pool_dir" in src
     ), (
-        "train_models must warn when cluster + L1-SHM are combined; "
-        "see docs/orchestrator.md"
+        "train_models must warn when cluster + run mmap cache are "
+        "combined; see docs/orchestrator.md"
     )

@@ -30,6 +30,7 @@ from .local_parallelism import (
     add_local_parallelism_args,
     call_wrapped_kwargs,
     configure_torch_sharing_strategy_for_capacity,
+    estimate_fit_dataloader_shm_gb,
     fit_shm_capacity_check,
     hoist_torchinductor_compile_threads,
     resolve_local_parallelism_args,
@@ -64,7 +65,7 @@ _FIT_DATALOADER_SHM_FALSE_VALUES = {"0", "false", "no", "off"}
 
 
 def _normalized_fit_dataloader_shm_env():
-    """Return normalized Layer-2 SHM env pin: ``"1"``, ``"0"``, or None."""
+    """Return normalized fit DataLoader SHM env pin: ``"1"``, ``"0"``, or None."""
     value = os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
     if value is None:
         return None
@@ -235,10 +236,10 @@ parser.add_argument(
     metavar="DIR",
     default=None,
     help="Directory under which the orchestrator pre-builds per-fold "
-    "mmap-backed random-negative pools (see mhcflurry/shared_memory.py "
-    "Layer 1). When set, training workers consume an OS-page-cache-"
-    "shared encoded pool instead of regenerating + re-encoding their "
-    "own each cycle. Requires the hyperparameters' "
+    "mmap-backed random-negative pools (the run mmap cache; see "
+    "mhcflurry/shared_memory.py). When set, training workers consume an "
+    "OS-page-cache-shared encoded pool instead of regenerating + "
+    "re-encoding their own each cycle. Requires the hyperparameters' "
     "``random_negative_pool_epochs`` to be > 1 (otherwise each epoch "
     "regenerates and there's nothing to share). The directory is "
     "populated by ``shared_memory.setup_shared_random_negative_pools`` "
@@ -1008,7 +1009,7 @@ def initialize_training(args):
 
 
 def _initialize_shared_random_negative_pools(args, all_work_items):
-    """Pre-build per-fold mmap random-negative pools (Layer 1 SHM).
+    """Pre-build per-fold mmap random-negative pools (run mmap cache).
 
     Wraps ``shared_memory.setup_shared_random_negative_pools`` with the
     orchestrator-side glue: instantiates a sentinel
@@ -1254,9 +1255,13 @@ def _preflight_shm_capacity(args):
     """Pre-fork advisory + auto-fallback for /dev/shm capacity.
 
     Runs once in the orchestrator before workers are spawned. Computes
-    the expected Layer-2 SHM footprint from ``--num-jobs`` and a
-    per-fit estimate, compares to ``/dev/shm`` free space, and:
+    the expected per-fit fit DataLoader SHM footprint from
+    ``--num-jobs`` and a live estimate (peptide encoding + alignment +
+    train rows + random-negative rate from ``GLOBAL_DATA["work_items"]``
+    when available), compares to ``/dev/shm`` free space, and:
 
+    * Always prints the live estimator breakdown so the user can see why
+      the capacity headline landed where it did.
     * Always prints a one-line summary (free, total, required).
     * If insufficient AND the user hasn't force-pinned
       ``MHCFLURRY_FIT_DATALOADER_SHM``, sets it to ``"0"`` so workers
@@ -1266,12 +1271,44 @@ def _preflight_shm_capacity(args):
       escalates the warning so the OOM is at least expected.
 
     Skipped entirely when ``num_jobs == 0`` (serial run; no DataLoader
-    workers; no Layer-2 SHM relevant).
+    workers; no fit DataLoader SHM relevant).
     """
     num_jobs = int(getattr(args, "num_jobs", 0) or 0)
     if num_jobs <= 0:
         return  # serial / cluster — capacity check is per-node and not actionable here.
-    result = fit_shm_capacity_check(num_workers=num_jobs)
+
+    # Live estimate from work_items + train_data when both are loaded.
+    # Stays None for synthetic call sites (tests, ad-hoc helpers); the
+    # capacity-check helper then falls back to the constant default.
+    work_items = GLOBAL_DATA.get("work_items")
+    train_df = GLOBAL_DATA.get("train_data")
+    train_rows = len(train_df) if train_df is not None else None
+    num_folds = int(getattr(args, "num_folds", 4) or 4)
+    per_fit_gb, breakdown = estimate_fit_dataloader_shm_gb(
+        work_items=work_items,
+        train_row_count=train_rows,
+        num_folds=num_folds,
+    )
+    if per_fit_gb is None:
+        env_override = os.environ.get("MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB")
+        from .local_parallelism import _PER_FIT_SHM_FOOTPRINT_GB_DEFAULT
+        used_gb = float(env_override) if env_override else _PER_FIT_SHM_FOOTPRINT_GB_DEFAULT
+        print(
+            "fit DataLoader SHM estimate: %.3f GB/fit (%s); %s"
+            % (
+                used_gb,
+                "MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB override"
+                if env_override else "fallback constant",
+                breakdown,
+            )
+        )
+    else:
+        used_gb = per_fit_gb
+        print(breakdown)
+
+    result = fit_shm_capacity_check(
+        num_workers=num_jobs, per_fit_gb=used_gb
+    )
     print(result["message"])
     if result["safe"]:
         return
@@ -1290,17 +1327,17 @@ def _preflight_shm_capacity(args):
     # Tight /dev/shm with no user pin: prefer torch's file_descriptor
     # sharing strategy when available. It avoids torch_shm_manager/name
     # cleanup issues, but it still allocates POSIX shared memory via
-    # shm_open and therefore does NOT solve tmpfs capacity. Disable
-    # Layer-2 SHM after the best-effort switch so auto-backed component
-    # models take the numpy path instead of stampeding into ENOSPC.
+    # shm_open and therefore does NOT solve tmpfs capacity. Disable the
+    # fit DataLoader SHM path after the best-effort switch so auto-backed
+    # component models take the numpy path instead of stampeding into ENOSPC.
     if os.environ.get("MHCFLURRY_TORCH_SHM_AUTO", "1") != "0":
         configure_torch_sharing_strategy_for_capacity(
-            num_workers=num_jobs
+            num_workers=num_jobs, per_fit_gb=used_gb,
         )
-    # Auto-disable Layer-2 SHM as the conservative fallback.
+    # Auto-disable the fit DataLoader SHM path as the conservative fallback.
     os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] = "0"
     print(
-        "Auto-disabling Layer-2 SHM for this run "
+        "Auto-disabling fit DataLoader SHM for this run "
         "(MHCFLURRY_FIT_DATALOADER_SHM=0). Per-fit DataLoader will use the "
         "numpy backing path; per-worker pickling cost is paid once per "
         "epoch instead of being amortized via shared tensors. Throughput "
@@ -1347,10 +1384,11 @@ def train_models(args):
         # can still hoist compile-thread defaults into the worker environment.
         hoist_torchinductor_compile_threads(args)
 
-    # Layer-2 SHM capacity pre-flight. With small /dev/shm (8 GB Docker
-    # default) + many workers, share_memory_() will OOM mid-fit with a
-    # cryptic OSError. Check up front and (a) print a loud advisory,
-    # (b) auto-disable Layer-2 SHM unless the user has force-pinned
+    # fit DataLoader SHM capacity pre-flight. With small /dev/shm (8 GB
+    # Docker default) + many workers, share_memory_() will OOM mid-fit
+    # with a cryptic OSError. Check up front and (a) print a loud
+    # advisory + live estimator breakdown, (b) auto-disable the fit
+    # DataLoader SHM path unless the user has force-pinned
     # MHCFLURRY_FIT_DATALOADER_SHM=1. See docs/orchestrator.md.
     _preflight_shm_capacity(args)
 
@@ -1360,9 +1398,9 @@ def train_models(args):
     if getattr(args, "use_encoding_cache", False):
         _initialize_encoding_cache(args, all_work_items)
 
-    # Layer-1 SHM (per-run, mmap, read-only): pre-build per-fold random-
-    # negative pools and stash the lookup table in GLOBAL_DATA. Each
-    # work item's fit() will look up its own pool dir at task start.
+    # Run mmap cache (per-run, mmap, read-only): pre-build per-fold
+    # random-negative pools and stash the lookup table in GLOBAL_DATA.
+    # Each work item's fit() will look up its own pool dir at task start.
     # See mhcflurry/shared_memory.py for the layered SHM design.
     if getattr(args, "random_negative_shared_pool_dir", None):
         # Cluster mode: workers run on (possibly) other nodes. The mmap
@@ -1766,7 +1804,7 @@ def train_model(
             16,
         )
 
-    # Layer-1 SHM lookup: if the orchestrator pre-built a per-fold
+    # Run mmap cache lookup: if the orchestrator pre-built a per-fold
     # random-negative pool for this work item's (fold, random-negative
     # config), pass the dir through so fit() uses from_shared_mmap.
     # Otherwise the kwarg defaults to None and fit() falls back to the

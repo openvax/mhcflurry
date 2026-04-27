@@ -1,9 +1,9 @@
 """Tests for the consolidated shared-memory module.
 
-Covers Layer-1 (per-run mmap random-negative pool) wiring. Layer-2
-(per-fit tensor SHM) helpers are re-exports and tested in
-``test_pytorch_regressions.py``; this file only checks they're
-importable from the new module.
+Covers run-mmap-cache (per-run mmap random-negative pool) wiring. The
+fit DataLoader SHM (per-fit tensor SHM) helpers are re-exports and
+tested in ``test_pytorch_regressions.py``; this file only checks
+they're importable from the new module.
 """
 
 import os
@@ -24,7 +24,7 @@ def setup_teardown():
 
 
 def test_layer2_public_api():
-    """All Layer-2 helpers are importable by their canonical names."""
+    """All fit DataLoader SHM helpers are importable by their canonical names."""
     assert callable(shm.share_tensor)
     assert callable(shm.share_like)
     assert callable(shm.update_shared)

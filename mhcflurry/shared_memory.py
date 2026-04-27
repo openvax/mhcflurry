@@ -4,7 +4,7 @@ mhcflurry has two shared-memory layers, both implementing the same
 "build once, share with many readers" pattern but using different OS
 mechanisms because the lifecycles differ.
 
-Layer 1 — per-run, file-mmap, orchestrator-built, read-only.
+run mmap cache — per-run, file-mmap, orchestrator-built, read-only.
     Random-negative pool, encoding cache. Built ONCE before any
     training worker is forked; workers ``numpy.memmap`` the file and
     the OS page cache holds a single resident copy across N workers.
@@ -12,7 +12,7 @@ Layer 1 — per-run, file-mmap, orchestrator-built, read-only.
 
     Mechanism: ``numpy.memmap`` of files written by the orchestrator.
 
-Layer 2 — per-fit(), POSIX shm, fit()-built, read+write.
+fit DataLoader SHM — per-fit(), POSIX shm, fit()-built, read+write.
     Dataset backing arrays for a single fit() inner DataLoader.
     Lifetime is one ``fit()`` call. Tensors are allocated in
     ``/dev/shm`` so the DataLoader's spawn workers receive storage
@@ -23,9 +23,10 @@ Layer 2 — per-fit(), POSIX shm, fit()-built, read+write.
 Both layers share one resident copy across many readers; both are
 controlled by the same idea ("the orchestrator owns the resource;
 workers consume it"). The mechanism asymmetry is intentional —
-file-mmap fits Layer 1's persist-across-runs property, torch shm fits
-Layer 2's mutate-per-epoch property — but the API surface is uniform:
-a ``setup_*`` factory and a small set of generic helpers.
+file-mmap fits the run mmap cache's persist-across-runs property,
+torch shm fits the fit DataLoader SHM's mutate-per-epoch property —
+but the API surface is uniform: a ``setup_*`` factory and a small set
+of generic helpers.
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ from .random_negative_peptides import (
 )
 
 
-# ---- Layer 2: per-fit() torch shared tensors ----------------------------
+# ---- fit DataLoader SHM: per-fit() torch shared tensors -----------------
 
 def torch_shared_memory_status():
     """Return whether PyTorch CPU tensor sharing works in this process.
@@ -197,7 +198,7 @@ class FitBacking:
     A single bundle replaces the parallel ``_shm_x_peptide`` /
     ``dataset_x_peptide`` scaffolding the fit() loop used to maintain.
     ``tensor_backed`` is true when the underlying storage is shared
-    torch tensors (Layer 2 SHM); false when it's plain numpy.
+    torch tensors (fit DataLoader SHM path); false when it's plain numpy.
 
     This is an internal transport container, not a model feature. The
     model-side peptide encoding decision is controlled separately by
@@ -268,7 +269,7 @@ class FitBacking:
         )
 
 
-# ---- Layer 1: per-run mmap random-negative pool -------------------------
+# ---- run mmap cache: per-run mmap random-negative pool ------------------
 
 def _planner_from_hyperparameters(hyperparameters):
     """Build a ``RandomNegativePeptides`` planner from a hyperparameter dict.
@@ -429,7 +430,7 @@ def lookup_pool_dir(fold_pool_dirs, *, fold_num, hyperparameters):
     """Worker-side O(1) lookup. Returns dir or None if no match.
 
     ``None`` is the signal for the worker's fit() to fall back to the
-    in-process pool — same surface area as "Layer 1 not enabled."
+    in-process pool — same surface area as "run mmap cache not enabled."
     """
     if not fold_pool_dirs:
         return None
