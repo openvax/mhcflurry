@@ -94,7 +94,7 @@ class AlleleEncoding(object):
         ----------
         encoding_name : string
             How to represent amino acids. Valid names include "BLOSUM62",
-            "one-hot", "physchem", and ``+``-joined composites. See
+            "one-hot", "physchem", "atchley", and ``+``-joined composites. See
             `amino_acid.available_vector_encodings()`.
 
         Returns
@@ -127,7 +127,7 @@ class AlleleEncoding(object):
         ----------
         encoding_name : string
             How to represent amino acids. Valid names include "BLOSUM62",
-            "one-hot", "physchem", and ``+``-joined composites. See
+            "one-hot", "physchem", "atchley", and ``+``-joined composites. See
             `amino_acid.available_vector_encodings()`.
 
         Returns

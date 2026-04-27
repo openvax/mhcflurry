@@ -71,12 +71,26 @@ def test_fixed_vectors_encoding_allows_non_square_vector_tables():
 
 def test_physchem_and_composite_vector_encodings():
     physchem = amino_acid.get_vector_encoding_df("physchem")
-    assert physchem.shape == (21, 5)
-    assert physchem.loc["X"].tolist() == [0.0, 0.0, 0.0, 0.0, 0.0]
+    assert physchem.shape == (21, 14)
+    assert physchem.loc["X"].tolist() == [0.0] * 14
+    assert list(physchem.columns[:4]) == [
+        "z_kd_hydropathy",
+        "z_grantham_composition",
+        "z_grantham_polarity",
+        "z_grantham_volume",
+    ]
+    assert physchem.loc["D", "side_chain_charge"] == -1.0
+    assert physchem.loc["K", "side_chain_charge"] == 1.0
+    assert physchem.loc["Y", "aromatic"] == 1.0
+    assert physchem.loc["S", "hydroxyl"] == 1.0
+
+    atchley = amino_acid.get_vector_encoding_df("atchley")
+    assert atchley.shape == (21, 5)
+    assert list(atchley.columns) != list(physchem.columns)
 
     composite = amino_acid.get_vector_encoding_df("BLOSUM62+physchem")
-    assert composite.shape == (21, 26)
-    assert amino_acid.vector_encoding_length("BLOSUM62+physchem") == 26
+    assert composite.shape == (21, 35)
+    assert amino_acid.vector_encoding_length("BLOSUM62+physchem") == 35
     assert_equal(
         composite.loc["A"].values[:21],
         amino_acid.get_vector_encoding_df("BLOSUM62").loc["A"].values,

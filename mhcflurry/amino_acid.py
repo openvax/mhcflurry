@@ -8,6 +8,7 @@ import warnings
 from copy import copy
 from io import StringIO
 
+import numpy
 import pandas
 
 
@@ -106,13 +107,93 @@ ATCHLEY_FACTORS = pandas.DataFrame.from_dict({
     "atchley_electrostatic_charge",
 ]).loc[AMINO_ACIDS].astype("float32")
 
+
+def _standardize_over_common_amino_acids(df):
+    """
+    Z-score columns over the 20 common amino acids, leaving X as zeros.
+    """
+    result = df.copy()
+    common = list(COMMON_AMINO_ACIDS)
+    means = result.loc[common].mean(axis=0)
+    stds = result.loc[common].std(axis=0, ddof=0).replace(0.0, 1.0)
+    result.loc[common] = (result.loc[common] - means) / stds
+    result.loc["X"] = 0.0
+    return result.astype("float32")
+
+
+# Explicit physicochemical descriptors. Continuous scales are z-scored over
+# the 20 common amino acids so no single unit system dominates the dense layer:
+# Kyte-Doolittle hydropathy plus Grantham composition, polarity, and volume.
+# The remaining columns are direct side-chain chemistry indicators. X is the
+# neutral/no-signal row, matching the convention used by BLOSUM62.
+_PHYSCHEM_CONTINUOUS_RAW = pandas.DataFrame.from_dict({
+    "A": [1.8, 0.00, 8.1, 31.0],
+    "R": [-4.5, 0.65, 10.5, 124.0],
+    "N": [-3.5, 1.33, 11.6, 56.0],
+    "D": [-3.5, 1.38, 13.0, 54.0],
+    "C": [2.5, 2.75, 5.5, 55.0],
+    "Q": [-3.5, 0.89, 10.5, 85.0],
+    "E": [-3.5, 0.92, 12.3, 83.0],
+    "G": [-0.4, 0.74, 9.0, 3.0],
+    "H": [-3.2, 0.58, 10.4, 96.0],
+    "I": [4.5, 0.00, 5.2, 111.0],
+    "L": [3.8, 0.00, 4.9, 111.0],
+    "K": [-3.9, 0.33, 11.3, 119.0],
+    "M": [1.9, 0.00, 5.7, 105.0],
+    "F": [2.8, 0.00, 5.2, 132.0],
+    "P": [-1.6, 0.39, 8.0, 32.5],
+    "S": [-0.8, 1.42, 9.2, 32.0],
+    "T": [-0.7, 0.71, 8.6, 61.0],
+    "W": [-0.9, 0.13, 5.4, 170.0],
+    "Y": [-1.3, 0.20, 6.2, 136.0],
+    "V": [4.2, 0.00, 5.9, 84.0],
+    "X": [0.0, 0.0, 0.0, 0.0],
+}, orient="index", columns=[
+    "z_kd_hydropathy",
+    "z_grantham_composition",
+    "z_grantham_polarity",
+    "z_grantham_volume",
+]).loc[AMINO_ACIDS]
+
+_PHYSCHEM_BINARY = pandas.DataFrame(0.0, index=AMINO_ACIDS, columns=[
+    "side_chain_charge",
+    "aromatic",
+    "sulfur",
+    "hydroxyl",
+    "amide",
+    "acidic",
+    "basic",
+    "aliphatic",
+    "glycine",
+    "proline",
+])
+_PHYSCHEM_BINARY.loc[["D", "E"], "side_chain_charge"] = -1.0
+_PHYSCHEM_BINARY.loc[["K", "R"], "side_chain_charge"] = 1.0
+_PHYSCHEM_BINARY.loc["H", "side_chain_charge"] = 0.1
+_PHYSCHEM_BINARY.loc[["F", "W", "Y", "H"], "aromatic"] = 1.0
+_PHYSCHEM_BINARY.loc[["C", "M"], "sulfur"] = 1.0
+_PHYSCHEM_BINARY.loc[["S", "T", "Y"], "hydroxyl"] = 1.0
+_PHYSCHEM_BINARY.loc[["N", "Q"], "amide"] = 1.0
+_PHYSCHEM_BINARY.loc[["D", "E"], "acidic"] = 1.0
+_PHYSCHEM_BINARY.loc[["K", "R", "H"], "basic"] = 1.0
+_PHYSCHEM_BINARY.loc[["A", "I", "L", "M", "V"], "aliphatic"] = 1.0
+_PHYSCHEM_BINARY.loc["G", "glycine"] = 1.0
+_PHYSCHEM_BINARY.loc["P", "proline"] = 1.0
+
+PHYSICOCHEMICAL_PROPERTIES = pandas.concat([
+    _standardize_over_common_amino_acids(_PHYSCHEM_CONTINUOUS_RAW),
+    _PHYSCHEM_BINARY,
+], axis=1).astype("float32")
+assert numpy.isfinite(PHYSICOCHEMICAL_PROPERTIES.values).all()
+assert (PHYSICOCHEMICAL_PROPERTIES.loc["X"].values == 0.0).all()
+
 ENCODING_DATA_FRAMES = {
     "BLOSUM62": BLOSUM62_MATRIX,
     "one-hot": pandas.DataFrame([
         [1 if i == j else 0 for i in range(len(AMINO_ACIDS))]
         for j in range(len(AMINO_ACIDS))
     ], index=AMINO_ACIDS, columns=AMINO_ACIDS),
-    "physchem": ATCHLEY_FACTORS,
+    "physchem": PHYSICOCHEMICAL_PROPERTIES,
     "atchley": ATCHLEY_FACTORS,
 }
 _COMPOSITE_ENCODING_DATA_FRAMES = {}
@@ -122,8 +203,8 @@ def get_vector_encoding_df(name):
     """
     Return the amino-acid vector encoding table for ``name``.
 
-    ``name`` may be a base encoding such as ``"BLOSUM62"`` or
-    ``"physchem"``, or a ``+``-joined composite such as
+    ``name`` may be a base encoding such as ``"BLOSUM62"``, ``"physchem"``,
+    or ``"atchley"``, or a ``+``-joined composite such as
     ``"BLOSUM62+physchem"``. Composite encodings concatenate the component
     columns in order and keep the same amino-acid row order.
     """
