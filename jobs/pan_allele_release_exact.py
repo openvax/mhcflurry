@@ -23,26 +23,27 @@ app = App(
     "pan-allele-release-exact",
     brev_config=BrevConfig(
         mode="container",
-        # OCI 8×A100-80GB via Brev's direct launchpad integration.
-        # $19.30/hr, 128 vCPUs, 27 TB disk, 15 min boot.
+        # 8×A100-80GB via Shadeform→Verda. 2026-04-26 confirmed working:
+        # the prior `mhcflurry-release-exact-verda-a100x8` box ran a full
+        # release_exact training cycle on this exact type.
         #
-        # Routes around the shadeform broker entirely. All 5 failed
-        # 2026-04-21 provisioning attempts (3× Denvr, 2× MassedCompute
-        # DGXx8) went through shadeform and failed with
-        # `external nodes: skipping (list failed): not_found` — the
-        # shadeform broker losing track of its own capacity pool.
-        # OCI launchpad is a different provisioning path (direct from
-        # NVIDIA Brev to Oracle) so it's immune to that class of
-        # failure.
+        # Switched off OCI (was: oci.a100x8.sxm.brev-dgxc) on 2026-04-27
+        # after Brev support confirmed the OCI launchpad path is broken
+        # at their backend layer (cloudCredId/workspaceGroupId rejection
+        # on every create call). runplz 3.15.0 default-blocks OCI from
+        # the auto-pick selector for the same reason; pinning here was
+        # forcing runplz to attempt the broken path anyway.
         #
-        # 80GB cards support MAX_WORKERS_PER_GPU=2 = 16 concurrent
-        # workers (vs 8 on 40GB). Cost delta over MassedCompute
-        # ($19.30 vs $12.29/hr, +57%) is acceptable given 5/5
-        # shadeform failures today.
-        instance_type="oci.a100x8.sxm.brev-dgxc",
+        # 80GB cards support MAX_WORKERS_PER_GPU=2 = 16 concurrent workers
+        # (vs 8 on 40GB). If Shadeform goes down again (5/5 failures on
+        # 2026-04-21), the next fallback worth trying by hand is
+        # massedcompute_A100_sxm4_80G — same hardware class via a
+        # different Shadeform sub-broker.
+        instance_type="verda_A100_sxm4_80Gx8",
         auto_create_instances=True,
-        # OCI boot advertised at 15 min; give 40 min margin against
-        # launchpad's own provisioning queue. Closes runplz #34.
+        # Verda boot has run ~5-10 min in practice; 40 min keeps the same
+        # generous margin we used for OCI without changing other timing.
+        # Closes runplz #34.
         ssh_ready_wait_seconds=2400,
         # Brev backend kill-switch. runplz only enforces wall caps for Brev
         # through BrevConfig.max_runtime_seconds; @app.function(timeout=...)
