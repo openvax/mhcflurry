@@ -268,6 +268,7 @@ from .shared_memory import (  # noqa: E402,F401
     share_like,
     share_tensor,
     tensor_batch_collate,
+    torch_shared_memory_status,
     update_shared,
 )
 
@@ -4256,6 +4257,20 @@ class Class1NeuralNetwork(object):
             # Prime cycle 0 once so we know the encoding shape; the
             # epoch loop reads the same cycle 0 below as a no-op.
             _, random_neg_template = random_negatives_pool.get_epoch_inputs(0)
+        if shm_enabled:
+            shm_status = torch_shared_memory_status()
+            if not shm_status["available"]:
+                logging.warning(
+                    "fit(): Layer-2 SHM unavailable with torch sharing "
+                    "strategy %r (%s); falling back to numpy DataLoader "
+                    "path for THIS fit() call.",
+                    shm_status["strategy"],
+                    shm_status["reason"],
+                )
+                fit_info["fit_dataloader_shm_fallback_reason"] = (
+                    "torch shared memory unavailable: %s" % shm_status["reason"]
+                )
+                shm_enabled = False
         if shm_enabled:
             try:
                 backing = FitBacking.share(

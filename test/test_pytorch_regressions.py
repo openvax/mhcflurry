@@ -26,6 +26,7 @@ from mhcflurry.shared_memory import (
     share_like,
     share_tensor,
     tensor_batch_collate,
+    torch_shared_memory_status,
     update_shared,
 )
 from mhcflurry.class1_processing_neural_network import (
@@ -83,11 +84,11 @@ def _seed_all(seed=1):
     torch.manual_seed(seed)
 
 
-def _skip_if_torch_shared_memory_unavailable():
-    try:
-        torch.empty(1).share_memory_()
-    except RuntimeError as exc:
-        pytest.skip("torch shared memory unavailable: %s" % exc)
+def _plain_or_shared_tensor(value):
+    """Use real SHM when available; otherwise plain tensors cover tensor path."""
+    if torch_shared_memory_status()["available"]:
+        return share_tensor(value)
+    return torch.from_numpy(np.ascontiguousarray(value)).clone()
 
 
 def test_fit_dataloader_numpy_backed_uses_numpy_collate_no_pin():
@@ -110,9 +111,8 @@ def test_fit_dataloader_numpy_backed_uses_numpy_collate_no_pin():
 
 def test_fit_dataloader_tensor_backed_uses_tensor_collate_and_pins():
     """Tensor-backed dataset → tensor collate + pinning."""
-    _skip_if_torch_shared_memory_unavailable()
-    x_peptide = share_tensor(np.zeros((4, 2, 3), dtype=np.float32))
-    y = share_tensor(np.zeros(4, dtype=np.float32))
+    x_peptide = _plain_or_shared_tensor(np.zeros((4, 2, 3), dtype=np.float32))
+    y = _plain_or_shared_tensor(np.zeros(4, dtype=np.float32))
     dataset = _FitBatchDataset(
         x_peptide=x_peptide,
         x_allele=None,
@@ -128,8 +128,21 @@ def test_fit_dataloader_tensor_backed_uses_tensor_collate_and_pins():
 
 def test_share_tensor_round_trip():
     """``share_tensor`` returns a SHM tensor with the same content."""
-    _skip_if_torch_shared_memory_unavailable()
     arr = np.arange(12, dtype=np.float32).reshape(3, 4)
+    status = torch_shared_memory_status()
+    if not status["available"]:
+        assert status["reason"]
+        assert share_tensor(None) is None
+        with pytest.raises(RuntimeError, match="|".join((
+                "Operation not permitted",
+                "No space left",
+                "Cannot allocate",
+                "torch_shm_manager",
+                "unable to mmap",
+        ))):
+            share_tensor(arr)
+        return
+
     shared = share_tensor(arr)
     assert isinstance(shared, torch.Tensor)
     assert shared.is_shared()
@@ -139,8 +152,20 @@ def test_share_tensor_round_trip():
 
 def test_share_like_and_update_shared():
     """``share_like`` allocates a shared buffer; ``update_shared`` fills it."""
-    _skip_if_torch_shared_memory_unavailable()
     src = np.arange(8, dtype=np.float32).reshape(4, 2)
+    status = torch_shared_memory_status()
+    if not status["available"]:
+        assert status["reason"]
+        with pytest.raises(RuntimeError, match="|".join((
+                "Operation not permitted",
+                "No space left",
+                "Cannot allocate",
+                "torch_shm_manager",
+                "unable to mmap",
+        ))):
+            share_like(src)
+        return
+
     buf = share_like(src)
     assert buf.is_shared()
     assert buf.shape == src.shape
@@ -158,12 +183,11 @@ def test_effective_fit_dataloader_num_workers_skips_size_guard_for_tensor_backed
 
     monkeypatch.setattr(cnn, "_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES", 32)
     monkeypatch.setattr(cnn, "_FIT_DATALOADER_DOWNGRADE_WARNED", False)
-    _skip_if_torch_shared_memory_unavailable()
-    x_peptide = share_tensor(np.zeros((8, 2, 3), dtype=np.float32))
+    x_peptide = _plain_or_shared_tensor(np.zeros((8, 2, 3), dtype=np.float32))
     dataset = _FitBatchDataset(
         x_peptide=x_peptide,
         x_allele=None,
-        y_encoded=share_tensor(np.zeros(8, dtype=np.float32)),
+        y_encoded=_plain_or_shared_tensor(np.zeros(8, dtype=np.float32)),
         sample_weights_with_negatives=None,
         train_indices=np.arange(8),
     )

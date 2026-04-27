@@ -47,6 +47,48 @@ from .random_negative_peptides import (
 
 # ---- Layer 2: per-fit() torch shared tensors ----------------------------
 
+def torch_shared_memory_status():
+    """Return whether PyTorch CPU tensor sharing works in this process.
+
+    Some local sandboxes and macOS launch paths expose only PyTorch's
+    ``file_system`` sharing strategy but block ``torch_shm_manager`` from
+    starting. In that state ``share_memory_()`` fails with ``Operation not
+    permitted`` even though the strategy is nominally available. Probe the
+    actual operation so callers can fall back deliberately instead of
+    discovering the failure through skipped tests or mid-fit exceptions.
+    """
+    try:
+        strategy = torch.multiprocessing.get_sharing_strategy()
+    except RuntimeError as exc:
+        return {
+            "available": False,
+            "reason": str(exc),
+            "strategy": None,
+            "strategies": (),
+        }
+    try:
+        strategies = tuple(sorted(torch.multiprocessing.get_all_sharing_strategies()))
+    except RuntimeError:
+        strategies = (strategy,)
+
+    try:
+        torch.empty(1).share_memory_()
+    except RuntimeError as exc:
+        return {
+            "available": False,
+            "reason": str(exc),
+            "strategy": strategy,
+            "strategies": strategies,
+        }
+
+    return {
+        "available": True,
+        "reason": None,
+        "strategy": strategy,
+        "strategies": strategies,
+    }
+
+
 def share_tensor(value):
     """Return ``value`` as a CPU ``torch.Tensor`` in shared memory.
 
