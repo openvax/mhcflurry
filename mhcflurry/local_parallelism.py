@@ -12,6 +12,7 @@ import sys
 import os
 import time
 import queue
+import subprocess
 from multiprocessing import Queue, cpu_count
 from multiprocessing.util import Finalize
 from pprint import pprint
@@ -23,13 +24,13 @@ from .common import configure_pytorch, normalize_pytorch_backend
 
 
 # Per-worker VRAM upper bound (gigabytes) used by ``auto_max_workers_per_gpu``
-# to budget how many workers fit on each GPU. The pan-allele MLP at the
-# default minibatch=4096 + RMSprop optimizer state + activations was measured
-# at ~5.5 GB on the 2026-04-25 8xA100 run; rounded up to 8 GB to leave
-# headroom for the largest architecture in the sweep + per-batch peaks.
+# to budget how many workers fit on each GPU. The pan-allele MLP's steady-state
+# VRAM is lower than this, but first-epoch compile / validation / allocator
+# transients vary across hardware and torch versions. Use a conservative
+# default that gives 2 workers on 80 GB cards and 1 worker on 40 GB cards.
 # Override with ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` if a
 # different model family or batch size lands.
-_AUTO_MWPG_PER_WORKER_GB_DEFAULT = 8.0
+_AUTO_MWPG_PER_WORKER_GB_DEFAULT = 16.0
 
 # SM-scheduler ceiling. Beyond ~4 workers/GPU the kernel queue serializes
 # behind a single SM scheduler, so per-worker throughput drops faster than
@@ -37,10 +38,10 @@ _AUTO_MWPG_PER_WORKER_GB_DEFAULT = 8.0
 # spot is 2-4 for small MLP workloads.
 _AUTO_MWPG_HARD_CAP_DEFAULT = 4
 
-# Fallback free-VRAM estimate per GPU (gigabytes) when ``torch.cuda.mem_get_info``
-# isn't callable yet (e.g. we're picking the pool size before any worker has
-# initialized CUDA). 16 GB is the common-denominator across A100-40GB / V100 /
-# L40S / A100-80GB at full freshness — conservative; real runs will see more.
+# Fallback free-VRAM estimate per GPU (gigabytes) when ``nvidia-smi`` is not
+# available. This path deliberately does not import torch: local pools use fork
+# on Linux, and touching the CUDA runtime in the parent before forking causes
+# CUDA re-initialization failures in children.
 _AUTO_MWPG_FREE_VRAM_FALLBACK_GB = 16.0
 
 
@@ -63,6 +64,62 @@ def _max_workers_per_gpu_arg(value):
     return v
 
 
+def _free_vram_override_gb(num_gpus):
+    """Return env-pinned free VRAM in GB, or ``None``.
+
+    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB`` accepts either one
+    value applied to every GPU or a comma/space-separated list. It exists for
+    tests and unusual launchers where ``nvidia-smi`` is hidden but the caller
+    knows the device budget.
+    """
+    value = os.environ.get("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB")
+    if not value:
+        return None
+    parts = [p for p in value.replace(",", " ").split() if p]
+    if not parts:
+        return None
+    vals = [float(p) for p in parts]
+    return min(vals[:max(int(num_gpus), 1)])
+
+
+def _free_vram_from_nvidia_smi_gb(num_gpus):
+    """Return minimum free VRAM across visible GPUs using ``nvidia-smi``.
+
+    This is intentionally a subprocess call instead of ``torch.cuda`` so the
+    orchestrator can size a fork-based worker pool without initializing CUDA in
+    the parent process.
+    """
+    try:
+        output = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except (
+            OSError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired):
+        return None
+
+    vals = []
+    for line in output.decode("utf-8", errors="ignore").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            # nvidia-smi reports MiB for memory.free with nounits.
+            vals.append(float(line.split()[0]) / 1024.0)
+        except (ValueError, IndexError):
+            continue
+    if not vals:
+        return None
+    return min(vals[:max(int(num_gpus), 1)])
+
+
 def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
     """Pick ``max_workers_per_gpu`` based on detected hardware.
 
@@ -78,10 +135,11 @@ def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
           - ``hard_cap`` (default 4) — SM-scheduler kernel-serialization
             wall.
 
-    Free VRAM is read live from ``torch.cuda.mem_get_info`` per GPU when
-    CUDA is initialized; falls back to a conservative 16 GB estimate
-    otherwise. Per-worker VRAM upper bound and the hard cap are both
-    overridable via the env vars
+    Free VRAM is read from ``nvidia-smi`` (or from
+    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB``). It deliberately
+    avoids ``torch.cuda`` so resolving local parallelism before forking does
+    not initialize CUDA in the parent process. Per-worker VRAM upper bound and
+    the hard cap are overridable via
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` and
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP``.
 
@@ -100,22 +158,10 @@ def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
         str(_AUTO_MWPG_HARD_CAP_DEFAULT),
     ))
 
-    free_vram_gb = None
-    try:
-        import torch
-        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-            mins = []
-            for i in range(min(int(num_gpus), torch.cuda.device_count())):
-                try:
-                    free, _total = torch.cuda.mem_get_info(i)
-                    mins.append(free / (1024 ** 3))
-                except (RuntimeError, AssertionError):
-                    # mem_get_info can raise before the device is selected.
-                    pass
-            if mins:
-                free_vram_gb = min(mins)
-    except Exception:  # pragma: no cover — diagnostic fallback
-        free_vram_gb = None
+    free_vram_gb = (
+        _free_vram_override_gb(num_gpus)
+        or _free_vram_from_nvidia_smi_gb(num_gpus)
+    )
 
     free_vram_gb_used = (
         free_vram_gb
@@ -168,6 +214,309 @@ def resolve_max_workers_per_gpu(args):
         resolved = int(value)
     args.max_workers_per_gpu = resolved
     return resolved
+
+
+def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
+    """Resolve and normalize local parallelism arguments in one place.
+
+    This is the single pre-fork normalization point for local worker pools:
+
+    * resolves ``--max-workers-per-gpu=auto`` without touching CUDA;
+    * when that value was auto, caps ``--num-jobs`` to the resolved GPU
+      capacity so an oversized planning value does not silently create CPU
+      overflow workers;
+    * hoists torch.compile's worker-thread cap before the Pool forks.
+
+    Explicit numeric ``--max-workers-per-gpu`` keeps the historical scheduler
+    behavior: if ``num_jobs`` exceeds GPU capacity, overflow workers run on CPU.
+    """
+    if getattr(args, "_local_parallelism_args_resolved", False):
+        return args
+
+    original = getattr(args, "max_workers_per_gpu", None)
+    was_auto = (
+        original is None
+        or (isinstance(original, str) and original.lower() == "auto")
+    )
+    resolved = resolve_max_workers_per_gpu(args)
+    args.max_workers_per_gpu_was_auto = was_auto
+
+    num_jobs = int(getattr(args, "num_jobs", 0) or 0)
+    num_gpus = int(getattr(args, "gpus", 0) or 0)
+    backend = normalize_pytorch_backend(getattr(args, "backend", "auto") or "auto")
+    if (
+            cap_auto_num_jobs
+            and was_auto
+            and num_jobs > 0
+            and num_gpus > 0
+            and backend in ("auto", "gpu")):
+        gpu_capacity = num_gpus * int(resolved)
+        if num_jobs > gpu_capacity:
+            print(
+                "Local parallelism: capping num_jobs from %d to %d because "
+                "--max-workers-per-gpu=auto resolved to %d across %d GPU(s). "
+                "Set MAX_WORKERS_PER_GPU=N / --max-workers-per-gpu N to allow "
+                "explicit CPU overflow workers." % (
+                    num_jobs, gpu_capacity, resolved, num_gpus,
+                )
+            )
+            args.num_jobs = gpu_capacity
+
+    hoist_torchinductor_compile_threads(args)
+    args._local_parallelism_args_resolved = True
+    return args
+
+
+# Inductor's compile worker pool defaults to ``os.cpu_count()``; that's
+# fine for one process but stacks badly when N fit() workers each spawn
+# their own pool. Match the same SM-scheduler-style cap used for
+# ``auto_max_workers_per_gpu``: 4 is enough compile parallelism to keep
+# Inductor useful without amplifying jitter across N workers.
+_INDUCTOR_THREAD_HARD_CAP = 4
+
+
+# Estimated per-fit() Layer-2 SHM footprint. Empirically ~2–3 GB for the
+# pan-allele MLP at the standard data scale (x_peptide + x_allele +
+# y_encoded + sample_weights + random_negative buffers). We round up to
+# 4 GB so the safety check has margin for outliers (longer max_length,
+# bigger random-negative pool, future hyperparameter shifts).
+_PER_FIT_SHM_FOOTPRINT_GB_DEFAULT = 4.0
+
+
+def shm_free_gb(shm_dir="/dev/shm"):
+    """Return free space (gigabytes) on ``shm_dir`` tmpfs, or ``None`` if unknown.
+
+    Returns ``None`` (not 0) on platforms without ``/dev/shm`` so callers
+    can distinguish "no /dev/shm" from "/dev/shm is full". macOS has no
+    /dev/shm; container runtimes always do.
+    """
+    if not os.path.isdir(shm_dir):
+        return None
+    try:
+        st = os.statvfs(shm_dir)
+    except OSError:
+        return None
+    return (st.f_bavail * st.f_frsize) / (1024 ** 3)
+
+
+def shm_total_gb(shm_dir="/dev/shm"):
+    """Return total size (gigabytes) of ``shm_dir`` tmpfs, or ``None``."""
+    if not os.path.isdir(shm_dir):
+        return None
+    try:
+        st = os.statvfs(shm_dir)
+    except OSError:
+        return None
+    return (st.f_blocks * st.f_frsize) / (1024 ** 3)
+
+
+def fit_shm_capacity_check(num_workers, per_fit_gb=None, shm_dir="/dev/shm"):
+    """Decide whether Layer-2 SHM is safe at this concurrency.
+
+    Returns a dict::
+
+        {"safe": bool,
+         "shm_total_gb": float | None,
+         "shm_free_gb": float | None,
+         "estimated_required_gb": float,
+         "message": str}
+
+    Used by the orchestrator pre-fork (loud warning) and by fit()'s
+    per-worker auto-detect (silent fallback). The threshold:
+    ``num_workers * per_fit_gb * 1.5`` (50% margin for transient peaks,
+    DataLoader semaphores, OpenMP per-process registrations).
+
+    On platforms without /dev/shm (macOS), returns ``safe=True`` —
+    PyTorch's file_descriptor sharing strategy bypasses the tmpfs so
+    no capacity check applies.
+    """
+    if per_fit_gb is None:
+        per_fit_gb = float(
+            os.environ.get(
+                "MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB",
+                _PER_FIT_SHM_FOOTPRINT_GB_DEFAULT,
+            )
+        )
+    free_gb = shm_free_gb(shm_dir)
+    total_gb = shm_total_gb(shm_dir)
+    required_gb = max(int(num_workers), 1) * per_fit_gb * 1.5
+    if free_gb is None:
+        # No /dev/shm visible; assume PyTorch's file_descriptor strategy
+        # will handle sharing. Caller treats as safe.
+        return {
+            "safe": True,
+            "shm_total_gb": total_gb,
+            "shm_free_gb": free_gb,
+            "estimated_required_gb": required_gb,
+            "message": (
+                "%s not present; skipping Layer-2 SHM capacity check"
+                % shm_dir
+            ),
+        }
+    safe = free_gb >= required_gb
+    if safe:
+        message = (
+            "Layer-2 SHM capacity OK: %s has %.1f GB free / %.1f GB total, "
+            "estimated need %.1f GB (%d workers × %.1f GB/fit × 1.5 margin)"
+            % (
+                shm_dir, free_gb, total_gb or 0.0, required_gb,
+                num_workers, per_fit_gb,
+            )
+        )
+    else:
+        message = (
+            "Layer-2 SHM capacity TIGHT: %s has %.1f GB free / %.1f GB "
+            "total, estimated need %.1f GB (%d workers × %.1f GB/fit × "
+            "1.5 margin). Workers will fall back to numpy DataLoader path "
+            "(slower, no per-worker share). To re-enable: bump tmpfs "
+            "(e.g. relaunch the container with --shm-size=64g) or reduce "
+            "--num-jobs / --max-workers-per-gpu. Force-on with "
+            "MHCFLURRY_FIT_DATALOADER_SHM=1 (will OOM mid-fit)."
+            % (
+                shm_dir, free_gb, total_gb or 0.0, required_gb,
+                num_workers, per_fit_gb,
+            )
+        )
+    return {
+        "safe": safe,
+        "shm_total_gb": total_gb,
+        "shm_free_gb": free_gb,
+        "estimated_required_gb": required_gb,
+        "message": message,
+    }
+
+
+def configure_torch_sharing_strategy_for_capacity(
+    num_workers,
+    per_fit_gb=None,
+    shm_dir="/dev/shm",
+):
+    """Switch torch's tensor-sharing strategy to ``file_descriptor`` when
+    ``/dev/shm`` is too small for the default ``file_system`` strategy.
+
+    Background: torch's default ``file_system`` strategy backs shared
+    tensors with POSIX-shm files in ``/dev/shm``. With many fit() workers
+    × multi-GB tensors, an 8 GB Docker-default ``/dev/shm`` runs out and
+    ``share_memory_()`` crashes with ``OSError [Errno 28]``. The
+    ``file_descriptor`` strategy passes anonymous FDs over Unix sockets
+    instead — no ``/dev/shm`` use at all, just an FD per shared tensor.
+
+    Returns one of:
+      * ``"unchanged"`` — capacity is fine OR no torch available; default
+        strategy retained.
+      * ``"file_descriptor"`` — capacity tight, switched. Layer-2 SHM
+        works without ``/dev/shm`` headroom.
+      * ``"failed"`` — capacity tight but switch failed (e.g. torch
+        already initialized sharing); caller should fall back to
+        disabling Layer-2 SHM.
+
+    Idempotent. Safe to call multiple times. Bumps ``RLIMIT_NOFILE`` to
+    cover the FDs the file_descriptor strategy needs (typically a few
+    hundred for 16-worker configs).
+
+    Should be called BEFORE any worker spawns or any tensor is shared,
+    typically from the orchestrator's pre-flight + from
+    ``class1_neural_network`` at module import time so fit() workers
+    that don't go through the orchestrator hook (tests, allele-specific
+    training, etc.) still benefit.
+    """
+    result = fit_shm_capacity_check(num_workers, per_fit_gb, shm_dir)
+    if result["safe"]:
+        return "unchanged"
+
+    try:
+        import torch.multiprocessing as torch_mp
+    except ImportError:
+        return "unchanged"
+
+    try:
+        current = torch_mp.get_sharing_strategy()
+    except RuntimeError:
+        # Torch unable to query; bail.
+        return "unchanged"
+
+    if current == "file_descriptor":
+        # Already switched (idempotent path).
+        return "file_descriptor"
+
+    try:
+        torch_mp.set_sharing_strategy("file_descriptor")
+    except (RuntimeError, ValueError, AssertionError):
+        # Strategy may be locked once any tensor has been shared, or the
+        # platform may not support file_descriptor (e.g. macOS torch
+        # only ships file_system). Fall through to caller's fallback.
+        return "failed"
+
+    # file_descriptor needs ~num_workers × num_dataloader_workers × N FDs
+    # per fit. Default ulimit -n is 1024 on most Linux distros, which is
+    # close to the line for 16-worker configs. Raise to 16384 if the
+    # hard cap allows.
+    try:
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        target = min(16384, hard)
+        if soft < target:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+    except (ValueError, OSError, ImportError):
+        # macOS sometimes refuses RLIMIT_NOFILE bumps; that's fine,
+        # macOS doesn't have /dev/shm and won't hit this path anyway.
+        pass
+
+    print(
+        "torch.multiprocessing: switched sharing strategy to "
+        "'file_descriptor' (was '%s'). Layer-2 SHM tensors will now use "
+        "anonymous FDs instead of /dev/shm; the capacity guard above is "
+        "no longer load-bearing." % current
+    )
+    return "file_descriptor"
+
+
+def hoist_torchinductor_compile_threads(args):
+    """Cap ``TORCHINDUCTOR_COMPILE_THREADS`` based on parallel-worker count.
+
+    ``torch.compile`` (when enabled via ``MHCFLURRY_TORCH_COMPILE=1``)
+    spins up an inductor compile worker pool that defaults to
+    ``os.cpu_count()`` threads. With N fit() workers each running
+    their own compile pool, an 8-job × 64-core box would spawn 512
+    compile threads — orders of magnitude over-subscribed.
+
+    The orchestrator owns "how many workers will exist", so it owns
+    the env knob too: set once before forking, every worker inherits.
+    Skips the hoist when the user has already pinned the value or when
+    ``MHCFLURRY_TORCH_COMPILE`` isn't on. Cluster workers running on
+    other hosts inherit nothing — but they share the same kernel cache
+    via inductor's content-addressed FX cache, so per-worker compile
+    counts there are bounded by cache hits, not by env.
+
+    Lives here (not in any one ``train_*_command`` module) so processing,
+    allele-specific, and any future train command can call it the same
+    way.
+    """
+    if os.environ.get("MHCFLURRY_TORCH_COMPILE", "0") != "1":
+        # No compile = no compile pool to size; leave env untouched.
+        return
+    auto_owned = (
+        os.environ.get("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO") == "1"
+    )
+    if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ and not auto_owned:
+        # User pinned explicitly; don't second-guess.
+        print(
+            "torch.compile: TORCHINDUCTOR_COMPILE_THREADS=%s "
+            "(user-pinned, orchestrator hoist skipped)"
+            % os.environ["TORCHINDUCTOR_COMPILE_THREADS"]
+        )
+        return
+    num_jobs = max(int(getattr(args, "num_jobs", 0) or 0), 1)
+    cpu_count_ = os.cpu_count() or 1
+    threads = max(1, min(_INDUCTOR_THREAD_HARD_CAP, cpu_count_ // num_jobs))
+    if auto_owned and os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") == str(threads):
+        return
+    os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = str(threads)
+    os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] = "1"
+    print(
+        "torch.compile: hoisted TORCHINDUCTOR_COMPILE_THREADS=%d "
+        "(num_jobs=%d, cpu_count=%d)" % (threads, num_jobs, cpu_count_)
+    )
 
 
 # ---- Non-daemonic worker pool --------------------------------------------
@@ -313,7 +662,7 @@ def worker_pool_with_gpu_assignments_from_args(args):
     -------
     multiprocessing.Pool
     """
-    resolve_max_workers_per_gpu(args)
+    resolve_local_parallelism_args(args)
 
     return worker_pool_with_gpu_assignments(
         num_jobs=args.num_jobs,

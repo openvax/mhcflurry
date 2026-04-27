@@ -18,9 +18,14 @@ import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
-from .common import normalize_allele_name
+from .common import (
+    amino_acid_distribution,
+    configure_logging,
+    filter_canonicalizable_alleles,
+    normalize_allele_name,
+    random_peptides,
+)
 from .encodable_sequences import EncodableSequences
-from .common import configure_logging, random_peptides, amino_acid_distribution
 from .local_parallelism import (
     add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
@@ -106,46 +111,11 @@ parser.add_argument(
     nargs=2,
     help="Min and max peptide length to calibrate, inclusive. "
     "Default: %(default)s")
-def _filter_canonicalizable_alleles(alleles, log_label="alleles"):
-    """Drop alleles that ``normalize_allele_name`` refuses to canonicalize.
-
-    ``predictor.supported_alleles`` (and any user-supplied
-    ``--alleles-file``) can contain pseudogenes / null alleles /
-    questionable annotations — those are real entries in the public
-    ``allele_sequences.csv`` (which aims to be exhaustive), but
-    ``predict_to_dataframe`` raises on them mid-iteration. Filter
-    once up front so calibration doesn't crash partway through, and
-    log the dropped sample so the missing rows in the resulting
-    percent-rank table are explainable.
-
-    A local memo keeps the per-allele ``normalize_allele_name`` cost
-    bounded — the predictor's allele set is ~20K entries and
-    mhcgnomes' parse is millisecond-scale, so without caching this
-    pre-pass alone would add ~20 sec of single-threaded startup.
-    """
-    seen = {}
-
-    def _ok(allele):
-        if allele not in seen:
-            try:
-                normalize_allele_name(allele)
-                seen[allele] = True
-            except (ValueError, TypeError):
-                seen[allele] = False
-        return seen[allele]
-
-    filtered = [a for a in alleles if _ok(a)]
-    dropped = [a for a in alleles if not _ok(a)]
-    if dropped:
-        sample = ", ".join(dropped[:5]) + (
-            ", ..." if len(dropped) > 5 else ""
-        )
-        print(
-            "Skipping %d %s that fail canonicalization "
-            "(pseudogene/null/questionable): %s"
-            % (len(dropped), log_label, sample)
-        )
-    return filtered
+# Back-compat alias: tests and external callers import this name from the
+# calibrate command module. The implementation now lives in
+# ``mhcflurry.common.filter_canonicalizable_alleles`` so it can be reused
+# by the select commands and any future iteration site.
+_filter_canonicalizable_alleles = filter_canonicalizable_alleles
 
 
 def _batch_size_arg(value):
@@ -228,8 +198,13 @@ def run(argv=sys.argv[1:]):
 
     # Resolve --max-workers-per-gpu='auto' to an int now, before any
     # downstream consumer reads it (model_kwargs below + pool creation).
-    from .local_parallelism import resolve_max_workers_per_gpu
-    resolve_max_workers_per_gpu(args)
+    # The shared helper also caps auto-sized local Pools to GPU capacity and
+    # hoists torch.compile worker-thread defaults before forking.
+    from .local_parallelism import resolve_local_parallelism_args
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+    )
 
     aa_distribution = None
     if args.match_amino_acid_distribution_data:

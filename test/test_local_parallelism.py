@@ -1,6 +1,7 @@
 from argparse import ArgumentParser, ArgumentTypeError, Namespace
 
 import multiprocessing
+import builtins
 import pytest
 
 from mhcflurry.local_parallelism import (
@@ -9,6 +10,7 @@ from mhcflurry.local_parallelism import (
     _max_workers_per_gpu_arg,
     add_local_parallelism_args,
     auto_max_workers_per_gpu,
+    resolve_local_parallelism_args,
     resolve_max_workers_per_gpu,
     validate_worker_pool_args,
     worker_init_kwargs_for_scheduler,
@@ -195,6 +197,7 @@ def test_auto_max_workers_per_gpu_caps_at_jobs_per_gpu(monkeypatch):
     """``num_jobs // num_gpus`` is the natural ceiling per GPU."""
     # 16 jobs, 8 GPUs, abundant VRAM → 2 (jobs/gpus, not VRAM-bound).
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "1")
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
     assert auto_max_workers_per_gpu(num_jobs=16, num_gpus=8) == 2
     # 32 jobs, 8 GPUs → 4 (hits the hard cap, not jobs/gpus).
     assert auto_max_workers_per_gpu(num_jobs=32, num_gpus=8) == 4
@@ -205,6 +208,7 @@ def test_auto_max_workers_per_gpu_caps_at_vram(monkeypatch):
     # 32 jobs, 8 GPUs, large per-worker VRAM, low free-VRAM fallback (16 GB)
     # → by_jobs=4, by_vram=floor(16*0.6/16)=0 → max(1,...) = 1.
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "16")
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "16")
     assert auto_max_workers_per_gpu(num_jobs=32, num_gpus=8) == 1
 
 
@@ -212,8 +216,23 @@ def test_auto_max_workers_per_gpu_respects_hard_cap(monkeypatch):
     """Hard cap clamps even when jobs/gpus and VRAM allow more."""
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "0.1")
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "3")
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
     # 32 jobs/8 gpus = 4 by_jobs, vram unbounded → hard_cap clamps to 3.
     assert auto_max_workers_per_gpu(num_jobs=32, num_gpus=8) == 3
+
+
+def test_auto_max_workers_per_gpu_does_not_import_torch(monkeypatch):
+    """Resolving local Pool size must not initialize CUDA in the parent."""
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    original_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name == "torch" or name.startswith("torch."):
+            raise AssertionError("auto_max_workers_per_gpu imported torch")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    assert auto_max_workers_per_gpu(num_jobs=16, num_gpus=8) == 2
 
 
 def test_resolve_max_workers_per_gpu_passes_through_int():
@@ -224,6 +243,7 @@ def test_resolve_max_workers_per_gpu_passes_through_int():
 
 def test_resolve_max_workers_per_gpu_resolves_auto(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "1")
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
     args = Namespace(
         max_workers_per_gpu="auto", num_jobs=16, gpus=8, backend="auto"
     )
@@ -235,12 +255,38 @@ def test_resolve_max_workers_per_gpu_resolves_auto(monkeypatch):
 
 def test_resolve_max_workers_per_gpu_is_idempotent(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "1")
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
     args = Namespace(
         max_workers_per_gpu="auto", num_jobs=16, gpus=8, backend="auto"
     )
     first = resolve_max_workers_per_gpu(args)
     second = resolve_max_workers_per_gpu(args)
     assert first == second
+
+
+def test_resolve_local_parallelism_args_caps_auto_num_jobs(monkeypatch):
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    args = Namespace(
+        max_workers_per_gpu="auto", num_jobs=16, gpus=8, backend="auto"
+    )
+    resolve_local_parallelism_args(args)
+    assert args.max_workers_per_gpu == 1
+    assert args.num_jobs == 8
+    assert args.max_workers_per_gpu_was_auto is True
+
+
+def test_resolve_local_parallelism_args_keeps_explicit_cpu_overflow(
+    monkeypatch,
+):
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    args = Namespace(
+        max_workers_per_gpu=1, num_jobs=16, gpus=8, backend="auto"
+    )
+    resolve_local_parallelism_args(args)
+    assert args.max_workers_per_gpu == 1
+    assert args.num_jobs == 16
+    assert args.max_workers_per_gpu_was_auto is False
 
 
 def test_nondaemonpool_worker_can_spawn_children():

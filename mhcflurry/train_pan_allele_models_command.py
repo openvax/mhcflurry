@@ -28,8 +28,13 @@ from .class1_neural_network import Class1NeuralNetwork
 from .common import configure_logging, normalize_allele_name
 from .local_parallelism import (
     add_local_parallelism_args,
+    call_wrapped_kwargs,
+    configure_torch_sharing_strategy_for_capacity,
+    fit_shm_capacity_check,
+    hoist_torchinductor_compile_threads,
+    resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
-    call_wrapped_kwargs)
+)
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -38,7 +43,9 @@ from .encodable_sequences import EncodableSequences
 from .encoding_cache import (
     EncodingCache,
     EncodingParams,
+    deterministic_unique_peptide_list,
     make_prepopulated_encodable_sequences,
+    prebuild_encoding_caches,
 )
 from .regression_target import from_ic50
 
@@ -1125,7 +1132,7 @@ def _initialize_encoding_cache(args, all_work_items):
             }
 
     df = GLOBAL_DATA["train_data"]
-    unique_peptides = _deterministic_unique_peptide_list(df.peptide.values)
+    unique_peptides = deterministic_unique_peptide_list(df.peptide.values)
     unique_peptide_to_idx = {
         peptide: i for i, peptide in enumerate(unique_peptides)
     }
@@ -1139,19 +1146,12 @@ def _initialize_encoding_cache(args, all_work_items):
     )
     del unique_peptide_to_idx
 
-    for cfg in configs_seen.values():
-        params = EncodingParams(**cfg)
-        cache = EncodingCache(cache_dir=cache_dir, params=params)
-        if cache.is_complete_for(unique_peptides):
-            print(f"Encoding cache hit: {cache.entry_path(unique_peptides)} "
-                  f"({len(unique_peptides)} peptides)")
-            continue
-        print(f"Building encoding cache for params "
-              f"{params.to_kwargs()} ({len(unique_peptides)} peptides) "
-              f"at {cache.entry_path(unique_peptides)}...")
-        t0 = time.time()
-        cache.ensure_built(unique_peptides)
-        print(f"Encoding cache built in {time.time() - t0:.1f}s.")
+    prebuild_encoding_caches(
+        cache_dir=cache_dir,
+        peptides=unique_peptides,
+        encoding_configs=list(configs_seen.values()),
+        label="train",
+    )
 
     GLOBAL_DATA["encoding_cache_dir"] = str(cache_dir)
     # Per-arch params lookup: hyperparameters dict doesn't change pickle size
@@ -1175,20 +1175,12 @@ def _initialize_encoding_cache(args, all_work_items):
     pretrain_data_path = getattr(args, "pretrain_data", None)
     if pretrain_data_path:
         pretrain_peptides = _read_pretrain_peptide_list(pretrain_data_path)
-        for cfg in configs_seen.values():
-            params = EncodingParams(**cfg)
-            cache = EncodingCache(cache_dir=cache_dir, params=params)
-            if cache.is_complete_for(pretrain_peptides):
-                print(f"Pretrain encoding cache hit: "
-                      f"{cache.entry_path(pretrain_peptides)} "
-                      f"({len(pretrain_peptides)} peptides)")
-                continue
-            print(f"Building pretrain encoding cache for params "
-                  f"{params.to_kwargs()} ({len(pretrain_peptides)} peptides) "
-                  f"at {cache.entry_path(pretrain_peptides)}...")
-            t0 = time.time()
-            cache.ensure_built(pretrain_peptides)
-            print(f"Pretrain encoding cache built in {time.time() - t0:.1f}s.")
+        prebuild_encoding_caches(
+            cache_dir=cache_dir,
+            peptides=pretrain_peptides,
+            encoding_configs=list(configs_seen.values()),
+            label="pretrain",
+        )
         # Use the same AlleleEncoding the workers will use
         # (``allele_encoding``, restricted to alleles with training data),
         # NOT ``full_allele_encoding``. ``_get_pretrain_allele_info``
@@ -1218,16 +1210,6 @@ def _initialize_encoding_cache(args, all_work_items):
             )
 
 
-def _deterministic_unique_peptide_list(peptide_values):
-    """Return unique peptides in first-seen order.
-
-    Must be stable: orchestrator's list must match what workers compute, or
-    the cache key (which hashes the list) won't match. pandas.Series
-    .drop_duplicates() preserves first-seen order — use it consistently.
-    """
-    return list(pandas.Series(peptide_values).drop_duplicates())
-
-
 def _read_pretrain_peptide_list(filename):
     """Read only the peptide column (index) from the pretrain CSV.
 
@@ -1238,6 +1220,71 @@ def _read_pretrain_peptide_list(filename):
     # Reading only usecols=[0] makes pandas parse just the peptide column.
     peptide_series = pandas.read_csv(filename, index_col=0, usecols=[0]).index
     return list(peptide_series)
+
+
+# Back-compat alias for any callers / tests that imported the helper from
+# this module before it was hoisted to ``local_parallelism``.
+_hoist_torchinductor_compile_threads = hoist_torchinductor_compile_threads
+
+
+def _preflight_shm_capacity(args):
+    """Pre-fork advisory + auto-fallback for /dev/shm capacity.
+
+    Runs once in the orchestrator before workers are spawned. Computes
+    the expected Layer-2 SHM footprint from ``--num-jobs`` and a
+    per-fit estimate, compares to ``/dev/shm`` free space, and:
+
+    * Always prints a one-line summary (free, total, required).
+    * If insufficient AND the user hasn't force-pinned
+      ``MHCFLURRY_FIT_DATALOADER_SHM``, sets it to ``"0"`` so workers
+      fall back to the numpy DataLoader path. Loud-warn naming the
+      remediation (resize tmpfs, reduce concurrency).
+    * If the user has force-pinned to ``"1"``, leaves the env alone but
+      escalates the warning so the OOM is at least expected.
+
+    Skipped entirely when ``num_jobs == 0`` (serial run; no DataLoader
+    workers; no Layer-2 SHM relevant).
+    """
+    num_jobs = int(getattr(args, "num_jobs", 0) or 0)
+    if num_jobs <= 0:
+        return  # serial / cluster — capacity check is per-node and not actionable here.
+    result = fit_shm_capacity_check(num_workers=num_jobs)
+    print(result["message"])
+    if result["safe"]:
+        return
+    pinned = os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
+    if pinned == "1":
+        # User force-on. Escalate warning; respect their choice.
+        print(
+            "WARNING: MHCFLURRY_FIT_DATALOADER_SHM=1 is force-pinned despite "
+            "tight /dev/shm. Workers WILL crash partway through fit() with "
+            "OSError [Errno 28]. Unset the env var to enable auto-fallback."
+        )
+        return
+    if pinned == "0":
+        # User force-off — already disabled; nothing to do.
+        return
+    # Tight /dev/shm with no user pin: try torch's file_descriptor sharing
+    # strategy first. That bypasses /dev/shm entirely (anonymous FDs over
+    # Unix sockets), preserving Layer-2 SHM on small-tmpfs containers like
+    # the Docker default (8 GB). Only fall back to disabling Layer-2 SHM
+    # when the strategy switch fails.
+    if os.environ.get("MHCFLURRY_TORCH_SHM_AUTO", "1") != "0":
+        switch = configure_torch_sharing_strategy_for_capacity(
+            num_workers=num_jobs
+        )
+        if switch == "file_descriptor":
+            return
+    # Auto-disable Layer-2 SHM as the conservative fallback.
+    os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] = "0"
+    print(
+        "Auto-disabling Layer-2 SHM for this run "
+        "(MHCFLURRY_FIT_DATALOADER_SHM=0). Per-fit DataLoader will use the "
+        "numpy backing path; per-worker pickling cost is paid once per "
+        "epoch instead of being amortized via shared tensors. Throughput "
+        "impact: roughly 10-30%% slower than the SHM path on a "
+        "large-/dev/shm box."
+    )
 
 
 def _local_pool_workers_inherit_global_data(worker_pool=None):
@@ -1268,6 +1315,23 @@ def train_models(args):
 
     all_work_items = GLOBAL_DATA["work_items"]
 
+    # Resolve local parallelism once before any pre-fork resource sizing. This
+    # caps auto-sized Pools to GPU capacity and hoists env knobs such as
+    # TORCHINDUCTOR_COMPILE_THREADS before workers inherit the environment.
+    if not getattr(args, "cluster_parallelism", False):
+        resolve_local_parallelism_args(args)
+    else:
+        # Cluster launchers do not use the local worker Pool, but the submitter
+        # can still hoist compile-thread defaults into the worker environment.
+        hoist_torchinductor_compile_threads(args)
+
+    # Layer-2 SHM capacity pre-flight. With small /dev/shm (8 GB Docker
+    # default) + many workers, share_memory_() will OOM mid-fit with a
+    # cryptic OSError. Check up front and (a) print a loud advisory,
+    # (b) auto-disable Layer-2 SHM unless the user has force-pinned
+    # MHCFLURRY_FIT_DATALOADER_SHM=1. See docs/orchestrator.md.
+    _preflight_shm_capacity(args)
+
     # Optionally pre-build the shared BLOSUM62 encoding cache. Orchestrator
     # does the (single-threaded) encoding pass once; workers mmap the result.
     # See mhcflurry/encoding_cache.py and issue openvax/mhcflurry#268.
@@ -1279,6 +1343,22 @@ def train_models(args):
     # work item's fit() will look up its own pool dir at task start.
     # See mhcflurry/shared_memory.py for the layered SHM design.
     if getattr(args, "random_negative_shared_pool_dir", None):
+        # Cluster mode: workers run on (possibly) other nodes. The mmap
+        # pool dir must be reachable from every worker's filesystem, or
+        # they will silently fall through to the in-process fallback.
+        # Loud-warn here rather than gating: NFS is the common cluster
+        # shape and gating would surprise users running on shared FS.
+        if getattr(args, "cluster_parallelism", False):
+            print(
+                "WARNING: --random-negative-shared-pool-dir is set with "
+                "--cluster-parallelism. The pool dir (%s) MUST be on a "
+                "filesystem reachable from every cluster worker (typically "
+                "the same NFS as --cluster-results-workdir) or workers will "
+                "fail to mmap and fall back to the in-process pool, "
+                "negating the speedup." % os.path.abspath(
+                    args.random_negative_shared_pool_dir
+                )
+            )
         _initialize_shared_random_negative_pools(args, all_work_items)
     complete_work_item_names = [
         network.fit_info[-1]["training_info"]["work_item_name"] for network in
@@ -1418,7 +1498,7 @@ def _build_train_peptides(
     unique_peptides = constant_data.get("encoding_cache_unique_peptides")
     if unique_peptides is None:
         df = constant_data["train_data"]
-        unique_peptides = _deterministic_unique_peptide_list(df.peptide.values)
+        unique_peptides = deterministic_unique_peptide_list(df.peptide.values)
     cache_entry_path = cache.ensure_built(unique_peptides)
     encoded_all = numpy.load(
         join(str(cache_entry_path), "encoded.npy"),

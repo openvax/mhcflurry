@@ -11,7 +11,10 @@
 #
 #   Inputs (env, all must be set before sourcing):
 #     GPUS                        number of visible CUDA devices (0 allowed)
-#     MAX_WORKERS_PER_GPU         training workers per GPU
+#     MAX_WORKERS_PER_GPU         training workers per GPU, or "auto" when
+#                                 NUM_JOBS is provided by the caller
+#     NUM_JOBS                    optional total training workers; preferred
+#                                 when MAX_WORKERS_PER_GPU is auto
 #     DATALOADER_NUM_WORKERS      per-training-worker DataLoader prefetch procs
 #
 #   Optional override:
@@ -20,7 +23,8 @@
 #
 # Allocation model:
 #   total_cores = nproc()
-#   total_training_workers = max(1, GPUS * MAX_WORKERS_PER_GPU)
+#   total_training_workers = NUM_JOBS when provided, else
+#                            max(1, GPUS * MAX_WORKERS_PER_GPU)
 #   reserved = 2 (OS / orchestrator) + total_training_workers * DATALOADER_NUM_WORKERS
 #   per_worker = max(1, (total_cores - reserved) / total_training_workers)
 #
@@ -36,9 +40,27 @@ set_cpu_threads() {
 
     local gpus=${GPUS:-0}
     local wpg=${MAX_WORKERS_PER_GPU:-1}
+    local num_jobs=${NUM_JOBS:-}
     local dl=${DATALOADER_NUM_WORKERS:-0}
 
-    local total_workers=$(( gpus * wpg ))
+    local total_workers
+    if [ -n "$num_jobs" ]; then
+        case "$num_jobs" in
+            *[!0-9]*|"")
+                echo "set_cpu_threads: NUM_JOBS must be numeric, got '$num_jobs'" >&2
+                return 2
+                ;;
+        esac
+        total_workers="$num_jobs"
+    else
+        case "$wpg" in
+            *[!0-9]*|"")
+                echo "set_cpu_threads: MAX_WORKERS_PER_GPU must be numeric when NUM_JOBS is unset, got '$wpg'" >&2
+                return 2
+                ;;
+        esac
+        total_workers=$(( gpus * wpg ))
+    fi
     if [ "$total_workers" -lt 1 ]; then
         total_workers=1
     fi
@@ -71,7 +93,7 @@ set_cpu_threads() {
     export OMP_NUM_THREADS MKL_NUM_THREADS OPENBLAS_NUM_THREADS
 
     printf >&2 \
-        '[set_cpu_threads] cores=%d gpus=%d workers_per_gpu=%d dl_workers=%d → per_worker=%d (OMP=%s MKL=%s OPENBLAS=%s)\n' \
-        "$cores" "$gpus" "$wpg" "$dl" "$per_worker" \
+        '[set_cpu_threads] cores=%d gpus=%d workers_per_gpu=%s total_workers=%d dl_workers=%d → per_worker=%d (OMP=%s MKL=%s OPENBLAS=%s)\n' \
+        "$cores" "$gpus" "$wpg" "$total_workers" "$dl" "$per_worker" \
         "$OMP_NUM_THREADS" "$MKL_NUM_THREADS" "$OPENBLAS_NUM_THREADS"
 }

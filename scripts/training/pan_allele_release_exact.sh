@@ -29,9 +29,10 @@ export PYTHONUNBUFFERED=1
 export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
 # Inductor defaults to a large compile helper pool per training process.
 # With 8-16 concurrent mhcflurry workers that multiplies into thousands of
-# short-lived subprocesses and can stall the box. Keep the default bounded;
-# callers can override upward when running fewer workers.
-export TORCHINDUCTOR_COMPILE_THREADS="${TORCHINDUCTOR_COMPILE_THREADS:-2}"
+# short-lived subprocesses and can stall the box. Leave the env unset by
+# default: mhcflurry.local_parallelism resolves it from the final NUM_JOBS
+# in the same place that resolves Pool/GPU concurrency. Callers can still
+# export TORCHINDUCTOR_COMPILE_THREADS before invoking this script to pin.
 # OMP/MKL/OPENBLAS set via set_cpu_threads helper below — auto-computes
 # from nproc + GPU/worker layout. Manually override any of them before
 # calling this script to pin an explicit value.
@@ -183,7 +184,7 @@ trap 'on_signal TERM' TERM
 trap cleanup_release_logging EXIT
 
 log_release_event script_start \
-    "pid=$$ out_dir=$MHCFLURRY_OUT pythonunbuffered=$PYTHONUNBUFFERED torch_compile=$MHCFLURRY_TORCH_COMPILE inductor_threads=$TORCHINDUCTOR_COMPILE_THREADS"
+    "pid=$$ out_dir=$MHCFLURRY_OUT pythonunbuffered=$PYTHONUNBUFFERED torch_compile=$MHCFLURRY_TORCH_COMPILE inductor_threads=${TORCHINDUCTOR_COMPILE_THREADS:-auto}"
 write_snapshot startup
 start_heartbeat
 
@@ -222,15 +223,36 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
-# Per-worker peak is 16-22 GB on mhcflurry pan-allele training (observed on
-# A100-80GB). Safe: 2 on 80GB, 1 on 40GB. 4 OOMs on 80GB.
-MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-2}"
+# Default to "auto" so the shared Python resolver picks from the actual
+# hardware budget. Resolve it here before shell arithmetic so every downstream
+# consumer (Pool size, BLAS thread budget, CLI args) sees one numeric plan.
+MAX_WORKERS_PER_GPU_REQUESTED="${MAX_WORKERS_PER_GPU:-auto}"
 if [ "$GPUS" -eq "0" ]; then
     NUM_JOBS="${NUM_JOBS-1}"
+    MAX_WORKERS_PER_GPU=1
+elif [ "$MAX_WORKERS_PER_GPU_REQUESTED" = "auto" ]; then
+    _NUM_JOBS_FOR_AUTO="${NUM_JOBS:-$(( GPUS * 2 ))}"
+    MAX_WORKERS_PER_GPU="$(
+        NUM_JOBS="$_NUM_JOBS_FOR_AUTO" GPUS="$GPUS" python - <<'PY'
+import os
+from mhcflurry.local_parallelism import auto_max_workers_per_gpu
+print(auto_max_workers_per_gpu(
+    num_jobs=int(os.environ["NUM_JOBS"]),
+    num_gpus=int(os.environ["GPUS"]),
+    backend="auto",
+))
+PY
+    )"
+    _GPU_WORKER_CAP=$(( GPUS * MAX_WORKERS_PER_GPU ))
+    if [ -z "${NUM_JOBS+x}" ] || [ "$NUM_JOBS" -gt "$_GPU_WORKER_CAP" ]; then
+        NUM_JOBS="$_GPU_WORKER_CAP"
+    fi
+    echo "Resolved MAX_WORKERS_PER_GPU=auto to $MAX_WORKERS_PER_GPU; NUM_JOBS=$NUM_JOBS"
 else
+    MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU_REQUESTED"
     NUM_JOBS="${NUM_JOBS-$(( GPUS * MAX_WORKERS_PER_GPU ))}"
 fi
-echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU)"
+echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU; requested=$MAX_WORKERS_PER_GPU_REQUESTED)"
 # Recycle after a bounded number of tasks so compile is still amortized
 # but leaks / descriptor creep / orphaned-runtime state cannot accumulate
 # indefinitely inside one worker. Override with MAX_TASKS_PER_WORKER.
@@ -253,7 +275,16 @@ USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-1}"
 CACHE_ARGS=()
 if [ "$USE_ENCODING_CACHE" = "1" ]; then
-    CACHE_ARGS=(--use-encoding-cache)
+    # Place the encoding cache OUTSIDE $MHCFLURRY_OUT so it
+    #   (a) doesn't ride back on the post-run rsync (~7 GB of mmap
+    #       BLOSUM62 we can rebuild locally in seconds), and
+    #   (b) persists across runs on the same box — the second run on a
+    #       reused instance hits a warm cache.
+    # Override with MHCFLURRY_ENCODING_CACHE_DIR=/path/to/dir.
+    ENCODING_CACHE_DIR="${MHCFLURRY_ENCODING_CACHE_DIR:-$HOME/runplz-cache/encoding_cache}"
+    mkdir -p "$ENCODING_CACHE_DIR"
+    CACHE_ARGS=(--use-encoding-cache --encoding-cache-dir "$ENCODING_CACHE_DIR")
+    log_release_event phase_info "encoding cache dir: $ENCODING_CACHE_DIR"
 fi
 
 # Auto-configure OMP / MKL / OPENBLAS thread budget uniformly based on
@@ -262,7 +293,7 @@ fi
 # script; the helper respects manual settings.
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/set_cpu_threads.sh"
-GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
+NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
     DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
 
 # ---- data ------------------------------------------------------------

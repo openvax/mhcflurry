@@ -82,6 +82,50 @@ def normalize_allele_name(
     return result.restrict_allele_fields(2).to_string()
 
 
+def filter_canonicalizable_alleles(alleles, log_label="alleles"):
+    """Drop alleles that ``normalize_allele_name`` refuses to canonicalize.
+
+    ``predictor.supported_alleles`` (and any user-supplied
+    ``--alleles-file``) can contain pseudogenes / null alleles /
+    questionable annotations — those are real entries in the public
+    ``allele_sequences.csv`` (which aims to be exhaustive), but
+    ``predict_to_dataframe`` raises on them mid-iteration. Filter
+    once up front so iteration doesn't crash partway through, and
+    log the dropped sample so the missing rows in the resulting
+    output table are explainable.
+
+    A local memo keeps the per-allele ``normalize_allele_name`` cost
+    bounded — the predictor's allele set is ~20K entries and
+    mhcgnomes' parse is millisecond-scale, so without caching this
+    pre-pass alone would add ~20 sec of single-threaded startup.
+    """
+    seen = {}
+
+    def _ok(allele):
+        if allele not in seen:
+            try:
+                normalize_allele_name(allele)
+                seen[allele] = True
+            except (ValueError, TypeError):
+                seen[allele] = False
+        return seen[allele]
+
+    filtered = []
+    dropped = []
+    for a in alleles:
+        (filtered if _ok(a) else dropped).append(a)
+    if dropped:
+        sample = ", ".join(dropped[:5]) + (
+            ", ..." if len(dropped) > 5 else ""
+        )
+        print(
+            "Skipping %d %s that fail canonicalization "
+            "(pseudogene/null/questionable): %s"
+            % (len(dropped), log_label, sample)
+        )
+    return filtered
+
+
 _pytorch_backend = "auto"
 _PYTORCH_BACKEND_ALIASES = {
     "default": "auto",

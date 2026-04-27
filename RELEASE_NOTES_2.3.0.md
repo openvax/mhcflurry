@@ -12,6 +12,11 @@ the patience-reset noise tail, and the post-training pipeline
 (select → calibrate → eval → plot) is unified into a single
 resumable script. Calibration is ~10–20× faster.
 
+The orchestrator-as-locus-of-control architecture is documented in
+[docs/orchestrator.md](docs/orchestrator.md) — read that for the
+"who owns what" picture across parallelism, shared memory, and env
+knobs.
+
 No changes to the prediction interface. **Saved 2.2.x model bundles
 load and predict identically — the changes are entirely in how new
 models are trained.**
@@ -54,7 +59,8 @@ validation run completes.
 | `max_epochs` | 5000 | 500 | Median observed was 67; max 174. The 5000 ceiling was theatrical and let pathological patience-reset tasks burn unbounded compute. 500 leaves comfortable headroom. |
 | `min_delta` | 0.0 | 1e-7 | With `min_delta=0`, a 1e-9 RMSprop noise-floor improvement resets the 20-epoch patience counter, stretching some tasks to 174+ epochs at val_loss ~0.28 with no real signal. 1e-7 is two orders of magnitude above the observed noise rate; preserves real escape trajectories (typically ≥1e-3/epoch). |
 | `validation_interval` | 1 (always validated) | 5 | Skip the validation forward pass on 4 of 5 epochs; saves ~150 ms/epoch + a GPU sync barrier. The final epoch and any patience-trigger epoch are always measured (the saved model reflects an up-to-date val_loss). |
-| `dataloader_num_workers` (job-env default) | 0 | 4 | Was 0 because spawn workers OOM'd on the 600 MB per-fit dataset. Layer-2 SHM eliminated that cost; auto-enables when `dataloader_num_workers > 0`. |
+| `dataloader_num_workers` (job-env default) | 0 | 1 | Was 0 because spawn workers OOM'd on the 600 MB per-fit dataset. Layer-2 SHM eliminated that cost; auto-enables when `dataloader_num_workers > 0`. One worker per fit is the release wrapper default; tune upward only when CPU headroom and measurements justify it. |
+| `peptide_amino_acid_encoding_torch` | n/a | `true` | Renamed replacement for the legacy `peptide_amino_acid_encoding_gpu` key, which is still accepted as an alias. Fixed peptide vector expansion moves from a numpy lookup at encode time to a frozen torch embedding table in the network's forward pass. `peptides_to_network_input` now returns int8 amino-acid indices by default; CUDA/MPS/CPU widens to the configured fixed vector encoding (`BLOSUM62`, `one-hot`, `PMBEC`, `contact`, `physchem` explicit descriptors, `atchley` factors, or composites such as `BLOSUM62+physchem`). Encodings may use a `:minmax` suffix, e.g. `PMBEC:minmax+contact:minmax`, to scale non-X values to [-1, 1] while preserving X as zero. Eliminates the ~17 sec/epoch CPU bottleneck in random-negative regeneration with `random_negative_pool_epochs=1`. Forward parity vs numpy path verified by `test_peptide_amino_acid_encoding_torch_forward_parity`. |
 
 `patience` stays at 20.
 
@@ -63,10 +69,11 @@ validation run completes.
 - **`mhcflurry-class1-train-pan-allele-models --max-workers-per-gpu`**
   default changed from `1000` (effectively unlimited per-GPU) to
   `auto`. Auto-detect picks `min(num_jobs/num_gpus,
-  0.6×free_vram/8GB, hard_cap=4)`.
+  0.6×free_vram/16GB, hard_cap=4)` without importing torch or
+  initializing CUDA in the parent process.
 
   Cross-checks: 8×A100-80GB + 16 jobs → 2 (matches old production
-  setting); 8×A100-40GB + 16 jobs → 2; 1×A100-80GB + 8 jobs → 4;
+  setting); 8×A100-40GB + 16 jobs → 1; 1×A100-80GB + 8 jobs → 3;
   CPU-only → 1.
 
   `MAX_WORKERS_PER_GPU=N` env var still pins explicitly.
@@ -112,6 +119,46 @@ real measurement:
 2. on the final epoch of the loop,
 3. when patience would trigger this epoch (so the saved val_loss
    reflects the actual stop state, not a stale carried-forward value).
+
+### Encoding cache lives outside `MHCFLURRY_OUT`
+
+`scripts/training/pan_allele_release_exact.sh` now places the
+encoding cache at `$HOME/runplz-cache/encoding_cache/` (override
+with `MHCFLURRY_ENCODING_CACHE_DIR`) instead of inside
+`$MHCFLURRY_OUT`. Two upsides: the ~7 GB fixed-encoding mmap doesn't ride
+back on the post-run rsync, and the cache persists on the box so a
+second run on the same instance hits a warm cache.
+
+A new helper, `scripts/dev/relocate_run_outputs.sh`, moves
+`brev_runs/` and `results/` outside the repo (with symlinks) so
+runplz's rsync_up doesn't ship 15+ GB of stale prior-run artifacts
+to the box on every launch. Run with `--apply` once per workstation.
+
+### Layer-2 SHM auto-detects /dev/shm capacity
+
+When the orchestrator detects insufficient `/dev/shm` for
+`num_workers × ~4 GB/fit × 1.5 margin`, it now follows a four-layer
+recovery cascade:
+
+1. Print a one-line capacity summary every run.
+2. **Try torch's `file_descriptor` sharing strategy first** — this
+   bypasses `/dev/shm` entirely (anonymous FDs over Unix sockets) and
+   fully recovers Layer-2 SHM throughput on Docker-default 8 GB
+   tmpfs. Auto-bumps `RLIMIT_NOFILE`. Disable with
+   `MHCFLURRY_TORCH_SHM_AUTO=0`.
+3. If the strategy switch fails (rare; some platforms only ship the
+   default `file_system` strategy), auto-disable Layer-2 SHM
+   (`MHCFLURRY_FIT_DATALOADER_SHM=0`) and continue with the numpy
+   DataLoader path (10–30% slower but functional).
+4. As a final defense, `fit()` catches resource-exhaustion errors from
+   torch tensor sharing and DataLoader setup (including FD exhaustion
+   sandbox/permission failures and torch RuntimeError variants) and
+   falls back to numpy / single-process mode for that one fit() call.
+
+Result: on the Docker-default 8 GB `/dev/shm` the typical 16-worker
+pan-allele run now keeps the full Layer-2 SHM speedup automatically;
+no container reprovisioning needed. Force-pin with
+`MHCFLURRY_FIT_DATALOADER_SHM=1` to override the auto-recovery.
 
 ### Layered SHM is auto-on with workers
 
