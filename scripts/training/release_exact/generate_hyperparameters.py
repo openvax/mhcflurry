@@ -72,8 +72,8 @@ base_hyperparameters = {
     # bottleneck in random-negative regeneration (with
     # random_negative_pool_epochs=1 the CPU encoding fires every epoch).
     # Forward parity vs numpy path verified by
-    # ``test_peptide_amino_acid_encoding_gpu_forward_parity``.
-    'peptide_amino_acid_encoding_gpu': True,
+    # ``test_peptide_amino_acid_encoding_torch_forward_parity``.
+    'peptide_amino_acid_encoding_torch': True,
     'peptide_allele_merge_activation': '',
     'peptide_allele_merge_method': 'concatenate',
     'peptide_amino_acid_encoding': 'BLOSUM62',

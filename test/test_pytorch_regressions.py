@@ -393,7 +393,7 @@ def test_validation_split_is_fixed_when_lr_zero():
 
 
 def test_dropout_probability_is_keep_prob():
-    nn = Class1NeuralNetwork()
+    nn = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
     peptide_shape = nn.peptides_to_network_input([]).shape[1:]
     model = Class1NeuralNetworkModel(
         peptide_encoding_shape=peptide_shape,
@@ -405,7 +405,7 @@ def test_dropout_probability_is_keep_prob():
 
 
 def test_batch_norm_uses_keras_defaults():
-    nn = Class1NeuralNetwork()
+    nn = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
     peptide_shape = nn.peptides_to_network_input([]).shape[1:]
     model = Class1NeuralNetworkModel(
         peptide_encoding_shape=peptide_shape,
@@ -1117,9 +1117,12 @@ def test_old_model_config_loads_with_new_features_added():
     # Legacy-renamed key dropped, not raised:
     assert "peptide_amino_acid_encoding" not in net.hyperparameters
 
-    # Atomic encoding still produces the expected shape.
+    # Atomic encoding now uses the torch-side lookup by default, so peptide
+    # network input is compact integer indices while the network itself still
+    # expands to BLOSUM62 vectors internally.
+    assert net.uses_peptide_torch_encoding()
     peptide_shape = net.peptides_to_network_input(["SIINFEKL"]).shape
-    assert peptide_shape == (1, 15, 21), f"got {peptide_shape}"
+    assert peptide_shape == (1, 15), f"got {peptide_shape}"
 
 
 def test_min_delta_not_silently_dropped_on_load():

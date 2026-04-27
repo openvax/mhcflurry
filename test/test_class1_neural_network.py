@@ -345,9 +345,10 @@ def test_split_forward_matches_full_forward():
         "contact",
         "BLOSUM62+physchem",
         "PMBEC+contact",
+        "PMBEC:minmax+contact:minmax",
     ],
 )
-def test_peptide_amino_acid_encoding_gpu_forward_parity(encoding_name):
+def test_peptide_amino_acid_encoding_torch_forward_parity(encoding_name):
     """Torch-side fixed peptide encoding must match CPU-side encoding.
 
     With weights fixed and identical between a legacy (BLOSUM-encoded
@@ -379,8 +380,11 @@ def test_peptide_amino_acid_encoding_gpu_forward_parity(encoding_name):
 
     peptides = random_peptides(16, length=9)
 
-    # Legacy path (flag off) — peptides encoded as (N, L, V) vectors.
-    legacy = Class1NeuralNetwork(**base_hparams)
+    # Legacy path (flag off) — peptides encoded as (N, L, V) numpy vectors.
+    legacy = Class1NeuralNetwork(
+        peptide_amino_acid_encoding_torch=False,
+        **base_hparams
+    )
     legacy._network = legacy.make_network(
         allele_representations=None,
         **legacy.network_hyperparameter_defaults.subselect(legacy.hyperparameters),
@@ -389,8 +393,8 @@ def test_peptide_amino_acid_encoding_gpu_forward_parity(encoding_name):
     assert legacy_input.ndim == 3
     assert legacy_input.shape[-1] == get_vector_encoding_df(encoding_name).shape[1]
 
-    # On-device path (flag on) — peptides encoded as (N, L) int indices.
-    onpath = Class1NeuralNetwork(peptide_amino_acid_encoding_gpu=True, **base_hparams)
+    # Torch path (default) — peptides encoded as (N, L) int indices.
+    onpath = Class1NeuralNetwork(**base_hparams)
     onpath._network = onpath.make_network(
         allele_representations=None,
         **onpath.network_hyperparameter_defaults.subselect(onpath.hyperparameters),
@@ -435,10 +439,12 @@ def test_peptide_torch_encoding_preserves_index_encoding_options():
         "allow_unsupported_amino_acids": True,
     }
     peptides = ["ACDZFGH"]
-    legacy = Class1NeuralNetwork(peptide_encoding=base_encoding)
+    legacy = Class1NeuralNetwork(
+        peptide_encoding=base_encoding,
+        peptide_amino_acid_encoding_torch=False,
+    )
     onpath = Class1NeuralNetwork(
         peptide_encoding=base_encoding,
-        peptide_amino_acid_encoding_gpu=True,
     )
 
     legacy_input = legacy.peptides_to_network_input(peptides)
@@ -447,6 +453,45 @@ def test_peptide_torch_encoding_preserves_index_encoding_options():
     expanded = table[onpath_indices]
 
     testing.assert_allclose(legacy_input, expanded)
+
+
+def test_peptide_amino_acid_encoding_torch_default_and_legacy_alias():
+    encoding = {
+        "vector_encoding_name": "BLOSUM62",
+        "alignment_method": "pad_middle",
+        "left_edge": 4,
+        "right_edge": 4,
+        "max_length": 15,
+    }
+    default = Class1NeuralNetwork(peptide_encoding=encoding)
+    assert default.uses_peptide_torch_encoding()
+    assert default.peptides_to_network_input(["SIINFEKL"]).shape == (1, 15)
+
+    explicit_cpu_torch = Class1NeuralNetwork(
+        peptide_encoding=encoding,
+        peptide_amino_acid_encoding_torch="cpu",
+    )
+    assert explicit_cpu_torch.uses_peptide_torch_encoding()
+    assert explicit_cpu_torch.peptides_to_network_input(["SIINFEKL"]).shape == (
+        1, 15,
+    )
+
+    explicit_numpy = Class1NeuralNetwork(
+        peptide_encoding=encoding,
+        peptide_amino_acid_encoding_torch=False,
+    )
+    assert not explicit_numpy.uses_peptide_torch_encoding()
+    assert explicit_numpy.peptides_to_network_input(["SIINFEKL"]).shape == (
+        1, 15, 21,
+    )
+
+    legacy_alias = Class1NeuralNetwork(
+        peptide_encoding=encoding,
+        peptide_amino_acid_encoding_gpu=False,
+    )
+    assert not legacy_alias.uses_peptide_torch_encoding()
+    assert "peptide_amino_acid_encoding_gpu" not in legacy_alias.hyperparameters
+    assert legacy_alias.hyperparameters["peptide_amino_acid_encoding_torch"] is False
 
 
 def test_serialization():

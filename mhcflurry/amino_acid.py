@@ -288,6 +288,30 @@ ENCODING_DATA_FRAMES = {
     "atchley": ATCHLEY_FACTORS,
 }
 _COMPOSITE_ENCODING_DATA_FRAMES = {}
+_NORMALIZED_ENCODING_DATA_FRAMES = {}
+
+
+def _minmax_scaled_encoding(df):
+    """
+    Scale non-X encoding values to [-1, 1], preserving X as all zeros.
+    """
+    result = df.astype("float32").copy()
+    common_rows = list(COMMON_AMINO_ACIDS)
+    value_columns = [column for column in result.columns if column != "X"]
+    values = result.loc[common_rows, value_columns].values
+    min_value = float(values.min())
+    max_value = float(values.max())
+    if max_value == min_value:
+        result.loc[common_rows, value_columns] = 0.0
+    else:
+        result.loc[common_rows, value_columns] = (
+            2.0 * (values - min_value) / (max_value - min_value) - 1.0
+        )
+    if "X" in result.index:
+        result.loc["X"] = 0.0
+    if "X" in result.columns:
+        result["X"] = 0.0
+    return result.astype("float32")
 
 
 def get_vector_encoding_df(name):
@@ -297,32 +321,45 @@ def get_vector_encoding_df(name):
     ``name`` may be a base encoding such as ``"BLOSUM62"``, ``"PMBEC"``,
     ``"contact"``, ``"physchem"``, or ``"atchley"``. The aliases
     ``"simons1999-contact"`` and the AAindex id ``"SIMK990103"`` both refer
-    to ``"contact"``. ``+``-joined composites such as
-    ``"BLOSUM62+physchem"`` concatenate the component columns in order and
-    keep the same amino-acid row order.
+    to ``"contact"``. A component may use the ``":minmax"`` suffix to scale
+    its non-X values to [-1, 1] while keeping X neutral. ``+``-joined
+    composites such as ``"BLOSUM62+physchem"`` concatenate the component
+    columns in order and keep the same amino-acid row order.
     """
     if name in ENCODING_DATA_FRAMES:
         return ENCODING_DATA_FRAMES[name]
-    if not isinstance(name, str) or "+" not in name:
+    if not isinstance(name, str):
         raise KeyError(name)
-    if name not in _COMPOSITE_ENCODING_DATA_FRAMES:
-        parts = [part.strip() for part in name.split("+") if part.strip()]
-        if len(parts) < 2:
-            raise KeyError(name)
-        frames = [
-            get_vector_encoding_df(part).loc[AMINO_ACIDS].add_prefix(
-                "%s:" % part
+    if "+" in name:
+        if name not in _COMPOSITE_ENCODING_DATA_FRAMES:
+            parts = [part.strip() for part in name.split("+") if part.strip()]
+            if len(parts) < 2:
+                raise KeyError(name)
+            frames = [
+                get_vector_encoding_df(part).loc[AMINO_ACIDS].add_prefix(
+                    "%s:" % part
+                )
+                for part in parts
+            ]
+            composite = pandas.concat(
+                frames,
+                axis=1,
             )
-            for part in parts
-        ]
-        composite = pandas.concat(
-            frames,
-            axis=1,
-        )
-        if any(frame.values.dtype.kind == "f" for frame in frames):
-            composite = composite.astype("float32")
-        _COMPOSITE_ENCODING_DATA_FRAMES[name] = composite
-    return _COMPOSITE_ENCODING_DATA_FRAMES[name]
+            if any(frame.values.dtype.kind == "f" for frame in frames):
+                composite = composite.astype("float32")
+            _COMPOSITE_ENCODING_DATA_FRAMES[name] = composite
+        return _COMPOSITE_ENCODING_DATA_FRAMES[name]
+
+    if ":" in name:
+        base_name, modifier = name.rsplit(":", 1)
+        if modifier == "minmax" and base_name:
+            if name not in _NORMALIZED_ENCODING_DATA_FRAMES:
+                _NORMALIZED_ENCODING_DATA_FRAMES[name] = _minmax_scaled_encoding(
+                    get_vector_encoding_df(base_name)
+                )
+            return _NORMALIZED_ENCODING_DATA_FRAMES[name]
+
+    raise KeyError(name)
 
 
 def available_vector_encodings():
@@ -330,7 +367,8 @@ def available_vector_encodings():
     Return list of registered amino acid vector encodings.
 
     ``get_vector_encoding_df`` also accepts ``+``-joined composites of
-    these names, for example ``"BLOSUM62+physchem"``.
+    these names and the ``:minmax`` suffix, for example
+    ``"BLOSUM62+PMBEC:minmax"``.
 
     Returns
     -------

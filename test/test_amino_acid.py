@@ -126,6 +126,21 @@ def test_substitution_matrix_encodings_extend_unknown():
     assert composite.shape == (21, 42)
     assert amino_acid.vector_encoding_length("PMBEC+contact") == 42
 
+    pmbec_minmax = amino_acid.get_vector_encoding_df("PMBEC:minmax")
+    common = list(amino_acid.COMMON_AMINO_ACIDS)
+    pmbec_minmax_common = pmbec_minmax.loc[common, common].values
+    assert pmbec_minmax.shape == pmbec.shape
+    assert pmbec_minmax_common.min() == numpy.float32(-1.0)
+    assert pmbec_minmax_common.max() == numpy.float32(1.0)
+    assert_equal(pmbec_minmax.loc["X"].values, [0.0] * 21)
+    assert_equal(pmbec_minmax["X"].values, [0.0] * 21)
+
+    normalized_composite = amino_acid.get_vector_encoding_df(
+        "PMBEC:minmax+contact:minmax")
+    assert normalized_composite.shape == (21, 42)
+    assert amino_acid.vector_encoding_length(
+        "PMBEC:minmax+contact:minmax") == 42
+
 
 def test_index_encoding_no_downcast_futurewarning():
     with warnings.catch_warnings():

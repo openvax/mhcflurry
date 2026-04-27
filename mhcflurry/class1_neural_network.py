@@ -773,6 +773,7 @@ _DEVICE_PEPTIDE_ENCODING_TRUE_VALUES = {
     "yes",
     "on",
     "auto",
+    "cpu",
     "device",
     "torch",
     "gpu",
@@ -783,7 +784,6 @@ _DEVICE_PEPTIDE_ENCODING_FALSE_VALUES = {
     "false",
     "no",
     "off",
-    "cpu",
     "numpy",
     "legacy",
 }
@@ -792,14 +792,15 @@ _DEVICE_PEPTIDE_ENCODING_FALSE_VALUES = {
 def _peptide_torch_encoding_name(hyperparameters):
     """Return the fixed amino-acid encoding to materialize in torch.
 
-    ``peptide_amino_acid_encoding_gpu`` is the historical flag name, but
-    the implementation is device-agnostic: CUDA, MPS, and CPU all use the
-    same frozen ``torch.nn.functional.embedding`` table once enabled. The
-    table comes from ``amino_acid.get_vector_encoding_df`` and is registered
-    as a non-persistent buffer, so it moves with ``.to(device)`` but never
-    trains or bloats the custom NPZ weight list.
+    ``peptide_amino_acid_encoding_torch`` controls whether peptide amino-acid
+    indices are widened to fixed vectors in torch. The implementation is
+    device-agnostic: CUDA, MPS, and CPU all use the same frozen
+    ``torch.nn.functional.embedding`` table once enabled. The table comes
+    from ``amino_acid.get_vector_encoding_df`` and is registered as a
+    non-persistent buffer, so it moves with ``.to(device)`` but never trains
+    or bloats the custom NPZ weight list.
     """
-    mode = hyperparameters.get("peptide_amino_acid_encoding_gpu", False)
+    mode = hyperparameters.get("peptide_amino_acid_encoding_torch", True)
     if isinstance(mode, str):
         mode_normalized = mode.strip().lower()
         if mode_normalized in _DEVICE_PEPTIDE_ENCODING_FALSE_VALUES:
@@ -811,7 +812,7 @@ def _peptide_torch_encoding_name(hyperparameters):
             pass
         if mode_normalized not in _DEVICE_PEPTIDE_ENCODING_TRUE_VALUES:
             raise ValueError(
-                "Unsupported peptide_amino_acid_encoding_gpu value %r. "
+                "Unsupported peptide_amino_acid_encoding_torch value %r. "
                 "Expected bool, a true/false string, or one of %s."
                 % (mode, sorted(amino_acid.ENCODING_DATA_FRAMES))
             )
@@ -824,7 +825,7 @@ def _peptide_torch_encoding_name(hyperparameters):
         amino_acid.get_vector_encoding_df(encoding_name)
     except KeyError:
         raise ValueError(
-            "peptide_amino_acid_encoding_gpu requires a fixed peptide "
+            "peptide_amino_acid_encoding_torch requires a fixed peptide "
             "vector encoding with a torch lookup table; got %r. Available: %s"
             % (encoding_name, sorted(amino_acid.ENCODING_DATA_FRAMES))
         ) from None
@@ -2494,9 +2495,8 @@ class Class1NeuralNetwork(object):
         # Feed the network (N, L) int amino-acid indices and widen to the
         # configured fixed vector encoding through a frozen torch embedding
         # table on the active device, instead of shipping the (N, L, V)
-        # vector tensor from numpy. False (default) preserves the legacy
-        # vector-encoding path.
-        peptide_amino_acid_encoding_gpu=False,
+        # vector tensor from numpy. Disable only for legacy byte-level tests.
+        peptide_amino_acid_encoding_torch=True,
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -2611,6 +2611,7 @@ class Class1NeuralNetwork(object):
         "embedding_input_dim": None,
         "embedding_output_dim": None,
         "embedding_init_method": None,
+        "peptide_amino_acid_encoding_gpu": "peptide_amino_acid_encoding_torch",
         "left_edge": None,
         "right_edge": None,
     }
@@ -2633,6 +2634,13 @@ class Class1NeuralNetwork(object):
             if from_name in hyperparameters:
                 value = hyperparameters.pop(from_name)
                 if to_name:
+                    if (to_name in hyperparameters
+                            and hyperparameters[to_name] != value):
+                        raise ValueError(
+                            "Conflicting values for renamed hyperparameter "
+                            "%s=%r and %s=%r"
+                            % (from_name, value, to_name, hyperparameters[to_name])
+                        )
                     hyperparameters[to_name] = value
         return hyperparameters
 
@@ -2862,6 +2870,10 @@ class Class1NeuralNetwork(object):
                     merged[key] = hyperparameters[key]
             hyperparameters = merged
 
+        hyperparameters = cls.hyperparameter_defaults.with_defaults(
+            cls.apply_hyperparameter_renames(dict(hyperparameters))
+        )
+
         # Create a temporary instance to get encoding shape
         temp = cls(**hyperparameters)
         peptide_encoding_shape = temp.peptides_to_network_input([]).shape[1:]
@@ -2955,6 +2967,9 @@ class Class1NeuralNetwork(object):
         if instance_hyperparameters:
             base_hyperparameters = dict(instance_hyperparameters)
             base_hyperparameters.update(config.get('hyperparameters', {}))
+        base_hyperparameters = cls.hyperparameter_defaults.with_defaults(
+            cls.apply_hyperparameter_renames(dict(base_hyperparameters))
+        )
         temp = cls(**base_hyperparameters)
         peptide_encoding_shape = temp.peptides_to_network_input([]).shape[1:]
         peptide_torch_encoding_name = _peptide_torch_encoding_name(
@@ -3279,11 +3294,11 @@ class Class1NeuralNetwork(object):
         Encode peptides to the fixed-length encoding expected by the neural
         network (which depends on the architecture).
 
-        When ``peptide_amino_acid_encoding_gpu`` is enabled (historical
-        flag name), the returned array is (N, L) int8 amino-acid indices
-        and the network widens it to the configured fixed vector encoding
-        on the active torch device. Otherwise the returned array is the
-        traditional (N, L, V) vector encoding.
+        When ``peptide_amino_acid_encoding_torch`` is enabled, the returned
+        array is (N, L) int8 amino-acid indices and the network widens it to
+        the configured fixed vector encoding on the active torch device.
+        Otherwise the returned array is the traditional (N, L, V) numpy
+        vector encoding.
 
         Parameters
         ----------
@@ -3498,10 +3513,11 @@ class Class1NeuralNetwork(object):
         # validation sets that's tens of ms/epoch of pure wasted bandwidth.
         # Hoist the copy to happen once before the epoch loop.
         #
-        # ``.to(device).float()`` (GPU-side widening cast; see Phase 4a
+        # ``.to(device).float()`` (device-side widening cast; see Phase 4a
         # of #268): when the encoding cache stores int8 (fixed-encoding native
-        # width), H2D transfer is 4× smaller; widening to fp32 on GPU is
-        # essentially free. For fp32-native encodings it's a no-op.
+        # width), host-to-device transfer is 4× smaller; widening to fp32 on
+        # the active device is essentially free. For fp32-native encodings
+        # it's a no-op.
         # 2D int → index-encoded; keep dtype intact so the embedding lookup
         # inside forward() sees int indices. 3D int is the compact
         # vector-encoded cache payload; widen as before.
@@ -4919,14 +4935,17 @@ class Class1NeuralNetwork(object):
             topology,
             num_outputs=1,
             allele_representations=None,
-            peptide_amino_acid_encoding_gpu=False):
+            peptide_amino_acid_encoding_torch=True,
+            peptide_amino_acid_encoding_gpu=None):
         """
         Helper function to make a PyTorch network for class 1 affinity prediction.
         """
+        if peptide_amino_acid_encoding_gpu is not None:
+            peptide_amino_acid_encoding_torch = peptide_amino_acid_encoding_gpu
         hyperparameters = dict(self.hyperparameters)
         hyperparameters["peptide_encoding"] = peptide_encoding
-        hyperparameters["peptide_amino_acid_encoding_gpu"] = (
-            peptide_amino_acid_encoding_gpu
+        hyperparameters["peptide_amino_acid_encoding_torch"] = (
+            peptide_amino_acid_encoding_torch
         )
         peptide_torch_encoding_name = _peptide_torch_encoding_name(hyperparameters)
         if peptide_torch_encoding_name:

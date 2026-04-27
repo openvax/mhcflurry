@@ -287,7 +287,7 @@ class TestWeightInitialization:
             Class1NeuralNetwork,
             Class1NeuralNetworkModel,
         )
-        nn_obj = Class1NeuralNetwork()
+        nn_obj = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
         peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
         return Class1NeuralNetworkModel(
             peptide_encoding_shape=peptide_shape,
@@ -328,7 +328,7 @@ class TestMergedClass1NeuralNetwork:
             Class1NeuralNetworkModel,
             MergedClass1NeuralNetwork,
         )
-        nn_obj = Class1NeuralNetwork()
+        nn_obj = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
         peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
         torch.manual_seed(0)
         networks = []
@@ -393,7 +393,7 @@ class TestSkipConnectionsTopology:
             Class1NeuralNetwork,
             Class1NeuralNetworkModel,
         )
-        nn_obj = Class1NeuralNetwork()
+        nn_obj = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
         peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
         torch.manual_seed(7)
         model = Class1NeuralNetworkModel(
@@ -410,7 +410,7 @@ class TestSkipConnectionsTopology:
             Class1NeuralNetwork,
             Class1NeuralNetworkModel,
         )
-        nn_obj = Class1NeuralNetwork()
+        nn_obj = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
         peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
 
         torch.manual_seed(99)

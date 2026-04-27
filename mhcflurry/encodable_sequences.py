@@ -143,7 +143,9 @@ class EncodableSequences(object):
             How to represent amino acids. Registered names include
             "BLOSUM62", "one-hot", "PMBEC", "contact", "physchem", and
             "atchley"; ``+``-joined composites such as
-            "BLOSUM62+physchem" are also accepted.
+            "BLOSUM62+physchem" are also accepted. Add the ``:minmax``
+            suffix to a component to scale its non-X values to [-1, 1],
+            for example "PMBEC:minmax+contact:minmax".
         alignment_method : string
             One of "pad_middle" or "left_pad_right_pad"
         left_edge : int
