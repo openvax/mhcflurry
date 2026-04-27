@@ -1222,9 +1222,10 @@ def _make_fit_dataloader(
 
     ``num_workers=0`` path runs everything in the main process.
     ``num_workers>0`` spawns worker processes (via 'spawn' to avoid
-    CUDA-context-fork hazards) that prefetch numpy minibatches, overlapping
-    CPU slicing with GPU compute while avoiding PyTorch CPU tensor allocator
-    growth in the workers.
+    CUDA-context-fork hazards) that prefetch minibatches, overlapping CPU
+    slicing with GPU compute. When the dataset is tensor-backed this uses
+    shared-memory tensors plus pinned batches; otherwise it stays on the
+    numpy-backed fallback path.
 
     ``drop_last=True`` makes every yielded batch exactly ``batch_size``
     rows. This is what torch.compile (Phase 4c scope) and bf16 autocast
