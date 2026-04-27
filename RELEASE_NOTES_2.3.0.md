@@ -60,6 +60,7 @@ validation run completes.
 | `min_delta` | 0.0 | 1e-7 | With `min_delta=0`, a 1e-9 RMSprop noise-floor improvement resets the 20-epoch patience counter, stretching some tasks to 174+ epochs at val_loss ~0.28 with no real signal. 1e-7 is two orders of magnitude above the observed noise rate; preserves real escape trajectories (typically ≥1e-3/epoch). |
 | `validation_interval` | 1 (always validated) | 5 | Skip the validation forward pass on 4 of 5 epochs; saves ~150 ms/epoch + a GPU sync barrier. The final epoch and any patience-trigger epoch are always measured (the saved model reflects an up-to-date val_loss). |
 | `dataloader_num_workers` (job-env default) | 0 | 4 | Was 0 because spawn workers OOM'd on the 600 MB per-fit dataset. Layer-2 SHM eliminated that cost; auto-enables when `dataloader_num_workers > 0`. |
+| `peptide_amino_acid_encoding_gpu` | `false` | `true` | Phase 2 of #268. BLOSUM62 expansion moves from a numpy lookup at encode time to a frozen `nn.Embedding(21, 21)` in the network's forward pass. `peptides_to_network_input` now returns int8 indices (cheap dict lookup); GPU widens to fp32. Eliminates the ~17 sec/epoch CPU bottleneck in random-negative regeneration with `random_negative_pool_epochs=1`. Forward parity vs numpy path verified by `test_peptide_amino_acid_encoding_gpu_forward_parity`. |
 
 `patience` stays at 20.
 
