@@ -19,6 +19,8 @@ import os
 import pathlib
 import subprocess
 
+import pytest
+
 
 def test_hoist_helper_lives_in_local_parallelism():
     """``hoist_torchinductor_compile_threads`` belongs in the parallelism
@@ -289,12 +291,12 @@ def test_preflight_shm_respects_force_pinned_off(monkeypatch, capsys):
 
     monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 1.0)
     monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
-    monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "0")
+    monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "false")
 
     args = argparse.Namespace(num_jobs=16)
     cmd._preflight_shm_capacity(args)
     # User pinned off; orchestrator should leave it.
-    assert os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] == "0"
+    assert os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] == "false"
 
 
 def test_preflight_shm_warns_loud_on_force_pinned_on(monkeypatch, capsys):
@@ -303,14 +305,27 @@ def test_preflight_shm_warns_loud_on_force_pinned_on(monkeypatch, capsys):
 
     monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 1.0)
     monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
-    monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "1")
+    monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "yes")
 
     args = argparse.Namespace(num_jobs=16)
     cmd._preflight_shm_capacity(args)
     # User pinned on despite tight tmpfs — env unchanged but loud warn.
-    assert os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] == "1"
+    assert os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] == "yes"
     out = capsys.readouterr().out
     assert "WARNING" in out and "force-pinned" in out
+
+
+def test_preflight_shm_rejects_invalid_env_pin(monkeypatch):
+    from mhcflurry import train_pan_allele_models_command as cmd
+    from mhcflurry import local_parallelism as lp
+
+    monkeypatch.setattr(lp, "shm_free_gb", lambda *a, **k: 1.0)
+    monkeypatch.setattr(lp, "shm_total_gb", lambda *a, **k: 8.0)
+    monkeypatch.setenv("MHCFLURRY_FIT_DATALOADER_SHM", "maybe")
+
+    args = argparse.Namespace(num_jobs=16)
+    with pytest.raises(ValueError, match="MHCFLURRY_FIT_DATALOADER_SHM"):
+        cmd._preflight_shm_capacity(args)
 
 
 def test_preflight_shm_skipped_for_serial_run(monkeypatch):

@@ -59,6 +59,29 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # via shared memory.
 GLOBAL_DATA = {}
 
+_FIT_DATALOADER_SHM_TRUE_VALUES = {"1", "true", "yes", "on"}
+_FIT_DATALOADER_SHM_FALSE_VALUES = {"0", "false", "no", "off"}
+
+
+def _normalized_fit_dataloader_shm_env():
+    """Return normalized Layer-2 SHM env pin: ``"1"``, ``"0"``, or None."""
+    value = os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized in _FIT_DATALOADER_SHM_TRUE_VALUES:
+        return "1"
+    if normalized in _FIT_DATALOADER_SHM_FALSE_VALUES:
+        return "0"
+    raise ValueError(
+        "MHCFLURRY_FIT_DATALOADER_SHM must be one of %s or %s; got %r"
+        % (
+            sorted(_FIT_DATALOADER_SHM_TRUE_VALUES),
+            sorted(_FIT_DATALOADER_SHM_FALSE_VALUES),
+            value,
+        )
+    )
+
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
 # process. Model loading and inference should happen in worker processes.
@@ -1252,7 +1275,7 @@ def _preflight_shm_capacity(args):
     print(result["message"])
     if result["safe"]:
         return
-    pinned = os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
+    pinned = _normalized_fit_dataloader_shm_env()
     if pinned == "1":
         # User force-on. Escalate warning; respect their choice.
         print(

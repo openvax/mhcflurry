@@ -404,6 +404,49 @@ def test_fit_dataloader_backing_explicit_shared_tensor_with_no_workers(monkeypat
         assert last_info.get("fit_dataloader_backing") == "shared_tensor"
 
 
+def test_fit_shm_fallback_probes_before_priming_random_negatives(monkeypatch):
+    """Unavailable SHM should not pre-build random negatives before fallback."""
+    from mhcflurry import class1_neural_network as cnn
+
+    monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
+    monkeypatch.setattr(
+        cnn,
+        "torch_shared_memory_status",
+        lambda: {
+            "available": False,
+            "reason": "Operation not permitted",
+            "strategy": "file_system",
+            "strategies": ("file_system",),
+        },
+    )
+    calls = []
+    original = cnn.RandomNegativesPool.get_epoch_inputs
+
+    def counting_get_epoch_inputs(self, epoch):
+        calls.append(epoch)
+        return original(self, epoch)
+
+    monkeypatch.setattr(
+        cnn.RandomNegativesPool,
+        "get_epoch_inputs",
+        counting_get_epoch_inputs,
+    )
+
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    _seed_all(29)
+    model = _make_simple_affinity_model(
+        max_epochs=1,
+        random_negative_rate=1.0,
+        random_negative_constant=0,
+        fit_dataloader_backing="shared_tensor",
+    )
+    model.fit(peptides, affinities)
+
+    assert calls == [0]
+    assert model.fit_info[-1]["fit_dataloader_shm_enabled"] is False
+
+
 def test_fit_dataloader_backing_serializes_with_component_model():
     """Component model configs carry the explicit fit transport policy."""
     model = _make_simple_affinity_model(fit_dataloader_backing="shared-tensor")

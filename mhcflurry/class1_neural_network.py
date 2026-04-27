@@ -4367,11 +4367,6 @@ class Class1NeuralNetwork(object):
         )
         fit_info["fit_dataloader_backing_reason"] = fit_dataloader_backing_reason
         shm_enabled = fit_dataloader_backing == "shared_tensor"
-        random_neg_template = None
-        if shm_enabled and num_random_negatives > 0:
-            # Prime cycle 0 once so we know the encoding shape; the
-            # epoch loop reads the same cycle 0 below as a no-op.
-            _, random_neg_template = random_negatives_pool.get_epoch_inputs(0)
         if shm_enabled:
             shm_status = torch_shared_memory_status()
             if not shm_status["available"]:
@@ -4387,6 +4382,13 @@ class Class1NeuralNetwork(object):
                 )
                 shm_enabled = False
                 fit_dataloader_backing = "numpy"
+        random_neg_template = None
+        if shm_enabled and num_random_negatives > 0:
+            # Prime cycle 0 only after SHM has been probed. The buffer is
+            # needed to size the shared tensor; reuse it for epoch 0 below
+            # so shared-mmap permutation paths don't materialize the same
+            # random-negative slice twice.
+            _, random_neg_template = random_negatives_pool.get_epoch_inputs(0)
         if shm_enabled:
             try:
                 backing = FitBacking.share(
@@ -4414,6 +4416,7 @@ class Class1NeuralNetwork(object):
                 fit_info["fit_dataloader_shm_fallback_reason"] = str(exc)
                 shm_enabled = False
                 fit_dataloader_backing = "numpy"
+                random_neg_template = None
         if not shm_enabled:
             backing = FitBacking.from_numpy(
                 x_peptide=x_dict_without_random_negatives["peptide"],
@@ -4446,9 +4449,13 @@ class Class1NeuralNetwork(object):
             # epoch (legacy behavior). On pool_epochs=N the heavy
             # encoding pass runs once per N epochs; the in-epoch call
             # here is an O(1) array view.
-            _, random_negative_peptides_encoding = (
-                random_negatives_pool.get_epoch_inputs(epoch)
-            )
+            if epoch == 0 and random_neg_template is not None:
+                random_negative_peptides_encoding = random_neg_template
+                random_neg_template = None
+            else:
+                _, random_negative_peptides_encoding = (
+                    random_negatives_pool.get_epoch_inputs(epoch)
+                )
             if backing.tensor_backed:
                 # Refill the shared random-neg buffer in place. PyTorch's
                 # DataLoader joins workers when the previous epoch's
