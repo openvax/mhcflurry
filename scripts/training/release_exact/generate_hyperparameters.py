@@ -67,7 +67,8 @@ base_hyperparameters = {
     # ``peptides_to_network_input`` returns int8 indices (cheap dict
     # lookup) and torch widens to the configured fp32 vectors on CUDA,
     # MPS, or CPU via the embedding lookup. Works for BLOSUM62, one-hot,
-    # physchem, atchley, and +joined composites. Eliminates the ~17 sec/epoch CPU
+    # PMBEC, SIMK990103, physchem, atchley, and +joined composites.
+    # Eliminates the ~17 sec/epoch CPU
     # bottleneck in random-negative regeneration (with
     # random_negative_pool_epochs=1 the CPU encoding fires every epoch).
     # Forward parity vs numpy path verified by

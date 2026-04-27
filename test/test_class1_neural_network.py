@@ -337,7 +337,15 @@ def test_split_forward_matches_full_forward():
 
 @pytest.mark.parametrize(
     "encoding_name",
-    ["BLOSUM62", "one-hot", "physchem", "BLOSUM62+physchem"],
+    [
+        "BLOSUM62",
+        "one-hot",
+        "physchem",
+        "PMBEC",
+        "SIMK990103",
+        "BLOSUM62+physchem",
+        "PMBEC+SIMK990103",
+    ],
 )
 def test_peptide_amino_acid_encoding_gpu_forward_parity(encoding_name):
     """Torch-side fixed peptide encoding must match CPU-side encoding.
