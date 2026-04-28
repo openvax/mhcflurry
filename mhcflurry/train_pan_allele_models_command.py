@@ -28,6 +28,7 @@ from .class1_neural_network import Class1NeuralNetwork
 from .common import configure_logging, normalize_allele_name
 from .local_parallelism import (
     add_local_parallelism_args,
+    apply_dataloader_num_workers_to_work_items,
     call_wrapped_kwargs,
     configure_torch_sharing_strategy_for_capacity,
     estimate_fit_dataloader_shm_gb,
@@ -1383,6 +1384,16 @@ def train_models(args):
         # Cluster launchers do not use the local worker Pool, but the submitter
         # can still hoist compile-thread defaults into the worker environment.
         hoist_torchinductor_compile_threads(args)
+
+    # Apply the resolved --dataloader-num-workers (auto or pinned) to every
+    # work item's hyperparameters. The resolver in
+    # resolve_local_parallelism_args computed an int from box capacity;
+    # injecting it here means the saved component-model configs reflect
+    # the value the orchestrator actually chose for this run.
+    if getattr(args, "dataloader_num_workers", None) is not None:
+        apply_dataloader_num_workers_to_work_items(
+            all_work_items, int(args.dataloader_num_workers)
+        )
 
     # fit DataLoader SHM capacity pre-flight. With small /dev/shm (8 GB
     # Docker default) + many workers, share_memory_() will OOM mid-fit

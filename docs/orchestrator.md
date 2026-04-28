@@ -85,10 +85,11 @@ Two backends, one CLI surface:
   layers both work — workers inherit GLOBAL_DATA via fork, mmap pool
   paths are local-process-visible. `resolve_local_parallelism_args`
   is the single pre-fork normalization point: it resolves
-  `--max-workers-per-gpu=auto` without touching CUDA, caps local
-  `--num-jobs` to GPU capacity when auto was requested, and hoists
-  torch.compile's thread cap before the Pool forks. Explicit numeric
-  `--max-workers-per-gpu` keeps the historical CPU-overflow behavior.
+  `--max-workers-per-gpu=auto` and `--dataloader-num-workers=auto`
+  without touching CUDA, caps local `--num-jobs` to GPU capacity when
+  auto was requested, and hoists torch.compile's thread cap before the
+  Pool forks. Explicit numeric `--max-workers-per-gpu` keeps the
+  historical CPU-overflow behavior.
 - **Cluster** (`cluster_parallelism.py`): one job per work-item
   submitted via `bsub` / `sbatch` / `sh`. Workers serialize
   GLOBAL_DATA to NFS, deserialize on the worker side. The run mmap
@@ -122,6 +123,112 @@ yet have orchestrator-side run mmap cache prebuild. When their
 datasets grow to where prebuild matters, call `prebuild_encoding_caches`
 from the relevant `train_*_command` after
 `add_local_parallelism_args(...)`.
+
+## Auto-tuned parallelism knobs
+
+Three knobs auto-derive from the box's hardware so the orchestrator
+keeps working when the recipe lands on a different tier. Every auto
+resolver lives in `mhcflurry.local_parallelism` and is exercised by
+the unit-test matrix in `test/test_orchestrator_helpers.py`. The
+production recipes pass `auto` for each; pin a literal int only when
+intentionally re-benchmarking.
+
+### `--max-workers-per-gpu auto` → `auto_max_workers_per_gpu`
+
+Picks the per-GPU worker concurrency from `min(num_jobs / num_gpus,
+floor(0.6 × free_vram_gb / per_worker_gb), hard_cap=4)`. Free VRAM is
+read from `nvidia-smi` (no torch import — the parent process must not
+initialize CUDA before forking). Per-worker VRAM upper bound is
+conservative (16 GB) and tunable via
+`MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`.
+
+| Box | num_gpus | free_vram | resolved |
+|---|---|---|---|
+| 8×A100-80GB | 8 | ~80 GB | **2** |
+| 8×A100-40GB | 8 | ~40 GB | **1** |
+| 1×A100-80GB | 1 | ~80 GB | **2** |
+| CPU-only | 0 | — | **1** |
+
+### `--dataloader-num-workers auto` → `auto_dataloader_num_workers`
+
+Picks the per-fit-worker DataLoader prefetch child count from box
+capacity. Inputs: total vCPUs, total RAM in GB, the post-cap
+fit-worker count (`--num-jobs` resolved by
+`resolve_local_parallelism_args`), and a hard cap (default 4 — the
+empirical SM-scheduler-style wall, env-overridable via
+`MHCFLURRY_AUTO_DATALOADER_HARD_CAP`).
+
+Heuristic:
+
+1. `cpu_per_fit = vcpus // num_fit_workers`
+2. `cpu_cap = cpu_per_fit // 2` — each DL child needs ~2 effective
+   cores (1 for the main loop, 1 for queue/collate/copy).
+3. RAM cap (when `ram_gb` is provided): assume ~2 GB baseline per
+   fit-worker plus ~0.5 GB per DL child;
+   `ram_cap = max(0, (ram_gb / num_fit_workers - 2.0) / 0.5)`.
+4. Result: `min(hard_cap, cpu_cap, ram_cap)` clamped to ≥1, except
+   when any input cap is 0 (oversubscribed mains, RAM exhaustion, or
+   user override `MHCFLURRY_AUTO_DATALOADER_HARD_CAP=0`) in which case
+   the result is 0 — i.e. in-process batching, no children.
+5. Serial / no-fit-worker case: returns 0.
+
+Cross-checked configurations (see
+`test_auto_dataloader_num_workers_hardware_tiers`):
+
+| Box | vCPU | RAM | fit | resolved |
+|---|---|---|---|---|
+| 8×A100-80GB Verda | 176 | 400 G | 16 | **4** |
+| 8×A100-40GB | 176 | 400 G | 8 | 4 |
+| 8×L40S sweep box | 96 | 200 G | 16 | 3 |
+| Single A100-80G Lambda | 30 | 200 G | 2 | 4 |
+| Single A100-80G tight | 16 | 64 G | 2 | 4 |
+| Single T4 / RTX | 8 | 16 G | 1 | 4 |
+| Tight cluster node | 32 | 64 G | 16 | 1 |
+| Very tight (8v / 8fit) | 8 | 16 G | 8 | **0** |
+| RAM-starved (32G / 16fit) | 176 | 32 G | 16 | **0** |
+| Serial / CPU | — | — | 0 | **0** |
+
+**The heuristic is hardware-only by design** — `train_row_count` and
+`random_negative_rate` do not enter the formula. Per-batch CPU work is
+bounded by `minibatch_size`, not total dataset rows. Bigger data
+scales fit-time SHM bytes (handled by `estimate_fit_dataloader_shm_gb`)
+and per-epoch random-negative regeneration cost (handled by
+`random_negative_pool_epochs > 1` if you need it), but DL child count
+stays the same.
+
+### `--num-jobs` (deprecated default of 0)
+
+Today the recipe explicitly sets `--num-jobs $((GPUS * MAX_WORKERS_PER_GPU))`
+in the shell. `mhcflurry.local_parallelism.auto_num_jobs(num_gpus,
+max_workers_per_gpu)` is the in-Python equivalent for callers that
+want to derive it after `auto_max_workers_per_gpu` has resolved.
+
+### Cross-model coverage
+
+| Model | `--max-workers-per-gpu auto` | `--dataloader-num-workers auto` | Notes |
+|---|---|---|---|
+| Pan-allele affinity | ✓ | ✓ | Default in release recipe |
+| Allele-specific affinity | ✓ | ✓ | Same `Class1NeuralNetwork` codebase; auto already wired |
+| Processing | ✓ | (no-op for now) | `Class1ProcessingNeuralNetwork` does not yet expose `dataloader_num_workers`; flag is accepted via shared `add_local_parallelism_args` so argv stays uniform across train_*_command, but `apply_dataloader_num_workers_to_work_items` won't change processing behavior until that hyperparameter is added. |
+| Presentation | n/a | n/a | Single-process today |
+
+When processing's fit() grows the same prefetch hyperparameter, the
+orchestrator hookup is one line: call
+`apply_dataloader_num_workers_to_work_items` from
+`train_processing_models_command.run()` after
+`resolve_local_parallelism_args(args)`. The auto resolver itself is
+already model-agnostic.
+
+### Env overrides
+
+| Env var | Default | Effect |
+|---|---|---|
+| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB` | 16.0 | Per-worker VRAM upper bound for the MWPG resolver |
+| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP` | 4 | SM-scheduler ceiling for MWPG |
+| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB` | (auto-detect) | Pin free VRAM (CSV per GPU); for tests / hidden-`nvidia-smi` launchers |
+| `MHCFLURRY_AUTO_DATALOADER_HARD_CAP` | 4 | DL child cap for `auto_dataloader_num_workers` |
+| `MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB` | (live estimate) | Override per-fit SHM footprint constant for the capacity check |
+| `MHCFLURRY_FIT_DATALOADER_SHM` | unset | Force-pin fit DataLoader SHM on/off (`1`/`0`) regardless of preflight |
 
 ## Env knobs vs CLI flags
 

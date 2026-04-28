@@ -190,6 +190,241 @@ def test_set_cpu_threads_accepts_auto_when_num_jobs_is_provided():
     assert "total_workers=16" in result.stderr
 
 
+def test_auto_dataloader_num_workers_hardware_tiers():
+    """Cross-check the heuristic against the production hardware tiers.
+
+    These are the configs the recipe currently runs on or has been
+    measured against. Regressions here will silently change runtime
+    parallelism on the next run, so the table is fixed.
+    """
+    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+
+    cases = [
+        # (label, vcpus, ram_gb, num_fit_workers, expected)
+        ("Verda 8xA100-80GB", 176, 400, 16, 4),
+        ("8xA100-40GB (1 worker/GPU)", 176, 400, 8, 4),
+        ("8xL40S sweep box (96v)", 96, 200, 16, 3),
+        ("Single A100-80G Lambda (30v)", 30, 200, 2, 4),
+        ("Single A100-80G tight (16v)", 16, 64, 2, 4),
+        ("Single T4 / RTX (8v / 16G)", 8, 16, 1, 4),
+        ("Tight cluster node (32v / 16fit)", 32, 64, 16, 1),
+        # Edge cases that exercise the floors / caps:
+        ("Tiny cluster node (8v / 4fit)", 8, 16, 4, 1),
+        ("Very tight (8v / 8fit)", 8, 16, 8, 0),  # cpu_per_fit=1, cpu_cap=0 → 0
+        ("Serial run (no fit workers)", 64, 200, 0, 0),
+        ("Single-fit / generous", 64, 200, 1, 4),
+    ]
+    for label, vcpus, ram, fit, want in cases:
+        got = auto_dataloader_num_workers(
+            num_fit_workers=fit, vcpus=vcpus, ram_gb=ram
+        )
+        assert got == want, (
+            "%s: vcpus=%d ram_gb=%s fit=%d → got %d, want %d"
+            % (label, vcpus, ram, fit, got, want)
+        )
+
+
+def test_auto_dataloader_num_workers_ram_constrained():
+    """RAM-tight boxes step the dataloader count down or to zero.
+
+    Each DL child is ~500 MB RSS over the main fit-worker baseline (~2 GB).
+    When ram_per_fit < 2 GB, no children should be spawned (in-process).
+    """
+    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+
+    cases = [
+        # (label, vcpus, ram_gb, num_fit_workers, expected)
+        ("Generous CPU + tight RAM (32G/16fit)", 176, 32, 16, 0),  # ram_per_fit=2 → 0 dl
+        ("Verda CPU + adequate RAM (64G/16fit)", 176, 64, 16, 4),  # ram_per_fit=4 → cap=4
+        ("Verda CPU + very tight RAM (16G/16fit)", 176, 16, 16, 0),  # baseline alone exhausts
+        ("Generous RAM + few fit (200G/2fit)", 30, 200, 2, 4),  # ram_per_fit=100 → no constraint
+    ]
+    for label, vcpus, ram, fit, want in cases:
+        got = auto_dataloader_num_workers(
+            num_fit_workers=fit, vcpus=vcpus, ram_gb=ram
+        )
+        assert got == want, (
+            "%s: vcpus=%d ram_gb=%s fit=%d → got %d, want %d"
+            % (label, vcpus, ram, fit, got, want)
+        )
+
+
+def test_auto_dataloader_num_workers_no_ram_input_means_cpu_only_decision():
+    """When ram_gb is None, only CPU/fit-worker math drives the choice."""
+    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+
+    # 176v / 16fit → cpu_per_fit=11, cpu_cap=5, hard_cap=4 → 4 regardless of RAM.
+    assert auto_dataloader_num_workers(num_fit_workers=16, vcpus=176) == 4
+    # 8v / 8fit → cpu_per_fit=1, cpu_cap=0 → 0 regardless of RAM.
+    assert auto_dataloader_num_workers(num_fit_workers=8, vcpus=8) == 0
+
+
+def test_auto_dataloader_num_workers_hard_cap_env_override(monkeypatch):
+    """``MHCFLURRY_AUTO_DATALOADER_HARD_CAP`` shifts the ceiling."""
+    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+
+    # Default cap = 4; with 176v/16fit we'd get 4.
+    monkeypatch.setenv("MHCFLURRY_AUTO_DATALOADER_HARD_CAP", "2")
+    assert auto_dataloader_num_workers(
+        num_fit_workers=16, vcpus=176, ram_gb=400) == 2
+    monkeypatch.setenv("MHCFLURRY_AUTO_DATALOADER_HARD_CAP", "0")
+    assert auto_dataloader_num_workers(
+        num_fit_workers=16, vcpus=176, ram_gb=400) == 0
+    # Increasing cap above default — picks min(cpu_cap, hard_cap).
+    monkeypatch.setenv("MHCFLURRY_AUTO_DATALOADER_HARD_CAP", "8")
+    # 176/16 = 11 cpu_per_fit, cpu_cap=5, hard_cap=8 → min(5,8) = 5.
+    assert auto_dataloader_num_workers(
+        num_fit_workers=16, vcpus=176, ram_gb=400) == 5
+
+
+def test_auto_dataloader_num_workers_handles_none_and_zero_fit_workers():
+    """Serial / no-fit-worker case should return 0 (in-process)."""
+    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+
+    assert auto_dataloader_num_workers(num_fit_workers=None) == 0
+    assert auto_dataloader_num_workers(num_fit_workers=0) == 0
+    assert auto_dataloader_num_workers(num_fit_workers=-1) == 0
+
+
+def test_resolve_dataloader_num_workers_passthrough_int():
+    """Pinned int is a passthrough; only "auto" or None invokes the heuristic."""
+    from mhcflurry.local_parallelism import resolve_dataloader_num_workers
+
+    assert resolve_dataloader_num_workers(0, num_fit_workers=16) == 0
+    assert resolve_dataloader_num_workers(2, num_fit_workers=16) == 2
+    assert resolve_dataloader_num_workers("3", num_fit_workers=16) == 3
+
+
+def test_resolve_dataloader_num_workers_auto_calls_heuristic():
+    from mhcflurry.local_parallelism import resolve_dataloader_num_workers
+
+    # Verda-like config; "auto" → 4.
+    got = resolve_dataloader_num_workers(
+        "auto", num_fit_workers=16, vcpus=176, ram_gb=400
+    )
+    assert got == 4
+    # None is the same as "auto".
+    got = resolve_dataloader_num_workers(
+        None, num_fit_workers=16, vcpus=176, ram_gb=400
+    )
+    assert got == 4
+
+
+def test_resolve_dataloader_num_workers_rejects_negative():
+    from mhcflurry.local_parallelism import resolve_dataloader_num_workers
+
+    with pytest.raises(ValueError, match=">= 0"):
+        resolve_dataloader_num_workers(-1, num_fit_workers=16)
+    with pytest.raises(ValueError, match="non-negative"):
+        resolve_dataloader_num_workers("not-a-number", num_fit_workers=16)
+
+
+def test_auto_num_jobs_basic():
+    from mhcflurry.local_parallelism import auto_num_jobs
+
+    assert auto_num_jobs(num_gpus=8, max_workers_per_gpu=2) == 16
+    assert auto_num_jobs(num_gpus=1, max_workers_per_gpu=2) == 2
+    assert auto_num_jobs(num_gpus=0, max_workers_per_gpu=2) == 0
+    assert auto_num_jobs(num_gpus=None, max_workers_per_gpu=2) == 0
+
+
+def test_auto_num_jobs_rejects_unresolved_auto():
+    """Caller must resolve max_workers_per_gpu first."""
+    from mhcflurry.local_parallelism import auto_num_jobs
+
+    with pytest.raises(ValueError, match="must be resolved"):
+        auto_num_jobs(num_gpus=8, max_workers_per_gpu="auto")
+
+
+def test_apply_dataloader_num_workers_to_work_items_overrides_existing():
+    """Applies the resolved value uniformly; counts overrides for the log."""
+    from mhcflurry.local_parallelism import apply_dataloader_num_workers_to_work_items
+
+    work_items = [
+        {"hyperparameters": {"dataloader_num_workers": 1, "minibatch_size": 4096}},
+        {"hyperparameters": {"dataloader_num_workers": 0}},
+        {"hyperparameters": {}},  # missing key → set fresh
+        {"hyperparameters": {"dataloader_num_workers": 4}},  # already correct
+    ]
+    log_lines = []
+    apply_dataloader_num_workers_to_work_items(
+        work_items, num_workers=4, log=log_lines.append
+    )
+    for item in work_items:
+        assert item["hyperparameters"]["dataloader_num_workers"] == 4
+    # 3 items had a non-4 / missing value before; the 4th was already 4.
+    msg = log_lines[0]
+    assert "4/4 items" in msg
+    assert "dataloader_num_workers=4" in msg
+    assert "overridden=3" in msg
+
+
+def test_apply_dataloader_num_workers_skips_items_without_hyperparameters():
+    """Defensive: items lacking the 'hyperparameters' key are left alone."""
+    from mhcflurry.local_parallelism import apply_dataloader_num_workers_to_work_items
+
+    work_items = [{"work_item_name": "no-hp"}, {"hyperparameters": {}}]
+    apply_dataloader_num_workers_to_work_items(
+        work_items, num_workers=2, log=lambda *a: None
+    )
+    assert "hyperparameters" not in work_items[0]
+    assert work_items[1]["hyperparameters"]["dataloader_num_workers"] == 2
+
+
+def test_data_size_growth_does_not_change_dataloader_count():
+    """Dataset growth scales SHM bytes, but DL worker count is hardware-bound.
+
+    The auto resolver is intentionally hardware-only — total dataset rows
+    affect the per-fit-worker SHM footprint (covered by the SHM
+    estimator), not the per-fit-worker prefetch count. Per-batch CPU work
+    is bounded by minibatch_size. This regression test pins that
+    independence: for the same Verda-like box, the resolver should pick
+    the same value whether train_rows is 700K (today) or 7M (10× growth).
+    """
+    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+
+    big_box = dict(num_fit_workers=16, vcpus=176, ram_gb=400)
+    chosen = auto_dataloader_num_workers(**big_box)
+    assert chosen == 4
+    # Heuristic doesn't accept train_rows — explicit by design, not omission.
+
+
+def test_random_negative_rate_growth_handled_by_shm_estimator():
+    """Higher random_negative_rate → more SHM bytes; DL count unchanged.
+
+    With rate=2.0, num_random_negatives doubles, fit-time SHM doubles,
+    and the SHM estimator's per-fit GB doubles. The DL worker count
+    stays the same because the per-batch work is unchanged.
+    """
+    from mhcflurry.local_parallelism import (
+        auto_dataloader_num_workers,
+        estimate_fit_dataloader_shm_gb,
+    )
+
+    base_hp = {
+        "peptide_encoding": {
+            "max_length": 15,
+            "alignment_method": "left_pad_centered_right_pad",
+        },
+        "peptide_amino_acid_encoding_torch": True,
+    }
+    rows = 1_000_000
+    gb_rate1, _ = estimate_fit_dataloader_shm_gb(
+        work_items=[{"hyperparameters": dict(base_hp, random_negative_rate=1.0)}],
+        train_row_count=rows,
+    )
+    gb_rate2, _ = estimate_fit_dataloader_shm_gb(
+        work_items=[{"hyperparameters": dict(base_hp, random_negative_rate=2.0)}],
+        train_row_count=rows,
+    )
+    # rows multiplier for rate=1 is (1+1)=2; for rate=2 is (1+2)=3.
+    # Bytes scale 3/2 = 1.5x.
+    assert gb_rate2 / gb_rate1 == pytest.approx(1.5, rel=0.05)
+    # Same hardware → same DL count regardless of rate.
+    box = dict(num_fit_workers=16, vcpus=176, ram_gb=400)
+    assert auto_dataloader_num_workers(**box) == 4
+
+
 def test_estimate_fit_dataloader_shm_gb_returns_none_without_inputs():
     """Without work items / row count, estimator falls back to constant."""
     from mhcflurry.local_parallelism import estimate_fit_dataloader_shm_gb

@@ -78,6 +78,26 @@ validation run completes.
   CPU-only → 1.
 
   `MAX_WORKERS_PER_GPU=N` env var still pins explicitly.
+- **`mhcflurry-class1-train-pan-allele-models --dataloader-num-workers`**
+  new flag, default `auto`. Orchestrator derives the per-fit-worker
+  DataLoader prefetch child count from the box's vCPUs / RAM /
+  resolved fit-worker plan via
+  `auto_dataloader_num_workers`, capped at 4. The resolved value
+  overrides any `dataloader_num_workers` set in component-model
+  hyperparameters at planning time, so saved configs reflect the
+  actual choice. On 8×A100-80GB Verda (176v / 16 fit / 400 G) this
+  resolves to 4 — the 2026-04-26 production benchmark — and steps
+  down on tighter boxes (3 on 8×L40S, 1 on tight cluster nodes, 0 on
+  RAM-starved or CPU-oversubscribed configs). The release recipe
+  passes `DATALOADER_NUM_WORKERS=auto` by default; pin a literal int
+  only when re-benchmarking.
+
+  The flag is added via shared `add_local_parallelism_args` so every
+  `train_*_command` accepts it. Affinity (pan-allele, allele-specific)
+  applies it via `apply_dataloader_num_workers_to_work_items`.
+  Processing accepts the flag for argv uniformity but is a no-op
+  until `Class1ProcessingNeuralNetwork` grows the same prefetch
+  hyperparameter; presentation runs single-process and ignores it.
 - **`mhcflurry-calibrate-percentile-ranks`** wrapper-default now
   passes `--gpu-batched` and uses larger chunk sizes. Bit-identical
   on CUDA per the existing flag's behavior (issue #272).

@@ -45,6 +45,56 @@ _AUTO_MWPG_HARD_CAP_DEFAULT = 4
 _AUTO_MWPG_FREE_VRAM_FALLBACK_GB = 16.0
 
 
+# ----- Auto DataLoader prefetch worker count --------------------------------
+#
+# Per-fit() ``dataloader_num_workers`` controls how many child processes each
+# fit() worker spawns to prefetch minibatches. The trade-off:
+#
+# * 0 → in-process batch building. No spawn cost; no parallel prefetch.
+#   GPU starves on CPU-heavy data prep (random-negative regeneration,
+#   fancy-indexing). Acceptable on tiny/CPU-only configs.
+# * 1 → one prefetcher per fit() worker. Hides single-step CPU prep behind
+#   the GPU step, but the lone prefetcher is the bottleneck when CPU prep
+#   dominates one step. This was the 2026-04-27 release recipe default and
+#   is what produced the 2× slowdown vs the 4-worker run on 8×A100.
+# * 2-4 → multiple prefetchers feed batches in parallel. Past 4 we hit
+#   diminishing returns on most boxes (PyTorch's MultiProcessingDataLoaderIter
+#   plus our shared-tensor backing share queue contention) and start losing
+#   to scheduler overhead.
+#
+# This auto-resolver picks per-fit-worker prefetch count from:
+#   * total vCPUs (default ``os.cpu_count()``)
+#   * fit-worker count (NUM_JOBS or num_gpus × max_workers_per_gpu)
+#   * total RAM in GB (optional, for tight-RAM boxes)
+#   * SM-scheduler-style hard cap (default 4, env-overridable)
+#
+# Intent: the recipe pins ``DATALOADER_NUM_WORKERS=auto`` and the orchestrator
+# computes the right value per box. Hardware tier mismatches like the
+# L40S-tuned "1" landing on a 176-vCPU 8×A100 box can't recur.
+
+# Per-fit-worker DataLoader child cap. Past 4, PyTorch's queue contention +
+# our SHM backing's shared collator hit diminishing returns on tested boxes
+# (8×A100 / L40S / single-A100). Override with
+# ``MHCFLURRY_AUTO_DATALOADER_HARD_CAP``.
+_AUTO_DATALOADER_HARD_CAP_DEFAULT = 4
+
+# Approximate RSS that one DataLoader child holds: torch + mhcflurry imports
+# (~400 MB) plus a small per-batch buffer. The SHM-backed datasets share
+# storage handles, so we don't double-count tensor bytes.
+_AUTO_DATALOADER_RAM_PER_CHILD_GB = 0.5
+
+# Approximate RSS that the main fit() worker holds before any DataLoader
+# children. Used by the RAM guard to avoid over-allocating prefetchers when
+# RAM-per-fit is tight. ~2 GB covers torch, mhcflurry, the validation cache,
+# and per-fold backing arrays.
+_AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB = 2.0
+
+# Effective cores per DL child for the CPU budget. Each prefetcher does
+# fancy-indexing + collation in one process; with ~50% blocking on the work
+# queue, two physical cores per child is a comfortable upper bound.
+_AUTO_DATALOADER_CORES_PER_CHILD = 2
+
+
 def _max_workers_per_gpu_arg(value):
     """argparse type for ``--max-workers-per-gpu``. Accepts ``"auto"`` or int>=1."""
     import argparse
@@ -60,6 +110,25 @@ def _max_workers_per_gpu_arg(value):
     if v < 1:
         raise argparse.ArgumentTypeError(
             "--max-workers-per-gpu must be >= 1, got %d" % (v,)
+        )
+    return v
+
+
+def _dataloader_num_workers_arg(value):
+    """argparse type for ``--dataloader-num-workers``. ``"auto"`` or int>=0."""
+    import argparse
+    if isinstance(value, str) and value.lower() == "auto":
+        return "auto"
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "--dataloader-num-workers must be 'auto' or an integer >= 0, "
+            "got %r" % (value,)
+        )
+    if v < 0:
+        raise argparse.ArgumentTypeError(
+            "--dataloader-num-workers must be >= 0, got %d" % (v,)
         )
     return v
 
@@ -190,6 +259,202 @@ def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
     return chosen
 
 
+def _system_ram_gb():
+    """Best-effort total system RAM in GB. ``None`` if unknown.
+
+    Reads ``/proc/meminfo`` on Linux without importing ``psutil``. The fork-pool
+    parent must avoid heavyweight imports so we use a 5-line procfs read.
+    macOS does not expose /proc, so this returns ``None`` there — auto-tuning
+    falls through to the CPU-only path, which is fine for dev work.
+    """
+    try:
+        with open("/proc/meminfo", "r") as fh:
+            for line in fh:
+                if line.startswith("MemTotal:"):
+                    parts = line.split()
+                    # Format: ``MemTotal:   123456 kB``
+                    return float(parts[1]) / (1024 * 1024)
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
+
+
+def auto_dataloader_num_workers(
+        num_fit_workers,
+        vcpus=None,
+        ram_gb=None,
+        hard_cap=None):
+    """Pick per-fit-worker DataLoader child count from box capacity.
+
+    Returns an int >= 0. The result is the value that should be plugged
+    into each component model's ``dataloader_num_workers`` hyperparameter.
+    A return of ``0`` means in-process batching (no prefetch children),
+    which is correct for serial runs and very tight CPU configs.
+
+    Inputs
+    ------
+    num_fit_workers : int
+        Total fit() worker processes that will share the box. Equal to
+        ``num_gpus * max_workers_per_gpu`` for the canonical GPU run, or
+        ``num_jobs`` for CPU-only runs.
+    vcpus : int, optional
+        Total vCPU count. Default ``os.cpu_count()``.
+    ram_gb : float, optional
+        Total system RAM in GB. ``None`` skips the RAM cap (CPU-only
+        decision).
+    hard_cap : int, optional
+        Maximum DL children per fit-worker. Default 4 (overridable via
+        ``MHCFLURRY_AUTO_DATALOADER_HARD_CAP``).
+
+    Heuristic
+    ---------
+    1. **Serial / no GPU work**: if ``num_fit_workers <= 0``, return 0.
+       The caller will run fit() in-process; spawning children would buy
+       nothing and cost a process-fork.
+    2. **CPU budget per fit-worker**: ``cpu_per_fit = vcpus // num_fit_workers``.
+       Each DL child needs ~``_AUTO_DATALOADER_CORES_PER_CHILD`` (=2)
+       physical cores to keep up with fancy-indexing + collate without
+       starving the main fit-worker's OMP/MKL pool.
+    3. **CPU cap**: ``cpu_cap = cpu_per_fit // 2``.
+    4. **RAM cap** (when ``ram_gb`` is provided): each DL child holds
+       ~``_AUTO_DATALOADER_RAM_PER_CHILD_GB`` (=0.5) GB of RSS for the
+       torch+mhcflurry imports; the main fit-worker baseline is
+       ~``_AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB`` (=2.0) GB.
+       ``ram_cap = max(0, (ram_per_fit_gb - 2.0) / 0.5)``.
+    5. **Hard cap**: ``min(cpu_cap, ram_cap, hard_cap)``.
+    6. **Floor**: 0 only when ``cpu_cap == 0`` (i.e. fewer cores than
+       fit-workers — rare, only on tight clusters). Otherwise the floor
+       is 1 because in-process batching on a multi-GPU box almost always
+       starves the GPU.
+
+    Edge cases
+    ----------
+    * ``num_fit_workers > vcpus`` → ``cpu_per_fit = 0``, ``cpu_cap = 0``,
+      result 0. The main fit-workers themselves are oversubscribed; adding
+      DL children would make it worse.
+    * ``ram_gb`` very small (e.g. < 2 GB / fit) → ``ram_cap = 0``, falls back
+      to in-process batching to preserve correctness over throughput.
+    * ``hard_cap`` env override of ``0`` → forces in-process for diagnostics.
+
+    Cross-checks (see test_orchestrator_helpers.py)
+    -----------------------------------------------
+    * 8×A100-80GB Verda (176v / 16 fit / 400G) → 4
+    * 8×A100-40GB (176v / 8 fit / 400G) → 4
+    * 8×L40S (96v / 16 fit / 200G) → 3
+    * Single A100 80G Lambda (30v / 2 fit / 200G) → 4
+    * Single A100 80G tight (16v / 2 fit / 64G) → 4
+    * Single T4 (8v / 1 fit / 16G) → 4
+    * CPU 8-thread (8v / 0 fit) → 0
+    * Tight cluster node (32v / 16 fit / 64G) → 1
+    * RAM-starved (176v / 16 fit / 32G) → 0
+    """
+    if num_fit_workers is None or int(num_fit_workers) <= 0:
+        return 0
+    num_fit_workers = int(num_fit_workers)
+    if vcpus is None:
+        vcpus = os.cpu_count() or 1
+    vcpus = int(vcpus)
+
+    if hard_cap is None:
+        hard_cap = int(os.environ.get(
+            "MHCFLURRY_AUTO_DATALOADER_HARD_CAP",
+            _AUTO_DATALOADER_HARD_CAP_DEFAULT,
+        ))
+    hard_cap = int(hard_cap)
+
+    cpu_per_fit = max(0, vcpus // num_fit_workers)
+    cpu_cap = cpu_per_fit // _AUTO_DATALOADER_CORES_PER_CHILD
+
+    if ram_gb is not None:
+        ram_per_fit = float(ram_gb) / num_fit_workers
+        ram_for_dl = max(0.0, ram_per_fit - _AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB)
+        ram_cap = int(ram_for_dl / _AUTO_DATALOADER_RAM_PER_CHILD_GB)
+    else:
+        ram_cap = None
+
+    chosen = min(hard_cap, cpu_cap)
+    if ram_cap is not None:
+        chosen = min(chosen, ram_cap)
+
+    # Floor at 1 when the box has CPU + RAM + cap headroom; floor at 0
+    # when ANY of cpu_cap / ram_cap / hard_cap is itself 0 (the user or
+    # the box explicitly forced in-process batching). The 1-floor exists
+    # so capable boxes don't accidentally disable prefetch when integer
+    # division rounds down to 0; it must not override an explicit 0.
+    if (
+        cpu_cap == 0
+        or (ram_cap is not None and ram_cap == 0)
+        or hard_cap == 0
+    ):
+        chosen = 0
+    else:
+        chosen = max(1, chosen)
+    chosen = max(0, chosen)
+
+    logging.info(
+        "auto_dataloader_num_workers: chose %d (num_fit_workers=%d, vcpus=%d, "
+        "ram_gb=%s, cpu_per_fit=%d, cpu_cap=%d, ram_cap=%s, hard_cap=%d)",
+        chosen, num_fit_workers, vcpus,
+        f"{ram_gb:.1f}" if ram_gb is not None else "?",
+        cpu_per_fit, cpu_cap,
+        str(ram_cap) if ram_cap is not None else "?",
+        hard_cap,
+    )
+    return chosen
+
+
+def resolve_dataloader_num_workers(
+        value,
+        num_fit_workers=None,
+        vcpus=None,
+        ram_gb=None):
+    """Normalize a ``dataloader_num_workers`` value to an int.
+
+    Accepts ``"auto"`` / unset / ``None`` (delegates to
+    ``auto_dataloader_num_workers``), or any int-coercible value. Used by
+    both the orchestrator-side resolver and the shell helper that injects
+    ``dataloader_num_workers`` into the recipe's hyperparameters.yaml.
+    """
+    if value is None or (isinstance(value, str) and value.strip().lower() == "auto"):
+        return auto_dataloader_num_workers(
+            num_fit_workers=num_fit_workers,
+            vcpus=vcpus,
+            ram_gb=ram_gb,
+        )
+    try:
+        out = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(
+            "dataloader_num_workers must be 'auto' or a non-negative integer; "
+            "got %r" % (value,)
+        )
+    if out < 0:
+        raise ValueError(
+            "dataloader_num_workers must be >= 0; got %d" % out
+        )
+    return out
+
+
+def auto_num_jobs(num_gpus, max_workers_per_gpu):
+    """Compute total fit-worker count from GPU plan.
+
+    Returns ``num_gpus * max_workers_per_gpu`` for GPU runs, ``0`` when no
+    GPUs are visible (caller decides serial vs explicit CPU pool). Treats
+    ``"auto"`` ``max_workers_per_gpu`` as not-yet-resolved and raises;
+    callers must resolve it first via ``auto_max_workers_per_gpu``.
+    """
+    if not num_gpus or int(num_gpus) <= 0:
+        return 0
+    if isinstance(max_workers_per_gpu, str):
+        if max_workers_per_gpu.strip().lower() == "auto":
+            raise ValueError(
+                "auto_num_jobs: max_workers_per_gpu must be resolved to an int "
+                "before computing num_jobs (call auto_max_workers_per_gpu first)."
+            )
+        max_workers_per_gpu = int(max_workers_per_gpu)
+    return int(num_gpus) * int(max_workers_per_gpu)
+
+
 def resolve_max_workers_per_gpu(args):
     """Resolve ``args.max_workers_per_gpu`` to an int, mutating ``args``.
 
@@ -262,9 +527,77 @@ def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
             )
             args.num_jobs = gpu_capacity
 
+    # Resolve --dataloader-num-workers=auto to an int. Done after num_jobs
+    # is finalized so the auto resolver sees the post-cap fit-worker count.
+    # Stored on args so each train_*_command can apply it to its work_items
+    # at planning time. Non-affinity commands (processing) accept the flag
+    # for argv uniformity but currently no-op when applying it; see
+    # ``apply_dataloader_num_workers_to_work_items``.
+    dl_value = getattr(args, "dataloader_num_workers", "auto")
+    final_num_jobs = int(getattr(args, "num_jobs", 0) or 0)
+    if final_num_jobs <= 0 and num_gpus > 0:
+        # Serial run on a GPU box: still resolve as if 1 fit-worker exists
+        # so a non-zero default lands. Tests pass num_jobs=0 frequently.
+        effective_fit_workers = 1
+    else:
+        effective_fit_workers = max(1, final_num_jobs)
+    args.dataloader_num_workers = resolve_dataloader_num_workers(
+        dl_value,
+        num_fit_workers=effective_fit_workers,
+        ram_gb=_system_ram_gb(),
+    )
+    args.dataloader_num_workers_was_auto = (
+        isinstance(dl_value, str) and dl_value.lower() == "auto"
+    )
+
     hoist_torchinductor_compile_threads(args)
     args._local_parallelism_args_resolved = True
     return args
+
+
+def apply_dataloader_num_workers_to_work_items(work_items, num_workers, *, log=None):
+    """Inject ``dataloader_num_workers`` into every work item's hyperparameters.
+
+    Generic across train_*_command modules. Affinity commands (pan-allele
+    + allele-specific) build per-work-item hyperparameter dicts that are
+    passed to ``Class1NeuralNetwork``; the resolver writes the integer
+    chosen at orchestrator startup into each. Processing models do not yet
+    consume ``dataloader_num_workers`` (their fit() loop has its own
+    DataLoader plumbing without this hyperparameter); calling this on
+    processing work items is a no-op write — the field is set but
+    ``Class1ProcessingNeuralNetwork`` ignores it. When processing's fit()
+    grows the same prefetch hyperparameter, no change is needed here.
+
+    Parameters
+    ----------
+    work_items : list of dict
+        Each dict has a ``hyperparameters`` sub-dict (the canonical shape
+        produced by ``train_pan_allele_models_command`` /
+        ``train_allele_specific_models_command``).
+    num_workers : int
+        The resolved value from
+        ``resolve_local_parallelism_args``. Use 0 to force in-process
+        batching (no prefetch children).
+    log : callable, optional
+        Logging hook for the human-readable summary. Defaults to ``print``.
+    """
+    if log is None:
+        log = print
+    overridden = 0
+    for item in work_items:
+        hp = item.get("hyperparameters")
+        if hp is None:
+            continue
+        prev = hp.get("dataloader_num_workers")
+        hp["dataloader_num_workers"] = int(num_workers)
+        if prev is None or int(prev) != int(num_workers):
+            overridden += 1
+    log(
+        "apply_dataloader_num_workers_to_work_items: set %d/%d items to "
+        "dataloader_num_workers=%d (overridden=%d)" % (
+            len(work_items), len(work_items), int(num_workers), overridden,
+        )
+    )
 
 
 # Inductor's compile worker pool defaults to ``os.cpu_count()``; that's
@@ -797,6 +1130,20 @@ def add_local_parallelism_args(parser):
         "--worker-log-dir",
         default=None,
         help="Write worker stdout and stderr logs to given directory.")
+    group.add_argument(
+        "--dataloader-num-workers",
+        type=_dataloader_num_workers_arg,
+        metavar="N",
+        default="auto",
+        help="Per-fit-worker DataLoader prefetch child count. Pass "
+             "'auto' (default) to derive from box vCPUs / RAM / "
+             "fit-worker plan via "
+             "``mhcflurry.local_parallelism.auto_dataloader_num_workers`` "
+             "(empirical hard cap = 4). Pass an integer to pin (0 disables "
+             "prefetch and runs batch building in-process). Overrides any "
+             "``dataloader_num_workers`` set in component-model "
+             "hyperparameters when applicable; non-affinity train commands "
+             "accept the flag for uniformity but currently no-op.")
 
 
 def worker_pool_with_gpu_assignments_from_args(args):

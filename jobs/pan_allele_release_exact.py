@@ -100,16 +100,18 @@ image = (
         # arithmetic to amortize its fixed overheads over.
         "MHCFLURRY_TORCH_COMPILE": "1",
         "TORCHINDUCTOR_COMPILE_THREADS": "2",
-        # One DataLoader subprocess per training worker matches the shell
-        # recipe's conservative default: SHM/prefetch remains active without
-        # multiplying process count and /dev/shm pressure. Prior L40S sweeps
-        # at smaller minibatches did not show a win from dl>=2, but the
-        # 8xA100 / minibatch=4096 operating point may differ. This sets
-        # only process count; component models keep
-        # fit_dataloader_backing="auto" and resolve numpy vs shared_tensor
-        # internally. Use 0 for single-process fit() batching; set 2+ only
-        # when intentionally re-benchmarking that regime.
-        "DATALOADER_NUM_WORKERS": "1",
+        # ``auto`` → orchestrator derives per-fit-worker DataLoader prefetch
+        # child count from box capacity (vCPU + RAM + fit-worker plan,
+        # capped at 4). On 8×A100-80GB Verda (176 vCPUs / 16 fit workers /
+        # 400 GB RAM) lands at 4 — the 2026-04-26 production benchmark.
+        # On L40S/T4/single-A100 boxes it steps down. See
+        # ``mhcflurry.local_parallelism.auto_dataloader_num_workers`` for
+        # the heuristic; the test matrix in
+        # ``test/test_orchestrator_helpers.py`` covers the production
+        # tiers. Pin a literal int (0/1/2/3/4) only when re-benchmarking;
+        # changing the cap to >4 also requires
+        # ``MHCFLURRY_AUTO_DATALOADER_HARD_CAP=N``.
+        "DATALOADER_NUM_WORKERS": "auto",
         # Populate the per-epoch timing arrays in fit_info (epoch_fetch_time,
         # epoch_train_time, epoch_validation_time, etc.). Writes to the
         # persisted model's config_json so we can do post-hoc breakdown

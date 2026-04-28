@@ -257,12 +257,6 @@ echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU; requested=$
 # but leaks / descriptor creep / orphaned-runtime state cannot accumulate
 # indefinitely inside one worker. Override with MAX_TASKS_PER_WORKER.
 MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
-PARALLELISM_ARGS=(
-    --num-jobs "$NUM_JOBS"
-    --max-tasks-per-worker "$MAX_TASKS_PER_WORKER"
-    --gpus "$GPUS"
-    --max-workers-per-gpu "$MAX_WORKERS_PER_GPU"
-)
 
 # Phase 1 (#268): enable the BLOSUM62 encoding cache + fit() DataLoader
 # prefetch by default. USE_ENCODING_CACHE=0 disables the global peptide
@@ -270,14 +264,52 @@ PARALLELISM_ARGS=(
 # fit_dataloader_backing remains "auto" so the component model resolves
 # numpy vs shared_tensor backing consistently in fit().
 USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
-# DataLoader prefetch workers per training worker. Default to 1 as the
-# conservative SHM/prefetch-on setting: it avoids the legacy no-prefetch path
-# while keeping process count and /dev/shm pressure bounded on high-concurrency
-# release runs. Prior L40S sweeps at smaller minibatches did not show a win
-# from dl>=2, but the 8xA100 / minibatch=4096 operating point may differ.
-# Override DATALOADER_NUM_WORKERS=2+ only when intentionally re-benchmarking
-# that regime; use 0 for single-process fit() batching.
-DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-1}"
+# DataLoader prefetch workers per training worker. Default ``auto`` is
+# resolved by the orchestrator (mhcflurry-class1-train-pan-allele-models)
+# at planning time via ``--dataloader-num-workers auto`` →
+# ``auto_dataloader_num_workers`` (vCPU + RAM + fit-worker plan, capped
+# at 4). On 8×A100-80GB Verda (176v / 16fit / 400G) this lands at 4,
+# matching the 2026-04-26 production benchmark. Set
+# DATALOADER_NUM_WORKERS=N (int) only when intentionally re-benchmarking;
+# the auto resolver covers the production tiers tested in
+# test/test_orchestrator_helpers.py. ``set_cpu_threads.sh`` still reads
+# this for OMP/MKL sizing, so the shell-side value must be numeric here:
+# resolve "auto" via the same helper Python uses.
+DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
+if [ "$DATALOADER_NUM_WORKERS" = "auto" ]; then
+    # Same Python helper that the orchestrator uses (and that the unit
+    # tests cover) so the OMP-thread budget computed below sees the same
+    # number that mhcflurry-class1-train-pan-allele-models will choose.
+    DATALOADER_NUM_WORKERS="$(NUM_FIT_WORKERS="$NUM_JOBS" python -c '
+import os
+from mhcflurry.local_parallelism import (
+    auto_dataloader_num_workers,
+    _system_ram_gb,
+)
+print(
+    auto_dataloader_num_workers(
+        num_fit_workers=int(os.environ["NUM_FIT_WORKERS"]),
+        ram_gb=_system_ram_gb(),
+    )
+)
+')"
+    printf >&2 \
+        "[pan_allele_release_exact.sh] DATALOADER_NUM_WORKERS=auto resolved to %s\n" \
+        "$DATALOADER_NUM_WORKERS"
+fi
+
+# Now that DATALOADER_NUM_WORKERS is a resolved int, build PARALLELISM_ARGS.
+# The orchestrator could also resolve "auto" on its own — passing the int
+# we just computed keeps the shell-side OMP budget (set_cpu_threads) and
+# the orchestrator-side hyperparameter injection in lockstep.
+PARALLELISM_ARGS=(
+    --num-jobs "$NUM_JOBS"
+    --max-tasks-per-worker "$MAX_TASKS_PER_WORKER"
+    --gpus "$GPUS"
+    --max-workers-per-gpu "$MAX_WORKERS_PER_GPU"
+    --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
+)
+
 CACHE_ARGS=()
 if [ "$USE_ENCODING_CACHE" = "1" ]; then
     # Place the encoding cache OUTSIDE $MHCFLURRY_OUT so it
@@ -320,17 +352,13 @@ TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 # ---- hyperparameters -------------------------------------------------
 CURRENT_PHASE="hyperparameters"
 cp "$RECIPE_DIR/generate_hyperparameters.py" .
-python generate_hyperparameters.py > hyperparameters.full.yaml
-# Inject dataloader_num_workers into every arch entry (Phase 1 #268).
-python - <<PY
-import yaml
-hp = yaml.safe_load(open("hyperparameters.full.yaml"))
-for d in hp:
-    d["dataloader_num_workers"] = $DATALOADER_NUM_WORKERS
-with open("hyperparameters.yaml", "w") as f:
-    yaml.safe_dump(hp, f)
-print(f"release_exact: {len(hp)} archs with dataloader_num_workers=$DATALOADER_NUM_WORKERS")
-PY
+python generate_hyperparameters.py > hyperparameters.yaml
+# ``dataloader_num_workers`` is no longer injected here. The orchestrator
+# overrides each work item's hyperparameters via the
+# ``--dataloader-num-workers`` CLI flag at planning time (see
+# ``apply_dataloader_num_workers_to_work_items``). One source of truth →
+# saved component-model configs reflect the value the orchestrator
+# actually chose for the run, not whatever the YAML happened to say.
 ARCH_COUNT=$(python -c "import yaml; print(len(yaml.safe_load(open('hyperparameters.yaml'))))")
 echo "Architectures in sweep: $ARCH_COUNT"
 
