@@ -414,12 +414,20 @@ def test_fit_shm_auto_enables_when_dataloader_workers_requested(monkeypatch):
 
 
 def test_fit_shm_off_by_default_when_no_workers(monkeypatch):
-    """Auto backing uses numpy when ``dataloader_num_workers=0``."""
+    """Auto backing uses numpy when ``dataloader_num_workers=0``.
+
+    Pinned to ``fit_tensor_residency=host`` because the device-resident
+    path bypasses the DataLoader entirely, leaving
+    ``fit_dataloader_backing`` unused. This test documents the
+    SHM resolver behavior, which is host-only by design.
+    """
     monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
     peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
     affinities = np.array([50.0, 30.0, 100.0, 5000.0])
     _seed_all(11)
-    model = _make_simple_affinity_model(max_epochs=2)
+    model = _make_simple_affinity_model(
+        max_epochs=2, fit_tensor_residency="host",
+    )
     model.fit(peptides, affinities)
     assert model.fit_info[-1].get("fit_dataloader_shm_enabled") is False
     assert model.fit_info[-1].get("fit_dataloader_backing_requested") == "auto"

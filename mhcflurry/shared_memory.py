@@ -415,7 +415,7 @@ class FitBacking:
             x_peptide=x_peptide_view,
             x_allele=x_allele_view,
             y_encoded=_to_device(y_encoded, dtype=_torch.float32),
-            sample_weights=_to_device(sample_weights),
+            sample_weights=_to_device(sample_weights, dtype=_torch.float32),
             random_negative_x_peptide=rn_peptide_view,
             random_negative_x_allele=rn_allele_view,
             tensor_backed=True,

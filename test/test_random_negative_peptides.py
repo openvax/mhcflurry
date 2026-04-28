@@ -398,6 +398,12 @@ def test_fit_end_to_end_pool_epochs_one_draws_from_global_rng(monkeypatch):
         random_negative_lengths=[9],
         # Default path.
         random_negative_pool_epochs=1,
+        # Pin host backing: the device-resident pool path samples
+        # via torch.multinomial directly (skipping
+        # planner.get_peptides), which would defeat the spy. The
+        # rng=None contract on the device path is covered separately
+        # by test_random_negatives_pool_device_mode_seeded_reproducible.
+        fit_tensor_residency="host",
     )
     peptides = random_peptides_fn(16, length=9)
     affinities = np.random.uniform(10, 50000, 16)
