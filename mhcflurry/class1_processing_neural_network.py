@@ -15,6 +15,11 @@ from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
+from .torch_training_loop import (
+    _configure_matmul_precision,
+    _maybe_compile_loss,
+    _maybe_compile_network,
+)
 
 
 class Class1ProcessingModel(nn.Module):
@@ -640,6 +645,7 @@ class Class1ProcessingNeuralNetwork(object):
             disable.
         """
         device = self.get_device()
+        _configure_matmul_precision(device)
 
         x_dict = self.network_input(sequences)
 
@@ -664,12 +670,18 @@ class Class1ProcessingNeuralNetwork(object):
 
         network = self.network()
         network.to(device)
+        # torch.compile + TF32 are gated by env vars (off by default). Wiring
+        # them in keeps processing at parity with affinity's fit / fit_generator
+        # paths so production opt-ins (MHCFLURRY_TORCH_COMPILE=1) light up
+        # both trainers.
+        network = _maybe_compile_network(network, device)
 
         # Setup optimizer
         optimizer = self._create_optimizer(network)
 
         # Loss function (binary cross-entropy)
         loss_fn = nn.BCELoss(reduction='none')
+        loss_fn = _maybe_compile_loss(loss_fn, device)
         reg_l1, reg_l2 = self.hyperparameters.get(
             "convolutional_kernel_l1_l2",
             [0.0, 0.0],
@@ -914,10 +926,12 @@ class Class1ProcessingNeuralNetwork(object):
         from .class1_neural_network import resolve_prediction_batch_size
 
         device = self.get_device()
+        _configure_matmul_precision(device)
 
         x_dict = self.network_input(sequences, throw=throw)
         network = self.network()
         network.to(device)
+        network = _maybe_compile_network(network, device)
         network.eval()
 
         batch_size = resolve_prediction_batch_size(
