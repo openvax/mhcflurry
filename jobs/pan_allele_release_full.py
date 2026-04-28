@@ -86,6 +86,12 @@ image = (
         "TORCHINDUCTOR_COMPILE_THREADS": "2",
         "DATALOADER_NUM_WORKERS": "auto",
         "MHCFLURRY_ENABLE_TIMING": "1",
+        # TF32 + cudnn.benchmark on. Free ~2x matmul speedup on Ampere+
+        # with fp32 accumulation preserved (input-mantissa truncation
+        # only). The affinity-only release_affinity job keeps this OFF
+        # to preserve bit-for-bit replication of public 2.2.0; this is
+        # a new (2.3.0) release so the small numeric drift is fine.
+        "MHCFLURRY_MATMUL_PRECISION": "high",
     },
 )
 def train():
