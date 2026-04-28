@@ -550,6 +550,22 @@ def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
         isinstance(dl_value, str) and dl_value.lower() == "auto"
     )
 
+    # Promote orchestrator-owned tuning knobs from CLI to env so the
+    # existing call sites (torch_training_loop._maybe_compile_network,
+    # _configure_matmul_precision, class1_neural_network._timing_enabled,
+    # hoist_torchinductor_compile_threads) read a single source of truth.
+    # Auto -> leave env untouched (preserves backward-compat for env-only
+    # deploys); explicit CLI value -> overrides env. Workers inherit
+    # via the multiprocessing fork done after this resolver runs.
+    torch_compile_cli = getattr(args, "torch_compile", "auto")
+    if torch_compile_cli in ("0", "1"):
+        os.environ["MHCFLURRY_TORCH_COMPILE"] = torch_compile_cli
+    matmul_cli = getattr(args, "matmul_precision", "none")
+    if matmul_cli != "none":
+        os.environ["MHCFLURRY_MATMUL_PRECISION"] = matmul_cli
+    if getattr(args, "enable_timing", False):
+        os.environ["MHCFLURRY_ENABLE_TIMING"] = "1"
+
     hoist_torchinductor_compile_threads(args)
     args._local_parallelism_args_resolved = True
     return args
@@ -1144,6 +1160,36 @@ def add_local_parallelism_args(parser):
              "``dataloader_num_workers`` set in component-model "
              "hyperparameters when applicable; non-affinity train commands "
              "accept the flag for uniformity but currently no-op.")
+    group.add_argument(
+        "--torch-compile",
+        choices=("auto", "0", "1"),
+        default="auto",
+        help="Enable torch.compile for forward kernels. '1' on, '0' off, "
+             "'auto' (default) reads MHCFLURRY_TORCH_COMPILE env (off when "
+             "unset). When on, the orchestrator also auto-sizes "
+             "TORCHINDUCTOR_COMPILE_THREADS — see "
+             "hoist_torchinductor_compile_threads. Loss compilation has its "
+             "own escape-hatch env (MHCFLURRY_TORCH_COMPILE_LOSS, default "
+             "off due to a known Triton crash on MSEWithInequalities); "
+             "intentionally NOT promoted to CLI until that's resolved.")
+    group.add_argument(
+        "--matmul-precision",
+        choices=("none", "highest", "high", "medium"),
+        default="none",
+        help="torch.set_float32_matmul_precision setting + cudnn.benchmark "
+             "enable. 'highest' keeps full fp32 numerics with cudnn "
+             "auto-tuning; 'high'/'medium' enable TF32 on Ampere+ (~2x "
+             "matmul speedup, fp32 accumulation preserved, input-mantissa "
+             "truncated). 'none' (default) leaves PyTorch's default "
+             "untouched. CPU/MPS: no-op.")
+    group.add_argument(
+        "--enable-timing",
+        action="store_true",
+        default=False,
+        help="Populate per-epoch timing arrays in fit_info "
+             "(epoch_fetch_time, epoch_train_time, epoch_validation_time). "
+             "Persisted in the model's config_json for post-hoc breakdown. "
+             "No runtime cost beyond a few timestamp records per epoch.")
 
 
 def worker_pool_with_gpu_assignments_from_args(args):

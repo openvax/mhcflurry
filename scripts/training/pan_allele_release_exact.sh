@@ -308,7 +308,20 @@ PARALLELISM_ARGS=(
     --gpus "$GPUS"
     --max-workers-per-gpu "$MAX_WORKERS_PER_GPU"
     --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
+    # Orchestrator-owned tuning knobs. CLI-resolved values are propagated
+    # to env (MHCFLURRY_TORCH_COMPILE / MHCFLURRY_MATMUL_PRECISION /
+    # MHCFLURRY_ENABLE_TIMING) inside resolve_local_parallelism_args, so
+    # the existing _maybe_compile_network / _configure_matmul_precision /
+    # _timing_enabled call sites continue to read env unchanged. Defaults
+    # to 'auto' for --torch-compile so an env preset (e.g.
+    # MHCFLURRY_TORCH_COMPILE=1 set by the runplz container) still wins
+    # when the shell is invoked outside the runplz path.
+    --torch-compile "${TORCH_COMPILE_CLI:-auto}"
+    --matmul-precision "${MATMUL_PRECISION_CLI:-none}"
 )
+if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
+    PARALLELISM_ARGS+=(--enable-timing)
+fi
 
 CACHE_ARGS=()
 if [ "$USE_ENCODING_CACHE" = "1" ]; then
