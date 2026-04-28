@@ -17,7 +17,6 @@ from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
 from .torch_training_loop import (
     _configure_matmul_precision,
-    _maybe_compile_loss,
     _maybe_compile_network,
 )
 
@@ -679,9 +678,14 @@ class Class1ProcessingNeuralNetwork(object):
         # Setup optimizer
         optimizer = self._create_optimizer(network)
 
-        # Loss function (binary cross-entropy)
+        # Loss function (binary cross-entropy). Not routed through
+        # _maybe_compile_loss: the MHCFLURRY_TORCH_COMPILE_LOSS env gate is
+        # currently a "do not enable" escape hatch for the affinity
+        # MSEWithInequalities crash (see torch_training_loop.py:138-149).
+        # Compiling BCELoss here would silently piggyback on that flag, so a
+        # well-intentioned opt-in for processing would re-break affinity.
+        # Re-evaluate once the gate is split or the upstream bug is fixed.
         loss_fn = nn.BCELoss(reduction='none')
-        loss_fn = _maybe_compile_loss(loss_fn, device)
         reg_l1, reg_l2 = self.hyperparameters.get(
             "convolutional_kernel_l1_l2",
             [0.0, 0.0],
