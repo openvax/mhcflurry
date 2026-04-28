@@ -26,14 +26,16 @@ base_hyperparameters = {
     # "patience-reset" tail where tiny noise improvements could keep a
     # task alive for thousands of epochs.
     'max_epochs': 500,
-    # Bumped 512 → 4096 to close the A100 utilization gap. At 512 rows per
-    # step the 2-layer MLP was <1 ms of actual compute sandwiched inside
-    # ~33 ms of Python/IPC glue (measured: 33.7 ms/step across 37
-    # completed models on the 2026-04-24 run). A 4096-row batch shifts
-    # the compute:overhead ratio ~8× in compute's favor. RMSprop absorbs
-    # the dynamics change; this breaks bit-exactness with the 2.2.0
-    # release weights but not the training recipe's semantics.
-    'minibatch_size': 4096,
+    # Bumped 4096 → 16384 (closest power of 2 to 16k) after the
+    # 2026-04-28 release_full diagnostic showed mean GPU 0 util at ~1%
+    # with peak ~4% on the 1024×512 MLP at minibatch=4096: ~656 µs of
+    # compute per ~66 ms batch, i.e. the GPU is starved by the CPU
+    # input pipeline. Quadrupling the batch size drops batches/epoch
+    # from ~452 to ~113 and gives the input pipeline 4× more time to
+    # keep up. RMSprop absorbs the dynamics change; this widens the
+    # divergence from 2.2.0 weights already established by the
+    # 512 → 4096 step.
+    'minibatch_size': 16384,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
     "patience": 20,
@@ -49,12 +51,14 @@ base_hyperparameters = {
     # cohort (~3 of 16 workers at any given moment).
     "min_delta": 1e-7,
     # Run the validation pass every N epochs instead of every epoch.
-    # Validation is ~150 ms on a 244K-row val set with bs=16384 and
-    # represents a per-epoch GPU-sync barrier that prevents pipelining
-    # the next epoch's CPU prep with the current epoch's training tail.
-    # Early-stop check still fires reliably because patience=20 is far
-    # larger than ``validation_interval=5``. A final validation pass is
-    # forced before any patience-triggered break (see fit() loop).
+    # Validation represents a per-epoch GPU-sync barrier that prevents
+    # pipelining the next epoch's CPU prep with the current epoch's
+    # training tail. With minibatch=16384 the effective val batch is
+    # 4×minibatch=65536 (see ``_effective_validation_batch_size``), so a
+    # 244K-row val set is ~4 batches per pass. Early-stop check still
+    # fires reliably because patience=20 is far larger than
+    # ``validation_interval=5``. A final validation pass is forced
+    # before any patience-triggered break (see fit() loop).
     "validation_interval": 5,
     'peptide_encoding': {
         'vector_encoding_name': 'BLOSUM62',

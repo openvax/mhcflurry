@@ -1361,25 +1361,76 @@ def attach_constant_data_to_work_items_if_needed(
     return True
 
 
+_COMPILE_KEY_HYPERPARAMS = (
+    "layer_sizes",
+    "topology",
+    "dropout_probability",
+    "batch_normalization",
+    "activation",
+    "output_activation",
+    "peptide_dense_layer_sizes",
+    "allele_dense_layer_sizes",
+    "peptide_allele_merge_method",
+    "peptide_allele_merge_activation",
+    "locally_connected_layers",
+    "peptide_amino_acid_encoding",
+    "peptide_amino_acid_encoding_torch",
+    "peptide_encoding",
+    "num_outputs",
+    "loss",
+    "convolutional_filters",
+    "convolutional_kernel_size",
+    "convolutional_activation",
+    "post_convolutional_dense_layer_sizes",
+    "convolutional_kernel_l1_l2",
+    "n_flank_length",
+    "c_flank_length",
+)
+
+
+def _arch_compile_key(hyperparameters):
+    """Stable fingerprint for hyperparameters that change the compile graph.
+
+    Two work items with the same key produce the same torch.compile graph
+    and therefore share an on-disk compile cache entry; warming one warms
+    both. Hyperparameters that only affect optimization or regularization
+    (learning rate, L1/L2 reg, max_epochs, patience, ...) are excluded —
+    they're applied outside the compiled forward / loss closure.
+    """
+    import json
+    return json.dumps(
+        {k: hyperparameters.get(k) for k in _COMPILE_KEY_HYPERPARAMS},
+        sort_keys=True,
+        default=str,
+    )
+
+
 def run_single_worker_torch_compile_warmup(
         args,
         work_items,
         work_function,
         constant_data=None):
-    """Run one real local work item first to populate torch compile caches.
+    """Prime the torch.compile on-disk cache for every unique architecture.
 
-    This is deliberately orchestrator-owned and worker-executed:
+    Walks ``work_items`` and groups them by architecture-compile fingerprint
+    (``_arch_compile_key``). For each unique fingerprint, runs **one** work
+    item in compile-warmup mode in a single non-daemon worker process —
+    ``compile_warmup_only=True`` short-circuits the work function to one
+    forward+backward pass after the network is constructed and compiled,
+    skipping pretraining, validation, and full training. The same worker
+    process handles every architecture sequentially so its CUDA context
+    and Inductor cache are populated incrementally.
 
-    * the parent process does **not** touch CUDA before forking;
-    * one non-daemon worker gets a production-like GPU assignment;
-    * Inductor compile helpers are temporarily sized for a single compiler-
-      heavy process;
-    * after the warmup returns, production compile-thread sizing is restored
-      before the full worker pool is created.
+    Skipped entirely when ``MHCFLURRY_TORCH_COMPILE`` is off — there is
+    no compile cache to warm.
 
-    Returns ``None`` when skipped; otherwise pops the warmed item from
-    ``work_items`` and returns ``(warmup_item, warmup_result)``. The caller owns
-    result merging/saving because predictor containers differ by train command.
+    ``work_items`` is **not** mutated: every task still runs in the
+    production pool. The trade-off is one extra ~1-batch fit per
+    architecture (typically <1 sec each after compile codegen) for
+    eliminating staggered first-compile costs in the production pool.
+
+    Returns ``None`` when skipped, otherwise the number of unique
+    architectures warmed.
     """
     if not work_items:
         return None
@@ -1397,10 +1448,25 @@ def run_single_worker_torch_compile_warmup(
     if backend in ("cpu", "mps"):
         return None
 
-    warmup_item = work_items.pop(0)
+    seen_keys = set()
+    unique_warmup_items = []
+    for item in work_items:
+        hp = item.get("hyperparameters") or {}
+        key = _arch_compile_key(hp)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        unique_warmup_items.append(item)
+
+    if not unique_warmup_items:
+        return None
+
     print(
-        "torch.compile warmup: running one work item before production pool "
-        "(work_item_name=%s)" % warmup_item.get("work_item_name", "<unknown>")
+        "torch.compile warmup: priming on-disk cache for %d unique "
+        "architecture(s) of %d work items "
+        "(1 forward+backward per architecture, single-worker phase)" % (
+            len(unique_warmup_items), len(work_items),
+        )
     )
 
     explicit_threads = (
@@ -1425,31 +1491,37 @@ def run_single_worker_torch_compile_warmup(
             max_workers_per_gpu=max(
                 int(getattr(args, "max_workers_per_gpu", 1) or 1), 1,
             ),
-            max_tasks_per_worker=1,
+            max_tasks_per_worker=len(unique_warmup_items) + 1,
             worker_log_dir=getattr(args, "worker_log_dir", None),
         )
-        item_for_worker = warmup_item
-        if (
-                constant_data is not None
-                and not worker_pool_uses_fork(warmup_pool)
-                and "constant_data" not in item_for_worker):
+        warmup_started_at = time.time()
+        for warmup_item in unique_warmup_items:
             item_for_worker = dict(warmup_item)
-            item_for_worker["constant_data"] = constant_data
-        result = warmup_pool.apply(
-            call_wrapped_kwargs, (work_function, item_for_worker)
-        )
+            item_for_worker["compile_warmup_only"] = True
+            if (
+                    constant_data is not None
+                    and not worker_pool_uses_fork(warmup_pool)
+                    and "constant_data" not in item_for_worker):
+                item_for_worker["constant_data"] = constant_data
+            warmup_pool.apply(
+                call_wrapped_kwargs, (work_function, item_for_worker)
+            )
         warmup_pool.close()
         warmup_pool.join()
         warmup_pool = None
-        print("torch.compile warmup: completed one work item.")
+        print(
+            "torch.compile warmup: completed %d architecture warmup(s) in "
+            "%.1f sec." % (
+                len(unique_warmup_items), time.time() - warmup_started_at,
+            )
+        )
     finally:
         if warmup_pool is not None:
             warmup_pool.terminate()
             warmup_pool.join()
-        # Restore production compile-thread sizing for the full worker pool.
         hoist_torchinductor_compile_threads(args, phase="production")
 
-    return warmup_item, result
+    return len(unique_warmup_items)
 
 
 def worker_pool_with_gpu_assignments(

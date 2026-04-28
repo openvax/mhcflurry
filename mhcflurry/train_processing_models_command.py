@@ -334,28 +334,12 @@ def train_models(args):
             constant_data=GLOBAL_DATA,
             result_serialization_method="pickle")
     else:
-        warmup = run_single_worker_torch_compile_warmup(
+        run_single_worker_torch_compile_warmup(
             args,
             work_items,
             train_model,
             constant_data=GLOBAL_DATA,
         )
-        if warmup is not None:
-            _, warmup_predictor = warmup
-            save_start = time.time()
-            (model,) = warmup_predictor.models
-            pprint.pprint(model.fit_info[-1]['training_info'])
-            (new_model_name,) = predictor.add_models(warmup_predictor.models)
-            predictor.save(
-                args.out_models_dir,
-                model_names_to_write=[new_model_name],
-                write_metadata=False)
-            print(
-                "Saved torch.compile warmup predictor (%d models total) "
-                "with 1 new model in %0.2f sec to %s" % (
-                    len(predictor.models),
-                    time.time() - save_start,
-                    args.out_models_dir))
 
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
@@ -405,6 +389,53 @@ def train_models(args):
     print("Predictor written to: %s" % args.out_models_dir)
 
 
+def _run_compile_warmup(hyperparameters, fold_num, constant_data):
+    """One forward+backward through a freshly-built processing network.
+
+    Companion to ``mhcflurry.train_pan_allele_models_command._run_compile_warmup``.
+    Used by ``run_single_worker_torch_compile_warmup`` to populate the
+    torch.compile on-disk cache once per unique architecture before the
+    production worker pool launches. Discards the resulting model.
+    """
+    from mhcflurry.flanking_encoding import FlankingEncoding
+
+    df = constant_data["train_data"]
+    folds_df = constant_data["folds_df"]
+    minibatch = max(int(hyperparameters.get("minibatch_size", 128) or 128), 1)
+    fold_mask = folds_df["fold_%d" % fold_num]
+    train_subset = df.loc[fold_mask].head(minibatch)
+    if len(train_subset) == 0:
+        train_subset = df.head(minibatch)
+
+    hp = dict(hyperparameters)
+    hp["max_epochs"] = 1
+    hp["validation_split"] = 0.0
+    hp["early_stopping"] = False
+    hp["data_dependent_initialization_method"] = None
+
+    print(
+        "compile_warmup_only (processing): convolutional_filters=%s "
+        "post_dense=%s minibatch=%d rows=%d" % (
+            hp.get("convolutional_filters"),
+            hp.get("post_convolutional_dense_layer_sizes"),
+            minibatch,
+            len(train_subset),
+        )
+    )
+    started = time.time()
+    model = Class1ProcessingNeuralNetwork(**hp)
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=train_subset.peptide.values,
+            n_flanks=train_subset.n_flank.values,
+            c_flanks=train_subset.c_flank.values),
+        targets=train_subset.hit.values,
+        verbose=0,
+    )
+    print("compile_warmup_only (processing): completed in %.1f sec" % (
+        time.time() - started))
+
+
 def train_model(
         work_item_name,
         work_item_num,
@@ -420,10 +451,15 @@ def train_model(
         progress_print_interval,
         predictor,
         save_to,
+        compile_warmup_only=False,
         constant_data=GLOBAL_DATA):
 
     from sklearn.metrics import roc_auc_score
     from mhcflurry.flanking_encoding import FlankingEncoding
+
+    if compile_warmup_only:
+        _run_compile_warmup(hyperparameters, fold_num, constant_data)
+        return None
 
     df = constant_data["train_data"]
     folds_df = constant_data["folds_df"]

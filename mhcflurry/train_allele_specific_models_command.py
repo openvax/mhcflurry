@@ -23,7 +23,6 @@ from .local_parallelism import (
     add_local_parallelism_args,
     attach_constant_data_to_work_items_if_needed,
     resolve_local_parallelism_args,
-    run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from .hyperparameters import HyperparameterDefaults
@@ -274,27 +273,14 @@ def run(argv=sys.argv[1:]):
         # the order of the work.
         random.shuffle(work_items)
 
-        warmup = run_single_worker_torch_compile_warmup(
-            args,
-            work_items,
-            train_model,
-            constant_data=GLOBAL_DATA,
-        )
-        if warmup is not None:
-            _, warmup_predictor = warmup
-            save_start = time.time()
-            new_model_names = predictor.merge_in_place([warmup_predictor])
-            predictor.save(
-                args.out_models_dir,
-                model_names_to_write=new_model_names,
-                write_metadata=False)
-            print(
-                "Saved torch.compile warmup predictor (%d models total) "
-                "including %d new models in %0.2f sec to %s" % (
-                    len(predictor.neural_networks),
-                    len(new_model_names),
-                    time.time() - save_start,
-                    args.out_models_dir))
+        # NOTE: torch.compile warmup is currently wired only for the
+        # pan-allele and processing trainers, which expose a
+        # ``compile_warmup_only=True`` short-circuit in their
+        # ``train_model``. The allele-specific trainer goes through
+        # ``fit_allele_specific_predictors`` and would need its own
+        # warmup short-circuit; until that exists, the production pool
+        # eats one ~30 s first-compile per architecture per process,
+        # which is acceptable for this trainer's smaller sweeps.
 
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         assert worker_pool is not None

@@ -1461,26 +1461,12 @@ def train_models(args):
             constant_data=GLOBAL_DATA,
             result_serialization_method="save_predictor")
     else:
-        warmup = run_single_worker_torch_compile_warmup(
+        run_single_worker_torch_compile_warmup(
             args,
             work_items,
             train_model,
             constant_data=GLOBAL_DATA,
         )
-        if warmup is not None:
-            _, warmup_predictor = warmup
-            save_start = time.time()
-            (new_model_name,) = predictor.merge_in_place([warmup_predictor])
-            predictor.save(
-                args.out_models_dir,
-                model_names_to_write=[new_model_name],
-                write_metadata=False)
-            print(
-                "Saved torch.compile warmup predictor (%d models total) "
-                "with 1 new model in %0.2f sec to %s" % (
-                    len(predictor.neural_networks),
-                    time.time() - save_start,
-                    args.out_models_dir))
 
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
@@ -1599,6 +1585,68 @@ def _build_train_peptides(
     return make_prepopulated_encodable_sequences(peptide_values, fold_encoded, params)
 
 
+def _run_compile_warmup(hyperparameters, fold_num, constant_data):
+    """One forward+backward through a freshly-built network for compile-cache priming.
+
+    Used by ``run_single_worker_torch_compile_warmup`` to populate the
+    torch.compile on-disk cache once per unique architecture before the
+    production worker pool launches. Trains for one epoch on
+    ``minibatch_size`` rows with pretrain/validation/early-stop disabled,
+    discards the resulting model, and returns. The compile cache write
+    is the only durable side effect.
+    """
+    df = constant_data["train_data"]
+    folds_df = constant_data["folds_df"]
+    allele_encoding = constant_data["allele_encoding"]
+
+    minibatch = max(int(hyperparameters.get("minibatch_size", 128) or 128), 1)
+    fold_mask = folds_df["fold_%d" % fold_num]
+    train_subset = df.loc[fold_mask].head(minibatch)
+    if len(train_subset) == 0:
+        train_subset = df.head(minibatch)
+
+    train_peptides = _build_train_peptides(
+        train_subset.peptide.values,
+        hyperparameters,
+        constant_data,
+        peptide_index=train_subset.index,
+    )
+    train_alleles = AlleleEncoding(
+        train_subset.allele.values, borrow_from=allele_encoding)
+
+    hp = dict(hyperparameters)
+    hp["max_epochs"] = 1
+    hp["validation_split"] = 0.0
+    hp["early_stopping"] = False
+    hp["data_dependent_initialization_method"] = None
+    train_data_overrides = dict(hp.get("train_data") or {})
+    train_data_overrides["pretrain"] = False
+    hp["train_data"] = train_data_overrides
+
+    print(
+        "compile_warmup_only: layer_sizes=%s topology=%s minibatch=%d "
+        "rows=%d" % (
+            hp.get("layer_sizes"),
+            hp.get("topology"),
+            minibatch,
+            len(train_subset),
+        )
+    )
+    started = time.time()
+    model = Class1NeuralNetwork(**hp)
+    model.fit(
+        peptides=train_peptides,
+        affinities=train_subset.measurement_value.values,
+        allele_encoding=train_alleles,
+        inequalities=(
+            train_subset.measurement_inequality.values
+            if "measurement_inequality" in train_subset.columns else None
+        ),
+        verbose=0,
+    )
+    print("compile_warmup_only: completed in %.1f sec" % (time.time() - started))
+
+
 def train_model(
         work_item_name,
         work_item_num,
@@ -1615,7 +1663,12 @@ def train_model(
         progress_print_interval,
         predictor,
         save_to,
+        compile_warmup_only=False,
         constant_data=GLOBAL_DATA):
+
+    if compile_warmup_only:
+        _run_compile_warmup(hyperparameters, fold_num, constant_data)
+        return None
 
     df = constant_data["train_data"]
     folds_df = constant_data["folds_df"]
