@@ -473,6 +473,88 @@ def resolve_dataloader_num_workers(
     return out
 
 
+_AUTO_FIT_RESIDENCY_VRAM_BUDGET_FRACTION_DEFAULT = 0.40
+
+
+def auto_fit_tensor_residency(
+        *,
+        requested,
+        device_type,
+        num_train_rows,
+        peptide_max_length,
+        num_random_negatives,
+        pool_epochs,
+        num_workers_per_gpu,
+        free_vram_gb=None,
+        budget_fraction=None):
+    """Resolve ``fit_tensor_residency=auto`` to ``"device"`` or ``"host"``.
+
+    The residency decides whether a fit() bundle lives on the training
+    device (CUDA/MPS/CPU as appropriate) or on the host (numpy / shared
+    memory + DataLoader workers). When data fits comfortably alongside
+    the model + activations + compile cache, device-resident wins:
+    no per-batch H2D copies, no DataLoader prefetcher overhead, no
+    ``/dev/shm`` capacity preflight needed.
+
+    Inputs
+    ------
+    requested : str
+        Caller's request, one of ``"auto"`` (default), ``"device"``,
+        ``"host"``, ``"host_numpy"``, or ``"host_shared"``. Explicit
+        host/device passes through unchanged.
+    device_type : str
+        ``"cuda"`` / ``"mps"`` / ``"cpu"``. CPU keeps host backing —
+        residency doesn't change perf appreciably and CPU paths run on
+        laptops where SHM-free numpy is the most predictable.
+    num_train_rows : int
+        Real training rows for this fit (after fold split). Drives the
+        peptide / allele / label tensor footprint.
+    peptide_max_length : int
+        Longest peptide. ``left_pad_centered_right_pad`` encoded length
+        is ``3 * peptide_max_length`` int8 bytes per row.
+    num_random_negatives : int
+        Per-pool-epoch RN count.
+    pool_epochs : int
+        Total pool footprint multiplier (RN tensor is sized for the
+        whole cycle, not just one epoch).
+    num_workers_per_gpu : int
+        Co-resident fit-workers sharing the training device. Per-fit
+        bytes scale with this on the CUDA path.
+    free_vram_gb : float, optional
+        Per-GPU free VRAM. ``None`` → assume an A100-class card
+        (conservative: keep device residency unless explicit override
+        forces host).
+    budget_fraction : float, optional
+        Fraction of free VRAM reserved for fit data tensors (rest is
+        for model, activations, compile cache). Default 0.40, override
+        via ``MHCFLURRY_AUTO_FIT_RESIDENCY_VRAM_BUDGET_FRACTION``.
+    """
+    if requested in ("device", "host", "host_numpy", "host_shared"):
+        return requested
+    if requested != "auto":
+        raise ValueError(
+            "auto_fit_tensor_residency: requested must be one of "
+            "{auto, device, host, host_numpy, host_shared}; got %r" % (requested,)
+        )
+    if device_type not in ("cuda", "mps"):
+        return "host"
+    if budget_fraction is None:
+        budget_fraction = float(os.environ.get(
+            "MHCFLURRY_AUTO_FIT_RESIDENCY_VRAM_BUDGET_FRACTION",
+            str(_AUTO_FIT_RESIDENCY_VRAM_BUDGET_FRACTION_DEFAULT),
+        ))
+    encoded_bytes_per_row = max(int(peptide_max_length), 1) * 3
+    bytes_real = int(num_train_rows) * (
+        encoded_bytes_per_row + 8 + 8 + 4
+    )
+    bytes_rn = int(num_random_negatives) * int(pool_epochs) * encoded_bytes_per_row
+    bytes_total = (bytes_real + bytes_rn) * max(int(num_workers_per_gpu), 1)
+    if free_vram_gb is None:
+        return "device"
+    budget_bytes = float(free_vram_gb) * (1024 ** 3) * float(budget_fraction)
+    return "device" if bytes_total < budget_bytes else "host"
+
+
 def auto_random_negative_pool_epochs(
         num_random_negatives,
         peptide_max_length,

@@ -193,18 +193,28 @@ def tensor_batch_collate(batch):
 
 @dataclass
 class FitBacking:
-    """Backing arrays for one fit() call, common to numpy and SHM modes.
+    """Backing arrays for one fit() call.
 
-    A single bundle replaces the parallel ``_shm_x_peptide`` /
-    ``dataset_x_peptide`` scaffolding the fit() loop used to maintain.
-    ``tensor_backed`` is true when the underlying storage is shared
-    torch tensors (fit DataLoader SHM path); false when it's plain numpy.
+    Three residency modes:
+
+    * ``residency="host_numpy"``: numpy arrays, batches built by
+      ``_FitBatchDataset.__getitem__`` and copied H2D per batch by the
+      DataLoader / fit() loop.
+    * ``residency="host_shared"``: SHM-shared CPU torch tensors. Same
+      batch path but DataLoader workers see zero-copy views via OS-page-
+      cache sharing.
+    * ``residency="device"``: torch tensors already on the training
+      device (CUDA/MPS/CPU). The fit() loop indexes them directly, no
+      DataLoader, no per-batch H2D. The default for CUDA when the data
+      bundle fits in VRAM (see ``_pick_fit_tensor_residency``).
+
+    ``tensor_backed`` is preserved for back-compat: it is true for both
+    ``host_shared`` and ``device``. ``device_backed`` is the new sharper
+    flag — true only for ``device``.
 
     This is an internal transport container, not a model feature. The
     model-side peptide encoding decision is controlled separately by
-    ``peptide_amino_acid_encoding_torch``; ``FitBacking`` only decides
-    whether already-encoded fit() arrays are exposed to the DataLoader as
-    numpy arrays or shared CPU tensors.
+    ``peptide_amino_acid_encoding_torch``.
     """
 
     x_peptide: Any
@@ -214,6 +224,8 @@ class FitBacking:
     random_negative_x_peptide: Any = None
     random_negative_x_allele: Any = None
     tensor_backed: bool = False
+    device_backed: bool = False
+    residency: str = "host_numpy"
 
     @classmethod
     def from_numpy(
@@ -234,6 +246,8 @@ class FitBacking:
             random_negative_x_peptide=random_negative_x_peptide,
             random_negative_x_allele=random_negative_x_allele,
             tensor_backed=False,
+            device_backed=False,
+            residency="host_numpy",
         )
 
     @classmethod
@@ -266,6 +280,70 @@ class FitBacking:
             ),
             random_negative_x_allele=share_tensor(random_negative_x_allele),
             tensor_backed=True,
+            device_backed=False,
+            residency="host_shared",
+        )
+
+    @classmethod
+    def from_device(
+        cls,
+        *,
+        x_peptide,
+        x_allele,
+        y_encoded,
+        sample_weights,
+        random_negative_x_peptide_template,
+        random_negative_x_allele,
+        device,
+    ):
+        """Materialize a device-resident bundle.
+
+        Every static tensor (x_peptide, x_allele, y_encoded,
+        sample_weights, random_negative_x_allele) is moved to ``device``
+        once. ``random_negative_x_peptide`` is allocated as a fixed-shape
+        device-resident buffer matching the shape of one cycle's
+        encoding; the caller refills it in place each cycle via the
+        same ``update_shared`` API (which dispatches on dtype to do a
+        device-side copy).
+
+        Inputs may be numpy arrays or CPU torch tensors; the constructor
+        handles the .to(device) move uniformly.
+        """
+        import torch as _torch
+
+        def _to_device(value, dtype=None):
+            if value is None:
+                return None
+            if isinstance(value, _torch.Tensor):
+                tensor = value
+            else:
+                tensor = _torch.as_tensor(value)
+            if dtype is not None and tensor.dtype != dtype:
+                tensor = tensor.to(dtype)
+            return tensor.to(device, non_blocking=False)
+
+        rn_peptide = None
+        if random_negative_x_peptide_template is not None:
+            template = random_negative_x_peptide_template
+            if isinstance(template, _torch.Tensor):
+                shape = tuple(template.shape)
+                template_dtype = template.dtype
+            else:
+                shape = tuple(template.shape)
+                template_dtype = _torch.as_tensor(template).dtype
+            rn_peptide = _torch.zeros(
+                shape, dtype=template_dtype, device=device
+            )
+        return cls(
+            x_peptide=_to_device(x_peptide),
+            x_allele=_to_device(x_allele),
+            y_encoded=_to_device(y_encoded, dtype=_torch.float32),
+            sample_weights=_to_device(sample_weights),
+            random_negative_x_peptide=rn_peptide,
+            random_negative_x_allele=_to_device(random_negative_x_allele),
+            tensor_backed=True,
+            device_backed=True,
+            residency="device",
         )
 
 
