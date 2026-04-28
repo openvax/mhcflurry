@@ -6,6 +6,7 @@ import os
 import numpy
 import pandas
 
+from . import amino_acid
 from .encodable_sequences import EncodableSequences
 from .hyperparameters import HyperparameterDefaults
 from .common import amino_acid_distribution, random_peptides
@@ -673,3 +674,290 @@ class RandomNegativesPool(object):
             )
         )
         return rng.permutation(self._total_count)
+
+
+# --- Device-resident random-negative encoding -----------------------------
+#
+# The host path generates peptides by sampling AA letters via
+# ``numpy.random.choice``, joining each row into a Python string, and then
+# round-tripping the strings through ``EncodableSequences.create`` →
+# ``sequences_to_fixed_length_index_encoded_array`` to recover integer
+# indices. On a release-exact run that string round-trip dominated random-
+# negative generation: ~22.5 M Python string allocations + 1.5 M joins per
+# epoch.
+#
+# The helpers below skip the round-trip entirely. They sample integer
+# indices directly via ``torch.multinomial`` against the canonical AA
+# distribution and apply the same per-(allele, length) alignment math as
+# the host path, writing into a pre-allocated device-resident int8 tensor.
+# Output rows match ``planner.get_peptides()`` order: outer loop over
+# pool epochs, then ``plan_df`` row-major iteration of (allele, length,
+# count). Within a (allele, length) block, the row order is the order
+# returned by torch.multinomial — not the same RNG stream as the numpy
+# path, but the row layout (which (allele, length) sits where) is
+# byte-identical.
+
+
+_SUPPORTED_DEVICE_ALIGNMENTS = (
+    "left_pad_centered_right_pad",
+    "pad_middle",
+)
+
+
+def _place_indices_with_alignment(
+        out_rows,
+        block,
+        length,
+        alignment,
+        max_length,
+        left_edge=4,
+        right_edge=4):
+    """Write a ``(count, length)`` index block into ``out_rows`` in place.
+
+    ``out_rows`` is a (count, encoded_length) tensor or array prefilled
+    with the X index. Mirrors the per-length branch of
+    :func:`EncodableSequences.sequences_to_fixed_length_index_encoded_array`
+    for the supported alignment methods, but operates on already-sampled
+    integer indices instead of peptide strings.
+
+    Factored out so the device-aware encoder and host-side parity tests
+    share one source of truth for the alignment math.
+    """
+    L = int(length)
+    if alignment == "left_pad_centered_right_pad":
+        if L < 1 or L > int(max_length):
+            raise ValueError(
+                "left_pad_centered_right_pad requires 1 <= length <= "
+                "max_length=%d; got %d" % (max_length, L)
+            )
+        out_rows[:, :L] = block
+        out_rows[:, -L:] = block
+        center_left_padding = (int(max_length) - L) // 2
+        center_left_offset = int(max_length) + center_left_padding
+        out_rows[:, center_left_offset : center_left_offset + L] = block
+        return
+    if alignment == "pad_middle":
+        min_length = int(left_edge) + int(right_edge)
+        if L < min_length or L > int(max_length):
+            raise ValueError(
+                "pad_middle requires %d <= length <= max_length=%d; "
+                "got %d" % (min_length, max_length, L)
+            )
+        middle_length = int(max_length) - int(left_edge) - int(right_edge)
+        num_null = int(max_length) - L
+        num_null_left = int(math.ceil(num_null / 2))
+        num_middle_filled = middle_length - num_null
+        middle_start = int(left_edge) + num_null_left
+        out_rows[:, : int(left_edge)] = block[:, : int(left_edge)]
+        out_rows[:, -int(right_edge) :] = block[:, -int(right_edge) :]
+        if num_middle_filled > 0:
+            out_rows[
+                :, middle_start : middle_start + num_middle_filled
+            ] = block[
+                :, int(left_edge) : int(left_edge) + num_middle_filled
+            ]
+        return
+    raise NotImplementedError(
+        "Device-resident RN encoder supports alignment_method in %r; "
+        "got %r." % (_SUPPORTED_DEVICE_ALIGNMENTS, alignment)
+    )
+
+
+def encoded_length_for_alignment(alignment, max_length):
+    """Return the per-row encoded length for an alignment method.
+
+    Mirrors the shape contract of
+    :func:`EncodableSequences.sequences_to_fixed_length_index_encoded_array`.
+    """
+    if alignment == "left_pad_centered_right_pad":
+        return 3 * int(max_length)
+    if alignment == "pad_middle":
+        return int(max_length)
+    if alignment == "left_pad_right_pad":
+        return 2 * int(max_length)
+    if alignment in ("right_pad", "left_pad"):
+        return int(max_length)
+    raise NotImplementedError(
+        "encoded_length_for_alignment: unknown alignment %r" % (alignment,)
+    )
+
+
+def aa_distribution_to_index_weights(distribution, device=None, dtype=None):
+    """Convert a letter-indexed AA distribution to a torch index-weight vector.
+
+    Inputs
+    ------
+    distribution : pandas.Series or None
+        Letter→probability map (typically the planner's
+        ``aa_distribution``). When ``None``, weights are uniform over
+        the 20 common amino acids.
+    device, dtype : forwarded to the result tensor. ``dtype`` defaults
+        to ``torch.float32`` (multinomial requires float).
+
+    Returns
+    -------
+    torch.Tensor of shape ``(len(amino_acid.AMINO_ACIDS),)`` — index 20
+    (X) is always zero so X is never sampled.
+    """
+    import torch as _torch
+
+    if dtype is None:
+        dtype = _torch.float32
+    weights = _torch.zeros(
+        len(amino_acid.AMINO_ACIDS), dtype=dtype, device=device
+    )
+    if distribution is None:
+        for letter in amino_acid.COMMON_AMINO_ACIDS:
+            weights[amino_acid.AMINO_ACID_INDEX[letter]] = 1.0
+    else:
+        for letter, prob in distribution.items():
+            idx = amino_acid.AMINO_ACID_INDEX[letter]
+            if idx == amino_acid.X_INDEX:
+                continue
+            weights[idx] = float(prob)
+    total = weights.sum()
+    if float(total) <= 0.0:
+        raise ValueError(
+            "aa_distribution_to_index_weights: all weights are zero. "
+            "Either supply a distribution covering common AAs or pass "
+            "distribution=None for a uniform fallback."
+        )
+    weights = weights / total
+    return weights
+
+
+def encode_random_negatives_on_device(
+        *,
+        planner,
+        pool_epochs,
+        peptide_encoding,
+        device,
+        generator=None,
+        dtype=None,
+        out=None):
+    """Sample + encode ``pool_epochs`` cycles of random negatives on device.
+
+    Parameters
+    ----------
+    planner : RandomNegativePeptides
+        Already had ``plan(...)`` called.
+    pool_epochs : int
+        Number of consecutive get_peptides() epochs to materialize. The
+        result has ``pool_epochs * planner.get_total_count()`` rows.
+    peptide_encoding : dict
+        Subset of ``Class1NeuralNetwork.network_hyperparameter_defaults``
+        that controls peptide encoding. Required keys:
+        ``alignment_method``, ``max_length``. For ``pad_middle``,
+        ``left_edge`` and ``right_edge`` are also consulted (default 4
+        each, matching the historical defaults).
+    device : torch.device or str
+        Output tensor device. Sampling and alignment writes happen here
+        (no host round-trip).
+    generator : torch.Generator, optional
+        When supplied, all multinomial draws are routed through it. The
+        caller is responsible for seeding (the numpy / torch RNG streams
+        are not bridged — for reproducible parity tests, seed both).
+    dtype : torch.dtype, optional
+        Output dtype. Default ``torch.int8`` (alphabet size 21 fits with
+        room to spare).
+    out : torch.Tensor, optional
+        Pre-allocated output tensor of the correct shape, dtype, and
+        device. When supplied, this function refills it in place — the
+        usual pattern for the device-resident fit path, where the
+        per-fit RN buffer is allocated once and reused per cycle.
+
+    Returns
+    -------
+    torch.Tensor of shape ``(pool_epochs * total_count, encoded_length)``,
+    dtype int8 by default, on ``device``. Rows are the per-(allele,
+    length) blocks in canonical ``planner.plan_df`` row-major order,
+    repeated ``pool_epochs`` times — same layout the host path produces
+    after encoding ``planner.get_peptides()``.
+    """
+    import torch as _torch
+
+    if planner.plan_df is None:
+        raise ValueError(
+            "encode_random_negatives_on_device: planner has no plan; "
+            "call planner.plan(...) before encoding."
+        )
+    pool_epochs = max(int(pool_epochs), 1)
+    if dtype is None:
+        dtype = _torch.int8
+
+    alignment = peptide_encoding["alignment_method"]
+    max_length = int(peptide_encoding["max_length"])
+    if alignment not in _SUPPORTED_DEVICE_ALIGNMENTS:
+        raise NotImplementedError(
+            "encode_random_negatives_on_device: alignment_method %r not "
+            "supported on device. Falls back to host encoding via "
+            "EncodableSequences." % (alignment,)
+        )
+    left_edge = int(peptide_encoding.get("left_edge", 4))
+    right_edge = int(peptide_encoding.get("right_edge", 4))
+    encoded_length = encoded_length_for_alignment(alignment, max_length)
+
+    total_count = int(planner.get_total_count())
+    expected_rows = pool_epochs * total_count
+    expected_shape = (expected_rows, encoded_length)
+    if out is None:
+        out = _torch.full(
+            expected_shape,
+            int(amino_acid.X_INDEX),
+            dtype=dtype,
+            device=device,
+        )
+    else:
+        if tuple(out.shape) != expected_shape:
+            raise ValueError(
+                "out shape mismatch: expected %r, got %r" % (
+                    expected_shape, tuple(out.shape),
+                )
+            )
+        if out.dtype != dtype:
+            raise ValueError(
+                "out dtype mismatch: expected %r, got %r" % (dtype, out.dtype)
+            )
+        out.fill_(int(amino_acid.X_INDEX))
+
+    weights = aa_distribution_to_index_weights(
+        planner.aa_distribution, device=device
+    )
+
+    plan_df = planner.plan_df
+    alleles = list(plan_df.index)
+    length_columns = list(plan_df.columns)
+
+    cursor = 0
+    for _epoch in range(pool_epochs):
+        for allele in alleles:
+            for length in length_columns:
+                num = int(plan_df.at[allele, length])
+                if num <= 0:
+                    continue
+                L = int(length)
+                flat = _torch.multinomial(
+                    weights,
+                    num_samples=num * L,
+                    replacement=True,
+                    generator=generator,
+                )
+                block = flat.view(num, L).to(dtype)
+                _place_indices_with_alignment(
+                    out[cursor : cursor + num],
+                    block,
+                    length=L,
+                    alignment=alignment,
+                    max_length=max_length,
+                    left_edge=left_edge,
+                    right_edge=right_edge,
+                )
+                cursor += num
+    if cursor != expected_rows:
+        raise AssertionError(
+            "encode_random_negatives_on_device: wrote %d rows, expected "
+            "%d (planner.get_total_count() drift?)" % (
+                cursor, expected_rows,
+            )
+        )
+    return out

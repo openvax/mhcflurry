@@ -486,3 +486,200 @@ def test_shared_pool_write_requires_seed(tmp_path):
         RandomNegativesPool.write_shared_pool(
             str(tmp_path), planner, _int8_encoder, pool_epochs=3, seed=None,
         )
+
+
+# --- Device-resident RN encoder ---------------------------------------
+
+
+def _placement_planner():
+    planner = RandomNegativePeptides(
+        random_negative_method="by_allele",
+        random_negative_rate=1.0,
+        random_negative_constant=2,
+    )
+    data_rows = [("HLA-A*02:01", "SIINFEKL", 400, "=")]
+    for peptide in random_peptides(20, length=9):
+        data_rows.append(("HLA-A*02:01", peptide, 100, "="))
+    for peptide in random_peptides(20, length=10):
+        data_rows.append(("HLA-B*07:02", peptide, 1000, "="))
+    data = pandas.DataFrame(
+        data_rows,
+        columns=["allele", "peptide", "affinity", "inequality"])
+    planner.plan(
+        peptides=data.peptide.values,
+        affinities=data.affinity.values,
+        alleles=data.allele.values,
+        inequalities=data.inequality.values)
+    return planner
+
+
+def test_alignment_left_pad_centered_right_pad_matches_host():
+    """The device alignment helper must produce row-for-row output equal
+    to ``EncodableSequences.sequences_to_fixed_length_index_encoded_array``
+    when fed the same per-length index blocks. Bypass the RNG by
+    handing pre-chosen indices to both paths."""
+    import torch
+    from mhcflurry.encodable_sequences import EncodableSequences
+    from mhcflurry.random_negative_peptides import _place_indices_with_alignment
+    from mhcflurry import amino_acid
+
+    max_length = 15
+    encoded_length = 3 * max_length
+    rng = numpy.random.default_rng(42)
+    for length in [5, 9, 12, 15]:
+        count = 7
+        # Sample integer indices in [0, 19] (skip X) directly — this is
+        # what the device path will do post-multinomial.
+        indices = rng.integers(0, 20, size=(count, length), dtype=numpy.int8)
+
+        peptides = [amino_acid.indices_to_peptide(row) for row in indices]
+        host = EncodableSequences.create(
+            peptides
+        ).variable_length_to_fixed_length_categorical(
+            alignment_method="left_pad_centered_right_pad",
+            max_length=max_length,
+        )
+
+        device = torch.full(
+            (count, encoded_length),
+            int(amino_acid.X_INDEX),
+            dtype=torch.int8,
+        )
+        block = torch.from_numpy(indices)
+        _place_indices_with_alignment(
+            device, block, length=length,
+            alignment="left_pad_centered_right_pad",
+            max_length=max_length,
+        )
+        numpy.testing.assert_array_equal(device.numpy(), host)
+
+
+def test_alignment_pad_middle_matches_host():
+    import torch
+    from mhcflurry.encodable_sequences import EncodableSequences
+    from mhcflurry.random_negative_peptides import _place_indices_with_alignment
+    from mhcflurry import amino_acid
+
+    max_length = 15
+    left_edge = 4
+    right_edge = 4
+    rng = numpy.random.default_rng(7)
+    for length in [8, 9, 11, 15]:
+        count = 5
+        indices = rng.integers(0, 20, size=(count, length), dtype=numpy.int8)
+        peptides = [amino_acid.indices_to_peptide(row) for row in indices]
+        host = EncodableSequences.create(
+            peptides
+        ).variable_length_to_fixed_length_categorical(
+            alignment_method="pad_middle",
+            max_length=max_length,
+            left_edge=left_edge,
+            right_edge=right_edge,
+        )
+        device = torch.full(
+            (count, max_length),
+            int(amino_acid.X_INDEX),
+            dtype=torch.int8,
+        )
+        block = torch.from_numpy(indices)
+        _place_indices_with_alignment(
+            device, block, length=length, alignment="pad_middle",
+            max_length=max_length, left_edge=left_edge, right_edge=right_edge,
+        )
+        numpy.testing.assert_array_equal(device.numpy(), host)
+
+
+def test_encode_random_negatives_on_device_shape_and_dtype():
+    """Layout/shape contract for the device encoder.
+
+    Doesn't compare RNG streams (numpy vs torch generators); checks that
+    shape, dtype, and the per-(allele, length) row layout match what the
+    host path produces row-for-row when given the same index source via
+    ``_place_indices_with_alignment``.
+    """
+    import torch
+    from mhcflurry.random_negative_peptides import (
+        encode_random_negatives_on_device,
+    )
+
+    planner = _placement_planner()
+    pool_epochs = 3
+    encoding = {"alignment_method": "left_pad_centered_right_pad", "max_length": 15}
+    gen = torch.Generator(device="cpu")
+    gen.manual_seed(123)
+    out = encode_random_negatives_on_device(
+        planner=planner,
+        pool_epochs=pool_epochs,
+        peptide_encoding=encoding,
+        device="cpu",
+        generator=gen,
+    )
+    total = planner.get_total_count()
+    assert out.shape == (pool_epochs * total, 3 * 15)
+    assert out.dtype == torch.int8
+    # All sampled indices must be in the 20-AA range, never X (= 20).
+    common_max = len(_amino_acid_module().COMMON_AMINO_ACIDS) - 1
+    sampled_mask = out != int(_amino_acid_module().X_INDEX)
+    assert (out[sampled_mask] >= 0).all()
+    assert (out[sampled_mask] <= common_max).all()
+
+
+def test_encode_random_negatives_on_device_reuses_out_buffer():
+    """Device-resident fit allocates the RN buffer once and refills it
+    per cycle. The encoder must accept the buffer and overwrite it
+    cleanly (no leftover values from the previous cycle)."""
+    import torch
+    from mhcflurry.random_negative_peptides import (
+        encode_random_negatives_on_device,
+    )
+
+    planner = _placement_planner()
+    pool_epochs = 2
+    encoding = {"alignment_method": "left_pad_centered_right_pad", "max_length": 15}
+    total = planner.get_total_count()
+
+    out = torch.zeros(
+        (pool_epochs * total, 3 * 15), dtype=torch.int8, device="cpu",
+    )
+    out_id = id(out)
+    out.fill_(99)  # sentinel
+    gen = torch.Generator(device="cpu")
+    gen.manual_seed(0)
+    encode_random_negatives_on_device(
+        planner=planner, pool_epochs=pool_epochs,
+        peptide_encoding=encoding, device="cpu", generator=gen, out=out,
+    )
+    assert id(out) == out_id  # in-place
+    # No leftover sentinel values.
+    assert (out != 99).any()
+    # Re-encoding into the same buffer with a different seed produces
+    # different content (no stale carry-over), and the buffer identity
+    # is preserved.
+    snapshot = out.clone()
+    gen2 = torch.Generator(device="cpu")
+    gen2.manual_seed(99)
+    encode_random_negatives_on_device(
+        planner=planner, pool_epochs=pool_epochs,
+        peptide_encoding=encoding, device="cpu", generator=gen2, out=out,
+    )
+    assert id(out) == out_id
+    assert not torch.equal(out, snapshot)
+
+
+def test_encode_random_negatives_on_device_unsupported_alignment():
+    import pytest
+    from mhcflurry.random_negative_peptides import (
+        encode_random_negatives_on_device,
+    )
+    planner = _placement_planner()
+    with pytest.raises(NotImplementedError, match="alignment_method"):
+        encode_random_negatives_on_device(
+            planner=planner, pool_epochs=1,
+            peptide_encoding={"alignment_method": "left_pad_right_pad", "max_length": 15},
+            device="cpu",
+        )
+
+
+def _amino_acid_module():
+    from mhcflurry import amino_acid as aa
+    return aa

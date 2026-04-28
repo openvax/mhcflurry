@@ -45,6 +45,63 @@ for (letter, i) in list(AMINO_ACID_INDEX.items()):
 
 AMINO_ACIDS = list(COMMON_AMINO_ACIDS_WITH_UNKNOWN.keys())
 
+# Single canonical letter<->index mapping for the whole codebase. Position
+# of a letter in ``AMINO_ACIDS`` equals ``AMINO_ACID_INDEX[letter]``; X is
+# at index 20. Anything that round-trips between peptide strings and
+# integer index arrays must go through these helpers — that is the
+# contract device-resident encoding paths rely on for re-materializing
+# peptides from index tensors.
+
+X_INDEX = AMINO_ACID_INDEX["X"]
+"""Canonical index of the X (unknown) amino acid; equal to
+``len(COMMON_AMINO_ACIDS)``."""
+
+NUM_COMMON_AMINO_ACIDS = len(COMMON_AMINO_ACIDS)
+"""Count of the 20 common amino acids (excludes X)."""
+
+
+def peptide_to_indices(peptide, dtype="int8"):
+    """
+    Convert a peptide string to a 1-D integer index array.
+
+    Uppercases the input and uses :data:`AMINO_ACID_INDEX` for the
+    letter→index map so the result matches what
+    :func:`index_encoding` produces for one row.
+
+    Parameters
+    ----------
+    peptide : str
+    dtype : numpy dtype, default ``"int8"``
+        Index payloads fit comfortably in int8 (alphabet size 21 ≪ 127).
+
+    Returns
+    -------
+    numpy.ndarray of shape ``(len(peptide),)``
+    """
+    return numpy.asarray(
+        [AMINO_ACID_INDEX[char] for char in peptide.upper()],
+        dtype=dtype,
+    )
+
+
+def indices_to_peptide(indices):
+    """
+    Convert a 1-D integer index array (or sequence) back to its peptide
+    string.
+
+    Inverse of :func:`peptide_to_indices` for canonical alphabet
+    members. Out-of-range indices raise :class:`IndexError`.
+
+    Parameters
+    ----------
+    indices : iterable of int
+
+    Returns
+    -------
+    str
+    """
+    return "".join(AMINO_ACIDS[int(i)] for i in indices)
+
 BLOSUM62_MATRIX = pandas.read_csv(StringIO("""
    A  R  N  D  C  Q  E  G  H  I  L  K  M  F  P  S  T  W  Y  V  X
 A  4 -1 -2 -2  0 -1 -1  0 -2 -1 -1 -1 -1 -2 -1  1  0 -3 -2  0  0

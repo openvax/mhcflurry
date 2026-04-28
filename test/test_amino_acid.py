@@ -148,3 +148,28 @@ def test_index_encoding_no_downcast_futurewarning():
         index_encoding = amino_acid.index_encoding(
             ["AAAA", "ABCA"], letter_to_index_dict)
     assert index_encoding.dtype.kind in ("i", "u")
+
+
+def test_peptide_index_round_trip_preserves_string():
+    """Single-source-of-truth round-trip: peptide → indices → peptide."""
+    for peptide in ["SIINFEKL", "ACDEFGHIKLMNPQRSTVWY", "XAXAAA", ""]:
+        indices = amino_acid.peptide_to_indices(peptide)
+        assert indices.dtype == numpy.dtype("int8")
+        recovered = amino_acid.indices_to_peptide(indices)
+        assert recovered == peptide.upper()
+
+
+def test_peptide_index_alphabet_anchors():
+    """Position of letters in AMINO_ACIDS is the contract device-resident
+    code relies on. Pin the well-known anchors so a future reorder breaks
+    the test, not silently the encoded tensor layout."""
+    assert amino_acid.AMINO_ACIDS[0] == "A"
+    assert amino_acid.AMINO_ACIDS[amino_acid.X_INDEX] == "X"
+    assert amino_acid.X_INDEX == 20
+    assert amino_acid.NUM_COMMON_AMINO_ACIDS == 20
+    assert amino_acid.AMINO_ACID_INDEX["A"] == 0
+    assert amino_acid.AMINO_ACID_INDEX["X"] == 20
+    # Sorted alphabetically over the 20 common AAs.
+    common = sorted(amino_acid.COMMON_AMINO_ACIDS)
+    for i, letter in enumerate(common):
+        assert amino_acid.AMINO_ACID_INDEX[letter] == i
