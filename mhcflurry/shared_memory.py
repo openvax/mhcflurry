@@ -226,6 +226,14 @@ class FitBacking:
     tensor_backed: bool = False
     device_backed: bool = False
     residency: str = "host_numpy"
+    # Device-residency only: pre-stitched (RN | real) device tensors that
+    # the inner fit() loop indexes into directly. Top slice is RN
+    # (refilled per cycle by RandomNegativesPool); bottom slice is the
+    # static real-data block. ``random_negative_x_peptide`` and
+    # ``x_peptide`` are views into ``combined_peptide`` (and same for
+    # allele) so refills propagate without any copy.
+    combined_peptide: Any = None
+    combined_allele: Any = None
 
     @classmethod
     def from_numpy(
@@ -298,13 +306,27 @@ class FitBacking:
     ):
         """Materialize a device-resident bundle.
 
-        Every static tensor (x_peptide, x_allele, y_encoded,
-        sample_weights, random_negative_x_allele) is moved to ``device``
-        once. ``random_negative_x_peptide`` is allocated as a fixed-shape
-        device-resident buffer matching the shape of one cycle's
-        encoding; the caller refills it in place each cycle via the
-        same ``update_shared`` API (which dispatches on dtype to do a
-        device-side copy).
+        Pre-allocates one combined ``(num_random_negatives + num_real,
+        encoded_length)`` peptide tensor on ``device`` (and same for
+        allele). The top ``num_random_negatives`` rows are the RN slice
+        — refilled per cycle by ``RandomNegativesPool`` via in-place
+        copy. The bottom ``num_real`` rows are the static real-data
+        block — copied once at construction. ``x_peptide`` and
+        ``random_negative_x_peptide`` (and the allele equivalents) are
+        returned as views into the combined buffer so refills propagate
+        with zero copy.
+
+        Why one combined tensor: the fit() inner loop indexes via a
+        single ``index_select`` into ``combined_peptide`` per batch,
+        which is what eliminates the per-batch H2D copies that
+        dominate the host-DataLoader path. ``train_indices`` already
+        addresses the unified ``[0, num_rn + num_real)`` space (see
+        ``y_encoded`` / ``sample_weights_with_negatives`` construction
+        in ``fit``), so no index translation is needed.
+
+        ``y_encoded`` and ``sample_weights`` are already laid out in
+        the unified ``[RN | real]`` order by the caller and just need
+        to land on device.
 
         Inputs may be numpy arrays or CPU torch tensors; the constructor
         handles the .to(device) move uniformly.
@@ -322,28 +344,85 @@ class FitBacking:
                 tensor = tensor.to(dtype)
             return tensor.to(device, non_blocking=False)
 
-        rn_peptide = None
+        x_peptide_dev = _to_device(x_peptide)
+        x_allele_dev = _to_device(x_allele)
+
+        combined_peptide = None
+        rn_peptide_view = None
+        x_peptide_view = x_peptide_dev
         if random_negative_x_peptide_template is not None:
             template = random_negative_x_peptide_template
             if isinstance(template, _torch.Tensor):
-                shape = tuple(template.shape)
-                template_dtype = template.dtype
+                rn_shape = tuple(template.shape)
+                rn_dtype = template.dtype
             else:
-                shape = tuple(template.shape)
-                template_dtype = _torch.as_tensor(template).dtype
-            rn_peptide = _torch.zeros(
-                shape, dtype=template_dtype, device=device
+                rn_shape = tuple(template.shape)
+                rn_dtype = _torch.as_tensor(template).dtype
+            num_rn = int(rn_shape[0])
+            if x_peptide_dev is None:
+                raise ValueError(
+                    "FitBacking.from_device: x_peptide is required when "
+                    "random_negative_x_peptide_template is set."
+                )
+            if x_peptide_dev.dtype != rn_dtype:
+                x_peptide_dev = x_peptide_dev.to(rn_dtype)
+            num_real = int(x_peptide_dev.shape[0])
+            combined_shape = (num_rn + num_real, *rn_shape[1:])
+            if tuple(x_peptide_dev.shape[1:]) != tuple(rn_shape[1:]):
+                raise ValueError(
+                    "FitBacking.from_device: real and random-negative "
+                    "peptide tensors disagree on per-row shape: %r vs %r" % (
+                        tuple(x_peptide_dev.shape[1:]),
+                        tuple(rn_shape[1:]),
+                    )
+                )
+            combined_peptide = _torch.empty(
+                combined_shape, dtype=rn_dtype, device=device
             )
+            rn_peptide_view = combined_peptide[:num_rn]
+            x_peptide_view = combined_peptide[num_rn:]
+            x_peptide_view.copy_(x_peptide_dev)
+            rn_peptide_view.zero_()
+
+        rn_allele_dev = _to_device(random_negative_x_allele)
+        combined_allele = None
+        rn_allele_view = rn_allele_dev
+        x_allele_view = x_allele_dev
+        if rn_allele_dev is not None and x_allele_dev is not None:
+            if rn_allele_dev.dtype != x_allele_dev.dtype:
+                # Match dtypes via the wider one (typically float32 for allele).
+                target_dtype = (
+                    _torch.float32
+                    if (rn_allele_dev.dtype.is_floating_point
+                        or x_allele_dev.dtype.is_floating_point)
+                    else x_allele_dev.dtype
+                )
+                rn_allele_dev = rn_allele_dev.to(target_dtype)
+                x_allele_dev = x_allele_dev.to(target_dtype)
+            num_rn_a = int(rn_allele_dev.shape[0])
+            num_real_a = int(x_allele_dev.shape[0])
+            combined_allele = _torch.empty(
+                (num_rn_a + num_real_a, *rn_allele_dev.shape[1:]),
+                dtype=rn_allele_dev.dtype,
+                device=device,
+            )
+            combined_allele[:num_rn_a].copy_(rn_allele_dev)
+            combined_allele[num_rn_a:].copy_(x_allele_dev)
+            rn_allele_view = combined_allele[:num_rn_a]
+            x_allele_view = combined_allele[num_rn_a:]
+
         return cls(
-            x_peptide=_to_device(x_peptide),
-            x_allele=_to_device(x_allele),
+            x_peptide=x_peptide_view,
+            x_allele=x_allele_view,
             y_encoded=_to_device(y_encoded, dtype=_torch.float32),
             sample_weights=_to_device(sample_weights),
-            random_negative_x_peptide=rn_peptide,
-            random_negative_x_allele=_to_device(random_negative_x_allele),
+            random_negative_x_peptide=rn_peptide_view,
+            random_negative_x_allele=rn_allele_view,
             tensor_backed=True,
             device_backed=True,
             residency="device",
+            combined_peptide=combined_peptide,
+            combined_allele=combined_allele,
         )
 
 
