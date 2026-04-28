@@ -457,7 +457,7 @@ asymmetries to know about:
   that, rsync ships ~tiny symlinks instead of multi-GB directories.
 - **Down direction:** the post-run rsync has NO excludes — everything
   under `out/` returns. The orchestrator script
-  (`scripts/training/pan_allele_release_exact.sh`) places the
+  (`scripts/training/pan_allele_release_affinity.sh`) places the
   encoding cache OUTSIDE `$MHCFLURRY_OUT` (default
   `$HOME/runplz-cache/encoding_cache/`) so the ~7 GB fixed-encoding mmap
   doesn't ride back. Override with `MHCFLURRY_ENCODING_CACHE_DIR`.

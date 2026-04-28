@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Quickly measure per-epoch wall time with OMP_NUM_THREADS=1. Same
-# pipeline as pan_allele_release_exact.sh but caps work:
+# pipeline as pan_allele_release_affinity.sh but caps work:
 #   - 1 fold (not 4)
 #   - 2 architectures (not 35 from generate_hyperparameters.py)
 #   - no percentile-rank calibration

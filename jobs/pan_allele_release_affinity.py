@@ -4,7 +4,7 @@ same 4 folds, same 35-architecture sweep, same selection step
 (--min-models 2 --max-models 8), same percentile-rank calibration.
 
 Launch:
-    runplz brev --instance mhcflurry-release-exact jobs/pan_allele_release_exact.py
+    runplz brev --instance mhcflurry-release-exact jobs/pan_allele_release_affinity.py
 
 Compute: ~140 networks × ~90 min each on A100 → ~210 GPU-hours. On the
 pinned 8×A100 box that's ~28 hours wall-clock, ~$336.
@@ -127,7 +127,7 @@ def train():
     env = os.environ.copy()
     env["MHCFLURRY_OUT"] = env["RUNPLZ_OUT"]
     subprocess.run(
-        ["bash", "scripts/training/pan_allele_release_exact.sh"],
+        ["bash", "scripts/training/pan_allele_release_affinity.sh"],
         check=True,
         env=env,
     )

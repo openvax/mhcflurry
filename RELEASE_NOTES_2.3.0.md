@@ -143,7 +143,7 @@ real measurement:
 
 ### Encoding cache lives outside `MHCFLURRY_OUT`
 
-`scripts/training/pan_allele_release_exact.sh` now places the
+`scripts/training/pan_allele_release_affinity.sh` now places the
 encoding cache at `$HOME/runplz-cache/encoding_cache/` (override
 with `MHCFLURRY_ENCODING_CACHE_DIR`) instead of inside
 `$MHCFLURRY_OUT`. Two upsides: the ~7 GB fixed-encoding mmap doesn't ride
@@ -205,7 +205,7 @@ all common configurations.
 
 When to use which:
 - **`compare_new_vs_public.py`** — single run vs the published 2.2.0
-  baseline. The eval stage of `pan_allele_release_exact.sh` runs this
+  baseline. The eval stage of `pan_allele_release_affinity.sh` runs this
   by default.
 - **`compare_runs.py`** — any two runs against each other. Use when
   comparing recipe variants, hyperparameter sweeps, or 2.3.0
@@ -214,7 +214,7 @@ When to use which:
 
 ## Pipeline orchestration
 
-`scripts/training/pan_allele_release_exact.sh` is now end-to-end:
+`scripts/training/pan_allele_release_affinity.sh` is now end-to-end:
 
 ```
 fetch_pretrain_data   → fetch_data_curated   → train_combined

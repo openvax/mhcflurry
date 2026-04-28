@@ -77,7 +77,7 @@ image = (
         "MHCFLURRY_TORCH_COMPILE": "1",
         "TORCHINDUCTOR_COMPILE_THREADS": "2",
         # OMP/MKL/OPENBLAS auto-computed by set_cpu_threads inside
-        # pan_allele_release_exact.sh based on nproc + worker layout.
+        # pan_allele_release_affinity.sh based on nproc + worker layout.
         # No manual override here → script auto-tunes.
     },
 )
@@ -85,7 +85,7 @@ def train():
     env = os.environ.copy()
     env["MHCFLURRY_OUT"] = env["RUNPLZ_OUT"]
     subprocess.run(
-        ["bash", "scripts/training/pan_allele_release_exact.sh"],
+        ["bash", "scripts/training/pan_allele_release_affinity.sh"],
         check=True,
         env=env,
     )

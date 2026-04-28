@@ -294,7 +294,7 @@ print(
 )
 ')"
     printf >&2 \
-        "[pan_allele_release_exact.sh] DATALOADER_NUM_WORKERS=auto resolved to %s\n" \
+        "[pan_allele_release_affinity.sh] DATALOADER_NUM_WORKERS=auto resolved to %s\n" \
         "$DATALOADER_NUM_WORKERS"
 fi
 
