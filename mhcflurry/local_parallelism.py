@@ -136,6 +136,25 @@ def _dataloader_num_workers_arg(value):
     return v
 
 
+def _random_negative_pool_epochs_arg(value):
+    """argparse type for ``--random-negative-pool-epochs``. ``"auto"`` or int>=1."""
+    import argparse
+    if isinstance(value, str) and value.lower() == "auto":
+        return "auto"
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "--random-negative-pool-epochs must be 'auto' or an integer >= 1, "
+            "got %r" % (value,)
+        )
+    if v < 1:
+        raise argparse.ArgumentTypeError(
+            "--random-negative-pool-epochs must be >= 1, got %d" % (v,)
+        )
+    return v
+
+
 def _free_vram_override_gb(num_gpus):
     """Return env-pinned free VRAM in GB, or ``None``.
 
@@ -454,6 +473,112 @@ def resolve_dataloader_num_workers(
     return out
 
 
+def auto_random_negative_pool_epochs(
+        num_random_negatives,
+        peptide_max_length,
+        num_workers,
+        ram_gb=None,
+        *,
+        safety_fraction=None,
+        per_pool_epoch_per_worker_bytes=None,
+        hard_cap=None):
+    """Pick ``random_negative_pool_epochs`` from box capacity.
+
+    The pool sits in the heap of every fit-worker process. Per-pool-epoch
+    memory cost is dominated by:
+
+    * ``num_random_negatives × peptide_max_length`` int8 indices,
+    * intermediate ``pandas.Series[str]`` allocations and encoder buffers
+      observed in practice at ~10–40× the int8 size on 2026-04 measurements
+      (the old ``pool_epochs=100`` run OOM'd a 944 GB box at ~199 GB / worker
+      worth of transient pool cost).
+
+    We budget for the pessimistic ``per_pool_epoch_per_worker_bytes`` figure
+    so the auto value is safe under transient peaks; tunable via env when
+    a workload is known to behave better than the empirical pessimistic
+    figure.
+
+    Returns an int >= 1. ``1`` reproduces the pre-Phase-1 every-epoch-regen
+    behavior. ``> 1`` amortizes the RN gen + encode cost across N epochs.
+
+    Inputs
+    ------
+    num_random_negatives : int
+        Number of random-negative peptides per epoch (the planner's
+        ``get_total_count()``). The size of one pool-epoch in the cycle.
+    peptide_max_length : int
+        Longest peptide the encoding allocates space for. With
+        BLOSUM62 + ``peptide_amino_acid_encoding_torch=True`` the
+        per-peptide footprint is ``peptide_max_length`` int8 bytes.
+    num_workers : int
+        Total fit() worker processes that will share the box. Each holds
+        its own RN pool, so total RAM cost = ``num_workers × pool_epochs ×
+        per_pool_epoch_per_worker_bytes``.
+    ram_gb : float, optional
+        Total system RAM in GB. ``None`` returns ``1`` (safe default —
+        we don't know the budget so don't bump pool_epochs above legacy).
+    safety_fraction : float, optional
+        Fraction of total RAM available to RN pools across all workers.
+        Default ``0.5`` (half of system RAM, leaving 50% for the rest).
+        Override via ``MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION``.
+    per_pool_epoch_per_worker_bytes : float, optional
+        Empirical per-pool-epoch per-worker RAM cost in bytes. Default
+        ``1 GB`` (conservative — captures the int8 indices + transient
+        pandas + encoder buffers seen on the 2026-04 run). Override via
+        ``MHCFLURRY_AUTO_RN_POOL_PER_EPOCH_PER_WORKER_GB``.
+    hard_cap : int, optional
+        Maximum pool_epochs regardless of memory budget. Default ``10``
+        (overridable via ``MHCFLURRY_AUTO_RN_POOL_HARD_CAP``). Past 10
+        the diminishing-return curve flattens — RN gen overhead is
+        already amortized to <1 sec/epoch by then.
+
+    Heuristic
+    ---------
+    Total available bytes for RN pools across the box:
+        ``ram_gb × 1e9 × safety_fraction``
+    Per-worker budget:
+        ``available / max(num_workers, 1)``
+    Pool epochs that fit:
+        ``per_worker_budget / per_pool_epoch_per_worker_bytes``
+    Clamp to ``[1, hard_cap]``.
+
+    Cross-checks
+    ------------
+    * 8×A100-80GB Verda (400 GB / 32 fit-workers, 1 GB/pool-epoch):
+        400 × 0.5 / 32 / 1 = 6.25 → 6
+    * Single A100 80G Lambda (200 GB / 2 fit-workers):
+        200 × 0.5 / 2 / 1 = 50 → clamped to ``hard_cap``=10
+    * Tight cluster node (64 GB / 16 fit-workers):
+        64 × 0.5 / 16 / 1 = 2 → 2
+    * RAM-starved (32 GB / 16 fit-workers):
+        32 × 0.5 / 16 / 1 = 1 → 1 (legacy regen-every-epoch)
+    """
+    if num_workers is None or int(num_workers) <= 0:
+        return 1
+    if ram_gb is None:
+        return 1
+    if safety_fraction is None:
+        safety_fraction = float(os.environ.get(
+            "MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION", "0.5"))
+    if per_pool_epoch_per_worker_bytes is None:
+        per_pool_epoch_per_worker_bytes = float(os.environ.get(
+            "MHCFLURRY_AUTO_RN_POOL_PER_EPOCH_PER_WORKER_GB", "1.0"
+        )) * (1024 ** 3)
+    if hard_cap is None:
+        hard_cap = int(os.environ.get(
+            "MHCFLURRY_AUTO_RN_POOL_HARD_CAP", "10"
+        ))
+    available_bytes = float(ram_gb) * (1024 ** 3) * float(safety_fraction)
+    per_worker_budget = available_bytes / max(int(num_workers), 1)
+    by_memory = max(1, int(per_worker_budget / max(
+        per_pool_epoch_per_worker_bytes, 1.0)))
+    # The `num_random_negatives` and `peptide_max_length` inputs are
+    # accepted for API symmetry / future extensions (e.g. variable-size
+    # encodings); the empirical per-pool-epoch figure already covers them.
+    del num_random_negatives, peptide_max_length
+    return min(by_memory, max(1, int(hard_cap)))
+
+
 def auto_num_jobs(num_gpus, max_workers_per_gpu):
     """Compute total fit-worker count from GPU plan.
 
@@ -569,6 +694,24 @@ def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
         isinstance(dl_value, str) and dl_value.lower() == "auto"
     )
 
+    # Resolve --random-negative-pool-epochs=auto to an int. Sized from
+    # system RAM and the post-cap fit-worker plan. Non-resolved here when
+    # we don't yet know num_random_negatives or peptide_max_length — the
+    # auto resolver tolerates None for those (see
+    # ``auto_random_negative_pool_epochs``).
+    rn_pool_value = getattr(args, "random_negative_pool_epochs", "auto")
+    if isinstance(rn_pool_value, str) and rn_pool_value.lower() == "auto":
+        args.random_negative_pool_epochs = auto_random_negative_pool_epochs(
+            num_random_negatives=None,
+            peptide_max_length=None,
+            num_workers=effective_fit_workers,
+            ram_gb=_system_ram_gb(),
+        )
+        args.random_negative_pool_epochs_was_auto = True
+    else:
+        args.random_negative_pool_epochs = int(rn_pool_value)
+        args.random_negative_pool_epochs_was_auto = False
+
     # Promote orchestrator-owned tuning knobs from CLI to env so the
     # existing call sites (torch_training_loop._maybe_compile_network,
     # _configure_matmul_precision, class1_neural_network._timing_enabled,
@@ -591,6 +734,45 @@ def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
     hoist_torchinductor_compile_threads(args)
     args._local_parallelism_args_resolved = True
     return args
+
+
+def apply_random_negative_pool_epochs_to_work_items(
+        work_items, pool_epochs, *, log=None):
+    """Inject ``random_negative_pool_epochs`` into every work item's hyperparameters.
+
+    Parallel to ``apply_dataloader_num_workers_to_work_items``: the orchestrator
+    chooses an auto value once at startup (or honors the CLI int) and writes it
+    into every per-work-item hyperparameter dict. fit() reads it from
+    ``self.hyperparameters['random_negative_pool_epochs']`` when constructing
+    its ``RandomNegativesPool``.
+
+    Parameters
+    ----------
+    work_items : list of dict
+        Each dict has a ``hyperparameters`` sub-dict.
+    pool_epochs : int
+        The resolved value from ``resolve_local_parallelism_args`` (>= 1).
+    log : callable, optional
+        Logging hook. Defaults to ``print``.
+    """
+    if log is None:
+        log = print
+    pool_epochs_int = int(pool_epochs)
+    overridden = 0
+    for item in work_items:
+        hp = item.get("hyperparameters")
+        if hp is None:
+            continue
+        prev = hp.get("random_negative_pool_epochs")
+        hp["random_negative_pool_epochs"] = pool_epochs_int
+        if prev is None or int(prev) != pool_epochs_int:
+            overridden += 1
+    log(
+        "apply_random_negative_pool_epochs_to_work_items: set %d/%d items to "
+        "random_negative_pool_epochs=%d (overridden=%d)" % (
+            len(work_items), len(work_items), pool_epochs_int, overridden,
+        )
+    )
 
 
 def apply_dataloader_num_workers_to_work_items(work_items, num_workers, *, log=None):
@@ -1256,6 +1438,19 @@ def add_local_parallelism_args(parser):
              "``dataloader_num_workers`` set in component-model "
              "hyperparameters when applicable; non-affinity train commands "
              "accept the flag for uniformity but currently no-op.")
+    group.add_argument(
+        "--random-negative-pool-epochs",
+        type=_random_negative_pool_epochs_arg,
+        metavar="N",
+        default="auto",
+        help="Number of consecutive epochs that share a pre-encoded "
+             "random-negative pool. Pass 'auto' (default) to size from "
+             "system RAM / fit-worker plan via "
+             "``mhcflurry.local_parallelism.auto_random_negative_pool_epochs`` "
+             "(hard cap = 10). Pass an integer to pin (1 reproduces "
+             "pre-Phase-1 every-epoch-regen behavior). Overrides any "
+             "``random_negative_pool_epochs`` set in component-model "
+             "hyperparameters.")
     group.add_argument(
         "--torch-compile",
         choices=("auto", "0", "1"),

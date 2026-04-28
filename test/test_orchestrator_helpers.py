@@ -362,6 +362,98 @@ def test_auto_dataloader_num_workers_hard_cap_env_override(monkeypatch):
         num_fit_workers=16, vcpus=176, ram_gb=400) == 5
 
 
+def test_auto_random_negative_pool_epochs_hardware_tiers():
+    """Cross-check the RN-pool-epoch heuristic across production hardware tiers.
+
+    With default safety_fraction=0.5 and per-pool-epoch=1 GB/worker, the
+    pool epochs scale inversely with ``num_workers / ram_gb``. The hard
+    cap of 10 prevents marginal-return values from running away.
+    """
+    from mhcflurry.local_parallelism import auto_random_negative_pool_epochs
+
+    cases = [
+        # (label, ram_gb, num_workers, expected)
+        # 8x80GB Verda (32 fit-workers, 400 GB): 400*0.5/32 = 6.25 → 6
+        ("Verda 8xA100-80GB (32 workers / 400G)", 400, 32, 6),
+        # 8x40GB (16 fit-workers, 400 GB): 400*0.5/16 = 12.5 → cap=10
+        ("8xA100-40GB (16 workers / 400G)", 400, 16, 10),
+        # 8xL40S (16 fit-workers, 200 GB): 200*0.5/16 = 6.25 → 6
+        ("8xL40S (16 workers / 200G)", 200, 16, 6),
+        # Single A100-80G Lambda (2 fit-workers, 200 GB): 200*0.5/2 = 50 → cap=10
+        ("Single A100-80G Lambda (2/200G)", 200, 2, 10),
+        # Tight cluster (16 fit-workers, 64 GB): 64*0.5/16 = 2 → 2
+        ("Tight cluster (16/64G)", 64, 16, 2),
+        # RAM-starved (16 fit-workers, 32 GB): 32*0.5/16 = 1 → 1 (legacy)
+        ("RAM-starved (16/32G)", 32, 16, 1),
+        # Single T4 (1 fit-worker, 16 GB): 16*0.5/1 = 8 → 8
+        ("Single T4 (1/16G)", 16, 1, 8),
+    ]
+    for label, ram, workers, want in cases:
+        got = auto_random_negative_pool_epochs(
+            num_random_negatives=1_500_000,
+            peptide_max_length=15,
+            num_workers=workers,
+            ram_gb=ram,
+        )
+        assert got == want, (
+            "%s: ram_gb=%s workers=%d → got %d, want %d"
+            % (label, ram, workers, got, want)
+        )
+
+
+def test_auto_random_negative_pool_epochs_serial_or_no_ram_returns_one():
+    """Serial run or unknown-RAM box → conservative pool_epochs=1."""
+    from mhcflurry.local_parallelism import auto_random_negative_pool_epochs
+
+    # No fit-workers: serial run, no need to amortize.
+    assert auto_random_negative_pool_epochs(
+        num_random_negatives=1_500_000,
+        peptide_max_length=15,
+        num_workers=0,
+        ram_gb=400,
+    ) == 1
+    # Unknown RAM (e.g. macOS dev machine with no /proc/meminfo): keep
+    # legacy regen-every-epoch behavior since we don't know the budget.
+    assert auto_random_negative_pool_epochs(
+        num_random_negatives=1_500_000,
+        peptide_max_length=15,
+        num_workers=8,
+        ram_gb=None,
+    ) == 1
+
+
+def test_auto_random_negative_pool_epochs_env_overrides(monkeypatch):
+    """Env knobs let operators tighten or loosen the heuristic."""
+    from mhcflurry.local_parallelism import auto_random_negative_pool_epochs
+
+    # Verda baseline: 6.
+    assert auto_random_negative_pool_epochs(
+        num_random_negatives=1_500_000, peptide_max_length=15,
+        num_workers=32, ram_gb=400) == 6
+
+    # Halve the safety fraction → halves the budget.
+    monkeypatch.setenv("MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION", "0.25")
+    assert auto_random_negative_pool_epochs(
+        num_random_negatives=1_500_000, peptide_max_length=15,
+        num_workers=32, ram_gb=400) == 3
+    monkeypatch.delenv("MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION")
+
+    # Lower the per-pool cost estimate → higher pool epochs.
+    monkeypatch.setenv("MHCFLURRY_AUTO_RN_POOL_PER_EPOCH_PER_WORKER_GB", "0.25")
+    # 400*0.5/32/0.25 = 25 → cap=10.
+    assert auto_random_negative_pool_epochs(
+        num_random_negatives=1_500_000, peptide_max_length=15,
+        num_workers=32, ram_gb=400) == 10
+    monkeypatch.delenv("MHCFLURRY_AUTO_RN_POOL_PER_EPOCH_PER_WORKER_GB")
+
+    # Lower the hard cap.
+    monkeypatch.setenv("MHCFLURRY_AUTO_RN_POOL_HARD_CAP", "3")
+    # 400*0.5/32/1 = 6.25 → cap=3.
+    assert auto_random_negative_pool_epochs(
+        num_random_negatives=1_500_000, peptide_max_length=15,
+        num_workers=32, ram_gb=400) == 3
+
+
 def test_auto_dataloader_num_workers_handles_none_and_zero_fit_workers():
     """Serial / no-fit-worker case should return 0 (in-process)."""
     from mhcflurry.local_parallelism import auto_dataloader_num_workers

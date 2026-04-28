@@ -28,6 +28,7 @@ from .common import configure_logging, normalize_allele_name
 from .local_parallelism import (
     add_local_parallelism_args,
     apply_dataloader_num_workers_to_work_items,
+    apply_random_negative_pool_epochs_to_work_items,
     attach_constant_data_to_work_items_if_needed,
     call_wrapped_kwargs,
     configure_torch_sharing_strategy_for_capacity,
@@ -1374,6 +1375,14 @@ def train_models(args):
     if getattr(args, "dataloader_num_workers", None) is not None:
         apply_dataloader_num_workers_to_work_items(
             all_work_items, int(args.dataloader_num_workers)
+        )
+
+    # Inject the resolved (orchestrator-chosen) random_negative_pool_epochs
+    # into every work item's hyperparameters. fit() reads the int from
+    # ``self.hyperparameters`` when constructing its RandomNegativesPool.
+    if getattr(args, "random_negative_pool_epochs", None) is not None:
+        apply_random_negative_pool_epochs_to_work_items(
+            all_work_items, int(args.random_negative_pool_epochs)
         )
 
     # fit DataLoader SHM capacity pre-flight. With small /dev/shm (8 GB

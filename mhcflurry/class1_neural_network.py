@@ -4265,11 +4265,20 @@ class Class1NeuralNetwork(object):
 
         for epoch in range(self.hyperparameters["max_epochs"]):
             epoch_wall_start = time.perf_counter()
+            # Coarse buckets retained for back-compat (sum of fine buckets).
             input_build_time = 0.0
+            # Fine-grained input-build subbuckets (split out 2026-04-28
+            # to identify which call inside the per-epoch input-build
+            # phase actually costs the time. Pre-split, the lump was
+            # ~9 s/epoch with no breakdown).
+            rn_pool_get_time = 0.0
+            rn_shm_update_time = 0.0
+            dataset_construction_time = 0.0
             initialization_time = 0.0
             shuffle_dataset_time = 0.0
             dataloader_setup_time = 0.0
-            train_loop_time = 0.0
+            train_loop_wall_time = 0.0  # wall time of `for batch in loader:` loop
+            train_loop_time = 0.0       # sum of per-batch GPU compute (inside loop)
             epoch_h2d_time = 0.0
             epoch_loss_sync_time = 0.0
             validation_materialize_time = 0.0
@@ -4277,12 +4286,12 @@ class Class1NeuralNetwork(object):
             callback_time = 0.0
             gc_time = 0.0
 
-            build_start = time.perf_counter()
             # Phase 1 (#268): slice the per-epoch negatives out of a
             # pre-encoded pool. On pool_epochs=1 this regenerates every
             # epoch (legacy behavior). On pool_epochs=N the heavy
             # encoding pass runs once per N epochs; the in-epoch call
             # here is an O(1) array view.
+            rn_get_start = time.perf_counter()
             if epoch == 0 and random_neg_template is not None:
                 random_negative_peptides_encoding = random_neg_template
                 random_neg_template = None
@@ -4290,6 +4299,9 @@ class Class1NeuralNetwork(object):
                 _, random_negative_peptides_encoding = (
                     random_negatives_pool.get_epoch_inputs(epoch)
                 )
+            rn_pool_get_time += time.perf_counter() - rn_get_start
+
+            shm_update_start = time.perf_counter()
             if backing.tensor_backed:
                 # Refill the shared random-neg buffer in place. PyTorch's
                 # DataLoader joins workers when the previous epoch's
@@ -4305,6 +4317,9 @@ class Class1NeuralNetwork(object):
                 backing.random_negative_x_peptide = (
                     random_negative_peptides_encoding
                 )
+            rn_shm_update_time += time.perf_counter() - shm_update_start
+
+            dataset_start = time.perf_counter()
             dataset = _FitBatchDataset(
                 x_peptide=backing.x_peptide,
                 x_allele=backing.x_allele,
@@ -4315,7 +4330,10 @@ class Class1NeuralNetwork(object):
                 random_negative_x_allele=backing.random_negative_x_allele,
                 num_random_negatives=num_random_negatives,
             )
-            input_build_time += time.perf_counter() - build_start
+            dataset_construction_time += time.perf_counter() - dataset_start
+            input_build_time = (
+                rn_pool_get_time + rn_shm_update_time + dataset_construction_time
+            )
 
             if needs_initialization:
                 init_start = _timing_start(device, timing_enabled)
@@ -4350,6 +4368,7 @@ class Class1NeuralNetwork(object):
             # Training
             network.train()
             epoch_start = time.time()
+            train_loop_wall_start = time.perf_counter()
 
             # Create batches via DataLoader — with num_workers=0 this is
             # bit-identical to the old single-process inline-iteration path
@@ -4490,6 +4509,7 @@ class Class1NeuralNetwork(object):
                 train_losses.append(loss)
 
             epoch_time = time.time() - epoch_start
+            train_loop_wall_time = time.perf_counter() - train_loop_wall_start
             # Single GPU→CPU sync per epoch over accumulated loss tensors.
             # Without timing, this .item() is the first sync of the
             # epoch and blocks on the entire queued training pass; with
@@ -4698,7 +4718,16 @@ class Class1NeuralNetwork(object):
             gc.collect()
             gc_time += time.perf_counter() - gc_start
             if timing_enabled:
+                # Coarse + fine-grained input-build buckets. The split was
+                # added to find the unaccounted 35 s/epoch gap on the
+                # 2026-04-28 release_full run (epoch_total_time ~45 s,
+                # sum of pre-split components ~10 s).
                 fit_info["epoch_input_build_time"].append(input_build_time)
+                fit_info["epoch_rn_pool_get_time"].append(rn_pool_get_time)
+                fit_info["epoch_rn_shm_update_time"].append(rn_shm_update_time)
+                fit_info["epoch_dataset_construction_time"].append(
+                    dataset_construction_time
+                )
                 fit_info["epoch_initialization_time"].append(
                     initialization_time
                 )
@@ -4710,6 +4739,19 @@ class Class1NeuralNetwork(object):
                 )
                 fit_info["epoch_h2d_time"].append(epoch_h2d_time)
                 fit_info["epoch_train_time"].append(train_loop_time)
+                fit_info["epoch_train_loop_wall_time"].append(
+                    train_loop_wall_time
+                )
+                # The dataloader-iter overhead is the wall time of the
+                # `for batch in loader:` loop minus the per-batch GPU
+                # compute and H2D copies that are timed separately. It
+                # captures DataLoader worker IPC, prefetcher waits,
+                # Python iterator overhead, and any compile-recompile
+                # storms — i.e. exactly the gap that was unaccounted
+                # for in the pre-split breakdown.
+                fit_info["epoch_dataloader_iter_overhead_time"].append(
+                    max(0.0, train_loop_wall_time - epoch_h2d_time - train_loop_time)
+                )
                 fit_info["epoch_loss_sync_time"].append(epoch_loss_sync_time)
                 fit_info["epoch_validation_materialize_time"].append(
                     validation_materialize_time
