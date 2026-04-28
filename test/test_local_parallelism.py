@@ -265,7 +265,14 @@ def test_resolve_max_workers_per_gpu_is_idempotent(monkeypatch):
 
 
 def test_resolve_local_parallelism_args_caps_auto_num_jobs(monkeypatch):
+    # Force a VRAM cap by pinning per-worker GB high so by_vram=1 and the
+    # auto MWPG resolves below by_jobs (which would otherwise pin to 2 here).
+    # 40 GB free / 0.6 / 24 GB/worker = 1 worker. by_jobs=16/8=2.
+    # min(1, 2, 4) = 1 -> num_jobs capped to 8.
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "24"
+    )
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
     args = Namespace(
         max_workers_per_gpu="auto", num_jobs=16, gpus=8, backend="auto"
@@ -274,6 +281,47 @@ def test_resolve_local_parallelism_args_caps_auto_num_jobs(monkeypatch):
     assert args.max_workers_per_gpu == 1
     assert args.num_jobs == 8
     assert args.max_workers_per_gpu_was_auto is True
+
+
+def test_resolve_local_parallelism_args_unlocks_4_per_gpu_on_80gb(
+    monkeypatch,
+):
+    # The post-2026-04-28 default (per_worker=4 GB) lets 80 GB cards
+    # resolve to the hard_cap of 4 workers/GPU once num_jobs is also auto:
+    # by_vram = floor(0.6 * 80 / 4) = 12, by_jobs skipped, hard_cap=4 wins.
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.delenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", raising=False
+    )
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs=0,  # auto -> by_jobs clamp skipped
+        gpus=8,
+        backend="auto",
+    )
+    resolve_local_parallelism_args(args)
+    assert args.max_workers_per_gpu == 4
+    # auto_num_jobs derives num_jobs = num_gpus * MWPG = 8 * 4
+    # but cap_auto_num_jobs only fires when an explicit num_jobs was passed
+    # and exceeded GPU capacity; with num_jobs=0 the resolver leaves it 0
+    # (auto_num_jobs is the trainer's own helper to fill in later).
+    assert args.max_workers_per_gpu_was_auto is True
+
+
+def test_auto_max_workers_per_gpu_pins_to_by_jobs_when_num_jobs_explicit(
+    monkeypatch,
+):
+    # Production today passes --num-jobs 16. With 8 GPUs and the new
+    # 4 GB/worker default + 80 GB free, by_vram=12 and hard_cap=4 — but
+    # by_jobs=16//8=2 still wins. This is intentional: explicit num_jobs
+    # is a user contract.
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.delenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", raising=False
+    )
+    chosen = auto_max_workers_per_gpu(num_jobs=16, num_gpus=8, backend="auto")
+    assert chosen == 2
 
 
 def test_resolve_local_parallelism_args_keeps_explicit_cpu_overflow(

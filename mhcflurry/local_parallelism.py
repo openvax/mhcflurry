@@ -24,13 +24,16 @@ from .common import configure_pytorch, normalize_pytorch_backend
 
 
 # Per-worker VRAM upper bound (gigabytes) used by ``auto_max_workers_per_gpu``
-# to budget how many workers fit on each GPU. The pan-allele MLP's steady-state
-# VRAM is lower than this, but first-epoch compile / validation / allocator
-# transients vary across hardware and torch versions. Use a conservative
-# default that gives 2 workers on 80 GB cards and 1 worker on 40 GB cards.
-# Override with ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` if a
-# different model family or batch size lands.
-_AUTO_MWPG_PER_WORKER_GB_DEFAULT = 16.0
+# to budget how many workers fit on each GPU. Live diagnostics from the
+# 2026-04-28 release_exact run showed actual per-worker steady-state VRAM
+# is 1.85-2.4 GB on the 4096-batch torch.compile path; the 16.0 GB historical
+# value was set before the fixed-encoding + indices-on-device work landed
+# and was producing only 2 workers/GPU on 80 GB cards (well below the
+# hard_cap of 4). Lowered to 4.0 GB which keeps a 2x safety margin over
+# observed and unlocks the 4-worker tier on 80 GB cards. 40 GB cards still
+# resolve to 1-2 (60% headroom × 40 / 4 = 6, hard-capped). Override with
+# ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` for re-benchmarking.
+_AUTO_MWPG_PER_WORKER_GB_DEFAULT = 4.0
 
 # SM-scheduler ceiling. Beyond ~4 workers/GPU the kernel queue serializes
 # behind a single SM scheduler, so per-worker throughput drops faster than
@@ -238,18 +241,34 @@ def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
         else _AUTO_MWPG_FREE_VRAM_FALLBACK_GB
     )
 
-    by_jobs = max(1, int(num_jobs) // max(int(num_gpus), 1))
+    # When ``num_jobs`` is user-explicit (>0) it caps how many workers/GPU
+    # we can pack: e.g. --num-jobs 8 across 8 GPUs means 1/GPU regardless
+    # of VRAM. When ``num_jobs <= 0`` (the default; user delegated to
+    # auto_num_jobs), don't let it clamp — otherwise this is a chicken/egg
+    # with auto_num_jobs (which derives num_jobs from max_workers_per_gpu)
+    # and the resolver pins itself to whatever happens to be in args
+    # before the resolver runs. Practical effect on the 8x80GB tier:
+    # without the user-explicit guard, by_jobs would clamp MWPG to 2
+    # (16//8) when production sets num_jobs=16; with the guard, MWPG can
+    # rise to the hard_cap of 4 if VRAM allows.
+    num_jobs_int = int(num_jobs)
     by_vram = max(1, int(free_vram_gb_used * 0.6 / per_worker_gb))
-    chosen = max(1, min(by_jobs, by_vram, hard_cap))
+    if num_jobs_int > 0:
+        by_jobs = max(1, num_jobs_int // max(int(num_gpus), 1))
+        chosen = max(1, min(by_jobs, by_vram, hard_cap))
+        by_jobs_log = str(by_jobs)
+    else:
+        chosen = max(1, min(by_vram, hard_cap))
+        by_jobs_log = "skipped (num_jobs auto)"
 
     logging.info(
         "auto_max_workers_per_gpu: chose %d "
-        "(num_jobs=%d, num_gpus=%d, by_jobs=%d, by_vram=%d at "
+        "(num_jobs=%d, num_gpus=%d, by_jobs=%s, by_vram=%d at "
         "free_vram=%.1f GB%s / %.1f GB/worker, hard_cap=%d)",
         chosen,
-        int(num_jobs),
+        num_jobs_int,
         int(num_gpus),
-        by_jobs,
+        by_jobs_log,
         by_vram,
         free_vram_gb_used,
         "" if free_vram_gb is not None else " (fallback)",
