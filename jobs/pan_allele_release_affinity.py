@@ -89,7 +89,15 @@ image = (
         # inference), unlocking 16 concurrent training workers across
         # 8 GPUs. With Phase 2 NonDaemonPool, each worker's DataLoader
         # prefetch path is live in production too.
-        "MAX_WORKERS_PER_GPU": "2",
+        # auto -> orchestrator resolves on the actual box. Lands at 4 on
+        # 8x80GB Verda (per the 2026-04-28 _AUTO_MWPG_PER_WORKER_GB_DEFAULT
+        # change to 4.0 GB/worker + by_jobs skip when num_jobs is also auto).
+        # Was pinned to 2 historically to mirror the 2.2.0 training config,
+        # but mhcflurry seeds tasks from (fold, arch, replicate) — not from
+        # worker ID — so wall-time parallelism doesn't affect trained
+        # weights, and torch.compile/cudnn nondeterminism already broke
+        # any bit-for-bit promise the historical pin offered.
+        "MAX_WORKERS_PER_GPU": "auto",
         "MAX_TASKS_PER_WORKER": "12",
         # Enable torch.compile (gated in class1_neural_network.py via
         # _maybe_compile_network + _maybe_compile_loss). Pays ~60 s

@@ -231,7 +231,13 @@ if [ "$GPUS" -eq "0" ]; then
     NUM_JOBS="${NUM_JOBS-1}"
     MAX_WORKERS_PER_GPU=1
 elif [ "$MAX_WORKERS_PER_GPU_REQUESTED" = "auto" ]; then
-    _NUM_JOBS_FOR_AUTO="${NUM_JOBS:-$(( GPUS * 2 ))}"
+    # When NUM_JOBS is explicit, honor it: by_jobs clamps MWPG to
+    # NUM_JOBS // GPUS. When NUM_JOBS is unset (the typical "auto"
+    # case), pass 0 so the orchestrator skips the by_jobs clamp and
+    # picks MWPG on VRAM + hard_cap alone — otherwise the historical
+    # _NUM_JOBS_FOR_AUTO=GPUS*2 default pinned MWPG to 2 even when
+    # VRAM allowed 4.
+    _NUM_JOBS_FOR_AUTO="${NUM_JOBS:-0}"
     MAX_WORKERS_PER_GPU="$(
         NUM_JOBS="$_NUM_JOBS_FOR_AUTO" GPUS="$GPUS" python - <<'PY'
 import os
