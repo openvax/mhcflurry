@@ -80,7 +80,11 @@ image = (
         # path produces identical worker state; keeping both means
         # callers can tune via container env or via shell-script CLI
         # without divergence.
-        "MAX_WORKERS_PER_GPU": "2",
+        # auto → orchestrator resolves on the actual box (8x80GB Verda
+        # lands at 4 via VRAM + hard_cap, vs affinity-only's pinned 2 for
+        # 2.2.0 replication). The shell pre-resolves via the same helper
+        # so OMP/MKL budget calculations downstream see a numeric value.
+        "MAX_WORKERS_PER_GPU": "auto",
         "MAX_TASKS_PER_WORKER": "12",
         "MHCFLURRY_TORCH_COMPILE": "1",
         "TORCHINDUCTOR_COMPILE_THREADS": "2",

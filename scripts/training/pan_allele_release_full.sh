@@ -51,7 +51,11 @@ if command -v nvidia-smi >/dev/null 2>&1; then
 else
     GPUS=0
 fi
-MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-2}"
+# Default to auto so the new (2.3.0) full release exercises the
+# orchestrator's hardware-aware resolver. On 8x80GB this lands at 4
+# workers/GPU = 32 fit workers (vs the affinity-only release_exact's
+# pinned 2/GPU = 16, which preserves bit-for-bit replication of 2.2.0).
+MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
 PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
@@ -59,8 +63,29 @@ PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
 
 if [ "$GPUS" -eq 0 ]; then
     NUM_JOBS=1
-else
+    MAX_WORKERS_PER_GPU=1
+elif [ "$MAX_WORKERS_PER_GPU" = "auto" ]; then
+    # Pre-resolve via the orchestrator's helper so the rest of the
+    # script (set_cpu_threads helper, COMMON_PARALLELISM_ARGS, log
+    # banners) can use a numeric value. Pass num_jobs=0 to skip the
+    # by_jobs clamp inside auto_max_workers_per_gpu — we want the
+    # resolver to pick on VRAM + hard_cap alone, then derive num_jobs
+    # from the picked MWPG.
+    MAX_WORKERS_PER_GPU="$(
+        GPUS="$GPUS" python - <<'PY'
+import os
+from mhcflurry.local_parallelism import auto_max_workers_per_gpu
+print(auto_max_workers_per_gpu(
+    num_jobs=0,
+    num_gpus=int(os.environ["GPUS"]),
+    backend="auto",
+))
+PY
+    )"
     NUM_JOBS="$(( GPUS * MAX_WORKERS_PER_GPU ))"
+    echo "Resolved MAX_WORKERS_PER_GPU=auto to $MAX_WORKERS_PER_GPU; NUM_JOBS=$NUM_JOBS"
+else
+    NUM_JOBS="${NUM_JOBS:-$(( GPUS * MAX_WORKERS_PER_GPU ))}"
 fi
 
 # Same parallelism args as stage 1; processing/presentation stages
