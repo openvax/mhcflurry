@@ -4254,10 +4254,23 @@ class Class1NeuralNetwork(object):
             self.hyperparameters.get("fit_dataloader_backing", "auto")
         )
         env_shm_override = os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
+        # Only EXPLICIT host signals override device residency. The
+        # orchestrator's auto-tuner sets dataloader_num_workers to a
+        # nonzero value as a hardware-shaped suggestion for the host
+        # path; that suggestion must NOT win against device residency
+        # when the residency auto-resolver picks ``device``. Treat
+        # ``dataloader_num_workers > 0`` as a host trigger only when
+        # the user spelled it explicitly via hyperparameters
+        # (i.e. anything other than the orchestrator-supplied
+        # ``auto`` resolution that lives in ``self.hyperparameters``).
+        # In practice, since auto-resolution always lands a concrete
+        # int in ``self.hyperparameters``, we instead require an
+        # explicit ``fit_dataloader_backing`` hint to flip residency:
+        # if the user wanted SHM/numpy DataLoader, they say so on the
+        # backing knob.
         explicit_host_backing = (
             fit_dataloader_backing_hint in ("shared_tensor", "numpy")
             or env_shm_override is not None
-            or int(self.hyperparameters.get("dataloader_num_workers", 0) or 0) > 0
         )
         if (
             fit_tensor_residency_requested == "auto"
@@ -4292,6 +4305,21 @@ class Class1NeuralNetwork(object):
         )
         fit_info["fit_tensor_residency_requested"] = fit_tensor_residency_requested
         fit_info["fit_tensor_residency"] = fit_tensor_residency
+        # Surface residency to train.log so misrouting is visible at a
+        # glance. With device residency engaged, the next log lines
+        # we'd previously see (SHM preflight, DataLoader worker
+        # count, etc.) are no longer the relevant signal — every
+        # static tensor lives on the training device and the inner
+        # loop indexes a pre-stitched [RN | real] buffer with zero
+        # per-batch H2D copies.
+        logging.info(
+            "fit tensor residency: %s (requested=%s, device=%s, "
+            "free_vram_gb=%s)",
+            fit_tensor_residency,
+            fit_tensor_residency_requested,
+            device.type,
+            "n/a" if _free_vram_gb is None else "%.1f" % _free_vram_gb,
+        )
 
         dataloader_num_workers_requested = int(
             self.hyperparameters.get("dataloader_num_workers", 0) or 0
@@ -4306,6 +4334,24 @@ class Class1NeuralNetwork(object):
             # variant — that path holds a single resident copy per
             # box and we don't want to lose its sharing — but the
             # in-process pool gets replaced.
+            #
+            # On device the orchestrator's ``random_negative_pool_epochs``
+            # auto-tune (which exists to amortize the ~5–80 sec/epoch
+            # host-side string round-trip) is no longer load-bearing
+            # for performance — torch.multinomial-based generation runs
+            # in ~50 ms regardless of pool size. The value still
+            # controls sample diversity within a cycle, so we honor
+            # whatever was passed but log it loudly when it would
+            # change RN behavior.
+            if random_negative_pool_epochs > 1:
+                logging.info(
+                    "fit_tensor_residency=device: random_negative_"
+                    "pool_epochs=%d retained (device encode is "
+                    "~50ms — amortization is no longer needed; the "
+                    "value now only affects within-cycle sample "
+                    "diversity)",
+                    random_negative_pool_epochs,
+                )
             if random_negative_shared_pool_dir is None and num_random_negatives > 0:
                 random_negatives_pool = RandomNegativesPool(
                     planner=random_negatives_planner,

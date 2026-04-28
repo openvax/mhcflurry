@@ -387,7 +387,14 @@ def test_fit_with_shm_env_override_trains_and_predicts(monkeypatch):
 
 
 def test_fit_shm_auto_enables_when_dataloader_workers_requested(monkeypatch):
-    """Auto backing uses SHM when ``dataloader_num_workers > 0``."""
+    """Auto backing uses SHM when ``dataloader_num_workers > 0``.
+
+    Pinned to ``fit_tensor_residency=host`` because this test
+    documents the SHM resolver behavior, which is host-only by
+    design. The device-resident path (default on accelerators)
+    bypasses the DataLoader entirely so ``dataloader_num_workers``
+    no longer drives a backing decision there.
+    """
     monkeypatch.delenv("MHCFLURRY_FIT_DATALOADER_SHM", raising=False)
     peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
     affinities = np.array([50.0, 30.0, 100.0, 5000.0])
@@ -397,6 +404,7 @@ def test_fit_shm_auto_enables_when_dataloader_workers_requested(monkeypatch):
         random_negative_rate=1.0,
         random_negative_constant=0,
         dataloader_num_workers=2,
+        fit_tensor_residency="host",
     )
     model.fit(peptides, affinities)
     last_info = model.fit_info[-1]
