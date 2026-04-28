@@ -54,7 +54,14 @@ app = App(
 
 image = (
     Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
-    .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
+    # ``python-is-python3`` is needed on bare-metal Brev providers
+    # (MassedCompute, etc.) where runplz container mode does not
+    # actually launch a docker container; the host ships
+    # ``/usr/bin/python3`` only and ``run.sh`` invokes plain ``python``.
+    .apt_install(
+        "bzip2", "wget", "rsync", "build-essential", "git",
+        "python-is-python3",
+    )
     .pip_install(
         # 3.11.0: detached remote bootstrap (setsid + nohup + file redirects)
         # so an SSH drop from the client can no longer SIGPIPE the remote

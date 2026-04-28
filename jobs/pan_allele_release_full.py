@@ -51,7 +51,14 @@ app = App(
 
 image = (
     Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
-    .apt_install("bzip2", "wget", "rsync", "build-essential", "git")
+    # ``python-is-python3`` is for bare-metal Brev providers (e.g. the
+    # MassedCompute DGXx8 fleet) where runplz container mode does not
+    # actually launch a docker container; the Ubuntu host ships
+    # ``/usr/bin/python3`` only and ``run.sh`` invokes plain ``python``.
+    .apt_install(
+        "bzip2", "wget", "rsync", "build-essential", "git",
+        "python-is-python3",
+    )
     .pip_install(
         "runplz>=3.11.0",
         "pandas>=2.0",
