@@ -70,7 +70,8 @@ image = (
     timeout=18 * 60 * 60,  # 18h cap; single-GPU wall time ~8-12h
     env={
         "DATALOADER_NUM_WORKERS": "1",
-        "TORCHINDUCTOR_COMPILE_THREADS": "2",
+        "TORCHINDUCTOR_COMPILE_THREADS": "auto",
+        "MHCFLURRY_TORCH_COMPILE_LOSS": "1",
         # Wrap stage 1 affinity training in `nsys profile` for the first
         # ~3 min to capture a representative slice (startup + pretrain +
         # first finetune epochs). Rest of the run is uninstrumented.

@@ -74,7 +74,8 @@ image = (
         # Keep prefetch modest on 14 vCPUs; production-sized fit() datasets
         # downgrade to in-process batching to avoid spawn-pickling arrays.
         "DATALOADER_NUM_WORKERS": "1",
-        "TORCHINDUCTOR_COMPILE_THREADS": "2",
+        "TORCHINDUCTOR_COMPILE_THREADS": "auto",
+        "MHCFLURRY_TORCH_COMPILE_LOSS": "1",
     },
 )
 def train():

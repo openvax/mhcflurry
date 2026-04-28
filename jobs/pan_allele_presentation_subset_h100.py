@@ -84,7 +84,8 @@ image = (
         # Shell default is 1. Production-sized fit() datasets downgrade to
         # in-process batching to avoid spawn-pickling arrays into children.
         "DATALOADER_NUM_WORKERS": "1",
-        "TORCHINDUCTOR_COMPILE_THREADS": "2",
+        "TORCHINDUCTOR_COMPILE_THREADS": "auto",
+        "MHCFLURRY_TORCH_COMPILE_LOSS": "1",
         "NSYS_PROFILE": "1",
     },
 )

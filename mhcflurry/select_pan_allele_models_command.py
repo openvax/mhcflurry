@@ -25,6 +25,7 @@ from .encodable_sequences import EncodableSequences
 from .allele_encoding import AlleleEncoding
 from .common import configure_logging, filter_canonicalizable_alleles
 from .local_parallelism import (
+    attach_constant_data_to_work_items_if_needed,
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)
 from .cluster_parallelism import (
@@ -254,9 +255,9 @@ def run(argv=sys.argv[1:]):
         print("Processing %d work items in parallel." % len(work_items))
         assert not serial_run
 
-        for item in work_items:
-            item['constant_data'] = GLOBAL_DATA
-
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
         # Parallel run
         results = worker_pool.imap_unordered(
             do_model_select_task,

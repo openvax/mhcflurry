@@ -579,6 +579,9 @@ def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
     torch_compile_cli = getattr(args, "torch_compile", "auto")
     if torch_compile_cli in ("0", "1"):
         os.environ["MHCFLURRY_TORCH_COMPILE"] = torch_compile_cli
+    torch_compile_loss_cli = getattr(args, "torch_compile_loss", "auto")
+    if torch_compile_loss_cli in ("0", "1"):
+        os.environ["MHCFLURRY_TORCH_COMPILE_LOSS"] = torch_compile_loss_cli
     matmul_cli = getattr(args, "matmul_precision", "none")
     if matmul_cli != "none":
         os.environ["MHCFLURRY_MATMUL_PRECISION"] = matmul_cli
@@ -635,12 +638,13 @@ def apply_dataloader_num_workers_to_work_items(work_items, num_workers, *, log=N
     )
 
 
-# Inductor's compile worker pool defaults to ``os.cpu_count()``; that's
-# fine for one process but stacks badly when N fit() workers each spawn
-# their own pool. Match the same SM-scheduler-style cap used for
-# ``auto_max_workers_per_gpu``: 4 is enough compile parallelism to keep
-# Inductor useful without amplifying jitter across N workers.
-_INDUCTOR_THREAD_HARD_CAP = 4
+# Inductor's compile worker pool defaults to ``os.cpu_count()``; that's fine
+# for one process but stacks badly when N fit() workers each spawn their own
+# pool. Production auto-sizing budgets roughly ``cpu_count // num_jobs`` helper
+# threads per worker and caps the result. The one-worker cache warmup can use a
+# much larger cap because only one compiler-heavy process exists.
+_INDUCTOR_THREAD_HARD_CAP = 16
+_INDUCTOR_WARMUP_THREAD_HARD_CAP = 64
 
 
 # Conservative fallback estimate for per-fit() fit DataLoader SHM footprint
@@ -993,33 +997,103 @@ def configure_torch_sharing_strategy_for_capacity(
     return "file_descriptor"
 
 
-def hoist_torchinductor_compile_threads(args):
-    """Cap ``TORCHINDUCTOR_COMPILE_THREADS`` based on parallel-worker count.
+def _torch_compile_enabled():
+    return os.environ.get("MHCFLURRY_TORCH_COMPILE", "0") == "1"
+
+
+def _auto_torchinductor_compile_threads(num_jobs, phase="production"):
+    """Return auto-sized Inductor compile helper count for this phase."""
+    cpu_count_ = os.cpu_count() or 1
+    if phase == "warmup":
+        cap = int(os.environ.get(
+            "MHCFLURRY_TORCHINDUCTOR_WARMUP_COMPILE_THREADS_CAP",
+            str(_INDUCTOR_WARMUP_THREAD_HARD_CAP),
+        ))
+        return max(1, min(cap, cpu_count_))
+    cap = int(os.environ.get(
+        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP",
+        str(_INDUCTOR_THREAD_HARD_CAP),
+    ))
+    return max(1, min(cap, cpu_count_ // max(int(num_jobs), 1)))
+
+
+def _compile_threads_env_is_auto_owned():
+    return (
+        os.environ.get("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO") == "1"
+        or os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") == "auto"
+    )
+
+
+def _set_auto_torchinductor_compile_threads(num_jobs, phase="production"):
+    """Set ``TORCHINDUCTOR_COMPILE_THREADS`` to the auto value."""
+    threads = _auto_torchinductor_compile_threads(num_jobs, phase=phase)
+    os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = str(threads)
+    os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] = "1"
+    return threads
+
+
+def configure_cluster_worker_torch_compile_threads():
+    """Auto-size Inductor helper threads inside one cluster worker process.
+
+    Cluster parallelism submits each work item as its own process, often on
+    different nodes. We therefore do not try to share a compile cache across
+    the cluster. Each worker process still needs the same local policy: if
+    compile is enabled and ``TORCHINDUCTOR_COMPILE_THREADS`` is unset or
+    ``auto``, pick a numeric value on that machine before the first
+    ``torch.compile`` call.
+
+    If a scheduler packs several mhcflurry work items onto one node, set
+    ``MHCFLURRY_CLUSTER_WORKERS_PER_NODE`` so the auto value is divided across
+    those co-resident compiler processes. Otherwise the default assumes one
+    work process owns its scheduler CPU allocation.
+    """
+    if not _torch_compile_enabled():
+        return
+    if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ and not (
+            _compile_threads_env_is_auto_owned()):
+        return
+    workers_per_node = int(os.environ.get(
+        "MHCFLURRY_CLUSTER_WORKERS_PER_NODE", "1"
+    ))
+    threads = _set_auto_torchinductor_compile_threads(
+        num_jobs=max(workers_per_node, 1),
+        phase="production",
+    )
+    print(
+        "torch.compile: cluster worker auto-set "
+        "TORCHINDUCTOR_COMPILE_THREADS=%d "
+        "(MHCFLURRY_CLUSTER_WORKERS_PER_NODE=%d)" % (
+            threads, workers_per_node,
+        )
+    )
+
+
+def hoist_torchinductor_compile_threads(args, phase="production"):
+    """Auto-size ``TORCHINDUCTOR_COMPILE_THREADS`` for local training.
 
     ``torch.compile`` (when enabled via ``MHCFLURRY_TORCH_COMPILE=1``)
     spins up an inductor compile worker pool that defaults to
-    ``os.cpu_count()`` threads. With N fit() workers each running
-    their own compile pool, an 8-job × 64-core box would spawn 512
-    compile threads — orders of magnitude over-subscribed.
+    ``os.cpu_count()`` threads. With N fit() workers each running their own
+    compile pool, that multiplies into an oversubscribed compile storm. The
+    production phase uses an auto value derived from available cores and the
+    worker count; the warmup phase uses a larger value because only one worker
+    is compiling.
 
     The orchestrator owns "how many workers will exist", so it owns
     the env knob too: set once before forking, every worker inherits.
     Skips the hoist when the user has already pinned the value or when
     ``MHCFLURRY_TORCH_COMPILE`` isn't on. Cluster workers running on
-    other hosts inherit nothing — but they share the same kernel cache
-    via inductor's content-addressed FX cache, so per-worker compile
-    counts there are bounded by cache hits, not by env.
+    other hosts must size themselves locally; see
+    ``configure_cluster_worker_torch_compile_threads``.
 
     Lives here (not in any one ``train_*_command`` module) so processing,
     allele-specific, and any future train command can call it the same
     way.
     """
-    if os.environ.get("MHCFLURRY_TORCH_COMPILE", "0") != "1":
+    if not _torch_compile_enabled():
         # No compile = no compile pool to size; leave env untouched.
         return
-    auto_owned = (
-        os.environ.get("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO") == "1"
-    )
+    auto_owned = _compile_threads_env_is_auto_owned()
     if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ and not auto_owned:
         # User pinned explicitly; don't second-guess.
         print(
@@ -1030,14 +1104,17 @@ def hoist_torchinductor_compile_threads(args):
         return
     num_jobs = max(int(getattr(args, "num_jobs", 0) or 0), 1)
     cpu_count_ = os.cpu_count() or 1
-    threads = max(1, min(_INDUCTOR_THREAD_HARD_CAP, cpu_count_ // num_jobs))
-    if auto_owned and os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") == str(threads):
+    threads = _auto_torchinductor_compile_threads(num_jobs, phase=phase)
+    if (
+            auto_owned
+            and os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") == str(threads)):
         return
-    os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = str(threads)
-    os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] = "1"
+    _set_auto_torchinductor_compile_threads(num_jobs, phase=phase)
     print(
         "torch.compile: hoisted TORCHINDUCTOR_COMPILE_THREADS=%d "
-        "(num_jobs=%d, cpu_count=%d)" % (threads, num_jobs, cpu_count_)
+        "(phase=%s, num_jobs=%d, cpu_count=%d)" % (
+            threads, phase, num_jobs, cpu_count_,
+        )
     )
 
 
@@ -1187,10 +1264,16 @@ def add_local_parallelism_args(parser):
              "'auto' (default) reads MHCFLURRY_TORCH_COMPILE env (off when "
              "unset). When on, the orchestrator also auto-sizes "
              "TORCHINDUCTOR_COMPILE_THREADS — see "
-             "hoist_torchinductor_compile_threads. Loss compilation has its "
-             "own escape-hatch env (MHCFLURRY_TORCH_COMPILE_LOSS, default "
-             "off due to a known Triton crash on MSEWithInequalities); "
-             "intentionally NOT promoted to CLI until that's resolved.")
+             "hoist_torchinductor_compile_threads.")
+    group.add_argument(
+        "--torch-compile-loss",
+        choices=("auto", "0", "1"),
+        default="auto",
+        help="Enable torch.compile for training loss modules. 'auto' "
+             "(default) reads MHCFLURRY_TORCH_COMPILE_LOSS env; when unset, "
+             "loss compilation defaults on inside _maybe_compile_loss. CUDA "
+             "workers run a one-op autograd warmup before compiling losses to "
+             "avoid the PyTorch 2.4 / Triton invalid-device-context bug.")
     group.add_argument(
         "--matmul-precision",
         choices=("none", "highest", "high", "medium"),
@@ -1238,6 +1321,135 @@ def worker_pool_with_gpu_assignments_from_args(args):
         max_tasks_per_worker=args.max_tasks_per_worker,
         worker_log_dir=args.worker_log_dir,
     )
+
+
+def worker_pool_uses_fork(worker_pool=None):
+    """Return True when local Pool workers inherit parent globals by fork."""
+    context = getattr(worker_pool, "_ctx", None)
+    if context is not None:
+        return context.get_start_method() == "fork"
+    try:
+        method = multiprocessing.get_start_method(allow_none=True)
+        if method is None:
+            method = multiprocessing.get_context().get_start_method()
+        return method == "fork"
+    except RuntimeError:
+        return False
+
+
+def attach_constant_data_to_work_items_if_needed(
+        work_items,
+        constant_data,
+        worker_pool,
+        *,
+        log=None):
+    """Attach constant data only when the Pool cannot inherit it by fork."""
+    if log is None:
+        log = print
+    if worker_pool_uses_fork(worker_pool):
+        log(
+            "Local Pool uses fork; workers inherit GLOBAL_DATA without "
+            "per-task pickle payloads."
+        )
+        return False
+    log(
+        "Local Pool does not use fork; attaching GLOBAL_DATA to each work "
+        "item for worker delivery."
+    )
+    for item in work_items:
+        item["constant_data"] = constant_data
+    return True
+
+
+def run_single_worker_torch_compile_warmup(
+        args,
+        work_items,
+        work_function,
+        constant_data=None):
+    """Run one real local work item first to populate torch compile caches.
+
+    This is deliberately orchestrator-owned and worker-executed:
+
+    * the parent process does **not** touch CUDA before forking;
+    * one non-daemon worker gets a production-like GPU assignment;
+    * Inductor compile helpers are temporarily sized for a single compiler-
+      heavy process;
+    * after the warmup returns, production compile-thread sizing is restored
+      before the full worker pool is created.
+
+    Returns ``None`` when skipped; otherwise pops the warmed item from
+    ``work_items`` and returns ``(warmup_item, warmup_result)``. The caller owns
+    result merging/saving because predictor containers differ by train command.
+    """
+    if not work_items:
+        return None
+    resolve_local_parallelism_args(args)
+    if getattr(args, "cluster_parallelism", False):
+        return None
+    if int(getattr(args, "num_jobs", 0) or 0) <= 1:
+        return None
+    if not _torch_compile_enabled():
+        return None
+    if os.environ.get("MHCFLURRY_TORCH_COMPILE_WARMUP", "1") == "0":
+        return None
+
+    backend = normalize_pytorch_backend(getattr(args, "backend", "auto") or "auto")
+    if backend in ("cpu", "mps"):
+        return None
+
+    warmup_item = work_items.pop(0)
+    print(
+        "torch.compile warmup: running one work item before production pool "
+        "(work_item_name=%s)" % warmup_item.get("work_item_name", "<unknown>")
+    )
+
+    explicit_threads = (
+        "TORCHINDUCTOR_COMPILE_THREADS" in os.environ
+        and not _compile_threads_env_is_auto_owned()
+    )
+    if not explicit_threads:
+        threads = _set_auto_torchinductor_compile_threads(
+            num_jobs=1, phase="warmup"
+        )
+        print(
+            "torch.compile warmup: TORCHINDUCTOR_COMPILE_THREADS=%d "
+            "(single-worker codegen phase)" % threads
+        )
+
+    warmup_pool = None
+    try:
+        warmup_pool = worker_pool_with_gpu_assignments(
+            num_jobs=1,
+            num_gpus=1 if int(getattr(args, "gpus", 0) or 0) > 0 else 0,
+            backend=backend,
+            max_workers_per_gpu=max(
+                int(getattr(args, "max_workers_per_gpu", 1) or 1), 1,
+            ),
+            max_tasks_per_worker=1,
+            worker_log_dir=getattr(args, "worker_log_dir", None),
+        )
+        item_for_worker = warmup_item
+        if (
+                constant_data is not None
+                and not worker_pool_uses_fork(warmup_pool)
+                and "constant_data" not in item_for_worker):
+            item_for_worker = dict(warmup_item)
+            item_for_worker["constant_data"] = constant_data
+        result = warmup_pool.apply(
+            call_wrapped_kwargs, (work_function, item_for_worker)
+        )
+        warmup_pool.close()
+        warmup_pool.join()
+        warmup_pool = None
+        print("torch.compile warmup: completed one work item.")
+    finally:
+        if warmup_pool is not None:
+            warmup_pool.terminate()
+            warmup_pool.join()
+        # Restore production compile-thread sizing for the full worker pool.
+        hoist_torchinductor_compile_threads(args, phase="production")
+
+    return warmup_item, result
 
 
 def worker_pool_with_gpu_assignments(

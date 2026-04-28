@@ -87,7 +87,8 @@ image = (
         "MAX_WORKERS_PER_GPU": "auto",
         "MAX_TASKS_PER_WORKER": "12",
         "MHCFLURRY_TORCH_COMPILE": "1",
-        "TORCHINDUCTOR_COMPILE_THREADS": "2",
+        "TORCHINDUCTOR_COMPILE_THREADS": "auto",
+        "MHCFLURRY_TORCH_COMPILE_LOSS": "1",
         "DATALOADER_NUM_WORKERS": "auto",
         "MHCFLURRY_ENABLE_TIMING": "1",
         # TF32 + cudnn.benchmark on. Free ~2x matmul speedup on Ampere+

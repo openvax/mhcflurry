@@ -107,7 +107,8 @@ image = (
         # minibatch=4096 bump — bigger batches give compile more
         # arithmetic to amortize its fixed overheads over.
         "MHCFLURRY_TORCH_COMPILE": "1",
-        "TORCHINDUCTOR_COMPILE_THREADS": "2",
+        "TORCHINDUCTOR_COMPILE_THREADS": "auto",
+        "MHCFLURRY_TORCH_COMPILE_LOSS": "1",
         # ``auto`` → orchestrator derives per-fit-worker DataLoader prefetch
         # child count from box capacity (vCPU + RAM + fit-worker plan,
         # capped at 4). On 8×A100-80GB Verda (176 vCPUs / 16 fit workers /

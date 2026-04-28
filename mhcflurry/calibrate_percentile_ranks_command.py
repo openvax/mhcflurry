@@ -27,6 +27,7 @@ from .common import (
 )
 from .encodable_sequences import EncodableSequences
 from .local_parallelism import (
+    attach_constant_data_to_work_items_if_needed,
     add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
@@ -410,9 +411,9 @@ def run_class1_affinity_predictor(args, peptides):
         print("Worker pool", worker_pool)
         assert worker_pool is not None
 
-        for item in work_items:
-            item['constant_data'] = GLOBAL_DATA
-
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
         results = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, do_class1_affinity_calibrate_percentile_ranks),
             work_items,

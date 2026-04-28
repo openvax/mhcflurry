@@ -17,6 +17,8 @@ import os
 
 import torch
 
+_TRITON_AUTOGRAD_WARMED_DEVICES = set()
+
 
 def _configure_matmul_precision(device):
     """Optionally enable TF32 + cuDNN benchmark on CUDA Ampere+.
@@ -136,18 +138,15 @@ def _maybe_compile_loss(loss_obj, device):
     """
     if device.type != "cuda":
         return loss_obj
-    # Gated on a SEPARATE env var from the network compile. Setting
-    # ``MHCFLURRY_TORCH_COMPILE=1`` no longer implicitly compiles the
-    # loss — opt in with ``MHCFLURRY_TORCH_COMPILE_LOSS=1``. Caught on
-    # the 2026-04-24 release_exact launch: compiling ``MSEWithInequalities``
-    # on the 4096-batch CUDA path crashed every training worker with
-    # ``RuntimeError: Triton Error [CUDA]: invalid device context`` inside
-    # the fused backward kernel (``triton_poi_fused__to_copy_add_ge_gt_le_lt_mul_pow_sub``).
-    # Likely a torch.compile x loss-module x dynamic-batch interaction;
-    # turning the loss compile off keeps the much bigger network-compile
-    # win intact. Revisit once the upstream Triton / torch bug is known
-    # or after we build a smoke-test harness to catch regressions.
-    if os.environ.get("MHCFLURRY_TORCH_COMPILE_LOSS", "0") != "1":
+    if os.environ.get("MHCFLURRY_TORCH_COMPILE", "0") != "1":
+        return loss_obj
+    # Loss compilation is enabled by default when network compilation is
+    # enabled. PyTorch 2.4 / Triton 3.0 has an upstream bug where the first
+    # Triton kernel launched from autograd's backward worker thread can fail
+    # with ``RuntimeError: Triton Error [CUDA]: invalid device context``.
+    # Running a tiny CUDA backward in the *training worker process* initializes
+    # that thread-local CUDA context before the compiled loss backward fires.
+    if os.environ.get("MHCFLURRY_TORCH_COMPILE_LOSS", "1") != "1":
         return loss_obj
     if hasattr(loss_obj, "_orig_mod"):
         return loss_obj
@@ -159,8 +158,25 @@ def _maybe_compile_loss(loss_obj, device):
     # dynamic-batch shapes that mirror the network's forward. Match the
     # network's dynamic/static policy via the same env knob.
     dynamic = os.environ.get("MHCFLURRY_TORCH_COMPILE_DYNAMIC", "1") != "0"
+    _warm_cuda_autograd_for_triton(device)
     logging.info("torch.compile applied to loss (mode=%s, dynamic=%s)", mode, dynamic)
     return torch.compile(loss_obj, mode=mode, dynamic=dynamic)
+
+
+def _warm_cuda_autograd_for_triton(device):
+    """Initialize CUDA context in autograd's backward thread once per device."""
+    if device.type != "cuda":
+        return
+    index = device.index
+    if index is None:
+        index = torch.cuda.current_device()
+    key = int(index)
+    if key in _TRITON_AUTOGRAD_WARMED_DEVICES:
+        return
+    with torch.cuda.device(device):
+        torch.empty(1, device=device, requires_grad=True).sum().backward()
+        torch.cuda.synchronize(device)
+    _TRITON_AUTOGRAD_WARMED_DEVICES.add(key)
 
 
 def _effective_validation_batch_size(

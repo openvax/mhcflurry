@@ -22,6 +22,7 @@ from mhcflurry.class1_neural_network import (
     _make_fit_dataloader,
     _resolve_fit_dataloader_backing,
 )
+from mhcflurry.torch_training_loop import _maybe_compile_loss
 from mhcflurry.shared_memory import (
     numpy_batch_collate,
     share_like,
@@ -252,6 +253,53 @@ def test_resource_exhaustion_error_detection():
         RuntimeError("torch_shm_manager: Operation not permitted")
     )
     assert not _is_resource_exhaustion_error(ValueError("shape mismatch"))
+
+
+def test_maybe_compile_loss_defaults_on_with_network_compile_cuda(monkeypatch):
+    from mhcflurry import torch_training_loop as ttl
+
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE_LOSS", raising=False)
+    monkeypatch.setattr(ttl, "_warm_cuda_autograd_for_triton", lambda device: None)
+    calls = []
+
+    def fake_compile(obj, mode=None, dynamic=None):
+        calls.append((obj, mode, dynamic))
+        return "compiled-loss"
+
+    monkeypatch.setattr(torch, "compile", fake_compile)
+    loss = MSEWithInequalities()
+
+    result = _maybe_compile_loss(loss, torch.device("cuda"))
+
+    assert result == "compiled-loss"
+    assert calls == [(loss, "default", True)]
+
+
+def test_maybe_compile_loss_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE_LOSS", "0")
+    calls = []
+    monkeypatch.setattr(torch, "compile", lambda *a, **k: calls.append((a, k)))
+    loss = MSEWithInequalities()
+
+    result = _maybe_compile_loss(loss, torch.device("cuda"))
+
+    assert result is loss
+    assert calls == []
+
+
+def test_maybe_compile_loss_requires_network_compile(monkeypatch):
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE_LOSS", raising=False)
+    calls = []
+    monkeypatch.setattr(torch, "compile", lambda *a, **k: calls.append((a, k)))
+    loss = MSEWithInequalities()
+
+    result = _maybe_compile_loss(loss, torch.device("cuda"))
+
+    assert result is loss
+    assert calls == []
 
 
 def test_fit_dataloader_backing_auto_resolves_from_worker_count():

@@ -21,6 +21,9 @@ from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import configure_logging
 from .local_parallelism import (
     add_local_parallelism_args,
+    attach_constant_data_to_work_items_if_needed,
+    resolve_local_parallelism_args,
+    run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from .hyperparameters import HyperparameterDefaults
@@ -182,6 +185,7 @@ def run(argv=sys.argv[1:]):
 
     GLOBAL_DATA["train_data"] = df
     GLOBAL_DATA["args"] = args
+    resolve_local_parallelism_args(args)
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -207,6 +211,9 @@ def run(argv=sys.argv[1:]):
 
         if args.max_epochs:
             hyperparameters['max_epochs'] = args.max_epochs
+        hyperparameters["dataloader_num_workers"] = int(
+            args.dataloader_num_workers
+        )
 
         hyperparameters['train_data'] = (
             TRAIN_DATA_HYPERPARAMETER_DEFAULTS.with_defaults(
@@ -259,18 +266,41 @@ def run(argv=sys.argv[1:]):
 
     start = time.time()
 
-    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
-
-    if worker_pool:
+    worker_pool = None
+    if args.num_jobs != 0:
         print("Processing %d work items in parallel." % len(work_items))
 
         # The estimated time to completion is more accurate if we randomize
         # the order of the work.
         random.shuffle(work_items)
 
-        for item in work_items:
-            item['constant_data'] = GLOBAL_DATA
+        warmup = run_single_worker_torch_compile_warmup(
+            args,
+            work_items,
+            train_model,
+            constant_data=GLOBAL_DATA,
+        )
+        if warmup is not None:
+            _, warmup_predictor = warmup
+            save_start = time.time()
+            new_model_names = predictor.merge_in_place([warmup_predictor])
+            predictor.save(
+                args.out_models_dir,
+                model_names_to_write=new_model_names,
+                write_metadata=False)
+            print(
+                "Saved torch.compile warmup predictor (%d models total) "
+                "including %d new models in %0.2f sec to %s" % (
+                    len(predictor.neural_networks),
+                    len(new_model_names),
+                    time.time() - save_start,
+                    args.out_models_dir))
 
+        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        assert worker_pool is not None
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
         results_generator = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, train_model),
             work_items,

@@ -25,6 +25,9 @@ from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from .common import configure_logging
 from .local_parallelism import (
     add_local_parallelism_args,
+    attach_constant_data_to_work_items_if_needed,
+    resolve_local_parallelism_args,
+    run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from .cluster_parallelism import (
@@ -175,6 +178,10 @@ def main(args):
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
     configure_logging(verbose=args.verbosity > 1)
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+    )
 
     if not args.continue_incomplete:
         initialize_training(args)
@@ -327,6 +334,29 @@ def train_models(args):
             constant_data=GLOBAL_DATA,
             result_serialization_method="pickle")
     else:
+        warmup = run_single_worker_torch_compile_warmup(
+            args,
+            work_items,
+            train_model,
+            constant_data=GLOBAL_DATA,
+        )
+        if warmup is not None:
+            _, warmup_predictor = warmup
+            save_start = time.time()
+            (model,) = warmup_predictor.models
+            pprint.pprint(model.fit_info[-1]['training_info'])
+            (new_model_name,) = predictor.add_models(warmup_predictor.models)
+            predictor.save(
+                args.out_models_dir,
+                model_names_to_write=[new_model_name],
+                write_metadata=False)
+            print(
+                "Saved torch.compile warmup predictor (%d models total) "
+                "with 1 new model in %0.2f sec to %s" % (
+                    len(predictor.models),
+                    time.time() - save_start,
+                    args.out_models_dir))
+
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
         assert worker_pool is not None
@@ -334,9 +364,9 @@ def train_models(args):
         print("Processing %d work items in parallel." % len(work_items))
         assert not serial_run
 
-        for item in work_items:
-            item['constant_data'] = GLOBAL_DATA
-
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
         results_generator = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, train_model),
             work_items,

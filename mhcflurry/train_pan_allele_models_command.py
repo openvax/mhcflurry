@@ -15,7 +15,6 @@ import hashlib
 import pickle
 import uuid
 import resource
-import multiprocessing
 from functools import partial
 
 import numpy
@@ -29,12 +28,14 @@ from .common import configure_logging, normalize_allele_name
 from .local_parallelism import (
     add_local_parallelism_args,
     apply_dataloader_num_workers_to_work_items,
+    attach_constant_data_to_work_items_if_needed,
     call_wrapped_kwargs,
     configure_torch_sharing_strategy_for_capacity,
     estimate_fit_dataloader_shm_gb,
     fit_shm_capacity_check,
     hoist_torchinductor_compile_threads,
     resolve_local_parallelism_args,
+    run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
 )
 from .cluster_parallelism import (
@@ -852,6 +853,10 @@ def main(args):
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
     configure_logging(verbose=args.verbosity > 1)
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+    )
 
     if not args.continue_incomplete:
         initialize_training(args)
@@ -1347,20 +1352,6 @@ def _preflight_shm_capacity(args):
     )
 
 
-def _local_pool_workers_inherit_global_data(worker_pool=None):
-    """Return True when local Pool workers inherit GLOBAL_DATA by fork."""
-    context = getattr(worker_pool, "_ctx", None)
-    if context is not None:
-        return context.get_start_method() == "fork"
-    try:
-        method = multiprocessing.get_start_method(allow_none=True)
-        if method is None:
-            method = multiprocessing.get_context().get_start_method()
-        return method == "fork"
-    except RuntimeError:
-        return False
-
-
 def train_models(args):
     global GLOBAL_DATA
 
@@ -1374,16 +1365,6 @@ def train_models(args):
     print("Loaded training init info.")
 
     all_work_items = GLOBAL_DATA["work_items"]
-
-    # Resolve local parallelism once before any pre-fork resource sizing. This
-    # caps auto-sized Pools to GPU capacity and hoists env knobs such as
-    # TORCHINDUCTOR_COMPILE_THREADS before workers inherit the environment.
-    if not getattr(args, "cluster_parallelism", False):
-        resolve_local_parallelism_args(args)
-    else:
-        # Cluster launchers do not use the local worker Pool, but the submitter
-        # can still hoist compile-thread defaults into the worker environment.
-        hoist_torchinductor_compile_threads(args)
 
     # Apply the resolved --dataloader-num-workers (auto or pinned) to every
     # work item's hyperparameters. The resolver in
@@ -1480,6 +1461,27 @@ def train_models(args):
             constant_data=GLOBAL_DATA,
             result_serialization_method="save_predictor")
     else:
+        warmup = run_single_worker_torch_compile_warmup(
+            args,
+            work_items,
+            train_model,
+            constant_data=GLOBAL_DATA,
+        )
+        if warmup is not None:
+            _, warmup_predictor = warmup
+            save_start = time.time()
+            (new_model_name,) = predictor.merge_in_place([warmup_predictor])
+            predictor.save(
+                args.out_models_dir,
+                model_names_to_write=[new_model_name],
+                write_metadata=False)
+            print(
+                "Saved torch.compile warmup predictor (%d models total) "
+                "with 1 new model in %0.2f sec to %s" % (
+                    len(predictor.neural_networks),
+                    time.time() - save_start,
+                    args.out_models_dir))
+
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
         assert worker_pool is not None
@@ -1487,14 +1489,9 @@ def train_models(args):
         print("Processing %d work items in parallel." % len(work_items))
         assert not serial_run
 
-        if _local_pool_workers_inherit_global_data(worker_pool):
-            print("Local Pool uses fork; workers inherit GLOBAL_DATA without "
-                  "per-task pickle payloads.")
-        else:
-            print("Local Pool does not use fork; attaching GLOBAL_DATA to "
-                  "each work item for worker delivery.")
-            for item in work_items:
-                item['constant_data'] = GLOBAL_DATA
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
 
         results_generator = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, train_model),

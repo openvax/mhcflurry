@@ -127,11 +127,11 @@ def test_hoist_torchinductor_sizes_against_num_jobs(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
     monkeypatch.delenv("TORCHINDUCTOR_COMPILE_THREADS", raising=False)
     monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
-    # 8 jobs on a 64-core box → 64/8=8, capped at 4.
+    # 8 jobs on a 64-core box → 64/8=8.
     monkeypatch.setattr(os, "cpu_count", lambda: 64)
     args = argparse.Namespace(num_jobs=8)
     _hoist_torchinductor_compile_threads(args)
-    assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "4"
+    assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "8"
 
     # 1 job on 4-core box → 4/1=4, hits cap.
     monkeypatch.delenv("TORCHINDUCTOR_COMPILE_THREADS", raising=False)
@@ -169,6 +169,91 @@ def test_hoist_torchinductor_recomputes_auto_owned_value(monkeypatch):
     args = argparse.Namespace(num_jobs=4)
     _hoist_torchinductor_compile_threads(args)
     assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "4"
+
+
+def test_hoist_torchinductor_accepts_auto_env(monkeypatch):
+    from mhcflurry.local_parallelism import (
+        hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
+    )
+
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
+    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "auto")
+    monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
+    monkeypatch.setattr(os, "cpu_count", lambda: 64)
+    args = argparse.Namespace(num_jobs=4)
+    _hoist_torchinductor_compile_threads(args)
+    assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "16"
+    assert os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] == "1"
+
+
+def test_hoist_torchinductor_warmup_uses_larger_single_worker_budget(monkeypatch):
+    from mhcflurry.local_parallelism import (
+        hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
+    )
+
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
+    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "auto")
+    monkeypatch.setattr(os, "cpu_count", lambda: 64)
+    args = argparse.Namespace(num_jobs=1)
+    _hoist_torchinductor_compile_threads(args, phase="warmup")
+    assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "64"
+
+
+def test_cluster_worker_compile_threads_auto(monkeypatch):
+    from mhcflurry.local_parallelism import configure_cluster_worker_torch_compile_threads
+
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
+    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "auto")
+    monkeypatch.setenv("MHCFLURRY_CLUSTER_WORKERS_PER_NODE", "4")
+    monkeypatch.setattr(os, "cpu_count", lambda: 64)
+
+    configure_cluster_worker_torch_compile_threads()
+
+    # Production cap=16, 64/4=16.
+    assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "16"
+
+
+def test_attach_constant_data_skips_fork_pool():
+    from mhcflurry.local_parallelism import attach_constant_data_to_work_items_if_needed
+
+    class Ctx:
+        def get_start_method(self):
+            return "fork"
+
+    pool = argparse.Namespace(_ctx=Ctx())
+    work_items = [{"a": 1}, {"b": 2}]
+    constant_data = {"large": object()}
+    logs = []
+
+    attached = attach_constant_data_to_work_items_if_needed(
+        work_items, constant_data, pool, log=logs.append
+    )
+
+    assert attached is False
+    assert all("constant_data" not in item for item in work_items)
+    assert any("inherit GLOBAL_DATA" in line for line in logs)
+
+
+def test_attach_constant_data_attaches_for_non_fork_pool():
+    from mhcflurry.local_parallelism import attach_constant_data_to_work_items_if_needed
+
+    class Ctx:
+        def get_start_method(self):
+            return "spawn"
+
+    pool = argparse.Namespace(_ctx=Ctx())
+    work_items = [{"a": 1}, {"b": 2}]
+    constant_data = {"large": object()}
+
+    attached = attach_constant_data_to_work_items_if_needed(
+        work_items, constant_data, pool, log=lambda _: None
+    )
+
+    assert attached is True
+    assert [item["constant_data"] for item in work_items] == [
+        constant_data,
+        constant_data,
+    ]
 
 
 def test_set_cpu_threads_accepts_auto_when_num_jobs_is_provided():

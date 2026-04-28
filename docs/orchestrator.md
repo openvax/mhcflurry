@@ -240,17 +240,44 @@ the environment?
 - **CLI flag** when the orchestrator owns it and propagates it.
   (Examples: `--max-workers-per-gpu`, `--random-negative-shared-pool-dir`,
   `--num-jobs`.)
-- **Env var** when the consumer is inside `fit()` or another
-  worker-private code path, and the orchestrator is just a relay.
-  (Examples: `MHCFLURRY_TORCH_COMPILE`,
-  `MHCFLURRY_FIT_DATALOADER_SHM`, `TORCHINDUCTOR_COMPILE_THREADS`.)
+- **Env var with optional CLI relay** when the consumer is inside
+  `fit()` or another worker-private code path, and the orchestrator
+  only centralizes policy. (Examples: `MHCFLURRY_TORCH_COMPILE`,
+  `MHCFLURRY_TORCH_COMPILE_LOSS`, `MHCFLURRY_FIT_DATALOADER_SHM`,
+  `TORCHINDUCTOR_COMPILE_THREADS`.)
 
 The orchestrator may **hoist** env vars: read its own args, compute a
-sensible default, and `os.environ.setdefault(...)` so workers
-inherit. `resolve_local_parallelism_args` calls
+sensible default, and put a concrete value in `os.environ` so workers
+inherit it. `resolve_local_parallelism_args` calls
 `hoist_torchinductor_compile_threads` for local runs — it sizes the
 inductor compile pool against the resolved `--num-jobs` so N workers
-don't each spawn `cpu_count()` compile threads.
+don't each spawn `cpu_count()` compile threads. If
+`TORCHINDUCTOR_COMPILE_THREADS=auto`, the orchestrator replaces it
+with a numeric value before any worker sees it.
+
+## Torch Compile Warmup
+
+`torch.compile` is worker-local: the Python wrapper, graph guards, and
+CUDA module handles cannot be shared across processes. What can be
+shared on one machine is the Inductor/Triton on-disk cache. For local
+Pool training, the orchestrator therefore runs one real work item
+first in a one-worker warmup pool with a larger compile-thread budget,
+saves that result, then restores production compile-thread sizing and
+launches the full worker pool.
+
+Cluster workers are different: they may land on different nodes, so
+mhcflurry does not try to share Inductor cache across a cluster. Each
+cluster worker process auto-sizes `TORCHINDUCTOR_COMPILE_THREADS`
+locally when the env is unset or `auto`. If a scheduler packs multiple
+mhcflurry work items onto one node, set
+`MHCFLURRY_CLUSTER_WORKERS_PER_NODE` so each process uses a fair share
+of cores.
+
+Compiled losses are enabled by default when `MHCFLURRY_TORCH_COMPILE=1`
+and can be disabled with `MHCFLURRY_TORCH_COMPILE_LOSS=0` or
+`--torch-compile-loss 0`. CUDA workers run a one-op autograd warmup
+before compiling losses to avoid the PyTorch 2.4 / Triton
+`invalid device context` failure in the first compiled backward kernel.
 
 ## What is NOT the orchestrator's job
 
@@ -498,11 +525,11 @@ and adding it would be feature work, not a fix":
   Allele-specific training does similar work but at smaller per-allele
   scale.
 - **`torch.compile`** is off by default everywhere; opt-in via
-  `MHCFLURRY_TORCH_COMPILE=1`. The thread-count hoist is in the
-  pan-allele orchestrator only because that's where worker oversub
-  was observed. If processing/allele-specific runs ever turn on
-  `torch.compile` at scale, lift `_hoist_torchinductor_compile_threads`
-  to a shared helper.
+  `MHCFLURRY_TORCH_COMPILE=1` or `--torch-compile 1`. When enabled,
+  the shared local-parallelism layer owns compile-thread sizing and
+  local one-worker cache warmup for affinity and processing trainers.
+  Presentation fitting is a separate model family and does not enter
+  this central torch-training path.
 
 ## Future tightening (not in 2.3.0)
 
