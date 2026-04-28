@@ -337,7 +337,14 @@ class RandomNegativesPool(object):
     debugging and for regression tests.
     """
 
-    def __init__(self, planner, peptide_encoder, pool_epochs=1, seed=None):
+    def __init__(
+            self,
+            planner,
+            peptide_encoder,
+            pool_epochs=1,
+            seed=None,
+            device=None,
+            peptide_encoding=None):
         """
         Parameters
         ----------
@@ -348,7 +355,8 @@ class RandomNegativesPool(object):
             Receives an ``EncodableSequences`` and returns an encoded
             numpy array (typically ``Class1NeuralNetwork
             .peptides_to_network_input``). Called once per cycle on the
-            full pool.
+            full pool. Ignored when ``device`` is set — the device path
+            samples and encodes integer indices directly.
 
         pool_epochs : int
             Number of consecutive epochs that share a pool. 1 is
@@ -356,17 +364,41 @@ class RandomNegativesPool(object):
 
         seed : int, optional
             Seed for the per-cycle RNG. When None, draws go through
-            numpy's global state (same as pre-Phase-1).
+            numpy's global state (or, on the device path, an unseeded
+            ``torch.Generator`` on ``device``).
+
+        device : torch.device or str, optional
+            When set, the pool builds device-resident int8 tensors via
+            :func:`encode_random_negatives_on_device` instead of the
+            host-side string-→encoder path. ``peptide_encoding`` must
+            be provided alongside; ``peptide_encoder`` is unused on
+            this path. Peptide strings are not materialized
+            (``get_epoch_inputs`` returns ``(None, encoded_slice)``).
+
+        peptide_encoding : dict, optional
+            Required when ``device`` is set. Subset of the model's
+            ``peptide_encoding`` hyperparameter — at minimum
+            ``alignment_method`` and ``max_length`` (plus
+            ``left_edge`` / ``right_edge`` for ``pad_middle``).
         """
         assert planner.plan_df is not None, "Call planner.plan() first"
+        if device is not None and peptide_encoding is None:
+            raise ValueError(
+                "RandomNegativesPool: device-resident pool requires "
+                "peptide_encoding (alignment_method, max_length, ...)"
+            )
         self.planner = planner
         self.peptide_encoder = peptide_encoder
         self.pool_epochs = max(int(pool_epochs), 1)
         self.seed = seed
+        self.device = device
+        self.peptide_encoding = peptide_encoding
         self._total_count = int(planner.get_total_count())
         self._current_cycle = None
         self._current_encoded = None  # shape: (pool_epochs * total_count, ...)
         self._current_peptides = None  # list of str, len = pool_epochs * total_count
+        # Allocated lazily on first device-mode build, reused per cycle.
+        self._device_buffer = None
 
     def _rng_for_cycle(self, cycle):
         if self.seed is None:
@@ -376,7 +408,37 @@ class RandomNegativesPool(object):
         )
         return numpy.random.default_rng(seed_seq)
 
+    def _torch_generator_for_cycle(self, cycle):
+        """Per-cycle torch.Generator for the device path.
+
+        Returns ``None`` when ``self.seed`` is None (let torch's global
+        state vary per worker). Mirrors the SeedSequence(seed, cycle)
+        deterministic mix used by the host path so seeded device pools
+        are reproducible across rebuilds.
+        """
+        import torch as _torch
+        if self.seed is None:
+            return None
+        seed_seq = numpy.random.SeedSequence(
+            entropy=int(self.seed), spawn_key=(int(cycle),)
+        )
+        # Squeeze the SeedSequence into a 64-bit unsigned int seed.
+        seed64 = int(seed_seq.generate_state(2, dtype=numpy.uint32).astype(
+            numpy.uint64
+        )[0]) | (
+            int(seed_seq.generate_state(2, dtype=numpy.uint32).astype(
+                numpy.uint64
+            )[1]) << 32
+        )
+        seed64 &= (1 << 63) - 1  # torch wants signed positive 64-bit
+        gen = _torch.Generator(device=self.device)
+        gen.manual_seed(seed64)
+        return gen
+
     def _build_cycle(self, cycle):
+        if self.device is not None:
+            self._build_cycle_device(cycle)
+            return
         rng = self._rng_for_cycle(cycle)
         peptides = []
         for _ in range(self.pool_epochs):
@@ -387,6 +449,37 @@ class RandomNegativesPool(object):
         self._current_encoded = encoded
         self._current_cycle = cycle
 
+    def _build_cycle_device(self, cycle):
+        """Device-resident path: sample + encode int indices on device.
+
+        Allocates a single device-resident int8 tensor on first call
+        and refills it in place every cycle. ``_current_peptides``
+        stays ``None`` — fit() doesn't need the strings; logging /
+        debug callers can re-materialize via
+        :func:`amino_acid.indices_to_peptide`.
+        """
+        gen = self._torch_generator_for_cycle(cycle)
+        if self._device_buffer is None:
+            self._device_buffer = encode_random_negatives_on_device(
+                planner=self.planner,
+                pool_epochs=self.pool_epochs,
+                peptide_encoding=self.peptide_encoding,
+                device=self.device,
+                generator=gen,
+            )
+        else:
+            encode_random_negatives_on_device(
+                planner=self.planner,
+                pool_epochs=self.pool_epochs,
+                peptide_encoding=self.peptide_encoding,
+                device=self.device,
+                generator=gen,
+                out=self._device_buffer,
+            )
+        self._current_encoded = self._device_buffer
+        self._current_peptides = None
+        self._current_cycle = cycle
+
     def get_epoch_inputs(self, epoch):
         """Return ``(peptides_list, encoded_slice)`` for ``epoch``.
 
@@ -395,6 +488,11 @@ class RandomNegativesPool(object):
         to own the memory should ``.copy()`` it first. The list of raw
         peptide strings is included for callers that need it (e.g.
         logging / diagnostics).
+
+        On the device-resident path ``peptides_list`` is ``None`` (the
+        strings are never materialized; recover them via
+        :func:`amino_acid.indices_to_peptide` against the int8
+        encoded slice if a logging caller needs them).
 
         Phase 3 (#268) shared-mmap path: when the pool was built via
         ``from_shared_mmap`` with a ``permutation_seed``, the slice is
@@ -418,12 +516,24 @@ class RandomNegativesPool(object):
             self._build_cycle(cycle)
         offset = (int(epoch) % self.pool_epochs) * self._total_count
         end = offset + self._total_count
-        peptides_slice = self._current_peptides[offset:end]
+        if self._current_peptides is None:
+            peptides_slice = None
+        else:
+            peptides_slice = self._current_peptides[offset:end]
         encoded_slice = self._current_encoded[offset:end]
         permutation = self._epoch_permutation(epoch)
         if permutation is not None:
-            peptides_slice = [peptides_slice[i] for i in permutation]
-            encoded_slice = numpy.asarray(encoded_slice)[permutation]
+            if peptides_slice is not None:
+                peptides_slice = [peptides_slice[i] for i in permutation]
+            if self.device is not None:
+                import torch as _torch
+                perm_t = _torch.as_tensor(
+                    permutation, device=encoded_slice.device,
+                    dtype=_torch.long,
+                )
+                encoded_slice = encoded_slice.index_select(0, perm_t)
+            else:
+                encoded_slice = numpy.asarray(encoded_slice)[permutation]
         return peptides_slice, encoded_slice
 
     @property

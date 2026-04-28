@@ -683,3 +683,97 @@ def test_encode_random_negatives_on_device_unsupported_alignment():
 def _amino_acid_module():
     from mhcflurry import amino_acid as aa
     return aa
+
+
+def test_random_negatives_pool_device_mode_returns_tensor():
+    """Device-mode pool stores a torch.Tensor and returns torch slices
+    from get_epoch_inputs. Peptide strings are not materialized."""
+    import torch
+    planner = _placement_planner()
+    encoding = {"alignment_method": "left_pad_centered_right_pad", "max_length": 15}
+    pool = RandomNegativesPool(
+        planner=planner,
+        peptide_encoder=None,
+        pool_epochs=2,
+        seed=7,
+        device="cpu",
+        peptide_encoding=encoding,
+    )
+    peptides, encoded = pool.get_epoch_inputs(0)
+    assert peptides is None
+    assert isinstance(encoded, torch.Tensor)
+    assert encoded.shape == (planner.get_total_count(), 3 * 15)
+    assert encoded.dtype == torch.int8
+    # Epoch 1 reads a different slice of the same pool (no rebuild).
+    cycle_before = pool._current_cycle
+    _, encoded_e1 = pool.get_epoch_inputs(1)
+    assert pool._current_cycle == cycle_before
+    assert encoded_e1.shape == encoded.shape
+
+
+def test_random_negatives_pool_device_mode_seeded_reproducible():
+    """Seeded device-mode pool produces byte-identical content across
+    fresh instances. This is the contract that lets two workers running
+    the same seed see the same RN pool."""
+    import torch
+    planner = _placement_planner()
+    encoding = {"alignment_method": "left_pad_centered_right_pad", "max_length": 15}
+    pool_a = RandomNegativesPool(
+        planner=planner, peptide_encoder=None, pool_epochs=2,
+        seed=42, device="cpu", peptide_encoding=encoding,
+    )
+    pool_b = RandomNegativesPool(
+        planner=planner, peptide_encoder=None, pool_epochs=2,
+        seed=42, device="cpu", peptide_encoding=encoding,
+    )
+    _, e_a = pool_a.get_epoch_inputs(0)
+    _, e_b = pool_b.get_epoch_inputs(0)
+    assert torch.equal(e_a, e_b)
+    # Different seed must produce different content.
+    pool_c = RandomNegativesPool(
+        planner=planner, peptide_encoder=None, pool_epochs=2,
+        seed=99, device="cpu", peptide_encoding=encoding,
+    )
+    _, e_c = pool_c.get_epoch_inputs(0)
+    assert not torch.equal(e_a, e_c)
+
+
+def test_random_negatives_pool_device_mode_buffer_reused():
+    """Cycle rebuilds reuse the device buffer (allocate-once-refill)."""
+    planner = _placement_planner()
+    encoding = {"alignment_method": "left_pad_centered_right_pad", "max_length": 15}
+    pool = RandomNegativesPool(
+        planner=planner, peptide_encoder=None, pool_epochs=1,
+        seed=1, device="cpu", peptide_encoding=encoding,
+    )
+    pool.get_epoch_inputs(0)
+    buf_id = id(pool._device_buffer)
+    pool.get_epoch_inputs(1)  # cycle 1 → rebuild
+    assert id(pool._device_buffer) == buf_id
+
+
+def test_random_negatives_pool_device_requires_peptide_encoding():
+    import pytest
+    planner = _placement_planner()
+    with pytest.raises(ValueError, match="peptide_encoding"):
+        RandomNegativesPool(
+            planner=planner, peptide_encoder=None,
+            pool_epochs=1, device="cpu",
+        )
+
+
+def test_random_negatives_pool_device_permutation_on_device():
+    """When permutation_seed is set on a device-mode pool, the
+    permutation is applied on-device (no host round-trip)."""
+    import torch
+    planner = _placement_planner()
+    encoding = {"alignment_method": "left_pad_centered_right_pad", "max_length": 15}
+    pool = RandomNegativesPool(
+        planner=planner, peptide_encoder=None, pool_epochs=1,
+        seed=11, device="cpu", peptide_encoding=encoding,
+    )
+    pool._permutation_seed = 5
+    _, encoded = pool.get_epoch_inputs(0)
+    assert isinstance(encoded, torch.Tensor)
+    assert encoded.device.type == "cpu"
+    assert encoded.shape == (planner.get_total_count(), 3 * 15)
