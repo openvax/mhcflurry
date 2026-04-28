@@ -5075,19 +5075,78 @@ class MergedClass1NeuralNetwork(nn.Module):
         super(MergedClass1NeuralNetwork, self).__init__()
         self.networks = nn.ModuleList(networks)
         self.merge_method = merge_method
+        # Per-sub-network peptide_stage feature dims, populated lazily on
+        # the first call to ``forward_peptide_stage``. Used by
+        # ``forward_from_peptide_stage`` / ``forward_cartesian_from_peptide_stage``
+        # to split a concatenated peptide-stage tensor back into per-network
+        # slices. Lazy because the dim depends on each sub-network's
+        # peptide_dense_layer configuration; computing it without running
+        # an actual peptide forward is fragile.
+        self._sub_stage_dims = None
+
+    def _combine_subnet_outputs(self, outputs):
+        """Apply ``self.merge_method`` to a list of per-subnet output tensors."""
+        if self.merge_method == "average":
+            return torch.stack(outputs, dim=-1).mean(dim=-1)
+        if self.merge_method == "sum":
+            return torch.stack(outputs, dim=-1).sum(dim=-1)
+        if self.merge_method == "concatenate":
+            return torch.cat(outputs, dim=-1)
+        raise ValueError(f"Unknown merge method: {self.merge_method}")
+
+    def _split_peptide_stage(self, peptide_stage):
+        """Split a concatenated peptide-stage tensor into per-subnet chunks.
+
+        ``forward_peptide_stage`` concatenates per-subnet stages along the
+        feature axis; this is the inverse operation, used inside the
+        ``forward_*_from_peptide_stage`` helpers below.
+        """
+        if self._sub_stage_dims is None:
+            raise RuntimeError(
+                "forward_peptide_stage must be called before "
+                "forward_from_peptide_stage / forward_cartesian_from_peptide_stage "
+                "on MergedClass1NeuralNetwork (the per-subnet feature dims "
+                "are recorded lazily on the first peptide forward)."
+            )
+        chunks = []
+        offset = 0
+        for d in self._sub_stage_dims:
+            chunks.append(peptide_stage[..., offset:offset + d])
+            offset += d
+        return chunks
 
     def forward(self, inputs):
         outputs = [network(inputs) for network in self.networks]
-        stacked = torch.stack(outputs, dim=-1)
+        return self._combine_subnet_outputs(outputs)
 
-        if self.merge_method == "average":
-            return stacked.mean(dim=-1)
-        elif self.merge_method == "sum":
-            return stacked.sum(dim=-1)
-        elif self.merge_method == "concatenate":
-            return torch.cat(outputs, dim=-1)
-        else:
-            raise ValueError(f"Unknown merge method: {self.merge_method}")
+    def forward_peptide_stage(self, peptide):
+        """Run each sub-network's peptide-side stage and concatenate.
+
+        Returned tensor has shape ``(batch, sum_i(peptide_dim_i))``;
+        ``forward_from_peptide_stage`` and ``forward_cartesian_from_peptide_stage``
+        split it back along the feature axis using the recorded per-subnet
+        dims and merge the per-subnet outputs via ``self.merge_method``.
+        """
+        stages = [net.forward_peptide_stage(peptide) for net in self.networks]
+        if self._sub_stage_dims is None:
+            self._sub_stage_dims = tuple(int(s.shape[-1]) for s in stages)
+        return torch.cat(stages, dim=-1)
+
+    def forward_from_peptide_stage(self, peptide_stage, allele_idx):
+        chunks = self._split_peptide_stage(peptide_stage)
+        outputs = [
+            net.forward_from_peptide_stage(chunk, allele_idx)
+            for net, chunk in zip(self.networks, chunks)
+        ]
+        return self._combine_subnet_outputs(outputs)
+
+    def forward_cartesian_from_peptide_stage(self, peptide_stage, allele_idx):
+        chunks = self._split_peptide_stage(peptide_stage)
+        outputs = [
+            net.forward_cartesian_from_peptide_stage(chunk, allele_idx)
+            for net, chunk in zip(self.networks, chunks)
+        ]
+        return self._combine_subnet_outputs(outputs)
 
     def get_weights_list(self):
         """Get all weights as a flat list."""
