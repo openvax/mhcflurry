@@ -458,6 +458,27 @@ def do_class1_affinity_calibrate_percentile_ranks(
     gpu_peptide_batch_size = args.pop('gpu_peptide_batch_size', "auto")
     num_workers_per_gpu = args.pop('num_workers_per_gpu', 1)
 
+    # The fast path calls forward_peptide_stage() to cache peptide-side
+    # activations and reuse them across alleles. MergedClass1NeuralNetwork
+    # (multi-sub-network architectures + ensemble-merge wrapper) only
+    # exposes forward(); calling forward_peptide_stage on it raises
+    # AttributeError in calibrate_percentile_ranks_fast. Detect that
+    # case and fall back to the per-allele path, which works through
+    # the regular forward() path that Merged supports.
+    if gpu_batched:
+        from .class1_neural_network import MergedClass1NeuralNetwork
+        predictor = constant_data['predictor']
+        for net_obj in predictor.class1_pan_allele_models:
+            if isinstance(net_obj.network(borrow=True), MergedClass1NeuralNetwork):
+                if args.get('verbose'):
+                    print(
+                        "calibrate_percentile_ranks: --gpu-batched fast path "
+                        "does not support MergedClass1NeuralNetwork "
+                        "architectures; falling back to per-allele path."
+                    )
+                gpu_batched = False
+                break
+
     if gpu_batched:
         # Single fast-path call over the whole chunk — see
         # Class1AffinityPredictor.calibrate_percentile_ranks_fast. The
