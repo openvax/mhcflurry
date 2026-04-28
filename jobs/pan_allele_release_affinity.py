@@ -39,11 +39,11 @@ app = App(
         # 2026-04-21), the next fallback worth trying by hand is
         # massedcompute_A100_sxm4_80G — same hardware class via a
         # different Shadeform sub-broker.
-        instance_type="verda_A100_sxm4_80Gx8",
+        instance_type="massedcompute_A100_sxm4_80G_DGXx8",
         auto_create_instances=True,
-        # Verda boot has run ~5-10 min in practice; 40 min keeps the same
-        # generous margin we used for OCI without changing other timing.
-        # Closes runplz #34.
+        # MassedCompute DGXx8 boots in ~8 min; 40 min keeps the same
+        # generous margin we used for OCI/Verda without changing other
+        # timing. Closes runplz #34.
         ssh_ready_wait_seconds=2400,
         # Brev backend kill-switch. runplz only enforces wall caps for Brev
         # through BrevConfig.max_runtime_seconds; @app.function(timeout=...)

@@ -35,10 +35,12 @@ app = App(
     "pan-allele-release-full",
     brev_config=BrevConfig(
         mode="container",
-        # 8xA100-80GB via Shadeform->Verda; same instance type that
-        # ran the affinity-only release_exact job. 80GB cards fit 2
-        # workers/GPU = 16 concurrent training workers across 8 GPUs.
-        instance_type="verda_A100_sxm4_80Gx8",
+        # 8xA100-80GB via Shadeform->MassedCompute DGXx8. Verda's 8x
+        # shape stopped showing up in `brev search` after 2026-04-28;
+        # MassedCompute is the next-cheapest 8x80GB option ($12.29/hr,
+        # ~8m boot). 80GB cards fit 2 workers/GPU = 16 concurrent
+        # training workers across 8 GPUs.
+        instance_type="massedcompute_A100_sxm4_80G_DGXx8",
         auto_create_instances=True,
         ssh_ready_wait_seconds=2400,
         # Headroom: stage 1 alone uses ~28h of the 60h Brev cap; the
