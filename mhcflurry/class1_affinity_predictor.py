@@ -1857,6 +1857,16 @@ class Class1AffinityPredictor(object):
 
         if bins is None:
             bins = to_ic50(numpy.linspace(1, 0, 1000))
+        # numpy.histogram accepts bins as either an int (n_bins) or an
+        # array of edges. The fast path requires explicit edges so we
+        # can bucketize on device. Materialize ints into edges here.
+        bin_edges_array = numpy.asarray(bins)
+        if bin_edges_array.ndim == 0:
+            n_bins_int = int(bin_edges_array)
+            assert n_bins_int > 0
+            bin_edges_array = to_ic50(
+                numpy.linspace(1, 0, n_bins_int + 1)
+            )
 
         if device is None:
             device = (
@@ -1951,6 +1961,11 @@ class Class1AffinityPredictor(object):
         n_alleles = len(alleles)
         frequency_matrices = [] if motif_summary else None
         length_distributions = [] if motif_summary else None
+        # Bin edges for the on-device batched histogram fit. Materialize
+        # once outside the per-chunk loop — same edges across alleles.
+        bins_tensor = torch.as_tensor(
+            bin_edges_array, dtype=torch.float64, device=device,
+        )
 
         for abatch_start in range(0, n_alleles, allele_batch_size):
             abatch_end = min(abatch_start + allele_batch_size, n_alleles)
@@ -1997,13 +2012,22 @@ class Class1AffinityPredictor(object):
                         )
 
             log_mean = log_ic50_sum / float(len(cached_stages))
-            ic50 = torch.exp(log_mean).to("cpu").numpy()  # (a_size, n_peptides)
+            ic50_device = torch.exp(log_mean)  # (a_size, n_peptides) on device
+            # Batched torch fit replaces the per-allele numpy.histogram
+            # loop that dominated calibrate wall time. One bucketize +
+            # one scatter_add covers all 30 alleles in the chunk; the
+            # final per-allele cdf is materialized as numpy only at
+            # storage time so the persistent format is unchanged.
+            transforms = PercentRankTransform.fit_batch_torch(
+                ic50_device, bins_tensor,
+            )
+            ic50_cpu_for_motif = (
+                ic50_device.to("cpu").numpy() if motif_summary else None
+            )
             for local_i, allele in enumerate(batch_alleles):
-                predictions = ic50[local_i]
-                transform = PercentRankTransform()
-                transform.fit(predictions, bins=bins)
-                self.allele_to_percent_rank_transform[allele] = transform
+                self.allele_to_percent_rank_transform[allele] = transforms[local_i]
                 if motif_summary:
+                    predictions = ic50_cpu_for_motif[local_i]
                     df = pandas.DataFrame({
                         "peptide": encoded_peptides.sequences,
                         "prediction": predictions,
