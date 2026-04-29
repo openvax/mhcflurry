@@ -4673,12 +4673,25 @@ class Class1NeuralNetwork(object):
             # Same rationale as fit_generator's loss-compile call.
             loss_obj = _maybe_compile_loss(loss_obj, device)
 
-            # Train/val split (keep validation fixed)
+            # Train/val split (keep validation fixed). Shuffle on device
+            # when the training loop is device-resident: the train indices
+            # are simply [0, n_train) (since ``train_indices_base = indices[:n_train]``
+            # and ``indices = numpy.arange(n_total)``), so a shuffled view
+            # is just ``torch.randperm(n_train, device=device)`` — no host
+            # array, no H2D copy. Host residency keeps the numpy path so
+            # _FitBatchDataset's CPU indexing semantics stay unchanged.
             dataset_start = time.perf_counter()
-            train_indices = train_indices_base.copy()
-            numpy.random.shuffle(train_indices)
-            if dataset is not None:
-                dataset.train_indices = train_indices
+            if backing.device_backed:
+                train_indices_dev_full = torch.randperm(
+                    train_indices_base.shape[0], device=device,
+                )
+                train_indices = None
+            else:
+                train_indices = train_indices_base.copy()
+                numpy.random.shuffle(train_indices)
+                if dataset is not None:
+                    dataset.train_indices = train_indices
+                train_indices_dev_full = None
             shuffle_dataset_time += time.perf_counter() - dataset_start
 
             # Training
@@ -4699,7 +4712,12 @@ class Class1NeuralNetwork(object):
 
             train_losses = []
             epoch_num_train_rows = 0
-            full_batch_count = (len(train_indices) // batch_size) * batch_size
+            n_train_epoch = (
+                int(train_indices_dev_full.shape[0])
+                if backing.device_backed
+                else len(train_indices)
+            )
+            full_batch_count = (n_train_epoch // batch_size) * batch_size
             if backing.device_backed:
                 # --- Device-resident inner loop ---
                 # No DataLoader, no per-batch H2D. Indices live on device;
@@ -4707,11 +4725,7 @@ class Class1NeuralNetwork(object):
                 # buffer that holds [RN | real] rows.
                 fit_info["fit_dataloader_num_workers"] = 0
                 if full_batch_count > 0:
-                    train_indices_dev = torch.as_tensor(
-                        train_indices[:full_batch_count],
-                        dtype=torch.long,
-                        device=device,
-                    )
+                    train_indices_dev = train_indices_dev_full[:full_batch_count]
                     num_full_batches = full_batch_count // batch_size
                     for step in range(num_full_batches):
                         batch_indices = train_indices_dev[
@@ -4744,11 +4758,9 @@ class Class1NeuralNetwork(object):
                             first_batch_time = batch_time
                         epoch_num_train_rows += int(y_batch.shape[0])
                         train_losses.append(loss)
-                tail_indices = train_indices[full_batch_count:]
-                if len(tail_indices) > 0:
-                    tail_indices_dev = torch.as_tensor(
-                        tail_indices, dtype=torch.long, device=device,
-                    )
+                tail_count = n_train_epoch - full_batch_count
+                if tail_count > 0:
+                    tail_indices_dev = train_indices_dev_full[full_batch_count:]
                     inputs, y_batch, weights_batch = (
                         _build_device_batch_from_combined(
                             backing=backing,
