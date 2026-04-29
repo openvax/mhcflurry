@@ -480,8 +480,17 @@ def pretrain_data_iterator(
             yield (allele_encoding, encodable_peptides, df.stack().values)
 
 
+_LOGGED_PRETRAIN_ALLELE_INFO = set()
+
+
 def _get_pretrain_allele_info(filename, master_allele_encoding, verbose):
-    """Return (normalized-empty-df, usable_alleles, skipped_alleles)."""
+    """Return (normalized-empty-df, usable_alleles, skipped_alleles).
+
+    Verbose output is dedup'd per (filename, skipped_alleles) tuple at
+    module scope: this function gets called repeatedly by the per-fold
+    pretrain loaders and was emitting 10× redundant 'Pretrain alleles'
+    + 'Skipped alleles' blocks per training run that drowned the log.
+    """
     empty = pandas.read_csv(filename, index_col=0, nrows=0)
     empty.columns = empty.columns.map(normalize_allele_name)
     usable_alleles = [
@@ -493,9 +502,14 @@ def _get_pretrain_allele_info(filename, master_allele_encoding, verbose):
         if c not in master_allele_encoding.allele_to_sequence
     ]
     if verbose:
-        print("Pretrain alleles available: ", *empty.columns.values)
-        print("Using %d / %d alleles" % (len(usable_alleles), len(empty.columns)))
-        print("Skipped alleles: ", skipped_alleles)
+        log_key = (filename, tuple(skipped_alleles))
+        if log_key not in _LOGGED_PRETRAIN_ALLELE_INFO:
+            _LOGGED_PRETRAIN_ALLELE_INFO.add(log_key)
+            print("Pretrain alleles available: ", *empty.columns.values)
+            print("Using %d / %d alleles" % (
+                len(usable_alleles), len(empty.columns)
+            ))
+            print("Skipped alleles: ", skipped_alleles)
     return empty, usable_alleles, skipped_alleles
 
 

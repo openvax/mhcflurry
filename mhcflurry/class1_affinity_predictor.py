@@ -1697,18 +1697,39 @@ class Class1AffinityPredictor(object):
     def _auto_size_calibration_batches(
             model, device, n_peptides, n_alleles,
             num_workers_per_gpu=1,
-            free_memory_fraction=0.4,
+            free_memory_fraction=0.6,
             num_cached_networks=1,
-            peptide_stage_dim=None):
+            peptide_stage_dim=None,
+            num_sub_networks=None,
+            cuda_overhead_bytes=2 * (1 << 30),
+            safety_multiplier=1.3):
         """Split the auto-sized batch budget between peptide and allele axes.
 
-        Calibrate's peak VRAM is dominated by ``cached_stages`` — all
-        ``num_cached_networks`` networks' peptide-stage outputs held on
-        device simultaneously, sized ``n_peptides × peptide_stage_dim ×
-        4 bytes`` per network. That footprint is fixed (independent of
-        batch size) and must be subtracted before sizing the
-        peptide/allele forward batches, otherwise auto-sizing gives a
-        budget that fits a single forward but not the forward + cache.
+        Models the per-worker VRAM peak as:
+
+            peak = cuda_overhead
+                 + cache_bytes                # peptide-stage cache,
+                                              # ``num_cached_networks ×
+                                              # n_peptides × stage_dim × 4``
+                 + cartesian_intermediate     # transient forward
+                                              # ``a_size × p_batch ×
+                                              # peak_bytes_per_row``
+                 + small_state                # log-IC50 acc, ic50_unique,
+                                              # motif state (~1 GB)
+            with the whole thing inflated by ``safety_multiplier`` to
+            absorb allocator fragmentation that ``mem_get_info`` can't see.
+
+        ``peak_bytes_per_row`` already factors in *all* sub-networks of
+        a merged ensemble (the recursive
+        :func:`_estimate_peak_bytes_per_row` sums per-sub-net peaks
+        because ``MergedClass1NeuralNetwork.forward_cartesian_from_peptide_stage``
+        keeps every sub-net's intermediate alive in a list comprehension
+        before the merge). The cartesian-intermediate term scales with
+        ``a_size × p_batch``, which is exactly the rate the budget
+        carves out — preserving the existing
+        ``total_rows = forward_budget // peak_bytes`` math.
+
+        Returns the chosen ``(peptide_batch, allele_batch)``.
         """
         from .class1_neural_network import (
             compute_prediction_batch_size,
@@ -1732,12 +1753,20 @@ class Class1AffinityPredictor(object):
             peak_bytes = _estimate_peak_bytes_per_row(model)
             per_worker_budget = int(free * float(free_memory_fraction) / workers)
             stage_dim = peptide_stage_dim
+            sub_networks = getattr(model, "networks", None)
+            if num_sub_networks is None:
+                num_sub_networks = (
+                    len(sub_networks) if sub_networks is not None else 1
+                )
             if stage_dim is None:
                 # MergedClass1NeuralNetwork: peptide-stage cache is the
                 # concatenation of all sub-networks' stages → sum the
-                # per-sub-network stage dims. Otherwise fall back to a
-                # conservative encoding-shape probe.
-                sub_networks = getattr(model, "networks", None)
+                # per-sub-network stage dims. The peptide_encoding_shape
+                # heuristic is a *floor* (raw encoded peptide) — actual
+                # stage_dim grows when peptide_dense_layer_sizes or LC
+                # layers are configured. Caller should pass
+                # ``peptide_stage_dim`` from a real probe to avoid
+                # under-counting.
                 if (
                     sub_networks is not None
                     and not hasattr(model, "peptide_encoding_shape")
@@ -1768,16 +1797,51 @@ class Class1AffinityPredictor(object):
                 * int(stage_dim)
                 * 4
             )
-            forward_budget = per_worker_budget - cache_bytes
+            # Small-state pad: log-IC50 accumulator, ic50_unique view,
+            # motif-summary state, PercentRankTransform.fit_batch_torch
+            # buffers, allele_idx tensor, etc. Scales with a_size and
+            # n_peptides; a 1 GB constant covers the production ranges
+            # without further accounting. Cheap insurance vs OOM.
+            small_state_bytes = 1 * (1 << 30)
+            fixed_overhead = (
+                int(cuda_overhead_bytes) + cache_bytes + small_state_bytes
+            )
+            # Inflate the FIXED side of the budget by the safety
+            # multiplier — that's where allocator fragmentation hits
+            # hardest (cache and CUDA workspace are pinned, while
+            # forward intermediates churn). The forward-budget side
+            # then represents only the marginal headroom available
+            # for batch-dependent allocations.
+            forward_budget = (
+                per_worker_budget - int(fixed_overhead * safety_multiplier)
+            )
+            logging.info(
+                "calibrate auto-sizer: free=%.2f GB, workers=%d, "
+                "per_worker_budget=%.2f GB, stage_dim=%d "
+                "(sub_networks=%d, num_cached=%d), cache=%.2f GB, "
+                "cuda_overhead=%.2f GB, small_state=%.2f GB, "
+                "safety=%.2fx -> forward_budget=%.2f GB, "
+                "peak_bytes_per_row=%d (≈%.2f KB)",
+                free / 1e9, workers, per_worker_budget / 1e9, stage_dim,
+                num_sub_networks, num_cached_networks,
+                cache_bytes / 1e9, cuda_overhead_bytes / 1e9,
+                small_state_bytes / 1e9, safety_multiplier,
+                forward_budget / 1e9, peak_bytes, peak_bytes / 1024,
+            )
             if forward_budget < peak_bytes * _AUTO_BATCH_MIN_ROWS:
                 logging.warning(
-                    "calibrate auto-sizer: cached_stages footprint "
-                    "(%.2f GB) exceeds %.0f%% of per-worker budget "
-                    "(%.2f GB free / %d workers). Falling back to "
-                    "minimum batch; consider --max-workers-per-gpu 1.",
+                    "calibrate auto-sizer: fixed overhead "
+                    "(cuda %.2f GB + cache %.2f GB + state %.2f GB) "
+                    "× safety %.2fx exceeds per-worker budget "
+                    "(%.2f GB free × %.0f%% / %d workers). Falling back "
+                    "to minimum batch; reduce --max-workers-per-gpu or "
+                    "lower the peptide universe size.",
+                    cuda_overhead_bytes / 1e9,
                     cache_bytes / 1e9,
-                    free_memory_fraction * 100,
+                    small_state_bytes / 1e9,
+                    safety_multiplier,
                     free / 1e9,
+                    free_memory_fraction * 100,
                     workers,
                 )
                 forward_budget = peak_bytes * _AUTO_BATCH_MIN_ROWS
@@ -1790,6 +1854,48 @@ class Class1AffinityPredictor(object):
         while allele_batch * peptide_batch > total_rows and peptide_batch > 2_000:
             peptide_batch = max(2_000, peptide_batch // 2)
         return int(peptide_batch), int(allele_batch)
+
+    @staticmethod
+    def _probe_peptide_stage_dim(net_obj, encoded_peptides, device):
+        """Run a 1-row forward through ``forward_peptide_stage`` to
+        record the actual feature dimension of the peptide-stage
+        output. The auto-sizer's cache estimate depends on this and
+        the encoding-shape heuristic under-counts when the model
+        configures ``peptide_dense_layer_sizes`` or LC layers.
+
+        Returns ``None`` on probe failure so callers can fall back
+        to the heuristic.
+        """
+        import torch
+        from .encodable_sequences import EncodableSequences
+        try:
+            seqs = list(encoded_peptides.sequences)
+            if not seqs:
+                return None
+            probe_seqs = EncodableSequences.create([seqs[0]])
+            probe_input = net_obj.peptides_to_network_input(probe_seqs)
+            probe_is_int = net_obj.uses_peptide_torch_encoding()
+            if (
+                probe_is_int
+                and probe_input.ndim == 2
+                and numpy.issubdtype(probe_input.dtype, numpy.integer)
+            ):
+                probe_tensor = torch.from_numpy(probe_input).to(device)
+            else:
+                probe_tensor = torch.from_numpy(
+                    numpy.asarray(probe_input, dtype=numpy.float32)
+                ).to(device)
+            model = net_obj.network(borrow=True)
+            model.eval()
+            with torch.no_grad():
+                stage = model.forward_peptide_stage(probe_tensor)
+            return int(stage.shape[-1])
+        except Exception as exc:
+            logging.warning(
+                "calibrate auto-sizer: peptide_stage_dim probe failed "
+                "(%s); falling back to encoding-shape heuristic", exc,
+            )
+            return None
 
     @staticmethod
     def _prepare_motif_summary_state_gpu(encoded_peptides, device):
@@ -2122,12 +2228,24 @@ class Class1AffinityPredictor(object):
             # Resolve once, using the first network as the architecture
             # probe — all ensembles we serve have homogeneous layer
             # sizing, so one probe is sufficient.
-            probe_net = networks[0].network(borrow=True)
+            probe_net_obj = networks[0]
+            probe_net = probe_net_obj.network(borrow=True)
             probe_net.to(device)
+            # Probe the *actual* peptide_stage output dim so the cache
+            # estimate doesn't fall back to the encoding-shape floor.
+            probed_stage_dim = self._probe_peptide_stage_dim(
+                probe_net_obj, encoded_peptides, device,
+            )
+            sub_networks = getattr(probe_net, "networks", None)
+            num_sub_networks_probed = (
+                len(sub_networks) if sub_networks is not None else 1
+            )
             auto_peptide, auto_allele = self._auto_size_calibration_batches(
                 probe_net, device, n_peptides, len(alleles),
                 num_workers_per_gpu=num_workers_per_gpu,
                 num_cached_networks=len(networks),
+                peptide_stage_dim=probed_stage_dim,
+                num_sub_networks=num_sub_networks_probed,
             )
             if peptide_batch_size in (None, "auto"):
                 peptide_batch_size = auto_peptide
@@ -2139,7 +2257,9 @@ class Class1AffinityPredictor(object):
                     f"peptide_batch={peptide_batch_size}, "
                     f"allele_batch={allele_batch_size} "
                     f"(workers_per_gpu={num_workers_per_gpu}, "
-                    f"cached_networks={len(networks)})"
+                    f"cached_networks={len(networks)}, "
+                    f"sub_networks={num_sub_networks_probed}, "
+                    f"probed_stage_dim={probed_stage_dim})"
                 )
         peptide_batch_size = int(peptide_batch_size)
         allele_batch_size = int(allele_batch_size)
