@@ -2263,35 +2263,69 @@ class Class1AffinityPredictor(object):
                 )
         peptide_batch_size = int(peptide_batch_size)
         allele_batch_size = int(allele_batch_size)
-        cached_stages = []  # list of (net_obj, model, peptide_stage on device)
-        for net_obj in networks:
-            (_, allele_reps) = net_obj.allele_encoding_to_network_input(
-                AlleleEncoding(alleles=[], borrow_from=master),
-            )
-            net_obj.set_allele_representations(allele_reps)
-            model = net_obj.network(borrow=True)
-            model.to(device)
-            model.eval()
-            peptide_input = net_obj.peptides_to_network_input(encoded_peptides)
-            peptide_is_indices = net_obj.uses_peptide_torch_encoding()
-            stage_parts = []
-            with torch.no_grad():
-                for start in range(0, n_peptides, peptide_batch_size):
-                    end = min(start + peptide_batch_size, n_peptides)
-                    chunk = peptide_input[start:end]
-                    keep_int = (
-                        peptide_is_indices
-                        and chunk.ndim == 2
-                        and numpy.issubdtype(chunk.dtype, numpy.integer)
-                    )
-                    if keep_int:
-                        tensor = torch.from_numpy(chunk).to(device)
-                    else:
-                        tensor = torch.from_numpy(
-                            numpy.asarray(chunk, dtype=numpy.float32),
-                        ).to(device)
-                    stage_parts.append(model.forward_peptide_stage(tensor))
-            cached_stages.append((net_obj, model, torch.cat(stage_parts, dim=0)))
+
+        # Cross-task cached_stages reuse: when calibrate is sharded into
+        # many tasks, each task is a separate ``calibrate_percentile_ranks_fast``
+        # call inside the same worker process and re-builds
+        # ``cached_stages`` from scratch even though the peptide universe
+        # and the predictor are identical. Cache the built tensors on
+        # the predictor instance and skip the rebuild whenever the
+        # signature matches. ``forward_peptide_stage`` runs once per
+        # peptide-batch per network, so for the production workload
+        # (~400k peptides × ~32 chunks/worker) each saved rebuild
+        # represents a couple-second-per-task win that compounds.
+        cache_signature = (
+            len(encoded_peptides.sequences),
+            encoded_peptides.sequences[0],
+            encoded_peptides.sequences[-1],
+            tuple(id(net) for net in networks),
+            str(device),
+            int(peptide_batch_size),
+        )
+        cached_attr = "_calibrate_fast_cached_stages"
+        cached_signature_attr = "_calibrate_fast_cached_signature"
+        prev_sig = getattr(self, cached_signature_attr, None)
+        if prev_sig == cache_signature:
+            cached_stages = getattr(self, cached_attr)
+        else:
+            # Drop stale cache before building the new one — releases
+            # the previous peptide-stage tensor's VRAM before we
+            # allocate the next, which matters when the per-call
+            # peptide universe size changes (e.g. a smoke test
+            # followed by the production calibrate in the same worker).
+            if hasattr(self, cached_attr):
+                delattr(self, cached_attr)
+            cached_stages = []
+            for net_obj in networks:
+                (_, allele_reps) = net_obj.allele_encoding_to_network_input(
+                    AlleleEncoding(alleles=[], borrow_from=master),
+                )
+                net_obj.set_allele_representations(allele_reps)
+                model = net_obj.network(borrow=True)
+                model.to(device)
+                model.eval()
+                peptide_input = net_obj.peptides_to_network_input(encoded_peptides)
+                peptide_is_indices = net_obj.uses_peptide_torch_encoding()
+                stage_parts = []
+                with torch.no_grad():
+                    for start in range(0, n_peptides, peptide_batch_size):
+                        end = min(start + peptide_batch_size, n_peptides)
+                        chunk = peptide_input[start:end]
+                        keep_int = (
+                            peptide_is_indices
+                            and chunk.ndim == 2
+                            and numpy.issubdtype(chunk.dtype, numpy.integer)
+                        )
+                        if keep_int:
+                            tensor = torch.from_numpy(chunk).to(device)
+                        else:
+                            tensor = torch.from_numpy(
+                                numpy.asarray(chunk, dtype=numpy.float32),
+                            ).to(device)
+                        stage_parts.append(model.forward_peptide_stage(tensor))
+                cached_stages.append((net_obj, model, torch.cat(stage_parts, dim=0)))
+            setattr(self, cached_attr, cached_stages)
+            setattr(self, cached_signature_attr, cache_signature)
             del peptide_input
 
         log50000 = float(numpy.log(50000.0))
@@ -2306,11 +2340,24 @@ class Class1AffinityPredictor(object):
 
         # Hoist the per-allele dedup + length-bucket + AA-encoding work
         # out of the chunk loop. The peptide universe is identical across
-        # alleles so this only needs to run once per calibrate call.
-        motif_state = (
-            self._prepare_motif_summary_state_gpu(encoded_peptides, device)
-            if motif_summary else None
-        )
+        # alleles so this only needs to run once per calibrate call —
+        # and across the many tasks per worker that share the same
+        # peptide universe, we reuse the device-resident state via the
+        # same signature key as ``cached_stages`` above.
+        motif_attr = "_calibrate_fast_motif_state"
+        motif_sig_attr = "_calibrate_fast_motif_signature"
+        if motif_summary:
+            motif_signature = (cache_signature, "motif")
+            if getattr(self, motif_sig_attr, None) == motif_signature:
+                motif_state = getattr(self, motif_attr)
+            else:
+                motif_state = self._prepare_motif_summary_state_gpu(
+                    encoded_peptides, device,
+                )
+                setattr(self, motif_attr, motif_state)
+                setattr(self, motif_sig_attr, motif_signature)
+        else:
+            motif_state = None
 
         for abatch_start in range(0, n_alleles, allele_batch_size):
             abatch_end = min(abatch_start + allele_batch_size, n_alleles)
