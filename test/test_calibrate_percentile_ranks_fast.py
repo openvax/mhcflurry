@@ -14,8 +14,9 @@ import pandas
 import pytest
 
 from mhcflurry import Class1AffinityPredictor
-from mhcflurry.common import random_peptides
+from mhcflurry.common import positional_frequency_matrix, random_peptides
 from mhcflurry.downloads import get_path
+from mhcflurry.encodable_sequences import EncodableSequences
 
 
 def _load_downloaded_pan_allele():
@@ -34,6 +35,132 @@ def _pick_alleles(predictor, n):
     ][:n]
     assert len(candidates) >= 2, "Need at least 2 HLA alleles for parity"
     return candidates
+
+
+def _legacy_motif_summary_from_predictions(
+        peptides, predictions, alleles, summary_top_peptide_fractions):
+    frequency_matrices = []
+    length_distributions = []
+    for allele_i, allele in enumerate(alleles):
+        df = pandas.DataFrame({
+            "peptide": peptides,
+            "prediction": predictions[allele_i],
+        }).drop_duplicates("peptide").set_index("peptide")
+        df["length"] = df.index.str.len()
+        for (length, sub_df) in df.groupby("length"):
+            for cutoff_fraction in summary_top_peptide_fractions:
+                selected = sub_df.prediction.nsmallest(
+                    max(int(len(sub_df) * cutoff_fraction), 1),
+                ).index.values
+                matrix = positional_frequency_matrix(selected).reset_index()
+                original_columns = list(matrix.columns)
+                matrix["allele"] = allele
+                matrix["length"] = length
+                matrix["cutoff_fraction"] = cutoff_fraction
+                matrix["cutoff_count"] = len(selected)
+                matrix = matrix[
+                    ["allele", "length", "cutoff_fraction", "cutoff_count"]
+                    + original_columns
+                ]
+                frequency_matrices.append(matrix)
+
+        for cutoff_fraction in summary_top_peptide_fractions:
+            cutoff_count = max(int(len(df) * cutoff_fraction), 1)
+            length_distribution = df.prediction.nsmallest(
+                cutoff_count,
+            ).index.str.len().value_counts()
+            length_distribution.index.name = "length"
+            length_distribution /= length_distribution.sum()
+            length_distribution = length_distribution.to_frame("fraction")
+            length_distribution = length_distribution.reset_index()
+            length_distribution["allele"] = allele
+            length_distribution["cutoff_fraction"] = cutoff_fraction
+            length_distribution["cutoff_count"] = cutoff_count
+            length_distribution = length_distribution[[
+                "allele",
+                "cutoff_fraction",
+                "cutoff_count",
+                "length",
+                "fraction",
+            ]].sort_values(["cutoff_fraction", "length"])
+            length_distributions.append(length_distribution)
+
+    return {
+        "frequency_matrices": pandas.concat(
+            frequency_matrices, ignore_index=True,
+        ),
+        "length_distributions": pandas.concat(
+            length_distributions, ignore_index=True,
+        ),
+    }
+
+
+def test_motif_summary_gpu_helper_matches_legacy_edge_cases():
+    peptides = [
+        "AA",
+        "CC",
+        "DD",
+        "EE",
+        "FF",
+        "AZ",  # Z should be treated like X: dropped from the 20 AA columns.
+        "GGG",
+        "HHH",
+        "GGG",  # Duplicate should keep the first prediction, not this one.
+        "ACDEFGHIKLMNPQRS",  # Observed length outside the default 8-15 range.
+        "AZDEFGHIKLMNPQRS",
+    ]
+    alleles = ["allele-a", "allele-b"]
+    predictions = numpy.asarray([
+        [1.0, 1.0, 1.0, 1.0, 0.0, 2.0, 9.0, 1.0, 0.0, 2.0, 3.0],
+        [7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 0.0, 5.0, 0.0, 1.0, 1.0],
+    ])
+    cutoff_fractions = (0.4, 1.0)
+
+    state = Class1AffinityPredictor._prepare_motif_summary_state_gpu(
+        EncodableSequences.create(peptides),
+        torch.device("cpu"),
+    )
+    fast_freq, fast_ld = Class1AffinityPredictor._motif_summary_chunk_gpu(
+        torch.from_numpy(predictions),
+        state,
+        cutoff_fractions,
+        alleles,
+    )
+    fast_summary = {
+        "frequency_matrices": pandas.concat(fast_freq, ignore_index=True),
+        "length_distributions": pandas.concat(fast_ld, ignore_index=True),
+    }
+    legacy_summary = _legacy_motif_summary_from_predictions(
+        peptides,
+        predictions,
+        alleles,
+        cutoff_fractions,
+    )
+
+    freq_sort = ["allele", "length", "cutoff_fraction", "position"]
+    pandas.testing.assert_frame_equal(
+        legacy_summary["frequency_matrices"].sort_values(
+            freq_sort,
+        ).reset_index(drop=True),
+        fast_summary["frequency_matrices"].sort_values(
+            freq_sort,
+        ).reset_index(drop=True),
+        check_exact=False,
+        rtol=0,
+        atol=0,
+    )
+    ld_sort = ["allele", "cutoff_fraction", "length"]
+    pandas.testing.assert_frame_equal(
+        legacy_summary["length_distributions"].sort_values(
+            ld_sort,
+        ).reset_index(drop=True),
+        fast_summary["length_distributions"].sort_values(
+            ld_sort,
+        ).reset_index(drop=True),
+        check_exact=False,
+        rtol=0,
+        atol=0,
+    )
 
 
 def test_calibrate_fast_parity_with_legacy_path():
@@ -125,9 +252,9 @@ def test_calibrate_fast_parity_with_motif_summary():
         check_exact=False, rtol=1e-10, atol=1e-12,
     )
     # frequency_matrices: per-allele content must match the legacy slow
-    # path. Topk and pandas.nsmallest can break ties differently, so we
-    # allow at most a single-peptide swap per (allele, length, cutoff)
-    # bucket — that bounds the per-cell drift to ``1/k``.
+    # path. A separate synthetic test covers exact top-k tie behavior;
+    # this end-to-end test keeps a small tolerance for numerical drift
+    # near a real model's cutoff boundary.
     lf = legacy_summary["frequency_matrices"]
     ff = fast_summary["frequency_matrices"]
     assert set(lf.allele.unique()) == set(ff.allele.unique())
@@ -155,9 +282,8 @@ def test_calibrate_fast_parity_with_motif_summary():
         sub_l_sorted = sub_l.sort_values("position").reset_index(drop=True)
         sub_f_sorted = sub_f.sort_values("position").reset_index(drop=True)
         k = int(sub_l_sorted["cutoff_count"].iloc[0])
-        # Per-cell drift bound: ties at the topk boundary can differ by
-        # at most a single peptide, swapping at most ``length`` AA
-        # counts (one per position) by ``1/k``.
+        # Per-cell drift above one peptide's contribution would mean
+        # the per-allele top-k selection diverged materially.
         diff = (
             sub_l_sorted[aa_columns].to_numpy()
             - sub_f_sorted[aa_columns].to_numpy()

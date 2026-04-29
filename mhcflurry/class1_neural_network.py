@@ -1889,6 +1889,16 @@ class Class1NeuralNetworkModel(nn.Module):
         merge + first linear layer can be factored, this avoids materializing
         the larger ``num_alleles * num_peptides * peptide_stage_dim`` repeated
         peptide-stage tensor used by ``forward_from_peptide_stage``.
+
+        Skip-connections (``topology == "with-skip-connections"``) are
+        also factorized: layer 1's input ``cat[merged_input, layer0_out]``
+        is computed without materializing the (a*p, peptide_width +
+        allele_width) merged_input expansion — instead layer 1's weight
+        is split column-wise into peptide / allele / prev pieces and
+        the contributions are summed in their factored shapes
+        (``(p, h1)`` + ``(a, h1)`` + ``(a, p, h1)``). Layers ≥ 2's
+        input ``cat[prev[-2], prev[-1]]`` is similarly factorized via
+        column-wise weight splits, avoiding the explicit concat.
         """
         if not self.has_allele:
             raise RuntimeError(
@@ -1901,9 +1911,17 @@ class Class1NeuralNetworkModel(nn.Module):
         num_peptides = peptide_stage.shape[0]
         num_alleles = allele_idx.shape[0]
 
+        is_skip = self.topology == "with-skip-connections"
+        # ``_first_linear_from_cartesian_stages`` handles both
+        # ``concatenate`` and ``multiply`` merge methods via separate
+        # codepaths, so the standard (non-skip) factorized path is fine
+        # for either. Skip-connections factorization at layer 1 below
+        # only handles the concatenate case (multiply + skip is rare
+        # and would need an einsum at every skip layer); fall back to
+        # the non-factorized path for that combo.
         can_factorize_first_layer = (
             self.merge_activation is None
-            and self.topology != "with-skip-connections"
+            and (not is_skip or self.peptide_allele_merge_method == "concatenate")
         )
         if not can_factorize_first_layer:
             peptide_width = peptide_stage.shape[-1]
@@ -1938,21 +1956,79 @@ class Class1NeuralNetworkModel(nn.Module):
             if self.dropouts[0] is not None:
                 x = self.dropouts[0](x)
 
-            # ``enumerate(seq, start=N)`` triggers a torch._dynamo graph
-            # break on PyTorch <=2.4 (``call_enumerate`` rejects the
-            # ``start`` kwarg in builtin.py:775) — every traced forward
-            # then falls back to eager for the layer-stack loop, losing
-            # the compile speedup. Iterate by index instead so the loop
-            # body stays inside the compiled graph. Issue #270 perf note.
-            for offset, layer in enumerate(self.dense_layers[1:]):
-                i = offset + 1
-                x = layer(x)
-                if self.activation is not None:
-                    x = self.activation(x)
-                if self.batch_norms[i] is not None:
-                    x = self.batch_norms[i](x)
-                if self.dropouts[i] is not None:
-                    x = self.dropouts[i](x)
+            if is_skip:
+                # Skip-connections factorized path. layer 1's input is
+                # cat[merged_input, prev[0]] = cat[peptide_expanded,
+                # allele_expanded, prev[0]]; rather than materialize
+                # the (a*p, peptide_width + allele_width + h0) tensor,
+                # split the layer's weight column-wise and sum the
+                # three contributions in their natural factored shapes.
+                # Layers ≥ 2 take cat[prev[-2], prev[-1]]; both are
+                # already in flat-cartesian form so we just split the
+                # weight column-wise to skip the concat materialization.
+                peptide_width = peptide_stage.shape[-1]
+                allele_width = allele_stage.shape[-1]
+                prev_outputs = [x]
+                for offset, layer in enumerate(self.dense_layers[1:]):
+                    i = offset + 1
+                    if i == 1:
+                        W = layer.weight
+                        W_p = W[:, :peptide_width]
+                        W_a = W[:, peptide_width:peptide_width + allele_width]
+                        W_prev = W[:, peptide_width + allele_width:]
+                        peptide_part = peptide_stage.matmul(W_p.t())  # (p, h1)
+                        allele_part = allele_stage.matmul(W_a.t())   # (a, h1)
+                        prev_reshaped = prev_outputs[0].reshape(
+                            num_alleles, num_peptides, -1,
+                        )
+                        prev_part = prev_reshaped.matmul(W_prev.t())  # (a, p, h1)
+                        new_x = (
+                            peptide_part.unsqueeze(0)
+                            + allele_part.unsqueeze(1)
+                            + prev_part
+                            + layer.bias
+                        )
+                        new_x = new_x.reshape(
+                            num_alleles * num_peptides, -1,
+                        )
+                    else:
+                        # Layers ≥ 2: cat[prev[-2], prev[-1]] @ W.T + bias
+                        # = prev[-2] @ W_left.T + prev[-1] @ W_right.T + bias
+                        h_left = prev_outputs[-2].shape[-1]
+                        W = layer.weight
+                        W_left = W[:, :h_left]
+                        W_right = W[:, h_left:]
+                        new_x = (
+                            prev_outputs[-2].matmul(W_left.t())
+                            + prev_outputs[-1].matmul(W_right.t())
+                            + layer.bias
+                        )
+                    if self.activation is not None:
+                        new_x = self.activation(new_x)
+                    if self.batch_norms[i] is not None:
+                        new_x = self.batch_norms[i](new_x)
+                    if self.dropouts[i] is not None:
+                        new_x = self.dropouts[i](new_x)
+                    prev_outputs.append(new_x)
+                x = prev_outputs[-1]
+            else:
+                # Standard feedforward (no skip): existing tight loop.
+                # ``enumerate(seq, start=N)`` triggers a torch._dynamo
+                # graph break on PyTorch <=2.4 (``call_enumerate`` rejects
+                # the ``start`` kwarg in builtin.py:775) — every traced
+                # forward then falls back to eager for the layer-stack
+                # loop, losing the compile speedup. Iterate by index
+                # instead so the loop body stays inside the compiled
+                # graph. Issue #270 perf note.
+                for offset, layer in enumerate(self.dense_layers[1:]):
+                    i = offset + 1
+                    x = layer(x)
+                    if self.activation is not None:
+                        x = self.activation(x)
+                    if self.batch_norms[i] is not None:
+                        x = self.batch_norms[i](x)
+                    if self.dropouts[i] is not None:
+                        x = self.dropouts[i](x)
             output = self.output_layer(x)
         else:
             output = x

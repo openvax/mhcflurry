@@ -807,6 +807,73 @@ def test_forward_cartesian_from_peptide_stage_matches_expanded_path(merge_method
     )
 
 
+@pytest.mark.parametrize("layer_sizes", [
+    [4, 4],            # 2 dense layers — exercises layer-1 factorization
+    [4, 4, 4],         # 3 dense layers — exercises layer-2+ factorization
+    [4, 6, 8, 10],     # 4 dense layers — exercises a deeper skip stack
+])
+def test_forward_cartesian_skip_connections_matches_expanded(layer_sizes):
+    """Skip-connections topology, factorized cartesian forward must
+    match the explicit (a*p, peptide_width + allele_width) expansion.
+
+    The factorization avoids materializing the merged_input expansion
+    at layer 1 by splitting each post-layer-0 weight column-wise into
+    peptide / allele / prev-output pieces. This test pins parity vs
+    the non-factorized path for 2, 3, and 4 dense layers."""
+    _seed_all(271)
+    model = Class1NeuralNetwork(
+        activation="tanh",
+        topology="with-skip-connections",
+        layer_sizes=layer_sizes,
+        allele_dense_layer_sizes=[6],
+        peptide_dense_layer_sizes=[6],
+        locally_connected_layers=[],
+        peptide_allele_merge_method="concatenate",
+        peptide_allele_merge_activation="",
+        batch_normalization=False,
+        dropout_probability=0.0,
+        dense_layer_l1_regularization=0.0,
+        dense_layer_l2_regularization=0.0,
+    )
+    network = model.make_network(
+        allele_representations=_make_allele_representations(num_alleles=4),
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters),
+    )
+    network.eval()
+
+    peptide = torch.randn(3, *network.peptide_encoding_shape)
+    allele_idx = torch.tensor([1, 3])
+    with torch.no_grad():
+        peptide_stage = network.forward_peptide_stage(peptide)
+        compact = network.forward_cartesian_from_peptide_stage(
+            peptide_stage,
+            allele_idx,
+        )
+        # Build the explicit expansion as the reference, calling the
+        # canonical ``forward_from_peptide_stage`` path which always
+        # uses the merged-input cat for skip-connections.
+        expanded_peptide_stage = peptide_stage.unsqueeze(0).expand(
+            len(allele_idx),
+            peptide_stage.shape[0],
+            peptide_stage.shape[-1],
+        ).reshape(len(allele_idx) * peptide_stage.shape[0], peptide_stage.shape[-1])
+        expanded_alleles = allele_idx.unsqueeze(1).expand(
+            len(allele_idx),
+            peptide_stage.shape[0],
+        ).reshape(-1)
+        expanded = network.forward_from_peptide_stage(
+            expanded_peptide_stage,
+            expanded_alleles,
+        ).reshape(len(allele_idx), peptide_stage.shape[0], -1)
+
+    np.testing.assert_allclose(
+        compact.detach().cpu().numpy(),
+        expanded.detach().cpu().numpy(),
+        rtol=0,
+        atol=1e-5,
+    )
+
+
 def test_merge_allele_specific_raises_not_implemented():
     _seed_all(5)
     model_a = _make_simple_affinity_model(max_epochs=1)
