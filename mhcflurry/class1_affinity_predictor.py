@@ -1849,10 +1849,29 @@ class Class1AffinityPredictor(object):
                 _AUTO_BATCH_MIN_ROWS,
                 min(forward_budget // peak_bytes, _AUTO_BATCH_MAX_ROWS),
             )
-        peptide_batch = min(n_peptides, max(2_000, total_rows // 64))
-        allele_batch = min(n_alleles, max(1, total_rows // peptide_batch), 256)
-        while allele_batch * peptide_batch > total_rows and peptide_batch > 2_000:
-            peptide_batch = max(2_000, peptide_batch // 2)
+        # Joint (allele_batch, peptide_batch) optimization. Earlier code
+        # carved peptide off ``total_rows // 64`` and floored at 2000;
+        # for chunk sizes where n_alleles is small (the production
+        # workload uses 30 alleles per chunk) that left peptide_batch
+        # pinned at the floor while ``total_rows`` was 5-10× higher than
+        # what we used. Now pick allele_batch to fill the chunk
+        # (``min(n_alleles, total_rows / p_min)``) and peptide_batch to
+        # absorb the remaining budget — typical result on 8×A100-80GB
+        # is allele_batch=n_alleles, peptide_batch=10-30k vs the legacy
+        # allele_batch=8, peptide_batch=2000. Fewer Python-level inner
+        # loop iterations, fewer kernel launches, much better tensor-core
+        # utilization on the cartesian forward.
+        p_floor = max(_AUTO_BATCH_MIN_ROWS, 2_000)
+        allele_batch = min(int(n_alleles), max(1, int(total_rows // p_floor)))
+        allele_batch = min(allele_batch, 256)
+        peptide_batch = min(int(n_peptides), max(p_floor, total_rows // max(allele_batch, 1)))
+        # Final safety: make sure we don't exceed total_rows after the
+        # rounding above (can happen when allele_batch hits n_alleles
+        # before the floor).
+        while allele_batch * peptide_batch > total_rows and peptide_batch > p_floor:
+            peptide_batch = max(p_floor, peptide_batch // 2)
+        while allele_batch * peptide_batch > total_rows and allele_batch > 1:
+            allele_batch -= 1
         return int(peptide_batch), int(allele_batch)
 
     @staticmethod
@@ -1940,11 +1959,12 @@ class Class1AffinityPredictor(object):
 
         # ASCII -> AA-index lookup so the per-residue encoding is one
         # vectorized numpy gather instead of 8M Python ops over 800k
-        # peptides. Unknown bytes default to 0 ("A"), matching the
-        # implicit "trust caller" contract elsewhere in mhcflurry's
-        # peptide handling — random_peptides only emits the 20 common
-        # AAs so this is unreachable in the calibrate path.
-        ascii_lut = numpy.zeros(256, dtype=numpy.int64)
+        # peptides. Unknown bytes map to X and the X bucket is dropped
+        # from the final 20-column matrix, matching
+        # positional_frequency_matrix's treatment of non-common letters.
+        ascii_lut = numpy.full(
+            256, AMINO_ACID_INDEX["X"], dtype=numpy.int64,
+        )
         for letter, idx in AMINO_ACID_INDEX.items():
             if len(letter) == 1:
                 ascii_lut[ord(letter)] = idx
@@ -1974,6 +1994,53 @@ class Class1AffinityPredictor(object):
         }
 
     @staticmethod
+    def _topk_first_tie_indices(values, k):
+        """Return k smallest column indices per row with pandas tie semantics.
+
+        ``torch.topk`` is fast but does not promise which entries it
+        returns when the kth value is tied. Pandas ``Series.nsmallest``
+        defaults to ``keep='first'``; after ``drop_duplicates('peptide')``,
+        "first" means lower position on the unique-peptide axis. Keep
+        the fast ``topk`` path for normal continuous predictions and
+        repair only rows whose cutoff falls inside an exact tie block.
+        """
+        import torch
+
+        n = int(values.shape[1])
+        if k >= n:
+            return torch.arange(
+                n, dtype=torch.long, device=values.device,
+            ).expand(int(values.shape[0]), n)
+
+        top = torch.topk(values, k, dim=1, largest=False, sorted=False)
+        top_idx = top.indices
+
+        boundary = top.values.max(dim=1).values.unsqueeze(1)
+        lt_counts = (values < boundary).sum(dim=1)
+        eq_counts = (values == boundary).sum(dim=1)
+        tie_needed = k - lt_counts
+        tied_cutoff_rows = eq_counts > tie_needed
+        if not bool(tied_cutoff_rows.any().item()):
+            return top_idx
+
+        top_idx = top_idx.clone()
+        row_ids = torch.nonzero(
+            tied_cutoff_rows, as_tuple=False,
+        ).flatten()
+        row_values = values.index_select(0, row_ids)
+        row_boundary = boundary.index_select(0, row_ids)
+        row_lt = row_values < row_boundary
+        row_eq = row_values == row_boundary
+        row_tie_needed = tie_needed.index_select(0, row_ids).unsqueeze(1)
+        eq_rank = row_eq.to(torch.int64).cumsum(dim=1)
+        selected = row_lt | (row_eq & (eq_rank <= row_tie_needed))
+        stable_idx = selected.nonzero(as_tuple=False)[:, 1].reshape(
+            int(row_ids.numel()), k,
+        )
+        top_idx[row_ids] = stable_idx
+        return top_idx
+
+    @staticmethod
     def _motif_summary_chunk_gpu(
             ic50_device,
             state,
@@ -1986,12 +2053,11 @@ class Class1AffinityPredictor(object):
         block in the fast path with vectorized tensor ops:
 
         * ``torch.topk(largest=False)`` selects top-k tightest binders
-          per (allele, length) — kernel-tuned partial sort across all
-          alleles in the chunk in one launch instead of 30× per-allele
-          pandas ``nsmallest`` calls.
+          per (allele, length), with a small tie repair to match pandas
+          ``nsmallest(keep='first')`` at exact cutoff ties.
         * AA frequency matrices are computed by gathering precomputed
           per-length AA-code tensors and ``scatter_add`` into a one-hot
-          counts buffer of shape ``(a_size, L, 20)``; pandas only
+          counts buffer of shape ``(a_size, L, 21)``; pandas only
           assembles the final per-row schema.
         * Length distributions are ``topk`` over the full
           unique-peptide axis followed by a per-row ``scatter_add``
@@ -2020,11 +2086,11 @@ class Class1AffinityPredictor(object):
         for cutoff_fraction in summary_top_peptide_fractions:
             for L, idx_in_unique in state["length_groups"].items():
                 n_at_L = int(idx_in_unique.numel())
-                k = max(int(n_at_L * cutoff_fraction), 1)
+                k = min(max(int(n_at_L * cutoff_fraction), 1), n_at_L)
                 ic50_L = ic50_unique.index_select(1, idx_in_unique)
-                top_idx = torch.topk(
-                    ic50_L, k, dim=1, largest=False, sorted=False,
-                ).indices  # (a_size, k)
+                top_idx = Class1AffinityPredictor._topk_first_tie_indices(
+                    ic50_L, k,
+                )  # (a_size, k)
                 codes = state["aa_codes_per_length"][L]  # (n_at_L, L) long
                 selected_codes = codes[top_idx]  # (a_size, k, L) long
                 # Permute to (a_size, L, k) so scatter_add packs counts
@@ -2057,10 +2123,10 @@ class Class1AffinityPredictor(object):
                     df.insert(3, "cutoff_count", k)
                     freq_matrices.append(df)
 
-            k_total = max(int(n_unique * cutoff_fraction), 1)
-            top_full_idx = torch.topk(
-                ic50_unique, k_total, dim=1, largest=False, sorted=False,
-            ).indices  # (a_size, k_total)
+            k_total = min(max(int(n_unique * cutoff_fraction), 1), n_unique)
+            top_full_idx = Class1AffinityPredictor._topk_first_tie_indices(
+                ic50_unique, k_total,
+            )  # (a_size, k_total)
             lengths_per_topk = state["unique_lengths_t"][top_full_idx]
             max_len_p1 = int(state["unique_lengths_t"].max().item()) + 1
             length_counts = torch.zeros(
@@ -2306,7 +2372,34 @@ class Class1AffinityPredictor(object):
                 model.eval()
                 peptide_input = net_obj.peptides_to_network_input(encoded_peptides)
                 peptide_is_indices = net_obj.uses_peptide_torch_encoding()
-                stage_parts = []
+                # Pre-size the cache tensor by probing one row's stage_dim
+                # then write each chunk in-place. The previous build path
+                # used append+torch.cat, which transiently held *both* the
+                # per-chunk parts and the new contiguous tensor at once —
+                # a 2× VRAM peak (~13 GB extra on the production 400k
+                # peptide × 8-subnet ensemble) that pushed --max-workers-
+                # per-gpu auto into OOM territory. Pre-sized fill keeps
+                # the peak at 1× the cache.
+                with torch.no_grad():
+                    probe_chunk = peptide_input[:1]
+                    probe_keep_int = (
+                        peptide_is_indices
+                        and probe_chunk.ndim == 2
+                        and numpy.issubdtype(probe_chunk.dtype, numpy.integer)
+                    )
+                    if probe_keep_int:
+                        probe_tensor = torch.from_numpy(probe_chunk).to(device)
+                    else:
+                        probe_tensor = torch.from_numpy(
+                            numpy.asarray(probe_chunk, dtype=numpy.float32),
+                        ).to(device)
+                    probe_stage = model.forward_peptide_stage(probe_tensor)
+                    stage_dim_cached = int(probe_stage.shape[-1])
+                    stage_dtype = probe_stage.dtype
+                cached_tensor = torch.empty(
+                    n_peptides, stage_dim_cached,
+                    dtype=stage_dtype, device=device,
+                )
                 with torch.no_grad():
                     for start in range(0, n_peptides, peptide_batch_size):
                         end = min(start + peptide_batch_size, n_peptides)
@@ -2322,8 +2415,10 @@ class Class1AffinityPredictor(object):
                             tensor = torch.from_numpy(
                                 numpy.asarray(chunk, dtype=numpy.float32),
                             ).to(device)
-                        stage_parts.append(model.forward_peptide_stage(tensor))
-                cached_stages.append((net_obj, model, torch.cat(stage_parts, dim=0)))
+                        cached_tensor[start:end] = model.forward_peptide_stage(
+                            tensor,
+                        )
+                cached_stages.append((net_obj, model, cached_tensor))
             setattr(self, cached_attr, cached_stages)
             setattr(self, cached_signature_attr, cache_signature)
             del peptide_input
