@@ -46,11 +46,29 @@ collect results  ◀──────────────────  retu
 The orchestrator does the **expensive, single-threaded preparation**
 ONCE. Workers do the **parallel, per-task** work N times.
 
-## Layered shared memory
+## Tensor residency: device vs host
 
-mhcflurry uses two SHM layers. They share the "build once, share with
-many readers" idea but use different OS mechanisms because lifetimes
-differ.
+On CUDA boxes the default fit-time residency is **device**: the
+training tensors (peptide encodings, allele encodings, targets,
+sample weights, random-negative buffers) live on the GPU for the
+whole `fit()` call and never round-trip through host RAM or
+DataLoader workers. This is the principal training path on the
+release-pipeline boxes; the host/SHM stack documented below is
+the fallback path that auto-engages when the model + data don't
+fit on-device.
+
+The auto-resolver picks residency from the per-fit footprint, the
+free VRAM after model placement, and the configured
+`MHCFLURRY_AUTO_FIT_RESIDENCY_VRAM_BUDGET_FRACTION` (default 0.40).
+When residency falls back to host, the layered SHM described next
+takes over.
+
+## Layered shared memory (host-residency fallback)
+
+When residency falls back to host (model too big for VRAM, CPU-only
+box, etc.), mhcflurry uses two SHM layers. They share the "build
+once, share with many readers" idea but use different OS mechanisms
+because lifetimes differ.
 
 | | run mmap cache | fit DataLoader SHM |
 |---|---|---|

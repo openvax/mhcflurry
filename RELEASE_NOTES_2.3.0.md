@@ -6,11 +6,23 @@ and any last revisions land; will move to `CHANGELOG.md` at tag time.
 
 ## Headline
 
-Pan-allele training pipeline modernization: layered shared-memory
-infrastructure closes the GPU-starvation gap, recipe tightening kills
-the patience-reset noise tail, and the post-training pipeline
-(select → calibrate → eval → plot) is unified into a single
-resumable script. Calibration is ~10–20× faster.
+Pan-allele training pipeline modernization. ``fit()`` now defaults to
+**device-resident** tensors on CUDA — the inner training loop, random-
+negative pool, and validation forward pass all stay on-GPU, closing the
+GPU-starvation gap that the host/SHM DataLoader path was working
+around. The post-training pipeline (select → calibrate → eval → plot)
+is unified into a single resumable script, and calibration runs on
+device end-to-end (`PercentRankTransform.fit_batch_torch`,
+`_motif_summary_chunk_gpu`) for an additional per-worker speedup on
+top of the legacy `--gpu-batched` allele batching. Recipe tightening
+(``min_delta=1e-7``, ``max_epochs=500``) kills the patience-reset
+noise tail. Auto-resolvers pick workers/dataloader/compile settings
+from hardware so per-box tuning stops being manual.
+
+Layered shared-memory infrastructure (run mmap cache, fit DataLoader
+SHM) is still present as the host-residency fallback when the model
+doesn't fit on-device, but is no longer the principal training path
+on CUDA boxes.
 
 The orchestrator-as-locus-of-control architecture is documented in
 [docs/orchestrator.md](docs/orchestrator.md) — read that for the
