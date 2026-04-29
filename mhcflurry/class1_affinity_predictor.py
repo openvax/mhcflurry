@@ -1791,6 +1791,203 @@ class Class1AffinityPredictor(object):
             peptide_batch = max(2_000, peptide_batch // 2)
         return int(peptide_batch), int(allele_batch)
 
+    @staticmethod
+    def _prepare_motif_summary_state_gpu(encoded_peptides, device):
+        """One-time setup for GPU motif_summary; lifts the per-allele
+        ``drop_duplicates`` + length-bucket + AA-encoding work out of
+        the calibrate chunk loop so each chunk is pure tensor math.
+
+        Returns a dict of device-resident tensors:
+            unique_idx_t : (n_unique,) long — first-occurrence indices
+                into the full peptide list. Selecting columns with this
+                from the chunk's ``ic50_device`` reproduces the legacy
+                ``drop_duplicates('peptide')`` semantics (first row wins).
+            length_groups : dict[L] -> (n_at_L,) long indices into the
+                unique-peptide axis for peptides of length L.
+            aa_codes_per_length : dict[L] -> (n_at_L, L) long tensor of
+                amino-acid index codes (matches ``AMINO_ACID_INDEX``,
+                so X = 20 if it ever appears).
+            unique_lengths_t : (n_unique,) long — peptide length per
+                unique peptide; powers the per-allele length distribution.
+            n_unique : int.
+        """
+        import torch
+        from .amino_acid import AMINO_ACID_INDEX
+
+        seqs = list(encoded_peptides.sequences)
+        seen = set()
+        unique_idx = []
+        for i, s in enumerate(seqs):
+            if s not in seen:
+                seen.add(s)
+                unique_idx.append(i)
+        unique_idx = numpy.asarray(unique_idx, dtype=numpy.int64)
+        unique_seqs = [seqs[i] for i in unique_idx]
+        lengths = numpy.fromiter(
+            (len(p) for p in unique_seqs),
+            dtype=numpy.int64,
+            count=len(unique_seqs),
+        )
+
+        unique_lengths_t = torch.from_numpy(lengths).to(device)
+        unique_idx_t = torch.from_numpy(unique_idx).to(device)
+
+        # ASCII -> AA-index lookup so the per-residue encoding is one
+        # vectorized numpy gather instead of 8M Python ops over 800k
+        # peptides. Unknown bytes default to 0 ("A"), matching the
+        # implicit "trust caller" contract elsewhere in mhcflurry's
+        # peptide handling — random_peptides only emits the 20 common
+        # AAs so this is unreachable in the calibrate path.
+        ascii_lut = numpy.zeros(256, dtype=numpy.int64)
+        for letter, idx in AMINO_ACID_INDEX.items():
+            if len(letter) == 1:
+                ascii_lut[ord(letter)] = idx
+
+        length_groups = {}
+        aa_codes_per_length = {}
+        for L_np in numpy.unique(lengths):
+            L = int(L_np)
+            sel = numpy.where(lengths == L)[0].astype(numpy.int64)
+            n_at_L = int(sel.shape[0])
+            joined = "".join(unique_seqs[i] for i in sel).encode("ascii")
+            byte_arr = numpy.frombuffer(
+                joined, dtype=numpy.uint8,
+            ).reshape(n_at_L, L)
+            codes = ascii_lut[byte_arr]  # (n_at_L, L) int64
+            length_groups[L] = torch.from_numpy(sel).to(device)
+            aa_codes_per_length[L] = torch.from_numpy(
+                numpy.ascontiguousarray(codes),
+            ).to(device)
+
+        return {
+            "unique_idx_t": unique_idx_t,
+            "length_groups": length_groups,
+            "aa_codes_per_length": aa_codes_per_length,
+            "unique_lengths_t": unique_lengths_t,
+            "n_unique": int(unique_idx.shape[0]),
+        }
+
+    @staticmethod
+    def _motif_summary_chunk_gpu(
+            ic50_device,
+            state,
+            summary_top_peptide_fractions,
+            batch_alleles):
+        """GPU motif_summary for one allele chunk.
+
+        Replaces the per-allele
+        ``DataFrame(...).drop_duplicates().groupby('length').nsmallest(...)``
+        block in the fast path with vectorized tensor ops:
+
+        * ``torch.topk(largest=False)`` selects top-k tightest binders
+          per (allele, length) — kernel-tuned partial sort across all
+          alleles in the chunk in one launch instead of 30× per-allele
+          pandas ``nsmallest`` calls.
+        * AA frequency matrices are computed by gathering precomputed
+          per-length AA-code tensors and ``scatter_add`` into a one-hot
+          counts buffer of shape ``(a_size, L, 20)``; pandas only
+          assembles the final per-row schema.
+        * Length distributions are ``topk`` over the full
+          unique-peptide axis followed by a per-row ``scatter_add``
+          (a row-wise ``bincount``).
+
+        Returns ``(freq_matrix_dfs, length_dist_dfs)`` — lists of
+        ``pandas.DataFrame`` matching the legacy slow path's per-row
+        schema, ready to ``pandas.concat`` once all chunks are done.
+        """
+        import torch
+        from .amino_acid import AMINO_ACIDS
+
+        a_size = len(batch_alleles)
+        device = ic50_device.device
+        n_unique = state["n_unique"]
+        # AMINO_ACIDS = COMMON_AMINO_ACIDS_WITH_UNKNOWN keys, alphabetical
+        # then X — first 20 entries are the BLOSUM62-ordered non-X rows
+        # the legacy ``positional_frequency_matrix`` returns.
+        aa_columns = AMINO_ACIDS[:20]
+
+        ic50_unique = ic50_device.index_select(1, state["unique_idx_t"])
+
+        freq_matrices = []
+        length_dists = []
+
+        for cutoff_fraction in summary_top_peptide_fractions:
+            for L, idx_in_unique in state["length_groups"].items():
+                n_at_L = int(idx_in_unique.numel())
+                k = max(int(n_at_L * cutoff_fraction), 1)
+                ic50_L = ic50_unique.index_select(1, idx_in_unique)
+                top_idx = torch.topk(
+                    ic50_L, k, dim=1, largest=False, sorted=False,
+                ).indices  # (a_size, k)
+                codes = state["aa_codes_per_length"][L]  # (n_at_L, L) long
+                selected_codes = codes[top_idx]  # (a_size, k, L) long
+                # Permute to (a_size, L, k) so scatter_add packs counts
+                # along the last (AA) axis. We allocate 21 AA slots to
+                # absorb X (index 20) and discard the X column at the
+                # end — this matches the legacy semantics where
+                # ``positional_frequency_matrix``'s row index excludes X
+                # while the divisor stays at ``k`` (so positions with
+                # any X residues sum to <1 across the 20 columns).
+                scatter_dst = selected_codes.permute(0, 2, 1)
+                counts = torch.zeros(
+                    a_size, L, 21, dtype=torch.float64, device=device,
+                )
+                counts.scatter_add_(
+                    2, scatter_dst,
+                    torch.ones_like(scatter_dst, dtype=torch.float64),
+                )
+                freq_cpu = (counts[:, :, :20] / float(k)).cpu().numpy()
+                for ai, allele in enumerate(batch_alleles):
+                    df = pandas.DataFrame(
+                        freq_cpu[ai],
+                        index=numpy.arange(1, L + 1),
+                        columns=aa_columns,
+                    )
+                    df.index.name = "position"
+                    df = df.reset_index()
+                    df.insert(0, "allele", allele)
+                    df.insert(1, "length", L)
+                    df.insert(2, "cutoff_fraction", cutoff_fraction)
+                    df.insert(3, "cutoff_count", k)
+                    freq_matrices.append(df)
+
+            k_total = max(int(n_unique * cutoff_fraction), 1)
+            top_full_idx = torch.topk(
+                ic50_unique, k_total, dim=1, largest=False, sorted=False,
+            ).indices  # (a_size, k_total)
+            lengths_per_topk = state["unique_lengths_t"][top_full_idx]
+            max_len_p1 = int(state["unique_lengths_t"].max().item()) + 1
+            length_counts = torch.zeros(
+                a_size, max_len_p1, dtype=torch.float64, device=device,
+            )
+            length_counts.scatter_add_(
+                1, lengths_per_topk,
+                torch.ones_like(lengths_per_topk, dtype=torch.float64),
+            )
+            length_fractions_cpu = (
+                length_counts / float(k_total)
+            ).cpu().numpy()
+            for ai, allele in enumerate(batch_alleles):
+                row = length_fractions_cpu[ai]
+                present = numpy.where(row > 0)[0]
+                if present.size == 0:
+                    continue
+                ld = pandas.DataFrame({
+                    "allele": allele,
+                    "cutoff_fraction": cutoff_fraction,
+                    "cutoff_count": k_total,
+                    "length": present.astype(numpy.int64),
+                    "fraction": row[present],
+                })[[
+                    "allele", "cutoff_fraction", "cutoff_count",
+                    "length", "fraction",
+                ]].sort_values(
+                    ["cutoff_fraction", "length"]
+                ).reset_index(drop=True)
+                length_dists.append(ld)
+
+        return freq_matrices, length_dists
+
     def calibrate_percentile_ranks_fast(
             self,
             peptides,
@@ -1868,7 +2065,6 @@ class Class1AffinityPredictor(object):
         from .allele_encoding import AlleleEncoding
         from .regression_target import to_ic50
         from .percent_rank_transform import PercentRankTransform
-        from .common import positional_frequency_matrix
 
         if not self.class1_pan_allele_models:
             raise ValueError(
@@ -1988,6 +2184,14 @@ class Class1AffinityPredictor(object):
             bin_edges_array, dtype=torch.float64, device=device,
         )
 
+        # Hoist the per-allele dedup + length-bucket + AA-encoding work
+        # out of the chunk loop. The peptide universe is identical across
+        # alleles so this only needs to run once per calibrate call.
+        motif_state = (
+            self._prepare_motif_summary_state_gpu(encoded_peptides, device)
+            if motif_summary else None
+        )
+
         for abatch_start in range(0, n_alleles, allele_batch_size):
             abatch_end = min(abatch_start + allele_batch_size, n_alleles)
             a_size = abatch_end - abatch_start
@@ -2042,47 +2246,24 @@ class Class1AffinityPredictor(object):
             transforms = PercentRankTransform.fit_batch_torch(
                 ic50_device, bins_tensor,
             )
-            ic50_cpu_for_motif = (
-                ic50_device.to("cpu").numpy() if motif_summary else None
-            )
             for local_i, allele in enumerate(batch_alleles):
                 self.allele_to_percent_rank_transform[allele] = transforms[local_i]
-                if motif_summary:
-                    predictions = ic50_cpu_for_motif[local_i]
-                    df = pandas.DataFrame({
-                        "peptide": encoded_peptides.sequences,
-                        "prediction": predictions,
-                    }).drop_duplicates("peptide").set_index("peptide")
-                    df["length"] = df.index.str.len()
-                    for (length, sub_df) in df.groupby("length"):
-                        for cutoff_fraction in summary_top_peptide_fractions:
-                            k = max(int(len(sub_df) * cutoff_fraction), 1)
-                            selected = sub_df.prediction.nsmallest(k).index.values
-                            matrix = positional_frequency_matrix(selected).reset_index()
-                            original_columns = list(matrix.columns)
-                            matrix["allele"] = allele
-                            matrix["length"] = length
-                            matrix["cutoff_fraction"] = cutoff_fraction
-                            matrix["cutoff_count"] = len(selected)
-                            matrix = matrix[
-                                ["allele", "length", "cutoff_fraction", "cutoff_count"]
-                                + original_columns
-                            ]
-                            frequency_matrices.append(matrix)
-                    for cutoff_fraction in summary_top_peptide_fractions:
-                        k = max(int(len(df) * cutoff_fraction), 1)
-                        ld = df.prediction.nsmallest(k).index.str.len().value_counts()
-                        ld.index.name = "length"
-                        ld = ld / ld.sum()
-                        ld = ld.to_frame(name="fraction").reset_index()
-                        ld["allele"] = allele
-                        ld["cutoff_fraction"] = cutoff_fraction
-                        ld["cutoff_count"] = k
-                        ld = ld[[
-                            "allele", "cutoff_fraction", "cutoff_count",
-                            "length", "fraction",
-                        ]].sort_values(["cutoff_fraction", "length"])
-                        length_distributions.append(ld)
+            if motif_summary:
+                # All motif-summary work now runs on device — topk +
+                # scatter_add for AA frequency matrices, topk + scatter_add
+                # bincount for length distributions. Pandas only assembles
+                # final per-row schema at chunk-end. This replaces the
+                # per-allele DataFrame.drop_duplicates().groupby().nsmallest()
+                # block that dominated calibrate wall time after the
+                # PercentRankTransform.fit GPU port.
+                chunk_freq, chunk_ld = self._motif_summary_chunk_gpu(
+                    ic50_device,
+                    motif_state,
+                    summary_top_peptide_fractions,
+                    batch_alleles,
+                )
+                frequency_matrices.extend(chunk_freq)
+                length_distributions.extend(chunk_ld)
             if verbose:
                 print(
                     "calibrate_percentile_ranks_fast: "

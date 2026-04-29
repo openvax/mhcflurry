@@ -124,13 +124,25 @@ def test_calibrate_fast_parity_with_motif_summary():
         _sort_key(fast_summary["length_distributions"]),
         check_exact=False, rtol=1e-10, atol=1e-12,
     )
-    # frequency_matrices: the top-k peptide *set* should match per
-    # (allele,length,cutoff) bucket. Ordering within ties can drift in
-    # numerical rounding, so we compare the set of frequency values
-    # after sorting within each group.
+    # frequency_matrices: per-allele content must match the legacy slow
+    # path. Topk and pandas.nsmallest can break ties differently, so we
+    # allow at most a single-peptide swap per (allele, length, cutoff)
+    # bucket — that bounds the per-cell drift to ``1/k``.
     lf = legacy_summary["frequency_matrices"]
     ff = fast_summary["frequency_matrices"]
     assert set(lf.allele.unique()) == set(ff.allele.unique())
+    aa_columns = [c for c in lf.columns if len(c) == 1 and c.isalpha()]
+    assert "A" in aa_columns and "Y" in aa_columns
+    # Sanity: rows must sum close to 1 within each position (no X in
+    # random_peptides, so should be exactly 1.0 modulo float rounding).
+    fast_row_sums = ff[aa_columns].sum(axis=1)
+    numpy.testing.assert_allclose(fast_row_sums, 1.0, rtol=0, atol=1e-9)
+    # Sanity: different alleles must produce different motif matrices.
+    fast_allele_signatures = ff.groupby("allele")[aa_columns].mean()
+    assert fast_allele_signatures.nunique(axis=0).max() > 1, (
+        "all alleles produced identical motif matrices — per-allele "
+        "topk is not selecting different peptide sets per row"
+    )
     for (allele, length, cutoff), sub_l in lf.groupby(
         ["allele", "length", "cutoff_fraction"]
     ):
@@ -140,6 +152,22 @@ def test_calibrate_fast_parity_with_motif_summary():
             & (ff.cutoff_fraction == cutoff)
         ]
         assert len(sub_l) == len(sub_f)
+        sub_l_sorted = sub_l.sort_values("position").reset_index(drop=True)
+        sub_f_sorted = sub_f.sort_values("position").reset_index(drop=True)
+        k = int(sub_l_sorted["cutoff_count"].iloc[0])
+        # Per-cell drift bound: ties at the topk boundary can differ by
+        # at most a single peptide, swapping at most ``length`` AA
+        # counts (one per position) by ``1/k``.
+        diff = (
+            sub_l_sorted[aa_columns].to_numpy()
+            - sub_f_sorted[aa_columns].to_numpy()
+        )
+        max_abs = numpy.abs(diff).max()
+        assert max_abs <= 1.0 / k + 1e-9, (
+            f"frequency-matrix drift {max_abs:.4g} exceeds 1/k = "
+            f"{1.0 / k:.4g} for ({allele}, length={length}, "
+            f"cutoff={cutoff}) — per-allele top-k diverged beyond ties"
+        )
 
 
 def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
