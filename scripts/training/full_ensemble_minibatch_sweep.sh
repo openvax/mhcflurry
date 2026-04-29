@@ -68,8 +68,18 @@ for MB in $MINIBATCH_SIZES; do
     mkdir -p "$SIZE_OUT"
     cd "$SIZE_OUT"
 
+    # Phase-level idempotency: each phase writes a sentinel
+    # ($SIZE_OUT/.<phase>.done) on success, recording its wall time
+    # for the summary CSV. A killed-mid-phase rerun skips already-done
+    # phases (avoids re-training when only calibrate failed last time).
+    TRAIN_SENTINEL="$SIZE_OUT/.train.done"
+    SELECT_SENTINEL="$SIZE_OUT/.select.done"
+    CALIBRATE_SENTINEL="$SIZE_OUT/.calibrate.done"
+    EVAL_SENTINEL="$SIZE_OUT/.eval.done"
+
     # Patch the hyperparameters template's minibatch_size in every spec.
-    python3 - "$HYPERPARAMS_TPL" "$MB" <<'PY' > hyperparameters.yaml
+    if [ ! -f "$SIZE_OUT/hyperparameters.yaml" ]; then
+        python3 - "$HYPERPARAMS_TPL" "$MB" <<'PY' > "$SIZE_OUT/hyperparameters.yaml"
 import sys, yaml
 src, mb = sys.argv[1], int(sys.argv[2])
 with open(src) as f:
@@ -78,8 +88,13 @@ for spec in specs:
     spec["minibatch_size"] = mb
 print(yaml.safe_dump(specs))
 PY
+    fi
 
     # ---- train ----
+    if [ -f "$TRAIN_SENTINEL" ]; then
+        train_sec=$(cat "$TRAIN_SENTINEL")
+        echo "=== minibatch=$MB train already complete (${train_sec}s), skipping ==="
+    else
     train_start=$(date +%s)
     mhcflurry-class1-train-pan-allele-models \
         --data "$TRAIN_DATA" \
@@ -102,8 +117,14 @@ PY
         2>&1 | tee "$SIZE_OUT/train.log"
     train_end=$(date +%s)
     train_sec=$(( train_end - train_start ))
+    echo "$train_sec" > "$TRAIN_SENTINEL"
+    fi
 
     # ---- select ----
+    if [ -f "$SELECT_SENTINEL" ]; then
+        select_sec=$(cat "$SELECT_SENTINEL")
+        echo "=== minibatch=$MB select already complete (${select_sec}s), skipping ==="
+    else
     select_start=$(date +%s)
     cd "$SIZE_OUT"
     mhcflurry-class1-select-pan-allele-models \
@@ -122,8 +143,14 @@ PY
         2>&1 | tee "$SIZE_OUT/select.log"
     select_end=$(date +%s)
     select_sec=$(( select_end - select_start ))
+    echo "$select_sec" > "$SELECT_SENTINEL"
+    fi
 
     # ---- calibrate (max-workers-per-gpu pinned to avoid auto-OOM) ----
+    if [ -f "$CALIBRATE_SENTINEL" ]; then
+        cal_sec=$(cat "$CALIBRATE_SENTINEL")
+        echo "=== minibatch=$MB calibrate already complete (${cal_sec}s), skipping ==="
+    else
     cal_start=$(date +%s)
     mhcflurry-calibrate-percentile-ranks \
         --models-dir "$SIZE_OUT/models.combined" \
@@ -141,8 +168,14 @@ PY
         2>&1 | tee "$SIZE_OUT/calibrate.log"
     cal_end=$(date +%s)
     cal_sec=$(( cal_end - cal_start ))
+    echo "$cal_sec" > "$CALIBRATE_SENTINEL"
+    fi
 
     # ---- eval (compare against public 2.2.0) ----
+    if [ -f "$EVAL_SENTINEL" ]; then
+        eval_sec=$(cat "$EVAL_SENTINEL")
+        echo "=== minibatch=$MB eval already complete (${eval_sec}s), skipping ==="
+    else
     eval_start=$(date +%s)
     mkdir -p "$SIZE_OUT/eval_comparison"
     python3 "$COMPARE_SCRIPT" \
@@ -153,6 +186,8 @@ PY
         2>&1 | tee "$SIZE_OUT/eval.log"
     eval_end=$(date +%s)
     eval_sec=$(( eval_end - eval_start ))
+    echo "$eval_sec" > "$EVAL_SENTINEL"
+    fi
 
     total_sec=$(( train_sec + select_sec + cal_sec + eval_sec ))
 
