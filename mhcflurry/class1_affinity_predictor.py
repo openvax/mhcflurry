@@ -1697,28 +1697,77 @@ class Class1AffinityPredictor(object):
     def _auto_size_calibration_batches(
             model, device, n_peptides, n_alleles,
             num_workers_per_gpu=1,
-            free_memory_fraction=0.5):
+            free_memory_fraction=0.4,
+            num_cached_networks=1,
+            peptide_stage_dim=None):
         """Split the auto-sized batch budget between peptide and allele axes.
 
-        Wraps ``compute_prediction_batch_size`` (the single source of
-        truth for GPU-memory-aware batch sizing) and splits the budget
-        so the peptide axis is ≥10 k (amortizing dispatch) and the
-        allele axis uses whatever remains (capped at 256 since dispatch
-        savings flatten out past that point).
+        Calibrate's peak VRAM is dominated by ``cached_stages`` — all
+        ``num_cached_networks`` networks' peptide-stage outputs held on
+        device simultaneously, sized ``n_peptides × peptide_stage_dim ×
+        4 bytes`` per network. That footprint is fixed (independent of
+        batch size) and must be subtracted before sizing the
+        peptide/allele forward batches, otherwise auto-sizing gives a
+        budget that fits a single forward but not the forward + cache.
         """
-        from .class1_neural_network import compute_prediction_batch_size
-        total_rows = compute_prediction_batch_size(
-            device,
-            model=model,
-            num_workers_per_gpu=num_workers_per_gpu,
-            free_memory_fraction=free_memory_fraction,
+        from .class1_neural_network import (
+            compute_prediction_batch_size,
+            _free_device_memory_bytes,
+            _estimate_peak_bytes_per_row,
+            _AUTO_BATCH_MAX_ROWS,
+            _AUTO_BATCH_MIN_ROWS,
         )
         if n_peptides == 0 or n_alleles == 0:
             return max(n_peptides, 1), max(n_alleles, 1)
-        peptide_batch = min(n_peptides, max(10_000, total_rows // 64))
+        if device.type != "cuda":
+            total_rows = compute_prediction_batch_size(
+                device,
+                model=model,
+                num_workers_per_gpu=num_workers_per_gpu,
+                free_memory_fraction=free_memory_fraction,
+            )
+        else:
+            workers = max(int(num_workers_per_gpu), 1)
+            free = _free_device_memory_bytes(device)
+            peak_bytes = _estimate_peak_bytes_per_row(model)
+            per_worker_budget = int(free * float(free_memory_fraction) / workers)
+            stage_dim = peptide_stage_dim
+            if stage_dim is None:
+                try:
+                    enc_shape = getattr(model, "peptide_encoding_shape", None)
+                    if enc_shape is not None:
+                        stage_dim = int(enc_shape[0]) * int(enc_shape[1])
+                except Exception:
+                    stage_dim = None
+                if stage_dim is None:
+                    stage_dim = peak_bytes // 32 if peak_bytes else 1024
+            cache_bytes = (
+                int(num_cached_networks)
+                * int(n_peptides)
+                * int(stage_dim)
+                * 4
+            )
+            forward_budget = per_worker_budget - cache_bytes
+            if forward_budget < peak_bytes * _AUTO_BATCH_MIN_ROWS:
+                logging.warning(
+                    "calibrate auto-sizer: cached_stages footprint "
+                    "(%.2f GB) exceeds %.0f%% of per-worker budget "
+                    "(%.2f GB free / %d workers). Falling back to "
+                    "minimum batch; consider --max-workers-per-gpu 1.",
+                    cache_bytes / 1e9,
+                    free_memory_fraction * 100,
+                    free / 1e9,
+                    workers,
+                )
+                forward_budget = peak_bytes * _AUTO_BATCH_MIN_ROWS
+            total_rows = max(
+                _AUTO_BATCH_MIN_ROWS,
+                min(forward_budget // peak_bytes, _AUTO_BATCH_MAX_ROWS),
+            )
+        peptide_batch = min(n_peptides, max(2_000, total_rows // 64))
         allele_batch = min(n_alleles, max(1, total_rows // peptide_batch), 256)
-        while allele_batch * peptide_batch > total_rows and peptide_batch > 10_000:
-            peptide_batch = max(10_000, peptide_batch // 2)
+        while allele_batch * peptide_batch > total_rows and peptide_batch > 2_000:
+            peptide_batch = max(2_000, peptide_batch // 2)
         return int(peptide_batch), int(allele_batch)
 
     def calibrate_percentile_ranks_fast(
@@ -1851,6 +1900,7 @@ class Class1AffinityPredictor(object):
             auto_peptide, auto_allele = self._auto_size_calibration_batches(
                 probe_net, device, n_peptides, len(alleles),
                 num_workers_per_gpu=num_workers_per_gpu,
+                num_cached_networks=len(networks),
             )
             if peptide_batch_size in (None, "auto"):
                 peptide_batch_size = auto_peptide
@@ -1861,7 +1911,8 @@ class Class1AffinityPredictor(object):
                     "calibrate_percentile_ranks_fast auto-sized: "
                     f"peptide_batch={peptide_batch_size}, "
                     f"allele_batch={allele_batch_size} "
-                    f"(workers_per_gpu={num_workers_per_gpu})"
+                    f"(workers_per_gpu={num_workers_per_gpu}, "
+                    f"cached_networks={len(networks)})"
                 )
         peptide_batch_size = int(peptide_batch_size)
         allele_batch_size = int(allele_batch_size)

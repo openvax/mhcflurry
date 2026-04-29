@@ -445,6 +445,30 @@ do
     #     Override with CALIBRATE_PEPTIDES_PER_LENGTH.
     CALIBRATE_PEPTIDES_PER_LENGTH="${CALIBRATE_PEPTIDES_PER_LENGTH:-50000}"
     CALIBRATE_ALLELES_PER_CHUNK="${CALIBRATE_ALLELES_PER_CHUNK:-30}"
+    # Calibrate's peak VRAM is dominated by `cached_stages` —
+    # all selected networks' peptide-stage outputs held on
+    # device simultaneously per worker. With 4 workers/GPU on
+    # 80 GB cards each worker only gets a 10 GB budget that the
+    # cache + cartesian forward routinely overshoots (run
+    # 20260428T202028Z OOM'd at peptide_batch=10000,
+    # allele_batch=30 with 4 workers/GPU). Calibrate is
+    # GPU-bound, not Python-bound, so 1 worker/GPU on 8 GPUs
+    # matches throughput without the contention. Override with
+    # CALIBRATE_MAX_WORKERS_PER_GPU.
+    CALIBRATE_MAX_WORKERS_PER_GPU="${CALIBRATE_MAX_WORKERS_PER_GPU:-1}"
+    CALIBRATE_NUM_JOBS=$(( GPUS * CALIBRATE_MAX_WORKERS_PER_GPU ))
+    CALIBRATE_PARALLELISM_ARGS=(
+        --num-jobs "$CALIBRATE_NUM_JOBS"
+        --max-tasks-per-worker "$MAX_TASKS_PER_WORKER"
+        --gpus "$GPUS"
+        --max-workers-per-gpu "$CALIBRATE_MAX_WORKERS_PER_GPU"
+        --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
+        --torch-compile "${TORCH_COMPILE_CLI:-auto}"
+        --matmul-precision "${MATMUL_PRECISION_CLI:-none}"
+    )
+    if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
+        CALIBRATE_PARALLELISM_ARGS+=(--enable-timing)
+    fi
     run_logged_step "calibrate_${kind}" "$CALIBRATE_LOG" \
         mhcflurry-calibrate-percentile-ranks \
         --models-dir "$SELECTED_DIR" \
@@ -454,7 +478,7 @@ do
         --alleles-per-work-chunk "$CALIBRATE_ALLELES_PER_CHUNK" \
         --gpu-batched \
         --verbosity 1 \
-        "${PARALLELISM_ARGS[@]}"
+        "${CALIBRATE_PARALLELISM_ARGS[@]}"
 done
 
 # ---- eval against public release ------------------------------------
