@@ -201,10 +201,20 @@ def run(argv=sys.argv[1:]):
     # downstream consumer reads it (model_kwargs below + pool creation).
     # The shared helper also caps auto-sized local Pools to GPU capacity and
     # hoists torch.compile worker-thread defaults before forking.
+    #
+    # ``per_worker_gb=24`` overrides the train-default (4 GB) because
+    # calibrate's per-worker footprint is dominated by the cached_stages
+    # peptide-side activation tensor (~15 GB) plus CUDA + working state
+    # (~3 GB) × 1.3x safety. Without this hint, auto MWPG picks 4
+    # workers/GPU based on training's footprint, then the calibrate
+    # auto-sizer falls back to the minimum peptide_batch (~2000 rows)
+    # because each worker's budget runs out — defeating the purpose of
+    # the joint (a, p) optimization.
     from .local_parallelism import resolve_local_parallelism_args
     resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+        per_worker_gb=24.0,
     )
 
     aa_distribution = None

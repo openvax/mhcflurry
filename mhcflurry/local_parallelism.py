@@ -229,7 +229,8 @@ def _free_vram_from_nvidia_smi_gb(num_gpus):
     return min(vals[:max(int(num_gpus), 1)])
 
 
-def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
+def auto_max_workers_per_gpu(
+        num_jobs, num_gpus, backend="auto", per_worker_gb=None):
     """Pick ``max_workers_per_gpu`` based on detected hardware.
 
     Returns an int ≥ 1. Logic:
@@ -252,16 +253,26 @@ def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` and
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP``.
 
+    Calibrate's per-worker footprint is dominated by the cached_stages
+    tensor (~15 GB at production peptide universe / ensemble size), so
+    callers in the calibrate path pass ``per_worker_gb`` explicitly to
+    override the train-default of 4 GB. When given, the explicit hint
+    wins over the env var. (No env var override: the workload-specific
+    knowledge belongs in the workload's command, not in a global env.)
+
     The result is logged so the chosen value is visible in the worker
     log alongside the reasoning.
     """
     if not num_gpus or num_gpus < 1 or backend == "cpu":
         return 1
 
-    per_worker_gb = float(os.environ.get(
-        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB",
-        str(_AUTO_MWPG_PER_WORKER_GB_DEFAULT),
-    ))
+    if per_worker_gb is None:
+        per_worker_gb = float(os.environ.get(
+            "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB",
+            str(_AUTO_MWPG_PER_WORKER_GB_DEFAULT),
+        ))
+    else:
+        per_worker_gb = float(per_worker_gb)
     hard_cap = int(os.environ.get(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP",
         str(_AUTO_MWPG_HARD_CAP_DEFAULT),
@@ -705,13 +716,18 @@ def auto_num_jobs(num_gpus, max_workers_per_gpu):
     return int(num_gpus) * int(max_workers_per_gpu)
 
 
-def resolve_max_workers_per_gpu(args):
+def resolve_max_workers_per_gpu(args, per_worker_gb=None):
     """Resolve ``args.max_workers_per_gpu`` to an int, mutating ``args``.
 
     Accepts the literal string ``"auto"`` (the default) or an int. When
     ``"auto"``, calls ``auto_max_workers_per_gpu`` with the rest of the
     args' parallelism config to pick a value. Idempotent — calling
     twice on the same args is a no-op the second time.
+
+    ``per_worker_gb`` lets workload-specific commands (e.g. calibrate,
+    where cached_stages dominates per-worker VRAM at ~15 GB) override
+    the train-default. Falls back to env var / the module default when
+    not given.
 
     Returns the resolved int (also stored on ``args.max_workers_per_gpu``
     so subsequent consumers see the int).
@@ -724,6 +740,7 @@ def resolve_max_workers_per_gpu(args):
             num_jobs=getattr(args, "num_jobs", 0),
             num_gpus=getattr(args, "gpus", 0) or 0,
             backend=getattr(args, "backend", "auto"),
+            per_worker_gb=per_worker_gb,
         )
     else:
         resolved = int(value)
@@ -731,7 +748,8 @@ def resolve_max_workers_per_gpu(args):
     return resolved
 
 
-def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
+def resolve_local_parallelism_args(
+        args, cap_auto_num_jobs=True, per_worker_gb=None):
     """Resolve and normalize local parallelism arguments in one place.
 
     This is the single pre-fork normalization point for local worker pools:
@@ -757,7 +775,7 @@ def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
         original is None
         or (isinstance(original, str) and original.lower() == "auto")
     )
-    resolved = resolve_max_workers_per_gpu(args)
+    resolved = resolve_max_workers_per_gpu(args, per_worker_gb=per_worker_gb)
     args.max_workers_per_gpu_was_auto = was_auto
 
     num_jobs_raw = getattr(args, "num_jobs", "auto")
