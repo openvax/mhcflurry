@@ -5165,7 +5165,19 @@ class Class1NeuralNetwork(object):
                 )
                 fit_info["epoch_num_train_batches"].append(len(train_losses))
                 fit_info["epoch_num_train_rows"].append(epoch_num_train_rows)
-                fit_info["epoch_tail_train_rows"].append(len(tail_indices))
+                # Tail-batch row count: device path computes from
+                # ``n_train_epoch - full_batch_count``; host path keeps
+                # the original numpy ``train_indices[full_batch_count:]``
+                # slice. ``tail_count`` is set on both paths now (see
+                # the device branch's tail-batch block).
+                if backing.device_backed:
+                    fit_info["epoch_tail_train_rows"].append(
+                        n_train_epoch - full_batch_count
+                    )
+                else:
+                    fit_info["epoch_tail_train_rows"].append(
+                        len(tail_indices)
+                    )
                 fit_info["epoch_num_validation_batches"].append(
                     int(numpy.ceil(n_val / val_batch_size)) if n_val > 0 else 0
                 )
