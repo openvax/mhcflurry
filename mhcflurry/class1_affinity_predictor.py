@@ -1733,12 +1733,33 @@ class Class1AffinityPredictor(object):
             per_worker_budget = int(free * float(free_memory_fraction) / workers)
             stage_dim = peptide_stage_dim
             if stage_dim is None:
-                try:
-                    enc_shape = getattr(model, "peptide_encoding_shape", None)
-                    if enc_shape is not None:
-                        stage_dim = int(enc_shape[0]) * int(enc_shape[1])
-                except Exception:
-                    stage_dim = None
+                # MergedClass1NeuralNetwork: peptide-stage cache is the
+                # concatenation of all sub-networks' stages → sum the
+                # per-sub-network stage dims. Otherwise fall back to a
+                # conservative encoding-shape probe.
+                sub_networks = getattr(model, "networks", None)
+                if (
+                    sub_networks is not None
+                    and not hasattr(model, "peptide_encoding_shape")
+                ):
+                    try:
+                        sub_dims = []
+                        for net in sub_networks:
+                            sub_enc = getattr(net, "peptide_encoding_shape", None)
+                            if sub_enc is not None:
+                                sub_dims.append(int(sub_enc[0]) * int(sub_enc[1]))
+                            else:
+                                sub_dims.append(1024)
+                        stage_dim = int(sum(sub_dims))
+                    except Exception:
+                        stage_dim = None
+                if stage_dim is None:
+                    try:
+                        enc_shape = getattr(model, "peptide_encoding_shape", None)
+                        if enc_shape is not None:
+                            stage_dim = int(enc_shape[0]) * int(enc_shape[1])
+                    except Exception:
+                        stage_dim = None
                 if stage_dim is None:
                     stage_dim = peak_bytes // 32 if peak_bytes else 1024
             cache_bytes = (

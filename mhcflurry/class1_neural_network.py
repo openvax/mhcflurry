@@ -59,6 +59,21 @@ def _estimate_peak_bytes_per_row(model):
     """
     if model is None:
         return 32 * 1024  # conservative 32 KB/row fallback
+    # MergedClass1NeuralNetwork wraps N sub-networks and runs each one's
+    # forward independently in a list comprehension, then combines the
+    # outputs. All N sub-networks' peak intermediates are alive
+    # simultaneously, so the per-row peak is the SUM of per-sub-network
+    # peaks, not the max. Without this, the merged ensemble's auto-sized
+    # batch overshoots VRAM by Nx (~8x for the production 8-network
+    # release ensemble) and OOMs in calibrate's cartesian forward.
+    sub_networks = getattr(model, "networks", None)
+    if sub_networks is not None and not hasattr(model, "peptide_encoding_shape"):
+        try:
+            return int(sum(
+                _estimate_peak_bytes_per_row(net) for net in sub_networks
+            ))
+        except Exception:
+            pass
     widths = []
     try:
         lc_out_len = int(model.peptide_encoding_shape[0])
