@@ -21,8 +21,8 @@
 #   PUBLIC_MODELS_DIR public 2.2.0 models.combined for eval comparison
 #   DATA_EVAL_DIR     data_evaluation/ for benchmark hits/decoys
 #   COMPARE_SCRIPT    path to compare_new_vs_public.py
-#   GPUS, NUM_JOBS, MAX_TASKS_PER_WORKER, MAX_WORKERS_PER_GPU,
-#   CALIBRATE_MAX_WORKERS_PER_GPU, ENCODING_CACHE_DIR
+#   GPUS, MAX_TASKS_PER_WORKER, ENCODING_CACHE_DIR
+# (--num-jobs and --max-workers-per-gpu auto-resolve per phase)
 #
 # Output layout:
 #   $SWEEP_OUT/
@@ -46,11 +46,12 @@ PUBLIC_MODELS_DIR="${PUBLIC_MODELS_DIR:-$(mhcflurry-downloads path models_class1
 DATA_EVAL_DIR="${DATA_EVAL_DIR:-$(mhcflurry-downloads path data_evaluation)}"
 COMPARE_SCRIPT="${COMPARE_SCRIPT:?COMPARE_SCRIPT must point at compare_new_vs_public.py}"
 GPUS="${GPUS:-8}"
-NUM_JOBS="${NUM_JOBS:-32}"
 MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
-MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-4}"
-CALIBRATE_MAX_WORKERS_PER_GPU="${CALIBRATE_MAX_WORKERS_PER_GPU:-1}"
 ENCODING_CACHE_DIR="${ENCODING_CACHE_DIR:-$HOME/runplz-cache/encoding_cache}"
+# --num-jobs and --max-workers-per-gpu are passed as ``auto`` so that
+# the resolver in mhcflurry/local_parallelism.py picks values that match
+# the box (free VRAM, GPU count, per-worker memory) instead of being
+# pinned to fixed sweep-time defaults that drift away from reality.
 
 mkdir -p "$SWEEP_OUT"
 SUMMARY="$SWEEP_OUT/sweep_summary.csv"
@@ -106,10 +107,10 @@ PY
         --out-models-dir "$SIZE_OUT/models.unselected.combined" \
         --worker-log-dir "$SIZE_OUT" \
         --use-encoding-cache --encoding-cache-dir "$ENCODING_CACHE_DIR" \
-        --num-jobs "$NUM_JOBS" \
+        --num-jobs auto \
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
         --gpus "$GPUS" \
-        --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
+        --max-workers-per-gpu auto \
         --dataloader-num-workers 1 \
         --torch-compile auto \
         --matmul-precision none \
@@ -132,10 +133,10 @@ PY
         --models-dir "$SIZE_OUT/models.unselected.combined" \
         --out-models-dir "$SIZE_OUT/models.combined" \
         --min-models 2 --max-models 8 \
-        --num-jobs "$NUM_JOBS" \
+        --num-jobs auto \
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
         --gpus "$GPUS" \
-        --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
+        --max-workers-per-gpu auto \
         --dataloader-num-workers 1 \
         --torch-compile auto \
         --matmul-precision none \
@@ -146,7 +147,7 @@ PY
     echo "$select_sec" > "$SELECT_SENTINEL"
     fi
 
-    # ---- calibrate (max-workers-per-gpu pinned to avoid auto-OOM) ----
+    # ---- calibrate (auto MWPG accounts for cartesian forward + cache) ----
     if [ -f "$CALIBRATE_SENTINEL" ]; then
         cal_sec=$(cat "$CALIBRATE_SENTINEL")
         echo "=== minibatch=$MB calibrate already complete (${cal_sec}s), skipping ==="
@@ -157,10 +158,10 @@ PY
         --match-amino-acid-distribution-data "$SIZE_OUT/models.unselected.combined/train_data.csv.bz2" \
         --motif-summary --num-peptides-per-length 50000 \
         --alleles-per-work-chunk 30 --gpu-batched --verbosity 1 \
-        --num-jobs "$NUM_JOBS" \
+        --num-jobs auto \
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
         --gpus "$GPUS" \
-        --max-workers-per-gpu "$CALIBRATE_MAX_WORKERS_PER_GPU" \
+        --max-workers-per-gpu auto \
         --dataloader-num-workers 1 \
         --torch-compile auto \
         --matmul-precision none \

@@ -117,6 +117,24 @@ def _max_workers_per_gpu_arg(value):
     return v
 
 
+def _num_jobs_arg(value):
+    """argparse type for ``--num-jobs``. Accepts ``"auto"`` or int>=0."""
+    import argparse
+    if isinstance(value, str) and value.lower() == "auto":
+        return "auto"
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "--num-jobs must be 'auto' or an integer >= 0, got %r" % (value,)
+        )
+    if v < 0:
+        raise argparse.ArgumentTypeError(
+            "--num-jobs must be >= 0, got %d" % (v,)
+        )
+    return v
+
+
 def _dataloader_num_workers_arg(value):
     """argparse type for ``--dataloader-num-workers``. ``"auto"`` or int>=0."""
     import argparse
@@ -270,7 +288,13 @@ def auto_max_workers_per_gpu(num_jobs, num_gpus, backend="auto"):
     # without the user-explicit guard, by_jobs would clamp MWPG to 2
     # (16//8) when production sets num_jobs=16; with the guard, MWPG can
     # rise to the hard_cap of 4 if VRAM allows.
-    num_jobs_int = int(num_jobs)
+    # ``num_jobs`` may arrive as ``"auto"`` when called from
+    # ``resolve_local_parallelism_args`` (which resolves MWPG before
+    # num_jobs); treat that as "user delegated" — same as ``num_jobs=0``.
+    if isinstance(num_jobs, str) and num_jobs.strip().lower() == "auto":
+        num_jobs_int = 0
+    else:
+        num_jobs_int = int(num_jobs)
     by_vram = max(1, int(free_vram_gb_used * 0.6 / per_worker_gb))
     if num_jobs_int > 0:
         by_jobs = max(1, num_jobs_int // max(int(num_gpus), 1))
@@ -713,13 +737,17 @@ def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
     This is the single pre-fork normalization point for local worker pools:
 
     * resolves ``--max-workers-per-gpu=auto`` without touching CUDA;
-    * when that value was auto, caps ``--num-jobs`` to the resolved GPU
-      capacity so an oversized planning value does not silently create CPU
-      overflow workers;
+    * resolves ``--num-jobs=auto`` to ``gpus × max_workers_per_gpu`` (post-
+      MWPG resolution), so the worker count always matches GPU capacity by
+      default;
+    * caps any user-explicit ``--num-jobs`` that exceeds GPU capacity. CPU
+      overflow workers are almost never useful for GPU-bound mhcflurry
+      workloads (calibrate / pan-allele cartesian forwards) — they take
+      work items at GPU pace from the imap_unordered queue and then chew
+      on them at CPU pace, blocking GPU workers from idling out properly.
+      The legacy "explicit MWPG opts in to CPU overflow" exception was a
+      foot-gun in practice and is gone;
     * hoists torch.compile's worker-thread cap before the Pool forks.
-
-    Explicit numeric ``--max-workers-per-gpu`` keeps the historical scheduler
-    behavior: if ``num_jobs`` exceeds GPU capacity, overflow workers run on CPU.
     """
     if getattr(args, "_local_parallelism_args_resolved", False):
         return args
@@ -732,23 +760,39 @@ def resolve_local_parallelism_args(args, cap_auto_num_jobs=True):
     resolved = resolve_max_workers_per_gpu(args)
     args.max_workers_per_gpu_was_auto = was_auto
 
-    num_jobs = int(getattr(args, "num_jobs", 0) or 0)
+    num_jobs_raw = getattr(args, "num_jobs", "auto")
+    num_jobs_was_auto = (
+        num_jobs_raw is None
+        or (isinstance(num_jobs_raw, str) and num_jobs_raw.lower() == "auto")
+    )
     num_gpus = int(getattr(args, "gpus", 0) or 0)
     backend = normalize_pytorch_backend(getattr(args, "backend", "auto") or "auto")
+
+    if num_jobs_was_auto:
+        if num_gpus > 0 and backend in ("auto", "gpu"):
+            args.num_jobs = num_gpus * int(resolved)
+        else:
+            # CPU-only or no GPU plan: 0 = serial, the historical "auto" zero.
+            args.num_jobs = 0
+    else:
+        args.num_jobs = int(num_jobs_raw)
+    args.num_jobs_was_auto = num_jobs_was_auto
+
+    num_jobs = int(args.num_jobs)
     if (
             cap_auto_num_jobs
-            and was_auto
             and num_jobs > 0
             and num_gpus > 0
             and backend in ("auto", "gpu")):
         gpu_capacity = num_gpus * int(resolved)
         if num_jobs > gpu_capacity:
             print(
-                "Local parallelism: capping num_jobs from %d to %d because "
-                "--max-workers-per-gpu=auto resolved to %d across %d GPU(s). "
-                "Set MAX_WORKERS_PER_GPU=N / --max-workers-per-gpu N to allow "
-                "explicit CPU overflow workers." % (
-                    num_jobs, gpu_capacity, resolved, num_gpus,
+                "Local parallelism: capping num_jobs from %d to %d "
+                "(--gpus=%d × --max-workers-per-gpu=%d). CPU overflow "
+                "workers serialize the work queue and starve the GPU "
+                "workers, so excess --num-jobs is dropped rather than "
+                "spilling to CPU." % (
+                    num_jobs, gpu_capacity, num_gpus, resolved,
                 )
             )
             args.num_jobs = gpu_capacity
@@ -1463,11 +1507,14 @@ def add_local_parallelism_args(parser):
 
     group.add_argument(
         "--num-jobs",
-        default=0,
-        type=int,
+        default="auto",
+        type=_num_jobs_arg,
         metavar="N",
         help="Number of local processes to parallelize training over. "
-             "Set to 0 for serial run. Default: %(default)s.")
+             "Pass 'auto' (default) to derive from "
+             "``--gpus * --max-workers-per-gpu`` once the latter is "
+             "resolved (so workers never overflow to CPU silently). "
+             "Pass 0 for serial run, or an int to pin.")
     group.add_argument(
         "--backend",
         choices=("auto", "default", "gpu", "mps", "cpu"),
