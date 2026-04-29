@@ -64,6 +64,8 @@ def test_fit_batch_torch_handles_out_of_range_values():
     # Row 0: hist [1, 1, 2] (12->bin0, 22->bin1, 32->bin2, 38->bin2)
     # -> cdf cumulative = 25, 50, 100
     assert_allclose(transforms[0].cdf[2:-1], [25.0, 50.0, 100.0], atol=1e-9)
-    # Row 2: 2 in bin 0 (11, 12), 0 in bin 1, 2 in bin 2 (50, 60 fold-in to last)
-    assert_allclose(transforms[2].cdf[2:-1], [50.0, 50.0, 100.0], atol=1e-9)
+    # Row 2: 2 in bin 0 (11, 12 -> [10,20)). 50 and 60 are strictly
+    # above the last edge (40) and are *dropped* by numpy.histogram —
+    # the fast path matches that semantics. hist=[2,0,0], cdf=[100,100,100].
+    assert_allclose(transforms[2].cdf[2:-1], [100.0, 100.0, 100.0], atol=1e-9)
 

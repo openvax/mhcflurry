@@ -445,20 +445,32 @@ do
     #     Override with CALIBRATE_PEPTIDES_PER_LENGTH.
     CALIBRATE_PEPTIDES_PER_LENGTH="${CALIBRATE_PEPTIDES_PER_LENGTH:-50000}"
     CALIBRATE_ALLELES_PER_CHUNK="${CALIBRATE_ALLELES_PER_CHUNK:-30}"
-    # Calibrate's peak VRAM is dominated by `cached_stages` —
-    # all selected networks' peptide-stage outputs held on
-    # device simultaneously per worker. With 4 workers/GPU on
-    # 80 GB cards each worker only gets a 10 GB budget that the
-    # cache + cartesian forward routinely overshoots (run
-    # 20260428T202028Z OOM'd at peptide_batch=10000,
-    # allele_batch=30 with 4 workers/GPU). Calibrate is
-    # GPU-bound, not Python-bound, so 1 worker/GPU on 8 GPUs
-    # matches throughput without the contention. Override with
-    # CALIBRATE_MAX_WORKERS_PER_GPU.
-    CALIBRATE_MAX_WORKERS_PER_GPU="${CALIBRATE_MAX_WORKERS_PER_GPU:-1}"
-    CALIBRATE_NUM_JOBS=$(( GPUS * CALIBRATE_MAX_WORKERS_PER_GPU ))
+    # Calibrate's peak VRAM per worker is dominated by the merged
+    # ensemble's peptide-stage cache (~8x stage_dim × n_peptides × 4
+    # bytes ≈ 6-13 GB depending on architecture). After the GPU
+    # PercentRankTransform.fit move this is GPU-bound (cartesian
+    # forward + bucketize + scatter_add), not Python-bound, so
+    # 1 worker/GPU saturates the SMs on its own — but we let the
+    # auto-resolver pick: it'll choose 1 on small-VRAM cards or
+    # workloads that hit the cache hard, and >1 only when there's
+    # genuine slack. Override with CALIBRATE_MAX_WORKERS_PER_GPU.
+    # CALIBRATE_PER_WORKER_GB tells the resolver how much VRAM to
+    # budget per worker (default 12 — the cache + ~2 GB working
+    # set on 8-network ensembles). Bumped from the training
+    # default of 4 because the calibrate cache is much larger.
+    CALIBRATE_MAX_WORKERS_PER_GPU="${CALIBRATE_MAX_WORKERS_PER_GPU:-auto}"
+    CALIBRATE_PER_WORKER_GB="${CALIBRATE_PER_WORKER_GB:-12}"
+    if [ "$CALIBRATE_MAX_WORKERS_PER_GPU" = "auto" ]; then
+        # Pass a high ceiling and let resolve_local_parallelism_args
+        # cap to ``GPUs × resolved_max_workers_per_gpu`` after the
+        # auto-resolver runs (cap_auto_num_jobs=True path). Hard cap on
+        # max_workers_per_gpu is 4, so 4×GPUs is a sufficient ceiling.
+        CALIBRATE_NUM_JOBS_VALUE=$(( GPUS * 4 ))
+    else
+        CALIBRATE_NUM_JOBS_VALUE=$(( GPUS * CALIBRATE_MAX_WORKERS_PER_GPU ))
+    fi
     CALIBRATE_PARALLELISM_ARGS=(
-        --num-jobs "$CALIBRATE_NUM_JOBS"
+        --num-jobs "$CALIBRATE_NUM_JOBS_VALUE"
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER"
         --gpus "$GPUS"
         --max-workers-per-gpu "$CALIBRATE_MAX_WORKERS_PER_GPU"
@@ -470,6 +482,7 @@ do
         CALIBRATE_PARALLELISM_ARGS+=(--enable-timing)
     fi
     run_logged_step "calibrate_${kind}" "$CALIBRATE_LOG" \
+        env "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB=$CALIBRATE_PER_WORKER_GB" \
         mhcflurry-calibrate-percentile-ranks \
         --models-dir "$SELECTED_DIR" \
         --match-amino-acid-distribution-data "$UNSELECTED_DIR/train_data.csv.bz2" \

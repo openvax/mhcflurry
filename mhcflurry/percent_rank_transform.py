@@ -72,27 +72,30 @@ class PercentRankTransform(object):
         assert n_bins > 0
         assert n_values > 0
 
-        # bucketize semantics with right=False:
-        #   x in [edges[k], edges[k+1]) -> index = k+1
-        #   x < edges[0]                -> index = 0  (out of range, drop)
-        #   x >= edges[-1]              -> index = n_edges (numpy folds into last bin)
-        indices = torch.bucketize(values_2d, bin_edges_1d, right=False)
-        # For numpy.histogram parity: items >= last edge land in the last
-        # bin (right-inclusive on the last interval only). Items strictly
-        # below the first edge are dropped. Clamp to [1, n_bins] so that
-        # bin_idx after the -1 lands in [0, n_bins-1].
-        bin_idx = indices.clamp(min=1, max=n_bins) - 1  # in [0, n_bins-1]
+        # numpy.histogram semantics: bins are half-open ``[edges[k],
+        # edges[k+1])`` *except* the last bin which is closed
+        # ``[edges[-2], edges[-1]]``. Values strictly outside the bin
+        # range are dropped (not counted).
+        #
+        # torch.bucketize with right=True returns the first index k such
+        # that edges[k] > value:
+        #   value < edges[0]                  -> 0
+        #   value in [edges[k-1], edges[k])   -> k     (1..n_edges-1)
+        #   value == edges[-1]                -> n_edges (no edge > value)
+        #   value > edges[-1]                 -> n_edges
+        # The "last bin closed" rule means value == edges[-1] is in the
+        # last bin; we recover that by an explicit equality mask. Values
+        # below first edge or strictly above last edge get a weight of 0.
+        indices = torch.bucketize(values_2d, bin_edges_1d, right=True)
+        bin_idx = (indices - 1).clamp(min=0, max=n_bins - 1)
+        in_range_interior = (indices >= 1) & (indices <= n_bins)
+        last_edge_match = (values_2d == bin_edges_1d[-1])
+        weights = (in_range_interior | last_edge_match).long()
 
-        # In-place scatter_add fills hist[a, bin_idx[a, p]] += 1 vectorized.
+        # In-place scatter_add fills hist[a, bin_idx[a, p]] += weight[a, p]
+        # vectorized across both axes.
         hist = torch.zeros(n_dist, n_bins, dtype=torch.long, device=values_2d.device)
-        hist.scatter_add_(1, bin_idx, torch.ones_like(bin_idx))
-
-        # Subtract back the spurious additions to bin 0 from out-of-range
-        # values (bucketize returned 0 -> clamped to 1 -> bin 0). For the
-        # mhcflurry calibration set IC50 ∈ [1, 50000] this count is 0 in
-        # practice, but keep the correction for completeness.
-        below_first = (indices == 0).sum(dim=1)
-        hist[:, 0] -= below_first
+        hist.scatter_add_(1, bin_idx, weights)
 
         totals = hist.sum(dim=1, keepdim=True).to(torch.float64)
         # Guard against an entirely-out-of-range row (totals == 0). In
