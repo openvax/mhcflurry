@@ -2063,9 +2063,14 @@ class Class1AffinityPredictor(object):
           unique-peptide axis followed by a per-row ``scatter_add``
           (a row-wise ``bincount``).
 
-        Returns ``(freq_matrix_dfs, length_dist_dfs)`` — lists of
-        ``pandas.DataFrame`` matching the legacy slow path's per-row
-        schema, ready to ``pandas.concat`` once all chunks are done.
+        All math runs on the calibration device; per-batch ``.cpu()``
+        transfers happen once per (cutoff_fraction, length) at chunk-end
+        instead of inside the per-allele Python loop, and pandas only
+        stamps the persistent per-row schema on the consolidated
+        per-block tensors. Returns ``(freq_matrix_dfs, length_dist_dfs)``
+        — lists of ``pandas.DataFrame`` matching the legacy slow path's
+        per-row schema, ready to ``pandas.concat`` once all chunks are
+        done.
         """
         import torch
         from .amino_acid import AMINO_ACIDS
@@ -2080,8 +2085,11 @@ class Class1AffinityPredictor(object):
 
         ic50_unique = ic50_device.index_select(1, state["unique_idx_t"])
 
-        freq_matrices = []
-        length_dists = []
+        # Stage 1 (Torch on device): build all freq + length-dist tensors.
+        # Each entry is (cutoff_fraction, k, L, freq_t (a_size, L, 20)).
+        freq_tensors = []
+        # Each entry is (cutoff_fraction, k_total, length_fractions_t (a_size, max_len_p1)).
+        length_fraction_tensors = []
 
         for cutoff_fraction in summary_top_peptide_fractions:
             for L, idx_in_unique in state["length_groups"].items():
@@ -2108,20 +2116,10 @@ class Class1AffinityPredictor(object):
                     2, scatter_dst,
                     torch.ones_like(scatter_dst, dtype=torch.float64),
                 )
-                freq_cpu = (counts[:, :, :20] / float(k)).cpu().numpy()
-                for ai, allele in enumerate(batch_alleles):
-                    df = pandas.DataFrame(
-                        freq_cpu[ai],
-                        index=numpy.arange(1, L + 1),
-                        columns=aa_columns,
-                    )
-                    df.index.name = "position"
-                    df = df.reset_index()
-                    df.insert(0, "allele", allele)
-                    df.insert(1, "length", L)
-                    df.insert(2, "cutoff_fraction", cutoff_fraction)
-                    df.insert(3, "cutoff_count", k)
-                    freq_matrices.append(df)
+                freq_t = counts[:, :, :20] / float(k)  # device tensor
+                freq_tensors.append(
+                    (float(cutoff_fraction), int(k), int(L), freq_t),
+                )
 
             k_total = min(max(int(n_unique * cutoff_fraction), 1), n_unique)
             top_full_idx = Class1AffinityPredictor._topk_first_tie_indices(
@@ -2136,27 +2134,50 @@ class Class1AffinityPredictor(object):
                 1, lengths_per_topk,
                 torch.ones_like(lengths_per_topk, dtype=torch.float64),
             )
-            length_fractions_cpu = (
-                length_counts / float(k_total)
-            ).cpu().numpy()
-            for ai, allele in enumerate(batch_alleles):
-                row = length_fractions_cpu[ai]
-                present = numpy.where(row > 0)[0]
-                if present.size == 0:
-                    continue
-                ld = pandas.DataFrame({
-                    "allele": allele,
-                    "cutoff_fraction": cutoff_fraction,
-                    "cutoff_count": k_total,
-                    "length": present.astype(numpy.int64),
-                    "fraction": row[present],
-                })[[
-                    "allele", "cutoff_fraction", "cutoff_count",
-                    "length", "fraction",
-                ]].sort_values(
-                    ["cutoff_fraction", "length"]
-                ).reset_index(drop=True)
-                length_dists.append(ld)
+            length_fractions_t = length_counts / float(k_total)
+            length_fraction_tensors.append(
+                (float(cutoff_fraction), int(k_total), length_fractions_t),
+            )
+
+        # Stage 2 (single device→host transfer per logical block): build
+        # one wide-format pandas DataFrame per (cutoff_fraction, L) in
+        # one shot — the per-allele Python loop is replaced by a flat
+        # reshape + numpy.repeat for the allele/position axes.
+        batch_alleles_arr = numpy.asarray(batch_alleles)
+
+        freq_matrices = []
+        for cutoff_fraction, k, L, freq_t in freq_tensors:
+            freq_arr = freq_t.cpu().numpy()  # (a_size, L, 20)
+            wide = freq_arr.reshape(a_size * L, 20)
+            df = pandas.DataFrame(wide, columns=aa_columns)
+            df.insert(0, "allele", numpy.repeat(batch_alleles_arr, L))
+            df.insert(1, "length", L)
+            df.insert(2, "cutoff_fraction", cutoff_fraction)
+            df.insert(3, "cutoff_count", k)
+            df.insert(
+                4, "position", numpy.tile(numpy.arange(1, L + 1), a_size),
+            )
+            freq_matrices.append(df)
+
+        length_dists = []
+        for cutoff_fraction, k_total, length_fractions_t in length_fraction_tensors:
+            length_fractions = length_fractions_t.cpu().numpy()
+            a_idx, l_idx = numpy.where(length_fractions > 0)
+            if a_idx.size == 0:
+                continue
+            ld = pandas.DataFrame({
+                "allele": batch_alleles_arr[a_idx],
+                "cutoff_fraction": cutoff_fraction,
+                "cutoff_count": k_total,
+                "length": l_idx.astype(numpy.int64),
+                "fraction": length_fractions[a_idx, l_idx],
+            })[[
+                "allele", "cutoff_fraction", "cutoff_count",
+                "length", "fraction",
+            ]].sort_values(
+                ["allele", "cutoff_fraction", "length"]
+            ).reset_index(drop=True)
+            length_dists.append(ld)
 
         return freq_matrices, length_dists
 

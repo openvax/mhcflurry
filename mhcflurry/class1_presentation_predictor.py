@@ -182,24 +182,37 @@ class Class1PresentationPredictor(object):
         df["peptide_num"] = df.index
         if sample_names is None:
             peptides = EncodableSequences.create(peptides)
-            all_alleles = set()
-            for lst in alleles.values():
-                all_alleles.update(lst)
-
-            iterator = sorted(all_alleles)
+            all_alleles = sorted({a for lst in alleles.values() for a in lst})
 
             if verbose > 0:
                 print("Predicting affinities.")
-                if tqdm is not None:
-                    iterator = tqdm.tqdm(iterator, total=len(all_alleles))
 
-            predictions_df = pandas.DataFrame(index=df.index)
-            for allele in iterator:
-                predictions_df[allele] = self.affinity_predictor.predict(
-                    peptides=peptides,
-                    allele=allele,
-                    model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
-                    throw=throw)
+            # Single batched cartesian forward over peptides × alleles,
+            # replacing the previous per-allele Python loop. The pan-allele
+            # predictor's compact AlleleEncoding dedups alleles internally,
+            # so the allele branch still runs once per unique allele; the
+            # peptide branch sees one big batch instead of len(all_alleles)
+            # small calls — same total compute, far less Python/GPU-launch
+            # overhead.
+            n_peps = len(peptides)
+            n_all = len(all_alleles)
+            peptides_repeated = EncodableSequences.create(
+                numpy.tile(peptides.sequences, n_all)
+            )
+            alleles_repeated = numpy.repeat(
+                numpy.asarray(all_alleles), n_peps,
+            )
+            flat_predictions = self.affinity_predictor.predict(
+                peptides=peptides_repeated,
+                alleles=alleles_repeated,
+                model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
+                throw=throw,
+            )
+            predictions_df = pandas.DataFrame(
+                flat_predictions.reshape(n_all, n_peps).T,
+                columns=all_alleles,
+                index=df.index,
+            )
 
             dfs = []
             for (sample_name, sample_alleles) in alleles.items():
@@ -231,14 +244,30 @@ class Class1PresentationPredictor(object):
                         iterator, total=df.sample_name.nunique())
 
             for (sample, sub_df) in iterator:
-                predictions_df = pandas.DataFrame(index=sub_df.index)
                 sample_peptides = EncodableSequences.create(sub_df.peptide.values)
-                for allele in alleles[sample]:
-                    predictions_df[allele] = self.affinity_predictor.predict(
-                        peptides=sample_peptides,
-                        allele=allele,
-                        model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
-                        throw=throw)
+                sample_alleles = list(alleles[sample])
+                # Same single-cartesian-forward vectorization as the
+                # sample_names=None branch above: replicate peptides
+                # across alleles once, predict in one batched call.
+                n_peps = len(sample_peptides)
+                n_all = len(sample_alleles)
+                peptides_repeated = EncodableSequences.create(
+                    numpy.tile(sample_peptides.sequences, n_all)
+                )
+                alleles_repeated = numpy.repeat(
+                    numpy.asarray(sample_alleles), n_peps,
+                )
+                flat_predictions = self.affinity_predictor.predict(
+                    peptides=peptides_repeated,
+                    alleles=alleles_repeated,
+                    model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
+                    throw=throw,
+                )
+                predictions_df = pandas.DataFrame(
+                    flat_predictions.reshape(n_all, n_peps).T,
+                    columns=sample_alleles,
+                    index=sub_df.index,
+                )
                 df.loc[
                     sub_df.index, "affinity"
                 ] = predictions_df.min(axis=1).values

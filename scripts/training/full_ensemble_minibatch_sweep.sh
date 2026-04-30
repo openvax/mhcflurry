@@ -37,7 +37,7 @@ set -x
 
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 SWEEP_OUT="${SWEEP_OUT:-$MHCFLURRY_OUT/full_sweep}"
-MINIBATCH_SIZES="${MINIBATCH_SIZES:-1024 2048 4096 8192 16384}"
+MINIBATCH_SIZES="${MINIBATCH_SIZES:-512 1024 2048 4096 8192 16384}"
 TRAIN_DATA="${TRAIN_DATA:-$MHCFLURRY_OUT/train_data.csv.bz2}"
 HYPERPARAMS_TPL="${HYPERPARAMS_TPL:-$MHCFLURRY_OUT/hyperparameters.yaml}"
 ALLELE_SEQUENCES="${ALLELE_SEQUENCES:-$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv}"
@@ -65,7 +65,7 @@ mkdir -p "$SWEEP_OUT"
 SUMMARY="$SWEEP_OUT/sweep_summary.csv"
 
 if [ ! -f "$SUMMARY" ]; then
-    echo "minibatch,train_seconds,select_seconds,calibrate_seconds,eval_seconds,total_seconds,n_alleles_reported,n_hits,n_rows,roc_auc_macro_new,roc_auc_macro_public,pr_auc_macro_new,pr_auc_macro_public,ppv_at_n_macro_new,ppv_at_n_macro_public,roc_auc_micro_new,roc_auc_micro_public,pr_auc_micro_new,pr_auc_micro_public,ppv_at_n_micro_new,ppv_at_n_micro_public,new_better_roc_auc,new_better_pr_auc,new_better_ppv_at_n,public_better_roc_auc,public_better_pr_auc,public_better_ppv_at_n" > "$SUMMARY"
+    echo "minibatch,n_models,params_M,train_seconds,select_seconds,calibrate_seconds,eval_seconds,total_seconds,n_alleles_reported,n_hits,n_rows,roc_auc_macro_new,roc_auc_macro_public,pr_auc_macro_new,pr_auc_macro_public,ppv_at_n_macro_new,ppv_at_n_macro_public,roc_auc_micro_new,roc_auc_micro_public,pr_auc_micro_new,pr_auc_micro_public,ppv_at_n_micro_new,ppv_at_n_micro_public,new_better_roc_auc,new_better_pr_auc,new_better_ppv_at_n,public_better_roc_auc,public_better_pr_auc,public_better_ppv_at_n" > "$SUMMARY"
 fi
 
 for MB in $MINIBATCH_SIZES; do
@@ -201,18 +201,35 @@ PY
 
     total_sec=$(( train_sec + select_sec + cal_sec + eval_sec ))
 
-    # Pull metrics out of summary.json into the sweep CSV.
+    # Pull metrics out of summary.json into the sweep CSV. n_models +
+    # params_M are derived from models.combined: row count of manifest.csv
+    # gives ensemble size, and summing parameter counts across each
+    # weights_<name>.npz gives total trainable params (in millions).
     python3 - "$SIZE_OUT/eval_comparison/summary.json" "$MB" "$train_sec" \
-        "$select_sec" "$cal_sec" "$eval_sec" "$total_sec" "$SUMMARY" <<'PY'
-import json, sys
-summary_path, mb, train_s, sel_s, cal_s, eval_s, tot_s, csv_path = sys.argv[1:9]
+        "$select_sec" "$cal_sec" "$eval_sec" "$total_sec" "$SUMMARY" \
+        "$SIZE_OUT/models.combined" <<'PY'
+import json, os, sys
+import numpy
+import pandas
+(summary_path, mb, train_s, sel_s, cal_s, eval_s, tot_s, csv_path,
+ models_dir) = sys.argv[1:10]
 with open(summary_path) as f:
     s = json.load(f)
 mac = s["macro_mean_over_alleles"]
 mic = s["micro_pooled"]
 ac = s["allele_count"]
+manifest = pandas.read_csv(os.path.join(models_dir, "manifest.csv"))
+n_models = len(manifest)
+total_params = 0
+for name in manifest["model_name"]:
+    weights_path = os.path.join(models_dir, f"weights_{name}.npz")
+    with numpy.load(weights_path) as wf:
+        for key in wf.files:
+            total_params += int(wf[key].size)
+params_M = total_params / 1_000_000.0
 row = [
-    mb, train_s, sel_s, cal_s, eval_s, tot_s,
+    mb, n_models, f"{params_M:.3f}",
+    train_s, sel_s, cal_s, eval_s, tot_s,
     s["n_alleles_reported"], s["n_hits"], s["n_rows"],
     mac["roc_auc"]["new"], mac["roc_auc"]["public"],
     mac["pr_auc"]["new"],  mac["pr_auc"]["public"],
@@ -225,8 +242,9 @@ row = [
 ]
 with open(csv_path, "a") as f:
     f.write(",".join(str(x) for x in row) + "\n")
-print(f"=== minibatch={mb} done: train={train_s}s select={sel_s}s "
-      f"calibrate={cal_s}s eval={eval_s}s total={tot_s}s ===")
+print(f"=== minibatch={mb} done: n_models={n_models} params={params_M:.2f}M "
+      f"train={train_s}s select={sel_s}s calibrate={cal_s}s "
+      f"eval={eval_s}s total={tot_s}s ===")
 PY
 
     cd "$MHCFLURRY_OUT"
