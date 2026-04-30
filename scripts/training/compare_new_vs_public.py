@@ -38,6 +38,80 @@ def _stamp(msg):
     print(f"[+{time.time() - _T0:6.1f}s] {msg}", flush=True)
 
 
+def _detect_gpu_count():
+    """Probe GPU count in a subprocess so the parent never imports torch
+    or initializes CUDA -- otherwise the spawn-context children can't
+    independently set CUDA_VISIBLE_DEVICES."""
+    import subprocess
+    out = subprocess.run(
+        [sys.executable, "-c",
+         "import torch; print(torch.cuda.device_count() if torch.cuda.is_available() else 0)"],
+        check=False, capture_output=True, text=True,
+    )
+    try:
+        return int(out.stdout.strip())
+    except ValueError:
+        return 0
+
+
+def _predict_chunk_worker(args):
+    """Run inside a spawned worker pinned to a single GPU. Loads the
+    predictor and runs predict() on the assigned chunk."""
+    predictor_dir, peptides, alleles, gpu_id = args
+    import os as _os
+    _os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+    import numpy as _np
+    from mhcflurry.common import configure_pytorch
+    configure_pytorch(backend="gpu")
+    from mhcflurry import Class1AffinityPredictor
+    predictor = Class1AffinityPredictor.load(predictor_dir)
+    return _np.asarray(predictor.predict(
+        peptides=peptides, alleles=alleles, throw=False))
+
+
+def _read_supported_alleles(predictor_dir):
+    """Enumerate supported alleles from the predictor's bundled
+    allele_sequences.csv -- avoids importing the predictor in the parent
+    process (which would initialize CUDA before workers can pin GPUs)."""
+    path = os.path.join(predictor_dir, "allele_sequences.csv")
+    if not os.path.exists(path):
+        # Fall back to system download path; layout matches predictor.
+        return set()
+    df = pandas.read_csv(path)
+    col = "normalized_allele" if "normalized_allele" in df.columns else df.columns[0]
+    return set(df[col].astype(str).tolist())
+
+
+def parallel_predict(predictor_dir, peptides, alleles, n_gpus):
+    """Spread predictions across n_gpus worker processes, each pinned
+    to one GPU via CUDA_VISIBLE_DEVICES. Reassembles the results in
+    original order. Falls back to in-process predict if n_gpus<=1."""
+    import multiprocessing as mp
+    if n_gpus <= 1 or len(peptides) < 100_000:
+        from mhcflurry.common import configure_pytorch
+        configure_pytorch(backend="gpu" if n_gpus >= 1 else "auto")
+        from mhcflurry import Class1AffinityPredictor
+        predictor = Class1AffinityPredictor.load(predictor_dir)
+        return numpy.asarray(predictor.predict(
+            peptides=peptides, alleles=alleles, throw=False))
+
+    chunk_idxs = numpy.array_split(numpy.arange(len(peptides)), n_gpus)
+    chunks = [
+        (predictor_dir,
+         peptides[idxs],
+         alleles[idxs],
+         gpu)
+        for gpu, idxs in enumerate(chunk_idxs)
+    ]
+    ctx = mp.get_context("spawn")
+    with ctx.Pool(n_gpus) as pool:
+        results = pool.map(_predict_chunk_worker, chunks)
+    out = numpy.empty(len(peptides), dtype=results[0].dtype)
+    for idxs, vals in zip(chunk_idxs, results):
+        out[idxs] = vals
+    return out
+
+
 def ppv_at_n(y_true, y_score, n):
     order = numpy.argsort(-y_score)
     top = order[:n]
@@ -78,28 +152,21 @@ def main():
 
     os.makedirs(args.out, exist_ok=True)
 
-    from mhcflurry import Class1AffinityPredictor
-    from mhcflurry.common import configure_pytorch
+    # Detect GPUs without importing torch in the parent. Workers will
+    # each set CUDA_VISIBLE_DEVICES before importing torch.
+    n_gpus = _detect_gpu_count()
+    _stamp(f"detected {n_gpus} GPUs (parallel predict if >1)")
 
-    # Eval was running on CPU (default _pytorch_backend was never flipped
-    # for this standalone script) so 30M predictions took ~12 min on a
-    # box with 8x A100 idle. Force GPU here; auto-detect backend.
-    try:
-        configure_pytorch(backend="gpu")
-        _stamp("configured pytorch backend=gpu")
-    except RuntimeError as exc:
-        _stamp(f"GPU backend unavailable, falling back to auto ({exc})")
-        configure_pytorch(backend="auto")
-
-    _stamp(f"[1/5] Loading new ensemble: {args.new_models_dir}")
-    new = Class1AffinityPredictor.load(args.new_models_dir)
-    print(f"      {len(new.neural_networks)} networks, "
-          f"{len(new.supported_alleles)} alleles supported")
-
-    _stamp(f"[2/5] Loading public ensemble: {args.public_models_dir}")
-    pub = Class1AffinityPredictor.load(args.public_models_dir)
-    print(f"      {len(pub.neural_networks)} networks, "
-          f"{len(pub.supported_alleles)} alleles supported")
+    # We need supported_alleles for the new/public ensembles before we
+    # know what rows to evaluate, but we don't want to import torch in
+    # the parent. Read manifests directly via pandas to enumerate
+    # supported alleles -- predict happens entirely in workers.
+    new_alleles = _read_supported_alleles(args.new_models_dir)
+    pub_alleles = _read_supported_alleles(args.public_models_dir)
+    _stamp(f"[1/5] new ensemble: {args.new_models_dir} "
+           f"({len(new_alleles)} alleles supported)")
+    _stamp(f"[2/5] public ensemble: {args.public_models_dir} "
+           f"({len(pub_alleles)} alleles supported)")
 
     _stamp(f"[3/5] Finding benchmark files...")
     if args.source == "both":
@@ -126,8 +193,6 @@ def main():
     test = pandas.concat(all_dfs, ignore_index=True)
     print(f"      total rows: {len(test):,}")
 
-    new_alleles = set(new.supported_alleles)
-    pub_alleles = set(pub.supported_alleles)
     both = new_alleles & pub_alleles
     print(f"      new alleles: {len(new_alleles)}, public: {len(pub_alleles)}, "
           f"intersect: {len(both)}")
@@ -140,17 +205,21 @@ def main():
     test = test[(test.peptide_len >= 8) & (test.peptide_len <= 15)].copy()
     print(f"      evaluable rows after filter: {len(test):,}")
 
-    _stamp(f"[4a/5] Predicting NEW ensemble ({len(test):,} rows)...")
-    test["new_pred"] = new.predict(
-        peptides=test.peptide.values,
-        alleles=test.hla.values,
-        throw=False,
+    _stamp(f"[4a/5] Predicting NEW ensemble ({len(test):,} rows, "
+           f"{n_gpus} GPUs)...")
+    test["new_pred"] = parallel_predict(
+        args.new_models_dir,
+        test.peptide.values,
+        test.hla.values,
+        n_gpus,
     )
-    _stamp(f"[4b/5] Predicting PUBLIC ensemble ({len(test):,} rows)...")
-    test["public_pred"] = pub.predict(
-        peptides=test.peptide.values,
-        alleles=test.hla.values,
-        throw=False,
+    _stamp(f"[4b/5] Predicting PUBLIC ensemble ({len(test):,} rows, "
+           f"{n_gpus} GPUs)...")
+    test["public_pred"] = parallel_predict(
+        args.public_models_dir,
+        test.peptide.values,
+        test.hla.values,
+        n_gpus,
     )
     test = test.dropna(subset=["new_pred", "public_pred"])
     _stamp(f"      rows with both predictions: {len(test):,}")

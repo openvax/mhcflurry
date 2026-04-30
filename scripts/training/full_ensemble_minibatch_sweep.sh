@@ -63,6 +63,11 @@ MIN_MODELS_PER_FOLD="${MIN_MODELS_PER_FOLD:-2}"
 MAX_MODELS_PER_FOLD="${MAX_MODELS_PER_FOLD:-8}"
 ENCODING_CACHE_DIR="${ENCODING_CACHE_DIR:-$HOME/runplz-cache/encoding_cache}"
 MHCFLURRY_SCALE_LR="${MHCFLURRY_SCALE_LR:-0}"
+# When 1, skip the calibrate phase entirely (eval doesn't need percentile
+# ranks, only the predict outputs from models.combined). Useful for fast
+# multi-cell sweeps where calibrate would be ~10-15min/cell of pure
+# overhead. Run calibrate manually for the winning cell at the end.
+MHCFLURRY_SKIP_CALIBRATE="${MHCFLURRY_SKIP_CALIBRATE:-0}"
 # --num-jobs and --max-workers-per-gpu are passed as ``auto`` so that
 # the resolver in mhcflurry/local_parallelism.py picks values that match
 # the box (free VRAM, GPU count, per-worker memory) instead of being
@@ -171,7 +176,11 @@ PY
     fi
 
     # ---- calibrate (auto MWPG accounts for cartesian forward + cache) ----
-    if [ -f "$CALIBRATE_SENTINEL" ]; then
+    if [ "$MHCFLURRY_SKIP_CALIBRATE" = "1" ]; then
+        cal_sec=0
+        echo "0" > "$CALIBRATE_SENTINEL"
+        echo "=== minibatch=$MB calibrate skipped (MHCFLURRY_SKIP_CALIBRATE=1) ==="
+    elif [ -f "$CALIBRATE_SENTINEL" ]; then
         cal_sec=$(cat "$CALIBRATE_SENTINEL")
         echo "=== minibatch=$MB calibrate already complete (${cal_sec}s), skipping ==="
     else
