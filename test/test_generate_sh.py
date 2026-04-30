@@ -79,8 +79,32 @@ def test_regenerate_reruns_command_then_snapshots():
         assert os.path.exists(os.path.join(tmp, "models.combined.tar.gz"))
 
 
+def test_regenerate_refuses_when_generate_sh_marker_missing():
+    """Safety check: if a user removes GENERATE.sh from the artifact
+    dir before re-running it (e.g. they mounted something else on top),
+    regenerate must refuse rather than rm -rf an unrelated tree."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out_dir = os.path.join(tmp, "models.combined")
+        os.makedirs(out_dir)
+        common.write_generate_sh(out_dir, argv=["echo", "noop"])
+        # Save the script content, then delete GENERATE.sh from the dir
+        # but keep a copy elsewhere so we can still invoke it.
+        script_path = os.path.join(out_dir, "GENERATE.sh")
+        copied = os.path.join(tmp, "GENERATE_copy.sh")
+        os.rename(script_path, copied)
+        os.chmod(copied, 0o755)
+        result = subprocess.run(
+            ["bash", copied, "regenerate"],
+            capture_output=True, text=True)
+        assert result.returncode != 0
+        assert "GENERATE.sh missing" in result.stderr, result.stderr
+        # Original dir must be intact (not rm -rf'd).
+        assert os.path.isdir(out_dir)
+
+
 if __name__ == "__main__":
     test_writes_executable_generate_sh()
     test_default_run_produces_tar_gz_snapshot()
     test_regenerate_reruns_command_then_snapshots()
+    test_regenerate_refuses_when_generate_sh_marker_missing()
     print("PASS")

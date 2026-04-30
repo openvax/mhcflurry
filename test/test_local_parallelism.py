@@ -410,6 +410,67 @@ def test_resolve_local_parallelism_args_num_jobs_auto_cpu_only(
     assert args.num_jobs_was_auto is True
 
 
+def test_resolve_local_parallelism_args_auto_detects_gpus(monkeypatch):
+    """When --gpus is unset and backend allows GPU, the resolver
+    auto-detects the visible CUDA device count via nvidia-smi -L
+    (no torch import in the parent). Without this, parallel prediction
+    with --num-jobs N and no --gpus piles every worker onto GPU 0."""
+    from mhcflurry import local_parallelism
+
+    monkeypatch.setattr(
+        local_parallelism, "_detect_num_cuda_devices_no_torch", lambda: 4)
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs="auto",
+        gpus=None,        # unset — should be auto-filled
+        backend="auto",
+    )
+    resolve_local_parallelism_args(args)
+    assert args.gpus == 4
+    assert args.gpus_was_auto is True
+    # num_jobs auto resolves to gpus * mwpg now that we know the count.
+    assert args.num_jobs > 0
+
+
+def test_resolve_local_parallelism_args_skips_auto_detect_with_explicit_gpus(
+        monkeypatch):
+    """An explicit --gpus value isn't overridden by auto-detect."""
+    from mhcflurry import local_parallelism
+
+    monkeypatch.setattr(
+        local_parallelism, "_detect_num_cuda_devices_no_torch",
+        lambda: 8)  # would lie if called
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs="auto",
+        gpus=2,            # explicit
+        backend="auto",
+    )
+    resolve_local_parallelism_args(args)
+    assert args.gpus == 2
+    assert args.gpus_was_auto is False
+
+
+def test_resolve_local_parallelism_args_no_auto_detect_for_cpu_backend(
+        monkeypatch):
+    """backend=cpu must not auto-detect GPUs (we don't want CUDA-pinned
+    workers when the user explicitly asked for CPU inference)."""
+    from mhcflurry import local_parallelism
+
+    monkeypatch.setattr(
+        local_parallelism, "_detect_num_cuda_devices_no_torch",
+        lambda: 8)
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs="auto",
+        gpus=None,
+        backend="cpu",
+    )
+    resolve_local_parallelism_args(args)
+    assert (args.gpus or 0) == 0
+    assert args.gpus_was_auto is False
+
+
 def test_nondaemonpool_worker_can_spawn_children():
     """Non-daemon pool workers must be able to spawn multiprocessing children.
 

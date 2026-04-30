@@ -22,7 +22,11 @@
 #   DATA_EVAL_DIR     data_evaluation/ for benchmark hits/decoys
 #   COMPARE_SCRIPT    path to compare_new_vs_public.py
 #   GPUS, MAX_TASKS_PER_WORKER, ENCODING_CACHE_DIR
-#   MHCFLURRY_SCALE_LR  if "1", multiply learning_rate by sqrt(mb/64) for
+#   MHCFLURRY_SCALE_LR_BASE_MB  reference minibatch for sqrt LR scaling
+#                                (default 128, matching the historical
+#                                2.0.0–2.2.x pan-allele recipe — the
+#                                old documented value of 64 was wrong).
+#   MHCFLURRY_SCALE_LR  if "1", multiply learning_rate by sqrt(mb/BASE_MB) for
 #                       mb>64 (square-root LR scaling, Goyal et al. 2017
 #                       Appendix B). Default "0" leaves LR untouched, so
 #                       the sweep isolates the effect of minibatch size at
@@ -63,6 +67,7 @@ MIN_MODELS_PER_FOLD="${MIN_MODELS_PER_FOLD:-2}"
 MAX_MODELS_PER_FOLD="${MAX_MODELS_PER_FOLD:-8}"
 ENCODING_CACHE_DIR="${ENCODING_CACHE_DIR:-$HOME/runplz-cache/encoding_cache}"
 MHCFLURRY_SCALE_LR="${MHCFLURRY_SCALE_LR:-0}"
+MHCFLURRY_SCALE_LR_BASE_MB="${MHCFLURRY_SCALE_LR_BASE_MB:-128}"
 # When 1, skip the calibrate phase entirely (eval doesn't need percentile
 # ranks, only the predict outputs from models.combined). Useful for fast
 # multi-cell sweeps where calibrate would be ~10-15min/cell of pure
@@ -99,21 +104,28 @@ for MB in $MINIBATCH_SIZES; do
     EVAL_SENTINEL="$SIZE_OUT/.eval.done"
 
     # Patch the hyperparameters template's minibatch_size in every spec.
-    # When MHCFLURRY_SCALE_LR=1 and mb>64, also scale learning_rate by
-    # sqrt(mb/64) (square-root LR scaling). 64 is the historical mhcflurry
-    # baseline batch size; sweeps below 64 don't get downscaled because
-    # smaller batches already train fine at the baseline LR.
+    # When MHCFLURRY_SCALE_LR=1 and mb > MHCFLURRY_SCALE_LR_BASE_MB,
+    # also scale learning_rate by sqrt(mb/BASE_MB) (square-root LR
+    # scaling, Goyal et al. 2017). BASE_MB defaults to 128 to match the
+    # 2.0.0–2.2.x pan-allele recipe; sweeps at or below the baseline
+    # don't get downscaled because smaller batches already train fine
+    # at the baseline LR.
     if [ ! -f "$SIZE_OUT/hyperparameters.yaml" ]; then
         python3 - "$HYPERPARAMS_TPL" "$MB" "$MHCFLURRY_SCALE_LR" \
+            "$MHCFLURRY_SCALE_LR_BASE_MB" \
             <<'PY' > "$SIZE_OUT/hyperparameters.yaml"
 import math, sys, yaml
-src, mb, scale_lr = sys.argv[1], int(sys.argv[2]), sys.argv[3] == "1"
+src = sys.argv[1]
+mb = int(sys.argv[2])
+scale_lr = sys.argv[3] == "1"
+base_mb = int(sys.argv[4])
 with open(src) as f:
     specs = yaml.safe_load(f)
 for spec in specs:
     spec["minibatch_size"] = mb
-    if scale_lr and mb > 64 and "learning_rate" in spec:
-        spec["learning_rate"] = float(spec["learning_rate"]) * math.sqrt(mb / 64.0)
+    if scale_lr and mb > base_mb and "learning_rate" in spec:
+        spec["learning_rate"] = (
+            float(spec["learning_rate"]) * math.sqrt(mb / base_mb))
 print(yaml.safe_dump(specs))
 PY
     fi

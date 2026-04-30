@@ -279,6 +279,21 @@ paths.
   2.2.x even on identical seeds. Predictions on the same `(peptide,
   allele)` pair will differ — quantified in
   [validation results](#validation-results).
+  - Two contributing factors beyond the obvious framework switch:
+    1. `RandomNegativesPool` with `random_negative_pool_epochs > 1`
+       generates one batch of random negatives and slices it across N
+       epochs, rather than re-sampling fresh negatives every epoch as
+       2.2.x did. Within a pool cycle consecutive epochs see distinct
+       slices of the same pool; a new pool is drawn at each
+       `epoch // pool_epochs` boundary. Set `random_negative_pool_epochs=1`
+       to recover the pre-2.3.0 "fresh negatives every epoch" semantics
+       (at the ~17 s/epoch encode cost).
+    2. The 1-batch-per-architecture warmup primes torch.compile's
+       on-disk cache with one synthetic forward+backward; the
+       compiled-graph cache it writes does not affect weights, but
+       running it does advance the global RNG before training proper
+       starts. Pin a per-arch seed if you need bit-equivalence across
+       runs.
 - **Saved 2.2.x model bundles still work unchanged** in 2.3.0 for
   prediction; no migration needed for downstream users running
   inference on existing bundles.

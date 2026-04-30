@@ -408,7 +408,12 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     if len(train_subset) == 0:
         train_subset = df.head(minibatch)
 
-    hp = dict(hyperparameters)
+    # Subselect to keys this network actually accepts so warmup is
+    # robust to upstream configs carrying parameters that belong to a
+    # different network (e.g. affinity-only data_dependent_initialization_method
+    # used to leak in here and crash the strict-keys check).
+    hp = Class1ProcessingNeuralNetwork.hyperparameter_defaults.subselect(
+        dict(hyperparameters))
     hp["max_epochs"] = 1
     hp["validation_split"] = 0.0
     hp["early_stopping"] = False

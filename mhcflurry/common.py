@@ -479,6 +479,26 @@ ORIGINAL_COMMAND=(
 )
 
 if [ "${{1:-}}" = "regenerate" ]; then
+    # Safety checks before destroying the artifact dir:
+    #   * $HERE must resolve to a directory we own,
+    #   * not be the filesystem root or $HOME,
+    #   * and contain the GENERATE.sh we are running -- the canonical
+    #     marker that this dir was produced by mhcflurry. Without these
+    #     checks, a user re-running GENERATE.sh from inside an already-
+    #     replaced mountpoint, or with $HERE corrupted by a path edit,
+    #     could rm -rf an unrelated tree.
+    if [ -z "$HERE" ] || [ "$HERE" = "/" ] || [ "$HERE" = "$HOME" ]; then
+        echo "regenerate: refusing to rm -rf suspicious path: $HERE" >&2
+        exit 1
+    fi
+    if [ ! -d "$HERE" ] || [ ! -O "$HERE" ]; then
+        echo "regenerate: $HERE is not a directory we own" >&2
+        exit 1
+    fi
+    if [ ! -f "$HERE/GENERATE.sh" ]; then
+        echo "regenerate: GENERATE.sh missing in $HERE -- refusing" >&2
+        exit 1
+    fi
     cd "$ORIGINAL_CWD"
     rm -rf "$HERE"
     "${{ORIGINAL_COMMAND[@]}}"

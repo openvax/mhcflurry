@@ -1509,7 +1509,11 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     train_alleles = AlleleEncoding(
         train_subset.allele.values, borrow_from=allele_encoding)
 
-    hp = dict(hyperparameters)
+    # Subselect to keys this network actually accepts so warmup is
+    # robust to upstream configs carrying parameters from a different
+    # network or removed-but-still-present keys.
+    hp = Class1NeuralNetwork.hyperparameter_defaults.subselect(
+        dict(hyperparameters))
     hp["max_epochs"] = 1
     hp["validation_split"] = 0.0
     hp["early_stopping"] = False
