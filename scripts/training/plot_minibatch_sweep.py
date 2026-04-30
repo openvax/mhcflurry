@@ -90,6 +90,20 @@ def _is_log_safe(series):
     return s.notna().all() and (s > 0).all()
 
 
+# Minimum span (max/min) for a log scale to add visual information.
+# Below this, log just stretches the axis linearly and the resulting
+# plot is indistinguishable from lin-lin.
+_LOG_SPAN_THRESHOLD = 1.5
+
+
+def _wide_enough_for_log(series):
+    s = pd.to_numeric(series, errors="coerce").dropna()
+    s = s[s > 0]
+    if len(s) < 2:
+        return False
+    return float(s.max()) / float(s.min()) >= _LOG_SPAN_THRESHOLD
+
+
 def _is_constant(series):
     s = pd.to_numeric(series, errors="coerce").dropna()
     return s.nunique() <= 1
@@ -213,9 +227,11 @@ def plot_per_variable(df, out_dir):
     for col in cols:
         y = pd.to_numeric(df[col], errors="coerce")
         for x_scale, y_scale in (("linear", "linear"), ("log", "log")):
-            if x_scale == "log" and not _is_log_safe(x):
+            if x_scale == "log" and (not _is_log_safe(x)
+                                     or not _wide_enough_for_log(x)):
                 continue
-            if y_scale == "log" and not _is_log_safe(y):
+            if y_scale == "log" and (not _is_log_safe(y)
+                                     or not _wide_enough_for_log(y)):
                 continue
 
             fig, ax = plt.subplots(figsize=FIGSIZE, constrained_layout=True)
@@ -264,9 +280,11 @@ def plot_pairs(df, out_dir):
         xv = pd.to_numeric(df[x_col], errors="coerce")
         yv = pd.to_numeric(df[y_col], errors="coerce")
         for x_scale, y_scale in (("linear", "linear"), ("log", "log")):
-            if x_scale == "log" and not _is_log_safe(xv):
+            if x_scale == "log" and (not _is_log_safe(xv)
+                                     or not _wide_enough_for_log(xv)):
                 continue
-            if y_scale == "log" and not _is_log_safe(yv):
+            if y_scale == "log" and (not _is_log_safe(yv)
+                                     or not _wide_enough_for_log(yv)):
                 continue
 
             fig, ax = plt.subplots(figsize=FIGSIZE, constrained_layout=True)
