@@ -2160,6 +2160,10 @@ class Class1NeuralNetwork(object):
         # but fit() itself is device-resident only and ignores this knob.
         # Kept in the schema so old configs that set it don't error.
         dataloader_num_workers=0,
+        # Random-negative pool backing for fit(). None uses the optimized
+        # device-resident pool; "host" preserves the legacy
+        # planner.get_peptides() path for compatibility/debugging.
+        fit_tensor_residency=None,
         # Batch size used for the validation forward pass. ``None`` uses a
         # device-aware heuristic: ``max(4 * minibatch_size, 4096)`` on CUDA
         # and ``4 * minibatch_size`` elsewhere. Separate from minibatch_size
@@ -2233,11 +2237,9 @@ class Class1NeuralNetwork(object):
         "peptide_amino_acid_encoding_gpu": "peptide_amino_acid_encoding_torch",
         "left_edge": None,
         "right_edge": None,
-        # 2.3.0 cleanup: fit() is device-resident only and the per-fit
-        # DataLoader backing layer is gone. Old configs may still set
-        # these knobs; silently drop them.
+        # 2.3.0 cleanup: the per-fit DataLoader backing layer is gone.
+        # Old configs may still set this knob; silently drop it.
         "fit_dataloader_backing": None,
-        "fit_tensor_residency": None,
     }
 
     @classmethod
@@ -3865,7 +3867,14 @@ class Class1NeuralNetwork(object):
         # stitched [RN | real] buffer via index_select with zero
         # per-batch H2D copies and no DataLoader workers. CPU training
         # uses the same path with device='cpu' tensors.
-        if num_random_negatives > 0 and random_negative_shared_pool_dir is None:
+        requested_fit_tensor_residency = self.hyperparameters.get(
+            "fit_tensor_residency"
+        )
+        use_device_random_negative_pool = requested_fit_tensor_residency != "host"
+        if (
+                num_random_negatives > 0
+                and random_negative_shared_pool_dir is None
+                and use_device_random_negative_pool):
             # Re-build the in-process random-negatives pool so it
             # samples + encodes int8 indices straight onto ``device``
             # (skipping the host string round-trip). The shared-mmap
@@ -3884,6 +3893,12 @@ class Class1NeuralNetwork(object):
                 seed=pool_seed,
                 device=device,
                 peptide_encoding=self.hyperparameters["peptide_encoding"],
+            )
+        if random_negative_shared_pool_dir is not None:
+            fit_info["random_negative_pool_residency"] = "shared_mmap"
+        else:
+            fit_info["random_negative_pool_residency"] = (
+                "device" if use_device_random_negative_pool else "host"
             )
         random_neg_template = None
         if num_random_negatives > 0:
@@ -4372,6 +4387,7 @@ class Class1NeuralNetwork(object):
             network = self.network(borrow=True)
 
         network.to(device)
+        network = _maybe_compile_network(network, device)
         network.eval()
 
         # Resolve ``"auto"`` once the network is on device so the

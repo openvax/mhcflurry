@@ -582,3 +582,65 @@ def test_calibration_fast_cache_state_lifecycle():
     assert getattr(predictor, "_calibration_fast_cache_state", None) is None
     # clearing again is a no-op
     predictor.clear_calibration_fast_cache()
+
+
+def test_calibrate_fast_rejects_scalar_bins_before_model_work():
+    predictor = Class1AffinityPredictor(
+        class1_pan_allele_models=[object()],
+        allele_to_sequence={"A": "AAAAAAAA"},
+    )
+    with pytest.raises(ValueError, match="requires explicit IC50 bin edges"):
+        predictor.calibrate_percentile_ranks_fast(
+            peptides=["AAAA"],
+            alleles=["A"],
+            bins=3,
+            peptide_batch_size=1,
+            allele_batch_size=1,
+            device="cpu",
+        )
+
+
+def test_calibrate_fast_cache_signature_cleared_if_rebuild_fails():
+    class FailingModel:
+        def to(self, device):
+            return self
+
+        def eval(self):
+            return self
+
+    class FailingNetwork:
+        def allele_encoding_to_network_input(self, allele_encoding):
+            return None, object()
+
+        def set_allele_representations(self, allele_representations):
+            pass
+
+        def network(self, borrow=True):
+            return FailingModel()
+
+        def peptides_to_network_input(self, encoded_peptides):
+            raise RuntimeError("intentional cache rebuild failure")
+
+        def uses_peptide_torch_encoding(self):
+            return True
+
+    predictor = Class1AffinityPredictor(
+        class1_pan_allele_models=[FailingNetwork()],
+        allele_to_sequence={"A": "AAAAAAAA"},
+    )
+    cache = predictor._calibration_fast_cache()
+    cache.stage_signature = ("old-signature",)
+    cache.cached_stages = ["old-cache"]
+
+    with pytest.raises(RuntimeError, match="intentional cache rebuild failure"):
+        predictor.calibrate_percentile_ranks_fast(
+            peptides=["AAAA"],
+            alleles=["A"],
+            bins=numpy.array([0.0, 1.0, 2.0]),
+            peptide_batch_size=1,
+            allele_batch_size=1,
+            device="cpu",
+        )
+
+    assert cache.stage_signature is None
+    assert cache.cached_stages is None

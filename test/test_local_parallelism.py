@@ -9,7 +9,9 @@ from mhcflurry.local_parallelism import (
     NonDaemonProcess,
     _max_workers_per_gpu_arg,
     add_local_parallelism_args,
+    add_prediction_parallelism_args,
     auto_max_workers_per_gpu,
+    chunk_ranges_for_local_parallelism,
     resolve_local_parallelism_args,
     resolve_max_workers_per_gpu,
     validate_worker_pool_args,
@@ -185,6 +187,31 @@ def test_add_local_parallelism_args_default_is_auto():
     assert args.max_workers_per_gpu == "auto"
     args = parser.parse_args(["--max-workers-per-gpu", "3"])
     assert args.max_workers_per_gpu == 3
+
+
+def test_add_prediction_parallelism_args_omits_training_only_flags():
+    parser = ArgumentParser()
+    add_prediction_parallelism_args(parser)
+    args = parser.parse_args([])
+    assert args.num_jobs == "auto"
+    assert args.max_workers_per_gpu == "auto"
+    assert not hasattr(args, "dataloader_num_workers")
+    assert not hasattr(args, "random_negative_pool_epochs")
+
+
+def test_chunk_ranges_for_local_parallelism_are_contiguous():
+    ranges = chunk_ranges_for_local_parallelism(
+        num_items=10, num_jobs=2, chunks_per_worker=2)
+    assert ranges == [
+        (0, 0, 3),
+        (1, 3, 6),
+        (2, 6, 9),
+        (3, 9, 10),
+    ]
+
+
+def test_chunk_ranges_for_local_parallelism_handles_empty():
+    assert chunk_ranges_for_local_parallelism(0, num_jobs=4) == []
 
 
 def test_auto_max_workers_per_gpu_cpu_only_returns_one():

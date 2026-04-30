@@ -2122,6 +2122,7 @@ class Class1AffinityPredictor(object):
 
         a_size = len(batch_alleles)
         device = ic50_device.device
+        count_dtype = torch.float32 if device.type == "mps" else torch.float64
         n_unique = state["n_unique"]
         # AMINO_ACIDS = COMMON_AMINO_ACIDS_WITH_UNKNOWN keys, alphabetical
         # then X — first 20 entries are the BLOSUM62-ordered non-X rows
@@ -2155,11 +2156,11 @@ class Class1AffinityPredictor(object):
                 # any X residues sum to <1 across the 20 columns).
                 scatter_dst = selected_codes.permute(0, 2, 1)
                 counts = torch.zeros(
-                    a_size, L, 21, dtype=torch.float64, device=device,
+                    a_size, L, 21, dtype=count_dtype, device=device,
                 )
                 counts.scatter_add_(
                     2, scatter_dst,
-                    torch.ones_like(scatter_dst, dtype=torch.float64),
+                    torch.ones_like(scatter_dst, dtype=count_dtype),
                 )
                 freq_t = counts[:, :, :20] / float(k)  # device tensor
                 freq_tensors.append(
@@ -2173,11 +2174,11 @@ class Class1AffinityPredictor(object):
             lengths_per_topk = state["unique_lengths_t"][top_full_idx]
             max_len_p1 = int(state["unique_lengths_t"].max().item()) + 1
             length_counts = torch.zeros(
-                a_size, max_len_p1, dtype=torch.float64, device=device,
+                a_size, max_len_p1, dtype=count_dtype, device=device,
             )
             length_counts.scatter_add_(
                 1, lengths_per_topk,
-                torch.ones_like(lengths_per_topk, dtype=torch.float64),
+                torch.ones_like(lengths_per_topk, dtype=count_dtype),
             )
             length_fractions_t = length_counts / float(k_total)
             length_fraction_tensors.append(
@@ -2299,8 +2300,12 @@ class Class1AffinityPredictor(object):
         peptides : sequence of string or EncodableSequences
         alleles : sequence of string — already-normalized allele names
             (canonicalization is the caller's responsibility for speed).
-        bins : argument to ``numpy.histogram`` (default: 999 bin edges
-            in IC50 space, matching ``calibrate_percentile_ranks``).
+        bins : sequence of bin edges in IC50 space (default: 999 log-spaced
+            IC50 bins, matching ``calibrate_percentile_ranks``). Scalar
+            integer ``numpy.histogram`` bin counts are rejected in this fast
+            path because they imply data-dependent edges per allele, while
+            the batched GPU histogram uses one explicit edge vector for the
+            whole allele chunk.
         motif_summary : bool — populate frequency matrices + length
             distributions, same format as ``calibrate_percentile_ranks``.
         summary_top_peptide_fractions : iterable of float — only used
@@ -2335,15 +2340,20 @@ class Class1AffinityPredictor(object):
 
         if bins is None:
             bins = to_ic50(numpy.linspace(1, 0, 1000))
-        # numpy.histogram accepts bins as either an int (n_bins) or an
-        # array of edges. The fast path requires explicit edges so we
-        # can bucketize on device. Materialize ints into edges here.
         bin_edges_array = numpy.asarray(bins)
         if bin_edges_array.ndim == 0:
-            n_bins_int = int(bin_edges_array)
-            assert n_bins_int > 0
-            bin_edges_array = to_ic50(
-                numpy.linspace(1, 0, n_bins_int + 1)
+            raise ValueError(
+                "calibrate_percentile_ranks_fast requires explicit IC50 bin "
+                "edges. Scalar integer bins use numpy.histogram's "
+                "data-dependent per-allele edges in the legacy path and "
+                "cannot be represented by one batched GPU edge vector. Use "
+                "bins=to_ic50(numpy.linspace(1, 0, n_bins + 1)) for fixed "
+                "log-space IC50 edges."
+            )
+        if bin_edges_array.ndim != 1 or bin_edges_array.shape[0] < 2:
+            raise ValueError(
+                "calibrate_percentile_ranks_fast requires a one-dimensional "
+                "sequence of at least two IC50 bin edges."
             )
 
         if device is None:
@@ -2442,7 +2452,7 @@ class Class1AffinityPredictor(object):
             str(device),
             int(peptide_batch_size),
         )
-        if cache.stage_signature == cache_signature:
+        if cache.stage_signature == cache_signature and cache.cached_stages is not None:
             cached_stages = cache.cached_stages
         else:
             # Drop stale cache before building the new one — releases
@@ -2450,6 +2460,7 @@ class Class1AffinityPredictor(object):
             # allocate the next, which matters when the per-call
             # peptide universe size changes (e.g. a smoke test
             # followed by the production calibrate in the same worker).
+            cache.stage_signature = None
             cache.cached_stages = None
             cache.motif_signature = None
             cache.motif_state = None
@@ -2521,8 +2532,11 @@ class Class1AffinityPredictor(object):
         length_distributions = [] if motif_summary else None
         # Bin edges for the on-device batched histogram fit. Materialize
         # once outside the per-chunk loop — same edges across alleles.
+        calibration_float_dtype = (
+            torch.float32 if device.type == "mps" else torch.float64
+        )
         bins_tensor = torch.as_tensor(
-            bin_edges_array, dtype=torch.float64, device=device,
+            bin_edges_array, dtype=calibration_float_dtype, device=device,
         )
 
         # Hoist the per-allele dedup + length-bucket + AA-encoding work
@@ -2672,6 +2686,11 @@ class Class1AffinityPredictor(object):
 
         dfs = []
         allele_to_allele_specific_models = {}
+
+        def model_is_selectable(model):
+            max_epochs = model.hyperparameters.get("max_epochs", 1)
+            return max_epochs is None or int(max_epochs) > 0
+
         for allele in alleles:
             df = pandas.DataFrame({
                 'model': self.allele_to_allele_specific_models[allele]
@@ -2679,16 +2698,19 @@ class Class1AffinityPredictor(object):
             df["model_num"] = df.index
             df["allele"] = allele
             df["selected"] = False
+            df["selectable"] = df.model.map(model_is_selectable)
 
             round_num = 1
 
-            while not df.selected.all() and sum(df.selected) < max_models:
+            while (
+                    not df.loc[df.selectable, "selected"].all()
+                    and sum(df.selected) < max_models):
                 score_col = "score_%2d" % round_num
                 prev_score_col = "score_%2d" % (round_num - 1)
 
                 existing_selected = list(df[df.selected].model)
                 df[score_col] = [
-                    numpy.nan if row.selected else
+                    numpy.nan if row.selected or not row.selectable else
                     score_function(
                         Class1AffinityPredictor(
                             allele_to_allele_specific_models={
@@ -2698,6 +2720,9 @@ class Class1AffinityPredictor(object):
                     )
                     for (_, row) in df.iterrows()
                 ]
+
+                if not numpy.isfinite(df[score_col]).any():
+                    break
 
                 if round_num > min_models and (
                         df[score_col].max() < df[prev_score_col].max()):

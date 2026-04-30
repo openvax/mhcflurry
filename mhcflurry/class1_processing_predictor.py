@@ -260,6 +260,14 @@ class Class1ProcessingPredictor(object):
         pandas.DataFrame
         """
 
+        if len(sequences.dataframe) == 0:
+            return pandas.DataFrame({
+                "peptide": pandas.Series(dtype=object),
+                "n_flank": pandas.Series(dtype=object),
+                "c_flank": pandas.Series(dtype=object),
+                "score": pandas.Series(dtype=float),
+            })
+
         score_array = []
 
         for (i, network) in enumerate(self.models):

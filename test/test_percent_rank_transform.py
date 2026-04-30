@@ -1,5 +1,6 @@
 
 import numpy
+import pytest
 import torch
 
 from mhcflurry.percent_rank_transform import PercentRankTransform
@@ -50,11 +51,9 @@ def test_fit_batch_torch_matches_per_row_numpy():
 
 def test_fit_batch_torch_handles_out_of_range_values():
     bin_edges = numpy.array([10.0, 20.0, 30.0, 40.0])
-    # Row 0: all in-range. Row 1: all below first edge (out of range).
-    # Row 2: half in last bin (>= last edge), half in first bin.
+    # Row 0: all in-range. Row 1: half above the last edge, half in first bin.
     values = numpy.array([
         [12.0, 22.0, 32.0, 38.0],
-        [1.0, 2.0, 3.0, 4.0],
         [11.0, 12.0, 50.0, 60.0],
     ])
     transforms = PercentRankTransform.fit_batch_torch(
@@ -64,8 +63,34 @@ def test_fit_batch_torch_handles_out_of_range_values():
     # Row 0: hist [1, 1, 2] (12->bin0, 22->bin1, 32->bin2, 38->bin2)
     # -> cdf cumulative = 25, 50, 100
     assert_allclose(transforms[0].cdf[2:-1], [25.0, 50.0, 100.0], atol=1e-9)
-    # Row 2: 2 in bin 0 (11, 12 -> [10,20)). 50 and 60 are strictly
+    # Row 1: 2 in bin 0 (11, 12 -> [10,20)). 50 and 60 are strictly
     # above the last edge (40) and are *dropped* by numpy.histogram —
     # the fast path matches that semantics. hist=[2,0,0], cdf=[100,100,100].
-    assert_allclose(transforms[2].cdf[2:-1], [100.0, 100.0, 100.0], atol=1e-9)
+    assert_allclose(transforms[1].cdf[2:-1], [100.0, 100.0, 100.0], atol=1e-9)
 
+
+def test_fit_batch_torch_rejects_all_out_of_range_rows():
+    bin_edges = numpy.array([10.0, 20.0, 30.0, 40.0])
+    values = numpy.array([
+        [12.0, 22.0, 32.0, 38.0],
+        [1.0, 2.0, 3.0, 4.0],
+    ])
+    with pytest.raises(ValueError, match="no values inside the bin range"):
+        PercentRankTransform.fit_batch_torch(
+            torch.as_tensor(values, dtype=torch.float64),
+            torch.as_tensor(bin_edges, dtype=torch.float64),
+        )
+
+
+def test_fit_batch_torch_runs_on_mps_without_float64():
+    if not torch.backends.mps.is_available():
+        pytest.skip("MPS not available")
+
+    values = torch.as_tensor(
+        [[12.0, 22.0, 32.0, 38.0]], dtype=torch.float32, device="mps",
+    )
+    bin_edges = torch.as_tensor(
+        [10.0, 20.0, 30.0, 40.0], dtype=torch.float32, device="mps",
+    )
+    transforms = PercentRankTransform.fit_batch_torch(values, bin_edges)
+    assert_allclose(transforms[0].cdf[2:-1], [25.0, 50.0, 100.0], atol=1e-5)

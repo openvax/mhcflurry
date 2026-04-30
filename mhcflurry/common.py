@@ -181,8 +181,6 @@ def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
     num_threads : int, optional
         Number of threads for PyTorch operations
     """
-    import torch
-
     global _pytorch_backend
 
     if backend is not None:
@@ -192,6 +190,7 @@ def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
         os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, gpu_device_nums))
 
     if num_threads:
+        import torch
         torch.set_num_threads(num_threads)
 
 

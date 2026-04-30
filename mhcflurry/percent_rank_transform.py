@@ -42,7 +42,9 @@ class PercentRankTransform(object):
 
         Equivalent to calling ``fit(values_2d[i], bins=bin_edges_1d)`` for
         each row i, but vectorized across the row dim — eliminates the
-        per-allele Python loop in calibrate's hot path.
+        per-allele Python loop in calibrate's hot path. Rows with no values
+        inside the bin range are invalid and raise instead of fabricating an
+        empty CDF.
 
         Parameters
         ----------
@@ -97,11 +99,20 @@ class PercentRankTransform(object):
         hist = torch.zeros(n_dist, n_bins, dtype=torch.long, device=values_2d.device)
         hist.scatter_add_(1, bin_idx, weights)
 
-        totals = hist.sum(dim=1, keepdim=True).to(torch.float64)
-        # Guard against an entirely-out-of-range row (totals == 0). In
-        # practice unreachable for IC50 inputs vs the mhcflurry bin range.
-        totals = totals.clamp(min=1)
-        cumsum = torch.cumsum(hist.to(torch.float64) * 100.0 / totals, dim=1)
+        totals = hist.sum(dim=1, keepdim=True)
+        zero_total = totals == 0
+        if bool(zero_total.any().item()):
+            rows = torch.nonzero(zero_total.flatten(), as_tuple=False).flatten()
+            raise ValueError(
+                "Cannot fit PercentRankTransform for row(s) with no values "
+                "inside the bin range: %s" % rows.cpu().numpy().tolist()
+            )
+
+        math_dtype = (
+            torch.float32 if values_2d.device.type == "mps" else torch.float64
+        )
+        totals = totals.to(math_dtype)
+        cumsum = torch.cumsum(hist.to(math_dtype) * 100.0 / totals, dim=1)
 
         cumsum_cpu = cumsum.cpu().numpy()
         bin_edges_cpu = bin_edges_1d.cpu().numpy()

@@ -953,6 +953,9 @@ class Class1ProcessingNeuralNetwork(object):
         )
 
         n_samples = len(x_dict["sequence"])
+        if n_samples == 0:
+            return numpy.array([], dtype="float64")
+
         all_predictions = []
 
         def prediction_tensor(batch_array):

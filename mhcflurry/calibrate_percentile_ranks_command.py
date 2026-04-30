@@ -29,6 +29,7 @@ from .encodable_sequences import EncodableSequences
 from .local_parallelism import (
     attach_constant_data_to_work_items_if_needed,
     add_local_parallelism_args,
+    chunk_ranges_for_local_parallelism,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from .cluster_parallelism import (
@@ -248,7 +249,6 @@ def run(argv=sys.argv[1:]):
 
 
 def run_class1_presentation_predictor(args, peptides):
-    # This will trigger a Keras import - will break local parallelism.
     predictor = Class1PresentationPredictor.load(args.models_dir)
 
     if args.allele:
@@ -286,16 +286,77 @@ def run_class1_presentation_predictor(args, peptides):
     print("Sampled genotypes: ", list(genotypes))
     print("Num peptides: ", len(peptides))
 
+    GLOBAL_DATA["presentation_models_dir"] = args.models_dir
+    GLOBAL_DATA["presentation_peptides"] = peptides
+    affinity_model_kwargs = {"batch_size": args.prediction_batch_size}
+    if getattr(args, "max_workers_per_gpu", None):
+        affinity_model_kwargs["num_workers_per_gpu"] = int(
+            args.max_workers_per_gpu)
+    GLOBAL_DATA["presentation_predict_kwargs"] = {
+        "affinity_model_kwargs": affinity_model_kwargs,
+        "processing_batch_size": args.prediction_batch_size,
+    }
+    GLOBAL_DATA.pop("_presentation_predictor", None)
+    GLOBAL_DATA.pop("_presentation_predictor_models_dir", None)
+
+    serial_run = not args.cluster_parallelism and args.num_jobs == 0
+    if serial_run:
+        GLOBAL_DATA["_presentation_predictor"] = predictor
+
+    genotype_items = list(genotypes.items())
+    work_items = []
+    for (chunk_num, start, end) in chunk_ranges_for_local_parallelism(
+            len(genotype_items), args.num_jobs):
+        work_items.append({
+            "chunk_num": chunk_num,
+            "genotypes": dict(genotype_items[start:end]),
+        })
+
     start = time.time()
     print("Generating predictions")
-    predictions_df = predictor.predict(
-        peptides=peptides,
-        alleles=genotypes)
+    worker_pool = None
+    if serial_run:
+        print("Running in serial.")
+        results = (
+            do_class1_presentation_percent_rank_scores(**item)
+            for item in work_items)
+    elif args.cluster_parallelism:
+        print("Running on cluster.")
+        results = cluster_results_from_args(
+            args,
+            work_function=do_class1_presentation_percent_rank_scores,
+            work_items=work_items,
+            constant_data=GLOBAL_DATA,
+            result_serialization_method="pickle",
+            clear_constant_data=True)
+    else:
+        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        print("Worker pool", worker_pool)
+        assert worker_pool is not None
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
+        results = worker_pool.imap_unordered(
+            partial(call_wrapped_kwargs,
+                    do_class1_presentation_percent_rank_scores),
+            work_items,
+            chunksize=1)
+
+    score_chunks = [
+        scores for scores in tqdm.tqdm(results, total=len(work_items))
+    ]
+    if worker_pool:
+        worker_pool.close()
+        worker_pool.join()
     print("Finished in %0.2f sec." % (time.time() - start))
-    print(predictions_df)
+    scores = (
+        numpy.concatenate(score_chunks, axis=0)
+        if score_chunks
+        else numpy.array([], dtype=float)
+    )
+    print("Generated %d presentation scores." % len(scores))
 
     print("Calibrating ranks")
-    scores = predictions_df.presentation_score.values
     predictor.calibrate_percentile_ranks(scores)
     print("Done. Saving.")
 
@@ -308,6 +369,29 @@ def run_class1_presentation_predictor(args, peptides):
         write_info=False,
         write_metdata=False)
     print("Wrote predictor to: %s" % args.models_dir)
+
+
+def _presentation_predictor_for_calibration(constant_data):
+    cache_key = constant_data["presentation_models_dir"]
+    predictor = GLOBAL_DATA.get("_presentation_predictor")
+    if (
+            predictor is None
+            or GLOBAL_DATA.get("_presentation_predictor_models_dir") != cache_key):
+        predictor = Class1PresentationPredictor.load(cache_key)
+        GLOBAL_DATA["_presentation_predictor"] = predictor
+        GLOBAL_DATA["_presentation_predictor_models_dir"] = cache_key
+    return predictor
+
+
+def do_class1_presentation_percent_rank_scores(
+        genotypes, chunk_num=None, constant_data=GLOBAL_DATA):
+    del chunk_num
+    predictor = _presentation_predictor_for_calibration(constant_data)
+    predictions_df = predictor.predict(
+        peptides=constant_data["presentation_peptides"],
+        alleles=genotypes,
+        **constant_data["presentation_predict_kwargs"])
+    return predictions_df.presentation_score.values
 
 
 def run_class1_affinity_predictor(args, peptides):

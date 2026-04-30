@@ -1204,6 +1204,100 @@ def add_local_parallelism_args(parser):
              "No runtime cost beyond a few timestamp records per epoch.")
 
 
+def add_prediction_parallelism_args(parser):
+    """
+    Add prediction-time local parallelism arguments to an argparse parser.
+
+    This is the inference subset of ``add_local_parallelism_args``: the worker
+    scheduler, backend selection, and torch forward-kernel knobs, without
+    training-only DataLoader/random-negative options.
+    """
+    group = parser.add_argument_group("Prediction parallelism")
+
+    group.add_argument(
+        "--num-jobs",
+        default="auto",
+        type=_num_jobs_arg,
+        metavar="N",
+        help="Number of local prediction worker processes. Pass 'auto' "
+             "(default) to use ``--gpus * --max-workers-per-gpu`` when "
+             "CUDA GPUs are specified, otherwise run serially. Pass 0 for "
+             "serial prediction.")
+    group.add_argument(
+        "--backend",
+        choices=("auto", "default", "gpu", "mps", "cpu"),
+        default="auto",
+        help="Device backend. 'auto' (default) selects GPU > MPS > CPU. "
+             "When --gpus is set, GPU-assigned workers use CUDA.")
+    group.add_argument(
+        "--gpus",
+        type=int,
+        metavar="N",
+        help="Number of CUDA GPUs, starting at index 0, to assign across "
+             "parallel prediction workers. Requires --num-jobs > 0.")
+    group.add_argument(
+        "--max-workers-per-gpu",
+        type=_max_workers_per_gpu_arg,
+        metavar="N",
+        default="auto",
+        help="Maximum prediction workers to assign to each CUDA GPU. Pass "
+             "'auto' (default) to choose from detected free VRAM, or an int "
+             "to pin.")
+    group.add_argument(
+        "--max-tasks-per-worker",
+        type=int,
+        metavar="N",
+        default=None,
+        help="Restart workers after N prediction chunks. Requires Python >=3.2.")
+    group.add_argument(
+        "--worker-log-dir",
+        default=None,
+        help="Write prediction worker stdout and stderr logs to this directory.")
+    group.add_argument(
+        "--torch-compile",
+        choices=("auto", "0", "1"),
+        default="auto",
+        help="Enable torch.compile for forward kernels. 'auto' reads "
+             "MHCFLURRY_TORCH_COMPILE.")
+    group.add_argument(
+        "--matmul-precision",
+        choices=("none", "highest", "high", "medium"),
+        default="none",
+        help="torch.set_float32_matmul_precision setting. CPU/MPS: no-op.")
+
+
+def chunk_ranges_for_local_parallelism(
+        num_items, num_jobs=0, chunks_per_worker=4):
+    """
+    Split a row/sequence axis into stable contiguous chunks for local workers.
+
+    Parameters
+    ----------
+    num_items : int
+        Number of input items.
+    num_jobs : int
+        Number of worker processes. ``0`` yields one serial chunk.
+    chunks_per_worker : int
+        Target number of work chunks per worker for load balancing.
+
+    Returns
+    -------
+    list of tuple
+        ``(chunk_index, start, end)`` ranges.
+    """
+    num_items = int(num_items)
+    if num_items <= 0:
+        return []
+
+    num_jobs = max(int(num_jobs or 0), 1)
+    target_chunks = min(num_items, max(1, num_jobs * int(chunks_per_worker)))
+    chunk_size = int(numpy.ceil(float(num_items) / target_chunks))
+    return [
+        (i, start, min(start + chunk_size, num_items))
+        for (i, start) in enumerate(range(0, num_items, chunk_size))
+    ]
+
+
 def worker_pool_with_gpu_assignments_from_args(args):
     """
     Create a multiprocessing.Pool where each worker uses its own GPU.

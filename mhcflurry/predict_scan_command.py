@@ -43,6 +43,11 @@ import pandas
 from .downloads import get_default_class1_presentation_models_dir
 from .class1_presentation_predictor import Class1PresentationPredictor
 from .fasta import read_fasta_to_dataframe
+from .local_parallelism import (
+    add_prediction_parallelism_args,
+    chunk_ranges_for_local_parallelism,
+    worker_pool_with_gpu_assignments_from_args,
+)
 from .version import __version__
 
 
@@ -181,6 +186,34 @@ model_args.add_argument(
     default=False,
     help="Do not use flanking sequence information in predictions")
 
+add_prediction_parallelism_args(parser)
+
+
+_PREDICTOR_CACHE = {}
+
+
+def _load_predictor_for_command(models_dir):
+    if models_dir not in _PREDICTOR_CACHE:
+        _PREDICTOR_CACHE[models_dir] = Class1PresentationPredictor.load(
+            models_dir)
+    return _PREDICTOR_CACHE[models_dir]
+
+
+def _predict_sequences_chunk_worker(work_item):
+    predictor = _load_predictor_for_command(work_item["models_dir"])
+    result_df = predictor.predict_sequences(
+        sequences=work_item["sequences"],
+        alleles=work_item["alleles"],
+        result="all",
+        peptide_lengths=work_item["peptide_lengths"],
+        use_flanks=work_item["use_flanks"],
+        include_affinity_percentile=work_item[
+            "include_affinity_percentile"],
+        throw=work_item["throw"],
+        affinity_model_kwargs=work_item["affinity_model_kwargs"],
+        processing_batch_size=work_item["processing_batch_size"])
+    return work_item["chunk_num"], result_df
+
 
 def parse_peptide_lengths(value):
     try:
@@ -230,7 +263,7 @@ def run(argv=sys.argv[1:]):
         # message instructing them to download the models if needed.
         models_dir = get_default_class1_presentation_models_dir(test_exists=True)
 
-    predictor = Class1PresentationPredictor.load(models_dir)
+    predictor = _load_predictor_for_command(models_dir)
 
     if args.list_supported_alleles:
         print("\n".join(predictor.supported_alleles))
@@ -301,14 +334,57 @@ def run(argv=sys.argv[1:]):
         print("No alleles specified. Will perform processing prediction only.")
         alleles = {}
 
-    result_df = predictor.predict_sequences(
-        sequences=df[args.sequence_column].to_dict(),
-        alleles=alleles,
-        result="all",
-        peptide_lengths=peptide_lengths,
-        use_flanks=not args.no_flanking,
-        include_affinity_percentile=not args.no_affinity_percentile,
-        throw=not args.no_throw)
+    sequences = df[args.sequence_column].to_dict()
+    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+    affinity_model_kwargs = {}
+    if getattr(args, "max_workers_per_gpu", None):
+        affinity_model_kwargs["num_workers_per_gpu"] = int(
+            args.max_workers_per_gpu)
+    if not sequences:
+        if worker_pool is not None:
+            worker_pool.close()
+            worker_pool.join()
+        result_df = pandas.DataFrame()
+    elif worker_pool is None:
+        result_df = predictor.predict_sequences(
+            sequences=sequences,
+            alleles=alleles,
+            result="all",
+            peptide_lengths=peptide_lengths,
+            use_flanks=not args.no_flanking,
+            include_affinity_percentile=not args.no_affinity_percentile,
+            throw=not args.no_throw,
+            affinity_model_kwargs=affinity_model_kwargs,
+            processing_batch_size="auto")
+    else:
+        sequence_items = list(sequences.items())
+        ranges = chunk_ranges_for_local_parallelism(
+            len(sequence_items), args.num_jobs)
+        work_items = []
+        for (chunk_num, start, end) in ranges:
+            work_items.append({
+                "chunk_num": chunk_num,
+                "models_dir": models_dir,
+                "sequences": dict(sequence_items[start:end]),
+                "alleles": alleles,
+                "peptide_lengths": peptide_lengths,
+                "use_flanks": not args.no_flanking,
+                "include_affinity_percentile": (
+                    not args.no_affinity_percentile),
+                "throw": not args.no_throw,
+                "affinity_model_kwargs": affinity_model_kwargs,
+                "processing_batch_size": "auto",
+            })
+        try:
+            results = worker_pool.imap_unordered(
+                _predict_sequences_chunk_worker, work_items, chunksize=1)
+            chunks = [result for result in results]
+        finally:
+            worker_pool.close()
+            worker_pool.join()
+        result_df = pandas.concat(
+            [chunk for (_, chunk) in sorted(chunks)],
+            ignore_index=True)
 
     # Apply thresholds
     if args.threshold_presentation_score is not None:

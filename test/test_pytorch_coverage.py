@@ -496,6 +496,22 @@ class TestConfigurePyTorch:
         with pytest.raises(ValueError, match="Invalid backend"):
             common.configure_pytorch(backend="gpuu")
 
+    def test_gpu_visibility_does_not_import_torch(self, monkeypatch):
+        import builtins
+        from mhcflurry import common
+
+        monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+        original_import = builtins.__import__
+
+        def guarded_import(name, *args, **kwargs):
+            if name == "torch" or name.startswith("torch."):
+                raise AssertionError("configure_pytorch imported torch")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", guarded_import)
+        common.configure_pytorch(gpu_device_nums=[2])
+        assert common.os.environ["CUDA_VISIBLE_DEVICES"] == "2"
+
     def test_default_backend_alias_maps_to_auto(self):
         from mhcflurry import common
         old_backend = common._pytorch_backend
