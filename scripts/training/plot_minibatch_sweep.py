@@ -36,6 +36,13 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib.ticker import FixedLocator, ScalarFormatter, NullLocator
 
+try:
+    # adjustText iteratively repositions text to avoid overlapping any
+    # dots or other labels. Optional; we fall back to fixed offsets.
+    from adjustText import adjust_text as _adjust_text
+except ImportError:
+    _adjust_text = None
+
 
 # Columns excluded from plotting because they are not values we want
 # to compare. ``minibatch`` is the primary axis. Constants are dropped
@@ -106,6 +113,8 @@ def _force_plain_ticks(ax, x_scale, y_scale):
 
 def _save(fig, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    # constrained_layout (set on the figure) handles colorbar padding
+    # automatically; explicit tight_layout would fight with it.
     fig.savefig(path, dpi=DPI)
     plt.close(fig)
 
@@ -133,16 +142,46 @@ def _add_mb_colorbar(fig, ax, mb_values, norm):
 
 
 def _annotate_points(ax, xs, ys, labels):
+    """Place mb labels next to each dot, then (if available) iteratively
+    nudge them to avoid overlapping each other and the dots. Falls back
+    to a fixed NE offset if adjustText isn't installed."""
+    texts = []
     for xi, yi, lbl in zip(xs, ys, labels):
         if pd.notna(xi) and pd.notna(yi):
-            ax.annotate(
-                str(lbl),
-                (xi, yi),
-                textcoords="offset points",
-                xytext=(7, 7),
+            t = ax.text(
+                xi, yi, str(lbl),
                 fontsize=8.5,
                 color="#222",
+                ha="left", va="bottom",
             )
+            texts.append(t)
+    if not texts:
+        return
+
+    if _adjust_text is not None:
+        # Treat the data points as obstacles too so labels don't sit on
+        # top of any dot. expand_text/expand_points pad bounding boxes
+        # so adjacent labels keep a small gap.
+        valid = [(x, y) for x, y in zip(xs, ys)
+                 if pd.notna(x) and pd.notna(y)]
+        x_arr = [v[0] for v in valid]
+        y_arr = [v[1] for v in valid]
+        _adjust_text(
+            texts,
+            x=x_arr, y=y_arr, ax=ax,
+            expand=(1.2, 1.4),
+            arrowprops=dict(arrowstyle="-", color="#888",
+                            lw=0.6, alpha=0.6),
+            time_lim=2.0,
+            max_move=20,
+        )
+    else:
+        # Static NE offset; readers will sometimes see overlap, but
+        # without adjustText there's no automated fix.
+        for t, xi, yi in zip(texts, xs, ys):
+            t.set_position((xi, yi))
+            t.set_x(xi)
+            t.set_y(yi)
 
 
 def _filter_columns(df):
@@ -179,7 +218,7 @@ def plot_per_variable(df, out_dir):
             if y_scale == "log" and not _is_log_safe(y):
                 continue
 
-            fig, ax = plt.subplots(figsize=FIGSIZE)
+            fig, ax = plt.subplots(figsize=FIGSIZE, constrained_layout=True)
             ax.plot(x, y, color=LINE_COLOR, linewidth=1.4,
                     alpha=LINE_ALPHA, zorder=1)
             ax.scatter(x, y, c=point_colors, s=DOT_SIZE,
@@ -203,7 +242,6 @@ def plot_per_variable(df, out_dir):
                 fontsize=9, color="#666",
             )
             ax.grid(True, **GRID_KW)
-            fig.tight_layout()
 
             tag = "loglog" if x_scale == "log" else "linlin"
             path = os.path.join(out_dir, f"{col}__{tag}.png")
@@ -231,7 +269,7 @@ def plot_pairs(df, out_dir):
             if y_scale == "log" and not _is_log_safe(yv):
                 continue
 
-            fig, ax = plt.subplots(figsize=FIGSIZE)
+            fig, ax = plt.subplots(figsize=FIGSIZE, constrained_layout=True)
             ax.scatter(xv, yv, c=point_colors, s=DOT_SIZE,
                        edgecolor=DOT_EDGE, linewidth=DOT_EDGE_WIDTH,
                        zorder=3)
@@ -255,7 +293,6 @@ def plot_pairs(df, out_dir):
             )
             ax.grid(True, **GRID_KW)
             _add_mb_colorbar(fig, ax, mb_values, norm)
-            fig.tight_layout()
 
             tag = "loglog" if x_scale == "log" else "linlin"
             path = os.path.join(out_dir, f"{x_col}__VS__{y_col}__{tag}.png")
