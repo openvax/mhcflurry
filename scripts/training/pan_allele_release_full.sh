@@ -8,9 +8,8 @@
 #     which carries the heartbeat / write_snapshot / log_release_event
 #     instrumentation, --continue-incomplete resume logic, and the
 #     calibrate + eval-against-public-release phases.
-#   - Stages 2-3 (processing + presentation) are inlined here, modeled
-#     on pan_allele_presentation_subset.sh but without the SUBSET_ARCHS
-#     truncation so the full architecture sweep trains.
+#   - Stages 2-3 (processing + presentation) are inlined here, with
+#     the full architecture sweep (no truncation).
 #
 # Each stage writes to its own subdirectory under MHCFLURRY_OUT so
 # artifacts don't collide (affinity/, processing/, presentation/). The
