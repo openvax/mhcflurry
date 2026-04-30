@@ -412,7 +412,6 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     hp["max_epochs"] = 1
     hp["validation_split"] = 0.0
     hp["early_stopping"] = False
-    hp["data_dependent_initialization_method"] = None
 
     print(
         "compile_warmup_only (processing): convolutional_filters=%s "
