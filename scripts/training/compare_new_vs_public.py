@@ -255,6 +255,83 @@ def main():
     m_new_all = metrics(test.hit.values, test.new_score.values)
     m_pub_all = metrics(test.hit.values, test.public_score.values)
 
+    # Per-peptide-length breakdown (8-12mers). For each length we compute:
+    #   - micro: pool all rows of that length across alleles
+    #   - macro: mean of per-allele metrics (allele restricted to that length;
+    #     skip alleles with <30 rows or 0 hits at this length)
+    lengths = [8, 9, 10, 11, 12]
+    per_length_rows = []
+    per_length_per_allele_rows = []
+    for L in lengths:
+        sub = test[test.peptide_len == L]
+        if len(sub) == 0:
+            continue
+        m_new_L = metrics(sub.hit.values, sub.new_score.values)
+        m_pub_L = metrics(sub.hit.values, sub.public_score.values)
+        per_allele_L = []
+        for allele, group in sub.groupby("hla"):
+            if len(group) < 30 or group.hit.sum() == 0:
+                continue
+            ma_new = metrics(group.hit.values, group.new_score.values)
+            ma_pub = metrics(group.hit.values, group.public_score.values)
+            per_allele_L.append({
+                "allele": allele, "length": L,
+                "n": ma_new["n"], "n_pos": ma_new["n_pos"],
+                "new_roc_auc": ma_new["roc_auc"],
+                "public_roc_auc": ma_pub["roc_auc"],
+                "new_pr_auc": ma_new["pr_auc"],
+                "public_pr_auc": ma_pub["pr_auc"],
+                "new_ppv_at_n": ma_new["ppv_at_n"],
+                "public_ppv_at_n": ma_pub["ppv_at_n"],
+            })
+        per_length_per_allele_rows.extend(per_allele_L)
+        macro_new = {m: float(numpy.nanmean([r[f"new_{m}"] for r in per_allele_L]))
+                     if per_allele_L else float("nan")
+                     for m in ["roc_auc", "pr_auc", "ppv_at_n"]}
+        macro_pub = {m: float(numpy.nanmean([r[f"public_{m}"] for r in per_allele_L]))
+                     if per_allele_L else float("nan")
+                     for m in ["roc_auc", "pr_auc", "ppv_at_n"]}
+        per_length_rows.append({
+            "length": L,
+            "n": m_new_L["n"], "n_pos": m_new_L["n_pos"],
+            "n_alleles_reported": len(per_allele_L),
+            "new_micro_roc_auc": m_new_L["roc_auc"],
+            "public_micro_roc_auc": m_pub_L["roc_auc"],
+            "new_micro_pr_auc": m_new_L["pr_auc"],
+            "public_micro_pr_auc": m_pub_L["pr_auc"],
+            "new_micro_ppv_at_n": m_new_L["ppv_at_n"],
+            "public_micro_ppv_at_n": m_pub_L["ppv_at_n"],
+            "new_macro_roc_auc": macro_new["roc_auc"],
+            "public_macro_roc_auc": macro_pub["roc_auc"],
+            "new_macro_pr_auc": macro_new["pr_auc"],
+            "public_macro_pr_auc": macro_pub["pr_auc"],
+            "new_macro_ppv_at_n": macro_new["ppv_at_n"],
+            "public_macro_ppv_at_n": macro_pub["ppv_at_n"],
+        })
+    per_length = pandas.DataFrame(per_length_rows)
+    if not per_length.empty:
+        for col in ["micro_roc_auc", "micro_pr_auc", "micro_ppv_at_n",
+                    "macro_roc_auc", "macro_pr_auc", "macro_ppv_at_n"]:
+            per_length[f"{col}_diff"] = (
+                per_length[f"new_{col}"] - per_length[f"public_{col}"])
+    per_length_path = os.path.join(args.out, "per_length.csv")
+    per_length.to_csv(per_length_path, index=False)
+    print(f"      wrote {per_length_path} ({len(per_length)} lengths)")
+
+    if per_length_per_allele_rows:
+        per_length_per_allele = pandas.DataFrame(per_length_per_allele_rows)
+        for col in ["roc_auc", "pr_auc", "ppv_at_n"]:
+            per_length_per_allele[f"{col}_diff"] = (
+                per_length_per_allele[f"new_{col}"]
+                - per_length_per_allele[f"public_{col}"])
+        per_length_per_allele = per_length_per_allele.sort_values(
+            ["length", "n"], ascending=[True, False])
+        per_length_per_allele_path = os.path.join(
+            args.out, "per_length_per_allele.csv")
+        per_length_per_allele.to_csv(per_length_per_allele_path, index=False)
+        print(f"      wrote {per_length_per_allele_path} "
+              f"({len(per_length_per_allele)} (length, allele) rows)")
+
     summary = {
         "n_rows": int(len(test)),
         "n_hits": int(test.hit.sum()),
@@ -265,6 +342,26 @@ def main():
                 "new": float(per_allele[f"new_{metric}"].mean()),
                 "public": float(per_allele[f"public_{metric}"].mean()),
             } for metric in ["roc_auc", "pr_auc", "ppv_at_n"]
+        },
+        "per_length": {
+            str(int(row["length"])): {
+                "n": int(row["n"]),
+                "n_pos": int(row["n_pos"]),
+                "n_alleles_reported": int(row["n_alleles_reported"]),
+                "micro": {
+                    metric: {
+                        "new": float(row[f"new_micro_{metric}"]),
+                        "public": float(row[f"public_micro_{metric}"]),
+                    } for metric in ["roc_auc", "pr_auc", "ppv_at_n"]
+                },
+                "macro": {
+                    metric: {
+                        "new": float(row[f"new_macro_{metric}"]),
+                        "public": float(row[f"public_macro_{metric}"]),
+                    } for metric in ["roc_auc", "pr_auc", "ppv_at_n"]
+                },
+            }
+            for _, row in per_length.iterrows()
         },
         "allele_count": {
             "new_better_roc_auc": int((per_allele.roc_auc_diff > 0).sum()),
