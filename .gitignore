@@ -75,10 +75,3 @@ target/
 
 # OS X extra files
 .DS_Store
-.venv/
-
-# Runner outputs
-out/
-
-# Claude Code local state
-.claude/
