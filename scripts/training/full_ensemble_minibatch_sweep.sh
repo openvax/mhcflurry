@@ -47,6 +47,14 @@ DATA_EVAL_DIR="${DATA_EVAL_DIR:-$(mhcflurry-downloads path data_evaluation)}"
 COMPARE_SCRIPT="${COMPARE_SCRIPT:?COMPARE_SCRIPT must point at compare_new_vs_public.py}"
 GPUS="${GPUS:-8}"
 MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
+# Model selection bounds. mhcflurry-class1-select-pan-allele-models picks
+# between MIN_MODELS_PER_FOLD and MAX_MODELS_PER_FOLD models per training
+# fold; with 4 folds, total ensemble size lands in
+# [4*MIN_MODELS_PER_FOLD, 4*MAX_MODELS_PER_FOLD]. Default range matches
+# the historical 2.x recipe; pin both to the same value to fix ensemble
+# size (e.g. =3 → 12 models = 3/fold × 4 folds).
+MIN_MODELS_PER_FOLD="${MIN_MODELS_PER_FOLD:-2}"
+MAX_MODELS_PER_FOLD="${MAX_MODELS_PER_FOLD:-8}"
 ENCODING_CACHE_DIR="${ENCODING_CACHE_DIR:-$HOME/runplz-cache/encoding_cache}"
 # --num-jobs and --max-workers-per-gpu are passed as ``auto`` so that
 # the resolver in mhcflurry/local_parallelism.py picks values that match
@@ -132,7 +140,8 @@ PY
         --data "$SIZE_OUT/models.unselected.combined/train_data.csv.bz2" \
         --models-dir "$SIZE_OUT/models.unselected.combined" \
         --out-models-dir "$SIZE_OUT/models.combined" \
-        --min-models 2 --max-models 8 \
+        --min-models-per-fold "$MIN_MODELS_PER_FOLD" \
+        --max-models-per-fold "$MAX_MODELS_PER_FOLD" \
         --num-jobs auto \
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
         --gpus "$GPUS" \
