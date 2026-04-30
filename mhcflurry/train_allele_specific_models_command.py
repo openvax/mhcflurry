@@ -18,7 +18,7 @@ from .common import normalize_allele_name
 import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .common import configure_logging
+from .common import configure_logging, write_generate_sh
 from .local_parallelism import (
     add_local_parallelism_args,
     attach_constant_data_to_work_items_if_needed,
@@ -329,6 +329,7 @@ def run(argv=sys.argv[1:]):
 
     print("Saving final predictor to: %s" % args.out_models_dir)
     predictor.save(args.out_models_dir)  # write all models just to be sure
+    write_generate_sh(args.out_models_dir)
     print("Done.")
 
     print("*" * 30)

@@ -14,7 +14,7 @@ import tqdm  # progress bar
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
-from .common import configure_logging
+from .common import configure_logging, write_generate_sh
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -164,6 +164,7 @@ def main(args):
         write_percent_ranks = True,
         write_info = True,
         write_metdata = True)
+    write_generate_sh(args.out_models_dir)
     print("Wrote", args.out_models_dir)
 
 

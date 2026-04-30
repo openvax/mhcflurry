@@ -24,7 +24,7 @@ import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import Class1NeuralNetwork
-from .common import configure_logging, normalize_allele_name
+from .common import configure_logging, normalize_allele_name, write_generate_sh
 from .local_parallelism import (
     add_local_parallelism_args,
     apply_dataloader_num_workers_to_work_items,
@@ -1399,6 +1399,7 @@ def train_models(args):
         GLOBAL_DATA['full_allele_encoding'].allele_to_sequence)
     predictor.clear_cache()
     predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
     print("Done.")
 
     print("*" * 30)

@@ -22,7 +22,7 @@ import tqdm  # progress bar
 
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
-from .common import configure_logging
+from .common import configure_logging, write_generate_sh
 from .local_parallelism import (
     add_local_parallelism_args,
     attach_constant_data_to_work_items_if_needed,
@@ -374,6 +374,7 @@ def train_models(args):
                     args.out_models_dir))
 
     predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
     print("Done saving.")
 
     print("*" * 30)

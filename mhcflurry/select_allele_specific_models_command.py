@@ -25,6 +25,7 @@ from .common import (
     filter_canonicalizable_alleles,
     normalize_allele_name,
     random_peptides,
+    write_generate_sh,
 )
 from .encodable_sequences import EncodableSequences
 from .local_parallelism import worker_pool_with_gpu_assignments_from_args, add_local_parallelism_args
@@ -407,6 +408,7 @@ def run(argv=sys.argv[1:]):
 
     print("Done model selecting for %d alleles." % len(alleles))
     result_predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
 
     model_selection_time = time.time() - start
 

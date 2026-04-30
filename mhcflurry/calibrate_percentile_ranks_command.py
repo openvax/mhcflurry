@@ -24,6 +24,7 @@ from .common import (
     filter_canonicalizable_alleles,
     normalize_allele_name,
     random_peptides,
+    write_generate_sh,
 )
 from .encodable_sequences import EncodableSequences
 from .local_parallelism import (
@@ -368,6 +369,7 @@ def run_class1_presentation_predictor(args, peptides):
         write_percent_ranks=True,
         write_info=False,
         write_metdata=False)
+    write_generate_sh(args.models_dir)
     print("Wrote predictor to: %s" % args.models_dir)
 
 
@@ -529,6 +531,7 @@ def run_class1_affinity_predictor(args, peptides):
             print(df)
 
     predictor.save(args.models_dir, model_names_to_write=[])
+    write_generate_sh(args.models_dir)
 
     percent_rank_calibration_time = time.time() - start
 

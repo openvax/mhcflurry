@@ -23,7 +23,7 @@ import tqdm  # progress bar
 
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .flanking_encoding import FlankingEncoding
-from .common import configure_logging
+from .common import configure_logging, write_generate_sh
 from .local_parallelism import (
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)
@@ -214,6 +214,7 @@ def run(argv=sys.argv[1:]):
         summary_df.reset_index(drop=True))
 
     result_predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
 
     model_selection_time = time.time() - start
 

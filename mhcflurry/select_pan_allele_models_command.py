@@ -23,7 +23,11 @@ import tqdm  # progress bar
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .encodable_sequences import EncodableSequences
 from .allele_encoding import AlleleEncoding
-from .common import configure_logging, filter_canonicalizable_alleles
+from .common import (
+    configure_logging,
+    filter_canonicalizable_alleles,
+    write_generate_sh,
+)
 from .local_parallelism import (
     attach_constant_data_to_work_items_if_needed,
     worker_pool_with_gpu_assignments_from_args,
@@ -288,6 +292,7 @@ def run(argv=sys.argv[1:]):
         summary_df.reset_index(drop=True))
 
     result_predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
 
     model_selection_time = time.time() - start
     print(f"TIMING_MARKER selection_done {time.time():.3f}")
