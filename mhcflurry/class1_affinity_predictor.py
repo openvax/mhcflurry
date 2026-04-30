@@ -2357,10 +2357,8 @@ class Class1AffinityPredictor(object):
             )
 
         if device is None:
-            device = (
-                torch.device("cuda") if torch.cuda.is_available()
-                else torch.device("cpu")
-            )
+            from .common import get_pytorch_device
+            device = get_pytorch_device()
         else:
             device = torch.device(device)
 

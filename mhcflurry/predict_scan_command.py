@@ -344,7 +344,17 @@ def run(argv=sys.argv[1:]):
         if worker_pool is not None:
             worker_pool.close()
             worker_pool.join()
-        result_df = pandas.DataFrame()
+        # Empty input: return a DataFrame with the expected schema so
+        # threshold filters and downstream readers don't see a
+        # schema-less object. We don't know all columns the predictor
+        # would have produced, but the threshold-relevant ones are
+        # known; absent columns are filled in by predict_sequences in
+        # the non-empty paths.
+        result_df = pandas.DataFrame(columns=[
+            "sequence_name", "pos", "peptide", "n_flank", "c_flank",
+            "sample_name", "affinity", "affinity_percentile",
+            "processing_score", "presentation_score",
+        ])
     elif worker_pool is None:
         result_df = predictor.predict_sequences(
             sequences=sequences,
@@ -385,19 +395,35 @@ def run(argv=sys.argv[1:]):
         result_df = pandas.concat(
             [chunk for (_, chunk) in sorted(chunks)],
             ignore_index=True)
+        # Match the global sort that serial predict_sequences(result="all")
+        # applies in class1_presentation_predictor.predict_sequences().
+        # Each chunk is sorted within its sequence subset; after concat we
+        # need a stable global sort so parallel output ranking == serial.
+        if "presentation_score" in result_df.columns:
+            result_df = result_df.sort_values(
+                "presentation_score", ascending=False, kind="stable"
+            ).reset_index(drop=True)
+        elif "processing_score" in result_df.columns:
+            result_df = result_df.sort_values(
+                "processing_score", ascending=False, kind="stable"
+            ).reset_index(drop=True)
 
-    # Apply thresholds
-    if args.threshold_presentation_score is not None:
-        result_df = result_df.loc[result_df.presentation_score >= args.threshold_presentation_score]
-
-    if args.threshold_processing_score is not None:
-        result_df = result_df.loc[result_df.processing_score >= args.threshold_processing_score]
-
-    if args.threshold_affinity is not None:
-        result_df = result_df.loc[result_df.affinity <= args.threshold_affinity]
-
-    if args.threshold_affinity_percentile is not None:
-        result_df = result_df.loc[result_df.affinity_percentile <= args.threshold_affinity_percentile]
+    # Apply thresholds, skipping ones whose column is missing (e.g.
+    # processing-only run with no alleles, or --no-affinity-percentile
+    # leaves affinity_percentile out).
+    threshold_filters = [
+        ("presentation_score", args.threshold_presentation_score, "ge"),
+        ("processing_score", args.threshold_processing_score, "ge"),
+        ("affinity", args.threshold_affinity, "le"),
+        ("affinity_percentile", args.threshold_affinity_percentile, "le"),
+    ]
+    for col, thresh, op in threshold_filters:
+        if thresh is None or col not in result_df.columns:
+            continue
+        if op == "ge":
+            result_df = result_df.loc[result_df[col] >= thresh]
+        else:
+            result_df = result_df.loc[result_df[col] <= thresh]
 
     # Write results
     if args.out:

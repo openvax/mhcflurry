@@ -21,6 +21,7 @@ from .class1_presentation_predictor import Class1PresentationPredictor
 from .common import (
     amino_acid_distribution,
     configure_logging,
+    configure_pytorch,
     filter_canonicalizable_alleles,
     normalize_allele_name,
     random_peptides,
@@ -218,6 +219,15 @@ def run(argv=sys.argv[1:]):
         cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
         per_worker_gb=24.0,
     )
+
+    # If we're going to run in-process (serial — no worker pool), the
+    # forward kernels in this process must respect the requested
+    # backend. Worker pools take care of this in worker_init via
+    # configure_pytorch, but the parent never gets that path.
+    if (
+            getattr(args, "num_jobs", 0) == 0
+            and not getattr(args, "cluster_parallelism", False)):
+        configure_pytorch(backend=getattr(args, "backend", "auto") or "auto")
 
     aa_distribution = None
     if args.match_amino_acid_distribution_data:

@@ -191,6 +191,31 @@ def _free_vram_override_gb(num_gpus):
     return min(vals[:max(int(num_gpus), 1)])
 
 
+def _detect_num_cuda_devices_no_torch():
+    """Return the number of visible CUDA devices via ``nvidia-smi -L``.
+
+    Subprocess so the orchestrator can size a fork-based worker pool
+    without initializing CUDA in the parent process. Returns 0 when
+    nvidia-smi is unavailable or no GPUs are visible.
+    """
+    try:
+        output = subprocess.check_output(
+            ["nvidia-smi", "-L"],
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except (
+            OSError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired):
+        return 0
+    n = 0
+    for line in output.decode("utf-8", errors="ignore").splitlines():
+        if line.startswith("GPU "):
+            n += 1
+    return n
+
+
 def _free_vram_from_nvidia_smi_gb(num_gpus):
     """Return minimum free VRAM across visible GPUs using ``nvidia-smi``.
 
@@ -701,8 +726,23 @@ def resolve_local_parallelism_args(
         num_jobs_raw is None
         or (isinstance(num_jobs_raw, str) and num_jobs_raw.lower() == "auto")
     )
-    num_gpus = int(getattr(args, "gpus", 0) or 0)
+    num_gpus_raw = getattr(args, "gpus", None)
+    num_gpus = int(num_gpus_raw or 0)
     backend = normalize_pytorch_backend(getattr(args, "backend", "auto") or "auto")
+
+    # Auto-detect GPU count when the user didn't pass --gpus and the
+    # backend allows GPU. Without this, parallel prediction with
+    # --num-jobs > 0 leaves num_gpus=0 and every worker chooses the
+    # default CUDA device (typically GPU 0), starving GPUs 1..N. The
+    # detection uses nvidia-smi -L (no torch import here so we don't
+    # initialize CUDA in the parent before fork).
+    gpus_was_auto = num_gpus_raw is None and backend in ("auto", "gpu")
+    if gpus_was_auto:
+        detected = _detect_num_cuda_devices_no_torch()
+        if detected > 0:
+            num_gpus = detected
+            args.gpus = detected
+    args.gpus_was_auto = gpus_was_auto
 
     if num_jobs_was_auto:
         if num_gpus > 0 and backend in ("auto", "gpu"):

@@ -181,7 +181,9 @@ def test_calibrate_fast_parity_with_legacy_path():
         motif_summary=False,
     )
 
-    # Run fast path
+    # Run fast path. Pin to CPU so legacy (CPU/float64) and fast paths
+    # produce bit-identical results — without this, MPS on macOS ends
+    # up as the auto-picked device, which uses float32 and drifts.
     predictor.allele_to_percent_rank_transform = {}
     predictor.calibrate_percentile_ranks_fast(
         peptides=peptides,
@@ -189,6 +191,7 @@ def test_calibrate_fast_parity_with_legacy_path():
         motif_summary=False,
         allele_batch_size=2,  # exercise the batching boundary
         peptide_batch_size=500,
+        device=torch.device("cpu"),
     )
 
     for allele in alleles:
@@ -237,6 +240,7 @@ def test_calibrate_fast_parity_with_motif_summary():
         summary_top_peptide_fractions=(0.01,),
         allele_batch_size=3,
         peptide_batch_size=500,
+        device=torch.device("cpu"),
     )
 
     def _sort_key(df):
