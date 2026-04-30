@@ -9,7 +9,7 @@ from runplz import App, BrevConfig, Image
 
 app = App(
     "pan-allele-smoketest",
-    brev_config=BrevConfig(auto_create_instances=False),
+    brev=BrevConfig(auto_create=False),
 )
 
 image = Image.from_dockerfile("docker/Dockerfile.train")

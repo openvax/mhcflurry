@@ -4,14 +4,12 @@ compute node.
 """
 
 import itertools
-import multiprocessing
-import multiprocessing.pool
 import traceback
 import sys
 import os
 import time
 import queue
-from multiprocessing import Queue, cpu_count
+from multiprocessing import Pool, Queue, cpu_count
 from multiprocessing.util import Finalize
 from pprint import pprint
 import random
@@ -19,75 +17,6 @@ import random
 import numpy
 
 from .common import configure_pytorch, normalize_pytorch_backend
-
-
-# ---- Non-daemonic worker pool --------------------------------------------
-#
-# By default ``multiprocessing.Pool`` spawns daemon workers, and daemon
-# processes cannot fork their own children. That's incompatible with the
-# Phase 1 (#268) PyTorch DataLoader wrap in ``Class1NeuralNetwork.fit``,
-# which uses ``num_workers>0`` to prefetch minibatches via per-DataLoader
-# worker processes. Under the default Pool, the DataLoader init call
-# raises ``AssertionError: daemonic processes are not allowed to have
-# children`` the first time a training epoch tries to iterate.
-#
-# Phase 1 shipped a runtime downgrade (``_effective_num_workers`` in
-# class1_neural_network.py) that silently forces ``num_workers=0`` when
-# called from a daemon process — safe, but it effectively disables
-# DataLoader prefetch in production training. The real fix is here:
-# run Pool workers as NON-daemonic so they can spawn their own children.
-#
-# Non-daemon workers have one behavioral difference worth naming: if the
-# parent process dies ungracefully (e.g. SIGKILL), the workers may
-# linger as zombies rather than being auto-reaped by init. The
-# training orchestrator's ``try/finally`` closes and joins the pool on
-# clean exit, so this only matters under unusual fault modes.
-class NonDaemonProcess(multiprocessing.Process):
-    """A ``multiprocessing.Process`` whose ``daemon`` flag cannot be set.
-
-    Reading ``.daemon`` always returns False; writes are no-ops. This
-    lets us instantiate ``multiprocessing.pool.Pool`` with a worker
-    class that declines to be a daemon, so the DataLoader inside each
-    worker can spawn its own prefetch children.
-    """
-
-    @property
-    def daemon(self) -> bool:
-        return False
-
-    @daemon.setter
-    def daemon(self, value) -> None:
-        # Silently ignore; ``multiprocessing.Pool._repopulate_pool`` sets
-        # daemon=True on every fresh worker, so we must tolerate the
-        # assignment without raising.
-        pass
-
-
-class NonDaemonContext(type(multiprocessing.get_context())):
-    """A multiprocessing context that hands out ``NonDaemonProcess`` workers.
-
-    Subclasses the current default context so the start method (fork on
-    Linux, spawn on macOS) is preserved — we only swap the Process
-    class. The Pool uses ``self._ctx.Process(...)`` to create workers
-    and will now get our non-daemonic variant.
-    """
-
-    Process = NonDaemonProcess
-
-
-class NonDaemonPool(multiprocessing.pool.Pool):
-    """A ``multiprocessing.Pool`` that runs non-daemonic workers.
-
-    Pool's constructor takes a ``context`` kwarg — we thread a
-    ``NonDaemonContext`` through so each worker is a
-    ``NonDaemonProcess``. Everything else (apply_async, imap, etc.)
-    inherits unchanged.
-    """
-
-    def __init__(self, *args, **kwargs):
-        # Callers may pass their own context; if not, use our non-daemon one.
-        kwargs.setdefault("context", NonDaemonContext())
-        super().__init__(*args, **kwargs)
 
 
 def add_local_parallelism_args(parser):
@@ -371,10 +300,7 @@ def make_worker_pool(
         else:
             pool_kwargs["initializer"] = initializer
 
-    # Use a non-daemonic pool so workers can spawn DataLoader children.
-    # See NonDaemonPool for the rationale and the Phase 1 (#268) crash
-    # it unblocks.
-    worker_pool = NonDaemonPool(**pool_kwargs)
+    worker_pool = Pool(**pool_kwargs)
     print("Started pool: %s" % str(worker_pool))
     pprint(pool_kwargs)
     return worker_pool
