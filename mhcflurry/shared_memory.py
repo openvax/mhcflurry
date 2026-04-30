@@ -1,8 +1,8 @@
 """Shared-memory primitives used by mhcflurry training.
 
-mhcflurry has two shared-memory layers, both implementing the same
-"build once, share with many readers" pattern but using different OS
-mechanisms because the lifecycles differ.
+mhcflurry's training pipeline now uses a single per-fit() data residency
+— device-resident — and a per-run shared mmap pool for the random-negative
+peptide cycle. The two layers serve different lifecycles:
 
 run mmap cache — per-run, file-mmap, orchestrator-built, read-only.
     Random-negative pool, encoding cache. Built ONCE before any
@@ -12,21 +12,17 @@ run mmap cache — per-run, file-mmap, orchestrator-built, read-only.
 
     Mechanism: ``numpy.memmap`` of files written by the orchestrator.
 
-fit DataLoader SHM — per-fit(), POSIX shm, fit()-built, read+write.
-    Dataset backing arrays for a single fit() inner DataLoader.
-    Lifetime is one ``fit()`` call. Tensors are allocated in
-    ``/dev/shm`` so the DataLoader's spawn workers receive storage
-    handles instead of byte copies.
+per-fit() data — device-resident.
+    Backing arrays for a single ``fit()`` call. Live on the training
+    device (CUDA/MPS/CPU) for the lifetime of one fit; the inner
+    training loop indexes pre-stitched ``[random_negatives | real]``
+    device tensors directly, with zero per-batch H2D copies and no
+    DataLoader workers. Built by ``FitBacking.from_device``.
 
-    Mechanism: ``torch.Tensor.share_memory_()``.
-
-Both layers share one resident copy across many readers; both are
-controlled by the same idea ("the orchestrator owns the resource;
-workers consume it"). The mechanism asymmetry is intentional —
-file-mmap fits the run mmap cache's persist-across-runs property,
-torch shm fits the fit DataLoader SHM's mutate-per-epoch property —
-but the API surface is uniform: a ``setup_*`` factory and a small set
-of generic helpers.
+The legacy POSIX-shm "fit DataLoader SHM" backing and the host-resident
+DataLoader path are gone — the device-resident path is the only one.
+``FitBacking`` only carries device-resident state; ``setup_shared_random_negative_pools`` /
+``lookup_pool_dir`` continue to back the per-run mmap pool unchanged.
 """
 
 from __future__ import annotations
@@ -37,7 +33,6 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict
 
-import numpy
 import torch
 
 from .random_negative_peptides import (
@@ -46,171 +41,19 @@ from .random_negative_peptides import (
 )
 
 
-# ---- fit DataLoader SHM: per-fit() torch shared tensors -----------------
-
-def torch_shared_memory_status():
-    """Return whether PyTorch CPU tensor sharing works in this process.
-
-    Some local sandboxes and macOS launch paths expose only PyTorch's
-    ``file_system`` sharing strategy but block ``torch_shm_manager`` from
-    starting. In that state ``share_memory_()`` fails with ``Operation not
-    permitted`` even though the strategy is nominally available. Probe the
-    actual operation so callers can fall back deliberately instead of
-    discovering the failure through skipped tests or mid-fit exceptions.
-    """
-    try:
-        strategy = torch.multiprocessing.get_sharing_strategy()
-    except RuntimeError as exc:
-        return {
-            "available": False,
-            "reason": str(exc),
-            "strategy": None,
-            "strategies": (),
-        }
-    try:
-        strategies = tuple(sorted(torch.multiprocessing.get_all_sharing_strategies()))
-    except RuntimeError:
-        strategies = (strategy,)
-
-    try:
-        torch.empty(1).share_memory_()
-    except RuntimeError as exc:
-        return {
-            "available": False,
-            "reason": str(exc),
-            "strategy": strategy,
-            "strategies": strategies,
-        }
-
-    return {
-        "available": True,
-        "reason": None,
-        "strategy": strategy,
-        "strategies": strategies,
-    }
-
-
-def share_tensor(value):
-    """Return ``value`` as a CPU ``torch.Tensor`` in shared memory.
-
-    Accepts a ``numpy.ndarray`` or ``torch.Tensor``; passes ``None``
-    through. The returned tensor's storage lives in POSIX shm
-    (``/dev/shm``), so when the dataset is pickled to a DataLoader
-    spawn worker the storage handle is forwarded over the socket and
-    the worker materializes a tensor pointing at the same bytes — no
-    per-worker byte copy.
-
-    Always allocates a fresh storage (clones from the source) before
-    sharing so that callers retain their original buffer. The clone is
-    a one-time per-fit() memcpy; far cheaper than the per-epoch /
-    per-worker copy it eliminates.
-    """
-    if value is None:
-        return None
-    if isinstance(value, torch.Tensor):
-        tensor = value.detach().contiguous().clone()
-    else:
-        tensor = torch.from_numpy(numpy.ascontiguousarray(value)).clone()
-    tensor.share_memory_()
-    return tensor
-
-
-def share_like(template):
-    """Allocate a fresh shared-memory tensor with ``template``'s shape/dtype.
-
-    Contents are uninitialized; the caller MUST fill via ``update_shared``
-    before any consumer reads. Used for per-epoch buffers that are
-    refilled in place each iteration (e.g. fit()'s random-negative
-    payload).
-    """
-    if template is None:
-        raise TypeError("share_like: template cannot be None")
-    if isinstance(template, torch.Tensor):
-        shape, dtype = template.shape, template.dtype
-    else:
-        # ``torch.from_numpy`` is a zero-copy view, so ``.dtype`` lookup
-        # is O(1) and doesn't allocate the full tensor data.
-        arr = numpy.ascontiguousarray(template)
-        shape, dtype = arr.shape, torch.from_numpy(arr).dtype
-    tensor = torch.empty(shape, dtype=dtype)
-    tensor.share_memory_()
-    return tensor
-
-
-def update_shared(target, source):
-    """Copy ``source`` into ``target`` in place.
-
-    ``target`` is a shared tensor whose storage workers can already
-    see; mutating its contents propagates immediately. Safe between
-    DataLoader epochs because the parent's iter exhausts before any
-    refill, joining all workers.
-    """
-    if not isinstance(source, torch.Tensor):
-        source = torch.from_numpy(numpy.ascontiguousarray(source))
-    target.copy_(source)
-
-
-def array_nbytes(value):
-    """Return the byte size of ``value`` (numpy array or torch tensor)."""
-    if value is None:
-        return 0
-    if isinstance(value, numpy.ndarray):
-        return int(value.nbytes)
-    if isinstance(value, torch.Tensor):
-        return int(value.element_size() * value.numel())
-    raise TypeError(
-        "array_nbytes: unsupported type %s" % type(value).__name__
-    )
-
-
-def numpy_batch_collate(batch):
-    """Stack a list of numpy sample dicts into per-key numpy arrays.
-
-    Used by fit()'s DataLoader on the legacy numpy backing path.
-    Skipping PyTorch's default-collate ``torch.tensor(numpy_array)``
-    call avoids the CPU tensor allocator growth that motivated
-    openvax/mhcflurry#270.
-    """
-    return {
-        key: numpy.stack([sample[key] for sample in batch], axis=0)
-        for key in batch[0]
-    }
-
-
-def tensor_batch_collate(batch):
-    """Stack a list of tensor sample dicts into per-key tensors.
-
-    Used by fit()'s DataLoader on the SHM backing path. Each sample's
-    per-key value is a tensor view into shared memory; ``torch.stack``
-    materializes a contiguous CPU tensor that the parent then pins
-    and copies to device.
-    """
-    return {
-        key: torch.stack([sample[key] for sample in batch], dim=0)
-        for key in batch[0]
-    }
-
-
 @dataclass
 class FitBacking:
     """Backing arrays for one fit() call.
 
-    Three residency modes:
+    Device-resident only: every static tensor lives on the training
+    device. The fit() inner loop indexes the pre-stitched
+    ``combined_peptide`` (and ``combined_allele``) buffers directly,
+    so there are no per-batch H2D copies and no DataLoader workers.
 
-    * ``residency="host_numpy"``: numpy arrays, batches built by
-      ``_FitBatchDataset.__getitem__`` and copied H2D per batch by the
-      DataLoader / fit() loop.
-    * ``residency="host_shared"``: SHM-shared CPU torch tensors. Same
-      batch path but DataLoader workers see zero-copy views via OS-page-
-      cache sharing.
-    * ``residency="device"``: torch tensors already on the training
-      device (CUDA/MPS/CPU). The fit() loop indexes them directly, no
-      DataLoader, no per-batch H2D. The default for CUDA when the data
-      bundle fits in VRAM (see ``_pick_fit_tensor_residency``).
-
-    ``tensor_backed`` is preserved for back-compat: it is true for both
-    ``host_shared`` and ``device``. ``device_backed`` is the new sharper
-    flag — true only for ``device``.
+    ``random_negative_x_peptide`` and ``x_peptide`` are views into
+    ``combined_peptide`` (top slice = RN, bottom slice = real); the
+    same applies to alleles. Refilling RN bytes propagates to ``x_*``
+    automatically.
 
     This is an internal transport container, not a model feature. The
     model-side peptide encoding decision is controlled separately by
@@ -223,74 +66,11 @@ class FitBacking:
     sample_weights: Any = None
     random_negative_x_peptide: Any = None
     random_negative_x_allele: Any = None
-    tensor_backed: bool = False
-    device_backed: bool = False
-    residency: str = "host_numpy"
-    # Device-residency only: pre-stitched (RN | real) device tensors that
-    # the inner fit() loop indexes into directly. Top slice is RN
-    # (refilled per cycle by RandomNegativesPool); bottom slice is the
-    # static real-data block. ``random_negative_x_peptide`` and
-    # ``x_peptide`` are views into ``combined_peptide`` (and same for
-    # allele) so refills propagate without any copy.
+    # Pre-stitched (RN | real) device tensors that the inner fit() loop
+    # indexes into directly. Top slice is RN (refilled per cycle by
+    # RandomNegativesPool); bottom slice is the static real-data block.
     combined_peptide: Any = None
     combined_allele: Any = None
-
-    @classmethod
-    def from_numpy(
-        cls,
-        *,
-        x_peptide,
-        x_allele,
-        y_encoded,
-        sample_weights,
-        random_negative_x_peptide,
-        random_negative_x_allele,
-    ):
-        return cls(
-            x_peptide=x_peptide,
-            x_allele=x_allele,
-            y_encoded=y_encoded,
-            sample_weights=sample_weights,
-            random_negative_x_peptide=random_negative_x_peptide,
-            random_negative_x_allele=random_negative_x_allele,
-            tensor_backed=False,
-            device_backed=False,
-            residency="host_numpy",
-        )
-
-    @classmethod
-    def share(
-        cls,
-        *,
-        x_peptide,
-        x_allele,
-        y_encoded,
-        sample_weights,
-        random_negative_x_peptide_template,
-        random_negative_x_allele,
-    ):
-        """Materialize a SHM-backed bundle.
-
-        Static arrays (x_peptide, x_allele, y_encoded, sample_weights,
-        random_negative_x_allele) are cloned into shared memory once.
-        ``random_negative_x_peptide`` is allocated as a fixed-shape
-        buffer the size of one cycle's encoding; the caller refills it
-        in place each epoch via ``update_shared``.
-        """
-        return cls(
-            x_peptide=share_tensor(x_peptide),
-            x_allele=share_tensor(x_allele),
-            y_encoded=share_tensor(y_encoded),
-            sample_weights=share_tensor(sample_weights),
-            random_negative_x_peptide=(
-                share_like(random_negative_x_peptide_template)
-                if random_negative_x_peptide_template is not None else None
-            ),
-            random_negative_x_allele=share_tensor(random_negative_x_allele),
-            tensor_backed=True,
-            device_backed=False,
-            residency="host_shared",
-        )
 
     @classmethod
     def from_device(
@@ -318,28 +98,21 @@ class FitBacking:
 
         Why one combined tensor: the fit() inner loop indexes via a
         single ``index_select`` into ``combined_peptide`` per batch,
-        which is what eliminates the per-batch H2D copies that
-        dominate the host-DataLoader path. ``train_indices`` already
+        eliminating per-batch H2D copies. ``train_indices`` already
         addresses the unified ``[0, num_rn + num_real)`` space (see
         ``y_encoded`` / ``sample_weights_with_negatives`` construction
         in ``fit``), so no index translation is needed.
 
-        ``y_encoded`` and ``sample_weights`` are already laid out in
-        the unified ``[RN | real]`` order by the caller and just need
-        to land on device.
-
         Inputs may be numpy arrays or CPU torch tensors; the constructor
         handles the .to(device) move uniformly.
         """
-        import torch as _torch
-
         def _to_device(value, dtype=None):
             if value is None:
                 return None
-            if isinstance(value, _torch.Tensor):
+            if isinstance(value, torch.Tensor):
                 tensor = value
             else:
-                tensor = _torch.as_tensor(value)
+                tensor = torch.as_tensor(value)
             if dtype is not None and tensor.dtype != dtype:
                 tensor = tensor.to(dtype)
             return tensor.to(device, non_blocking=False)
@@ -352,12 +125,12 @@ class FitBacking:
         x_peptide_view = x_peptide_dev
         if random_negative_x_peptide_template is not None:
             template = random_negative_x_peptide_template
-            if isinstance(template, _torch.Tensor):
+            if isinstance(template, torch.Tensor):
                 rn_shape = tuple(template.shape)
                 rn_dtype = template.dtype
             else:
                 rn_shape = tuple(template.shape)
-                rn_dtype = _torch.as_tensor(template).dtype
+                rn_dtype = torch.as_tensor(template).dtype
             num_rn = int(rn_shape[0])
             if x_peptide_dev is None:
                 raise ValueError(
@@ -376,7 +149,7 @@ class FitBacking:
                         tuple(rn_shape[1:]),
                     )
                 )
-            combined_peptide = _torch.empty(
+            combined_peptide = torch.empty(
                 combined_shape, dtype=rn_dtype, device=device
             )
             rn_peptide_view = combined_peptide[:num_rn]
@@ -392,7 +165,7 @@ class FitBacking:
             if rn_allele_dev.dtype != x_allele_dev.dtype:
                 # Match dtypes via the wider one (typically float32 for allele).
                 target_dtype = (
-                    _torch.float32
+                    torch.float32
                     if (rn_allele_dev.dtype.is_floating_point
                         or x_allele_dev.dtype.is_floating_point)
                     else x_allele_dev.dtype
@@ -401,7 +174,7 @@ class FitBacking:
                 x_allele_dev = x_allele_dev.to(target_dtype)
             num_rn_a = int(rn_allele_dev.shape[0])
             num_real_a = int(x_allele_dev.shape[0])
-            combined_allele = _torch.empty(
+            combined_allele = torch.empty(
                 (num_rn_a + num_real_a, *rn_allele_dev.shape[1:]),
                 dtype=rn_allele_dev.dtype,
                 device=device,
@@ -414,13 +187,10 @@ class FitBacking:
         return cls(
             x_peptide=x_peptide_view,
             x_allele=x_allele_view,
-            y_encoded=_to_device(y_encoded, dtype=_torch.float32),
-            sample_weights=_to_device(sample_weights, dtype=_torch.float32),
+            y_encoded=_to_device(y_encoded, dtype=torch.float32),
+            sample_weights=_to_device(sample_weights, dtype=torch.float32),
             random_negative_x_peptide=rn_peptide_view,
             random_negative_x_allele=rn_allele_view,
-            tensor_backed=True,
-            device_backed=True,
-            residency="device",
             combined_peptide=combined_peptide,
             combined_allele=combined_allele,
         )
@@ -598,12 +368,6 @@ def lookup_pool_dir(fold_pool_dirs, *, fold_num, hyperparameters):
 
 __all__ = [
     "FitBacking",
-    "array_nbytes",
     "lookup_pool_dir",
-    "numpy_batch_collate",
     "setup_shared_random_negative_pools",
-    "share_like",
-    "share_tensor",
-    "tensor_batch_collate",
-    "update_shared",
 ]

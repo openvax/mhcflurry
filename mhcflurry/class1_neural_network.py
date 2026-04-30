@@ -245,81 +245,10 @@ def resolve_prediction_batch_size(
 # averages on top. 4× the inference peak is a conservative floor that
 # leaves headroom for cuDNN workspace + Python-side torch overhead.
 _TRAINING_PEAK_MULTIPLIER = 4
-_FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES = int(
-    float(os.environ.get("MHCFLURRY_FIT_DATALOADER_MAX_PICKLE_MB", "128"))
-    * 1024
-    * 1024
-)
-_FIT_DATALOADER_DOWNGRADE_WARNED = False
 
 
-def _is_resource_exhaustion_error(exc):
-    """True for errors that mean SHM/FD/RAM capacity is exhausted."""
-    import errno
-    if isinstance(exc, OSError) and exc.errno in (
-        errno.ENOSPC,
-        errno.ENOMEM,
-        errno.EMFILE,
-        errno.ENFILE,
-    ):
-        return True
-    text = str(exc).lower()
-    return any(fragment in text for fragment in (
-        "no space left on device",
-        "cannot allocate memory",
-        "out of shared memory",
-        "too many open files",
-        "operation not permitted",
-        "torch_shm_manager",
-        "unable to mmap",
-        "could not allocate",
-        "enospc",
-        "enomem",
-        "emfile",
-    ))
-
-
-# fit DataLoader SHM helpers + collation are defined in
-# mhcflurry/shared_memory.py (the canonical home). Re-exporting at
-# module-level so callers that already import them from
-# class1_neural_network keep working.
-from .shared_memory import (  # noqa: E402,F401
-    FitBacking,
-    array_nbytes,
-    numpy_batch_collate,
-    share_like,
-    share_tensor,
-    tensor_batch_collate,
-    torch_shared_memory_status,
-    update_shared,
-)
-
-
-# Auto-switch torch's tensor sharing strategy when /dev/shm is small
-# (Docker default 8 GB, etc.). Done at module-import time so any code
-# path that calls fit() — pan-allele training, allele-specific
-# training, tests, ad-hoc scripts — gets the right strategy without
-# having to remember to call the orchestrator pre-flight. Runs once
-# per process; idempotent. Override with MHCFLURRY_TORCH_SHM_AUTO=0
-# to disable the auto-switch (e.g. to test the legacy file_system path).
-if os.environ.get("MHCFLURRY_TORCH_SHM_AUTO", "1") != "0":
-    try:
-        from .local_parallelism import (  # noqa: E402
-            configure_torch_sharing_strategy_for_capacity,
-        )
-        # Best-effort estimate: use MHCFLURRY_MAX_WORKERS_PER_GPU × NUM_JOBS
-        # if exposed, else fall back to a conservative 8 workers. Worst
-        # case here is "switched when not strictly needed" — harmless.
-        _shm_estimated_workers = int(
-            os.environ.get("MHCFLURRY_NUM_JOBS_HINT")
-            or os.environ.get("NUM_JOBS")
-            or 8
-        )
-        configure_torch_sharing_strategy_for_capacity(
-            num_workers=_shm_estimated_workers
-        )
-    except Exception:  # pragma: no cover — best-effort, never fatal
-        pass
+# Per-fit() data residency helper (device-resident only).
+from .shared_memory import FitBacking  # noqa: E402,F401
 
 
 def check_training_batch_fits(
@@ -394,145 +323,6 @@ KERAS_BATCH_NORM_EPSILON = 1e-3
 # Keras uses moving = moving * 0.99 + batch * 0.01. PyTorch's momentum is the
 # new-batch coefficient, so the equivalent value is 0.01.
 KERAS_BATCH_NORM_MOMENTUM = 0.01
-
-
-class _FitBatchDataset(torch.utils.data.Dataset):
-    """Map-style Dataset backing fit()'s inner batch loop.
-
-    Wraps the already-built per-epoch arrays (x_peptide, x_allele,
-    y_encoded, sample_weights_with_negatives) and the shuffled
-    train_indices. __getitem__ does a single-row fancy-index into each
-    array. With ``shuffle=False`` on the DataLoader, iteration order
-    matches the current (non-DataLoader) code path exactly, which is
-    what the bit-identical integration test requires.
-
-    See issue openvax/mhcflurry#268 for motivation and semantic-
-    preservation rationale.
-    """
-
-    def __init__(
-            self,
-            x_peptide,
-            x_allele,
-            y_encoded,
-            sample_weights_with_negatives,
-            train_indices,
-            *,
-            random_negative_x_peptide=None,
-            random_negative_x_allele=None,
-            num_random_negatives=None):
-        self.x_peptide = x_peptide
-        self.x_allele = x_allele
-        self.random_negative_x_peptide = random_negative_x_peptide
-        self.random_negative_x_allele = random_negative_x_allele
-        self.num_random_negatives = (
-            None if num_random_negatives is None else int(num_random_negatives)
-        )
-        # Single source of truth for tensor-backed mode: any peptide
-        # array being a ``torch.Tensor`` means SHM path. Set once at
-        # construction so all subsequent code uses the flag (rather than
-        # re-running isinstance probes in hot paths).
-        self.tensor_backed = isinstance(
-            x_peptide if x_peptide is not None else random_negative_x_peptide,
-            torch.Tensor,
-        )
-        # Pre-cast y to float32 once at construction rather than per
-        # ``__getitem__`` call (millions of one-element allocs per
-        # epoch on large pan-allele training sets otherwise).
-        if self.tensor_backed:
-            if y_encoded.dtype != torch.float32:
-                y_encoded = y_encoded.to(torch.float32)
-        elif y_encoded.dtype != numpy.float32:
-            y_encoded = y_encoded.astype(numpy.float32)
-        self.y_encoded = y_encoded
-        self.sample_weights = sample_weights_with_negatives
-        self.train_indices = train_indices
-
-        if self.x_peptide is None and self.random_negative_x_peptide is None:
-            raise ValueError("FitBatchDataset requires peptide features")
-
-    def _lookup_feature_row(self, idx, *, base_array, negative_array):
-        if self.num_random_negatives is None:
-            return base_array[idx]
-        if idx < self.num_random_negatives:
-            return negative_array[idx]
-        return base_array[idx - self.num_random_negatives]
-
-    def _gather_feature_rows(self, indices, *, base_array, negative_array):
-        if base_array is None and negative_array is None:
-            return None
-        # ``self.tensor_backed`` was set once at construction. Both
-        # branches share the same logical structure; only the array-
-        # library calls differ. Downstream consumers
-        # (``_move_fit_batch_to_device`` / ``_batch_value_to_device``)
-        # accept either numpy or tensor results.
-        if self.tensor_backed:
-            indices = torch.as_tensor(
-                numpy.asarray(indices, dtype=numpy.int64)
-            )
-            empty = torch.empty
-        else:
-            indices = numpy.asarray(indices, dtype=numpy.int64)
-            empty = numpy.empty
-        if self.num_random_negatives is None:
-            return base_array[indices]
-        result = empty(
-            (len(indices),) + tuple(base_array.shape[1:]),
-            dtype=base_array.dtype,
-        )
-        negative_mask = indices < self.num_random_negatives
-        if negative_mask.any():
-            result[negative_mask] = negative_array[indices[negative_mask]]
-        if (~negative_mask).any():
-            result[~negative_mask] = base_array[
-                indices[~negative_mask] - self.num_random_negatives
-            ]
-        return result
-
-    def __len__(self):
-        return len(self.train_indices)
-
-    def __getitem__(self, i):
-        idx = self.train_indices[i]
-        sample = {
-            "peptide": self._lookup_feature_row(
-                idx,
-                base_array=self.x_peptide,
-                negative_array=self.random_negative_x_peptide,
-            ),
-            "y": self.y_encoded[idx],
-        }
-        if self.x_allele is not None or self.random_negative_x_allele is not None:
-            sample["allele"] = self._lookup_feature_row(
-                idx,
-                base_array=self.x_allele,
-                negative_array=self.random_negative_x_allele,
-            )
-        if self.sample_weights is not None:
-            sample["weight"] = self.sample_weights[idx]
-        return sample
-
-    def batch_for_indices(self, indices):
-        """Return a batch dict for the given global row indices."""
-        indices = numpy.asarray(indices, dtype=numpy.int64)
-        batch = {
-            "peptide": self._gather_feature_rows(
-                indices,
-                base_array=self.x_peptide,
-                negative_array=self.random_negative_x_peptide,
-            ),
-            "y": self.y_encoded[indices],
-        }
-        allele_rows = self._gather_feature_rows(
-            indices,
-            base_array=self.x_allele,
-            negative_array=self.random_negative_x_allele,
-        )
-        if allele_rows is not None:
-            batch["allele"] = allele_rows
-        if self.sample_weights is not None:
-            batch["weight"] = self.sample_weights[indices]
-        return batch
 
 
 def _identity_collate(sample):
@@ -716,22 +506,6 @@ _DEVICE_PEPTIDE_ENCODING_FALSE_VALUES = {
 }
 
 
-_FIT_DATALOADER_BACKING_MODES = {
-    "auto",
-    "numpy",
-    "shared_tensor",
-}
-_FIT_DATALOADER_BACKING_ALIASES = {
-    "shm": "shared_tensor",
-    "shared": "shared_tensor",
-    "shared-tensor": "shared_tensor",
-    "torch": "shared_tensor",
-    "tensor": "shared_tensor",
-}
-_FIT_DATALOADER_SHM_TRUE_VALUES = {"1", "true", "yes", "on"}
-_FIT_DATALOADER_SHM_FALSE_VALUES = {"0", "false", "no", "off"}
-
-
 def _peptide_torch_encoding_name(hyperparameters):
     """Return the fixed amino-acid encoding to materialize in torch.
 
@@ -778,79 +552,6 @@ def _peptide_torch_encoding_name(hyperparameters):
 def _peptide_uses_torch_encoding(hyperparameters):
     """Return True when peptide vectors are produced by torch embedding."""
     return _peptide_torch_encoding_name(hyperparameters) is not None
-
-
-def _normalize_fit_dataloader_backing(value):
-    """Return canonical fit() DataLoader backing mode.
-
-    ``fit_dataloader_backing`` controls how the parent fit() process exposes
-    the per-fit backing arrays to the inner DataLoader. It is deliberately
-    separate from ``dataloader_num_workers``:
-
-    * ``dataloader_num_workers`` is process parallelism.
-    * ``fit_dataloader_backing`` is data transport/storage.
-
-    The public, documented values are ``"auto"``, ``"numpy"``, and
-    ``"shared_tensor"``. Short aliases are accepted for developer diagnostics,
-    but configs are normalized before use.
-    """
-    if value is None:
-        value = "auto"
-    if not isinstance(value, str):
-        raise ValueError(
-            "fit_dataloader_backing must be one of %s; got %r"
-            % (sorted(_FIT_DATALOADER_BACKING_MODES), value)
-        )
-    normalized = value.strip().lower()
-    normalized = _FIT_DATALOADER_BACKING_ALIASES.get(normalized, normalized)
-    if normalized not in _FIT_DATALOADER_BACKING_MODES:
-        raise ValueError(
-            "Unsupported fit_dataloader_backing %r. Expected one of %s."
-            % (value, sorted(_FIT_DATALOADER_BACKING_MODES))
-        )
-    return normalized
-
-
-def _resolve_fit_dataloader_backing(value, dataloader_num_workers, environ=None):
-    """Resolve ``fit_dataloader_backing`` to ``numpy`` or ``shared_tensor``.
-
-    ``"auto"`` preserves the historical policy: use shared-memory tensors when
-    DataLoader worker processes are requested, otherwise use numpy arrays in the
-    training process. The legacy diagnostic env var
-    ``MHCFLURRY_FIT_DATALOADER_SHM`` remains supported, but only influences
-    ``"auto"``; an explicit hyperparameter wins.
-
-    Returns
-    -------
-    (requested, resolved, reason) : tuple[str, str, str]
-        ``requested`` is the canonical hyperparameter value. ``resolved`` is the
-        backing to attempt. ``reason`` is recorded in fit_info for debugging.
-    """
-    requested = _normalize_fit_dataloader_backing(value)
-    if requested != "auto":
-        return requested, requested, "explicit hyperparameter"
-
-    if environ is None:
-        environ = os.environ
-    env_value = environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
-    if env_value is not None:
-        normalized_env = env_value.strip().lower()
-        if normalized_env in _FIT_DATALOADER_SHM_TRUE_VALUES:
-            return requested, "shared_tensor", "MHCFLURRY_FIT_DATALOADER_SHM=1"
-        if normalized_env in _FIT_DATALOADER_SHM_FALSE_VALUES:
-            return requested, "numpy", "MHCFLURRY_FIT_DATALOADER_SHM=0"
-        raise ValueError(
-            "MHCFLURRY_FIT_DATALOADER_SHM must be one of %s or %s; got %r"
-            % (
-                sorted(_FIT_DATALOADER_SHM_TRUE_VALUES),
-                sorted(_FIT_DATALOADER_SHM_FALSE_VALUES),
-                env_value,
-            )
-        )
-
-    if int(dataloader_num_workers or 0) > 0:
-        return requested, "shared_tensor", "auto: dataloader_num_workers > 0"
-    return requested, "numpy", "auto: dataloader_num_workers == 0"
 
 
 def _peptide_torch_encoding_table(encoding_name):
@@ -1195,148 +896,6 @@ def _effective_num_workers(num_workers):
         )
         return 0
     return num_workers
-
-
-def _make_fit_dataloader(
-    dataset,
-    batch_size,
-    num_workers,
-    drop_last=False,
-):
-    """Construct a DataLoader for fit()'s inner batch loop.
-
-    ``num_workers=0`` path runs everything in the main process.
-    ``num_workers>0`` spawns worker processes (via 'spawn' to avoid
-    CUDA-context-fork hazards) that prefetch minibatches, overlapping CPU
-    slicing with GPU compute. When the dataset is tensor-backed this uses
-    shared-memory tensors plus pinned batches; otherwise it stays on the
-    numpy-backed fallback path.
-
-    ``drop_last=True`` makes every yielded batch exactly ``batch_size``
-    rows. This is what torch.compile (Phase 4c scope) and bf16 autocast
-    want: one shape means one compiled kernel. The cost is that the
-    final ``n_train % batch_size`` rows are not seen in a given epoch,
-    but because fit() reshuffles ``train_indices`` each epoch, every row
-    eventually cycles through. For default minibatch_size=512 and a
-    1.85M-row training set that's ~0.028% rows dropped per epoch —
-    negligible relative to stochastic-gradient noise. See Phase 4b of
-    openvax/mhcflurry#268.
-
-    Caller is responsible for ensuring ``len(dataset) >= batch_size``
-    when setting ``drop_last=True``; otherwise the DataLoader yields
-    zero batches.
-
-    If called from a daemon process (i.e. inside a
-    ``multiprocessing.Pool`` worker without the NonDaemonPool override),
-    ``num_workers`` is forced to 0 because daemon processes cannot spawn
-    their own children. Pinning is still derived from the dataset backing:
-    tensor-backed batches may request pinning, while numpy-backed batches do
-    not. See ``_effective_num_workers``.
-
-    Note: PyTorch's ``persistent_workers`` flag isn't exposed here
-    because ``fit()`` rebuilds the DataLoader per epoch (the x_peptide
-    arrays change with each epoch's random negatives) — persistent
-    workers have no DataLoader instance to persist across. If a future
-    refactor hoists DataLoader construction out of the epoch loop, add
-    the flag back then.
-    """
-    effective_workers = _effective_num_workers(num_workers)
-    # Tensor-backed datasets can pin (the per-batch payload is a small
-    # stack of tensor views; pinning is cheap and unlocks non-blocking
-    # H2D). Numpy-backed datasets cannot — pinning their per-batch
-    # payload would re-introduce the CPU-tensor allocator growth that
-    # motivated openvax/mhcflurry#270. Both paths pick the collate
-    # that matches their backing type for the same reason.
-    tensor_backed = bool(getattr(dataset, "tensor_backed", False))
-    # NOTE: ``persistent_workers`` is intentionally NOT enabled here.
-    # fit() rebuilds the DataLoader per epoch and refills the SHM
-    # random-negative buffer between iterations; persistent workers
-    # would hold a stale view of the dataset (their pickle is taken
-    # at first iter and not refreshed) and would race with the
-    # parent's in-place ``update_shared`` refill. If a future
-    # refactor hoists DataLoader construction outside the epoch
-    # loop, the refill semantics need to change too — re-evaluate
-    # before flipping this on.
-    kwargs = dict(
-        dataset=dataset,
-        batch_size=batch_size,
-        shuffle=False,  # Dataset already reflects shuffled train_indices.
-        num_workers=effective_workers,
-        pin_memory=tensor_backed,
-        drop_last=drop_last,
-        collate_fn=tensor_batch_collate if tensor_backed else numpy_batch_collate,
-    )
-    if effective_workers > 0:
-        # CUDA contexts aren't fork-safe. Using 'spawn' avoids copying the
-        # training process's CUDA state into workers, at a ~200-500 ms
-        # per-worker startup cost. Safe default.
-        kwargs["multiprocessing_context"] = "spawn"
-        # prefetch_factor is only valid when num_workers > 0.
-        kwargs["prefetch_factor"] = 2
-    return torch.utils.data.DataLoader(**kwargs)
-
-
-def _dataset_backing_nbytes(dataset):
-    """Bytes that spawn-based DataLoader workers would pickle into each child.
-
-    Counts each unique storage once. Used by
-    ``_effective_fit_dataloader_num_workers`` only on the numpy path —
-    tensor-backed datasets bypass this guard because their pickle
-    payload is just storage handles, not bytes.
-    """
-    total = 0
-    seen = set()
-    for value in (
-        dataset.x_peptide,
-        dataset.x_allele,
-        dataset.random_negative_x_peptide,
-        dataset.random_negative_x_allele,
-        dataset.y_encoded,
-        dataset.sample_weights,
-        dataset.train_indices,
-    ):
-        if value is None:
-            continue
-        ident = id(value)
-        if ident in seen:
-            continue
-        seen.add(ident)
-        total += array_nbytes(value)
-    return total
-
-
-def _effective_fit_dataloader_num_workers(num_workers, dataset):
-    """Avoid spawn-pickling huge fit() arrays into DataLoader workers."""
-    global _FIT_DATALOADER_DOWNGRADE_WARNED
-    if num_workers <= 0:
-        return int(num_workers), None
-    if os.environ.get("MHCFLURRY_FORCE_FIT_DATALOADER_WORKERS", "0") == "1":
-        return int(num_workers), None
-    # Tensor-backed datasets pickle as storage handles, not bytes — the
-    # size guard does not apply.
-    if getattr(dataset, "tensor_backed", False):
-        return int(num_workers), None
-
-    backing_bytes = _dataset_backing_nbytes(dataset)
-    if backing_bytes <= _FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES:
-        return int(num_workers), None
-
-    reason = (
-        "fit() DataLoader worker prefetch disabled: requested "
-        "dataloader_num_workers=%d, but the dataset backing arrays are %.1f MB "
-        "and spawn workers would pickle a copy into each worker every epoch "
-        "(limit %.1f MB). Set MHCFLURRY_FORCE_FIT_DATALOADER_WORKERS=1 to "
-        "force the old behavior."
-        % (
-            num_workers,
-            backing_bytes / (1024 * 1024),
-            _FIT_DATALOADER_SPAWN_COPY_LIMIT_BYTES / (1024 * 1024),
-        )
-    )
-    if not _FIT_DATALOADER_DOWNGRADE_WARNED:
-        logging.warning(reason)
-        _FIT_DATALOADER_DOWNGRADE_WARNED = True
-    return 0, reason
 
 
 def _make_fit_generator_dataloader(
@@ -2597,32 +2156,10 @@ class Class1NeuralNetwork(object):
         # recommended production value; smaller values preserve more
         # sample diversity but recover less of the encode cost.
         random_negative_pool_epochs=1,
-        # Number of DataLoader worker processes for the fit() inner batch
-        # loop. 0 (default) runs everything in the training process —
-        # bit-identical to pre-issue-#268 behavior. >0 spawns worker procs
-        # that prefetch minibatches into pinned host memory, overlapping
-        # CPU data-prep with GPU compute. Per-worker memory + CPU budget:
-        # each adds one Python process holding ~100-500 MB RSS. Don't
-        # exceed (num_cpu_cores - num_training_workers).
+        # Reserved: fit_generator (pretraining) still uses a DataLoader,
+        # but fit() itself is device-resident only and ignores this knob.
+        # Kept in the schema so old configs that set it don't error.
         dataloader_num_workers=0,
-        # Transport/storage backing for fit()'s inner DataLoader dataset.
-        # "auto" preserves the historical policy: numpy arrays when
-        # dataloader_num_workers=0; shared torch tensors when workers are
-        # requested. "numpy" forces single-process/pickle-friendly backing.
-        # "shared_tensor" forces fit DataLoader SHM backing even if worker
-        # count is zero, which is useful only for diagnostics. This does NOT control
-        # peptide amino-acid vector lookup; see
-        # peptide_amino_acid_encoding_torch for that model-side behavior.
-        fit_dataloader_backing="auto",
-        # Where the fit() data bundle lives. ``auto`` (default) resolves to
-        # ``device`` on CUDA when the per-fit footprint fits under
-        # ``MHCFLURRY_AUTO_FIT_RESIDENCY_VRAM_BUDGET_FRACTION`` × free
-        # VRAM, and to ``host`` otherwise. ``device`` forces device-
-        # resident tensors (zero per-batch H2D, no DataLoader); ``host``
-        # forces the legacy DataLoader path (numpy or shared_tensor as
-        # selected by ``fit_dataloader_backing``). Independent of
-        # ``fit_dataloader_backing``, which only matters on host paths.
-        fit_tensor_residency="auto",
         # Batch size used for the validation forward pass. ``None`` uses a
         # device-aware heuristic: ``max(4 * minibatch_size, 4096)`` on CUDA
         # and ``4 * minibatch_size`` elsewhere. Separate from minibatch_size
@@ -2696,6 +2233,11 @@ class Class1NeuralNetwork(object):
         "peptide_amino_acid_encoding_gpu": "peptide_amino_acid_encoding_torch",
         "left_edge": None,
         "right_edge": None,
+        # 2.3.0 cleanup: fit() is device-resident only and the per-fit
+        # DataLoader backing layer is gone. Old configs may still set
+        # these knobs; silently drop them.
+        "fit_dataloader_backing": None,
+        "fit_tensor_residency": None,
     }
 
     @classmethod
@@ -2729,11 +2271,6 @@ class Class1NeuralNetwork(object):
     def __init__(self, **hyperparameters):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
             self.apply_hyperparameter_renames(hyperparameters)
-        )
-        self.hyperparameters["fit_dataloader_backing"] = (
-            _normalize_fit_dataloader_backing(
-                self.hyperparameters.get("fit_dataloader_backing", "auto")
-            )
         )
 
         self._network = None
@@ -4322,261 +3859,62 @@ class Class1NeuralNetwork(object):
                 _val_weights_device,
             )
 
-        # --- Fit() data residency (device-resident or host-resident) ---
-        # ``fit_tensor_residency`` decides whether the per-fit data
-        # bundle lives on the training device (no DataLoader, zero
-        # per-batch H2D) or on the host (DataLoader path,
-        # numpy/shared_tensor backing decided by
-        # ``fit_dataloader_backing``). On CUDA the auto-resolver picks
-        # device when the bundle fits under
-        # ``MHCFLURRY_AUTO_FIT_RESIDENCY_VRAM_BUDGET_FRACTION`` × free
-        # VRAM (default 0.40); CPU/MPS keep host backing.
-        from .local_parallelism import auto_fit_tensor_residency
-        fit_tensor_residency_requested = self.hyperparameters.get(
-            "fit_tensor_residency", "auto"
-        )
-        # Explicit host-DataLoader signals imply host residency. The
-        # SHM/numpy diagnostic paths and ``dataloader_num_workers>0``
-        # only make sense with the DataLoader inner loop; force-routing
-        # them through the device-fast-path would silently ignore the
-        # user's intent (and break tests that assert SHM-on after
-        # setting the env override or asking for prefetcher workers).
-        fit_dataloader_backing_hint = _normalize_fit_dataloader_backing(
-            self.hyperparameters.get("fit_dataloader_backing", "auto")
-        )
-        env_shm_override = os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
-        # Only EXPLICIT host signals override device residency. The
-        # orchestrator's auto-tuner sets dataloader_num_workers to a
-        # nonzero value as a hardware-shaped suggestion for the host
-        # path; that suggestion must NOT win against device residency
-        # when the residency auto-resolver picks ``device``. Treat
-        # ``dataloader_num_workers > 0`` as a host trigger only when
-        # the user spelled it explicitly via hyperparameters
-        # (i.e. anything other than the orchestrator-supplied
-        # ``auto`` resolution that lives in ``self.hyperparameters``).
-        # In practice, since auto-resolution always lands a concrete
-        # int in ``self.hyperparameters``, we instead require an
-        # explicit ``fit_dataloader_backing`` hint to flip residency:
-        # if the user wanted SHM/numpy DataLoader, they say so on the
-        # backing knob.
-        explicit_host_backing = (
-            fit_dataloader_backing_hint in ("shared_tensor", "numpy")
-            or env_shm_override is not None
-        )
-        if (
-            fit_tensor_residency_requested == "auto"
-            and explicit_host_backing
-        ):
-            fit_tensor_residency_requested = "host"
-        # Real training rows for the current fit (after fold split has
-        # already been applied to ``peptide_encoding`` upstream): the
-        # planning estimator needs *real* rows, not the
-        # (real + RN)-shaped y_encoded.
-        _peptide_max_length = int(
-            self.hyperparameters["peptide_encoding"].get("max_length", 15)
-        )
-        _free_vram_gb = None
-        if device.type == "cuda":
-            try:
-                free_bytes, _ = torch.cuda.mem_get_info(device)
-                _free_vram_gb = float(free_bytes) / (1024 ** 3)
-            except Exception:
-                _free_vram_gb = None
-        fit_tensor_residency = auto_fit_tensor_residency(
-            requested=fit_tensor_residency_requested,
-            device_type=device.type,
-            num_train_rows=int(
-                len(x_dict_without_random_negatives["peptide"])
-            ),
-            peptide_max_length=_peptide_max_length,
-            num_random_negatives=int(num_random_negatives),
-            pool_epochs=int(random_negative_pool_epochs),
-            num_workers_per_gpu=1,  # one fit() per worker is the unit
-            free_vram_gb=_free_vram_gb,
-        )
-        fit_info["fit_tensor_residency_requested"] = fit_tensor_residency_requested
-        fit_info["fit_tensor_residency"] = fit_tensor_residency
-        # Surface residency to train.log so misrouting is visible at a
-        # glance. With device residency engaged, the next log lines
-        # we'd previously see (SHM preflight, DataLoader worker
-        # count, etc.) are no longer the relevant signal — every
-        # static tensor lives on the training device and the inner
-        # loop indexes a pre-stitched [RN | real] buffer with zero
-        # per-batch H2D copies.
-        logging.info(
-            "fit tensor residency: %s (requested=%s, device=%s, "
-            "free_vram_gb=%s)",
-            fit_tensor_residency,
-            fit_tensor_residency_requested,
-            device.type,
-            "n/a" if _free_vram_gb is None else "%.1f" % _free_vram_gb,
-        )
-
-        dataloader_num_workers_requested = int(
-            self.hyperparameters.get("dataloader_num_workers", 0) or 0
-        )
-
-        if fit_tensor_residency == "device":
-            # Device-resident path: re-build the random-negatives pool
-            # so it samples + encodes int8 indices straight onto
-            # ``device`` (skipping the Python string round-trip the
-            # host path goes through). The pool we already built up at
-            # function entry stays alive only if it's the shared-mmap
-            # variant — that path holds a single resident copy per
-            # box and we don't want to lose its sharing — but the
-            # in-process pool gets replaced.
+        # --- Fit() data residency: always device-resident ---
+        # The per-fit data bundle lives on the training device for the
+        # entire fit() call. The inner training loop indexes a pre-
+        # stitched [RN | real] buffer via index_select with zero
+        # per-batch H2D copies and no DataLoader workers. CPU training
+        # uses the same path with device='cpu' tensors.
+        if num_random_negatives > 0 and random_negative_shared_pool_dir is None:
+            # Re-build the in-process random-negatives pool so it
+            # samples + encodes int8 indices straight onto ``device``
+            # (skipping the host string round-trip). The shared-mmap
+            # pool is left alone — it holds a single resident copy per
+            # box and we keep that sharing.
             #
-            # On device the orchestrator's ``random_negative_pool_epochs``
-            # auto-tune (which exists to amortize the ~5–80 sec/epoch
-            # host-side string round-trip) is no longer load-bearing
-            # for performance — torch.multinomial-based generation runs
-            # in ~50 ms regardless of pool size. The value still
-            # controls sample diversity within a cycle, so we honor
-            # whatever was passed but log it loudly when it would
-            # change RN behavior.
-            if random_negative_pool_epochs > 1:
-                logging.info(
-                    "fit_tensor_residency=device: random_negative_"
-                    "pool_epochs=%d retained (device encode is "
-                    "~50ms — amortization is no longer needed; the "
-                    "value now only affects within-cycle sample "
-                    "diversity)",
-                    random_negative_pool_epochs,
-                )
-            if random_negative_shared_pool_dir is None and num_random_negatives > 0:
-                random_negatives_pool = RandomNegativesPool(
-                    planner=random_negatives_planner,
-                    peptide_encoder=self.peptides_to_network_input,
-                    pool_epochs=random_negative_pool_epochs,
-                    seed=pool_seed,
-                    device=device,
-                    peptide_encoding=self.hyperparameters["peptide_encoding"],
-                )
-            random_neg_template = None
-            if num_random_negatives > 0:
-                _, random_neg_template = random_negatives_pool.get_epoch_inputs(0)
-            backing = FitBacking.from_device(
-                x_peptide=x_dict_without_random_negatives["peptide"],
-                x_allele=x_dict_without_random_negatives.get("allele"),
-                y_encoded=y_encoded,
-                sample_weights=sample_weights_with_negatives,
-                random_negative_x_peptide_template=random_neg_template,
-                random_negative_x_allele=random_negative_x_allele_base,
+            # On device, ``random_negative_pool_epochs`` is no longer
+            # load-bearing for performance: torch.multinomial-based
+            # generation runs in ~50 ms regardless of pool size. The
+            # value still controls sample diversity within a cycle, so
+            # we honor whatever was passed.
+            random_negatives_pool = RandomNegativesPool(
+                planner=random_negatives_planner,
+                peptide_encoder=self.peptides_to_network_input,
+                pool_epochs=random_negative_pool_epochs,
+                seed=pool_seed,
                 device=device,
+                peptide_encoding=self.hyperparameters["peptide_encoding"],
             )
-            fit_dataloader_backing = "device"
-            fit_dataloader_backing_requested = self.hyperparameters.get(
-                "fit_dataloader_backing", "auto"
-            )
-            fit_dataloader_backing_reason = (
-                "fit_tensor_residency=device → DataLoader bypassed"
-            )
-            shm_enabled = False
-        else:
-            # --- Host-resident path: keep the legacy DataLoader flow ---
-            #
-            # * ``dataloader_num_workers`` controls process parallelism.
-            # * ``fit_dataloader_backing`` controls how the parent exposes
-            #   per-fit arrays to those processes.
-            #
-            # In ``auto`` mode (the default), shared tensor backing is used
-            # when worker processes are requested and numpy backing is used
-            # for single-process batching. Explicit ``numpy`` /
-            # ``shared_tensor`` modes are available for diagnostics and are
-            # serialized with each component model. This transport choice
-            # does NOT control peptide amino-acid encoding; the model-side
-            # torch embedding path is ``peptide_amino_acid_encoding_torch``.
-            (
-                fit_dataloader_backing_requested,
-                fit_dataloader_backing,
-                fit_dataloader_backing_reason,
-            ) = _resolve_fit_dataloader_backing(
-                self.hyperparameters.get("fit_dataloader_backing", "auto"),
-                dataloader_num_workers_requested,
-            )
-            shm_enabled = fit_dataloader_backing == "shared_tensor"
-            if shm_enabled:
-                shm_status = torch_shared_memory_status()
-                if not shm_status["available"]:
-                    logging.warning(
-                        "fit(): fit DataLoader SHM unavailable with torch sharing "
-                        "strategy %r (%s); falling back to numpy DataLoader "
-                        "path for THIS fit() call.",
-                        shm_status["strategy"],
-                        shm_status["reason"],
-                    )
-                    fit_info["fit_dataloader_shm_fallback_reason"] = (
-                        "torch shared memory unavailable: %s" % shm_status["reason"]
-                    )
-                    shm_enabled = False
-                    fit_dataloader_backing = "numpy"
-            random_neg_template = None
-            if shm_enabled and num_random_negatives > 0:
-                # Prime cycle 0 only after SHM has been probed. The buffer is
-                # needed to size the shared tensor; reuse it for epoch 0 below
-                # so shared-mmap permutation paths don't materialize the same
-                # random-negative slice twice.
-                _, random_neg_template = random_negatives_pool.get_epoch_inputs(0)
-            if shm_enabled:
-                try:
-                    backing = FitBacking.share(
-                        x_peptide=x_dict_without_random_negatives["peptide"],
-                        x_allele=x_dict_without_random_negatives.get("allele"),
-                        y_encoded=y_encoded,
-                        sample_weights=sample_weights_with_negatives,
-                        random_negative_x_peptide_template=random_neg_template,
-                        random_negative_x_allele=random_negative_x_allele_base,
-                    )
-                except Exception as exc:
-                    # /dev/shm / FD / allocator exhaustion mid-fit. The
-                    # orchestrator should catch the common case in pre-flight, but
-                    # resource errors can still surface from torch as RuntimeError
-                    # rather than OSError depending on the active sharing strategy.
-                    if not _is_resource_exhaustion_error(exc):
-                        raise
-                    logging.warning(
-                        "fit(): fit DataLoader SHM allocation failed with %r — "
-                        "falling back to numpy DataLoader path for THIS fit() "
-                        "call. Resize /dev/shm or reduce concurrency to "
-                        "avoid the fallback. See docs/orchestrator.md.",
-                        exc,
-                    )
-                    fit_info["fit_dataloader_shm_fallback_reason"] = str(exc)
-                    shm_enabled = False
-                    fit_dataloader_backing = "numpy"
-                    random_neg_template = None
-            if not shm_enabled:
-                backing = FitBacking.from_numpy(
-                    x_peptide=x_dict_without_random_negatives["peptide"],
-                    x_allele=x_dict_without_random_negatives.get("allele"),
-                    y_encoded=y_encoded,
-                    sample_weights=sample_weights_with_negatives,
-                    random_negative_x_peptide=None,  # filled per epoch below
-                    random_negative_x_allele=random_negative_x_allele_base,
-                )
-        fit_info["fit_dataloader_backing_requested"] = (
-            fit_dataloader_backing_requested
+        random_neg_template = None
+        if num_random_negatives > 0:
+            _, random_neg_template = random_negatives_pool.get_epoch_inputs(0)
+        backing = FitBacking.from_device(
+            x_peptide=x_dict_without_random_negatives["peptide"],
+            x_allele=x_dict_without_random_negatives.get("allele"),
+            y_encoded=y_encoded,
+            sample_weights=sample_weights_with_negatives,
+            random_negative_x_peptide_template=random_neg_template,
+            random_negative_x_allele=random_negative_x_allele_base,
+            device=device,
         )
-        fit_info["fit_dataloader_backing_reason"] = fit_dataloader_backing_reason
-        fit_info["fit_dataloader_shm_enabled"] = shm_enabled
-        fit_info["fit_dataloader_backing"] = fit_dataloader_backing
+        fit_info["fit_tensor_residency"] = "device"
+        logging.info("fit tensor residency: device (device=%s)", device.type)
 
         for epoch in range(self.hyperparameters["max_epochs"]):
             epoch_wall_start = time.perf_counter()
-            # Coarse buckets retained for back-compat (sum of fine buckets).
+            # Coarse + fine timing buckets — kept for back-compat with
+            # downstream telemetry consumers; the host-path-specific
+            # buckets (dataset construction, dataloader setup) stay
+            # at zero in the device-only world.
             input_build_time = 0.0
-            # Fine-grained input-build subbuckets (split out 2026-04-28
-            # to identify which call inside the per-epoch input-build
-            # phase actually costs the time. Pre-split, the lump was
-            # ~9 s/epoch with no breakdown).
             rn_pool_get_time = 0.0
-            rn_shm_update_time = 0.0
+            rn_refill_time = 0.0
             dataset_construction_time = 0.0
             initialization_time = 0.0
             shuffle_dataset_time = 0.0
             dataloader_setup_time = 0.0
-            train_loop_wall_time = 0.0  # wall time of `for batch in loader:` loop
-            train_loop_time = 0.0       # sum of per-batch GPU compute (inside loop)
+            train_loop_wall_time = 0.0
+            train_loop_time = 0.0
             epoch_h2d_time = 0.0
             epoch_loss_sync_time = 0.0
             validation_materialize_time = 0.0
@@ -4584,11 +3922,10 @@ class Class1NeuralNetwork(object):
             callback_time = 0.0
             gc_time = 0.0
 
-            # Phase 1 (#268): slice the per-epoch negatives out of a
-            # pre-encoded pool. On pool_epochs=1 this regenerates every
-            # epoch (legacy behavior). On pool_epochs=N the heavy
-            # encoding pass runs once per N epochs; the in-epoch call
-            # here is an O(1) array view.
+            # Per-epoch random-negatives slice. With ``pool_epochs=1``
+            # this regenerates every epoch (legacy behavior); with
+            # ``pool_epochs=N`` the encoding pass runs once per N
+            # epochs and this is an O(1) view.
             rn_get_start = time.perf_counter()
             if epoch == 0 and random_neg_template is not None:
                 random_negative_peptides_encoding = random_neg_template
@@ -4599,59 +3936,31 @@ class Class1NeuralNetwork(object):
                 )
             rn_pool_get_time += time.perf_counter() - rn_get_start
 
-            shm_update_start = time.perf_counter()
-            if backing.tensor_backed:
-                # Refill the shared / device random-neg buffer in
-                # place. On the device path this view-writes directly
-                # into ``combined_peptide``; on the SHM path PyTorch's
-                # DataLoader has already joined workers when the
-                # previous epoch's iter exhausted so the overwrite is
-                # race-free.
-                if backing.random_negative_x_peptide is not None:
-                    update_shared(
-                        backing.random_negative_x_peptide,
-                        random_negative_peptides_encoding,
+            # Refill the device random-neg slice in place. The
+            # ``random_negative_x_peptide`` field is a view into
+            # ``combined_peptide`` so the overwrite propagates to
+            # ``x_peptide`` automatically.
+            rn_refill_start = time.perf_counter()
+            if backing.random_negative_x_peptide is not None:
+                rn_source = random_negative_peptides_encoding
+                if not isinstance(rn_source, torch.Tensor):
+                    rn_source = torch.as_tensor(rn_source)
+                backing.random_negative_x_peptide.copy_(
+                    rn_source.to(
+                        backing.random_negative_x_peptide.device,
+                        dtype=backing.random_negative_x_peptide.dtype,
                     )
-            else:
-                # Numpy path: the per-epoch encoding lives directly on
-                # the backing (no shared buffer to refill).
-                backing.random_negative_x_peptide = (
-                    random_negative_peptides_encoding
                 )
-            rn_shm_update_time += time.perf_counter() - shm_update_start
-
-            dataset_start = time.perf_counter()
-            # Host paths build the _FitBatchDataset wrapper; the device
-            # path indexes the combined buffer directly so the wrapper
-            # (and its CPU index round-trip) is sidestepped entirely.
-            if backing.device_backed:
-                dataset = None
-            else:
-                dataset = _FitBatchDataset(
-                    x_peptide=backing.x_peptide,
-                    x_allele=backing.x_allele,
-                    y_encoded=backing.y_encoded,
-                    sample_weights_with_negatives=backing.sample_weights,
-                    train_indices=None,
-                    random_negative_x_peptide=backing.random_negative_x_peptide,
-                    random_negative_x_allele=backing.random_negative_x_allele,
-                    num_random_negatives=num_random_negatives,
-                )
-            dataset_construction_time += time.perf_counter() - dataset_start
-            input_build_time = (
-                rn_pool_get_time + rn_shm_update_time + dataset_construction_time
-            )
+            rn_refill_time += time.perf_counter() - rn_refill_start
+            input_build_time = rn_pool_get_time + rn_refill_time
 
             if needs_initialization:
                 init_start = _timing_start(device, timing_enabled)
-                if backing.device_backed:
-                    init_batch = _device_batch_for_indices(
-                        backing=backing,
-                        indices=indices,
-                        device=device,
-                    )
-                else:
-                    init_batch = dataset.batch_for_indices(indices)
+                init_batch = _device_batch_for_indices(
+                    backing=backing,
+                    indices=indices,
+                    device=device,
+                )
                 self.data_dependent_weights_initialization(
                     network,
                     init_batch,
@@ -4673,25 +3982,14 @@ class Class1NeuralNetwork(object):
             # Same rationale as fit_generator's loss-compile call.
             loss_obj = _maybe_compile_loss(loss_obj, device)
 
-            # Train/val split (keep validation fixed). Shuffle on device
-            # when the training loop is device-resident: the train indices
-            # are simply [0, n_train) (since ``train_indices_base = indices[:n_train]``
-            # and ``indices = numpy.arange(n_total)``), so a shuffled view
-            # is just ``torch.randperm(n_train, device=device)`` — no host
-            # array, no H2D copy. Host residency keeps the numpy path so
-            # _FitBatchDataset's CPU indexing semantics stay unchanged.
+            # Train indices live on device — train_indices_base is
+            # contiguous [0, n_train), so a shuffled view is just
+            # torch.randperm(n_train) on device with no host array
+            # or H2D copy.
             dataset_start = time.perf_counter()
-            if backing.device_backed:
-                train_indices_dev_full = torch.randperm(
-                    train_indices_base.shape[0], device=device,
-                )
-                train_indices = None
-            else:
-                train_indices = train_indices_base.copy()
-                numpy.random.shuffle(train_indices)
-                if dataset is not None:
-                    dataset.train_indices = train_indices
-                train_indices_dev_full = None
+            train_indices_dev_full = torch.randperm(
+                train_indices_base.shape[0], device=device,
+            )
             shuffle_dataset_time += time.perf_counter() - dataset_start
 
             # Training
@@ -4700,76 +3998,30 @@ class Class1NeuralNetwork(object):
             train_loop_wall_start = time.perf_counter()
 
             batch_size = _effective_minibatch
-            dataloader_num_workers = self.hyperparameters.get(
-                "dataloader_num_workers", 0
-            )
-            # H2D non-blocking is safe iff DataLoader pins the per-batch
-            # tensor before handing it to us — and pinning is on iff the
-            # dataset is tensor-backed (see _make_fit_dataloader). On
-            # device backing every tensor is already on device and H2D
-            # is a no-op.
-            non_blocking_h2d = backing.tensor_backed
-
             train_losses = []
             epoch_num_train_rows = 0
-            n_train_epoch = (
-                int(train_indices_dev_full.shape[0])
-                if backing.device_backed
-                else len(train_indices)
-            )
+            n_train_epoch = int(train_indices_dev_full.shape[0])
             full_batch_count = (n_train_epoch // batch_size) * batch_size
-            if backing.device_backed:
-                # --- Device-resident inner loop ---
-                # No DataLoader, no per-batch H2D. Indices live on device;
-                # batches are built by ``index_select`` into the combined
-                # buffer that holds [RN | real] rows.
-                fit_info["fit_dataloader_num_workers"] = 0
-                if full_batch_count > 0:
-                    train_indices_dev = train_indices_dev_full[:full_batch_count]
-                    num_full_batches = full_batch_count // batch_size
-                    for step in range(num_full_batches):
-                        batch_indices = train_indices_dev[
-                            step * batch_size : (step + 1) * batch_size
-                        ]
-                        # H2D bucket stays at zero — no copy here.
-                        inputs, y_batch, weights_batch = (
-                            _build_device_batch_from_combined(
-                                backing=backing,
-                                batch_indices=batch_indices,
-                            )
-                        )
-                        batch_start = _timing_start(device, timing_enabled)
-                        loss = _run_training_batch(
-                            network=network,
-                            optimizer=optimizer,
-                            loss_obj=loss_obj,
-                            regularization_parameters=regularization_parameters,
-                            l1_reg=l1_reg,
-                            l2_reg=l2_reg,
-                            inputs=inputs,
-                            y_batch=y_batch,
-                            weights_batch=weights_batch,
-                        )
-                        batch_time = _timing_stop(
-                            batch_start, device, timing_enabled
-                        )
-                        train_loop_time += batch_time
-                        if first_batch_time is None:
-                            first_batch_time = batch_time
-                        epoch_num_train_rows += int(y_batch.shape[0])
-                        train_losses.append(loss)
-                tail_count = n_train_epoch - full_batch_count
-                if tail_count > 0:
-                    tail_indices_dev = train_indices_dev_full[full_batch_count:]
+            # --- Device-resident inner loop ---
+            # No DataLoader, no per-batch H2D. Indices live on device;
+            # batches are built by index_select into the combined
+            # buffer that holds [RN | real] rows.
+            if full_batch_count > 0:
+                train_indices_dev = train_indices_dev_full[:full_batch_count]
+                num_full_batches = full_batch_count // batch_size
+                for step in range(num_full_batches):
+                    batch_indices = train_indices_dev[
+                        step * batch_size : (step + 1) * batch_size
+                    ]
                     inputs, y_batch, weights_batch = (
                         _build_device_batch_from_combined(
                             backing=backing,
-                            batch_indices=tail_indices_dev,
+                            batch_indices=batch_indices,
                         )
                     )
                     batch_start = _timing_start(device, timing_enabled)
                     loss = _run_training_batch(
-                        network=eager_network,
+                        network=network,
                         optimizer=optimizer,
                         loss_obj=loss_obj,
                         regularization_parameters=regularization_parameters,
@@ -4779,138 +4031,40 @@ class Class1NeuralNetwork(object):
                         y_batch=y_batch,
                         weights_batch=weights_batch,
                     )
-                    train_loop_time += _timing_stop(
+                    batch_time = _timing_stop(
                         batch_start, device, timing_enabled
                     )
+                    train_loop_time += batch_time
+                    if first_batch_time is None:
+                        first_batch_time = batch_time
                     epoch_num_train_rows += int(y_batch.shape[0])
                     train_losses.append(loss)
-            else:
-                # --- Host-resident inner loop (existing DataLoader path) ---
-                #
-                # Create batches via DataLoader — with num_workers=0 this is
-                # bit-identical to the old single-process inline-iteration path
-                # (DataLoader wraps the same fancy-indexing logic with no
-                # reordering). With num_workers>0, prefetcher processes build
-                # the next batch while the GPU crunches the current one.
-                # See issue openvax/mhcflurry#268.
-                if full_batch_count > 0:
-                    dataloader_setup_start = time.perf_counter()
-                    fit_dataset = _FitBatchDataset(
-                        x_peptide=backing.x_peptide,
-                        x_allele=backing.x_allele,
-                        y_encoded=dataset.y_encoded,
-                        sample_weights_with_negatives=backing.sample_weights,
-                        train_indices=train_indices[:full_batch_count],
-                        random_negative_x_peptide=backing.random_negative_x_peptide,
-                        random_negative_x_allele=backing.random_negative_x_allele,
-                        num_random_negatives=num_random_negatives,
+            tail_count = n_train_epoch - full_batch_count
+            if tail_count > 0:
+                tail_indices_dev = train_indices_dev_full[full_batch_count:]
+                inputs, y_batch, weights_batch = (
+                    _build_device_batch_from_combined(
+                        backing=backing,
+                        batch_indices=tail_indices_dev,
                     )
-                    (
-                        effective_fit_dataloader_num_workers,
-                        fit_dataloader_downgrade_reason,
-                    ) = _effective_fit_dataloader_num_workers(
-                        dataloader_num_workers,
-                        fit_dataset,
-                    )
-                    fit_info["fit_dataloader_num_workers"] = (
-                        effective_fit_dataloader_num_workers
-                    )
-                    if fit_dataloader_downgrade_reason is not None:
-                        fit_info["fit_dataloader_downgrade_reason"] = (
-                            fit_dataloader_downgrade_reason
-                        )
-                    try:
-                        loader = _make_fit_dataloader(
-                            dataset=fit_dataset,
-                            batch_size=batch_size,
-                            num_workers=effective_fit_dataloader_num_workers,
-                            drop_last=False,
-                        )
-                    except Exception as exc:
-                        if (
-                            effective_fit_dataloader_num_workers <= 0
-                            or not _is_resource_exhaustion_error(exc)
-                        ):
-                            raise
-                        logging.warning(
-                            "fit(): DataLoader worker setup failed with %r; "
-                            "retrying this fit() epoch with num_workers=0. "
-                            "Reduce dataloader_num_workers or system concurrency "
-                            "if this repeats.",
-                            exc,
-                        )
-                        effective_fit_dataloader_num_workers = 0
-                        fit_info["fit_dataloader_num_workers"] = 0
-                        fit_info["fit_dataloader_worker_fallback_reason"] = str(exc)
-                        loader = _make_fit_dataloader(
-                            dataset=fit_dataset,
-                            batch_size=batch_size,
-                            num_workers=0,
-                            drop_last=False,
-                        )
-                    dataloader_setup_time += (
-                        time.perf_counter() - dataloader_setup_start
-                    )
-
-                    for batch in loader:
-                        # Phase 0 timing (#268): H2D timed separately from
-                        # the training compute so the epoch breakdown adds
-                        # up to wall-clock.
-                        h2d_start = _timing_start(device, timing_enabled)
-                        inputs, y_batch, weights_batch = _move_fit_batch_to_device(
-                            batch,
-                            device,
-                            non_blocking=non_blocking_h2d,
-                        )
-                        epoch_h2d_time += _timing_stop(
-                            h2d_start, device, timing_enabled
-                        )
-                        batch_start = _timing_start(device, timing_enabled)
-                        loss = _run_training_batch(
-                            network=network,
-                            optimizer=optimizer,
-                            loss_obj=loss_obj,
-                            regularization_parameters=regularization_parameters,
-                            l1_reg=l1_reg,
-                            l2_reg=l2_reg,
-                            inputs=inputs,
-                            y_batch=y_batch,
-                            weights_batch=weights_batch,
-                        )
-                        batch_time = _timing_stop(batch_start, device, timing_enabled)
-                        train_loop_time += batch_time
-                        if first_batch_time is None:
-                            first_batch_time = batch_time
-                        epoch_num_train_rows += len(batch["y"])
-                        train_losses.append(loss)
-
-                tail_indices = train_indices[full_batch_count:]
-                if len(tail_indices) > 0:
-                    tail_batch = dataset.batch_for_indices(tail_indices)
-                    h2d_start = _timing_start(device, timing_enabled)
-                    inputs, y_batch, weights_batch = _move_fit_batch_to_device(
-                        tail_batch,
-                        device,
-                        non_blocking=False,
-                    )
-                    epoch_h2d_time += _timing_stop(
-                        h2d_start, device, timing_enabled
-                    )
-                    batch_start = _timing_start(device, timing_enabled)
-                    loss = _run_training_batch(
-                        network=eager_network,
-                        optimizer=optimizer,
-                        loss_obj=loss_obj,
-                        regularization_parameters=regularization_parameters,
-                        l1_reg=l1_reg,
-                        l2_reg=l2_reg,
-                        inputs=inputs,
-                        y_batch=y_batch,
-                        weights_batch=weights_batch,
-                    )
-                    train_loop_time += _timing_stop(batch_start, device, timing_enabled)
-                    epoch_num_train_rows += len(tail_batch["y"])
-                    train_losses.append(loss)
+                )
+                batch_start = _timing_start(device, timing_enabled)
+                loss = _run_training_batch(
+                    network=eager_network,
+                    optimizer=optimizer,
+                    loss_obj=loss_obj,
+                    regularization_parameters=regularization_parameters,
+                    l1_reg=l1_reg,
+                    l2_reg=l2_reg,
+                    inputs=inputs,
+                    y_batch=y_batch,
+                    weights_batch=weights_batch,
+                )
+                train_loop_time += _timing_stop(
+                    batch_start, device, timing_enabled
+                )
+                epoch_num_train_rows += int(y_batch.shape[0])
+                train_losses.append(loss)
 
             epoch_time = time.time() - epoch_start
             train_loop_wall_time = time.perf_counter() - train_loop_wall_start
@@ -4989,46 +4143,30 @@ class Class1NeuralNetwork(object):
                             val_weights,
                         ) = _val_device_tensors
                     else:
+                        # Rare case: val_indices overlaps the per-epoch
+                        # random-negative slice. Build the batch directly
+                        # from the device-resident combined buffer.
                         materialize_start = time.perf_counter()
-                        val_batch = dataset.batch_for_indices(val_indices)
+                        val_indices_dev = torch.as_tensor(
+                            val_indices, dtype=torch.long, device=device,
+                        )
+                        val_inputs, val_y, val_weights = (
+                            _build_device_batch_from_combined(
+                                backing=backing,
+                                batch_indices=val_indices_dev,
+                            )
+                        )
+                        val_peptide = val_inputs["peptide"]
+                        val_allele = val_inputs.get("allele")
                         validation_materialize_time += (
                             time.perf_counter() - materialize_start
                         )
-                        val_peptide = _batch_value_to_device(
-                            val_batch["peptide"],
-                            device,
-                            non_blocking=False,
-                            cast_float=True,
-                        )
-                        val_y = _batch_value_to_device(
-                            val_batch["y"],
-                            device,
-                            non_blocking=False,
-                            cast_float=False,
-                        )
-                        val_allele = None
-                        if "allele" in val_batch:
-                            val_allele = _batch_value_to_device(
-                                val_batch["allele"],
-                                device,
-                                non_blocking=False,
-                                cast_float=True,
-                            )
-                        val_weights = None
-                        if "weight" in val_batch:
-                            val_weights = _batch_value_to_device(
-                                val_batch["weight"],
-                                device,
-                                non_blocking=False,
-                                cast_float=True,
-                            )
                     val_batch_size = _effective_validation_batch_size(
                         device,
                         self.hyperparameters["validation_batch_size"],
                         batch_size,
                         model=eager_network,
-                        num_workers_per_gpu=dataloader_num_workers + 1
-                        if dataloader_num_workers else 1,
+                        num_workers_per_gpu=1,
                     )
                     fit_info["effective_validation_batch_size"] = val_batch_size
                     validation_start = _timing_start(device, timing_enabled)
@@ -5128,7 +4266,7 @@ class Class1NeuralNetwork(object):
                 # sum of pre-split components ~10 s).
                 fit_info["epoch_input_build_time"].append(input_build_time)
                 fit_info["epoch_rn_pool_get_time"].append(rn_pool_get_time)
-                fit_info["epoch_rn_shm_update_time"].append(rn_shm_update_time)
+                fit_info["epoch_rn_shm_update_time"].append(rn_refill_time)
                 fit_info["epoch_dataset_construction_time"].append(
                     dataset_construction_time
                 )
@@ -5165,19 +4303,9 @@ class Class1NeuralNetwork(object):
                 )
                 fit_info["epoch_num_train_batches"].append(len(train_losses))
                 fit_info["epoch_num_train_rows"].append(epoch_num_train_rows)
-                # Tail-batch row count: device path computes from
-                # ``n_train_epoch - full_batch_count``; host path keeps
-                # the original numpy ``train_indices[full_batch_count:]``
-                # slice. ``tail_count`` is set on both paths now (see
-                # the device branch's tail-batch block).
-                if backing.device_backed:
-                    fit_info["epoch_tail_train_rows"].append(
-                        n_train_epoch - full_batch_count
-                    )
-                else:
-                    fit_info["epoch_tail_train_rows"].append(
-                        len(tail_indices)
-                    )
+                fit_info["epoch_tail_train_rows"].append(
+                    n_train_epoch - full_batch_count
+                )
                 fit_info["epoch_num_validation_batches"].append(
                     int(numpy.ceil(n_val / val_batch_size)) if n_val > 0 else 0
                 )

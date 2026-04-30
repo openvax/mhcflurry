@@ -1,9 +1,13 @@
 """Tests for the consolidated shared-memory module.
 
-Covers run-mmap-cache (per-run mmap random-negative pool) wiring. The
-fit DataLoader SHM (per-fit tensor SHM) helpers are re-exports and
-tested in ``test_pytorch_regressions.py``; this file only checks
-they're importable from the new module.
+Covers the surviving two layers of mhcflurry's shared-memory design:
+
+* run mmap cache — per-run mmap random-negative pool, used by
+  ``setup_shared_random_negative_pools`` / ``lookup_pool_dir``.
+* per-fit() FitBacking — device-resident only.
+
+The legacy POSIX-shm "fit DataLoader SHM" backing was removed when
+fit() became device-resident only.
 """
 
 import os
@@ -54,8 +58,6 @@ def test_fit_backing_from_device_combined_buffer_layout():
         random_negative_x_allele=rn_allele,
         device="cpu",
     )
-    assert backing.device_backed
-    assert backing.residency == "device"
     assert isinstance(backing.combined_peptide, torch.Tensor)
     assert backing.combined_peptide.shape == (num_rn + num_real, encoded_length)
     # Real-data block is at the bottom and matches input.
@@ -99,21 +101,16 @@ def test_fit_backing_from_device_no_random_negatives():
         random_negative_x_allele=None,
         device="cpu",
     )
-    assert backing.device_backed
     assert backing.combined_peptide is None
     assert backing.random_negative_x_peptide is None
     numpy.testing.assert_array_equal(backing.x_peptide.numpy(), x_peptide)
 
 
-def test_layer2_public_api():
-    """All fit DataLoader SHM helpers are importable by their canonical names."""
-    assert callable(shm.share_tensor)
-    assert callable(shm.share_like)
-    assert callable(shm.update_shared)
-    assert callable(shm.array_nbytes)
-    assert callable(shm.numpy_batch_collate)
-    assert callable(shm.tensor_batch_collate)
+def test_public_api():
+    """Surviving public API surface."""
     assert hasattr(shm, "FitBacking")
+    assert callable(shm.setup_shared_random_negative_pools)
+    assert callable(shm.lookup_pool_dir)
 
 
 def test_random_negative_config_key_stable_across_dict_order():

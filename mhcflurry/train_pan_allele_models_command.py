@@ -31,9 +31,6 @@ from .local_parallelism import (
     apply_random_negative_pool_epochs_to_work_items,
     attach_constant_data_to_work_items_if_needed,
     call_wrapped_kwargs,
-    configure_torch_sharing_strategy_for_capacity,
-    estimate_fit_dataloader_shm_gb,
-    fit_shm_capacity_check,
     hoist_torchinductor_compile_threads,
     resolve_local_parallelism_args,
     run_single_worker_torch_compile_warmup,
@@ -62,29 +59,6 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # processes upon fork() call, allowing us to share large data with the workers
 # via shared memory.
 GLOBAL_DATA = {}
-
-_FIT_DATALOADER_SHM_TRUE_VALUES = {"1", "true", "yes", "on"}
-_FIT_DATALOADER_SHM_FALSE_VALUES = {"0", "false", "no", "off"}
-
-
-def _normalized_fit_dataloader_shm_env():
-    """Return normalized fit DataLoader SHM env pin: ``"1"``, ``"0"``, or None."""
-    value = os.environ.get("MHCFLURRY_FIT_DATALOADER_SHM")
-    if value is None:
-        return None
-    normalized = value.strip().lower()
-    if normalized in _FIT_DATALOADER_SHM_TRUE_VALUES:
-        return "1"
-    if normalized in _FIT_DATALOADER_SHM_FALSE_VALUES:
-        return "0"
-    raise ValueError(
-        "MHCFLURRY_FIT_DATALOADER_SHM must be one of %s or %s; got %r"
-        % (
-            sorted(_FIT_DATALOADER_SHM_TRUE_VALUES),
-            sorted(_FIT_DATALOADER_SHM_FALSE_VALUES),
-            value,
-        )
-    )
 
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
@@ -1272,101 +1246,6 @@ def _read_pretrain_peptide_list(filename):
 _hoist_torchinductor_compile_threads = hoist_torchinductor_compile_threads
 
 
-def _preflight_shm_capacity(args):
-    """Pre-fork advisory + auto-fallback for /dev/shm capacity.
-
-    Runs once in the orchestrator before workers are spawned. Computes
-    the expected per-fit fit DataLoader SHM footprint from
-    ``--num-jobs`` and a live estimate (peptide encoding + alignment +
-    train rows + random-negative rate from ``GLOBAL_DATA["work_items"]``
-    when available), compares to ``/dev/shm`` free space, and:
-
-    * Always prints the live estimator breakdown so the user can see why
-      the capacity headline landed where it did.
-    * Always prints a one-line summary (free, total, required).
-    * If insufficient AND the user hasn't force-pinned
-      ``MHCFLURRY_FIT_DATALOADER_SHM``, sets it to ``"0"`` so workers
-      fall back to the numpy DataLoader path. Loud-warn naming the
-      remediation (resize tmpfs, reduce concurrency).
-    * If the user has force-pinned to ``"1"``, leaves the env alone but
-      escalates the warning so the OOM is at least expected.
-
-    Skipped entirely when ``num_jobs == 0`` (serial run; no DataLoader
-    workers; no fit DataLoader SHM relevant).
-    """
-    num_jobs = int(getattr(args, "num_jobs", 0) or 0)
-    if num_jobs <= 0:
-        return  # serial / cluster — capacity check is per-node and not actionable here.
-
-    # Live estimate from work_items + train_data when both are loaded.
-    # Stays None for synthetic call sites (tests, ad-hoc helpers); the
-    # capacity-check helper then falls back to the constant default.
-    work_items = GLOBAL_DATA.get("work_items")
-    train_df = GLOBAL_DATA.get("train_data")
-    train_rows = len(train_df) if train_df is not None else None
-    num_folds = int(getattr(args, "num_folds", 4) or 4)
-    per_fit_gb, breakdown = estimate_fit_dataloader_shm_gb(
-        work_items=work_items,
-        train_row_count=train_rows,
-        num_folds=num_folds,
-    )
-    if per_fit_gb is None:
-        env_override = os.environ.get("MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB")
-        from .local_parallelism import _PER_FIT_SHM_FOOTPRINT_GB_DEFAULT
-        used_gb = float(env_override) if env_override else _PER_FIT_SHM_FOOTPRINT_GB_DEFAULT
-        print(
-            "fit DataLoader SHM estimate: %.3f GB/fit (%s); %s"
-            % (
-                used_gb,
-                "MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB override"
-                if env_override else "fallback constant",
-                breakdown,
-            )
-        )
-    else:
-        used_gb = per_fit_gb
-        print(breakdown)
-
-    result = fit_shm_capacity_check(
-        num_workers=num_jobs, per_fit_gb=used_gb
-    )
-    print(result["message"])
-    if result["safe"]:
-        return
-    pinned = _normalized_fit_dataloader_shm_env()
-    if pinned == "1":
-        # User force-on. Escalate warning; respect their choice.
-        print(
-            "WARNING: MHCFLURRY_FIT_DATALOADER_SHM=1 is force-pinned despite "
-            "tight /dev/shm. Workers WILL crash partway through fit() with "
-            "OSError [Errno 28]. Unset the env var to enable auto-fallback."
-        )
-        return
-    if pinned == "0":
-        # User force-off — already disabled; nothing to do.
-        return
-    # Tight /dev/shm with no user pin: prefer torch's file_descriptor
-    # sharing strategy when available. It avoids torch_shm_manager/name
-    # cleanup issues, but it still allocates POSIX shared memory via
-    # shm_open and therefore does NOT solve tmpfs capacity. Disable the
-    # fit DataLoader SHM path after the best-effort switch so auto-backed
-    # component models take the numpy path instead of stampeding into ENOSPC.
-    if os.environ.get("MHCFLURRY_TORCH_SHM_AUTO", "1") != "0":
-        configure_torch_sharing_strategy_for_capacity(
-            num_workers=num_jobs, per_fit_gb=used_gb,
-        )
-    # Auto-disable the fit DataLoader SHM path as the conservative fallback.
-    os.environ["MHCFLURRY_FIT_DATALOADER_SHM"] = "0"
-    print(
-        "Auto-disabling fit DataLoader SHM for this run "
-        "(MHCFLURRY_FIT_DATALOADER_SHM=0). Per-fit DataLoader will use the "
-        "numpy backing path; per-worker pickling cost is paid once per "
-        "epoch instead of being amortized via shared tensors. Throughput "
-        "impact: roughly 10-30%% slower than the SHM path on a "
-        "large-/dev/shm box."
-    )
-
-
 def train_models(args):
     global GLOBAL_DATA
 
@@ -1398,14 +1277,6 @@ def train_models(args):
         apply_random_negative_pool_epochs_to_work_items(
             all_work_items, int(args.random_negative_pool_epochs)
         )
-
-    # fit DataLoader SHM capacity pre-flight. With small /dev/shm (8 GB
-    # Docker default) + many workers, share_memory_() will OOM mid-fit
-    # with a cryptic OSError. Check up front and (a) print a loud
-    # advisory + live estimator breakdown, (b) auto-disable the fit
-    # DataLoader SHM path unless the user has force-pinned
-    # MHCFLURRY_FIT_DATALOADER_SHM=1. See docs/orchestrator.md.
-    _preflight_shm_capacity(args)
 
     # Optionally pre-build the shared BLOSUM62 encoding cache. Orchestrator
     # does the (single-threaded) encoding pass once; workers mmap the result.
