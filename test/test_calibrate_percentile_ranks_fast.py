@@ -519,3 +519,66 @@ def test_compute_prediction_batch_size_scales_with_memory_and_workers():
         # is allowed because the min_rows floor clamps both cases
         # when free memory is tight.
         assert shared <= single
+
+
+def test_peptide_sequences_fingerprint_distinguishes_middle_changes():
+    """Same length, first, last → different middle must yield different keys.
+
+    Regression for the legacy ``(count, first, last)`` cache_signature
+    which collided whenever the middle peptides differed but the
+    boundary peptides matched. Reusing a stale peptide-stage cache in
+    that case silently produced wrong PercentRankTransforms.
+    """
+    from mhcflurry.class1_affinity_predictor import (
+        _peptide_sequences_fingerprint,
+    )
+
+    a = _peptide_sequences_fingerprint(["AAAA", "BBBB", "CCCC"])
+    b = _peptide_sequences_fingerprint(["AAAA", "XXXX", "CCCC"])
+    assert a != b
+
+
+def test_peptide_sequences_fingerprint_length_prefix_prevents_concat_collision():
+    """Length prefixing prevents the trivial concatenation collision."""
+    from mhcflurry.class1_affinity_predictor import (
+        _peptide_sequences_fingerprint,
+    )
+
+    assert (
+        _peptide_sequences_fingerprint(["AB", "C"])
+        != _peptide_sequences_fingerprint(["A", "BC"])
+    )
+
+
+def test_peptide_sequences_fingerprint_order_sensitive():
+    """Reordering the same peptides must change the fingerprint."""
+    from mhcflurry.class1_affinity_predictor import (
+        _peptide_sequences_fingerprint,
+    )
+
+    assert (
+        _peptide_sequences_fingerprint(["A", "B"])
+        != _peptide_sequences_fingerprint(["B", "A"])
+    )
+
+
+def test_calibration_fast_cache_state_lifecycle():
+    """``_calibration_fast_cache`` is lazy and ``clear`` releases it."""
+    from mhcflurry.class1_affinity_predictor import (
+        Class1AffinityPredictor,
+        _CalibrationFastCache,
+    )
+
+    predictor = Class1AffinityPredictor()
+    assert getattr(predictor, "_calibration_fast_cache_state", None) is None
+
+    cache = predictor._calibration_fast_cache()
+    assert isinstance(cache, _CalibrationFastCache)
+    assert predictor._calibration_fast_cache() is cache  # idempotent
+
+    cache.cached_stages = ["sentinel"]
+    cache.stage_signature = ("sig",)
+    predictor.clear_calibration_fast_cache()
+    assert getattr(predictor, "_calibration_fast_cache_state", None) is None
+    # clearing again is a no-op
+    predictor.clear_calibration_fast_cache()

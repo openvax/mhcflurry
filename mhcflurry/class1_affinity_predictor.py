@@ -37,6 +37,51 @@ DEFAULT_CENTRALITY_MEASURE = "mean"
 OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 1))
 
 
+def _peptide_sequences_fingerprint(sequences):
+    """Order-and-content-sensitive SHA-256 of a peptide list.
+
+    Length-prefixes each peptide so e.g. ``["AB", "C"]`` and ``["A", "BC"]``
+    cannot collide by concatenation. Used as the cache key for the fast
+    calibration peptide-stage cache; collisions there silently reuse the
+    wrong tensors and produce wrong PercentRankTransforms.
+    """
+    h = hashlib.sha256()
+    for peptide in sequences:
+        b = str(peptide).encode("utf8")
+        h.update(len(b).to_bytes(8, "little"))
+        h.update(b)
+    return h.hexdigest()
+
+
+class _CalibrationFastCache(object):
+    """Per-predictor-instance state for ``calibrate_percentile_ranks_fast``.
+
+    Holds the device-resident peptide-stage tensors and the motif-summary
+    helper state that survive across calibrate tasks within one worker.
+    Centralizing both fields here makes the cache lifecycle visible —
+    it used to live behind dynamic ``setattr`` of private names.
+    """
+
+    __slots__ = (
+        "stage_signature",
+        "cached_stages",
+        "motif_signature",
+        "motif_state",
+    )
+
+    def __init__(self):
+        self.stage_signature = None
+        self.cached_stages = None
+        self.motif_signature = None
+        self.motif_state = None
+
+    def clear(self):
+        self.stage_signature = None
+        self.cached_stages = None
+        self.motif_signature = None
+        self.motif_state = None
+
+
 class Class1AffinityPredictor(object):
     """
     High-level interface for peptide/MHC I binding affinity prediction.
@@ -2181,6 +2226,30 @@ class Class1AffinityPredictor(object):
 
         return freq_matrices, length_dists
 
+    def _calibration_fast_cache(self):
+        """Return (creating if needed) the per-instance fast-calibrate cache.
+
+        See ``_CalibrationFastCache``. Lazy so that predictors loaded for
+        prediction never pay the allocation cost.
+        """
+        cache = getattr(self, "_calibration_fast_cache_state", None)
+        if cache is None:
+            cache = _CalibrationFastCache()
+            self._calibration_fast_cache_state = cache
+        return cache
+
+    def clear_calibration_fast_cache(self):
+        """Drop any cached fast-calibrate state on this predictor.
+
+        Long-lived workers that finish calibrate but stay alive for
+        prediction can reclaim the (potentially many GB) of device-
+        resident peptide-stage tensors via this hook.
+        """
+        cache = getattr(self, "_calibration_fast_cache_state", None)
+        if cache is not None:
+            cache.clear()
+            del self._calibration_fast_cache_state
+
     def calibrate_percentile_ranks_fast(
             self,
             peptides,
@@ -2253,7 +2322,6 @@ class Class1AffinityPredictor(object):
         """
         import torch
 
-        from .class1_neural_network import Class1NeuralNetwork  # noqa
         from .encodable_sequences import EncodableSequences
         from .allele_encoding import AlleleEncoding
         from .regression_target import to_ic50
@@ -2356,32 +2424,35 @@ class Class1AffinityPredictor(object):
         # call inside the same worker process and re-builds
         # ``cached_stages`` from scratch even though the peptide universe
         # and the predictor are identical. Cache the built tensors on
-        # the predictor instance and skip the rebuild whenever the
-        # signature matches. ``forward_peptide_stage`` runs once per
+        # ``self._calibration_fast_cache`` and skip the rebuild whenever
+        # the signature matches. ``forward_peptide_stage`` runs once per
         # peptide-batch per network, so for the production workload
-        # (~400k peptides × ~32 chunks/worker) each saved rebuild
-        # represents a couple-second-per-task win that compounds.
+        # (~400k peptides × ~32 chunks/worker) each saved rebuild is
+        # a couple-second-per-task win that compounds.
+        #
+        # The signature uses a SHA-256 fingerprint of the full peptide
+        # list rather than (count, first, last) — the latter would
+        # silently reuse a stale cache for two distinct peptide sets that
+        # share count/first/last (rare but real, and the failure mode is
+        # wrong PercentRankTransforms with no error).
+        cache = self._calibration_fast_cache()
         cache_signature = (
-            len(encoded_peptides.sequences),
-            encoded_peptides.sequences[0],
-            encoded_peptides.sequences[-1],
+            _peptide_sequences_fingerprint(encoded_peptides.sequences),
             tuple(id(net) for net in networks),
             str(device),
             int(peptide_batch_size),
         )
-        cached_attr = "_calibrate_fast_cached_stages"
-        cached_signature_attr = "_calibrate_fast_cached_signature"
-        prev_sig = getattr(self, cached_signature_attr, None)
-        if prev_sig == cache_signature:
-            cached_stages = getattr(self, cached_attr)
+        if cache.stage_signature == cache_signature:
+            cached_stages = cache.cached_stages
         else:
             # Drop stale cache before building the new one — releases
             # the previous peptide-stage tensor's VRAM before we
             # allocate the next, which matters when the per-call
             # peptide universe size changes (e.g. a smoke test
             # followed by the production calibrate in the same worker).
-            if hasattr(self, cached_attr):
-                delattr(self, cached_attr)
+            cache.cached_stages = None
+            cache.motif_signature = None
+            cache.motif_state = None
             cached_stages = []
             for net_obj in networks:
                 (_, allele_reps) = net_obj.allele_encoding_to_network_input(
@@ -2440,8 +2511,8 @@ class Class1AffinityPredictor(object):
                             tensor,
                         )
                 cached_stages.append((net_obj, model, cached_tensor))
-            setattr(self, cached_attr, cached_stages)
-            setattr(self, cached_signature_attr, cache_signature)
+            cache.cached_stages = cached_stages
+            cache.stage_signature = cache_signature
             del peptide_input
 
         log50000 = float(numpy.log(50000.0))
@@ -2460,18 +2531,16 @@ class Class1AffinityPredictor(object):
         # and across the many tasks per worker that share the same
         # peptide universe, we reuse the device-resident state via the
         # same signature key as ``cached_stages`` above.
-        motif_attr = "_calibrate_fast_motif_state"
-        motif_sig_attr = "_calibrate_fast_motif_signature"
         if motif_summary:
             motif_signature = (cache_signature, "motif")
-            if getattr(self, motif_sig_attr, None) == motif_signature:
-                motif_state = getattr(self, motif_attr)
+            if cache.motif_signature == motif_signature:
+                motif_state = cache.motif_state
             else:
                 motif_state = self._prepare_motif_summary_state_gpu(
                     encoded_peptides, device,
                 )
-                setattr(self, motif_attr, motif_state)
-                setattr(self, motif_sig_attr, motif_signature)
+                cache.motif_state = motif_state
+                cache.motif_signature = motif_signature
         else:
             motif_state = None
 

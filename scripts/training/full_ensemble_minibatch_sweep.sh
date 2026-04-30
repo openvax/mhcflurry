@@ -13,7 +13,7 @@
 # Required env (defaults assume the v7 release-exact run dir layout):
 #   MHCFLURRY_OUT     base output dir (e.g. .../out/affinity)
 #   SWEEP_OUT         sweep root (default: $MHCFLURRY_OUT/full_sweep)
-#   MINIBATCH_SIZES   space-separated list (default: "1024 2048 4096 8192 16384")
+#   MINIBATCH_SIZES   space-separated list (default: "256 512 1024 2048 4096 8192 16384")
 #   TRAIN_DATA        train_data.csv.bz2 from prior run
 #   HYPERPARAMS_TPL   template hyperparameters.yaml to patch
 #   ALLELE_SEQUENCES  path to allele_sequences.csv
@@ -37,7 +37,7 @@ set -x
 
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 SWEEP_OUT="${SWEEP_OUT:-$MHCFLURRY_OUT/full_sweep}"
-MINIBATCH_SIZES="${MINIBATCH_SIZES:-512 1024 2048 4096 8192 16384}"
+MINIBATCH_SIZES="${MINIBATCH_SIZES:-256 512 1024 2048 4096 8192 16384}"
 TRAIN_DATA="${TRAIN_DATA:-$MHCFLURRY_OUT/train_data.csv.bz2}"
 HYPERPARAMS_TPL="${HYPERPARAMS_TPL:-$MHCFLURRY_OUT/hyperparameters.yaml}"
 ALLELE_SEQUENCES="${ALLELE_SEQUENCES:-$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv}"

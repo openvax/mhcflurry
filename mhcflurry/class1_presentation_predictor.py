@@ -3,6 +3,7 @@ from os import mkdir
 from socket import gethostname
 from getpass import getuser
 
+import os
 import time
 import collections
 import logging
@@ -31,6 +32,15 @@ from .percent_rank_transform import PercentRankTransform
 MAX_ALLELES_PER_SAMPLE = 6
 PREDICT_BATCH_SIZE = DEFAULT_PREDICT_BATCH_SIZE
 PREDICT_CHUNK_SIZE = 100000  # currently used only for cleavage prediction
+
+# Target rows for one cartesian (peptides × alleles) predict() call inside
+# the presentation predictor. The predictor chunks the allele axis so that
+# each call materializes at most this many rows before the model sees them
+# — bounding peak memory regardless of how many alleles a caller supplies.
+# 1M peptide×allele rows is ~4 MB per int8 column, comfortable on A100.
+_PRESENTATION_PREDICT_TARGET_ROWS = int(
+    os.environ.get("MHCFLURRY_PRESENTATION_PREDICT_TARGET_ROWS", "1000000")
+)
 
 
 class Class1PresentationPredictor(object):
@@ -187,29 +197,46 @@ class Class1PresentationPredictor(object):
             if verbose > 0:
                 print("Predicting affinities.")
 
-            # Single batched cartesian forward over peptides × alleles,
-            # replacing the previous per-allele Python loop. The pan-allele
-            # predictor's compact AlleleEncoding dedups alleles internally,
-            # so the allele branch still runs once per unique allele; the
-            # peptide branch sees one big batch instead of len(all_alleles)
-            # small calls — same total compute, far less Python/GPU-launch
-            # overhead.
+            # Per-allele × per-peptide chunked predict. We keep the
+            # full ``(n_peps, n_unique_alleles)`` matrix so the
+            # per-sample idxmin below can still pick the best allele
+            # per peptide, but each predict() call only sees up to
+            # ``allele_chunk × n_peps`` cartesian rows — bounded
+            # memory regardless of how many alleles are shared across
+            # samples.
             n_peps = len(peptides)
             n_all = len(all_alleles)
-            peptides_repeated = EncodableSequences.create(
-                numpy.tile(peptides.sequences, n_all)
+            allele_chunk = max(1, _PRESENTATION_PREDICT_TARGET_ROWS // max(n_peps, 1))
+            predictions_matrix = numpy.full(
+                (n_peps, n_all), numpy.nan, dtype=numpy.float64,
             )
-            alleles_repeated = numpy.repeat(
-                numpy.asarray(all_alleles), n_peps,
-            )
-            flat_predictions = self.affinity_predictor.predict(
-                peptides=peptides_repeated,
-                alleles=alleles_repeated,
-                model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
-                throw=throw,
-            )
+            chunk_iter = range(0, n_all, allele_chunk)
+            if verbose > 0 and tqdm is not None and n_all > allele_chunk:
+                chunk_iter = tqdm.tqdm(
+                    chunk_iter,
+                    total=(n_all + allele_chunk - 1) // allele_chunk,
+                )
+            for chunk_start in chunk_iter:
+                chunk_end = min(chunk_start + allele_chunk, n_all)
+                chunk_alleles = all_alleles[chunk_start:chunk_end]
+                chunk_n = chunk_end - chunk_start
+                peptides_repeated = EncodableSequences.create(
+                    numpy.tile(peptides.sequences, chunk_n)
+                )
+                alleles_repeated = numpy.repeat(
+                    numpy.asarray(chunk_alleles), n_peps,
+                )
+                flat_predictions = self.affinity_predictor.predict(
+                    peptides=peptides_repeated,
+                    alleles=alleles_repeated,
+                    model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
+                    throw=throw,
+                )
+                predictions_matrix[:, chunk_start:chunk_end] = (
+                    flat_predictions.reshape(chunk_n, n_peps).T
+                )
             predictions_df = pandas.DataFrame(
-                flat_predictions.reshape(n_all, n_peps).T,
+                predictions_matrix,
                 columns=all_alleles,
                 index=df.index,
             )
@@ -246,38 +273,47 @@ class Class1PresentationPredictor(object):
             for (sample, sub_df) in iterator:
                 sample_peptides = EncodableSequences.create(sub_df.peptide.values)
                 sample_alleles = list(alleles[sample])
-                # Same single-cartesian-forward vectorization as the
-                # sample_names=None branch above: replicate peptides
-                # across alleles once, predict in one batched call.
                 n_peps = len(sample_peptides)
                 n_all = len(sample_alleles)
-                peptides_repeated = EncodableSequences.create(
-                    numpy.tile(sample_peptides.sequences, n_all)
+                # Per-sample best-affinity / best-allele tracking with
+                # chunked cartesian predicts. Strict ``<`` on update so
+                # the earliest allele in ``sample_alleles`` wins ties
+                # (matches the legacy ``pandas.idxmin`` behavior, which
+                # returns the first column at exact ties).
+                best_value = numpy.full(n_peps, numpy.inf, dtype=numpy.float64)
+                best_allele_arr = numpy.full(n_peps, None, dtype=object)
+                allele_chunk = max(
+                    1, _PRESENTATION_PREDICT_TARGET_ROWS // max(n_peps, 1),
                 )
-                alleles_repeated = numpy.repeat(
-                    numpy.asarray(sample_alleles), n_peps,
+                for chunk_start in range(0, n_all, allele_chunk):
+                    chunk_end = min(chunk_start + allele_chunk, n_all)
+                    chunk_alleles = sample_alleles[chunk_start:chunk_end]
+                    chunk_n = chunk_end - chunk_start
+                    peptides_repeated = EncodableSequences.create(
+                        numpy.tile(sample_peptides.sequences, chunk_n)
+                    )
+                    alleles_repeated = numpy.repeat(
+                        numpy.asarray(chunk_alleles), n_peps,
+                    )
+                    flat_predictions = self.affinity_predictor.predict(
+                        peptides=peptides_repeated,
+                        alleles=alleles_repeated,
+                        model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
+                        throw=throw,
+                    )
+                    chunk_matrix = flat_predictions.reshape(chunk_n, n_peps).T
+                    for j, allele in enumerate(chunk_alleles):
+                        col = chunk_matrix[:, j]
+                        valid = ~numpy.isnan(col)
+                        better = valid & (col < best_value)
+                        if better.any():
+                            best_value[better] = col[better]
+                            best_allele_arr[better] = allele
+                affinity_out = numpy.where(
+                    numpy.isfinite(best_value), best_value, numpy.nan,
                 )
-                flat_predictions = self.affinity_predictor.predict(
-                    peptides=peptides_repeated,
-                    alleles=alleles_repeated,
-                    model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
-                    throw=throw,
-                )
-                predictions_df = pandas.DataFrame(
-                    flat_predictions.reshape(n_all, n_peps).T,
-                    columns=sample_alleles,
-                    index=sub_df.index,
-                )
-                df.loc[
-                    sub_df.index, "affinity"
-                ] = predictions_df.min(axis=1).values
-                best_allele = pandas.Series(index=predictions_df.index, dtype=object)
-                valid = predictions_df.notna().any(axis=1)
-                if valid.any():
-                    best_allele.loc[valid] = predictions_df.loc[valid].idxmin(axis=1)
-                df.loc[
-                    sub_df.index, "best_allele"
-                ] = best_allele.values
+                df.loc[sub_df.index, "affinity"] = affinity_out
+                df.loc[sub_df.index, "best_allele"] = best_allele_arr
 
             result_df = df
 
