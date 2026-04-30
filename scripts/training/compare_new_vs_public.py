@@ -24,10 +24,18 @@ import glob
 import json
 import os
 import sys
+import time
 
 import numpy
 import pandas
 from sklearn.metrics import average_precision_score, roc_auc_score
+
+
+_T0 = time.time()
+
+
+def _stamp(msg):
+    print(f"[+{time.time() - _T0:6.1f}s] {msg}", flush=True)
 
 
 def ppv_at_n(y_true, y_score, n):
@@ -71,18 +79,29 @@ def main():
     os.makedirs(args.out, exist_ok=True)
 
     from mhcflurry import Class1AffinityPredictor
+    from mhcflurry.common import configure_pytorch
 
-    print(f"[1/5] Loading new ensemble: {args.new_models_dir}")
+    # Eval was running on CPU (default _pytorch_backend was never flipped
+    # for this standalone script) so 30M predictions took ~12 min on a
+    # box with 8x A100 idle. Force GPU here; auto-detect backend.
+    try:
+        configure_pytorch(backend="gpu")
+        _stamp("configured pytorch backend=gpu")
+    except RuntimeError as exc:
+        _stamp(f"GPU backend unavailable, falling back to auto ({exc})")
+        configure_pytorch(backend="auto")
+
+    _stamp(f"[1/5] Loading new ensemble: {args.new_models_dir}")
     new = Class1AffinityPredictor.load(args.new_models_dir)
     print(f"      {len(new.neural_networks)} networks, "
           f"{len(new.supported_alleles)} alleles supported")
 
-    print(f"[2/5] Loading public ensemble: {args.public_models_dir}")
+    _stamp(f"[2/5] Loading public ensemble: {args.public_models_dir}")
     pub = Class1AffinityPredictor.load(args.public_models_dir)
     print(f"      {len(pub.neural_networks)} networks, "
           f"{len(pub.supported_alleles)} alleles supported")
 
-    print(f"[3/5] Finding benchmark files...")
+    _stamp(f"[3/5] Finding benchmark files...")
     if args.source == "both":
         patterns = ["mixmhcpred", "netmhcpan4"]
     else:
@@ -121,24 +140,25 @@ def main():
     test = test[(test.peptide_len >= 8) & (test.peptide_len <= 15)].copy()
     print(f"      evaluable rows after filter: {len(test):,}")
 
-    print(f"[4/5] Predicting with both ensembles...")
+    _stamp(f"[4a/5] Predicting NEW ensemble ({len(test):,} rows)...")
     test["new_pred"] = new.predict(
         peptides=test.peptide.values,
         alleles=test.hla.values,
         throw=False,
     )
+    _stamp(f"[4b/5] Predicting PUBLIC ensemble ({len(test):,} rows)...")
     test["public_pred"] = pub.predict(
         peptides=test.peptide.values,
         alleles=test.hla.values,
         throw=False,
     )
     test = test.dropna(subset=["new_pred", "public_pred"])
-    print(f"      rows with both predictions: {len(test):,}")
+    _stamp(f"      rows with both predictions: {len(test):,}")
     # Score = -log10(predicted nM) (higher = binder-like)
     test["new_score"] = -numpy.log10(numpy.clip(test.new_pred, 1e-3, 1e8))
     test["public_score"] = -numpy.log10(numpy.clip(test.public_pred, 1e-3, 1e8))
 
-    print(f"[5/5] Computing metrics per allele...")
+    _stamp(f"[5/5] Computing metrics per allele...")
     rows = []
     for allele, group in test.groupby("hla"):
         if len(group) < 30 or group.hit.sum() == 0:
