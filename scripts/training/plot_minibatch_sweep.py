@@ -34,6 +34,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FixedLocator, ScalarFormatter, NullLocator
 
 
 # Columns whose values can sensibly be log-scaled (strictly positive).
@@ -44,6 +45,27 @@ def _is_log_safe(series):
     """True if every value is finite and strictly positive."""
     s = pd.to_numeric(series, errors="coerce")
     return s.notna().all() and (s > 0).all()
+
+
+def _make_plain_formatter():
+    fmt = ScalarFormatter(useMathText=False)
+    fmt.set_scientific(False)
+    fmt.set_useOffset(False)
+    return fmt
+
+
+def _force_plain_ticks(ax, x_scale, y_scale):
+    """Drop the matplotlib log-axis default ``8 × 10^1`` / ``6 × 10^3``
+    formatting in favor of plain decimal ticks so ``80`` shows as ``80``
+    and ``6000`` as ``6000``. matplotlib's log scale formats *both*
+    major and minor ticks via ``LogFormatterSciNotation``, so override
+    each independently."""
+    if x_scale == "log":
+        ax.xaxis.set_major_formatter(_make_plain_formatter())
+        ax.xaxis.set_minor_formatter(_make_plain_formatter())
+    if y_scale == "log":
+        ax.yaxis.set_major_formatter(_make_plain_formatter())
+        ax.yaxis.set_minor_formatter(_make_plain_formatter())
 
 
 def _save(fig, path):
@@ -82,6 +104,13 @@ def plot_per_variable(df, out_dir):
                         )
                 ax.set_xscale(x_scale)
                 ax.set_yscale(y_scale)
+                _force_plain_ticks(ax, x_scale, y_scale)
+                # x-axis is the discrete minibatch_size domain; pin
+                # ticks to actual data points so log-scaled axes don't
+                # spam dense matplotlib defaults that overlap.
+                mb_values = sorted(int(v) for v in df["minibatch"].unique())
+                ax.xaxis.set_major_locator(FixedLocator(mb_values))
+                ax.xaxis.set_minor_locator(NullLocator())
                 ax.set_xlabel("minibatch_size")
                 ax.set_ylabel(col)
                 ax.set_title(f"{col} vs minibatch ({x_scale} x, {y_scale} y)")
@@ -129,6 +158,7 @@ def plot_pairs(df, out_dir):
                     )
             ax.set_xscale(x_scale)
             ax.set_yscale(y_scale)
+            _force_plain_ticks(ax, x_scale, y_scale)
             ax.set_xlabel(x_col)
             ax.set_ylabel(y_col)
             ax.set_title(
