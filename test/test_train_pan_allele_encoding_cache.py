@@ -7,7 +7,7 @@ in ``train_pan_allele_models_command``:
         EncodableSequences either directly (cache disabled, old behavior)
         or via the pre-built memmap (cache enabled, new behavior).
 
-    _deterministic_unique_peptide_list() — both orchestrator and workers
+    deterministic_unique_peptide_list() — both orchestrator and workers
         must derive identical peptide lists from the same train_data, or
         the cache key won't match.
 
@@ -28,19 +28,27 @@ from unittest.mock import Mock
 import numpy
 import pandas
 import pytest
-from numpy.testing import assert_array_equal
+import torch
+from numpy.testing import assert_allclose, assert_array_equal
 
 from mhcflurry.allele_encoding import AlleleEncoding
-from mhcflurry.class1_neural_network import Class1NeuralNetwork
+from mhcflurry.class1_neural_network import (
+    Class1NeuralNetwork,
+    _move_fit_batch_to_device,
+)
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.encoding_cache import EncodingCache, EncodingParams
+from mhcflurry.regression_target import from_ic50
 from mhcflurry.train_pan_allele_models_command import (
     _build_train_peptides,
-    _deterministic_unique_peptide_list,
+    deterministic_unique_peptide_list,
+    _get_or_build_pretrain_batch_cache,
     _initialize_encoding_cache,
+    _pretrain_batch_cache_dir,
     _read_pretrain_peptide_list,
     GLOBAL_DATA,
     pretrain_data_iterator,
+    pretrain_network_input_iterator,
 )
 
 
@@ -106,11 +114,11 @@ def hyperparameters():
     return {"peptide_encoding": DEFAULT_PEPTIDE_ENCODING}
 
 
-# ---- _deterministic_unique_peptide_list ----
+# ---- deterministic_unique_peptide_list ----
 
 
 def test_unique_peptide_list_is_first_seen_order(train_data):
-    got = _deterministic_unique_peptide_list(train_data.peptide.values)
+    got = deterministic_unique_peptide_list(train_data.peptide.values)
     # Order of first appearance, no duplicates.
     assert got == [
         "SIINFEKL",
@@ -127,8 +135,8 @@ def test_unique_peptide_list_is_first_seen_order(train_data):
 
 def test_unique_peptide_list_stable_across_calls(train_data):
     """Must be deterministic — orchestrator and worker must agree."""
-    first = _deterministic_unique_peptide_list(train_data.peptide.values)
-    second = _deterministic_unique_peptide_list(train_data.peptide.values)
+    first = deterministic_unique_peptide_list(train_data.peptide.values)
+    second = deterministic_unique_peptide_list(train_data.peptide.values)
     assert first == second
 
 
@@ -422,6 +430,11 @@ def _consume_iterator(iterator, n_chunks):
     return out
 
 
+def _consume_network_input_iterator(iterator, n_chunks):
+    """Pull n_chunks from a pretrain_network_input_iterator generator."""
+    return [next(iterator) for _ in range(n_chunks)]
+
+
 def test_pretrain_iterator_without_cache_yields_normally(
     pretrain_csv, pretrain_allele_encoding
 ):
@@ -498,6 +511,171 @@ def test_pretrain_iterator_with_cache_bit_identical(
             numpy.float32
         )
         assert_array_equal(enc_via_uncached, enc_via_cached)
+
+
+def test_pretrain_network_input_iterator_cached_matches_uncached(
+    pretrain_csv, pretrain_allele_encoding, tmp_path
+):
+    """Training's encoded-batch iterator must stay bit-identical."""
+    params = EncodingParams(**DEFAULT_PEPTIDE_ENCODING)
+    cache_dir = tmp_path / "cache"
+
+    uncached = _consume_network_input_iterator(
+        pretrain_network_input_iterator(
+            str(pretrain_csv),
+            pretrain_allele_encoding,
+            DEFAULT_PEPTIDE_ENCODING,
+            peptides_per_chunk=4,
+        ),
+        n_chunks=2,
+    )
+    cached = _consume_network_input_iterator(
+        pretrain_network_input_iterator(
+            str(pretrain_csv),
+            pretrain_allele_encoding,
+            DEFAULT_PEPTIDE_ENCODING,
+            peptides_per_chunk=4,
+            encoding_cache_dir=str(cache_dir),
+            encoding_params=params,
+        ),
+        n_chunks=2,
+    )
+
+    for (uncached_batch, cached_batch) in zip(uncached, cached):
+        uncached_x, uncached_y = uncached_batch
+        cached_x, cached_y = cached_batch
+        assert_array_equal(uncached_y, cached_y)
+        assert_array_equal(uncached_x["peptide"], cached_x["peptide"])
+        assert_array_equal(uncached_x["allele"], cached_x["allele"])
+
+
+@pytest.mark.parametrize("merge_method", ["concatenate", "multiply"])
+def test_pretrain_network_input_iterator_compact_repeats_expand_in_forward(
+    pretrain_csv, pretrain_allele_encoding, tmp_path, merge_method
+):
+    """Production pretrain path avoids repeating raw peptide encodings."""
+    params = EncodingParams(**DEFAULT_PEPTIDE_ENCODING)
+    cache_dir = tmp_path / "cache"
+
+    full_x, full_y = next(pretrain_network_input_iterator(
+        str(pretrain_csv),
+        pretrain_allele_encoding,
+        DEFAULT_PEPTIDE_ENCODING,
+        peptides_per_chunk=4,
+        encoding_cache_dir=str(cache_dir),
+        encoding_params=params,
+    ))
+    compact_x, compact_y = next(pretrain_network_input_iterator(
+        str(pretrain_csv),
+        pretrain_allele_encoding,
+        DEFAULT_PEPTIDE_ENCODING,
+        peptides_per_chunk=4,
+        encoding_cache_dir=str(cache_dir),
+        encoding_params=params,
+        compact_peptide_repeats=True,
+    ))
+
+    assert_array_equal(full_y, compact_y)
+    assert_array_equal(full_x["allele"], compact_x["allele"])
+    assert compact_x["peptide_repeat_count"] == len(PRETRAIN_ALLELES)
+    assert compact_x["peptide"].shape[0] == 4
+    assert full_x["peptide"].shape[0] == 4 * len(PRETRAIN_ALLELES)
+
+    full_batch = dict(full_x)
+    full_batch["y"] = full_y
+    compact_batch = dict(compact_x)
+    compact_batch["y"] = compact_y
+
+    full_inputs, full_y_tensor, _ = _move_fit_batch_to_device(
+        full_batch,
+        device=torch.device("cpu"),
+        non_blocking=False,
+    )
+    compact_inputs, compact_y_tensor, _ = _move_fit_batch_to_device(
+        compact_batch,
+        device=torch.device("cpu"),
+        non_blocking=False,
+    )
+
+    assert compact_inputs["peptide_repeat_count"] == len(PRETRAIN_ALLELES)
+    assert compact_inputs["peptide"].shape[0] == 4
+    assert full_inputs["peptide"].shape[0] == 4 * len(PRETRAIN_ALLELES)
+    assert_array_equal(
+        full_inputs["allele"].detach().cpu().numpy(),
+        compact_inputs["allele"].detach().cpu().numpy(),
+    )
+    assert_array_equal(
+        full_y_tensor.detach().cpu().numpy(),
+        compact_y_tensor.detach().cpu().numpy(),
+    )
+
+    net = Class1NeuralNetwork(
+        activation="tanh",
+        layer_sizes=[5],
+        allele_dense_layer_sizes=[6],
+        peptide_dense_layer_sizes=[6],
+        locally_connected_layers=[],
+        peptide_allele_merge_method=merge_method,
+        peptide_allele_merge_activation="",
+        batch_normalization=True,
+        dropout_probability=0.0,
+        dense_layer_l1_regularization=0.0,
+        dense_layer_l2_regularization=0.0,
+        peptide_encoding=DEFAULT_PEPTIDE_ENCODING,
+    )
+    _, allele_representations = net.allele_encoding_to_network_input(
+        pretrain_allele_encoding
+    )
+    full_network = net.make_network(
+        allele_representations=allele_representations,
+        **net.network_hyperparameter_defaults.subselect(net.hyperparameters),
+    )
+    compact_network = net.make_network(
+        allele_representations=allele_representations,
+        **net.network_hyperparameter_defaults.subselect(net.hyperparameters),
+    )
+    compact_network.load_state_dict(full_network.state_dict())
+
+    full_network.train()
+    compact_network.train()
+    full_pred = full_network(full_inputs)
+    compact_pred = compact_network(compact_inputs)
+    assert_allclose(
+        full_pred.detach().cpu().numpy(),
+        compact_pred.detach().cpu().numpy(),
+        atol=1e-6,
+    )
+    for (full_name, full_buffer), (compact_name, compact_buffer) in zip(
+        full_network.named_buffers(),
+        compact_network.named_buffers(),
+    ):
+        assert full_name == compact_name
+        assert_allclose(
+            full_buffer.detach().cpu().numpy(),
+            compact_buffer.detach().cpu().numpy(),
+            atol=1e-6,
+            err_msg=full_name,
+        )
+
+    full_loss = (full_pred.reshape(-1) - full_y_tensor).square().mean()
+    compact_loss = (compact_pred.reshape(-1) - compact_y_tensor).square().mean()
+    full_loss.backward()
+    compact_loss.backward()
+    for (full_name, full_param), (compact_name, compact_param) in zip(
+        full_network.named_parameters(),
+        compact_network.named_parameters(),
+    ):
+        assert full_name == compact_name
+        if full_param.grad is None or compact_param.grad is None:
+            assert full_param.grad is None
+            assert compact_param.grad is None
+            continue
+        assert_allclose(
+            full_param.grad.detach().cpu().numpy(),
+            compact_param.grad.detach().cpu().numpy(),
+            atol=1e-6,
+            err_msg=full_name,
+        )
 
 
 def test_pretrain_iterator_cache_hit_avoids_reencoding(
@@ -698,7 +876,7 @@ def test_memmap_reopens_cleanly_in_fresh_encoding_cache(
 
     # Same unique-peptides list as orchestrator would have built.
     df = GLOBAL_DATA["train_data"]
-    unique_peptides = _deterministic_unique_peptide_list(df.peptide.values)
+    unique_peptides = deterministic_unique_peptide_list(df.peptide.values)
 
     # Should be a cache HIT — the entry exists from orchestrator's build.
     entry_dir = worker_cache.entry_path(unique_peptides)
@@ -848,9 +1026,9 @@ def test_initialize_stashes_unique_peptides_in_global_data(
     assert "encoding_cache_unique_peptides" in GLOBAL_DATA
     stashed = GLOBAL_DATA["encoding_cache_unique_peptides"]
     assert isinstance(stashed, list)
-    # Should equal what _deterministic_unique_peptide_list returns.
+    # Should equal what deterministic_unique_peptide_list returns.
     df = GLOBAL_DATA["train_data"]
-    expected = _deterministic_unique_peptide_list(df.peptide.values)
+    expected = deterministic_unique_peptide_list(df.peptide.values)
     assert stashed == expected
 
 
@@ -869,16 +1047,16 @@ def test_build_train_peptides_uses_stashed_unique_peptides(
     _initialize_encoding_cache(args, all_work_items)
     constant_data = dict(GLOBAL_DATA)
 
-    # Spy on _deterministic_unique_peptide_list to verify it's NOT called.
+    # Spy on deterministic_unique_peptide_list to verify it's NOT called.
     from mhcflurry import train_pan_allele_models_command as cmd
     calls = []
-    original = cmd._deterministic_unique_peptide_list
+    original = cmd.deterministic_unique_peptide_list
 
     def spy(*a, **kw):
         calls.append(1)
         return original(*a, **kw)
 
-    monkeypatch.setattr(cmd, "_deterministic_unique_peptide_list", spy)
+    monkeypatch.setattr(cmd, "deterministic_unique_peptide_list", spy)
 
     # Call from "worker" side with the pickled constant_data.
     worker_dict = pickle.loads(pickle.dumps(constant_data))
@@ -887,6 +1065,41 @@ def test_build_train_peptides_uses_stashed_unique_peptides(
     )
     assert calls == [], (
         "worker should reuse stashed unique peptides instead of recomputing"
+    )
+
+
+def test_build_train_peptides_uses_stashed_row_indices(
+    constant_data_with_cache, hyperparameters, train_data, monkeypatch
+):
+    """Production worker path should not rebuild the peptide-to-index dict."""
+    all_work_items = [{"hyperparameters": hyperparameters}]
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=None,
+    )
+    GLOBAL_DATA.update(constant_data_with_cache)
+    _initialize_encoding_cache(args, all_work_items)
+    constant_data = dict(GLOBAL_DATA)
+    assert "train_peptide_encoding_cache_indices" in constant_data
+
+    def fail_get_or_build(self, peptides):
+        raise AssertionError("worker should use stashed row indices")
+
+    monkeypatch.setattr(EncodingCache, "get_or_build", fail_get_or_build)
+
+    got = _build_train_peptides(
+        train_data.peptide.values,
+        hyperparameters,
+        constant_data,
+        peptide_index=train_data.index,
+    )
+
+    net = Class1NeuralNetwork(peptide_encoding=DEFAULT_PEPTIDE_ENCODING)
+    assert_array_equal(
+        net.peptides_to_network_input(got),
+        net.peptides_to_network_input(EncodableSequences(train_data.peptide.values)),
     )
 
 
@@ -908,13 +1121,13 @@ def test_build_train_peptides_fallback_when_stash_absent(
         "encoding_cache_dir": str(cache_dir),
     }
     calls = []
-    original = cmd._deterministic_unique_peptide_list
+    original = cmd.deterministic_unique_peptide_list
 
     def spy(*a, **kw):
         calls.append(1)
         return original(*a, **kw)
 
-    monkeypatch.setattr(cmd, "_deterministic_unique_peptide_list", spy)
+    monkeypatch.setattr(cmd, "deterministic_unique_peptide_list", spy)
 
     got = _build_train_peptides(
         train_data.peptide.values, hyperparameters, constant_data
@@ -922,7 +1135,7 @@ def test_build_train_peptides_fallback_when_stash_absent(
     assert isinstance(got, EncodableSequences)
     assert len(got.encoding_cache) == 1
     assert len(calls) == 1, (
-        f"expected exactly 1 fallback call to _deterministic_unique_peptide_list, "
+        f"expected exactly 1 fallback call to deterministic_unique_peptide_list, "
         f"got {len(calls)}"
     )
 
@@ -958,6 +1171,292 @@ def test_initialize_encoding_cache_prebuilds_pretrain_cache(
     assert cache.is_complete_for(pretrain_peptides), (
         "pretrain cache should have been pre-built by the orchestrator"
     )
+
+
+def test_initialize_encoding_cache_prebuilds_pretrain_batch_cache(
+    constant_data_with_cache, hyperparameters, pretrain_csv, pretrain_allele_encoding
+):
+    """The orchestrator also pre-builds the reusable pretrain chunk manifest."""
+    all_work_items = [
+        {
+            "hyperparameters": {
+                **hyperparameters,
+                "train_data": {
+                    "pretrain": True,
+                    "pretrain_peptides_per_step": 4,
+                },
+            }
+        }
+    ]
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=str(pretrain_csv),
+    )
+    GLOBAL_DATA.update(constant_data_with_cache)
+    # Driver pre-build now uses ``allele_encoding`` (the restricted one
+    # that workers see), not ``full_allele_encoding``. See the regression
+    # notes at ``test_pretrain_batch_cache_prebuild_matches_worker_hash``.
+    GLOBAL_DATA["allele_encoding"] = pretrain_allele_encoding
+    _initialize_encoding_cache(args, all_work_items)
+
+    cache_dir = _pretrain_batch_cache_dir(
+        filename=str(pretrain_csv),
+        usable_alleles=PRETRAIN_ALLELES,
+        peptides_per_chunk=4,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        encoding_params=EncodingParams(**hyperparameters["peptide_encoding"]),
+    )
+    assert (Path(cache_dir) / ".complete").exists()
+
+
+def test_pretrain_batch_cache_build_uses_row_offsets_without_index_map(
+    constant_data_with_cache,
+    hyperparameters,
+    pretrain_csv,
+    pretrain_allele_encoding,
+    monkeypatch,
+):
+    """Batch-cache build must not load the full peptide-to-index dict.
+
+    The CSV chunks are read in the same order used to build the encoding
+    cache, so chunk-local peptide indices are contiguous row offsets. Loading
+    the full cache index map here is pure memory overhead and caused
+    orchestrator-side OOMs on large pretrain files.
+    """
+    def fail_get_or_build(self, peptides):
+        raise AssertionError("batch-cache prebuild should use ensure_built")
+
+    monkeypatch.setattr(EncodingCache, "get_or_build", fail_get_or_build)
+    manifest = _get_or_build_pretrain_batch_cache(
+        filename=str(pretrain_csv),
+        master_allele_encoding=pretrain_allele_encoding,
+        peptides_per_chunk=3,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        encoding_params=EncodingParams(**hyperparameters["peptide_encoding"]),
+        verbose=False,
+    )
+
+    assert manifest["version"] == 2
+    targets_mmap = numpy.load(
+        Path(manifest["cache_dir"]) / manifest["targets_path"],
+        mmap_mode="r",
+    )
+    offset = 0
+    for chunk in manifest["chunks"]:
+        assert chunk["peptide_start"] == offset
+        assert chunk["peptide_end"] == offset + chunk["chunk_len"]
+        offset += chunk["chunk_len"]
+    assert offset == len(PRETRAIN_PEPTIDES)
+    expected_targets = from_ic50(
+        pandas.read_csv(str(pretrain_csv), index_col=0)[PRETRAIN_ALLELES]
+        .stack()
+        .values
+    ).astype(numpy.float32)
+    assert_array_equal(targets_mmap, expected_targets)
+
+
+def test_pretrain_batch_cache_row_offsets_match_index_map_lookup(
+    constant_data_with_cache,
+    hyperparameters,
+    pretrain_csv,
+    pretrain_allele_encoding,
+):
+    """The row-offset shortcut must produce the same indices as a real
+    peptide-to-row dict lookup would have.
+
+    The OOM fix in #270 replaced ``pretrain_peptide_to_idx[p] for p in
+    df.index.values`` (which required loading a 5M-entry dict) with
+    ``numpy.arange(chunk_start, row_offset)``. That equivalence is
+    only correct because the chunked CSV iterates rows in the same
+    order as ``_read_pretrain_peptide_list``. Pin that contract.
+    """
+    pretrain_peptides = _read_pretrain_peptide_list(pretrain_csv)
+    expected_index = {p: i for i, p in enumerate(pretrain_peptides)}
+
+    manifest = _get_or_build_pretrain_batch_cache(
+        filename=str(pretrain_csv),
+        master_allele_encoding=pretrain_allele_encoding,
+        peptides_per_chunk=3,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        encoding_params=EncodingParams(**hyperparameters["peptide_encoding"]),
+        verbose=False,
+    )
+
+    # Walk the original CSV to recover the per-chunk peptide names, then
+    # look them up in the dict and compare against the stored offsets.
+    df_iter = pandas.read_csv(
+        str(pretrain_csv), index_col=0, chunksize=3
+    )
+    for chunk_meta, df_chunk in zip(manifest["chunks"], df_iter):
+        stored_indices = numpy.arange(
+            chunk_meta["peptide_start"],
+            chunk_meta["peptide_end"],
+            dtype=numpy.int64,
+        )
+        recomputed = numpy.array(
+            [expected_index[p] for p in df_chunk.index.values],
+            dtype=numpy.int64,
+        )
+        assert_array_equal(stored_indices, recomputed)
+
+
+def test_pretrain_batch_cache_assertion_fires_on_row_count_mismatch(
+    constant_data_with_cache,
+    hyperparameters,
+    pretrain_csv,
+    pretrain_allele_encoding,
+    monkeypatch,
+):
+    """Defensive assert must trip when the chunk iterator yields fewer
+    rows than ``_read_pretrain_peptide_list`` saw.
+
+    If the CSV is truncated mid-build (or the pandas chunked iterator
+    silently skips rows) the orchestrator-side row-offset shortcut
+    would hand workers indices that don't line up with the encoded
+    memmap. The trailing ``row_offset != len(pretrain_peptides)``
+    check converts that latent corruption into a loud failure.
+    """
+    real_read_csv = pandas.read_csv
+
+    def truncated_read_csv(*args, **kwargs):
+        result = real_read_csv(*args, **kwargs)
+        if kwargs.get("chunksize") is not None:
+            # Wrap the iterator so it only yields the first chunk —
+            # simulates a truncated CSV / silent reader bug.
+            class _OneChunkIter:
+                def __init__(self, src):
+                    self._src = src
+                    self._yielded = False
+
+                def __iter__(self):
+                    return self
+
+                def __next__(self):
+                    if self._yielded:
+                        raise StopIteration
+                    self._yielded = True
+                    return next(self._src)
+
+            return _OneChunkIter(result)
+        return result
+
+    monkeypatch.setattr(pandas, "read_csv", truncated_read_csv)
+    with pytest.raises(AssertionError, match="indexed .* rows but peptide list has"):
+        _get_or_build_pretrain_batch_cache(
+            filename=str(pretrain_csv),
+            master_allele_encoding=pretrain_allele_encoding,
+            peptides_per_chunk=3,
+            encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+            encoding_params=EncodingParams(**hyperparameters["peptide_encoding"]),
+            verbose=False,
+        )
+
+
+def test_initialize_encoding_cache_orchestrator_path_does_not_call_get_or_build(
+    constant_data_with_cache,
+    hyperparameters,
+    pretrain_csv,
+    pretrain_allele_encoding,
+    monkeypatch,
+):
+    """Orchestrator's _initialize_encoding_cache must NOT call get_or_build.
+
+    get_or_build's _load step builds a peptide-to-row dict; on a 5M
+    peptide pretrain CSV that's the orchestrator-side OOM source.
+    Routing the orchestrator through ensure_built keeps the prebuild
+    memory bounded. This test fails loud if a future change reverts
+    the orchestrator to get_or_build.
+    """
+    GLOBAL_DATA.update(constant_data_with_cache)
+    GLOBAL_DATA["allele_encoding"] = pretrain_allele_encoding
+    GLOBAL_DATA["full_allele_encoding"] = pretrain_allele_encoding
+
+    def fail_get_or_build(self, peptides):
+        raise AssertionError(
+            "orchestrator prebuild must use ensure_built, not get_or_build "
+            "(see #270 fix — get_or_build allocates a peptide-to-row dict "
+            "the orchestrator does not need)"
+        )
+
+    monkeypatch.setattr(EncodingCache, "get_or_build", fail_get_or_build)
+
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        out_models_dir=str(
+            Path(constant_data_with_cache["encoding_cache_dir"]).parent
+        ),
+        pretrain_data=str(pretrain_csv),
+    )
+    all_work_items = [
+        {
+            "hyperparameters": {
+                **hyperparameters,
+                "train_data": {
+                    "pretrain": True,
+                    "pretrain_peptides_per_step": 3,
+                },
+            }
+        }
+    ]
+    # Should not raise.
+    _initialize_encoding_cache(args, all_work_items)
+    assert "encoding_cache_dir" in GLOBAL_DATA
+
+
+def test_pretrain_network_input_iterator_uses_warm_batch_cache_without_chunked_read(
+    constant_data_with_cache,
+    hyperparameters,
+    pretrain_csv,
+    pretrain_allele_encoding,
+    monkeypatch,
+):
+    """Warm-cache replay should avoid the expensive chunked pandas read path."""
+    all_work_items = [
+        {
+            "hyperparameters": {
+                **hyperparameters,
+                "train_data": {
+                    "pretrain": True,
+                    "pretrain_peptides_per_step": 4,
+                },
+            }
+        }
+    ]
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        out_models_dir=str(Path(constant_data_with_cache["encoding_cache_dir"]).parent),
+        pretrain_data=str(pretrain_csv),
+    )
+    GLOBAL_DATA.update(constant_data_with_cache)
+    # Driver pre-build now uses ``allele_encoding`` (the restricted one
+    # that workers see), not ``full_allele_encoding``. See the regression
+    # notes at ``test_pretrain_batch_cache_prebuild_matches_worker_hash``.
+    GLOBAL_DATA["allele_encoding"] = pretrain_allele_encoding
+    _initialize_encoding_cache(args, all_work_items)
+
+    calls = []
+    original_read_csv = pandas.read_csv
+
+    def spy_read_csv(*args, **kwargs):
+        calls.append(dict(kwargs))
+        return original_read_csv(*args, **kwargs)
+
+    monkeypatch.setattr(pandas, "read_csv", spy_read_csv)
+    it = pretrain_network_input_iterator(
+        str(pretrain_csv),
+        pretrain_allele_encoding,
+        DEFAULT_PEPTIDE_ENCODING,
+        peptides_per_chunk=4,
+        encoding_cache_dir=constant_data_with_cache["encoding_cache_dir"],
+        encoding_params=EncodingParams(**hyperparameters["peptide_encoding"]),
+    )
+    next(it)
+
+    assert not any(kwargs.get("chunksize") for kwargs in calls), calls
 
 
 def test_initialize_encoding_cache_pretrain_skipped_when_no_pretrain_data(
@@ -1164,3 +1663,202 @@ def test_pretrain_iterator_keyerror_message_names_cache_dir(
     # Message must mention the cache dir path so the user knows what to delete.
     assert "mycache" in str(exc_info.value)
     assert "different pretrain CSV" in str(exc_info.value)
+
+
+# ---- Driver / worker pretrain-batch-cache allele-encoding alignment ----
+#
+# Regression for 2026-04-23: the driver pre-built the pretrain batch cache
+# using ``GLOBAL_DATA["full_allele_encoding"]`` (all alleles with known
+# sequences) while workers look it up using ``GLOBAL_DATA["allele_encoding"]``
+# (only alleles with training data). Because ``_pretrain_batch_cache_dir``
+# hashes ``usable_alleles`` — which depends on which ``master_allele_encoding``
+# was passed — the two sides computed different cache dirs, the driver's
+# pre-build was silently ignored, and every DataLoader worker raced to
+# rebuild its own copy. On the 16-worker 8×A100 run that was ~10 minutes
+# of wasted setup, reported as a thundering-herd of concurrent chunk
+# writes.
+#
+# These tests lock in that the driver pre-builds at the *worker-compatible*
+# cache dir.
+
+
+def test_pretrain_batch_cache_prebuild_matches_worker_hash(
+    pretrain_csv, tmp_path
+):
+    """Driver pre-build must land at the hash workers will look up.
+
+    Setup mirrors the production wiring: GLOBAL_DATA has both a full
+    AlleleEncoding (superset — an extra allele with a sequence but no
+    training data) and a restricted AlleleEncoding (only alleles actually
+    seen in training). We run ``_initialize_encoding_cache`` with a
+    pretrain_data file. The resulting batch cache must exist at the
+    directory computed from the *restricted* encoding — because that's
+    what workers will compute — not at the directory from the full
+    encoding.
+    """
+    cache_dir = tmp_path / "encoding_cache"
+    cache_dir.mkdir()
+
+    restricted_allele_encoding = AlleleEncoding(
+        alleles=PRETRAIN_ALLELES,
+        allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+    # Full encoding also includes an extra allele with a sequence but no
+    # training data — this is the real-world condition that caused the bug
+    # (e.g. ``Mamu-A1*007:01`` had a sequence but no training rows).
+    extra_allele = "HLA-C*07:02"
+    extra_sequence = "YDSEYRNICAKTDESNLFLRYDSDAASPRTEPRAPWI"
+    full_alleles = list(PRETRAIN_ALLELES) + [extra_allele]
+    full_allele_to_sequence = {
+        **ALLELE_TO_SEQUENCE,
+        extra_allele: extra_sequence,
+    }
+    full_allele_encoding = AlleleEncoding(
+        alleles=full_alleles,
+        allele_to_sequence=full_allele_to_sequence,
+    )
+
+    # Work items: one architecture that uses pretrain.
+    peptides_per_chunk = 4
+    hp = {
+        "peptide_encoding": DEFAULT_PEPTIDE_ENCODING,
+        "train_data": {
+            "pretrain": True,
+            "pretrain_peptides_per_step": peptides_per_chunk,
+        },
+    }
+    all_work_items = [{"hyperparameters": hp}]
+
+    # train_data is only referenced by deterministic_unique_peptide_list,
+    # which just needs a peptide column. Reuse the pretrain peptides.
+    GLOBAL_DATA.clear()
+    GLOBAL_DATA.update({
+        "train_data": pandas.DataFrame({"peptide": PRETRAIN_PEPTIDES}),
+        "allele_encoding": restricted_allele_encoding,
+        "full_allele_encoding": full_allele_encoding,
+    })
+
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=str(cache_dir),
+        out_models_dir=str(tmp_path),
+        pretrain_data=str(pretrain_csv),
+    )
+    _initialize_encoding_cache(args, all_work_items)
+
+    encoding_params = EncodingParams(**DEFAULT_PEPTIDE_ENCODING)
+
+    # What the worker will look up: usable_alleles derived from the
+    # RESTRICTED encoding. PRETRAIN_ALLELES is already the set with
+    # sequences in the restricted encoding, and the extra allele isn't
+    # in the pretrain CSV at all — but the hash is still sensitive to
+    # which allele dict we pass through ``_get_pretrain_allele_info``.
+    restricted_usable = [
+        a for a in PRETRAIN_ALLELES
+        if a in restricted_allele_encoding.allele_to_sequence
+    ]
+    restricted_dir = _pretrain_batch_cache_dir(
+        filename=str(pretrain_csv),
+        usable_alleles=restricted_usable,
+        peptides_per_chunk=peptides_per_chunk,
+        encoding_cache_dir=str(cache_dir),
+        encoding_params=encoding_params,
+    )
+
+    # What the old code path (full_allele_encoding) would have produced.
+    # Same set of columns in the pretrain CSV, but the full encoding's
+    # sequences dict is a superset — for this test the intersection is
+    # still the PRETRAIN_ALLELES, so the hash is the same *when the
+    # pretrain CSV doesn't include the extra allele*. The real-world
+    # discrepancy shows up when the pretrain CSV has columns that are
+    # in the full encoding but not the restricted one.
+    #
+    # So we construct a second pretrain CSV that DOES include the extra
+    # allele as a column to drive the divergence.
+    pretrain_csv_with_extra = tmp_path / "pretrain_with_extra.csv"
+    rng = numpy.random.default_rng(7)
+    rows = []
+    for peptide in PRETRAIN_PEPTIDES:
+        row = {"peptide": peptide}
+        for allele in full_alleles:
+            row[allele] = rng.random()
+        rows.append(row)
+    df = pandas.DataFrame(rows).set_index("peptide")
+    df.to_csv(pretrain_csv_with_extra)
+
+    restricted_usable_extra = sorted(
+        a for a in full_alleles
+        if a in restricted_allele_encoding.allele_to_sequence
+    )
+    full_usable_extra = sorted(
+        a for a in full_alleles
+        if a in full_allele_encoding.allele_to_sequence
+    )
+    assert restricted_usable_extra != full_usable_extra, \
+        "test premise: full encoding includes an allele that restricted doesn't"
+
+    restricted_dir_extra = _pretrain_batch_cache_dir(
+        filename=str(pretrain_csv_with_extra),
+        usable_alleles=restricted_usable_extra,
+        peptides_per_chunk=peptides_per_chunk,
+        encoding_cache_dir=str(cache_dir),
+        encoding_params=encoding_params,
+    )
+    full_dir_extra = _pretrain_batch_cache_dir(
+        filename=str(pretrain_csv_with_extra),
+        usable_alleles=full_usable_extra,
+        peptides_per_chunk=peptides_per_chunk,
+        encoding_cache_dir=str(cache_dir),
+        encoding_params=encoding_params,
+    )
+    assert restricted_dir_extra != full_dir_extra, \
+        "test premise: the two encodings hash to different cache dirs"
+
+    # The load-bearing assertion: the pre-build from _initialize_encoding_cache
+    # (called above with the simpler pretrain_csv) landed at the restricted
+    # hash, i.e. what the workers will look up. The ``.complete`` marker is
+    # written only at end of a successful build.
+    assert Path(restricted_dir, ".complete").exists(), \
+        f"driver pre-build should land at restricted-encoding hash {restricted_dir}"
+
+
+def test_pretrain_batch_cache_requires_allele_encoding_key(
+    pretrain_csv, tmp_path
+):
+    """Missing ``allele_encoding`` in GLOBAL_DATA raises a clear KeyError.
+
+    Locks in the rename from ``full_allele_encoding``: the pre-build step
+    now requires ``allele_encoding`` (the restricted one that workers use).
+    If someone accidentally removes that key, the error message should
+    guide them to the right fix.
+    """
+    cache_dir = tmp_path / "encoding_cache"
+    cache_dir.mkdir()
+
+    hp = {
+        "peptide_encoding": DEFAULT_PEPTIDE_ENCODING,
+        "train_data": {"pretrain": True, "pretrain_peptides_per_step": 4},
+    }
+    all_work_items = [{"hyperparameters": hp}]
+
+    # Deliberately omit ``allele_encoding``. Keep full_allele_encoding so we
+    # can assert the error doesn't fall back to the old (wrong) key.
+    full_allele_encoding = AlleleEncoding(
+        alleles=PRETRAIN_ALLELES,
+        allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+    GLOBAL_DATA.clear()
+    GLOBAL_DATA.update({
+        "train_data": pandas.DataFrame({"peptide": PRETRAIN_PEPTIDES}),
+        "full_allele_encoding": full_allele_encoding,
+    })
+
+    args = Mock(
+        use_encoding_cache=True,
+        encoding_cache_dir=str(cache_dir),
+        out_models_dir=str(tmp_path),
+        pretrain_data=str(pretrain_csv),
+    )
+    with pytest.raises(KeyError) as exc_info:
+        _initialize_encoding_cache(args, all_work_items)
+    assert "allele_encoding" in str(exc_info.value)

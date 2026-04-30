@@ -48,6 +48,11 @@ import pandas
 from .downloads import get_default_class1_presentation_models_dir
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
+from .local_parallelism import (
+    add_prediction_parallelism_args,
+    chunk_ranges_for_local_parallelism,
+    worker_pool_with_gpu_assignments_from_args,
+)
 from .version import __version__
 
 
@@ -172,6 +177,85 @@ model_args.add_argument(
     default=False,
     help="Do not use flanking sequence information even when available")
 
+add_prediction_parallelism_args(parser)
+
+
+_PREDICTOR_CACHE = {}
+
+
+def _load_predictor_for_command(models_dir):
+    """
+    Load a presentation predictor or wrap an affinity-only predictor.
+
+    Returns
+    -------
+    tuple
+        ``(predictor, affinity_only_models)``.
+    """
+    cache_key = os.path.abspath(models_dir)
+    if cache_key not in _PREDICTOR_CACHE:
+        if os.path.exists(os.path.join(models_dir, "weights.csv")):
+            predictor = Class1PresentationPredictor.load(models_dir)
+            affinity_only_models = False
+        else:
+            affinity_predictor = Class1AffinityPredictor.load(models_dir)
+            predictor = Class1PresentationPredictor(
+                affinity_predictor=affinity_predictor)
+            affinity_only_models = True
+        _PREDICTOR_CACHE[cache_key] = (predictor, affinity_only_models)
+    return _PREDICTOR_CACHE[cache_key]
+
+
+def _allele_string_to_alleles(df, allele_column):
+    return (
+        df.drop_duplicates(allele_column).set_index(
+            allele_column, drop=False)[
+                allele_column
+        ].str.split(r"[,\s]+")).to_dict()
+
+
+def _predict_dataframe_chunk(predictor, df, options):
+    allele_string_to_alleles = _allele_string_to_alleles(
+        df, options["allele_column"])
+
+    if options["affinity_only"]:
+        predictions = predictor.predict_affinity(
+            peptides=df[options["peptide_column"]].values,
+            alleles=allele_string_to_alleles,
+            sample_names=df[options["allele_column"]],
+            throw=options["throw"],
+            include_affinity_percentile=options[
+                "include_affinity_percentile"],
+            model_kwargs=options["affinity_model_kwargs"])
+    else:
+        n_flanks = None
+        c_flanks = None
+        if options["use_flanking"]:
+            n_flanks = df[options["n_flank_column"]]
+            c_flanks = df[options["c_flank_column"]]
+
+        predictions = predictor.predict(
+            peptides=df[options["peptide_column"]].values,
+            n_flanks=n_flanks,
+            c_flanks=c_flanks,
+            alleles=allele_string_to_alleles,
+            sample_names=df[options["allele_column"]],
+            throw=options["throw"],
+            include_affinity_percentile=options[
+                "include_affinity_percentile"],
+            affinity_model_kwargs=options["affinity_model_kwargs"],
+            processing_batch_size=options["processing_batch_size"])
+
+    predictions = predictions.reset_index(drop=True)
+    predictions.index = df.index
+    return predictions
+
+
+def _predict_dataframe_chunk_worker(work_item):
+    predictor, _ = _load_predictor_for_command(work_item["models_dir"])
+    predictions = _predict_dataframe_chunk(
+        predictor, work_item["dataframe"], work_item["options"])
+    return work_item["chunk_num"], predictions
 
 def run(argv=sys.argv[1:]):
     if not argv:
@@ -191,19 +275,12 @@ def run(argv=sys.argv[1:]):
         # message instructing them to download the models if needed.
         models_dir = get_default_class1_presentation_models_dir(test_exists=True)
 
-    if os.path.exists(os.path.join(models_dir, "weights.csv")):
-        # Using a presentation predictor.
-        predictor = Class1PresentationPredictor.load(models_dir)
-    else:
-        # Using just an affinity predictor.
-        affinity_predictor = Class1AffinityPredictor.load(models_dir)
-        predictor = Class1PresentationPredictor(
-            affinity_predictor=affinity_predictor)
-        if not args.affinity_only:
-            logging.warning(
-                "Specified models are an affinity predictor, which implies "
-                "--affinity-only. Specify this argument to silence this warning.")
-            args.affinity_only = True
+    predictor, affinity_only_models = _load_predictor_for_command(models_dir)
+    if affinity_only_models and not args.affinity_only:
+        logging.warning(
+            "Specified models are an affinity predictor, which implies "
+            "--affinity-only. Specify this argument to silence this warning.")
+        args.affinity_only = True
 
     if args.list_supported_alleles:
         print("\n".join(predictor.supported_alleles))
@@ -242,45 +319,77 @@ def run(argv=sys.argv[1:]):
             "Predicting for %d alleles and %d peptides = %d predictions" % (
                 len(args.alleles), len(args.peptides), len(df)))
 
-    allele_string_to_alleles = (
-        df.drop_duplicates(args.allele_column).set_index(
-            args.allele_column, drop=False)[
-                args.allele_column
-        ].str.split(r"[,\s]+")).to_dict()
+    df = df.reset_index(drop=True)
+    allele_string_to_alleles = _allele_string_to_alleles(
+        df, args.allele_column)
 
-    if args.affinity_only:
-        predictions = predictor.predict_affinity(
-            peptides=df[args.peptide_column].values,
-            alleles=allele_string_to_alleles,
-            sample_names=df[args.allele_column],
-            throw=not args.no_throw,
-            include_affinity_percentile=not args.no_affinity_percentile)
+    use_flanking = (
+        not args.no_flanking
+        and args.n_flank_column in df.columns
+        and args.c_flank_column in df.columns
+    )
+    if not args.affinity_only and not args.no_flanking and not use_flanking:
+        logging.warning(
+            "No flanking information provided. Specify --no-flanking "
+            "to silence this warning")
+
+    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+
+    affinity_model_kwargs = {}
+    if getattr(args, "max_workers_per_gpu", None):
+        affinity_model_kwargs["num_workers_per_gpu"] = int(
+            args.max_workers_per_gpu)
+
+    prediction_options = {
+        "affinity_only": args.affinity_only,
+        "allele_column": args.allele_column,
+        "peptide_column": args.peptide_column,
+        "n_flank_column": args.n_flank_column,
+        "c_flank_column": args.c_flank_column,
+        "use_flanking": use_flanking,
+        "throw": not args.no_throw,
+        "include_affinity_percentile": not args.no_affinity_percentile,
+        "affinity_model_kwargs": affinity_model_kwargs,
+        "processing_batch_size": "auto",
+    }
+
+    if len(df) == 0:
+        if worker_pool is not None:
+            worker_pool.close()
+            worker_pool.join()
+        predictions = pandas.DataFrame(index=df.index)
+    elif worker_pool is None:
+        predictions = _predict_dataframe_chunk(
+            predictor, df, prediction_options)
     else:
-        n_flanks = None
-        c_flanks = None
-        if not args.no_flanking:
-            if args.n_flank_column in df.columns and args.c_flank_column in df.columns:
-                n_flanks = df[args.n_flank_column]
-                c_flanks = df[args.c_flank_column]
-            else:
-                logging.warning(
-                    "No flanking information provided. Specify --no-flanking "
-                    "to silence this warning")
-
-        predictions = predictor.predict(
-            peptides=df[args.peptide_column].values,
-            n_flanks=n_flanks,
-            c_flanks=c_flanks,
-            alleles=allele_string_to_alleles,
-            sample_names=df[args.allele_column],
-            throw=not args.no_throw,
-            include_affinity_percentile=not args.no_affinity_percentile)
+        ranges = chunk_ranges_for_local_parallelism(len(df), args.num_jobs)
+        work_items = [
+            {
+                "chunk_num": chunk_num,
+                "models_dir": models_dir,
+                "dataframe": df.iloc[start:end].copy(),
+                "options": prediction_options,
+            }
+            for (chunk_num, start, end) in ranges
+        ]
+        try:
+            results = worker_pool.imap_unordered(
+                _predict_dataframe_chunk_worker, work_items, chunksize=1)
+            chunks = [result for result in results]
+        finally:
+            worker_pool.close()
+            worker_pool.join()
+        predictions = pandas.concat(
+            [chunk for (_, chunk) in sorted(chunks)],
+            axis=0,
+        ).sort_index()
 
     # If each query is just for a single allele, the "best_allele" column
     # is redundant so we remove it.
     if not args.always_include_best_allele:
         if all(len(a) == 1 for a in allele_string_to_alleles.values()):
-            del predictions["best_allele"]
+            if "best_allele" in predictions:
+                del predictions["best_allele"]
 
     for col in predictions.columns:
         if col not in ("allele", "peptide", "sample_name", "peptide_num"):

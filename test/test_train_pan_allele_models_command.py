@@ -15,7 +15,12 @@ import pytest
 from numpy.testing import assert_array_less
 
 from mhcflurry import Class1AffinityPredictor
+from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
+from mhcflurry.train_pan_allele_models_command import (
+    _pop_train_param,
+    pretrain_data_iterator,
+)
 from .pytest_helpers import mhcflurry_cli
 
 from mhcflurry.testing_utils import cleanup, startup
@@ -134,6 +139,53 @@ TWLEAGSCNKFWCHY,43256.5,39229.2,31846.7,41249.1,22922.0,35472.1,37847.5,39274.3,
 EEATDSRNYMRRL,43309.9,39975.1,36980.8,40770.0,26845.4,31663.4,18520.3,40400.6,32317.1,28377.1,38169.4,35509.3,39890.3,41532.5,38309.8,38115.8,40846.9,36438.1,37093.9,42930.5,39579.2,34478.8,37658.8,40705.5,38297.7,41800.1,33067.9,33014.0,32985.0,34258.1,41326.6,38227.3,39134.9,32951.4,42209.4,41582.2,33913.4,37663.4,33216.3,38646.4,30554.2,33276.9,33973.5,30058.9,25584.4,33144.6,32602.9,38320.0,33672.5,39174.1,40919.7,42064.5,40530.9,28407.8,33487.5,32993.4,42157.0,44495.1,34922.9,31182.7,21642.8,18956.3,29151.9,23436.5,17335.5,28156.7,30184.3,19678.7,31271.4,39334.2,41414.2,31418.8,31800.9,16677.8,38726.9,35946.1,37806.4,36625.3,40075.2,36961.7,37460.0,40782.8,38173.0,42921.7,31447.5,38095.7,42302.2,46969.4,34483.4,35123.9,35823.2,43203.7,44314.5,30994.0,34785.4,35043.5,42765.9,39533.0,35406.3,35756.6,39472.2,30912.6,39842.7
 MSGDACND,39531.0,39404.3,42689.8,36631.0,24512.5,31873.8,22499.5,35348.8,27067.7,27959.4,36059.9,36380.6,40222.8,39885.0,35657.4,36346.6,37150.1,33696.8,35618.9,39815.2,37296.2,30732.1,30971.3,38186.1,33521.8,38861.9,32692.8,37045.0,37182.4,35007.3,35006.2,30627.5,21765.5,28733.2,38896.4,31030.8,34166.9,25154.9,37154.9,33131.6,26235.8,28117.1,32986.3,35470.5,26935.0,28876.1,27638.4,38167.8,21090.3,31994.7,32821.9,38174.9,26573.1,31407.1,35055.4,35544.4,35526.5,41595.8,36912.0,35058.5,32903.2,31917.8,28423.1,34514.3,39786.8,33805.7,23372.3,35819.7,25962.6,35199.4,35434.9,20873.3,10865.1,30611.6,26672.0,16901.8,32916.3,33854.9,34604.6,15853.9,22614.9,36981.8,36604.8,42344.9,37295.1,38385.0,39678.6,45767.9,36136.8,38201.6,35585.8,29834.5,26730.9,29939.4,17543.7,24477.3,36685.4,33534.9,40217.3,34840.3,25639.9,33476.0,38813.7
 """.strip()
+
+
+def test_pop_train_param_supports_pretrain_peptides_per_epoch_alias():
+    train_params = {"pretrain_peptides_per_epoch": 64}
+
+    actual = _pop_train_param(
+        train_params,
+        names=("pretrain_peptides_per_step", "pretrain_peptides_per_epoch"),
+        default=1024,
+        verbose=0,
+    )
+
+    assert actual == 64
+    assert train_params == {}
+
+
+def test_pretrain_data_iterator_keeps_short_final_chunk(tmp_path):
+    df = pandas.DataFrame(
+        {
+            "HLA-A*01:01": [100.0, 200.0, 300.0],
+            "HLA-A*02:01": [150.0, 250.0, 350.0],
+        },
+        index=["SIINFEKL", "LLFGYPVYV", "KLGGALQAK"],
+    )
+    filename = tmp_path / "pretrain.csv"
+    df.to_csv(filename)
+
+    master_allele_encoding = AlleleEncoding(
+        ["HLA-A*01:01", "HLA-A*02:01"],
+        allele_to_sequence={
+            "HLA-A*01:01": "A" * 34,
+            "HLA-A*02:01": "C" * 34,
+        },
+    )
+
+    iterator = pretrain_data_iterator(
+        str(filename),
+        master_allele_encoding,
+        peptides_per_chunk=2,
+    )
+    first = next(iterator)
+    second = next(iterator)
+
+    assert len(first[1]) == 4
+    assert len(first[2]) == 4
+    assert len(second[1]) == 2
+    assert len(second[2]) == 2
 
 def run_and_check(n_jobs=0, delete=True, additional_args=[]):
     models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
@@ -365,20 +417,23 @@ def test_run_parallel_encoding_cache_warm_reuse():
         _run_with_cache_and_check(n_jobs=2, cache_dir=shared_cache_dir)
         # First run built the cache; capture mtimes to verify they don't
         # change on the second (warm) run.
-        entries_after_first = sorted(os.listdir(shared_cache_dir))
-        complete_mtimes_first = {
-            e: os.path.getmtime(
-                os.path.join(shared_cache_dir, e, ".complete")
+        complete_mtimes_first = {}
+        for (dirpath, _dirnames, filenames) in os.walk(shared_cache_dir):
+            if ".complete" not in filenames:
+                continue
+            rel_dir = os.path.relpath(dirpath, shared_cache_dir)
+            complete_mtimes_first[rel_dir] = os.path.getmtime(
+                os.path.join(dirpath, ".complete")
             )
-            for e in entries_after_first
-            if os.path.isdir(os.path.join(shared_cache_dir, e))
-        }
+        assert complete_mtimes_first, (
+            f"expected at least one completed cache entry in {shared_cache_dir}"
+        )
 
         _run_with_cache_and_check(n_jobs=2, cache_dir=shared_cache_dir)
 
         # Second run should not have rewritten .complete (cache hit path).
-        for e, mtime_first in complete_mtimes_first.items():
-            sentinel_path = os.path.join(shared_cache_dir, e, ".complete")
+        for (entry_dir, mtime_first) in complete_mtimes_first.items():
+            sentinel_path = os.path.join(shared_cache_dir, entry_dir, ".complete")
             mtime_second = os.path.getmtime(sentinel_path)
             assert mtime_second == mtime_first, (
                 f"{sentinel_path} was rewritten between runs "

@@ -188,7 +188,7 @@ to train models for. Here's an example specifying a single architecture:
       locally_connected_layers: []
       loss: custom:mse_with_inequalities
       max_epochs: 500
-      minibatch_size: 128
+      minibatch_size: 16384
       n_models: 4
       output_activation: sigmoid
       patience: 20
@@ -262,5 +262,51 @@ MHCflurry behavior can be modified using these environment variables:
     affects both allele-specific and pan-allele predictors. It can have large
     effects on performance. Alternatively, if you are running out of memory,
     you can try decreasing the batch size.
+
+Auto-resolved training/calibration knobs
+-------------------------------------------------
+
+Several CLI flags accept the literal string ``auto`` and resolve to a
+hardware-derived value at runtime. These cover the moving pieces that
+used to require manual tuning per-box:
+
+``--max-workers-per-gpu auto``
+    Number of training workers to schedule on each GPU. Resolved from
+    free VRAM and per-fit memory footprint. Override with the env var
+    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` (default 4 GB
+    for fit, 12 GB for calibrate's ``cached_stages`` cache).
+
+``--dataloader-num-workers auto``
+    Per-fit DataLoader child count. Resolved from cores, RAM, and the
+    per-child SHM cost.
+
+``--torch-compile auto``
+    Enables ``torch.compile`` only on CUDA/MPS where the warmup cost
+    amortizes; falls back to eager on CPU. Compile threads come from
+    ``TORCHINDUCTOR_COMPILE_THREADS``.
+
+``--num-jobs auto``
+    Total worker pool size; resolved as ``gpus × max_workers_per_gpu``.
+
+When these resolvers misjudge (most often the calibrate auto-sizer's
+cache-bytes estimate when the merged ensemble has many sub-networks),
+hard-pin the value with an integer instead and the resolver is
+bypassed. The auto-sizer logs every input it used at INFO so the
+post-mortem is visible in the log.
+
+Also new in 2.3.0
+-------------------------------------------------
+
+* ``fit()`` defaults to **device-resident** tensors on CUDA — the
+  previous host/SHM DataLoader path is the fallback when the model
+  doesn't fit on-device. Override with
+  ``MHCFLURRY_AUTO_FIT_RESIDENCY_VRAM_BUDGET_FRACTION`` or by passing
+  ``residency="host"`` to ``fit()``.
+* The pan-allele calibrate command has a GPU fast path
+  (``--gpu-batched``) that batches alleles into a single forward and
+  computes the percent-rank histogram + motif summary on device. ~4×
+  faster per worker than the legacy per-allele path; per-allele
+  output (``percent_ranks.csv.bz2``, ``frequency_matrices.csv.bz2``,
+  ``length_distributions.csv.bz2``) is bit-equal to the legacy schema.
 
 

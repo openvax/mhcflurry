@@ -79,6 +79,8 @@ target/
 
 # Runner outputs
 out/
+brev_runs/
+sweep_results/
 
 # Claude Code local state
 .claude/

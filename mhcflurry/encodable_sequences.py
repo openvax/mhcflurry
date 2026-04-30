@@ -65,7 +65,9 @@ class EncodableSequences(object):
             alignment_method="pad_middle",
             left_edge=4,
             right_edge=4,
-            max_length=15):
+            max_length=15,
+            trim=False,
+            allow_unsupported_amino_acids=False):
         """
         Encode variable-length sequences to a fixed-size index-encoded (integer)
         matrix.
@@ -81,6 +83,12 @@ class EncodableSequences(object):
         right_edge : int, size of the fixed-position right side
             Only relevant for pad_middle alignment method
         max_length : maximum supported peptide length
+        trim : bool
+            If True, longer sequences will be trimmed to fit the maximum
+            supported length. Not supported for all alignment methods.
+        allow_unsupported_amino_acids : bool
+            If True, non-canonical amino acids will be replaced with the X
+            character before encoding.
 
         Returns
         -------
@@ -95,7 +103,9 @@ class EncodableSequences(object):
             alignment_method,
             left_edge,
             right_edge,
-            max_length)
+            max_length,
+            trim,
+            allow_unsupported_amino_acids)
 
         if cache_key not in self.encoding_cache:
             fixed_length_sequences = (
@@ -104,7 +114,9 @@ class EncodableSequences(object):
                     alignment_method=alignment_method,
                     left_edge=left_edge,
                     right_edge=right_edge,
-                    max_length=max_length))
+                    max_length=max_length,
+                    trim=trim,
+                    allow_unsupported_amino_acids=allow_unsupported_amino_acids))
             self.encoding_cache[cache_key] = fixed_length_sequences
         return self.encoding_cache[cache_key]
 
@@ -128,9 +140,12 @@ class EncodableSequences(object):
         Parameters
         ----------
         vector_encoding_name : string
-            How to represent amino acids.
-            One of "BLOSUM62", "one-hot", etc. Full list of supported vector
-            encodings is given by available_vector_encodings().
+            How to represent amino acids. Registered names include
+            "BLOSUM62", "one-hot", "PMBEC", "contact", "physchem", and
+            "atchley"; ``+``-joined composites such as
+            "BLOSUM62+physchem" are also accepted. Add the ``:minmax``
+            suffix to a component to scale its non-X values to [-1, 1],
+            for example "PMBEC:minmax+contact:minmax".
         alignment_method : string
             One of "pad_middle" or "left_pad_right_pad"
         left_edge : int
@@ -178,7 +193,7 @@ class EncodableSequences(object):
                     allow_unsupported_amino_acids=allow_unsupported_amino_acids))
             result = amino_acid.fixed_vectors_encoding(
                 fixed_length_sequences,
-                amino_acid.ENCODING_DATA_FRAMES[vector_encoding_name])
+                amino_acid.get_vector_encoding_df(vector_encoding_name))
             assert result.shape[0] == len(self.sequences)
             self.encoding_cache[cache_key] = result
         return self.encoding_cache[cache_key]

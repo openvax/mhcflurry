@@ -93,8 +93,10 @@ class AlleleEncoding(object):
         Parameters
         ----------
         encoding_name : string
-            How to represent amino acids. Valid names are "BLOSUM62" or
-            "one-hot". See `amino_acid.ENCODING_DATA_FRAMES`.
+            How to represent amino acids. Valid names include "BLOSUM62",
+            "one-hot", "PMBEC", "contact", "physchem", "atchley", and
+            ``+``-joined composites. Add ``:minmax`` to a component to scale
+            non-X values to [-1, 1]. See `amino_acid.available_vector_encodings()`.
 
         Returns
         -------
@@ -114,7 +116,7 @@ class AlleleEncoding(object):
                 amino_acid.AMINO_ACID_INDEX)
             vector_encoded = amino_acid.fixed_vectors_encoding(
                 index_encoded_matrix,
-                amino_acid.ENCODING_DATA_FRAMES[encoding_name])
+                amino_acid.get_vector_encoding_df(encoding_name))
             self.encoding_cache[cache_key] = vector_encoded
         return self.encoding_cache[cache_key]
 
@@ -125,8 +127,10 @@ class AlleleEncoding(object):
         Parameters
         ----------
         encoding_name : string
-            How to represent amino acids. Valid names are "BLOSUM62" or
-            "one-hot". See `amino_acid.ENCODING_DATA_FRAMES`.
+            How to represent amino acids. Valid names include "BLOSUM62",
+            "one-hot", "PMBEC", "contact", "physchem", "atchley", and
+            ``+``-joined composites. Add ``:minmax`` to a component to scale
+            non-X values to [-1, 1]. See `amino_acid.available_vector_encodings()`.
 
         Returns
         -------

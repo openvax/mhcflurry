@@ -36,6 +36,100 @@ class PercentRankTransform(object):
         numpy.cumsum(hist * 100.0 / numpy.sum(hist), out=self.cdf[2:-1])
         assert not numpy.isnan(self.cdf).any()
 
+    @classmethod
+    def fit_batch_torch(cls, values_2d, bin_edges_1d):
+        """Batched GPU fit across multiple distributions.
+
+        Equivalent to calling ``fit(values_2d[i], bins=bin_edges_1d)`` for
+        each row i, but vectorized across the row dim — eliminates the
+        per-allele Python loop in calibrate's hot path. Rows with no values
+        inside the bin range are invalid and raise instead of fabricating an
+        empty CDF.
+
+        Parameters
+        ----------
+        values_2d : torch.Tensor of shape (n_distributions, n_values).
+            Stays on whatever device it's on; histogram bucketing happens
+            there.
+        bin_edges_1d : torch.Tensor of shape (n_edges,), monotonically
+            increasing. Same device as values_2d.
+
+        Returns
+        -------
+        List of ``PercentRankTransform`` of length n_distributions.
+
+        Numerically equivalent to the per-row ``numpy.histogram`` path:
+        same bin assignment (right-open intervals, last bin inclusive),
+        same CDF normalization (% out of in-range count), bit-identical
+        ``cdf`` array layout (length n_bins+3, sentinels at [0]=[1]=0,
+        [-1]=100, cumsum in [2:-1]).
+        """
+        import torch
+        assert values_2d.dim() == 2, values_2d.shape
+        assert bin_edges_1d.dim() == 1, bin_edges_1d.shape
+        assert values_2d.device == bin_edges_1d.device
+        n_dist, n_values = values_2d.shape
+        n_edges = int(bin_edges_1d.numel())
+        n_bins = n_edges - 1
+        assert n_bins > 0
+        assert n_values > 0
+
+        # numpy.histogram semantics: bins are half-open ``[edges[k],
+        # edges[k+1])`` *except* the last bin which is closed
+        # ``[edges[-2], edges[-1]]``. Values strictly outside the bin
+        # range are dropped (not counted).
+        #
+        # torch.bucketize with right=True returns the first index k such
+        # that edges[k] > value:
+        #   value < edges[0]                  -> 0
+        #   value in [edges[k-1], edges[k])   -> k     (1..n_edges-1)
+        #   value == edges[-1]                -> n_edges (no edge > value)
+        #   value > edges[-1]                 -> n_edges
+        # The "last bin closed" rule means value == edges[-1] is in the
+        # last bin; we recover that by an explicit equality mask. Values
+        # below first edge or strictly above last edge get a weight of 0.
+        indices = torch.bucketize(values_2d, bin_edges_1d, right=True)
+        bin_idx = (indices - 1).clamp(min=0, max=n_bins - 1)
+        in_range_interior = (indices >= 1) & (indices <= n_bins)
+        last_edge_match = (values_2d == bin_edges_1d[-1])
+        weights = (in_range_interior | last_edge_match).long()
+
+        # In-place scatter_add fills hist[a, bin_idx[a, p]] += weight[a, p]
+        # vectorized across both axes.
+        hist = torch.zeros(n_dist, n_bins, dtype=torch.long, device=values_2d.device)
+        hist.scatter_add_(1, bin_idx, weights)
+
+        totals = hist.sum(dim=1, keepdim=True)
+        zero_total = totals == 0
+        if bool(zero_total.any().item()):
+            rows = torch.nonzero(zero_total.flatten(), as_tuple=False).flatten()
+            raise ValueError(
+                "Cannot fit PercentRankTransform for row(s) with no values "
+                "inside the bin range: %s" % rows.cpu().numpy().tolist()
+            )
+
+        math_dtype = (
+            torch.float32 if values_2d.device.type == "mps" else torch.float64
+        )
+        totals = totals.to(math_dtype)
+        cumsum = torch.cumsum(hist.to(math_dtype) * 100.0 / totals, dim=1)
+
+        cumsum_cpu = cumsum.cpu().numpy()
+        bin_edges_cpu = bin_edges_1d.cpu().numpy()
+
+        transforms = []
+        for i in range(n_dist):
+            t = cls()
+            cdf = numpy.empty(n_bins + 3, dtype=numpy.float64)
+            cdf[0] = 0.0
+            cdf[1] = 0.0
+            cdf[-1] = 100.0
+            cdf[2:-1] = cumsum_cpu[i]
+            t.cdf = cdf
+            t.bin_edges = bin_edges_cpu
+            transforms.append(t)
+        return transforms
+
     def transform(self, values):
         """
         Return percent ranks (range [0, 100]) for the given values.

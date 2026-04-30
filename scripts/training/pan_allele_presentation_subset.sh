@@ -27,6 +27,8 @@ export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
+export TORCHINDUCTOR_COMPILE_THREADS="${TORCHINDUCTOR_COMPILE_THREADS:-auto}"
+export MHCFLURRY_TORCH_COMPILE_LOSS="${MHCFLURRY_TORCH_COMPILE_LOSS:-1}"
 
 SUBSET_ARCHS="${SUBSET_ARCHS:-8}"
 # Per-worker GPU memory during mhcflurry training + validation inference
@@ -39,10 +41,11 @@ MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-2}"
 # USE_ENCODING_CACHE=0 to run the legacy path. Cache materializes under
 # $MHCFLURRY_OUT/affinity/encoding_cache.
 USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
-# DataLoader prefetch workers per training process. 0 = no prefetch
-# (bit-identical to pre-#268). 4 overlaps CPU data-prep with GPU
-# compute; each adds ~100-500 MB RSS.
-DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-4}"
+# DataLoader prefetch workers per training process. Production-sized fit()
+# datasets are automatically downgraded to 0 in Python to avoid spawn-pickling
+# fold arrays into children; keep this default small so pretrain/diagnostic
+# paths don't multiply process count and CPU reservation.
+DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-1}"
 REPO="${REPO:-$HOME/runplz-repo}"
 
 # Inject dataloader_num_workers into hyperparameters for all training
@@ -70,7 +73,7 @@ if [ "$GPUS" -eq 0 ]; then
 else
     NUM_JOBS="$(( GPUS * MAX_WORKERS_PER_GPU ))"
 fi
-PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker 1 --gpus $GPUS --max-workers-per-gpu $MAX_WORKERS_PER_GPU"
+PARALLELISM_ARGS="--num-jobs $NUM_JOBS --max-tasks-per-worker 1000 --gpus $GPUS --max-workers-per-gpu $MAX_WORKERS_PER_GPU"
 
 mkdir -p "$MHCFLURRY_OUT/affinity" "$MHCFLURRY_OUT/processing" "$MHCFLURRY_OUT/presentation"
 

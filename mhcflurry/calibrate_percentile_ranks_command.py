@@ -18,11 +18,20 @@ import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
-from .common import normalize_allele_name
+from .common import (
+    amino_acid_distribution,
+    configure_logging,
+    configure_pytorch,
+    filter_canonicalizable_alleles,
+    normalize_allele_name,
+    random_peptides,
+    write_generate_sh,
+)
 from .encodable_sequences import EncodableSequences
-from .common import configure_logging, random_peptides, amino_acid_distribution
 from .local_parallelism import (
+    attach_constant_data_to_work_items_if_needed,
     add_local_parallelism_args,
+    chunk_ranges_for_local_parallelism,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from .cluster_parallelism import (
@@ -106,11 +115,33 @@ parser.add_argument(
     nargs=2,
     help="Min and max peptide length to calibrate, inclusive. "
     "Default: %(default)s")
+# Back-compat alias: tests and external callers import this name from the
+# calibrate command module. The implementation now lives in
+# ``mhcflurry.common.filter_canonicalizable_alleles`` so it can be reused
+# by the select commands and any future iteration site.
+_filter_canonicalizable_alleles = filter_canonicalizable_alleles
+
+
+def _batch_size_arg(value):
+    """Accept either an int or the literal string 'auto' for --prediction-batch-size.
+
+    ``auto`` (the default) delegates sizing to
+    ``mhcflurry.class1_neural_network.compute_prediction_batch_size``,
+    which picks a per-GPU-memory batch, reserving the VRAM partition
+    across co-resident workers.
+    """
+    if isinstance(value, str) and value.strip().lower() in ("auto", ""):
+        return "auto"
+    return int(value)
+
+
 parser.add_argument(
     "--prediction-batch-size",
-    type=int,
-    default=4096,
-    help="Batch size for predictions")
+    type=_batch_size_arg,
+    default="auto",
+    help="Batch size for predictions. Pass an int to pin, or 'auto' "
+         "(default) to size per GPU free memory / workers-per-GPU — see "
+         "mhcflurry.class1_neural_network.compute_prediction_batch_size.")
 parser.add_argument(
     "--alleles-per-work-chunk",
     type=int,
@@ -122,6 +153,35 @@ parser.add_argument(
     type=int,
     help="Verbosity. Default: %(default)s",
     default=0)
+parser.add_argument(
+    "--gpu-batched",
+    default=False,
+    action="store_true",
+    help="[class1 affinity predictors only] Use the GPU-hoisted "
+         "calibration fast path (issue openvax/mhcflurry#272): "
+         "precompute peptide-side activations per network and batch "
+         "--gpu-allele-batch-size alleles into a single forward through "
+         "the merge + main dense path. Same output as the default path "
+         "(bit-identical on CUDA, ~1e-6 log-IC50 drift on MPS due to "
+         "missing fp64 support), typically 5-30x faster on CUDA for the "
+         "full pan-allele universe. Ignored when running a presentation "
+         "predictor or serial/cluster mode.")
+parser.add_argument(
+    "--gpu-allele-batch-size",
+    type=_batch_size_arg,
+    default="auto",
+    help="Alleles per GPU forward when --gpu-batched. Pass an int to "
+         "pin; 'auto' (default) partitions the VRAM budget with "
+         "--max-workers-per-gpu. Larger values trade off more VRAM for "
+         "fewer kernel launches.")
+parser.add_argument(
+    "--gpu-peptide-batch-size",
+    type=_batch_size_arg,
+    default="auto",
+    help="Peptide chunk size on device when --gpu-batched. Pass an int "
+         "to pin; 'auto' (default) picks the peptide axis of the "
+         "auto-sized budget. Reducing keeps peak VRAM down on smaller "
+         "GPUs but adds kernel-launch overhead.")
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
@@ -139,6 +199,35 @@ def run(argv=sys.argv[1:]):
     args.models_dir = os.path.abspath(args.models_dir)
 
     configure_logging(verbose=args.verbosity > 1)
+
+    # Resolve --max-workers-per-gpu='auto' to an int now, before any
+    # downstream consumer reads it (model_kwargs below + pool creation).
+    # The shared helper also caps auto-sized local Pools to GPU capacity and
+    # hoists torch.compile worker-thread defaults before forking.
+    #
+    # ``per_worker_gb=24`` overrides the train-default (4 GB) because
+    # calibrate's per-worker footprint is dominated by the cached_stages
+    # peptide-side activation tensor (~15 GB) plus CUDA + working state
+    # (~3 GB) × 1.3x safety. Without this hint, auto MWPG picks 4
+    # workers/GPU based on training's footprint, then the calibrate
+    # auto-sizer falls back to the minimum peptide_batch (~2000 rows)
+    # because each worker's budget runs out — defeating the purpose of
+    # the joint (a, p) optimization.
+    from .local_parallelism import resolve_local_parallelism_args
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+        per_worker_gb=24.0,
+    )
+
+    # If we're going to run in-process (serial — no worker pool), the
+    # forward kernels in this process must respect the requested
+    # backend. Worker pools take care of this in worker_init via
+    # configure_pytorch, but the parent never gets that path.
+    if (
+            getattr(args, "num_jobs", 0) == 0
+            and not getattr(args, "cluster_parallelism", False)):
+        configure_pytorch(backend=getattr(args, "backend", "auto") or "auto")
 
     aa_distribution = None
     if args.match_amino_acid_distribution_data:
@@ -171,15 +260,17 @@ def run(argv=sys.argv[1:]):
 
 
 def run_class1_presentation_predictor(args, peptides):
-    # This will trigger a Keras import - will break local parallelism.
     predictor = Class1PresentationPredictor.load(args.models_dir)
 
     if args.allele:
+        # Already canonicalized via normalize_allele_name above.
         alleles = [normalize_allele_name(a) for a in args.allele]
     elif args.alleles_file:
-        alleles = pandas.read_csv(args.alleles_file).allele.unique()
+        alleles = _filter_canonicalizable_alleles(
+            pandas.read_csv(args.alleles_file).allele.unique()
+        )
     else:
-        alleles = predictor.supported_alleles
+        alleles = _filter_canonicalizable_alleles(predictor.supported_alleles)
 
     print("Num alleles", len(alleles))
 
@@ -206,16 +297,77 @@ def run_class1_presentation_predictor(args, peptides):
     print("Sampled genotypes: ", list(genotypes))
     print("Num peptides: ", len(peptides))
 
+    GLOBAL_DATA["presentation_models_dir"] = args.models_dir
+    GLOBAL_DATA["presentation_peptides"] = peptides
+    affinity_model_kwargs = {"batch_size": args.prediction_batch_size}
+    if getattr(args, "max_workers_per_gpu", None):
+        affinity_model_kwargs["num_workers_per_gpu"] = int(
+            args.max_workers_per_gpu)
+    GLOBAL_DATA["presentation_predict_kwargs"] = {
+        "affinity_model_kwargs": affinity_model_kwargs,
+        "processing_batch_size": args.prediction_batch_size,
+    }
+    GLOBAL_DATA.pop("_presentation_predictor", None)
+    GLOBAL_DATA.pop("_presentation_predictor_models_dir", None)
+
+    serial_run = not args.cluster_parallelism and args.num_jobs == 0
+    if serial_run:
+        GLOBAL_DATA["_presentation_predictor"] = predictor
+
+    genotype_items = list(genotypes.items())
+    work_items = []
+    for (chunk_num, start, end) in chunk_ranges_for_local_parallelism(
+            len(genotype_items), args.num_jobs):
+        work_items.append({
+            "chunk_num": chunk_num,
+            "genotypes": dict(genotype_items[start:end]),
+        })
+
     start = time.time()
     print("Generating predictions")
-    predictions_df = predictor.predict(
-        peptides=peptides,
-        alleles=genotypes)
+    worker_pool = None
+    if serial_run:
+        print("Running in serial.")
+        results = (
+            do_class1_presentation_percent_rank_scores(**item)
+            for item in work_items)
+    elif args.cluster_parallelism:
+        print("Running on cluster.")
+        results = cluster_results_from_args(
+            args,
+            work_function=do_class1_presentation_percent_rank_scores,
+            work_items=work_items,
+            constant_data=GLOBAL_DATA,
+            result_serialization_method="pickle",
+            clear_constant_data=True)
+    else:
+        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        print("Worker pool", worker_pool)
+        assert worker_pool is not None
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
+        results = worker_pool.imap_unordered(
+            partial(call_wrapped_kwargs,
+                    do_class1_presentation_percent_rank_scores),
+            work_items,
+            chunksize=1)
+
+    score_chunks = [
+        scores for scores in tqdm.tqdm(results, total=len(work_items))
+    ]
+    if worker_pool:
+        worker_pool.close()
+        worker_pool.join()
     print("Finished in %0.2f sec." % (time.time() - start))
-    print(predictions_df)
+    scores = (
+        numpy.concatenate(score_chunks, axis=0)
+        if score_chunks
+        else numpy.array([], dtype=float)
+    )
+    print("Generated %d presentation scores." % len(scores))
 
     print("Calibrating ranks")
-    scores = predictions_df.presentation_score.values
     predictor.calibrate_percentile_ranks(scores)
     print("Done. Saving.")
 
@@ -227,7 +379,31 @@ def run_class1_presentation_predictor(args, peptides):
         write_percent_ranks=True,
         write_info=False,
         write_metdata=False)
+    write_generate_sh(args.models_dir)
     print("Wrote predictor to: %s" % args.models_dir)
+
+
+def _presentation_predictor_for_calibration(constant_data):
+    cache_key = constant_data["presentation_models_dir"]
+    predictor = GLOBAL_DATA.get("_presentation_predictor")
+    if (
+            predictor is None
+            or GLOBAL_DATA.get("_presentation_predictor_models_dir") != cache_key):
+        predictor = Class1PresentationPredictor.load(cache_key)
+        GLOBAL_DATA["_presentation_predictor"] = predictor
+        GLOBAL_DATA["_presentation_predictor_models_dir"] = cache_key
+    return predictor
+
+
+def do_class1_presentation_percent_rank_scores(
+        genotypes, chunk_num=None, constant_data=GLOBAL_DATA):
+    del chunk_num
+    predictor = _presentation_predictor_for_calibration(constant_data)
+    predictions_df = predictor.predict(
+        peptides=constant_data["presentation_peptides"],
+        alleles=genotypes,
+        **constant_data["presentation_predict_kwargs"])
+    return predictions_df.presentation_score.values
 
 
 def run_class1_affinity_predictor(args, peptides):
@@ -240,11 +416,15 @@ def run_class1_affinity_predictor(args, peptides):
     )
 
     if args.allele:
+        # Already canonicalized via normalize_allele_name above — pass
+        # through without re-filtering.
         alleles = [normalize_allele_name(a) for a in args.allele]
     elif args.alleles_file:
-        alleles = pandas.read_csv(args.alleles_file).allele.unique()
+        alleles = _filter_canonicalizable_alleles(
+            pandas.read_csv(args.alleles_file).allele.unique()
+        )
     else:
-        alleles = predictor.supported_alleles
+        alleles = _filter_canonicalizable_alleles(predictor.supported_alleles)
 
     allele_set = set(alleles)
 
@@ -285,13 +465,24 @@ def run_class1_affinity_predictor(args, peptides):
     # after fork, instead of needing to be pickled (when doing a parallel run).
     GLOBAL_DATA["calibration_peptides"] = encoded_peptides
     GLOBAL_DATA["predictor"] = predictor
+    model_kwargs = {
+        'batch_size': args.prediction_batch_size,
+    }
+    # Thread workers-per-GPU into the auto-size budget. The VRAM
+    # partition across co-resident workers matters only when the
+    # underlying predict path resolves ``"auto"`` — but it's cheap to
+    # always pass it through.
+    if getattr(args, 'max_workers_per_gpu', None):
+        model_kwargs['num_workers_per_gpu'] = int(args.max_workers_per_gpu)
     GLOBAL_DATA["args"] = {
         'motif_summary': args.motif_summary,
         'summary_top_peptide_fractions': args.summary_top_peptide_fraction,
         'verbose': args.verbosity > 0,
-        'model_kwargs': {
-            'batch_size': args.prediction_batch_size,
-        }
+        'model_kwargs': model_kwargs,
+        'gpu_batched': getattr(args, 'gpu_batched', False),
+        'gpu_allele_batch_size': getattr(args, 'gpu_allele_batch_size', 'auto'),
+        'gpu_peptide_batch_size': getattr(args, 'gpu_peptide_batch_size', 'auto'),
+        'num_workers_per_gpu': int(getattr(args, 'max_workers_per_gpu', 1) or 1),
     }
     del encoded_peptides
 
@@ -326,9 +517,9 @@ def run_class1_affinity_predictor(args, peptides):
         print("Worker pool", worker_pool)
         assert worker_pool is not None
 
-        for item in work_items:
-            item['constant_data'] = GLOBAL_DATA
-
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
         results = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, do_class1_affinity_calibrate_percentile_ranks),
             work_items,
@@ -350,6 +541,7 @@ def run_class1_affinity_predictor(args, peptides):
             print(df)
 
     predictor.save(args.models_dir, model_names_to_write=[])
+    write_generate_sh(args.models_dir)
 
     percent_rank_calibration_time = time.time() - start
 
@@ -368,6 +560,34 @@ def do_class1_affinity_calibrate_percentile_ranks(
     if 'predictor' not in constant_data:
         raise ValueError("No predictor provided: " + str(constant_data))
 
+    args = dict(constant_data["args"])
+    gpu_batched = args.pop('gpu_batched', False)
+    gpu_allele_batch_size = args.pop('gpu_allele_batch_size', "auto")
+    gpu_peptide_batch_size = args.pop('gpu_peptide_batch_size', "auto")
+    num_workers_per_gpu = args.pop('num_workers_per_gpu', 1)
+
+    if gpu_batched:
+        # Single fast-path call over the whole chunk — see
+        # Class1AffinityPredictor.calibrate_percentile_ranks_fast. The
+        # worker's chunk size (--alleles-per-work-chunk) gates the
+        # outer partition; within a chunk the allele sweep runs as
+        # fewer larger GPU forwards. num_workers_per_gpu narrows the
+        # VRAM partition the fast path claims so co-resident workers
+        # don't race each other into OOM.
+        return [
+            class1_affinity_calibrate_percentile_ranks_fast(
+                alleles=alleles,
+                predictor=constant_data['predictor'],
+                peptides=constant_data['calibration_peptides'],
+                motif_summary=args['motif_summary'],
+                summary_top_peptide_fractions=args['summary_top_peptide_fractions'],
+                verbose=args['verbose'],
+                gpu_allele_batch_size=gpu_allele_batch_size,
+                gpu_peptide_batch_size=gpu_peptide_batch_size,
+                num_workers_per_gpu=num_workers_per_gpu,
+            )
+        ]
+
     result_list = []
     for (i, allele) in enumerate(alleles):
         print("Processing allele", i + 1, "of", len(alleles))
@@ -375,9 +595,52 @@ def do_class1_affinity_calibrate_percentile_ranks(
             allele,
             constant_data['predictor'],
             peptides=constant_data['calibration_peptides'],
-            **constant_data["args"])
+            **args)
         result_list.append(result_item)
     return result_list
+
+
+def class1_affinity_calibrate_percentile_ranks_fast(
+        alleles,
+        predictor,
+        peptides,
+        motif_summary=False,
+        summary_top_peptide_fractions=(0.001,),
+        verbose=False,
+        gpu_allele_batch_size="auto",
+        gpu_peptide_batch_size="auto",
+        num_workers_per_gpu=1):
+    """Worker-side fast-path wrapper for the GPU-batched calibration path.
+
+    Returns the same ``(transforms_dict, summary_results)`` tuple the
+    per-allele wrapper produces so the surrounding result-aggregation
+    code doesn't need to know which path ran.
+    """
+    predictor.optimize()
+    start = time.time()
+    summary_results = predictor.calibrate_percentile_ranks_fast(
+        peptides=peptides,
+        alleles=alleles,
+        motif_summary=motif_summary,
+        summary_top_peptide_fractions=tuple(summary_top_peptide_fractions),
+        allele_batch_size=gpu_allele_batch_size,
+        peptide_batch_size=gpu_peptide_batch_size,
+        num_workers_per_gpu=num_workers_per_gpu,
+        verbose=verbose,
+    )
+    if verbose:
+        print(
+            "Done calibrating %d alleles in %0.2f sec via fast path" % (
+                len(alleles), time.time() - start,
+            )
+        )
+    transforms = {
+        allele: predictor.allele_to_percent_rank_transform[allele]
+        for allele in alleles
+    }
+    # Motif summary comes back pre-concatenated when fast path is used;
+    # mirror the legacy per-allele wrapper's return shape.
+    return (transforms, summary_results if motif_summary else None)
 
 
 def class1_affinity_calibrate_percentile_ranks(

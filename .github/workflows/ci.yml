@@ -38,6 +38,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
           auto-activate-base: false
 
+      - name: Lint shell scripts
+        run: |
+          # Catch syntax regressions in the training-pipeline shell
+          # wrappers cheaply. ``bash -n`` parses without executing.
+          set -e
+          mapfile -t shell_scripts < <(find scripts -type f -name "*.sh")
+          for script in "${shell_scripts[@]}"; do
+              echo "bash -n $script"
+              bash -n "$script"
+          done
+
       - name: Install python dependencies
         run: |
           pip install --upgrade pip

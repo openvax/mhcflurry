@@ -15,6 +15,11 @@ from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
+from .torch_training_loop import (
+    _configure_matmul_precision,
+    _maybe_compile_loss,
+    _maybe_compile_network,
+)
 
 
 class Class1ProcessingModel(nn.Module):
@@ -476,7 +481,7 @@ class Class1ProcessingNeuralNetwork(object):
         max_epochs=500,
         validation_split=0.1,
         early_stopping=True,
-        minibatch_size=256,
+        minibatch_size=512,
     )
     """
     Hyperparameters for neural network training.
@@ -640,6 +645,7 @@ class Class1ProcessingNeuralNetwork(object):
             disable.
         """
         device = self.get_device()
+        _configure_matmul_precision(device)
 
         x_dict = self.network_input(sequences)
 
@@ -664,12 +670,20 @@ class Class1ProcessingNeuralNetwork(object):
 
         network = self.network()
         network.to(device)
+        # torch.compile + TF32 are gated by env vars (off by default). Wiring
+        # them in keeps processing at parity with affinity's fit / fit_generator
+        # paths so production opt-ins (MHCFLURRY_TORCH_COMPILE=1) light up
+        # both trainers.
+        network = _maybe_compile_network(network, device)
 
         # Setup optimizer
         optimizer = self._create_optimizer(network)
 
-        # Loss function (binary cross-entropy)
-        loss_fn = nn.BCELoss(reduction='none')
+        # Loss function (binary cross-entropy). Route through the same
+        # compile gate as affinity losses so processing, affinity pretrain,
+        # and affinity finetune use one torch performance policy. Presentation
+        # training is a separate model family and does not enter this path.
+        loss_fn = _maybe_compile_loss(nn.BCELoss(reduction='none'), device)
         reg_l1, reg_l2 = self.hyperparameters.get(
             "convolutional_kernel_l1_l2",
             [0.0, 0.0],
@@ -682,9 +696,23 @@ class Class1ProcessingNeuralNetwork(object):
         n_val = int(n_total * val_split)
         n_train = n_total - n_val
 
-        indices = numpy.arange(n_total)
-        train_indices = indices[:n_train]
-        val_indices = indices[n_train:]
+        # Hoist all per-batch H2D copies to a single up-front device
+        # transfer. The processing dataset is small (peptide flanks for
+        # ~10–100k MS hits) so the whole thing fits on GPU comfortably;
+        # slicing by `batch_idx` on-device removes the per-step
+        # numpy.from_numpy + astype + .to(device) trio that this loop
+        # used to do every minibatch.
+        seq_dev = torch.from_numpy(x_dict["sequence"]).float().to(device)
+        length_dev = torch.from_numpy(x_dict["peptide_length"]).to(device)
+        targets_dev = torch.from_numpy(targets.astype(numpy.float32)).to(device)
+        weights_dev = (
+            torch.from_numpy(sample_weights.astype(numpy.float32)).to(device)
+            if sample_weights is not None
+            else None
+        )
+
+        train_indices_dev = torch.arange(n_train, device=device, dtype=torch.long)
+        val_indices_dev = torch.arange(n_train, n_total, device=device, dtype=torch.long)
 
         last_progress_print = None
         min_val_loss_iteration = None
@@ -695,18 +723,20 @@ class Class1ProcessingNeuralNetwork(object):
             epoch_start = time.time()
             network.train()
 
-            # Shuffle training indices each epoch
-            numpy.random.shuffle(train_indices)
+            # Shuffle training indices each epoch on-device
+            shuffled_train = train_indices_dev[
+                torch.randperm(n_train, device=device)
+            ]
 
             batch_size = self.hyperparameters["minibatch_size"]
             train_losses = []
 
             for batch_start in range(0, n_train, batch_size):
-                batch_idx = train_indices[batch_start:batch_start + batch_size]
+                batch_idx = shuffled_train[batch_start:batch_start + batch_size]
 
-                seq_batch = torch.from_numpy(x_dict["sequence"][batch_idx]).float().to(device)
-                length_batch = torch.from_numpy(x_dict["peptide_length"][batch_idx]).to(device)
-                target_batch = torch.from_numpy(targets[batch_idx].astype(numpy.float32)).to(device)
+                seq_batch = seq_dev.index_select(0, batch_idx)
+                length_batch = length_dev.index_select(0, batch_idx)
+                target_batch = targets_dev.index_select(0, batch_idx)
 
                 inputs = {"sequence": seq_batch, "peptide_length": length_batch}
 
@@ -714,11 +744,8 @@ class Class1ProcessingNeuralNetwork(object):
                 predictions = network(inputs)
                 loss = loss_fn(predictions, target_batch)
 
-                if sample_weights is not None:
-                    weight_batch = torch.from_numpy(
-                        sample_weights[batch_idx].astype(numpy.float32)
-                    ).to(device)
-                    loss = loss * weight_batch
+                if weights_dev is not None:
+                    loss = loss * weights_dev.index_select(0, batch_idx)
 
                 loss = loss.mean()
                 regularization_penalty = self._regularization_penalty(
@@ -740,18 +767,17 @@ class Class1ProcessingNeuralNetwork(object):
             if val_split > 0:
                 network.eval()
                 with torch.no_grad():
-                    val_seq = torch.from_numpy(x_dict["sequence"][val_indices]).float().to(device)
-                    val_length = torch.from_numpy(x_dict["peptide_length"][val_indices]).to(device)
-                    val_targets = torch.from_numpy(targets[val_indices].astype(numpy.float32)).to(device)
+                    val_seq = seq_dev.index_select(0, val_indices_dev)
+                    val_length = length_dev.index_select(0, val_indices_dev)
+                    val_targets = targets_dev.index_select(0, val_indices_dev)
 
                     val_inputs = {"sequence": val_seq, "peptide_length": val_length}
                     val_predictions = network(val_inputs)
                     val_loss = loss_fn(val_predictions, val_targets)
-                    if sample_weights is not None:
-                        val_weights = torch.from_numpy(
-                            sample_weights[val_indices].astype(numpy.float32)
-                        ).to(device)
-                        val_loss = val_loss * val_weights
+                    if weights_dev is not None:
+                        val_loss = val_loss * weights_dev.index_select(
+                            0, val_indices_dev,
+                        )
                     val_loss = val_loss.mean()
                     regularization_penalty = self._regularization_penalty(
                         regularization_parameters,
@@ -902,21 +928,34 @@ class Class1ProcessingNeuralNetwork(object):
             Peptides and flanking sequences
         throw : boolean
             Whether to throw exception on unsupported peptides
-        batch_size : int
-            Prediction batch size.
+        batch_size : int or ``"auto"``
+            Prediction batch size. ``"auto"`` (the default) auto-sizes
+            per the current device — see
+            ``mhcflurry.class1_neural_network.compute_prediction_batch_size``.
 
         Returns
         -------
         numpy.array
         """
+        from .class1_neural_network import resolve_prediction_batch_size
+
         device = self.get_device()
+        _configure_matmul_precision(device)
 
         x_dict = self.network_input(sequences, throw=throw)
         network = self.network()
         network.to(device)
+        network = _maybe_compile_network(network, device)
         network.eval()
 
+        batch_size = resolve_prediction_batch_size(
+            batch_size, device, model=network,
+        )
+
         n_samples = len(x_dict["sequence"])
+        if n_samples == 0:
+            return numpy.array([], dtype="float64")
+
         all_predictions = []
 
         def prediction_tensor(batch_array):

@@ -20,17 +20,64 @@ base_hyperparameters = {
     'locally_connected_layers': [],
     'topology': 'feedfoward',
     'loss': 'custom:mse_with_inequalities',
-    'max_epochs': 5000,
-    'minibatch_size': 128,
+    # Hard absolute cap (down from 5000). Median per-task epoch count
+    # observed on the 2026-04-25 verda_a100x8 run was 67 with max=174;
+    # 500 leaves comfortable headroom while preventing the runaway
+    # "patience-reset" tail where tiny noise improvements could keep a
+    # task alive for thousands of epochs.
+    'max_epochs': 500,
+    # Bumped 4096 → 16384 (closest power of 2 to 16k) after the
+    # 2026-04-28 release_full diagnostic showed mean GPU 0 util at ~1%
+    # with peak ~4% on the 1024×512 MLP at minibatch=4096: ~656 µs of
+    # compute per ~66 ms batch, i.e. the GPU is starved by the CPU
+    # input pipeline. Quadrupling the batch size drops batches/epoch
+    # from ~452 to ~113 and gives the input pipeline 4× more time to
+    # keep up. RMSprop absorbs the dynamics change; this widens the
+    # divergence from 2.2.0 weights already established by the
+    # 512 → 4096 step.
+    'minibatch_size': 16384,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
     "patience": 20,
-    "min_delta": 0.0,
+    # ``min_delta=0.0`` lets a 1e-9 RMSprop noise improvement reset the
+    # patience counter, which on the 2026-04-25 run caused tasks to
+    # stretch to 174 epochs against a median of 67. 1e-7 sits two
+    # orders above the observed noise-floor improvement rate
+    # (~4e-9 per epoch) so it cuts that pattern cleanly, while still
+    # preserving genuine late-escape trajectories — when an escape is
+    # real, the per-epoch val_loss drop is ≥1e-3, four orders above
+    # this threshold. 1e-6 (the prior draft) was more aggressive and
+    # would have killed the late-escape tasks visible on the live
+    # cohort (~3 of 16 workers at any given moment).
+    "min_delta": 1e-7,
+    # Run the validation pass every N epochs instead of every epoch.
+    # Validation represents a per-epoch GPU-sync barrier that prevents
+    # pipelining the next epoch's CPU prep with the current epoch's
+    # training tail. With minibatch=16384 the effective val batch is
+    # 4×minibatch=65536 (see ``_effective_validation_batch_size``), so a
+    # 244K-row val set is ~4 batches per pass. Early-stop check still
+    # fires reliably because patience=20 is far larger than
+    # ``validation_interval=5``. A final validation pass is forced
+    # before any patience-triggered break (see fit() loop).
+    "validation_interval": 5,
     'peptide_encoding': {
         'vector_encoding_name': 'BLOSUM62',
         'alignment_method': 'left_pad_centered_right_pad',
         'max_length': 15,
     },
+    # Phase 2 of issue openvax/mhcflurry#268: fixed peptide vector
+    # expansion as a frozen torch embedding table in the network's
+    # forward pass instead of a numpy lookup at peptide-encoding time.
+    # ``peptides_to_network_input`` returns int8 indices (cheap dict
+    # lookup) and torch widens to the configured fp32 vectors on CUDA,
+    # MPS, or CPU via the embedding lookup. Works for BLOSUM62, one-hot,
+    # PMBEC, contact, physchem, atchley, and +joined composites.
+    # Eliminates the ~17 sec/epoch CPU
+    # bottleneck in random-negative regeneration (with
+    # random_negative_pool_epochs=1 the CPU encoding fires every epoch).
+    # Forward parity vs numpy path verified by
+    # ``test_peptide_amino_acid_encoding_torch_forward_parity``.
+    'peptide_amino_acid_encoding_torch': True,
     'peptide_allele_merge_activation': '',
     'peptide_allele_merge_method': 'concatenate',
     'peptide_amino_acid_encoding': 'BLOSUM62',
@@ -43,6 +90,18 @@ base_hyperparameters = {
     'random_negative_rate': 1.0,
     'random_negative_method': 'by_allele_equalize_nonbinders',
     'random_negative_binder_threshold': 500.0,
+    # Phase 1 of issue openvax/mhcflurry#268: random-negative pool
+    # framework. ``pool_epochs=1`` preserves the pre-Phase-1 memory
+    # profile (one epoch of encoded negatives in heap at a time) and
+    # is the production-safe default. Setting >1 amortizes the
+    # generation+encoding cost across that many epochs but materializes
+    # ``pool_epochs × per_epoch_count`` peptides simultaneously per
+    # worker — at ``100`` on the 8xA100 release_exact run that was
+    # ~7.5 GB int8 per worker theoretically, but in practice ballooned
+    # to ~199 GB/worker (tooling overhead + intermediate Series) and
+    # OOM'd the 944 GB box. Hold at 1 until a streaming-rebuild fix
+    # lands that doesn't materialize the full N-epoch buffer at once.
+    'random_negative_pool_epochs': 1,
     'train_data': {
         'pretrain': True,
         'pretrain_peptides_per_epoch': 64,

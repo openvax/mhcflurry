@@ -287,7 +287,7 @@ class TestWeightInitialization:
             Class1NeuralNetwork,
             Class1NeuralNetworkModel,
         )
-        nn_obj = Class1NeuralNetwork()
+        nn_obj = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
         peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
         return Class1NeuralNetworkModel(
             peptide_encoding_shape=peptide_shape,
@@ -328,7 +328,7 @@ class TestMergedClass1NeuralNetwork:
             Class1NeuralNetworkModel,
             MergedClass1NeuralNetwork,
         )
-        nn_obj = Class1NeuralNetwork()
+        nn_obj = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
         peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
         torch.manual_seed(0)
         networks = []
@@ -393,7 +393,7 @@ class TestSkipConnectionsTopology:
             Class1NeuralNetwork,
             Class1NeuralNetworkModel,
         )
-        nn_obj = Class1NeuralNetwork()
+        nn_obj = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
         peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
         torch.manual_seed(7)
         model = Class1NeuralNetworkModel(
@@ -410,7 +410,7 @@ class TestSkipConnectionsTopology:
             Class1NeuralNetwork,
             Class1NeuralNetworkModel,
         )
-        nn_obj = Class1NeuralNetwork()
+        nn_obj = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
         peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
 
         torch.manual_seed(99)
@@ -495,6 +495,22 @@ class TestConfigurePyTorch:
         from mhcflurry import common
         with pytest.raises(ValueError, match="Invalid backend"):
             common.configure_pytorch(backend="gpuu")
+
+    def test_gpu_visibility_does_not_import_torch(self, monkeypatch):
+        import builtins
+        from mhcflurry import common
+
+        monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+        original_import = builtins.__import__
+
+        def guarded_import(name, *args, **kwargs):
+            if name == "torch" or name.startswith("torch."):
+                raise AssertionError("configure_pytorch imported torch")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", guarded_import)
+        common.configure_pytorch(gpu_device_nums=[2])
+        assert common.os.environ["CUDA_VISIBLE_DEVICES"] == "2"
 
     def test_default_backend_alias_maps_to_auto(self):
         from mhcflurry import common

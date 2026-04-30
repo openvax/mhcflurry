@@ -23,8 +23,13 @@ import tqdm  # progress bar
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .encodable_sequences import EncodableSequences
 from .allele_encoding import AlleleEncoding
-from .common import configure_logging
+from .common import (
+    configure_logging,
+    filter_canonicalizable_alleles,
+    write_generate_sh,
+)
 from .local_parallelism import (
+    attach_constant_data_to_work_items_if_needed,
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)
 from .cluster_parallelism import (
@@ -151,7 +156,13 @@ def run(argv=sys.argv[1:]):
         args.models_dir, optimization_level=0)
     print("Loaded: %s" % input_predictor)
 
-    alleles = input_predictor.supported_alleles
+    # Filter pseudogene / null / questionable alleles up front so a single
+    # bad row in ``input_predictor.supported_alleles`` doesn't crash the
+    # parallel selection pass mid-fold. Same helper that calibrate uses.
+    alleles = filter_canonicalizable_alleles(
+        input_predictor.supported_alleles,
+        log_label="supported_alleles",
+    )
     (min_peptide_length, max_peptide_length) = (
         input_predictor.supported_peptide_lengths)
 
@@ -226,6 +237,7 @@ def run(argv=sys.argv[1:]):
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
     worker_pool = None
     start = time.time()
+    print(f"TIMING_MARKER selection_start {start:.3f}")
     if serial_run:
         # Serial run
         print("Running in serial.")
@@ -247,9 +259,9 @@ def run(argv=sys.argv[1:]):
         print("Processing %d work items in parallel." % len(work_items))
         assert not serial_run
 
-        for item in work_items:
-            item['constant_data'] = GLOBAL_DATA
-
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
         # Parallel run
         results = worker_pool.imap_unordered(
             do_model_select_task,
@@ -280,8 +292,10 @@ def run(argv=sys.argv[1:]):
         summary_df.reset_index(drop=True))
 
     result_predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
 
     model_selection_time = time.time() - start
+    print(f"TIMING_MARKER selection_done {time.time():.3f}")
 
     if worker_pool:
         worker_pool.close()
