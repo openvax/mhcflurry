@@ -22,6 +22,12 @@
 #   DATA_EVAL_DIR     data_evaluation/ for benchmark hits/decoys
 #   COMPARE_SCRIPT    path to compare_new_vs_public.py
 #   GPUS, MAX_TASKS_PER_WORKER, ENCODING_CACHE_DIR
+#   MHCFLURRY_SCALE_LR  if "1", multiply learning_rate by sqrt(mb/64) for
+#                       mb>64 (square-root LR scaling, Goyal et al. 2017
+#                       Appendix B). Default "0" leaves LR untouched, so
+#                       the sweep isolates the effect of minibatch size at
+#                       fixed LR -- run twice (once with, once without)
+#                       into separate $SWEEP_OUT roots to compare.
 # (--num-jobs and --max-workers-per-gpu auto-resolve per phase)
 #
 # Output layout:
@@ -56,6 +62,7 @@ MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
 MIN_MODELS_PER_FOLD="${MIN_MODELS_PER_FOLD:-2}"
 MAX_MODELS_PER_FOLD="${MAX_MODELS_PER_FOLD:-8}"
 ENCODING_CACHE_DIR="${ENCODING_CACHE_DIR:-$HOME/runplz-cache/encoding_cache}"
+MHCFLURRY_SCALE_LR="${MHCFLURRY_SCALE_LR:-0}"
 # --num-jobs and --max-workers-per-gpu are passed as ``auto`` so that
 # the resolver in mhcflurry/local_parallelism.py picks values that match
 # the box (free VRAM, GPU count, per-worker memory) instead of being
@@ -87,14 +94,21 @@ for MB in $MINIBATCH_SIZES; do
     EVAL_SENTINEL="$SIZE_OUT/.eval.done"
 
     # Patch the hyperparameters template's minibatch_size in every spec.
+    # When MHCFLURRY_SCALE_LR=1 and mb>64, also scale learning_rate by
+    # sqrt(mb/64) (square-root LR scaling). 64 is the historical mhcflurry
+    # baseline batch size; sweeps below 64 don't get downscaled because
+    # smaller batches already train fine at the baseline LR.
     if [ ! -f "$SIZE_OUT/hyperparameters.yaml" ]; then
-        python3 - "$HYPERPARAMS_TPL" "$MB" <<'PY' > "$SIZE_OUT/hyperparameters.yaml"
-import sys, yaml
-src, mb = sys.argv[1], int(sys.argv[2])
+        python3 - "$HYPERPARAMS_TPL" "$MB" "$MHCFLURRY_SCALE_LR" \
+            <<'PY' > "$SIZE_OUT/hyperparameters.yaml"
+import math, sys, yaml
+src, mb, scale_lr = sys.argv[1], int(sys.argv[2]), sys.argv[3] == "1"
 with open(src) as f:
     specs = yaml.safe_load(f)
 for spec in specs:
     spec["minibatch_size"] = mb
+    if scale_lr and mb > 64 and "learning_rate" in spec:
+        spec["learning_rate"] = float(spec["learning_rate"]) * math.sqrt(mb / 64.0)
 print(yaml.safe_dump(specs))
 PY
     fi
