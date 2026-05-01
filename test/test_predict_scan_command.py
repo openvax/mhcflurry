@@ -184,6 +184,46 @@ def test_empty_input_csv_does_not_crash():
     assert len(result) == 0
 
 
+def test_empty_and_populated_schemas_match():
+    """Empty-input fast-path must emit the same column set as the
+    populated path. If the predictor's output schema gains a column,
+    we want CI to flag the empty path before users see drift."""
+    common = [
+        "--alleles", "HLA-A0201",
+        "--peptide-lengths", "9",
+        "--results-all",
+    ]
+    deletes = []
+    try:
+        # Empty input.
+        empty_in = tempfile.NamedTemporaryFile(
+            delete=False, suffix=".csv", mode="w")
+        empty_in.write("sequence\n")
+        empty_in.close()
+        empty_out = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        deletes.extend([empty_in.name, empty_out.name])
+        predict_scan_command.run(
+            [empty_in.name, "--out", empty_out.name] + common)
+        empty_df = read_output_csv(empty_out.name)
+
+        # Populated input.
+        full_out = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        deletes.append(full_out.name)
+        predict_scan_command.run(
+            ["--sequences", "MKVAVLAVALLVCLLI", "--out", full_out.name]
+            + common)
+        full_df = read_output_csv(full_out.name)
+    finally:
+        for d in deletes:
+            os.unlink(d)
+
+    assert len(empty_df) == 0
+    assert len(full_df) > 0
+    assert list(empty_df.columns) == list(full_df.columns), (
+        f"empty schema {list(empty_df.columns)} "
+        f"!= populated schema {list(full_df.columns)}")
+
+
 def test_parallel_output_globally_sorted():
     """Regression: parallel scan used to concat per-chunk sorted outputs
     without re-sorting globally, so output ranking diverged from serial.
@@ -228,3 +268,42 @@ def test_parallel_output_globally_sorted():
             "serial output not globally sorted")
         assert (parallel_scores[:-1] >= parallel_scores[1:]).all(), (
             "parallel output not globally sorted")
+
+
+def test_parallel_output_tie_break_is_deterministic():
+    """Parallel output sorts ties by ``peptide`` ascending, so two runs
+    with the same input produce identical row order even when several
+    peptides share the same presentation_score."""
+    seqs = ["ASDFGHKLPLPLPLPL", "QWERTYIPCVNMLLLM",
+            "MKVAVLAVALLVCLLI", "GVRDDQYRSPVDPAPL"]
+    common = [
+        "--sequences"] + seqs + [
+        "--alleles", "HLA-A0201,HLA-A0301",
+        "--peptide-lengths", "9",
+        "--results-all",
+        "--num-jobs", "2", "--backend", "cpu",
+    ]
+    deletes = []
+    try:
+        out_a = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        out_b = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        deletes.extend([out_a.name, out_b.name])
+        predict_scan_command.run(common + ["--out", out_a.name])
+        predict_scan_command.run(common + ["--out", out_b.name])
+        df_a = read_output_csv(out_a.name)
+        df_b = read_output_csv(out_b.name)
+    finally:
+        for d in deletes:
+            os.unlink(d)
+
+    assert df_a["peptide"].tolist() == df_b["peptide"].tolist(), (
+        "parallel output row order differs between runs")
+    if "presentation_score" in df_a.columns:
+        score = df_a["presentation_score"].values
+        peptide = df_a["peptide"].values
+        # On ties, peptide must be ascending.
+        for i in range(len(score) - 1):
+            if score[i] == score[i + 1]:
+                assert peptide[i] <= peptide[i + 1], (
+                    f"tie not sorted by peptide at row {i}: "
+                    f"{peptide[i]!r} > {peptide[i + 1]!r}")

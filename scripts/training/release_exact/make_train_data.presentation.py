@@ -3,7 +3,6 @@ Make training data by selecting decoys, etc.
 """
 import sys
 import argparse
-import os
 import numpy
 import collections
 

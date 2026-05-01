@@ -245,7 +245,7 @@ def main():
     print(f"\n[per-peptide] mean Spearman: {per_pep['spearman'].mean():.3f}")
 
     # Canonical-allele ranking
-    print(f"\n[canonical] is the canonical allele the top-scoring one?")
+    print("\n[canonical] is the canonical allele the top-scoring one?")
     w_ours = canonical_ranks(df_ours, "ours")
     print()
     w_public = canonical_ranks(df_public, "public")

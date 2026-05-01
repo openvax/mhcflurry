@@ -115,11 +115,6 @@ parser.add_argument(
     nargs=2,
     help="Min and max peptide length to calibrate, inclusive. "
     "Default: %(default)s")
-# Back-compat alias: tests and external callers import this name from the
-# calibrate command module. The implementation now lives in
-# ``mhcflurry.common.filter_canonicalizable_alleles`` so it can be reused
-# by the select commands and any future iteration site.
-_filter_canonicalizable_alleles = filter_canonicalizable_alleles
 
 
 def _batch_size_arg(value):
@@ -266,11 +261,11 @@ def run_class1_presentation_predictor(args, peptides):
         # Already canonicalized via normalize_allele_name above.
         alleles = [normalize_allele_name(a) for a in args.allele]
     elif args.alleles_file:
-        alleles = _filter_canonicalizable_alleles(
+        alleles = filter_canonicalizable_alleles(
             pandas.read_csv(args.alleles_file).allele.unique()
         )
     else:
-        alleles = _filter_canonicalizable_alleles(predictor.supported_alleles)
+        alleles = filter_canonicalizable_alleles(predictor.supported_alleles)
 
     print("Num alleles", len(alleles))
 
@@ -420,11 +415,11 @@ def run_class1_affinity_predictor(args, peptides):
         # through without re-filtering.
         alleles = [normalize_allele_name(a) for a in args.allele]
     elif args.alleles_file:
-        alleles = _filter_canonicalizable_alleles(
+        alleles = filter_canonicalizable_alleles(
             pandas.read_csv(args.alleles_file).allele.unique()
         )
     else:
-        alleles = _filter_canonicalizable_alleles(predictor.supported_alleles)
+        alleles = filter_canonicalizable_alleles(predictor.supported_alleles)
 
     allele_set = set(alleles)
 

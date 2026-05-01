@@ -31,7 +31,6 @@ from .local_parallelism import (
     apply_random_negative_pool_epochs_to_work_items,
     attach_constant_data_to_work_items_if_needed,
     call_wrapped_kwargs,
-    hoist_torchinductor_compile_threads,
     resolve_local_parallelism_args,
     run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
@@ -1239,11 +1238,6 @@ def _read_pretrain_peptide_list(filename):
     # Reading only usecols=[0] makes pandas parse just the peptide column.
     peptide_series = pandas.read_csv(filename, index_col=0, usecols=[0]).index
     return list(peptide_series)
-
-
-# Back-compat alias for any callers / tests that imported the helper from
-# this module before it was hoisted to ``local_parallelism``.
-_hoist_torchinductor_compile_threads = hoist_torchinductor_compile_threads
 
 
 def train_models(args):

@@ -471,6 +471,32 @@ def test_resolve_local_parallelism_args_no_auto_detect_for_cpu_backend(
     assert args.gpus_was_auto is False
 
 
+def test_detect_num_cuda_devices_parses_nvidia_smi_l(monkeypatch):
+    """Counts only ``GPU N:``-prefixed lines, not MIG sub-devices or any
+    diagnostic lines that happen to start with ``GPU ``."""
+    from mhcflurry import local_parallelism
+
+    sample = (
+        b"GPU 0: NVIDIA A100-SXM4-80GB (UUID: GPU-aaa)\n"
+        b"  MIG 1g.10gb     Device  0: (UUID: MIG-bbb)\n"
+        b"GPU 1: NVIDIA A100-SXM4-80GB (UUID: GPU-ccc)\n"
+        b"GPU debug: this should not be counted\n"
+    )
+    monkeypatch.setattr(
+        local_parallelism.subprocess, "check_output", lambda *a, **kw: sample)
+    assert local_parallelism._detect_num_cuda_devices_no_torch() == 2
+
+
+def test_detect_num_cuda_devices_returns_zero_when_smi_missing(monkeypatch):
+    """OSError (e.g. nvidia-smi not on PATH) must be swallowed and return 0."""
+    from mhcflurry import local_parallelism
+
+    def boom(*a, **kw):
+        raise OSError("nvidia-smi: not found")
+    monkeypatch.setattr(local_parallelism.subprocess, "check_output", boom)
+    assert local_parallelism._detect_num_cuda_devices_no_torch() == 0
+
+
 def test_nondaemonpool_worker_can_spawn_children():
     """Non-daemon pool workers must be able to spawn multiprocessing children.
 

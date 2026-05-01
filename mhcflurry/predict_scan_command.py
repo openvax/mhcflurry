@@ -344,17 +344,17 @@ def run(argv=sys.argv[1:]):
         if worker_pool is not None:
             worker_pool.close()
             worker_pool.join()
-        # Empty input: return a DataFrame with the expected schema so
+        # Empty input: return a DataFrame with the same schema the
+        # predictor would have produced for non-empty input, so
         # threshold filters and downstream readers don't see a
-        # schema-less object. We don't know all columns the predictor
-        # would have produced, but the threshold-relevant ones are
-        # known; absent columns are filled in by predict_sequences in
-        # the non-empty paths.
-        result_df = pandas.DataFrame(columns=[
-            "sequence_name", "pos", "peptide", "n_flank", "c_flank",
-            "sample_name", "affinity", "affinity_percentile",
-            "processing_score", "presentation_score",
-        ])
+        # schema-less object. The column list is derived from the
+        # predictor (single source of truth) — see test_empty_and_populated_schemas_match.
+        result_df = pandas.DataFrame(
+            columns=predictor.predict_sequences_columns(
+                alleles=alleles,
+                use_flanks=not args.no_flanking,
+                include_affinity_percentile=not args.no_affinity_percentile,
+            ))
     elif worker_pool is None:
         result_df = predictor.predict_sequences(
             sequences=sequences,
@@ -399,13 +399,19 @@ def run(argv=sys.argv[1:]):
         # applies in class1_presentation_predictor.predict_sequences().
         # Each chunk is sorted within its sequence subset; after concat we
         # need a stable global sort so parallel output ranking == serial.
+        # ``peptide`` is the secondary key so tied scores resolve in the
+        # same order regardless of how chunks were partitioned.
         if "presentation_score" in result_df.columns:
             result_df = result_df.sort_values(
-                "presentation_score", ascending=False, kind="stable"
+                ["presentation_score", "peptide"],
+                ascending=[False, True],
+                kind="stable",
             ).reset_index(drop=True)
         elif "processing_score" in result_df.columns:
             result_df = result_df.sort_values(
-                "processing_score", ascending=False, kind="stable"
+                ["processing_score", "peptide"],
+                ascending=[False, True],
+                kind="stable",
             ).reset_index(drop=True)
 
     # Apply thresholds, skipping ones whose column is missing (e.g.

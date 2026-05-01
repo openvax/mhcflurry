@@ -1,11 +1,10 @@
 """Unit tests for orchestrator-side helpers added in 2.3.0.
 
 Covers:
-* ``mhcflurry.common.filter_canonicalizable_alleles`` and its
-  back-compat alias.
+* ``mhcflurry.common.filter_canonicalizable_alleles``.
 * ``mhcflurry.encoding_cache.prebuild_encoding_caches`` and
   ``deterministic_unique_peptide_list``.
-* ``mhcflurry.train_pan_allele_models_command._hoist_torchinductor_compile_threads``
+* ``mhcflurry.local_parallelism.hoist_torchinductor_compile_threads``.
 * Confirmation that the select commands' source actually invokes the
   shared filter (cheap regression for the same class of bug as the
   calibrate pseudogene crash).
@@ -20,26 +19,6 @@ import pathlib
 import subprocess
 
 import pytest
-
-
-def test_hoist_helper_lives_in_local_parallelism():
-    """``hoist_torchinductor_compile_threads`` belongs in the parallelism
-    module so processing/allele-specific commands can use it without
-    importing from train_pan_allele."""
-    from mhcflurry.local_parallelism import hoist_torchinductor_compile_threads
-    from mhcflurry.train_pan_allele_models_command import (
-        _hoist_torchinductor_compile_threads,
-    )
-    assert _hoist_torchinductor_compile_threads is hoist_torchinductor_compile_threads
-
-
-def test_filter_helper_lives_in_common():
-    from mhcflurry.common import filter_canonicalizable_alleles
-    from mhcflurry.calibrate_percentile_ranks_command import (
-        _filter_canonicalizable_alleles,
-    )
-    # back-compat alias preserved for any external import path.
-    assert _filter_canonicalizable_alleles is filter_canonicalizable_alleles
 
 
 def test_filter_select_call_sites():

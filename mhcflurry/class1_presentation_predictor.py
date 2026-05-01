@@ -107,6 +107,33 @@ class Class1PresentationPredictor(object):
             self.supports_processing_prediction and
             self.weights_dataframe is not None)
 
+    def predict_sequences_columns(
+            self, alleles, use_flanks=True, include_affinity_percentile=True):
+        """
+        Column names that ``predict_sequences(..., result="all")`` will emit.
+
+        Used so the empty-input fast-path in ``mhcflurry-predict-scan`` can
+        seed a DataFrame with the same schema the populated path produces.
+        Mirrors the column set assembled in ``predict()`` plus the
+        ``sequence_name`` / ``pos`` columns inserted in ``predict_sequences``.
+        """
+        cols = ["sequence_name", "pos", "peptide"]
+        has_alleles = bool(alleles)
+        emits_processing = self.supports_processing_prediction
+        if emits_processing and use_flanks:
+            cols += ["n_flank", "c_flank"]
+        cols.append("sample_name")
+        if has_alleles:
+            cols += ["affinity", "best_allele"]
+            if include_affinity_percentile:
+                cols.append("affinity_percentile")
+        if emits_processing:
+            cols.append("processing_score")
+        if (has_alleles and emits_processing
+                and self.supports_presentation_prediction):
+            cols += ["presentation_score", "presentation_percentile"]
+        return cols
+
     def predict_affinity(
             self,
             peptides,

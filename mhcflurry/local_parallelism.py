@@ -7,6 +7,7 @@ import itertools
 import logging
 import multiprocessing
 import multiprocessing.pool
+import re
 import traceback
 import sys
 import os
@@ -209,9 +210,14 @@ def _detect_num_cuda_devices_no_torch():
             subprocess.CalledProcessError,
             subprocess.TimeoutExpired):
         return 0
+    # nvidia-smi -L output is one line per device:
+    #   "GPU 0: NVIDIA A100-SXM4-80GB (UUID: GPU-...)"
+    # Match the index-prefixed form so we don't count MIG slices or stray
+    # diagnostic lines that happen to start with "GPU ".
+    pattern = re.compile(r"^GPU \d+:")
     n = 0
     for line in output.decode("utf-8", errors="ignore").splitlines():
-        if line.startswith("GPU "):
+        if pattern.match(line):
             n += 1
     return n
 
@@ -744,12 +750,13 @@ def resolve_local_parallelism_args(
             args.gpus = detected
     args.gpus_was_auto = gpus_was_auto
 
+    gpu_capacity = (
+        auto_num_jobs(num_gpus, resolved)
+        if backend in ("auto", "gpu") else 0
+    )
     if num_jobs_was_auto:
-        if num_gpus > 0 and backend in ("auto", "gpu"):
-            args.num_jobs = num_gpus * int(resolved)
-        else:
-            # CPU-only or no GPU plan: 0 = serial, the historical "auto" zero.
-            args.num_jobs = 0
+        # CPU-only / no-GPU plan keeps the historical 0 = serial default.
+        args.num_jobs = gpu_capacity
     else:
         args.num_jobs = int(num_jobs_raw)
     args.num_jobs_was_auto = num_jobs_was_auto
@@ -758,9 +765,7 @@ def resolve_local_parallelism_args(
     if (
             cap_auto_num_jobs
             and num_jobs > 0
-            and num_gpus > 0
-            and backend in ("auto", "gpu")):
-        gpu_capacity = num_gpus * int(resolved)
+            and gpu_capacity > 0):
         if num_jobs > gpu_capacity:
             print(
                 "Local parallelism: capping num_jobs from %d to %d "

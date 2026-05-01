@@ -168,7 +168,7 @@ def main():
     _stamp(f"[2/5] public ensemble: {args.public_models_dir} "
            f"({len(pub_alleles)} alleles supported)")
 
-    _stamp(f"[3/5] Finding benchmark files...")
+    _stamp("[3/5] Finding benchmark files...")
     if args.source == "both":
         patterns = ["mixmhcpred", "netmhcpan4"]
     else:
@@ -227,7 +227,7 @@ def main():
     test["new_score"] = -numpy.log10(numpy.clip(test.new_pred, 1e-3, 1e8))
     test["public_score"] = -numpy.log10(numpy.clip(test.public_pred, 1e-3, 1e8))
 
-    _stamp(f"[5/5] Computing metrics per allele...")
+    _stamp("[5/5] Computing metrics per allele...")
     rows = []
     for allele, group in test.groupby("hla"):
         if len(group) < 30 or group.hit.sum() == 0:

@@ -815,50 +815,6 @@ def _run_training_batch(
     return loss.detach()
 
 
-def _build_epoch_input_arrays(
-    random_negative_peptides_encoding,
-    x_dict_without_random_negatives,
-    *,
-    random_negatives_allele_encoding,
-    allele_encoding_to_input,
-):
-    """Build the per-epoch ``(x_peptide, x_allele)`` arrays for fit().
-
-    Extracted from fit()'s epoch loop so that the previous epoch's
-    arrays go out of scope naturally on the caller's reassignment of
-    x_peptide / x_allele — no explicit ``del`` or ``= None`` needed
-    before the concat to keep peak RAM at 1× rather than 2×. For a
-    1.85M-row × 45-wide fixed-encoding training set that's an extra ~7 GB
-    briefly held per worker per epoch; on A100-40GB it's the
-    difference between ``MAX_WORKERS_PER_GPU=1`` and 2.
-
-    When there are no random negatives, returns the un-concatenated
-    training arrays directly (no copy). When there are random
-    negatives but no allele encoding, returns x_allele=None.
-    """
-    no_random_negs = random_negatives_allele_encoding is None and len(
-        random_negative_peptides_encoding
-    ) == 0
-    if no_random_negs:
-        return (
-            x_dict_without_random_negatives["peptide"],
-            x_dict_without_random_negatives.get("allele"),
-        )
-
-    x_peptide = numpy.concatenate([
-        random_negative_peptides_encoding,
-        x_dict_without_random_negatives["peptide"],
-    ])
-    if "allele" in x_dict_without_random_negatives:
-        x_allele = numpy.concatenate([
-            allele_encoding_to_input(random_negatives_allele_encoding)[0],
-            x_dict_without_random_negatives["allele"],
-        ])
-    else:
-        x_allele = None
-    return x_peptide, x_allele
-
-
 def _effective_num_workers(num_workers):
     """Downgrade ``num_workers`` to 0 when running inside a daemon process.
 
