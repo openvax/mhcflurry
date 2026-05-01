@@ -947,11 +947,23 @@ def initialize_training(args):
         os.mkdir(args.out_models_dir)
         print("Done.")
 
+    # Strip any pre-existing fold_* columns from ``df`` before joining the
+    # freshly-computed ``folds_df``. Public 2.2.0 train_data.csv.bz2 ships
+    # with fold_0..3 already attached; without this, ``pandas.merge`` adds
+    # ``_x``/``_y`` suffixes to disambiguate, which then breaks
+    # ``select_pan_allele_models_command``'s ``int(col.split("_")[-1])``
+    # parser. Re-folding is the intended behavior — fold assignment is a
+    # function of (data, num_folds, held_out_*), so any prior fold cols
+    # are stale.
+    df_no_folds = df.drop(
+        columns=[c for c in df.columns if c.startswith("fold_")],
+        errors="ignore",
+    )
     predictor = Class1AffinityPredictor(
         allele_to_sequence=allele_encoding.allele_to_sequence,
         metadata_dataframes={
             'train_data': pandas.merge(
-                df,
+                df_no_folds,
                 folds_df,
                 left_index=True,
                 right_index=True)

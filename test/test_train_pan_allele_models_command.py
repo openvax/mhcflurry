@@ -141,6 +141,27 @@ MSGDACND,39531.0,39404.3,42689.8,36631.0,24512.5,31873.8,22499.5,35348.8,27067.7
 """.strip()
 
 
+def test_train_data_metadata_drops_preexisting_fold_columns():
+    """Regression: when ``--data`` already has ``fold_*`` columns
+    (public 2.2.0 train_data ships with fold_0..3), the train command's
+    metadata-DataFrame join used to produce ``fold_0_x``/``fold_0_y``
+    after merging in the freshly-computed ``folds_df``. That left the
+    select command parsing ``int("x")`` and crashing. The fix drops
+    the stale fold columns before the merge, so the saved metadata
+    has clean ``fold_<int>`` columns regardless of input shape."""
+    import inspect
+    from mhcflurry import train_pan_allele_models_command as mod
+
+    src = inspect.getsource(mod.initialize_training)
+    # The drop-stale-folds helper must run before the merge.
+    assert "df_no_folds" in src, (
+        "initialize_training must drop pre-existing fold_* cols before merge")
+    drop_idx = src.index("df_no_folds")
+    merge_idx = src.index("pandas.merge(\n                df_no_folds")
+    assert drop_idx < merge_idx, (
+        "df_no_folds must be computed before being passed to merge")
+
+
 def test_pop_train_param_supports_pretrain_peptides_per_epoch_alias():
     train_params = {"pretrain_peptides_per_epoch": 64}
 

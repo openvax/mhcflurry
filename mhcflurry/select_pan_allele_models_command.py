@@ -8,6 +8,7 @@ selected models across all folds.
 """
 import argparse
 import os
+import re
 import signal
 import sys
 import time
@@ -173,10 +174,18 @@ def run(argv=sys.argv[1:]):
 
     metadata_dfs = {}
 
-    fold_cols = [c for c in df if c.startswith("fold_")]
+    # Match only ``fold_<int>`` exactly so a stray ``fold_0_x`` column
+    # (e.g. from a pandas merge with default ``_x``/``_y`` suffixes) is
+    # surfaced as a clean error instead of crashing later in
+    # ``int(col.split("_")[-1])``. The merge that produced the suffix
+    # collision is fixed upstream in train_pan_allele_models_command;
+    # this is the defense-in-depth so the parser never lies.
+    fold_cols = [c for c in df if re.match(r"^fold_\d+$", c)]
     num_folds = len(fold_cols)
     if num_folds <= 1:
-        raise ValueError("Too few folds: ", num_folds)
+        raise ValueError(
+            "Too few clean ``fold_<int>`` columns: %d (saw: %s)" % (
+                num_folds, [c for c in df if c.startswith("fold_")]))
 
     df = df.loc[
         (df.peptide.str.len() >= min_peptide_length) &
