@@ -1962,6 +1962,46 @@ class Class1AffinityPredictor(object):
             return None
 
     @staticmethod
+    def _cartesian_output_log_ic50_sum(
+            network_output, model, log50000, accum_dtype):
+        """Convert cartesian network outputs to summed log(IC50).
+
+        Normal models may expose multiple output channels; prediction defaults
+        to channel 0, so fast calibration must do the same. Optimized pan-model
+        ensembles are different: ``MergedClass1NeuralNetwork`` with
+        ``merge_method='concatenate'`` returns one channel per merged submodel.
+        Those channels are ensemble members and must all contribute to the
+        geometric mean.
+
+        Returns
+        -------
+        (torch.Tensor, int)
+            ``(a_size, chunk_n)`` summed log(IC50) contribution and the number
+            of ensemble members represented by the sum.
+        """
+        if network_output.ndim == 2:
+            network_output = network_output.unsqueeze(-1)
+        if network_output.ndim != 3 or int(network_output.shape[-1]) < 1:
+            raise ValueError(
+                "cartesian network output must have shape "
+                "(alleles, peptides, outputs); got %s" % (
+                    tuple(network_output.shape),
+                )
+            )
+
+        is_merged_concatenate = (
+            getattr(model, "merge_method", None) == "concatenate"
+            and getattr(model, "networks", None) is not None
+        )
+        if is_merged_concatenate:
+            selected = network_output
+        else:
+            selected = network_output[..., :1]
+
+        log_ic50 = (1.0 - selected).to(accum_dtype) * log50000
+        return log_ic50.sum(dim=-1), int(selected.shape[-1])
+
+    @staticmethod
     def _prepare_motif_summary_state_gpu(encoded_peptides, device):
         """One-time setup for GPU motif_summary; lifts the per-allele
         ``drop_duplicates`` + length-bucket + AA-encoding work out of
@@ -2564,7 +2604,8 @@ class Class1AffinityPredictor(object):
                 allele_idx_np[abatch_start:abatch_end],
             ).to(device)
 
-            # log-space accumulator across networks: (a_size, n_peptides).
+            # log-space accumulator across ensemble members:
+            # (a_size, n_peptides).
             # Same aggregation scheme as the existing ensemble code:
             # arithmetic mean of per-network log(IC50) = geometric mean
             # of per-network IC50. Use fp64 where supported so the
@@ -2577,8 +2618,10 @@ class Class1AffinityPredictor(object):
             log_ic50_sum = torch.zeros(
                 a_size, n_peptides, dtype=accum_dtype, device=device,
             )
+            ensemble_member_count = 0
 
             for (_, model, peptide_stage) in cached_stages:
+                model_member_count = None
                 with torch.no_grad():
                     for start in range(0, n_peptides, peptide_batch_size):
                         end = min(start + peptide_batch_size, n_peptides)
@@ -2589,18 +2632,28 @@ class Class1AffinityPredictor(object):
                                 batch_idx,
                             )
                         )
-                        # shape (a_size, chunk_n, num_outputs) — take the first
-                        # output (matches existing predict default).
-                        network_output = network_output[..., 0]
-                        # log(IC50) = (1 - network_output) * log(50000).
-                        # Network output ∈ [0,1] from sigmoid — never
-                        # negative, so the log(0) edge is avoided without
-                        # clamping.
-                        log_ic50_sum[:, start:end] += (
-                            (1.0 - network_output).to(accum_dtype) * log50000
+                        (
+                            log_ic50_chunk,
+                            chunk_member_count,
+                        ) = self._cartesian_output_log_ic50_sum(
+                            network_output, model, log50000, accum_dtype,
                         )
+                        if model_member_count is None:
+                            model_member_count = chunk_member_count
+                        elif model_member_count != chunk_member_count:
+                            raise ValueError(
+                                "cartesian network output member count changed "
+                                "within one calibration batch"
+                            )
+                        log_ic50_sum[:, start:end] += log_ic50_chunk
 
-            log_mean = log_ic50_sum / float(len(cached_stages))
+                if model_member_count is None:
+                    raise ValueError("No peptide batches were evaluated")
+                ensemble_member_count += model_member_count
+
+            if ensemble_member_count < 1:
+                raise ValueError("No ensemble members were evaluated")
+            log_mean = log_ic50_sum / float(ensemble_member_count)
             ic50_device = torch.exp(log_mean)  # (a_size, n_peptides) on device
             # Batched torch fit replaces the per-allele numpy.histogram
             # loop that dominated calibrate wall time. One bucketize +

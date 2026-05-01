@@ -3399,6 +3399,55 @@ class Class1NeuralNetwork(object):
             fit_info["first_batch_time"] = first_batch_time
         self.fit_info.append(dict(fit_info))
 
+    def _random_negatives_pool_for_fit(
+            self,
+            *,
+            random_negatives_planner,
+            random_negative_shared_pool_dir,
+            random_negative_pool_epochs,
+            pool_seed,
+            random_negative_permutation_seed,
+            device,
+            requested_fit_tensor_residency):
+        """Construct a shape-compatible random-negative pool for fit()."""
+        if random_negative_shared_pool_dir is not None:
+            return (
+                RandomNegativesPool.from_shared_mmap(
+                    output_dir=random_negative_shared_pool_dir,
+                    planner=random_negatives_planner,
+                    peptide_encoder=self.peptides_to_network_input,
+                    permutation_seed=random_negative_permutation_seed,
+                ),
+                "shared_mmap",
+            )
+
+        use_device_pool = (
+            requested_fit_tensor_residency != "host"
+            and self.uses_peptide_torch_encoding()
+        )
+        if use_device_pool:
+            return (
+                RandomNegativesPool(
+                    planner=random_negatives_planner,
+                    peptide_encoder=self.peptides_to_network_input,
+                    pool_epochs=random_negative_pool_epochs,
+                    seed=pool_seed,
+                    device=device,
+                    peptide_encoding=self.hyperparameters["peptide_encoding"],
+                ),
+                "device",
+            )
+
+        return (
+            RandomNegativesPool(
+                planner=random_negatives_planner,
+                peptide_encoder=self.peptides_to_network_input,
+                pool_epochs=random_negative_pool_epochs,
+                seed=pool_seed,
+            ),
+            "host",
+        )
+
     def _create_optimizer(self, network):
         """Create an optimizer for the network."""
         optimizer_name = self.hyperparameters["optimizer"].lower()
@@ -3524,30 +3573,37 @@ class Class1NeuralNetwork(object):
             if random_negative_pool_epochs > 1
             else None
         )
+        requested_fit_tensor_residency = self.hyperparameters.get(
+            "fit_tensor_residency"
+        )
         # Run mmap cache path (see shared_memory.py): when the
         # orchestrator has pre-built an mmap pool for this work item's
         # (fold, random-negative-config), construct via
         # ``from_shared_mmap`` and let
         # the OS page cache hold a single resident copy across all the
         # outer training Pool's workers. Otherwise the in-process
-        # constructor regenerates + re-encodes per worker per cycle.
+        # constructor either samples directly on device (for torch-index
+        # peptide inputs) or builds shape-compatible host encodings (for
+        # vector peptide inputs).
+        (
+            random_negatives_pool,
+            random_negative_pool_residency,
+        ) = self._random_negatives_pool_for_fit(
+            random_negatives_planner=random_negatives_planner,
+            random_negative_shared_pool_dir=random_negative_shared_pool_dir,
+            random_negative_pool_epochs=random_negative_pool_epochs,
+            pool_seed=pool_seed,
+            random_negative_permutation_seed=random_negative_permutation_seed,
+            device=device,
+            requested_fit_tensor_residency=requested_fit_tensor_residency,
+        )
         if random_negative_shared_pool_dir is not None:
-            random_negatives_pool = RandomNegativesPool.from_shared_mmap(
-                output_dir=random_negative_shared_pool_dir,
-                planner=random_negatives_planner,
-                peptide_encoder=self.peptides_to_network_input,
-                permutation_seed=random_negative_permutation_seed,
-            )
             fit_info["random_negative_pool_shared_dir"] = (
                 random_negative_shared_pool_dir
             )
-        else:
-            random_negatives_pool = RandomNegativesPool(
-                planner=random_negatives_planner,
-                peptide_encoder=self.peptides_to_network_input,
-                pool_epochs=random_negative_pool_epochs,
-                seed=pool_seed,
-            )
+        fit_info["random_negative_pool_residency"] = (
+            random_negative_pool_residency
+        )
         fit_info["random_negative_pool_epochs"] = random_negative_pool_epochs
 
         # Allele encoding for random negatives is planned once (the allele
@@ -3823,39 +3879,6 @@ class Class1NeuralNetwork(object):
         # stitched [RN | real] buffer via index_select with zero
         # per-batch H2D copies and no DataLoader workers. CPU training
         # uses the same path with device='cpu' tensors.
-        requested_fit_tensor_residency = self.hyperparameters.get(
-            "fit_tensor_residency"
-        )
-        use_device_random_negative_pool = requested_fit_tensor_residency != "host"
-        if (
-                num_random_negatives > 0
-                and random_negative_shared_pool_dir is None
-                and use_device_random_negative_pool):
-            # Re-build the in-process random-negatives pool so it
-            # samples + encodes int8 indices straight onto ``device``
-            # (skipping the host string round-trip). The shared-mmap
-            # pool is left alone — it holds a single resident copy per
-            # box and we keep that sharing.
-            #
-            # On device, ``random_negative_pool_epochs`` is no longer
-            # load-bearing for performance: torch.multinomial-based
-            # generation runs in ~50 ms regardless of pool size. The
-            # value still controls sample diversity within a cycle, so
-            # we honor whatever was passed.
-            random_negatives_pool = RandomNegativesPool(
-                planner=random_negatives_planner,
-                peptide_encoder=self.peptides_to_network_input,
-                pool_epochs=random_negative_pool_epochs,
-                seed=pool_seed,
-                device=device,
-                peptide_encoding=self.hyperparameters["peptide_encoding"],
-            )
-        if random_negative_shared_pool_dir is not None:
-            fit_info["random_negative_pool_residency"] = "shared_mmap"
-        else:
-            fit_info["random_negative_pool_residency"] = (
-                "device" if use_device_random_negative_pool else "host"
-            )
         random_neg_template = None
         if num_random_negatives > 0:
             _, random_neg_template = random_negatives_pool.get_epoch_inputs(0)

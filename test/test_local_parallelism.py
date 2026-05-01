@@ -417,6 +417,11 @@ def test_resolve_local_parallelism_args_auto_detects_gpus(monkeypatch):
     with --num-jobs N and no --gpus piles every worker onto GPU 0."""
     from mhcflurry import local_parallelism
 
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.delenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", raising=False
+    )
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "4")
     monkeypatch.setattr(
         local_parallelism, "_detect_num_cuda_devices_no_torch", lambda: 4)
     args = Namespace(
@@ -428,8 +433,33 @@ def test_resolve_local_parallelism_args_auto_detects_gpus(monkeypatch):
     resolve_local_parallelism_args(args)
     assert args.gpus == 4
     assert args.gpus_was_auto is True
-    # num_jobs auto resolves to gpus * mwpg now that we know the count.
-    assert args.num_jobs > 0
+    assert args.max_workers_per_gpu == 4
+    assert args.num_jobs == 16
+
+
+def test_resolve_local_parallelism_args_detects_gpus_before_explicit_jobs(
+        monkeypatch):
+    """Auto MWPG must see auto-detected GPUs before explicit num_jobs is
+    capacity-checked; otherwise 16 jobs on 8 GPUs is under-capped to 8."""
+    from mhcflurry import local_parallelism
+
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.delenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", raising=False
+    )
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "4")
+    monkeypatch.setattr(
+        local_parallelism, "_detect_num_cuda_devices_no_torch", lambda: 8)
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs=16,
+        gpus=None,
+        backend="auto",
+    )
+    resolve_local_parallelism_args(args)
+    assert args.gpus == 8
+    assert args.max_workers_per_gpu == 2
+    assert args.num_jobs == 16
 
 
 def test_resolve_local_parallelism_args_skips_auto_detect_with_explicit_gpus(

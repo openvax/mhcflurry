@@ -30,6 +30,7 @@ from .common import (
 )
 from .local_parallelism import (
     attach_constant_data_to_work_items_if_needed,
+    resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)
 from .cluster_parallelism import (
@@ -148,6 +149,10 @@ def run(argv=sys.argv[1:]):
     args.out_models_dir = os.path.abspath(args.out_models_dir)
 
     configure_logging(verbose=args.verbosity > 1)
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not args.cluster_parallelism,
+    )
 
     df = pandas.read_csv(args.data)
     print("Loaded data: %s" % (str(df.shape)))

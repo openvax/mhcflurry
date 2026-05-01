@@ -17,6 +17,7 @@ from mhcflurry import Class1AffinityPredictor
 from mhcflurry.common import positional_frequency_matrix, random_peptides
 from mhcflurry.downloads import get_path
 from mhcflurry.encodable_sequences import EncodableSequences
+from mhcflurry.regression_target import to_ic50
 
 
 def _load_downloaded_pan_allele():
@@ -161,6 +162,86 @@ def test_motif_summary_gpu_helper_matches_legacy_edge_cases():
         rtol=0,
         atol=0,
     )
+
+
+def test_fast_calibration_output_aggregation_handles_merged_concatenate():
+    class MergedConcatenate:
+        merge_method = "concatenate"
+        networks = [object(), object()]
+
+    output = torch.tensor(
+        [
+            [[0.2, 0.4], [0.6, 0.8]],
+            [[0.1, 0.3], [0.5, 0.7]],
+        ],
+        dtype=torch.float32,
+    )
+    log50000 = float(numpy.log(50000.0))
+
+    contribution, count = (
+        Class1AffinityPredictor._cartesian_output_log_ic50_sum(
+            output,
+            MergedConcatenate(),
+            log50000,
+            torch.float64,
+        )
+    )
+
+    expected = ((1.0 - output).to(torch.float64) * log50000).sum(dim=-1)
+    assert count == 2
+    torch.testing.assert_close(contribution, expected, rtol=0, atol=0)
+
+
+def test_fast_calibration_output_aggregation_uses_first_normal_output():
+    class NormalModel:
+        pass
+
+    output = torch.tensor(
+        [[[0.2, 0.4], [0.6, 0.8]]],
+        dtype=torch.float32,
+    )
+    log50000 = float(numpy.log(50000.0))
+
+    contribution, count = (
+        Class1AffinityPredictor._cartesian_output_log_ic50_sum(
+            output,
+            NormalModel(),
+            log50000,
+            torch.float64,
+        )
+    )
+
+    expected = (1.0 - output[..., 0]).to(torch.float64) * log50000
+    assert count == 1
+    torch.testing.assert_close(contribution, expected, rtol=0, atol=0)
+
+
+def test_calibrate_fast_optimized_merged_matches_unoptimized_fast():
+    unoptimized = _load_downloaded_pan_allele()
+    optimized = _load_downloaded_pan_allele()
+    assert optimized.optimize()
+
+    alleles = _pick_alleles(unoptimized, 2)
+    peptides = random_peptides(250, length=9)
+    bins = to_ic50(numpy.linspace(1, 0, 51))
+
+    for predictor in (unoptimized, optimized):
+        predictor.allele_to_percent_rank_transform = {}
+        predictor.calibrate_percentile_ranks_fast(
+            peptides=peptides,
+            alleles=alleles,
+            bins=bins,
+            motif_summary=False,
+            allele_batch_size=2,
+            peptide_batch_size=100,
+            device=torch.device("cpu"),
+        )
+
+    for allele in alleles:
+        a = unoptimized.allele_to_percent_rank_transform[allele]
+        b = optimized.allele_to_percent_rank_transform[allele]
+        numpy.testing.assert_allclose(a.bin_edges, b.bin_edges, rtol=0, atol=0)
+        numpy.testing.assert_allclose(a.cdf, b.cdf, rtol=0, atol=1e-12)
 
 
 def test_calibrate_fast_parity_with_legacy_path():

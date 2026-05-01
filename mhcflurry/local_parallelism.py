@@ -665,7 +665,31 @@ def auto_num_jobs(num_gpus, max_workers_per_gpu):
     return int(num_gpus) * int(max_workers_per_gpu)
 
 
-def resolve_max_workers_per_gpu(args, per_worker_gb=None):
+def resolve_num_gpus_for_local_parallelism(args, backend=None):
+    """Resolve ``args.gpus`` for local worker scheduling.
+
+    ``--gpus`` historically defaulted to ``None`` and most call sites only
+    knew the final device count after the worker pool was created. Resolve it
+    once, before sizing max-workers-per-GPU, so every downstream resolver sees
+    the same capacity.
+    """
+    if backend is None:
+        backend = normalize_pytorch_backend(
+            getattr(args, "backend", "auto") or "auto"
+        )
+    num_gpus_raw = getattr(args, "gpus", None)
+    gpus_was_auto = num_gpus_raw is None and backend in ("auto", "gpu")
+    if gpus_was_auto:
+        num_gpus = _detect_num_cuda_devices_no_torch()
+    else:
+        num_gpus = int(num_gpus_raw or 0)
+    args.gpus = int(num_gpus)
+    args.gpus_was_auto = gpus_was_auto
+    return int(num_gpus)
+
+
+def resolve_max_workers_per_gpu(
+        args, per_worker_gb=None, num_gpus=None, backend=None):
     """Resolve ``args.max_workers_per_gpu`` to an int, mutating ``args``.
 
     Accepts the literal string ``"auto"`` (the default) or an int. When
@@ -681,14 +705,18 @@ def resolve_max_workers_per_gpu(args, per_worker_gb=None):
     Returns the resolved int (also stored on ``args.max_workers_per_gpu``
     so subsequent consumers see the int).
     """
+    if backend is None:
+        backend = getattr(args, "backend", "auto")
+    if num_gpus is None:
+        num_gpus = getattr(args, "gpus", 0) or 0
     value = getattr(args, "max_workers_per_gpu", None)
     if value is None:
         value = "auto"
     if isinstance(value, str) and value.lower() == "auto":
         resolved = auto_max_workers_per_gpu(
             num_jobs=getattr(args, "num_jobs", 0),
-            num_gpus=getattr(args, "gpus", 0) or 0,
-            backend=getattr(args, "backend", "auto"),
+            num_gpus=num_gpus,
+            backend=backend,
             per_worker_gb=per_worker_gb,
         )
     else:
@@ -719,12 +747,20 @@ def resolve_local_parallelism_args(
     if getattr(args, "_local_parallelism_args_resolved", False):
         return args
 
+    backend = normalize_pytorch_backend(getattr(args, "backend", "auto") or "auto")
+    num_gpus = resolve_num_gpus_for_local_parallelism(args, backend=backend)
+
     original = getattr(args, "max_workers_per_gpu", None)
     was_auto = (
         original is None
         or (isinstance(original, str) and original.lower() == "auto")
     )
-    resolved = resolve_max_workers_per_gpu(args, per_worker_gb=per_worker_gb)
+    resolved = resolve_max_workers_per_gpu(
+        args,
+        per_worker_gb=per_worker_gb,
+        num_gpus=num_gpus,
+        backend=backend,
+    )
     args.max_workers_per_gpu_was_auto = was_auto
 
     num_jobs_raw = getattr(args, "num_jobs", "auto")
@@ -732,23 +768,6 @@ def resolve_local_parallelism_args(
         num_jobs_raw is None
         or (isinstance(num_jobs_raw, str) and num_jobs_raw.lower() == "auto")
     )
-    num_gpus_raw = getattr(args, "gpus", None)
-    num_gpus = int(num_gpus_raw or 0)
-    backend = normalize_pytorch_backend(getattr(args, "backend", "auto") or "auto")
-
-    # Auto-detect GPU count when the user didn't pass --gpus and the
-    # backend allows GPU. Without this, parallel prediction with
-    # --num-jobs > 0 leaves num_gpus=0 and every worker chooses the
-    # default CUDA device (typically GPU 0), starving GPUs 1..N. The
-    # detection uses nvidia-smi -L (no torch import here so we don't
-    # initialize CUDA in the parent before fork).
-    gpus_was_auto = num_gpus_raw is None and backend in ("auto", "gpu")
-    if gpus_was_auto:
-        detected = _detect_num_cuda_devices_no_torch()
-        if detected > 0:
-            num_gpus = detected
-            args.gpus = detected
-    args.gpus_was_auto = gpus_was_auto
 
     gpu_capacity = (
         auto_num_jobs(num_gpus, resolved)

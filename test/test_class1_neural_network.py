@@ -494,6 +494,36 @@ def test_peptide_amino_acid_encoding_torch_default_and_legacy_alias():
     assert legacy_alias.hyperparameters["peptide_amino_acid_encoding_torch"] is False
 
 
+def test_vector_encoded_random_negatives_use_shape_compatible_pool():
+    peptides = random_peptides(12, length=9)
+    affinities = numpy.random.uniform(10, 50000, len(peptides))
+    predictor = Class1NeuralNetwork(
+        peptide_amino_acid_encoding_torch=False,
+        activation="tanh",
+        layer_sizes=[4],
+        locally_connected_layers=[],
+        peptide_dense_layer_sizes=[],
+        allele_dense_layer_sizes=[],
+        dropout_probability=0.0,
+        batch_normalization=False,
+        dense_layer_l1_regularization=0.0,
+        dense_layer_l2_regularization=0.0,
+        max_epochs=1,
+        early_stopping=False,
+        validation_split=0.0,
+        minibatch_size=4,
+        random_negative_rate=1.0,
+        random_negative_constant=0,
+        random_negative_pool_epochs=1,
+    )
+
+    predictor.fit(peptides, affinities, verbose=0)
+
+    fit_info = predictor.fit_info[-1]
+    assert fit_info["random_negative_pool_residency"] == "host"
+    assert fit_info["fit_tensor_residency"] == "device"
+
+
 def test_serialization():
     """Test that network weights can be serialized and deserialized."""
     hyperparameters = dict(

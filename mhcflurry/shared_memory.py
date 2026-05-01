@@ -117,20 +117,35 @@ class FitBacking:
                 tensor = tensor.to(dtype)
             return tensor.to(device, non_blocking=False)
 
-        x_peptide_dev = _to_device(x_peptide)
+        def _peptide_to_device(value):
+            tensor = _to_device(value)
+            if (
+                    tensor is not None
+                    and tensor.ndim > 2
+                    and not tensor.dtype.is_floating_point):
+                tensor = tensor.to(torch.float32)
+            return tensor
+
+        def _peptide_template_shape_dtype(value):
+            if isinstance(value, torch.Tensor):
+                tensor = value
+            else:
+                tensor = torch.as_tensor(value)
+            dtype = tensor.dtype
+            if tensor.ndim > 2 and not dtype.is_floating_point:
+                dtype = torch.float32
+            return tuple(tensor.shape), dtype
+
+        x_peptide_dev = _peptide_to_device(x_peptide)
         x_allele_dev = _to_device(x_allele)
 
         combined_peptide = None
         rn_peptide_view = None
         x_peptide_view = x_peptide_dev
         if random_negative_x_peptide_template is not None:
-            template = random_negative_x_peptide_template
-            if isinstance(template, torch.Tensor):
-                rn_shape = tuple(template.shape)
-                rn_dtype = template.dtype
-            else:
-                rn_shape = tuple(template.shape)
-                rn_dtype = torch.as_tensor(template).dtype
+            rn_shape, rn_dtype = _peptide_template_shape_dtype(
+                random_negative_x_peptide_template
+            )
             num_rn = int(rn_shape[0])
             if x_peptide_dev is None:
                 raise ValueError(
