@@ -54,6 +54,37 @@ def _detect_gpu_count():
         return 0
 
 
+def _resolve_torchinductor_compile_threads(num_jobs):
+    """Resolve ``TORCHINDUCTOR_COMPILE_THREADS=auto`` to an integer in
+    the parent env so spawned workers inherit a value PyTorch can parse.
+
+    The orchestrator launchers export ``TORCHINDUCTOR_COMPILE_THREADS=auto``
+    so each train CLI's ``hoist_torchinductor_compile_threads`` can size
+    inductor against its ``num_jobs``. The eval script spawns its own
+    ``multiprocessing.Pool`` outside that hoist path, and PyTorch's
+    ``decide_compile_threads()`` does ``int(os.environ[...])`` on import
+    -- ``int("auto")`` raises and the workers crash before predict().
+
+    Mirrors the formula in
+    ``mhcflurry.local_parallelism._auto_torchinductor_compile_threads``
+    (production phase): ``max(1, min(cap, cpu_count // num_jobs))`` with
+    ``cap`` from ``MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP`` (default
+    16). Inlined to keep this module torch-free in the parent.
+    """
+    if os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") != "auto":
+        return
+    cap = int(os.environ.get(
+        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP", "16"))
+    cpu_count = os.cpu_count() or 1
+    threads = max(1, min(cap, cpu_count // max(int(num_jobs), 1)))
+    os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = str(threads)
+    os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] = "1"
+    _stamp(
+        f"resolved TORCHINDUCTOR_COMPILE_THREADS=auto -> {threads} "
+        f"(cpu={cpu_count}, num_jobs={num_jobs}, cap={cap})"
+    )
+
+
 def _predict_chunk_worker(args):
     """Run inside a spawned worker pinned to a single GPU. Loads the
     predictor and runs predict() on the assigned chunk."""
@@ -156,6 +187,14 @@ def main():
     # each set CUDA_VISIBLE_DEVICES before importing torch.
     n_gpus = _detect_gpu_count()
     _stamp(f"detected {n_gpus} GPUs (parallel predict if >1)")
+
+    # Workers inherit env from parent. Launchers set
+    # TORCHINDUCTOR_COMPILE_THREADS=auto so the train CLIs' orchestrator
+    # hoist can size it against num_jobs. This script bypasses that hoist
+    # (it spawns its own mp.Pool), and PyTorch's decide_compile_threads()
+    # does int(os.environ[...]) which raises on the literal "auto".
+    # Resolve in the parent so children inherit a numeric value.
+    _resolve_torchinductor_compile_threads(num_jobs=max(n_gpus, 1))
 
     # We need supported_alleles for the new/public ensembles before we
     # know what rows to evaluate, but we don't want to import torch in
