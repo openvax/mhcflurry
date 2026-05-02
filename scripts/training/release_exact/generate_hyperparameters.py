@@ -65,17 +65,13 @@ base_hyperparameters = {
         'alignment_method': 'left_pad_centered_right_pad',
         'max_length': 15,
     },
-    # Phase 2 of issue openvax/mhcflurry#268: fixed peptide vector
-    # expansion as a frozen torch embedding table in the network's
-    # forward pass instead of a numpy lookup at peptide-encoding time.
-    # ``peptides_to_network_input`` returns int8 indices (cheap dict
-    # lookup) and torch widens to the configured fp32 vectors on CUDA,
-    # MPS, or CPU via the embedding lookup. Works for BLOSUM62, one-hot,
-    # PMBEC, contact, physchem, atchley, and +joined composites.
-    # Eliminates the ~17 sec/epoch CPU
-    # bottleneck in random-negative regeneration (with
-    # random_negative_pool_epochs=1 the CPU encoding fires every epoch).
-    # Forward parity vs numpy path verified by
+    # Fixed peptide vector expansion as a frozen torch embedding table
+    # in the network's forward pass instead of a numpy lookup at
+    # peptide-encoding time. ``peptides_to_network_input`` returns int8
+    # indices (cheap dict lookup) and torch widens to the configured
+    # fp32 vectors on CUDA, MPS, or CPU via the embedding lookup. Works
+    # for BLOSUM62, one-hot, PMBEC, contact, physchem, atchley, and
+    # +joined composites. Forward parity vs numpy path verified by
     # ``test_peptide_amino_acid_encoding_torch_forward_parity``.
     'peptide_amino_acid_encoding_torch': True,
     'peptide_allele_merge_activation': '',
@@ -90,16 +86,14 @@ base_hyperparameters = {
     'random_negative_rate': 1.0,
     'random_negative_method': 'by_allele_equalize_nonbinders',
     'random_negative_binder_threshold': 500.0,
-    # Phase 1 of issue openvax/mhcflurry#268: random-negative pool
-    # framework. ``pool_epochs=1`` preserves the pre-Phase-1 memory
-    # profile (one epoch of encoded negatives in heap at a time) and
-    # is the production-safe default. Setting >1 amortizes the
-    # generation+encoding cost across that many epochs but materializes
-    # ``pool_epochs × per_epoch_count`` peptides simultaneously per
-    # worker — at ``100`` on the 8xA100 release_exact run that was
-    # ~7.5 GB int8 per worker theoretically, but in practice ballooned
-    # to ~199 GB/worker (tooling overhead + intermediate Series) and
-    # OOM'd the 944 GB box. Hold at 1 until a streaming-rebuild fix
+    # Random-negative pool framework. ``pool_epochs=1`` keeps a single
+    # epoch of encoded negatives in heap at a time (production-safe
+    # default). Setting >1 amortizes the generation+encoding cost across
+    # that many epochs but materializes ``pool_epochs × per_epoch_count``
+    # peptides simultaneously per worker — on the 8xA100 release_exact
+    # run, ``100`` was ~7.5 GB int8 per worker in theory but ballooned to
+    # ~199 GB/worker in practice (tooling overhead + intermediate Series)
+    # and OOM'd the 944 GB box. Hold at 1 until a streaming-rebuild fix
     # lands that doesn't materialize the full N-epoch buffer at once.
     'random_negative_pool_epochs': 1,
     'train_data': {

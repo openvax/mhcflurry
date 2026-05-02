@@ -111,7 +111,7 @@ def test_setup_shared_random_negative_pools_builds_files(tmp_path):
     )
     assert len(fold_pool_dirs) == 1  # one (fold, cfg) entry
     pool_dir = list(fold_pool_dirs.values())[0]
-    # Phase 3 contract: pool dir contains manifest + encoded + peptides files.
+    # Pool dir must contain manifest + encoded + peptides files.
     assert os.path.exists(os.path.join(pool_dir, "random_negatives_pool.json"))
     assert os.path.exists(
         os.path.join(pool_dir, "random_negatives_encoded.int8.mmap")

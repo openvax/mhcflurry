@@ -1,7 +1,7 @@
 """Integration tests for the encoding cache plumbed into train_pan_allele.
 
-This file exercises the specific surfaces that Phase 1 (issue #268) touches
-in ``train_pan_allele_models_command``:
+This file exercises the surfaces in ``train_pan_allele_models_command``
+that interact with the encoding cache:
 
     _build_train_peptides() — per-worker helper that returns an
         EncodableSequences either directly (cache disabled, old behavior)
@@ -15,8 +15,7 @@ in ``train_pan_allele_models_command``:
 
 The load-bearing assertion throughout: with or without the cache, the
 bytes that ``peptides_to_network_input`` produces from the returned
-EncodableSequences are identical. Bit-identical. Any deviation here means
-Phase 1 is not semantics-preserving and should not be merged.
+EncodableSequences are bit-identical.
 """
 
 from __future__ import annotations
@@ -185,10 +184,10 @@ def test_build_train_peptides_cache_enabled_returns_prepopulated(
 def test_build_train_peptides_bit_identical_across_modes(
     constant_data_no_cache, constant_data_with_cache, hyperparameters, train_data
 ):
-    """THE GATE: cached and un-cached paths produce byte-identical network input.
+    """Cached and un-cached paths must produce byte-identical network input.
 
     We run peptides_to_network_input on both and assert identical bytes.
-    If this fails, Phase 1 is not semantics-preserving. Do not merge.
+    If this fails, the cache is not semantics-preserving.
     """
     # Initialize the cache (orchestrator step).
     all_work_items = [{"hyperparameters": hyperparameters}]
@@ -1145,11 +1144,9 @@ def test_initialize_encoding_cache_prebuilds_pretrain_cache(
 ):
     """Orchestrator pre-builds the pretrain cache too, not just the train cache.
 
-    Before this, each Pool worker on its first ``pretrain_data_iterator``
-    call would race to build the pretrain cache. The Phase 1 race fix
-    made that safe, but every worker still paid the redundant encoding
-    cost. Pre-building here means workers hit a warm cache on first
-    access.
+    Without orchestrator-side prebuilding, each Pool worker on its first
+    ``pretrain_data_iterator`` call would race to build the pretrain cache.
+    Pre-building here means workers hit a warm cache on first access.
     """
     all_work_items = [{"hyperparameters": hyperparameters}]
     args = Mock(

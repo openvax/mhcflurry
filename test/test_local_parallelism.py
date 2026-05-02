@@ -111,11 +111,11 @@ def test_validate_worker_pool_args_rejects_invalid_backend():
 
 # ---- Non-daemonic pool regression tests ----------------------------------
 #
-# Phase 1 (#268) needs Pool workers to be non-daemonic so the PyTorch
-# DataLoader inside a training worker can spawn its own prefetch
-# children. The default multiprocessing.Pool ships daemon workers,
-# which makes DataLoader(num_workers>0) raise AssertionError. These
-# tests lock down the new NonDaemonPool / NonDaemonProcess behavior.
+# Pool workers must be non-daemonic so the PyTorch DataLoader inside a
+# training worker can spawn its own prefetch children. The default
+# multiprocessing.Pool ships daemon workers, which makes
+# DataLoader(num_workers>0) raise AssertionError. These tests lock down
+# the NonDaemonPool / NonDaemonProcess behavior.
 
 
 def _is_daemon_in_pool_worker(_):
@@ -153,8 +153,7 @@ def _grandchild_entry():
 def _spawn_child_from_pool_worker(_):
     """Spawn a grandchild process from within a Pool worker.
 
-    The AssertionError from the Phase 1 (#268) A100 crash reproduces here
-    if the Pool worker is daemonic: the inner multiprocessing.Process
+    If the Pool worker is daemonic, the inner multiprocessing.Process
     .start() call raises "daemonic processes are not allowed to have
     children". With a non-daemonic worker this succeeds.
     """
@@ -530,11 +529,11 @@ def test_detect_num_cuda_devices_returns_zero_when_smi_missing(monkeypatch):
 def test_nondaemonpool_worker_can_spawn_children():
     """Non-daemon pool workers must be able to spawn multiprocessing children.
 
-    This is the regression test for the Phase 1 (#268) A100 crash
-    where DataLoader(num_workers>0) called from a mhcflurry Pool worker
-    raised AssertionError("daemonic processes are not allowed to have
-    children"). With NonDaemonPool, the Pool workers are not daemonic,
-    so spawning a child succeeds.
+    Regression test for the case where DataLoader(num_workers>0) called
+    from a mhcflurry Pool worker raised
+    AssertionError("daemonic processes are not allowed to have children").
+    With NonDaemonPool the Pool workers are not daemonic, so spawning a
+    child succeeds.
     """
     with NonDaemonPool(processes=2) as pool:
         # Without the fix, this would raise from deep in the worker's

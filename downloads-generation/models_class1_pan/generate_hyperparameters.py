@@ -45,17 +45,15 @@ base_hyperparameters = {
     'random_negative_rate': 1.0,
     'random_negative_method': 'by_allele_equalize_nonbinders',
     'random_negative_binder_threshold': 500.0,
-    # Phase 1 of issue openvax/mhcflurry#268: random-negative pool
-    # framework, default-off (``pool_epochs=1`` is the pre-Phase-1
-    # memory profile). The original Phase 1 production setting was 100
-    # epochs amortizing ~17 s/epoch encoding cost across the cycle, but
-    # in practice this ballooned to ~199 GB/worker on the release_exact
-    # 8xA100 run (intermediate ``pandas.Series`` of strings + encoder
-    # buffers + torch caching allocator), OOM'ing the 944 GB box. Until
-    # a streaming-rebuild fix lands that doesn't materialize the full
-    # N-epoch buffer, leave this at 1. The pool primitive is exercised
-    # at this default in unit tests; opt-in workflows that test pool
-    # semantics can override per-call.
+    # Random-negative pool: ``pool_epochs=1`` keeps a single epoch of
+    # encoded negatives in heap at a time. Setting >1 amortizes the
+    # encoding cost across that many epochs but materializes the full
+    # ``pool_epochs × per_epoch_count`` peptide buffer per worker —
+    # on the 8xA100 release_exact run, ``100`` ballooned to ~199 GB/worker
+    # (tooling overhead + intermediate Series) and OOM'd a 944 GB box.
+    # Hold at 1 until a streaming-rebuild fix lands that doesn't
+    # materialize the full N-epoch buffer at once. The pool primitive is
+    # exercised at this default in unit tests.
     'random_negative_pool_epochs': 1,
     'train_data': {
         'pretrain': True,

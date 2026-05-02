@@ -1,10 +1,9 @@
 """Inference-time encoding cache tests.
 
-Phase 3 extension of issue #268: the encoding cache module was already
-training-agnostic, but the inference predict() path didn't wire it up.
-With ``encoding_cache_dir=<dir>``, a single pass encodes the peptide
-list and every network in the ensemble hits the prepopulated cache on
-its ``peptides_to_network_input`` call.
+The encoding cache is shared between training and inference. With
+``encoding_cache_dir=<dir>``, a single pass encodes the peptide list and
+every network in the ensemble hits the prepopulated cache on its
+``peptides_to_network_input`` call.
 
 The load-bearing invariants these tests protect:
 

@@ -213,7 +213,7 @@ def test_random_negatives_pool_different_seeds_diverge():
     )
 
 
-# ---- Phase 3 of openvax/mhcflurry#268: shared-mmap pool ----
+# ---- Shared-mmap random-negative pool ----
 
 def _int8_encoder(encodable_sequences):
     # Deterministic int8 encoder — good enough to verify the shared-mmap
@@ -360,10 +360,8 @@ def test_fit_end_to_end_pool_epochs_one_draws_from_global_rng(monkeypatch):
     """End-to-end behavioral: calling ``Class1NeuralNetwork.fit`` with
     ``random_negative_pool_epochs=1`` must draw random negatives from
     numpy's global state regardless of the ``random_negative_seed``
-    kwarg. This is the guarantee that the Phase 1 default path is
-    bit-identical to pre-Phase-1 behavior — without it, the training
-    driver's SHA1-mixed seed would silently flip default training to
-    deterministic-per-work-item.
+    kwarg. Without this guarantee the training driver's SHA1-mixed seed
+    would silently flip default training to deterministic-per-work-item.
     """
     import numpy as np
     from mhcflurry.class1_neural_network import Class1NeuralNetwork

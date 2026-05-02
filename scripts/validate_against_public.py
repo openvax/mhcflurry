@@ -91,7 +91,7 @@ def predict_affinity(pred, peptides, alleles, encoding_cache_dir=None) -> pd.Dat
     """Tall DataFrame: peptide, allele, affinity_nM.
 
     Batches by allele so the full peptide list goes through predict()
-    once per allele (letting the Phase 3 encoding cache, if configured,
+    once per allele (letting the encoding cache, if configured,
     prepopulate once and reuse across alleles).
     """
     rows = []
@@ -239,11 +239,11 @@ def main():
                    help="dir with public models_class1_presentation/models/. "
                         "If given, presentation Spearman is also reported.")
     p.add_argument("--encoding-cache-dir", default=None,
-                   help="Shared BLOSUM62 peptide encoding cache directory "
-                        "(Phase 3 of #268). Populated once on the first "
-                        "predict() call, reused by all subsequent predicts "
-                        "— so comparing N predictors on the same peptide "
-                        "list costs 1 encoding pass instead of N.")
+                   help="Shared BLOSUM62 peptide encoding cache directory. "
+                        "Populated once on the first predict() call, reused "
+                        "by all subsequent predicts — so comparing N "
+                        "predictors on the same peptide list costs 1 "
+                        "encoding pass instead of N.")
     args = p.parse_args()
 
     peptides = [pep for pep, _, _ in KNOWN_BINDERS]

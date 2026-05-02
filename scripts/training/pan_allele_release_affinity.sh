@@ -264,11 +264,8 @@ echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU; requested=$
 # indefinitely inside one worker. Override with MAX_TASKS_PER_WORKER.
 MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
 
-# Phase 1 (#268): enable the BLOSUM62 encoding cache + fit() DataLoader
-# prefetch by default. USE_ENCODING_CACHE=0 disables the global peptide
-# encoding cache. DATALOADER_NUM_WORKERS controls only process parallelism;
-# fit_dataloader_backing remains "auto" so the component model resolves
-# numpy vs shared_tensor backing consistently in fit().
+# Enable the BLOSUM62 encoding cache by default; USE_ENCODING_CACHE=0
+# disables the global peptide encoding cache.
 USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
 # DataLoader prefetch workers per training worker. Default ``auto`` is
 # resolved by the orchestrator (mhcflurry-class1-train-pan-allele-models)

@@ -97,12 +97,12 @@ def test_cached_matches_direct_byte_for_byte(cache, default_params):
     training will diverge from the un-cached code path and we can no
     longer claim determinism. Every other test below is secondary.
 
-    Dtype note: Phase 4a of #268 stores the encoder's native dtype
-    (int8 for BLOSUM62 — values fit tightly in [-4, +6]) instead of
-    widening to float32 at the cache layer. The downstream GPU cast
-    int8→float32 is a free widening op that preserves values exactly.
-    This test compares values (``assert_array_equal`` across the
-    widened cast) rather than dtype.
+    Dtype note: the cache stores the encoder's native dtype (int8 for
+    BLOSUM62 — values fit tightly in [-4, +6]) instead of widening to
+    float32 at the cache layer. The downstream GPU cast int8→float32 is
+    a free widening op that preserves values exactly. This test
+    compares values (``assert_array_equal`` across the widened cast)
+    rather than dtype.
     """
     direct = EncodableSequences(VALID_PEPTIDES).variable_length_to_fixed_length_vector_encoding(
         **default_params.to_kwargs()
