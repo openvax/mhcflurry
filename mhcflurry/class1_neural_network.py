@@ -73,8 +73,12 @@ def _estimate_peak_bytes_per_row(model):
             return int(sum(
                 _estimate_peak_bytes_per_row(net) for net in sub_networks
             ))
-        except Exception:
-            pass
+        except (AttributeError, TypeError) as exc:
+            logging.warning(
+                "Could not estimate peak per-row bytes for merged ensemble; "
+                "falling back to per-network walk: %s",
+                exc,
+            )
     widths = []
     try:
         lc_out_len = int(model.peptide_encoding_shape[0])
@@ -86,10 +90,8 @@ def _estimate_peak_bytes_per_row(model):
             except AttributeError:
                 pass
         widths.append(lc_out_len * lc_out_ch)
-        prev = lc_out_len * lc_out_ch
         for layer in model.peptide_dense_layers:
-            prev = layer.out_features
-            widths.append(prev)
+            widths.append(int(layer.out_features))
     except AttributeError:
         widths.append(1024)
     try:
@@ -457,10 +459,6 @@ class _StreamingBatchIterableDataset(torch.utils.data.IterableDataset):
             yield self._normalize_item(item)
 
 
-_FitGeneratorBatchIterableDataset = _StreamingBatchIterableDataset
-# Backward-compatible private alias used by older tests/importers.
-
-
 def _batch_value_to_device(value, device, *, non_blocking, cast_float):
     """Move a batch value (numpy array or tensor) to ``device``.
 
@@ -763,10 +761,6 @@ def _make_streaming_batch_dataloader(
         kwargs["multiprocessing_context"] = "spawn"
         kwargs["prefetch_factor"] = 2
     return torch.utils.data.DataLoader(**kwargs)
-
-
-_make_fit_generator_dataloader = _make_streaming_batch_dataloader
-# Backward-compatible private alias.
 
 
 def _batched_validation_loss(
@@ -2936,11 +2930,13 @@ class Class1NeuralNetwork(object):
         The method still shares the same low-level optimizer step, loss object,
         regularization, and batched validation helpers as :meth:`fit`.
 
-        ``generator`` may yield either legacy raw tuples
-        ``(allele_encoding, peptides, affinities)`` or pre-encoded
-        ``(x_dict, y)`` tuples. ``generator_factory`` enables DataLoader worker
-        prefetch: each worker calls it with ``worker_id`` and ``num_workers`` to
-        read a disjoint shard.
+        ``generator`` may yield either pre-encoded ``(x_dict, y)`` tuples
+        (the path the shipped pan-allele pretrain pipeline uses) or legacy
+        raw ``(allele_encoding, peptides, affinities)`` tuples. The legacy
+        form is still tested for back-compat but is not exercised by any
+        production pipeline. ``generator_factory`` enables DataLoader
+        worker prefetch: each worker calls it with ``worker_id`` and
+        ``num_workers`` to read a disjoint shard.
         """
         device = self.get_device()
         _configure_matmul_precision(device)

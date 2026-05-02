@@ -264,9 +264,12 @@ class AffinityDeviceTrainingData:
     def batch_for_indices(self, batch_indices):
         """Return ``(inputs, y_batch, weights_batch)`` for device indices.
 
-        ``batch_indices`` must be a torch integer tensor on ``self.device``.
-        Keeping indices on device lets the fit loop form batches with
-        ``index_select`` and no per-batch host-to-device copies.
+        Hot-path API used by the inner training and validation loops.
+        ``batch_indices`` must be a torch integer tensor already on
+        ``self.device``; keeping indices on device lets the fit loop form
+        batches with ``index_select`` and no per-batch host-to-device
+        copies. For one-shot use cases that start from a host-side
+        index array, see :meth:`batch_dict_for_indices`.
         """
         combined_peptide = self.combined_peptide
         if combined_peptide is None:
@@ -283,7 +286,15 @@ class AffinityDeviceTrainingData:
         return inputs, y_batch, weights_batch
 
     def batch_dict_for_indices(self, indices, device=None):
-        """Return a batch dict for LSUV/data-dependent initialization."""
+        """Return a flat ``{"peptide", "allele", "y", "weight"}`` dict.
+
+        Convenience wrapper used once per fit, by LSUV/data-dependent
+        weight init. Unlike :meth:`batch_for_indices`, this accepts
+        host-side ``indices`` (numpy array, list, or any tensor) and
+        moves them to the device for you, since the init path is
+        called outside the hot loop and isn't sensitive to the per-call
+        host-to-device copy.
+        """
         if device is None:
             device = self.device
         if not isinstance(indices, torch.Tensor):

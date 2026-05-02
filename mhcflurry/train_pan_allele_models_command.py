@@ -211,18 +211,13 @@ parser.add_argument(
     "--random-negative-shared-pool-dir",
     metavar="DIR",
     default=None,
-    help="Directory under which the orchestrator pre-builds per-fold "
-    "mmap-backed random-negative pools (see mhcflurry/shared_memory.py). "
-    "When set, training workers consume an OS-page-cache-shared encoded "
-    "pool instead of regenerating + re-encoding their own each cycle. "
-    "This is an opt-in host/mmap path; the default is each worker's "
-    "in-process pool, which may generate negatives directly on the active "
-    "torch device. Requires the hyperparameters' "
-    "``random_negative_pool_epochs`` to be > 1 (otherwise each epoch "
-    "regenerates and there's nothing to share). The directory is "
-    "populated by ``shared_memory.setup_shared_random_negative_pools`` "
-    "and written before any training worker is forked, so workers fault "
-    "in pages on first read. Default: None.")
+    help="Opt-in: directory under which the orchestrator pre-builds per-fold "
+    "mmap-backed random-negative pools. When set, training workers share one "
+    "page-cached encoded pool instead of each worker building its own. "
+    "Requires ``random_negative_pool_epochs`` > 1 in component hyperparameters "
+    "(otherwise each epoch regenerates and there is nothing to share). "
+    "Default: unset; each worker builds its own in-process pool. "
+    "See mhcflurry/shared_memory.py.")
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)

@@ -1,21 +1,17 @@
 """End-to-end integration test: training is bit-identical with cache on/off.
 
-This is THE gate for issue #268 Phase 1. Unit tests can prove that the
-cache produces encoded bytes matching ``variable_length_to_fixed_length_
-vector_encoding`` exactly — but that only tests the encoder's output. It
-doesn't test what happens when those bytes flow through multi-epoch
-training with stochastic operations (weight init, random negative
-sampling, minibatch shuffle, validation split).
+Unit tests can prove that the cache produces encoded bytes matching
+``variable_length_to_fixed_length_vector_encoding`` exactly — but that
+only tests the encoder's output. It doesn't test what happens when those
+bytes flow through multi-epoch training with stochastic operations
+(weight init, random negative sampling, minibatch shuffle, validation
+split).
 
 So: we run actual training on a tiny model, with fixed seeds, via both
-the original code path (fresh ``EncodableSequences``) and the new cached
+the original code path (fresh ``EncodableSequences``) and the cached
 path (``make_prepopulated_encodable_sequences``). We assert the per-epoch
 loss trajectories match bit-for-bit AND the final model weights match
 bit-for-bit.
-
-If this test passes, the semantic-preservation claim is proven end-to-end:
-the cache is a pure implementation-detail optimization, not a behavior
-change.
 
 On CPU only. GPU determinism requires extra flags and isn't necessary to
 prove the point — the cache doesn't know or care about the device.
@@ -34,7 +30,7 @@ import torch
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.class1_neural_network import (
     Class1NeuralNetwork,
-    _FitGeneratorBatchIterableDataset,
+    _StreamingBatchIterableDataset,
 )
 from mhcflurry.common import configure_pytorch
 from mhcflurry.encodable_sequences import EncodableSequences
@@ -515,11 +511,10 @@ def test_dataloader_cache_plus_workers_still_bit_identical(
 ):
     """Composition test: encoding cache + num_workers>0 must match baseline.
 
-    This is the stack test: both Phase 1 changes (encoding cache in
-    Step 2/3, DataLoader prefetching in Step 4) active at once must still
-    produce bit-identical training. If either changes semantics
-    independently the integration tests above catch it; this one catches
-    the case where they INTERACT in a bad way.
+    Stack test: both the encoding cache and DataLoader prefetching active
+    at once must still produce bit-identical training. The integration
+    tests above catch each in isolation; this one catches the case where
+    they INTERACT badly.
     """
     params = EncodingParams(**DEFAULT_PEPTIDE_ENCODING)
     cache = EncodingCache(cache_dir=tmp_path / "encoding_cache", params=params)
@@ -559,7 +554,7 @@ def test_dataloader_cache_plus_workers_still_bit_identical(
 def test_fit_generator_self_reproducible(training_df, allele_encoding):
     """fit_generator with the val-tensor hoist must be self-reproducible.
 
-    Regression lock for the Phase 1 extension (#268) to fit_generator:
+    Regression lock for the val-tensor hoist:
     - val_peptide_device / val_allele_device / val_y_device are allocated
       once before the epoch loop instead of re-materialized per epoch.
     - Validation uses those device tensors directly.
@@ -682,8 +677,7 @@ def test_fit_generator_validation_tensors_hoisted_once(
     assert call_count[0] <= expected_max, (
         f"torch.from_numpy called {call_count[0]} times in a 5-epoch run. "
         f"Expected ~{expected_max}. If this ballooned, the val-tensor "
-        f"hoist regressed — H2D is running per-epoch again, negating the "
-        f"Phase 1 fit_generator perf fix."
+        f"hoist regressed — H2D is running per-epoch again."
     )
 
 
@@ -830,7 +824,7 @@ def test_fit_generator_dataset_is_picklable_with_live_generator():
     assert isinstance(live_generator, type((x for x in ()))), \
         "test premise: _make_preencoded_fit_generator returns a generator"
 
-    dataset = _FitGeneratorBatchIterableDataset(
+    dataset = _StreamingBatchIterableDataset(
         generator=live_generator,
         generator_factory=_make_preencoded_fit_generator,
         source_batches_are_encoded=True,
@@ -857,7 +851,7 @@ def test_fit_generator_dataset_drops_bound_methods_on_encoded_path():
     """
     net = Class1NeuralNetwork(**_tiny_hyperparameters())
 
-    dataset = _FitGeneratorBatchIterableDataset(
+    dataset = _StreamingBatchIterableDataset(
         generator=(),
         generator_factory=_make_preencoded_fit_generator,
         source_batches_are_encoded=True,
@@ -875,7 +869,7 @@ def test_fit_generator_dataset_keeps_callbacks_on_raw_path():
     """Raw-tuple path must retain the encoding callbacks — they're used."""
     net = Class1NeuralNetwork(**_tiny_hyperparameters())
 
-    dataset = _FitGeneratorBatchIterableDataset(
+    dataset = _StreamingBatchIterableDataset(
         generator=iter(()),  # empty, but live-generator-shaped
         generator_factory=None,
         source_batches_are_encoded=False,
@@ -940,7 +934,7 @@ def test_fit_generator_downgrades_num_workers_on_raw_batches(caplog):
     ``allele_encoding_to_network_input``), and pickling those drags
     the whole network into every worker — which is wrong. Worker-
     prefetch must only activate when batches are pre-encoded AND a
-    factory is present. See a286d51 (``_FitGeneratorBatchIterableDataset``
+    factory is present. See a286d51 (``_StreamingBatchIterableDataset``
     downgrade check).
     """
     _seed_everything(seed=13580)
