@@ -8,15 +8,34 @@ prediction package with competitive accuracy and a fast and
 [documented](http://openvax.github.io/mhcflurry/) implementation.
 
 > [!IMPORTANT]
-> **Version 2.2.0** is the first release to use [PyTorch](https://pytorch.org/) as its neural network backend, replacing TensorFlow/Keras used in previous versions. It loads the same published weights and produces equivalent predictions, so existing workflows should continue to work with no changes.
+> **Version 2.3.0** keeps the same external API as 2.2.0 and ships substantial
+> performance and tooling improvements for users training their own models or
+> running large prediction workloads:
+> - **Device-resident affinity training**: `Class1NeuralNetwork.fit()` keeps
+>   peptides, alleles, targets, and the random-negative pool on the active
+>   torch device for the lifetime of one fit, eliminating per-batch
+>   host↔device copies.
+> - **Multi-GPU prediction by default**: `mhcflurry-predict`,
+>   `mhcflurry-predict-scan`, `mhcflurry-calibrate-percentile-ranks`, and the
+>   sweep eval script auto-discover visible GPUs and fan out across them.
+> - **Orchestrator auto-tuning**: `mhcflurry-class1-train-pan-allele-models`
+>   resolves `--num-jobs`, `--max-workers-per-gpu`, `--dataloader-num-workers`,
+>   and `random_negative_pool_epochs` from the box's hardware so the same
+>   recipe runs on a workstation, single-GPU node, or 8×A100 host.
+> - **`torch.compile` + TF32 + matmul-precision** are first-class CLI flags
+>   on the train commands; the in-process Inductor cache is warmed by a single
+>   worker before the production pool launches.
 >
-> Key changes in 2.2.0:
-> - **Backend**: TensorFlow/Keras replaced by PyTorch (>= 2.0)
-> - **Python**: Requires Python 3.10+ (previously 3.9+)
-> - **Dependencies**: `pandas >= 2.0` is now required; `tensorflow` and `keras` are no longer needed
-> - **Hardware**: Automatic GPU detection; Apple Silicon (MPS) is now supported
+> If you are upgrading from 2.1.x or 2.2.x, simply
+> `pip install --upgrade mhcflurry`. The published pre-trained models are
+> unchanged and will be loaded automatically. Internal refactors (per-fit
+> DataLoader SHM scaffolding, `fit_dataloader_backing` hyperparameter) do not
+> affect the public Python or CLI surface.
 >
-> If you are upgrading from 2.1.x, simply `pip install --upgrade mhcflurry`. The published pre-trained models are unchanged and will be loaded and converted automatically.
+> Earlier release: **Version 2.2.0** was the first release to use PyTorch as
+> its neural network backend, replacing TensorFlow/Keras. It introduced the
+> Python 3.10+ and `pandas >= 2.0` requirements and added Apple Silicon (MPS)
+> support.
 
 MHCflurry implements class I peptide/MHC binding affinity prediction.
 The current version provides pan-MHC I predictors supporting any MHC
