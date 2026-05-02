@@ -564,8 +564,8 @@ def auto_random_negative_pool_epochs(
     a workload is known to behave better than the empirical pessimistic
     figure.
 
-    Returns an int >= 1. ``1`` reproduces the pre-Phase-1 every-epoch-regen
-    behavior. ``> 1`` amortizes the RN gen + encode cost across N epochs.
+    Returns an int >= 1. ``1`` means fresh random negatives every epoch.
+    ``> 1`` amortizes random-negative generation + encoding across N epochs.
 
     Inputs
     ------
@@ -1079,18 +1079,12 @@ def hoist_torchinductor_compile_threads(args, phase="production"):
 # ---- Non-daemonic worker pool --------------------------------------------
 #
 # By default ``multiprocessing.Pool`` spawns daemon workers, and daemon
-# processes cannot fork their own children. That's incompatible with the
-# Phase 1 (#268) PyTorch DataLoader wrap in ``Class1NeuralNetwork.fit``,
-# which uses ``num_workers>0`` to prefetch minibatches via per-DataLoader
-# worker processes. Under the default Pool, the DataLoader init call
-# raises ``AssertionError: daemonic processes are not allowed to have
-# children`` the first time a training epoch tries to iterate.
-#
-# Phase 1 shipped a runtime downgrade (``_effective_num_workers`` in
-# class1_neural_network.py) that silently forces ``num_workers=0`` when
-# called from a daemon process — safe, but it effectively disables
-# DataLoader prefetch in production training. The real fix is here:
-# run Pool workers as NON-daemonic so they can spawn their own children.
+# processes cannot fork their own children. Streaming pretraining can use
+# PyTorch DataLoader workers to prefetch batches, so mhcflurry's outer training
+# pool must use non-daemonic workers. The runtime fallback in
+# ``class1_neural_network._effective_num_workers`` still downgrades to
+# ``num_workers=0`` if an external caller uses a daemon process, but production
+# training should keep prefetch available by using this pool.
 #
 # Non-daemon workers have one behavioral difference worth naming: if the
 # parent process dies ungracefully (e.g. SIGKILL), the workers may
@@ -1226,8 +1220,8 @@ def add_local_parallelism_args(parser):
              "random-negative pool. Pass 'auto' (default) to size from "
              "system RAM / fit-worker plan via "
              "``mhcflurry.local_parallelism.auto_random_negative_pool_epochs`` "
-             "(hard cap = 10). Pass an integer to pin (1 reproduces "
-             "pre-Phase-1 every-epoch-regen behavior). Overrides any "
+             "(hard cap = 10). Pass an integer to pin (1 means fresh "
+             "random negatives every epoch). Overrides any "
              "``random_negative_pool_epochs`` set in component-model "
              "hyperparameters.")
     group.add_argument(
@@ -1800,8 +1794,7 @@ def make_worker_pool(
             pool_kwargs["initializer"] = initializer
 
     # Use a non-daemonic pool so workers can spawn DataLoader children.
-    # See NonDaemonPool for the rationale and the Phase 1 (#268) crash
-    # it unblocks.
+    # See NonDaemonPool for the rationale.
     worker_pool = NonDaemonPool(**pool_kwargs)
     print("Started pool: %s" % str(worker_pool))
     pprint(pool_kwargs)

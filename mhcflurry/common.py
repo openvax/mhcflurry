@@ -330,11 +330,10 @@ def random_peptides(num, length=9, distribution=None, rng=None):
         distribution is used.
 
     rng : numpy.random.Generator, optional
-        If provided, peptides are sampled from this generator instead
-        of the global ``numpy.random`` state. Lets callers make peptide
-        generation deterministic (e.g. for the pre-generated-negative
-        pool in Phase 1 of #268). When None the global state is used,
-        preserving pre-existing call-site semantics.
+        If provided, peptides are sampled from this generator instead of the
+        global ``numpy.random`` state. Used by callers that need deterministic
+        peptide generation, such as pre-generated random-negative pools. When
+        None the global state is used, preserving legacy call-site semantics.
 
     Returns
     ----------

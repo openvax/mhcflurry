@@ -1,14 +1,4 @@
-"""Tests for the consolidated shared-memory module.
-
-Covers the surviving two layers of mhcflurry's shared-memory design:
-
-* run mmap cache — per-run mmap random-negative pool, used by
-  ``setup_shared_random_negative_pools`` / ``lookup_pool_dir``.
-* per-fit() FitBacking — device-resident only.
-
-The legacy POSIX-shm "fit DataLoader SHM" backing was removed when
-fit() became device-resident only.
-"""
+"""Tests for the per-run shared mmap random-negative pool module."""
 
 import os
 import pytest
@@ -27,88 +17,8 @@ def setup_teardown():
     cleanup()
 
 
-def test_fit_backing_from_device_combined_buffer_layout():
-    """Device-resident FitBacking pre-allocates ONE combined peptide
-    tensor with RN at the front and real at the back. ``x_peptide`` and
-    ``random_negative_x_peptide`` are views into that buffer so refills
-    propagate without copy."""
-    import numpy
-    import torch
-    from mhcflurry.shared_memory import FitBacking
-
-    num_rn = 5
-    num_real = 7
-    encoded_length = 3 * 15
-
-    x_peptide = numpy.arange(num_real * encoded_length, dtype=numpy.int8).reshape(
-        num_real, encoded_length
-    )
-    rn_template = numpy.zeros((num_rn, encoded_length), dtype=numpy.int8)
-    x_allele = numpy.ones((num_real, 39), dtype=numpy.float32) * 2.0
-    rn_allele = numpy.ones((num_rn, 39), dtype=numpy.float32) * 3.0
-    y_encoded = numpy.linspace(0.0, 1.0, num_rn + num_real, dtype=numpy.float32)
-    weights = numpy.ones(num_rn + num_real, dtype=numpy.float32)
-
-    backing = FitBacking.from_device(
-        x_peptide=x_peptide,
-        x_allele=x_allele,
-        y_encoded=y_encoded,
-        sample_weights=weights,
-        random_negative_x_peptide_template=rn_template,
-        random_negative_x_allele=rn_allele,
-        device="cpu",
-    )
-    assert isinstance(backing.combined_peptide, torch.Tensor)
-    assert backing.combined_peptide.shape == (num_rn + num_real, encoded_length)
-    # Real-data block is at the bottom and matches input.
-    numpy.testing.assert_array_equal(
-        backing.combined_peptide[num_rn:].numpy(), x_peptide
-    )
-    numpy.testing.assert_array_equal(
-        backing.x_peptide.numpy(), x_peptide
-    )
-    # RN block is initialized to zeros.
-    assert (backing.combined_peptide[:num_rn] == 0).all()
-    # Refilling RN through the view propagates into the combined buffer.
-    backing.random_negative_x_peptide.copy_(
-        torch.full((num_rn, encoded_length), 17, dtype=torch.int8)
-    )
-    assert (backing.combined_peptide[:num_rn] == 17).all()
-    # Real block must remain untouched.
-    numpy.testing.assert_array_equal(
-        backing.combined_peptide[num_rn:].numpy(), x_peptide
-    )
-
-    # Allele combined buffer follows the same RN-front, real-back layout.
-    assert backing.combined_allele.shape == (num_rn + num_real, 39)
-    assert (backing.combined_allele[:num_rn] == 3.0).all()
-    assert (backing.combined_allele[num_rn:] == 2.0).all()
-
-
-def test_fit_backing_from_device_no_random_negatives():
-    """When random_negative_x_peptide_template is None, no combined
-    buffer is allocated and ``x_peptide`` lands directly on device."""
-    import numpy
-    from mhcflurry.shared_memory import FitBacking
-
-    x_peptide = numpy.arange(7 * 45, dtype=numpy.int8).reshape(7, 45)
-    backing = FitBacking.from_device(
-        x_peptide=x_peptide,
-        x_allele=None,
-        y_encoded=numpy.zeros(7, dtype=numpy.float32),
-        sample_weights=None,
-        random_negative_x_peptide_template=None,
-        random_negative_x_allele=None,
-        device="cpu",
-    )
-    assert backing.combined_peptide is None
-    assert backing.random_negative_x_peptide is None
-    numpy.testing.assert_array_equal(backing.x_peptide.numpy(), x_peptide)
-
-
 def test_public_api():
     """Surviving public API surface."""
-    assert hasattr(shm, "FitBacking")
     assert callable(shm.setup_shared_random_negative_pools)
     assert callable(shm.lookup_pool_dir)
 

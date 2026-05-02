@@ -310,24 +310,17 @@ class RandomNegativePeptides(object):
 class RandomNegativesPool(object):
     """Amortize random-negative generation and encoding across N epochs.
 
-    Pre-issue-#268 Phase 1, ``Class1NeuralNetwork.fit()`` called
-    ``planner.get_peptides()`` followed by ``peptides_to_network_input``
-    at the top of every epoch — profiling on the release-exact 8xA100
-    run showed that pair at ~17 s/epoch (~44% of epoch wall-clock) for
-    the pan-allele default random-negative counts. The peptide strings
-    themselves are tiny; the cost is almost entirely in the
-    BLOSUM62-encoding pass.
+    ``Class1NeuralNetwork.fit`` needs random-negative peptides each epoch.
+    Generating them and encoding them into network inputs can dominate
+    training time for large pan-allele runs. This class generates
+    ``pool_epochs`` worth of random peptides in one call to the planner, encodes
+    the whole pool once, and hands back an O(1) slice per epoch.
 
-    This class generates ``pool_epochs`` worth of random peptides in one
-    call to the planner, encodes the whole pool once, and hands back an
-    O(1) slice per epoch. Setting ``pool_epochs=1`` reproduces the
-    pre-pool semantics exactly (one generation + one encode per epoch).
-    Setting ``pool_epochs=100`` reduces the amortized per-epoch encode
-    cost by ~100x; the trade-off is that within a pool-cycle the
-    negatives no longer *change* every epoch — consecutive epochs in a
-    cycle see distinct slices of the same pool, not freshly-sampled
-    peptides. A new pool is generated at the start of each cycle
-    (epoch // pool_epochs boundary).
+    Setting ``pool_epochs=1`` samples and encodes fresh negatives every epoch.
+    Setting ``pool_epochs>1`` amortizes generation and encoding across the pool;
+    the trade-off is that consecutive epochs in a pool cycle see distinct
+    slices of the same generated pool rather than independently generated
+    peptides. A new pool is generated at each ``epoch // pool_epochs`` boundary.
 
     Seeding is optional. When ``seed`` is None the peptides are drawn
     from the process's numpy global state, matching the pre-pool
@@ -359,8 +352,8 @@ class RandomNegativesPool(object):
             samples and encodes integer indices directly.
 
         pool_epochs : int
-            Number of consecutive epochs that share a pool. 1 is
-            semantically identical to pre-Phase-1 behavior.
+            Number of consecutive epochs that share a pool. 1 means fresh
+            random negatives every epoch.
 
         seed : int, optional
             Seed for the per-cycle RNG. When None, draws go through
@@ -494,11 +487,10 @@ class RandomNegativesPool(object):
         :func:`amino_acid.indices_to_peptide` against the int8
         encoded slice if a logging caller needs them).
 
-        Phase 3 (#268) shared-mmap path: when the pool was built via
-        ``from_shared_mmap`` with a ``permutation_seed``, the slice is
-        reordered by a per-worker permutation seeded by that value mixed
-        with the epoch counter. Diversity is preserved even though all
-        workers read from the same byte-identical encoded array.
+        Shared-mmap pools can be opened with a ``permutation_seed``. In that
+        case this method reorders the slice by a per-worker permutation seeded
+        by that value mixed with the epoch counter. Diversity is preserved even
+        though all workers read from the same byte-identical encoded array.
         """
         max_epoch = getattr(self, "_mmap_max_epoch", None)
         if max_epoch is not None and int(epoch) > max_epoch:
@@ -540,7 +532,7 @@ class RandomNegativesPool(object):
     def total_count(self):
         return self._total_count
 
-    # --- Phase 3 (#268): shared-mmap pool primitive ---
+    # --- Shared-mmap pool primitive -------------------------------------
     #
     # In a multi-worker training pool (the pan-allele release_exact run
     # spins up 16 training workers), each worker currently holds its own

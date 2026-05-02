@@ -1,28 +1,16 @@
-"""Shared-memory primitives used by mhcflurry training.
+"""Opt-in mmap random-negative pools used by affinity training workers.
 
-mhcflurry's training pipeline now uses a single per-fit() data residency
-— device-resident — and a per-run shared mmap pool for the random-negative
-peptide cycle. The two layers serve different lifecycles:
+This module owns only the random-negative mmap pool. The default affinity
+``fit()`` path keeps one fit's row space in device tensors, implemented in
+``class1_affinity_training_data.AffinityDeviceTrainingData``.
 
-run mmap cache — per-run, file-mmap, orchestrator-built, read-only.
-    Random-negative pool, encoding cache. Built ONCE before any
-    training worker is forked; workers ``numpy.memmap`` the file and
-    the OS page cache holds a single resident copy across N workers.
-    Persists to disk so it can be reused across runs.
-
-    Mechanism: ``numpy.memmap`` of files written by the orchestrator.
-
-per-fit() data — device-resident.
-    Backing arrays for a single ``fit()`` call. Live on the training
-    device (CUDA/MPS/CPU) for the lifetime of one fit; the inner
-    training loop indexes pre-stitched ``[random_negatives | real]``
-    device tensors directly, with zero per-batch H2D copies and no
-    DataLoader workers. Built by ``FitBacking.from_device``.
-
-The legacy POSIX-shm "fit DataLoader SHM" backing and the host-resident
-DataLoader path are gone — the device-resident path is the only one.
-``FitBacking`` only carries device-resident state; ``setup_shared_random_negative_pools`` /
-``lookup_pool_dir`` continue to back the per-run mmap pool unchanged.
+When ``--random-negative-shared-pool-dir`` is set, the training orchestrator
+builds encoded random-negative pools before forking local workers. Workers
+reopen those files with ``numpy.memmap`` so the operating-system page cache can
+hold one resident copy across processes. This is useful for host/vector encoded
+training or worker fan-out where regenerating identical host pools dominates.
+It is deliberately opt-in because the default torch-index path can generate
+random negatives directly for the active torch device.
 """
 
 from __future__ import annotations
@@ -30,188 +18,13 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-from dataclasses import dataclass
 from typing import Any, Dict
-
-import torch
 
 from .random_negative_peptides import (
     RandomNegativePeptides,
     RandomNegativesPool,
 )
 
-
-@dataclass
-class FitBacking:
-    """Backing arrays for one fit() call.
-
-    Device-resident only: every static tensor lives on the training
-    device. The fit() inner loop indexes the pre-stitched
-    ``combined_peptide`` (and ``combined_allele``) buffers directly,
-    so there are no per-batch H2D copies and no DataLoader workers.
-
-    ``random_negative_x_peptide`` and ``x_peptide`` are views into
-    ``combined_peptide`` (top slice = RN, bottom slice = real); the
-    same applies to alleles. Refilling RN bytes propagates to ``x_*``
-    automatically.
-
-    This is an internal transport container, not a model feature. The
-    model-side peptide encoding decision is controlled separately by
-    ``peptide_amino_acid_encoding_torch``.
-    """
-
-    x_peptide: Any
-    x_allele: Any = None
-    y_encoded: Any = None
-    sample_weights: Any = None
-    random_negative_x_peptide: Any = None
-    random_negative_x_allele: Any = None
-    # Pre-stitched (RN | real) device tensors that the inner fit() loop
-    # indexes into directly. Top slice is RN (refilled per cycle by
-    # RandomNegativesPool); bottom slice is the static real-data block.
-    combined_peptide: Any = None
-    combined_allele: Any = None
-
-    @classmethod
-    def from_device(
-        cls,
-        *,
-        x_peptide,
-        x_allele,
-        y_encoded,
-        sample_weights,
-        random_negative_x_peptide_template,
-        random_negative_x_allele,
-        device,
-    ):
-        """Materialize a device-resident bundle.
-
-        Pre-allocates one combined ``(num_random_negatives + num_real,
-        encoded_length)`` peptide tensor on ``device`` (and same for
-        allele). The top ``num_random_negatives`` rows are the RN slice
-        — refilled per cycle by ``RandomNegativesPool`` via in-place
-        copy. The bottom ``num_real`` rows are the static real-data
-        block — copied once at construction. ``x_peptide`` and
-        ``random_negative_x_peptide`` (and the allele equivalents) are
-        returned as views into the combined buffer so refills propagate
-        with zero copy.
-
-        Why one combined tensor: the fit() inner loop indexes via a
-        single ``index_select`` into ``combined_peptide`` per batch,
-        eliminating per-batch H2D copies. ``train_indices`` already
-        addresses the unified ``[0, num_rn + num_real)`` space (see
-        ``y_encoded`` / ``sample_weights_with_negatives`` construction
-        in ``fit``), so no index translation is needed.
-
-        Inputs may be numpy arrays or CPU torch tensors; the constructor
-        handles the .to(device) move uniformly.
-        """
-        def _to_device(value, dtype=None):
-            if value is None:
-                return None
-            if isinstance(value, torch.Tensor):
-                tensor = value
-            else:
-                tensor = torch.as_tensor(value)
-            if dtype is not None and tensor.dtype != dtype:
-                tensor = tensor.to(dtype)
-            return tensor.to(device, non_blocking=False)
-
-        def _peptide_to_device(value):
-            tensor = _to_device(value)
-            if (
-                    tensor is not None
-                    and tensor.ndim > 2
-                    and not tensor.dtype.is_floating_point):
-                tensor = tensor.to(torch.float32)
-            return tensor
-
-        def _peptide_template_shape_dtype(value):
-            if isinstance(value, torch.Tensor):
-                tensor = value
-            else:
-                tensor = torch.as_tensor(value)
-            dtype = tensor.dtype
-            if tensor.ndim > 2 and not dtype.is_floating_point:
-                dtype = torch.float32
-            return tuple(tensor.shape), dtype
-
-        x_peptide_dev = _peptide_to_device(x_peptide)
-        x_allele_dev = _to_device(x_allele)
-
-        combined_peptide = None
-        rn_peptide_view = None
-        x_peptide_view = x_peptide_dev
-        if random_negative_x_peptide_template is not None:
-            rn_shape, rn_dtype = _peptide_template_shape_dtype(
-                random_negative_x_peptide_template
-            )
-            num_rn = int(rn_shape[0])
-            if x_peptide_dev is None:
-                raise ValueError(
-                    "FitBacking.from_device: x_peptide is required when "
-                    "random_negative_x_peptide_template is set."
-                )
-            if x_peptide_dev.dtype != rn_dtype:
-                x_peptide_dev = x_peptide_dev.to(rn_dtype)
-            num_real = int(x_peptide_dev.shape[0])
-            combined_shape = (num_rn + num_real, *rn_shape[1:])
-            if tuple(x_peptide_dev.shape[1:]) != tuple(rn_shape[1:]):
-                raise ValueError(
-                    "FitBacking.from_device: real and random-negative "
-                    "peptide tensors disagree on per-row shape: %r vs %r" % (
-                        tuple(x_peptide_dev.shape[1:]),
-                        tuple(rn_shape[1:]),
-                    )
-                )
-            combined_peptide = torch.empty(
-                combined_shape, dtype=rn_dtype, device=device
-            )
-            rn_peptide_view = combined_peptide[:num_rn]
-            x_peptide_view = combined_peptide[num_rn:]
-            x_peptide_view.copy_(x_peptide_dev)
-            rn_peptide_view.zero_()
-
-        rn_allele_dev = _to_device(random_negative_x_allele)
-        combined_allele = None
-        rn_allele_view = rn_allele_dev
-        x_allele_view = x_allele_dev
-        if rn_allele_dev is not None and x_allele_dev is not None:
-            if rn_allele_dev.dtype != x_allele_dev.dtype:
-                # Match dtypes via the wider one (typically float32 for allele).
-                target_dtype = (
-                    torch.float32
-                    if (rn_allele_dev.dtype.is_floating_point
-                        or x_allele_dev.dtype.is_floating_point)
-                    else x_allele_dev.dtype
-                )
-                rn_allele_dev = rn_allele_dev.to(target_dtype)
-                x_allele_dev = x_allele_dev.to(target_dtype)
-            num_rn_a = int(rn_allele_dev.shape[0])
-            num_real_a = int(x_allele_dev.shape[0])
-            combined_allele = torch.empty(
-                (num_rn_a + num_real_a, *rn_allele_dev.shape[1:]),
-                dtype=rn_allele_dev.dtype,
-                device=device,
-            )
-            combined_allele[:num_rn_a].copy_(rn_allele_dev)
-            combined_allele[num_rn_a:].copy_(x_allele_dev)
-            rn_allele_view = combined_allele[:num_rn_a]
-            x_allele_view = combined_allele[num_rn_a:]
-
-        return cls(
-            x_peptide=x_peptide_view,
-            x_allele=x_allele_view,
-            y_encoded=_to_device(y_encoded, dtype=torch.float32),
-            sample_weights=_to_device(sample_weights, dtype=torch.float32),
-            random_negative_x_peptide=rn_peptide_view,
-            random_negative_x_allele=rn_allele_view,
-            combined_peptide=combined_peptide,
-            combined_allele=combined_allele,
-        )
-
-
-# ---- run mmap cache: per-run mmap random-negative pool ------------------
 
 def _planner_from_hyperparameters(hyperparameters):
     """Build a ``RandomNegativePeptides`` planner from a hyperparameter dict.
@@ -270,8 +83,7 @@ def setup_shared_random_negative_pools(
     Run once by the orchestrator BEFORE forking training workers. For
     each unique (fold, random-negative-config) tuple in ``work_items``,
     computes the plan against that fold's training data and writes a
-    Phase-3 mmap pool under
-    ``output_root_dir/fold_{fold}/cfg_{idx}/``.
+    mmap pool under ``output_root_dir/fold_{fold}/cfg_{idx}/``.
 
     Returns ``{(fold_num, config_key): pool_dir}`` for worker-side
     lookup via ``lookup_pool_dir``.
@@ -382,7 +194,6 @@ def lookup_pool_dir(fold_pool_dirs, *, fold_num, hyperparameters):
 
 
 __all__ = [
-    "FitBacking",
     "lookup_pool_dir",
     "setup_shared_random_negative_pools",
 ]

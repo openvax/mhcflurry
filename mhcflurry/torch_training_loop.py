@@ -185,7 +185,7 @@ def _effective_validation_batch_size(
     """Return the validation batch size to use for the current device.
 
     Static heuristic. MUST be deterministic across calls — fit() /
-    fit_generator() call this per-epoch, and torch.compile caches
+    fit_streaming_batches() call this per-epoch, and torch.compile caches
     specializations by input shape. A validation batch that varies
     with live free-VRAM (the auto-sized approach) forces the
     compiled graph to re-codegen every epoch and with 16 training

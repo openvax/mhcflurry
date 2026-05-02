@@ -671,7 +671,8 @@ class Class1ProcessingNeuralNetwork(object):
         network = self.network()
         network.to(device)
         # torch.compile + TF32 are gated by env vars (off by default). Wiring
-        # them in keeps processing at parity with affinity's fit / fit_generator
+        # them in keeps processing at parity with affinity fit /
+        # fit_streaming_batches()
         # paths so production opt-ins (MHCFLURRY_TORCH_COMPILE=1) light up
         # both trainers.
         network = _maybe_compile_network(network, device)

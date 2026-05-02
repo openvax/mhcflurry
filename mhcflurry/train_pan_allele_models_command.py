@@ -212,16 +212,17 @@ parser.add_argument(
     metavar="DIR",
     default=None,
     help="Directory under which the orchestrator pre-builds per-fold "
-    "mmap-backed random-negative pools (the run mmap cache; see "
-    "mhcflurry/shared_memory.py). When set, training workers consume an "
-    "OS-page-cache-shared encoded pool instead of regenerating + "
-    "re-encoding their own each cycle. Requires the hyperparameters' "
+    "mmap-backed random-negative pools (see mhcflurry/shared_memory.py). "
+    "When set, training workers consume an OS-page-cache-shared encoded "
+    "pool instead of regenerating + re-encoding their own each cycle. "
+    "This is an opt-in host/mmap path; the default is each worker's "
+    "in-process pool, which may generate negatives directly on the active "
+    "torch device. Requires the hyperparameters' "
     "``random_negative_pool_epochs`` to be > 1 (otherwise each epoch "
     "regenerates and there's nothing to share). The directory is "
     "populated by ``shared_memory.setup_shared_random_negative_pools`` "
     "and written before any training worker is forked, so workers fault "
-    "in pages on first read. Default: None (each worker builds its own "
-    "in-process pool, the legacy behavior).")
+    "in pages on first read. Default: None.")
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
@@ -1286,14 +1287,14 @@ def train_models(args):
 
     # Optionally pre-build the shared BLOSUM62 encoding cache. Orchestrator
     # does the (single-threaded) encoding pass once; workers mmap the result.
-    # See mhcflurry/encoding_cache.py and issue openvax/mhcflurry#268.
+    # See mhcflurry/encoding_cache.py.
     if getattr(args, "use_encoding_cache", False):
         _initialize_encoding_cache(args, all_work_items)
 
-    # Run mmap cache (per-run, mmap, read-only): pre-build per-fold
-    # random-negative pools and stash the lookup table in GLOBAL_DATA.
-    # Each work item's fit() will look up its own pool dir at task start.
-    # See mhcflurry/shared_memory.py for the layered SHM design.
+    # Optional random-negative mmap pools: pre-build per-fold pools and stash
+    # the lookup table in GLOBAL_DATA. Each work item's fit() looks up its own
+    # pool dir at task start; a missing match means "use the in-process pool."
+    # See mhcflurry/shared_memory.py.
     if getattr(args, "random_negative_shared_pool_dir", None):
         # Cluster mode: workers run on (possibly) other nodes. The mmap
         # pool dir must be reachable from every worker's filesystem, or
@@ -1615,8 +1616,8 @@ def train_model(
     print("%s [pid %d]. Hyperparameters:" % (progress_preamble, os.getpid()))
     pprint.pprint(hyperparameters)
 
-    # GPU memory telemetry at task boundaries. With max-tasks-per-worker>1
-    # (the post-Phase-4 default of 1000), a single worker process handles
+    # GPU memory telemetry at task boundaries. With max-tasks-per-worker>1,
+    # a single worker process handles
     # many arch×fold tasks sequentially. Logging allocated/reserved VRAM
     # plus the max-allocated high-water-mark at task start and end gives
     # us a trajectory to detect leaks: if the high-water mark or the
@@ -1705,7 +1706,7 @@ def train_model(
                 compact_peptide_repeats=True,
             )
 
-            model.fit_generator(
+            model.fit_streaming_batches(
                 generator=make_pretrain_generator(),
                 generator_factory=make_pretrain_generator,
                 generator_batches_are_encoded=True,
