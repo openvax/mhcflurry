@@ -1830,9 +1830,9 @@ def worker_init(
         # to disk immediately. Without it, Python defaults to ~8 KB block
         # buffering on a regular file, which silently swallows worker
         # output if the worker is killed (OOM, signal) before the buffer
-        # fills. That made debugging the openvax/mhcflurry#270 OOM nearly
-        # impossible — workers spun at 99% CPU and the LOG files stayed
-        # 0 bytes because no flush ever fired before the worker died.
+        # fills. With block buffering, a worker spinning at 99% CPU and
+        # then OOM-killed leaves a 0-byte LOG file because no flush
+        # ever fires before the worker dies — line buffering avoids that.
         sys.stderr = sys.stdout = open(os.path.join(
             worker_log_dir,
             "LOG-worker.%d.%d.txt" % (os.getpid(), int(time.time()))),
@@ -1851,7 +1851,6 @@ def worker_init(
     # batching (Class1NeuralNetwork.predict / fit's
     # check_training_batch_fits) can partition VRAM correctly when
     # multiple fit()/predict() calls are co-resident on one GPU.
-    # See issue openvax/mhcflurry#272.
     if max_workers_per_gpu is not None:
         os.environ["MHCFLURRY_MAX_WORKERS_PER_GPU"] = str(int(max_workers_per_gpu))
 

@@ -21,10 +21,9 @@ set -x
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 
 export PYTHONUNBUFFERED=1
-# torch.compile on by default after the Phase-4 sweep landed it.
-# Compile cost (~30-60s codegen) is paid once per worker. We deliberately
-# recycle workers after a moderate number of tasks to avoid the mysterious
-# long-lived-worker death mode seen on multi-day runs, while still
+# torch.compile is on by default. Compile cost (~30-60s codegen) is paid
+# once per worker; we recycle workers after a moderate number of tasks to
+# avoid long-lived-worker death modes on multi-day runs while still
 # amortizing compile / CUDA init across several networks.
 export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
 # Inductor defaults to a large compile helper pool per training process.
@@ -430,8 +429,8 @@ do
     # stacking to ~10-20x on CUDA on the pan-allele universe:
     #
     #   --gpu-batched: batches many alleles into one forward pass via
-    #     the issue-#272 GPU-hoisted fast path. Bit-identical on CUDA;
-    #     ~5-30x faster than the per-allele predict() loop.
+    #     the GPU-hoisted fast path. Bit-identical on CUDA; ~5-30x
+    #     faster than the per-allele predict() loop.
     #   --alleles-per-work-chunk 30 (was 10): better amortization of
     #     per-chunk fixed costs (pool dispatch, model load, aggregate).
     #     ~3x fewer chunks. Override with CALIBRATE_ALLELES_PER_CHUNK.

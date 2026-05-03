@@ -170,7 +170,7 @@ def test_ensure_built_does_not_load_peptides_txt(cache, monkeypatch):
         if self.name == "peptides.txt":
             raise AssertionError(
                 "ensure_built must not read peptides.txt; that triggers "
-                "the index-map allocation we removed in #270 fix"
+                "the per-peptide index-map allocation"
             )
         return real_read_text(self, *args, **kwargs)
 

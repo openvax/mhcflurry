@@ -58,17 +58,11 @@ Random-negative peptides are refilled in-place once per epoch into the
 top slice of the combined buffer, so the real-data block is never
 recopied.
 
-The 2.2.0 host/SHM DataLoader scaffolding (POSIX shm tensors, file-descriptor
-sharing strategy, `MHCFLURRY_FIT_DATALOADER_SHM`, `fit_dataloader_backing`
-hyperparameter, per-fit shm preflight) has been removed in 2.3.0. Old
-component configs that still set `fit_dataloader_backing` get the key
-silently dropped; see `apply_hyperparameter_renames`.
-
-The pretrain-streaming path (`fit_streaming_batches`, formerly
-`fit_generator`) is a separate code path that *does* use a PyTorch
-DataLoader with optional prefetch workers. That's controlled by
-`dataloader_num_workers`; 0 means in-process. It feeds the pretrain
-generator only and does not affect the affinity row layout above.
+The pretrain-streaming path (`fit_streaming_batches`) is a separate code
+path that *does* use a PyTorch DataLoader with optional prefetch workers.
+That's controlled by `dataloader_num_workers`; 0 means in-process. It
+feeds the pretrain generator only and does not affect the affinity row
+layout above.
 
 ## Opt-in mmap pool for random negatives
 
@@ -376,9 +370,7 @@ hyperparameters above, so allele-specific affinity models, pan-allele
 affinity models, and affinity ensembles resolve the same internal rules
 after config load. Missing keys in old component configs are filled
 from defaults (`peptide_amino_acid_encoding_torch=True`,
-`dataloader_num_workers=0`). The retired `fit_dataloader_backing` key
-is silently dropped from old configs by
-`apply_hyperparameter_renames`.
+`dataloader_num_workers=0`).
 
 Processing models do not use the affinity `fit()` row layout and
 therefore have no `AffinityDeviceTrainingData`.

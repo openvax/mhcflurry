@@ -1093,9 +1093,9 @@ class Class1NeuralNetworkModel(nn.Module):
         """Run only the peptide-side of the network.
 
         Ends at the point where the allele information enters — just
-        before the merge step. Used by the calibration fast path
-        (#272) to compute the peptide-dependent activations once and
-        reuse them across thousands of alleles.
+        before the merge step. Used by the calibration fast path to
+        compute the peptide-dependent activations once and reuse them
+        across thousands of alleles.
 
         Parameters
         ----------
@@ -1262,7 +1262,10 @@ class Class1NeuralNetworkModel(nn.Module):
             # ``start`` kwarg in builtin.py:775) — every traced forward
             # then falls back to eager for the layer-stack loop, losing
             # the compile speedup. Iterate by index instead so the loop
-            # body stays inside the compiled graph. Issue #270 perf note.
+            # body stays inside the compiled graph.
+            #
+            # When upgrading torch past 2.4 confirm the dynamo bug is
+            # fixed and revert to enumerate(seq, start=1).
             for offset, layer in enumerate(self.dense_layers[1:]):
                 i = offset + 1
                 x = layer(x)
@@ -1418,7 +1421,7 @@ class Class1NeuralNetworkModel(nn.Module):
                 # forward then falls back to eager for the layer-stack
                 # loop, losing the compile speedup. Iterate by index
                 # instead so the loop body stays inside the compiled
-                # graph. Issue #270 perf note.
+                # graph.
                 for offset, layer in enumerate(self.dense_layers[1:]):
                     i = offset + 1
                     x = layer(x)
@@ -3498,14 +3501,12 @@ class Class1NeuralNetwork(object):
         )
         if random_negative_pool_epochs < 1:
             random_negative_pool_epochs = 1
-        # Semantics: ``random_negative_seed`` is the pool's cross-cycle
-        # determinism knob — ignore it when pool_epochs == 1 so the
-        # default path stays on numpy's global RNG stream. Only seed the pool
-        # when pooling
-        # is enabled; otherwise a seed passed by the training driver
-        # would silently change default-path training semantics to
-        # deterministic-per-work-item, which is a prediction-affecting
-        # change. See openvax/mhcflurry#270 code review.
+        # ``random_negative_seed`` is the pool's cross-cycle determinism
+        # knob — ignore it when pool_epochs == 1 so the default path
+        # stays on numpy's global RNG stream. Otherwise a seed passed by
+        # the training driver would silently change default-path training
+        # semantics to deterministic-per-work-item, which is a
+        # prediction-affecting change.
         pool_seed = (
             random_negative_seed
             if random_negative_pool_epochs > 1
@@ -3642,7 +3643,6 @@ class Class1NeuralNetwork(object):
         # of this fit() call only — DO NOT mutate self.hyperparameters,
         # so the saved model config preserves the user's original
         # intent. fit_info carries the actual value used at run time.
-        # Issue openvax/mhcflurry#272.
         _requested_minibatch = int(self.hyperparameters["minibatch_size"])
         _effective_minibatch, _shrunk = check_training_batch_fits(
             _requested_minibatch,

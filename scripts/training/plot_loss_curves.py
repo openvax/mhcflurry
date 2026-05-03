@@ -1,8 +1,8 @@
 """Plot loss curves for every network in a training run + highlight
 which ones were picked by the selection step.
 
-The fit_info arrays (``loss``, ``val_loss``, plus the optional Phase-0
-timing breakdowns) are serialized inside each row's ``config_json`` in
+The fit_info arrays (``loss``, ``val_loss``, plus the optional
+per-epoch timing breakdowns) are serialized inside each row's ``config_json`` in
 the trained models' ``manifest.csv``. Before selection, that manifest
 has ~140 rows (one per candidate); after selection it has ~11 rows —
 the ones that entered the final ensemble.

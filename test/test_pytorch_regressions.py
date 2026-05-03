@@ -909,7 +909,7 @@ def test_old_model_config_loads_with_new_features_added():
     """Regression: adding new hyperparameters must not break old-model load.
 
     Simulates a 2.2.0-vintage model config that does NOT carry any of
-    the Phase-4 additions (``validation_batch_size``,
+    the post-2.2.0 additions (``validation_batch_size``,
     ``dataloader_num_workers``, ``fit_dataloader_backing``) and uses
     the atomic ``"BLOSUM62"`` encoding. Loading must succeed and
     produce a network whose hyperparameters populate the new fields
@@ -960,9 +960,9 @@ def test_old_model_config_loads_with_new_features_added():
     # New fields populated by defaults:
     assert "validation_batch_size" in net.hyperparameters
     assert "dataloader_num_workers" in net.hyperparameters
-    # ``fit_dataloader_backing`` was retired in 2.3.0 (rip-out of the
-    # host/SHM DataLoader path); legacy configs that set it should
-    # still load — the rename table drops the key silently.
+    # ``fit_dataloader_backing`` is no longer a live hyperparameter;
+    # legacy configs that set it must still load — the rename table
+    # drops the key silently.
     assert "fit_dataloader_backing" not in net.hyperparameters
 
     # Legacy-renamed key dropped, not raised:

@@ -151,7 +151,7 @@ def _tag_encoder(encodable_sequences):
 def test_random_negatives_pool_pool_epochs_one_is_per_epoch():
     # With pool_epochs=1 every epoch triggers a rebuild, so the slice
     # returned for each consecutive epoch is a fresh draw (different
-    # peptides on every call) — matching pre-Phase-1 fit() semantics.
+    # peptides on every call).
     planner = _planner_for_pool_tests()
     pool = RandomNegativesPool(planner, _tag_encoder, pool_epochs=1, seed=None)
     epoch0 = pool.get_epoch_inputs(0)[1]
@@ -427,18 +427,18 @@ def test_fit_end_to_end_pool_epochs_one_draws_from_global_rng(monkeypatch):
     non_none = [r for r in captured_rngs if r is not None]
     assert not non_none, (
         "fit() with pool_epochs=1 must call planner.get_peptides(rng=None) "
-        "to preserve pre-Phase-1 global-RNG semantics, but saw "
+        "to preserve global-RNG semantics, but saw "
         f"{len(non_none)} seeded calls: {non_none[:2]}"
     )
 
 
 def test_fit_ignores_random_negative_seed_when_pool_epochs_is_one():
-    """Codex review #270 issue 1: when ``random_negative_pool_epochs=1``
-    the default-path pool must stay on numpy's global RNG stream
-    regardless of any ``random_negative_seed`` the training driver
-    passes through. Otherwise adding the pool primitive would silently
-    make default-path training deterministic-per-work-item, which is a
-    prediction-affecting change not a speed optimization.
+    """When ``random_negative_pool_epochs=1`` the default-path pool must
+    stay on numpy's global RNG stream regardless of any
+    ``random_negative_seed`` the training driver passes through.
+    Otherwise the pool primitive would silently make default-path
+    training deterministic-per-work-item, which is a prediction-affecting
+    change not a speed optimization.
     """
     # Simulate what fit() does internally at pool_epochs=1. The
     # ``fit()`` bypass is the single line ``pool_seed = seed if
@@ -459,12 +459,10 @@ def test_fit_ignores_random_negative_seed_when_pool_epochs_is_one():
 
 
 def test_shared_pool_refuses_epochs_past_cycle_zero(tmp_path):
-    """Codex review #270 issue 3: ``from_shared_mmap`` only holds one
-    pool-cycle of peptides. Asking for an epoch past that cycle used to
-    crash with the generic refuse-to-reencode RuntimeError; it should
-    raise a clear ``ValueError`` explaining how to fix it (either
-    pre-size ``pool_epochs`` for the whole run or switch to an in-
-    process pool)."""
+    """``from_shared_mmap`` only holds one pool-cycle of peptides.
+    Asking for an epoch past that cycle must raise a clear ``ValueError``
+    explaining the fix (pre-size ``pool_epochs`` for the whole run, or
+    switch to an in-process pool)."""
     planner = _planner_with_ten_peptides()
     RandomNegativesPool.write_shared_pool(
         str(tmp_path), planner, _int8_encoder, pool_epochs=3, seed=42,

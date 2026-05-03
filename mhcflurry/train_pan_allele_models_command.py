@@ -1742,11 +1742,11 @@ def train_model(
         model = Class1NeuralNetwork(**hyperparameters)
 
     # Derive a per-work-item random-negative seed ONLY when the pool
-    # feature is actually in use. fit() has its own bypass for
-    # pool_epochs=1 (Codex review on #270), but defense in depth: if
-    # we don't pass a seed in the first place, a future refactor of
-    # fit() that drops the bypass still can't silently flip training
-    # to deterministic-per-work-item.
+    # feature is actually in use. fit() bypasses ``random_negative_seed``
+    # when pool_epochs == 1 (default), but defense in depth: if we don't
+    # pass a seed in the first place, a future refactor of fit() that
+    # drops the bypass still can't silently flip training to
+    # deterministic-per-work-item.
     #
     # hash() is randomized per-process via PYTHONHASHSEED, so use a
     # stable mix: SHA1 of the identity tuple truncated to 63 bits

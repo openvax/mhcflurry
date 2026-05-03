@@ -1263,11 +1263,10 @@ def test_pretrain_batch_cache_row_offsets_match_index_map_lookup(
     """The row-offset shortcut must produce the same indices as a real
     peptide-to-row dict lookup would have.
 
-    The OOM fix in #270 replaced ``pretrain_peptide_to_idx[p] for p in
-    df.index.values`` (which required loading a 5M-entry dict) with
-    ``numpy.arange(chunk_start, row_offset)``. That equivalence is
-    only correct because the chunked CSV iterates rows in the same
-    order as ``_read_pretrain_peptide_list``. Pin that contract.
+    The pretrain row mapping uses ``numpy.arange(chunk_start, row_offset)``
+    instead of a peptide-to-index dict (5M-entry dicts OOM the orchestrator).
+    The shortcut is only correct because the chunked CSV iterates rows in
+    the same order as ``_read_pretrain_peptide_list``. Pin that contract.
     """
     pretrain_peptides = _read_pretrain_peptide_list(pretrain_csv)
     expected_index = {p: i for i, p in enumerate(pretrain_peptides)}
@@ -1372,9 +1371,9 @@ def test_initialize_encoding_cache_orchestrator_path_does_not_call_get_or_build(
 
     def fail_get_or_build(self, peptides):
         raise AssertionError(
-            "orchestrator prebuild must use ensure_built, not get_or_build "
-            "(see #270 fix — get_or_build allocates a peptide-to-row dict "
-            "the orchestrator does not need)"
+            "orchestrator prebuild must use ensure_built, not get_or_build — "
+            "get_or_build allocates a peptide-to-row dict the orchestrator "
+            "does not need (and that costs ~5 GB on the production pretrain set)"
         )
 
     monkeypatch.setattr(EncodingCache, "get_or_build", fail_get_or_build)

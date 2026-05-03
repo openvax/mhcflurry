@@ -25,7 +25,7 @@
 #   REPO                       path to the rsynced mhcflurry repo
 #                              (default: $HOME/runplz-repo)
 #   MAX_WORKERS_PER_GPU        per-GPU worker cap (default 2 on 80GB cards)
-#   USE_ENCODING_CACHE         enable Phase-1 mmap encoding cache (default 1)
+#   USE_ENCODING_CACHE         enable BLOSUM62 mmap encoding cache (default 1)
 #   DATALOADER_NUM_WORKERS     'auto' (default) lets the orchestrator pick
 #   PROCESSING_HELD_OUT_SAMPLES  (default 50; subset script uses 10)
 #   PRESENTATION_DECOYS_PER_HIT (default 99 to match release; subset uses 2)

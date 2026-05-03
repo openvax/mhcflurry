@@ -194,10 +194,10 @@ def test_basic_training():
 def test_split_forward_matches_full_forward():
     """forward_peptide_stage + forward_from_peptide_stage = forward (bit-identical).
 
-    The calibration fast path (#272) precomputes peptide-side activations
-    once and reuses them across many alleles. For it to be a valid
-    speedup (not a silent behavior change) the split must compose to
-    the same numerical output as the monolithic ``forward``.
+    The calibration fast path precomputes peptide-side activations once
+    and reuses them across many alleles. For it to be a valid speedup
+    (not a silent behavior change) the split must compose to the same
+    numerical output as the monolithic ``forward``.
     """
     import torch
 

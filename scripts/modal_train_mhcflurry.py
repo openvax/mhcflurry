@@ -19,7 +19,16 @@ from __future__ import annotations
 import datetime
 import uuid
 
-import modal
+try:
+    import modal
+except ImportError as exc:  # pragma: no cover - exercised only when modal absent
+    raise ImportError(
+        "scripts/modal_train_mhcflurry.py requires the `modal` Python "
+        "client. Install it with `pip install modal` and run this file "
+        "via `modal run scripts/modal_train_mhcflurry.py ...`. mhcflurry "
+        "itself does not depend on modal — it is only used by this "
+        "optional Modal training entry point."
+    ) from exc
 
 
 REPO_URL = "https://github.com/openvax/mhcflurry.git"

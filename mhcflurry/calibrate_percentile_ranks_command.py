@@ -153,8 +153,8 @@ parser.add_argument(
     default=False,
     action="store_true",
     help="[class1 affinity predictors only] Use the GPU-hoisted "
-         "calibration fast path (issue openvax/mhcflurry#272): "
-         "precompute peptide-side activations per network and batch "
+         "calibration fast path: precompute peptide-side activations "
+         "per network and batch "
          "--gpu-allele-batch-size alleles into a single forward through "
          "the merge + main dense path. Same output as the default path "
          "(bit-identical on CUDA, ~1e-6 log-IC50 drift on MPS due to "
