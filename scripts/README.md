@@ -31,11 +31,6 @@ belong.
 - **`validate_presentation_with_flanks.py`** — fixed 10-peptide regression
   set including SLLQHLIGL (PRAME) with real flanks; rank correlation vs
   public release. Cheap acceptance test before publishing a new bundle.
-- **`modal_train_mhcflurry.py`** — generic Modal launcher; passes any
-  supported `mhcflurry-class1-train-*` template through to a Modal
-  worker pool. Keeps Modal as a documented training backend, distinct
-  from the Brev / local paths the production scripts assume.
-
 ## What used to live here (deleted)
 
 - TF→PyTorch parity scripts (`compare_tf_pytorch_random_outputs.py`,
@@ -45,4 +40,7 @@ belong.
 - Per-GPU-shape job launchers (`jobs/pan_allele_release_exact_l40s.py`
   etc.) — wrote them during 8×A100 provisioning incidents that have
   since cleared.
+- `modal_train_mhcflurry.py` — Modal-specific training launcher. Modal
+  isn't part of the live training path (Brev + local boxes via runplz
+  are); recreate from git when needed.
 - Smoketests of every kind. Tests live in `test/`.

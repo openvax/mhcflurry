@@ -1136,10 +1136,33 @@ class Class1AffinityPredictor(object):
                                 other_allele]
                             return transform.transform(affinities)
 
-                msg = "Allele %s has no percentile rank information" % (
-                    allele + (
-                        "" if allele == normalized_allele
-                        else " (normalized to %s)" % normalized_allele))
+                allele_repr = allele + (
+                    "" if allele == normalized_allele
+                    else " (normalized to %s)" % normalized_allele)
+                num_calibrated = len(self.allele_to_percent_rank_transform)
+                affinity_known = (
+                    self.allele_to_sequence is not None
+                    and normalized_allele in self.allele_to_sequence
+                )
+                hint_lines = [
+                    "Allele %s has no percentile rank information." % allele_repr,
+                    "%d allele(s) are calibrated; this one is not." % num_calibrated,
+                ]
+                if affinity_known:
+                    hint_lines.append(
+                        "The affinity predictor knows %s — only the "
+                        "percentile-rank calibration is missing." % normalized_allele
+                    )
+                else:
+                    hint_lines.append(
+                        "%s is also missing from allele_to_sequence, so the "
+                        "affinity predictor cannot score it either." % normalized_allele
+                    )
+                hint_lines.append(
+                    "To add it: run `mhcflurry-calibrate-percentile-ranks "
+                    "--alleles %s ...` against this models directory." % normalized_allele
+                )
+                msg = " ".join(hint_lines)
                 if throw:
                     raise ValueError(msg)
                 warnings.warn(msg)
