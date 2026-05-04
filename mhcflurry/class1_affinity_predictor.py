@@ -2,9 +2,10 @@ import collections
 import hashlib
 import json
 import logging
+import shlex
 import time
 import warnings
-from os.path import join, exists, abspath
+from os.path import join, exists, abspath, dirname
 from os import mkdir, environ
 from socket import gethostname
 from getpass import getuser
@@ -101,7 +102,8 @@ class Class1AffinityPredictor(object):
             allele_to_percent_rank_transform=None,
             metadata_dataframes=None,
             provenance_string=None,
-            optimization_info=None):
+            optimization_info=None,
+            models_dir=None):
         """
         Parameters
         ----------
@@ -136,6 +138,9 @@ class Class1AffinityPredictor(object):
             Dict describing any optimizations already performed on the model.
             The only currently supported optimization is to merge ensembles
             together into one PyTorch model.
+
+        models_dir : string, optional
+            Directory this predictor was loaded from. Used for diagnostics.
         """
 
         if allele_to_allele_specific_models is None:
@@ -167,6 +172,7 @@ class Class1AffinityPredictor(object):
         assert isinstance(self.class1_pan_allele_models, list)
 
         self.provenance_string = provenance_string
+        self.models_dir = models_dir
         self.allele_to_canonical = {}  # populated by load()
 
     @property
@@ -218,6 +224,7 @@ class Class1AffinityPredictor(object):
         """
         self._cache.clear()
         self.provenance_string = None
+        self.models_dir = None
 
     @property
     def neural_networks(self):
@@ -432,73 +439,85 @@ class Class1AffinityPredictor(object):
 
         model_names_to_write : list of string, optional
             Only write the weights for the specified models. Useful for
-            incremental updates during training.
+            incremental updates during training. Passing an explicit empty
+            list writes no model artifacts; this is used by calibration-only
+            updates that should replace ``percent_ranks.csv`` without touching
+            the manifest, weights, model provenance, allele sequences, or
+            optimization metadata. Explicit ``metadata_dataframes`` are still
+            written when ``write_metadata`` is true.
 
         write_metadata : boolean, optional
             Whether to write optional metadata
         """
-        self.check_consistency()
-
         if model_names_to_write is None:
             # Write all models
-            model_names_to_write = self.manifest_df.model_name.values
+            model_names_to_write = list(self.manifest_df.model_name.values)
+            write_model_artifacts = True
+        else:
+            model_names_to_write = list(model_names_to_write)
+            write_model_artifacts = len(model_names_to_write) > 0
+
+        if write_model_artifacts:
+            self.check_consistency()
 
         if not exists(models_dir):
             mkdir(models_dir)
 
-        sub_manifest_df = self.manifest_df.loc[
-            self.manifest_df.model_name.isin(model_names_to_write)
-        ].copy()
+        if write_model_artifacts:
+            sub_manifest_df = self.manifest_df.loc[
+                self.manifest_df.model_name.isin(model_names_to_write)
+            ].copy()
 
-        # Network JSON configs may have changed since the models were added,
-        # for example due to changes to the allele representation layer.
-        # So we update the JSON configs here also.
-        updated_network_config_jsons = []
-        for (_, row) in sub_manifest_df.iterrows():
-            updated_network_config_jsons.append(
-                json.dumps(row.model.get_config()))
-            weights_path = self.weights_path(models_dir, row.model_name)
-            save_weights(row.model.get_weights(), weights_path)
-            logging.info("Wrote: %s", weights_path)
-        sub_manifest_df["config_json"] = updated_network_config_jsons
-        self.manifest_df.loc[
-            sub_manifest_df.index,
-            "config_json"
-        ] = updated_network_config_jsons
+            # Network JSON configs may have changed since the models were added,
+            # for example due to changes to the allele representation layer.
+            # So we update the JSON configs here also.
+            updated_network_config_jsons = []
+            for (_, row) in sub_manifest_df.iterrows():
+                updated_network_config_jsons.append(
+                    json.dumps(row.model.get_config()))
+                weights_path = self.weights_path(models_dir, row.model_name)
+                save_weights(row.model.get_weights(), weights_path)
+                logging.info("Wrote: %s", weights_path)
+            sub_manifest_df["config_json"] = updated_network_config_jsons
+            self.manifest_df.loc[
+                sub_manifest_df.index,
+                "config_json"
+            ] = updated_network_config_jsons
 
-        write_manifest_df = self.manifest_df[[
-            c for c in self.manifest_df.columns if c != "model"
-        ]]
-        manifest_path = join(models_dir, "manifest.csv")
-        write_manifest_df.to_csv(manifest_path, index=False)
-        logging.info("Wrote: %s", manifest_path)
+            write_manifest_df = self.manifest_df[[
+                c for c in self.manifest_df.columns if c != "model"
+            ]]
+            manifest_path = join(models_dir, "manifest.csv")
+            write_manifest_df.to_csv(manifest_path, index=False)
+            logging.info("Wrote: %s", manifest_path)
 
-        if write_metadata:
-            # Write "info.txt"
-            info_path = join(models_dir, "info.txt")
-            rows = [
-                ("trained on", time.asctime()),
-                ("package   ", "mhcflurry %s" % __version__),
-                ("hostname  ", gethostname()),
-                ("user      ", getuser()),
-            ]
-            pandas.DataFrame(rows).to_csv(
-                info_path, sep="\t", header=False, index=False)
+            if write_metadata:
+                # Write "info.txt"
+                info_path = join(models_dir, "info.txt")
+                rows = [
+                    ("trained on", time.asctime()),
+                    ("package   ", "mhcflurry %s" % __version__),
+                    ("hostname  ", gethostname()),
+                    ("user      ", getuser()),
+                ]
+                pandas.DataFrame(rows).to_csv(
+                    info_path, sep="\t", header=False, index=False)
 
-            if self.metadata_dataframes:
-                for (name, df) in self.metadata_dataframes.items():
-                    metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
-                    df.to_csv(metadata_df_path, index=False, compression="bz2")
+            # Save allele sequences
+            if self.allele_to_sequence is not None:
+                allele_to_sequence_df = pandas.DataFrame(
+                    list(self.allele_to_sequence.items()),
+                    columns=['allele', 'sequence']
+                )
+                allele_to_sequence_df.to_csv(
+                    join(models_dir, "allele_sequences.csv"), index=False)
+                logging.info(
+                    "Wrote: %s", join(models_dir, "allele_sequences.csv"))
 
-        # Save allele sequences
-        if self.allele_to_sequence is not None:
-            allele_to_sequence_df = pandas.DataFrame(
-                list(self.allele_to_sequence.items()),
-                columns=['allele', 'sequence']
-            )
-            allele_to_sequence_df.to_csv(
-                join(models_dir, "allele_sequences.csv"), index=False)
-            logging.info("Wrote: %s", join(models_dir, "allele_sequences.csv"))
+        if write_metadata and self.metadata_dataframes:
+            for (name, df) in self.metadata_dataframes.items():
+                metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
+                df.to_csv(metadata_df_path, index=False, compression="bz2")
 
         if self.allele_to_percent_rank_transform:
             percent_ranks_df = None
@@ -521,7 +540,7 @@ class Class1AffinityPredictor(object):
                 index_label="bin")
             logging.info("Wrote: %s", percent_ranks_path)
 
-        if self.optimization_info:
+        if write_model_artifacts and self.optimization_info:
             # If the model being saved was optimized, we need to save that
             # information since it can affect how predictions are performed
             # (e.g. stitched-together ensembles output concatenated results,
@@ -529,6 +548,7 @@ class Class1AffinityPredictor(object):
             optimization_info_path = join(models_dir, "optimization_info.json")
             with open(optimization_info_path, "w") as fd:
                 json.dump(self.optimization_info, fd, indent=4)
+        self.models_dir = abspath(models_dir)
 
     @staticmethod
     def load(models_dir=None, max_models=None, optimization_level=None):
@@ -651,7 +671,8 @@ class Class1AffinityPredictor(object):
 
             model = Class1NeuralNetwork.from_config(
                 config,
-                weights_loader=partial(load_weights, abspath(weights_filename)))
+                weights_loader=partial(load_weights, abspath(weights_filename)),
+                weight_paths=abspath(weights_filename))
             if row.allele == "pan-class1":
                 class1_pan_allele_models.append(model)
             else:
@@ -713,6 +734,7 @@ class Class1AffinityPredictor(object):
             allele_to_percent_rank_transform=allele_to_percent_rank_transform,
             provenance_string=provenance_string,
             optimization_info=optimization_info,
+            models_dir=abspath(models_dir),
         )
         if allele_to_sequence is not None:
             result.allele_to_canonical = allele_to_canonical
@@ -1118,55 +1140,55 @@ class Class1AffinityPredictor(object):
         """
         if allele is not None:
             normalized_allele = self.canonicalize_allele_name(allele)
-            try:
-                transform = self.allele_to_percent_rank_transform[normalized_allele]
+            calibrated_allele = self.percent_rank_calibrated_allele(
+                normalized_allele
+            )
+            if calibrated_allele is not None:
+                transform = self.allele_to_percent_rank_transform[calibrated_allele]
                 return transform.transform(affinities)
-            except KeyError:
-                if self.allele_to_sequence:
-                    # See if we have information for an equivalent allele
-                    sequence = self.allele_to_sequence[normalized_allele]
-                    other_alleles = [
-                        other_allele for (other_allele, other_sequence)
-                        in self.allele_to_sequence.items()
-                        if other_sequence == sequence
-                    ]
-                    for other_allele in other_alleles:
-                        if other_allele in self.allele_to_percent_rank_transform:
-                            transform = self.allele_to_percent_rank_transform[
-                                other_allele]
-                            return transform.transform(affinities)
 
-                allele_repr = allele + (
-                    "" if allele == normalized_allele
-                    else " (normalized to %s)" % normalized_allele)
-                num_calibrated = len(self.allele_to_percent_rank_transform)
-                affinity_known = (
-                    self.allele_to_sequence is not None
-                    and normalized_allele in self.allele_to_sequence
-                )
-                hint_lines = [
-                    "Allele %s has no percentile rank information." % allele_repr,
-                    "%d allele(s) are calibrated; this one is not." % num_calibrated,
-                ]
-                if affinity_known:
-                    hint_lines.append(
-                        "The affinity predictor knows %s — only the "
-                        "percentile-rank calibration is missing." % normalized_allele
-                    )
-                else:
-                    hint_lines.append(
-                        "%s is also missing from allele_to_sequence, so the "
-                        "affinity predictor cannot score it either." % normalized_allele
-                    )
+            allele_repr = allele + (
+                "" if allele == normalized_allele
+                else " (normalized to %s)" % normalized_allele)
+            affinity_known = (
+                self.allele_to_sequence is not None
+                and normalized_allele in self.allele_to_sequence
+            )
+            hint_lines = [
+                "Missing percentile-rank calibration for %s." % allele_repr,
+            ]
+            if affinity_known:
                 hint_lines.append(
-                    "To add it: run `mhcflurry-calibrate-percentile-ranks "
-                    "--alleles %s ...` against this models directory." % normalized_allele
+                    "Affinity predictions are available; percentile ranks are not."
                 )
-                msg = " ".join(hint_lines)
-                if throw:
-                    raise ValueError(msg)
-                warnings.warn(msg)
-                return numpy.ones(len(affinities)) * numpy.nan  # Return NaNs
+            else:
+                hint_lines.append(
+                    "The predictor also lacks an allele sequence for %s; "
+                    "affinity prediction is unavailable." % normalized_allele
+                )
+            calibrate_command = ["mhcflurry-calibrate-percentile-ranks"]
+            models_dir = self.models_dir_for_diagnostics()
+            if models_dir:
+                calibrate_command.extend(["--models-dir", models_dir])
+            calibrate_command.extend(["--allele", normalized_allele, "..."])
+            calibrate_command = " ".join(
+                shlex.quote(part) for part in calibrate_command
+            )
+            if models_dir:
+                command_message = "Calibrate with: `%s`." % calibrate_command
+            else:
+                command_message = (
+                    "Calibrate with: `%s` against this models directory."
+                    % calibrate_command
+                )
+            hint_lines.append(
+                command_message
+            )
+            msg = " ".join(hint_lines)
+            if throw:
+                raise ValueError(msg)
+            warnings.warn(msg)
+            return numpy.ones(len(affinities)) * numpy.nan  # Return NaNs
 
         if alleles is None:
             raise ValueError("Specify allele or alleles")
@@ -1178,6 +1200,60 @@ class Class1AffinityPredictor(object):
             df.loc[sub_df.index, "result"] = self.percentile_ranks(
                 sub_df.affinity, allele=allele, throw=throw)
         return df.result.values
+
+    def model_source_description(self):
+        """Return a compact human-readable description of this predictor."""
+        pieces = []
+        models_dir = self.models_dir_for_diagnostics()
+        if models_dir:
+            pieces.append("models_dir=%s" % models_dir)
+        if self.provenance_string:
+            pieces.append(self.provenance_string)
+        pieces.append("%d model(s)" % len(self.neural_networks))
+        pieces.append(
+            "%d percent-rank calibration(s)" % (
+                len(self.allele_to_percent_rank_transform)))
+        return "; ".join(pieces)
+
+    def models_dir_for_diagnostics(self):
+        """Return explicit or inferred models dir for user-facing messages."""
+        if self.models_dir:
+            return self.models_dir
+
+        source_dirs = set()
+        for model in self.neural_networks:
+            for path in getattr(model, "network_weight_paths", ()):
+                source_dir = dirname(path)
+                if source_dir:
+                    source_dirs.add(abspath(source_dir))
+        if len(source_dirs) == 1:
+            return next(iter(source_dirs))
+        return None
+
+    def percent_rank_calibrated_allele(self, allele):
+        """Return the allele key whose percentile-rank transform applies.
+
+        Percent-rank calibration is allele-specific, but pan predictors can
+        reuse calibration from another allele with the same pseudosequence.
+        This helper centralizes that equivalence check for prediction and CLI
+        status/filtering code.
+        """
+        normalized_allele = self.canonicalize_allele_name(allele)
+        if normalized_allele in self.allele_to_percent_rank_transform:
+            return normalized_allele
+
+        if (
+                self.allele_to_sequence is None
+                or normalized_allele not in self.allele_to_sequence):
+            return None
+
+        sequence = self.allele_to_sequence[normalized_allele]
+        for other_allele in sorted(self.allele_to_sequence):
+            if (
+                    self.allele_to_sequence[other_allele] == sequence
+                    and other_allele in self.allele_to_percent_rank_transform):
+                return other_allele
+        return None
 
     def _prepare_peptides_with_optional_cache(
             self, peptides, *, encoding_cache_dir=None):

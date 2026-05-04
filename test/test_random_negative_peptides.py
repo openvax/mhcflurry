@@ -672,12 +672,19 @@ def test_encode_random_negatives_on_device_unsupported_alignment():
     import pytest
     from mhcflurry.random_negative_peptides import (
         encode_random_negatives_on_device,
+        supports_device_random_negative_encoding,
     )
     planner = _placement_planner()
+    unsupported = {"alignment_method": "left_pad_right_pad", "max_length": 15}
+    assert supports_device_random_negative_encoding({
+        "alignment_method": "left_pad_centered_right_pad",
+        "max_length": 15,
+    })
+    assert not supports_device_random_negative_encoding(unsupported)
     with pytest.raises(NotImplementedError, match="alignment_method"):
         encode_random_negatives_on_device(
             planner=planner, pool_epochs=1,
-            peptide_encoding={"alignment_method": "left_pad_right_pad", "max_length": 15},
+            peptide_encoding=unsupported,
             device="cpu",
         )
 

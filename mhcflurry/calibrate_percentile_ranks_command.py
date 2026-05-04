@@ -60,7 +60,8 @@ parser.add_argument(
     required=True,
     help="Directory to read and write models")
 parser.add_argument(
-    "--allele",
+    "--allele", "--alleles",
+    dest="allele",
     default=None,
     nargs="+",
     help="Alleles to calibrate percentile ranks for. If not specified all "
@@ -74,6 +75,21 @@ parser.add_argument(
     "--alleles-file",
     default=None,
     help="Use alleles in supplied CSV file, which must have an 'allele' column.")
+parser.add_argument(
+    "--list-percent-rank-status",
+    default=False,
+    action="store_true",
+    help="For class1 affinity predictors, print a CSV indicating which requested "
+    "alleles already have percentile-rank calibration and exit without "
+    "generating calibration peptides.")
+parser.add_argument(
+    "--only-missing",
+    dest="only_missing_percent_ranks",
+    default=False,
+    action="store_true",
+    help="For class1 affinity predictors, calibrate only requested alleles that "
+    "do not already have direct or sequence-equivalent percentile-rank "
+    "calibration.")
 parser.add_argument(
     "--num-peptides-per-length",
     type=int,
@@ -185,11 +201,12 @@ add_cluster_parallelism_args(parser)
 def run(argv=sys.argv[1:]):
     global GLOBAL_DATA
 
-    # On sigusr1 print stack trace
-    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
-    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
-
     args = parser.parse_args(argv)
+
+    if not args.list_percent_rank_status:
+        # On sigusr1 print stack trace
+        print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
+        signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
 
     args.models_dir = os.path.abspath(args.models_dir)
 
@@ -224,6 +241,19 @@ def run(argv=sys.argv[1:]):
             and not getattr(args, "cluster_parallelism", False)):
         configure_pytorch(backend=getattr(args, "backend", "auto") or "auto")
 
+    if (
+            args.only_missing_percent_ranks
+            and args.predictor_kind != "class1_affinity"):
+        raise ValueError(
+            "--only-missing is only supported for class1_affinity predictors")
+
+    if args.list_percent_rank_status:
+        if args.predictor_kind != "class1_affinity":
+            raise ValueError(
+                "--list-percent-rank-status is only supported for "
+                "class1_affinity predictors")
+        return run_class1_affinity_percent_rank_status(args)
+
     aa_distribution = None
     if args.match_amino_acid_distribution_data:
         distribution_peptides = pandas.read_csv(
@@ -254,18 +284,54 @@ def run(argv=sys.argv[1:]):
         raise ValueError("Unsupported kind %s" % args.predictor_kind)
 
 
+def requested_calibration_alleles(args, predictor):
+    """Return normalized alleles selected by CLI arguments."""
+    if args.allele:
+        # Explicit CLI alleles should fail loudly if they cannot be normalized.
+        return [normalize_allele_name(a) for a in args.allele]
+    if args.alleles_file:
+        return filter_canonicalizable_alleles(
+            pandas.read_csv(args.alleles_file).allele.unique()
+        )
+    return filter_canonicalizable_alleles(predictor.supported_alleles)
+
+
+def missing_percent_rank_alleles(predictor, alleles):
+    """Return alleles lacking direct or sequence-equivalent calibration."""
+    return [
+        allele for allele in alleles
+        if predictor.percent_rank_calibrated_allele(allele) is None
+    ]
+
+
+def percent_rank_status_df(predictor, alleles):
+    """Return per-allele percentile-rank calibration status."""
+    rows = []
+    supported_alleles = set(predictor.supported_alleles)
+    for allele in alleles:
+        normalized = predictor.canonicalize_allele_name(allele)
+        source_allele = predictor.percent_rank_calibrated_allele(normalized)
+        rows.append({
+            "allele": allele,
+            "normalized_allele": normalized,
+            "supported": normalized in supported_alleles,
+            "has_affinity_percent_rank": source_allele is not None,
+            "affinity_percent_rank_source_allele": source_allele or "",
+        })
+    return pandas.DataFrame(rows)
+
+
+def run_class1_affinity_percent_rank_status(args):
+    """Print percent-rank status for requested affinity alleles and exit."""
+    predictor = Class1AffinityPredictor.load(args.models_dir, optimization_level=0)
+    alleles = requested_calibration_alleles(args, predictor)
+    percent_rank_status_df(predictor, alleles).to_csv(sys.stdout, index=False)
+
+
 def run_class1_presentation_predictor(args, peptides):
     predictor = Class1PresentationPredictor.load(args.models_dir)
 
-    if args.allele:
-        # Already canonicalized via normalize_allele_name above.
-        alleles = [normalize_allele_name(a) for a in args.allele]
-    elif args.alleles_file:
-        alleles = filter_canonicalizable_alleles(
-            pandas.read_csv(args.alleles_file).allele.unique()
-        )
-    else:
-        alleles = filter_canonicalizable_alleles(predictor.supported_alleles)
+    alleles = requested_calibration_alleles(args, predictor)
 
     print("Num alleles", len(alleles))
 
@@ -410,20 +476,32 @@ def run_class1_affinity_predictor(args, peptides):
         optimization_level=0,
     )
 
-    if args.allele:
-        # Already canonicalized via normalize_allele_name above — pass
-        # through without re-filtering.
-        alleles = [normalize_allele_name(a) for a in args.allele]
-    elif args.alleles_file:
-        alleles = filter_canonicalizable_alleles(
-            pandas.read_csv(args.alleles_file).allele.unique()
-        )
-    else:
-        alleles = filter_canonicalizable_alleles(predictor.supported_alleles)
+    alleles = requested_calibration_alleles(args, predictor)
+
+    if args.only_missing_percent_ranks:
+        before_missing_filter = len(alleles)
+        alleles = missing_percent_rank_alleles(predictor, alleles)
+        print(
+            "Missing-percent-rank filter reduced num alleles from",
+            before_missing_filter,
+            "to",
+            len(alleles))
+        if not alleles:
+            print("No requested alleles are missing percentile-rank calibration.")
+            return
 
     allele_set = set(alleles)
 
     if predictor.allele_to_sequence:
+        unknown_alleles = [
+            allele for allele in allele_set
+            if allele not in predictor.allele_to_sequence
+        ]
+        if unknown_alleles:
+            raise ValueError(
+                "Cannot calibrate unsupported allele(s): %s" % (
+                    " ".join(sorted(unknown_alleles))))
+
         # Remove alleles that have the same sequence.
         new_allele_set = set()
         sequence_to_allele = collections.defaultdict(set)

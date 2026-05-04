@@ -26,7 +26,11 @@ from .common import get_pytorch_device
 from .pytorch_layers import LocallyConnected1D, get_activation
 from .pytorch_losses import get_pytorch_loss
 from .data_dependent_weights_initialization import lsuv_init
-from .random_negative_peptides import RandomNegativePeptides, RandomNegativesPool
+from .random_negative_peptides import (
+    RandomNegativePeptides,
+    RandomNegativesPool,
+    supports_device_random_negative_encoding,
+)
 from .class1_affinity_training_data import AffinityDeviceTrainingData
 from .torch_training_loop import (
     _configure_matmul_precision,
@@ -2117,6 +2121,7 @@ class Class1NeuralNetwork(object):
         self.network_json = None
         self.network_weights = None
         self.network_weights_loader = None
+        self.network_weight_paths = ()
 
         self.fit_info = []
         self.prediction_cache = weakref.WeakKeyDictionary()
@@ -2628,11 +2633,12 @@ class Class1NeuralNetwork(object):
         result["_network"] = None
         result["network_weights"] = None
         result["network_weights_loader"] = None
+        result.pop("network_weight_paths", None)
         result["prediction_cache"] = None
         return result
 
     @classmethod
-    def from_config(cls, config, weights=None, weights_loader=None):
+    def from_config(cls, config, weights=None, weights_loader=None, weight_paths=None):
         """
         deserialize from a dict returned by get_config().
 
@@ -2647,6 +2653,9 @@ class Class1NeuralNetwork(object):
             Network weights to restore
         weights_loader : callable, optional
             Function to call (no arguments) to load weights when needed
+        weight_paths : string or list of strings, optional
+            Filename(s) the weights were loaded from. This is diagnostic
+            provenance only and is not serialized by get_config().
 
         Returns
         -------
@@ -2669,8 +2678,32 @@ class Class1NeuralNetwork(object):
 
         instance.network_weights = weights
         instance.network_weights_loader = weights_loader
+        instance.network_weight_paths = (
+            cls._normalize_network_weight_paths(weight_paths)
+            or cls._network_weight_paths_from_loader(weights_loader)
+        )
         instance.prediction_cache = weakref.WeakKeyDictionary()
         return instance
+
+    @staticmethod
+    def _normalize_network_weight_paths(weight_paths):
+        """Return weight path(s) as a tuple of strings."""
+        if weight_paths is None:
+            return ()
+        if isinstance(weight_paths, (str, os.PathLike)):
+            return (os.fspath(weight_paths),)
+        return tuple(os.fspath(path) for path in weight_paths if path)
+
+    @classmethod
+    def _network_weight_paths_from_loader(cls, weights_loader):
+        """Infer weight path(s) from the standard lazy load_weights partial."""
+        if weights_loader is None:
+            return ()
+        func = getattr(weights_loader, "func", None)
+        args = getattr(weights_loader, "args", ())
+        if getattr(func, "__name__", None) == "load_weights" and args:
+            return cls._normalize_network_weight_paths(args[0])
+        return ()
 
     def load_weights(self):
         """
@@ -3365,6 +3398,9 @@ class Class1NeuralNetwork(object):
         use_device_pool = (
             requested_fit_tensor_residency != "host"
             and self.uses_peptide_torch_encoding()
+            and supports_device_random_negative_encoding(
+                self.hyperparameters["peptide_encoding"]
+            )
         )
         if use_device_pool:
             return (
@@ -4384,6 +4420,11 @@ class Class1NeuralNetwork(object):
             merge_method=merge_method
         )
         result.update_network_description()
+        result.network_weight_paths = tuple(
+            path
+            for model in models
+            for path in getattr(model, "network_weight_paths", ())
+        )
 
         return result
 

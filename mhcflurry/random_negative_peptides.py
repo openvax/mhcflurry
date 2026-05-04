@@ -806,6 +806,11 @@ _SUPPORTED_DEVICE_ALIGNMENTS = (
 )
 
 
+def supports_device_random_negative_encoding(peptide_encoding):
+    """Return whether random negatives can be encoded directly on device."""
+    return peptide_encoding.get("alignment_method") in _SUPPORTED_DEVICE_ALIGNMENTS
+
+
 def _place_indices_with_alignment(
         out_rows,
         block,
@@ -989,7 +994,7 @@ def encode_random_negatives_on_device(
 
     alignment = peptide_encoding["alignment_method"]
     max_length = int(peptide_encoding["max_length"])
-    if alignment not in _SUPPORTED_DEVICE_ALIGNMENTS:
+    if not supports_device_random_negative_encoding(peptide_encoding):
         raise NotImplementedError(
             "encode_random_negatives_on_device: alignment_method %r not "
             "supported on device. Falls back to host encoding via "

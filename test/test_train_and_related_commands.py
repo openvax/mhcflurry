@@ -14,6 +14,7 @@ import pandas
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry import calibrate_percentile_ranks_command
+from mhcflurry import common
 from mhcflurry import select_allele_specific_models_command
 from mhcflurry import train_allele_specific_models_command
 
@@ -104,6 +105,7 @@ def run_command(command_module, args):
 def test_train_calibrate_and_select_commands():
     models_dir1 = tempfile.mkdtemp(prefix="mhcflurry-test-models")
     models_dir2 = tempfile.mkdtemp(prefix="mhcflurry-test-models")
+    old_backend = common._pytorch_backend
     try:
         hyperparameters_filename = os.path.join(
             models_dir1, "hyperparameters.yaml")
@@ -128,10 +130,12 @@ def test_train_calibrate_and_select_commands():
                 "--allele", "HLA-A*02:01", "HLA-A*03:01",
                 "--out-models-dir", models_dir1,
                 "--num-jobs", "0",
+                "--backend", "cpu",
                 "--held-out-fraction-reciprocal", "2",
                 "--n-models", "1",
             ],
         )
+        assert common._pytorch_backend == "cpu"
 
         result = Class1AffinityPredictor.load(models_dir1)
         assert len(result.neural_networks) == 4
@@ -188,6 +192,7 @@ def test_train_calibrate_and_select_commands():
             result.allele_to_allele_specific_models[
                 "HLA-A*03:01"][0].hyperparameters["max_epochs"] == 2)
     finally:
+        common.configure_pytorch(backend=old_backend)
         print("Deleting: %s" % models_dir1)
         print("Deleting: %s" % models_dir2)
         shutil.rmtree(models_dir1, ignore_errors=True)

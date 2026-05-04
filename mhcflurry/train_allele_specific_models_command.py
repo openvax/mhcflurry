@@ -265,7 +265,7 @@ def run(argv=sys.argv[1:]):
 
     start = time.time()
 
-    worker_pool = None
+    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
     if args.num_jobs != 0:
         print("Processing %d work items in parallel." % len(work_items))
 
@@ -282,7 +282,6 @@ def run(argv=sys.argv[1:]):
         # eats one ~30 s first-compile per architecture per process,
         # which is acceptable for this trainer's smaller sweeps.
 
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         assert worker_pool is not None
         attach_constant_data_to_work_items_if_needed(
             work_items, GLOBAL_DATA, worker_pool
@@ -318,6 +317,7 @@ def run(argv=sys.argv[1:]):
         predictor.merge_in_place(unsaved_predictors)
 
     else:
+        assert worker_pool is None
         # Run in serial. In this case, every worker is passed the same predictor,
         # which it adds models to, so no merging is required. It also saves
         # as it goes so no saving is required at the end.

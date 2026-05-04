@@ -9,9 +9,11 @@ import subprocess
 import pytest
 import sys
 
+import numpy
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
+from mhcflurry.percent_rank_transform import PercentRankTransform
 from .pytest_helpers import mhcflurry_cli
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -103,6 +105,52 @@ def test_filter_canonicalizable_alleles_passthrough_when_all_valid():
     raw = ["HLA-A*02:01", "HLA-B*07:02", "HLA-C*04:01"]
     kept = filter_canonicalizable_alleles(raw)
     assert kept == raw
+
+
+def test_percent_rank_status_helpers_count_sequence_equivalent_calibration():
+    from mhcflurry.calibrate_percentile_ranks_command import (
+        missing_percent_rank_alleles,
+        percent_rank_status_df,
+    )
+
+    transform = PercentRankTransform()
+    transform.fit(numpy.array([10.0, 20.0, 30.0]), bins=3)
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={
+            "HLA-A*02:01": "SEQUENCE1",
+            "HLA-A*02:02": "SEQUENCE1",
+            "HLA-B*07:02": "SEQUENCE2",
+        },
+        allele_to_percent_rank_transform={"HLA-A*02:01": transform},
+    )
+    alleles = ["HLA-A*02:01", "HLA-A*02:02", "HLA-B*07:02"]
+
+    assert missing_percent_rank_alleles(predictor, alleles) == ["HLA-B*07:02"]
+
+    status = percent_rank_status_df(predictor, alleles)
+    assert status.to_dict("records") == [
+        {
+            "allele": "HLA-A*02:01",
+            "normalized_allele": "HLA-A*02:01",
+            "supported": True,
+            "has_affinity_percent_rank": True,
+            "affinity_percent_rank_source_allele": "HLA-A*02:01",
+        },
+        {
+            "allele": "HLA-A*02:02",
+            "normalized_allele": "HLA-A*02:02",
+            "supported": True,
+            "has_affinity_percent_rank": True,
+            "affinity_percent_rank_source_allele": "HLA-A*02:01",
+        },
+        {
+            "allele": "HLA-B*07:02",
+            "normalized_allele": "HLA-B*07:02",
+            "supported": True,
+            "has_affinity_percent_rank": False,
+            "affinity_percent_rank_source_allele": "",
+        },
+    ]
 
 
 def test_filter_canonicalizable_alleles_call_sites_cover_both_predictor_kinds():
