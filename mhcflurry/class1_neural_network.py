@@ -3093,16 +3093,23 @@ class Class1NeuralNetwork(object):
         )
 
         start = time.time()
-        iterator_setup_start = time.perf_counter()
-        iterator = iter(
-            _make_streaming_batch_dataloader(
-                dataset=dataset,
-                num_workers=dataloader_num_workers,
+        fit_info["iterator_setup_time"] = 0.0
+        fit_info["iterator_restarts"] = 0
+
+        def make_iterator():
+            iterator_setup_start = time.perf_counter()
+            iterator_result = iter(
+                _make_streaming_batch_dataloader(
+                    dataset=dataset,
+                    num_workers=dataloader_num_workers,
+                )
             )
-        )
-        fit_info["iterator_setup_time"] = (
-            time.perf_counter() - iterator_setup_start
-        )
+            fit_info["iterator_setup_time"] += (
+                time.perf_counter() - iterator_setup_start
+            )
+            return iterator_result
+
+        iterator = make_iterator()
 
         # Data dependent init
         data_dependent_init = self.hyperparameters[
@@ -3164,7 +3171,14 @@ class Class1NeuralNetwork(object):
                 try:
                     batch = next(iterator)
                 except StopIteration:
-                    break
+                    if generator_factory is None:
+                        break
+                    fit_info["iterator_restarts"] += 1
+                    iterator = make_iterator()
+                    try:
+                        batch = next(iterator)
+                    except StopIteration:
+                        break
                 epoch_fetch_time += time.perf_counter() - fetch_start
 
                 if expected_chunk_shape is None:

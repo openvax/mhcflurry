@@ -587,6 +587,50 @@ def test_fit_generator_preencoded_batches_support_dataloader_workers():
     assert info["num_points"] == 8
 
 
+def test_fit_generator_restarts_factory_after_exhaustion():
+    """Finite factory sources must restart instead of producing empty epochs."""
+    _seed_everything(seed=75319)
+
+    peptides = EncodableSequences(TRAIN_PEPTIDES[:8])
+    affinities = numpy.linspace(50.0, 50000.0, 8)
+    allele_list = [TRAIN_ALLELES_CYCLE[i % 3] for i in range(8)]
+    alleles = AlleleEncoding(
+        alleles=allele_list, allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+    hp = _tiny_hyperparameters()
+
+    def one_batch_factory(worker_id=0, num_workers=1):
+        assert worker_id == 0
+        assert num_workers == 1
+        x_dict, y = _PREENCODED_BATCHES[0]
+        yield (
+            {key: value.copy() for key, value in x_dict.items()},
+            y.copy(),
+        )
+
+    net = Class1NeuralNetwork(**hp)
+    net.fit_generator(
+        generator=(),
+        generator_factory=one_batch_factory,
+        generator_batches_are_encoded=True,
+        validation_peptide_encoding=peptides,
+        validation_affinities=affinities,
+        validation_allele_encoding=alleles,
+        steps_per_epoch=2,
+        epochs=2,
+        min_epochs=2,
+        patience=100,
+        verbose=0,
+        progress_print_interval=None,
+    )
+
+    info = net.fit_info[-1]
+    assert len(info["loss"]) == 2
+    assert numpy.isfinite(info["loss"]).all()
+    assert info["num_points"] == 16
+    assert info["iterator_restarts"] >= 3
+
+
 def test_fit_generator_dataset_is_picklable_with_live_generator():
     """Dataset must pickle cleanly even when caller passes a live generator.
 

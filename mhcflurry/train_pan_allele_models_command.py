@@ -22,7 +22,10 @@ import yaml
 import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .class1_neural_network import Class1NeuralNetwork
+from .class1_neural_network import (
+    Class1NeuralNetwork,
+    _peptide_uses_torch_encoding,
+)
 from .common import configure_logging, normalize_allele_name, write_generate_sh
 from .local_parallelism import (
     add_local_parallelism_args,
@@ -395,6 +398,10 @@ def pretrain_network_input_iterator(
         k: v for k, v in peptide_encoding.items()
         if k != "vector_encoding_name"
     }
+    use_torch_peptide_encoding = _peptide_uses_torch_encoding({
+        "peptide_encoding": peptide_encoding,
+        "peptide_amino_acid_encoding_torch": peptide_amino_acid_encoding_torch,
+    })
 
     synthetic_iter = pandas.read_csv(
         filename, index_col=0, chunksize=peptides_per_chunk)
@@ -420,7 +427,7 @@ def pretrain_network_input_iterator(
         else:
             peptide_values = numpy.repeat(df.index.values, len(usable_alleles))
         peptides = EncodableSequences(peptide_values)
-        if peptide_amino_acid_encoding_torch:
+        if use_torch_peptide_encoding:
             peptide_rows = (
                 peptides.variable_length_to_fixed_length_categorical(
                     **categorical_kwargs
@@ -997,8 +1004,8 @@ def train_model(
                 peptide_encoding=hyperparameters["peptide_encoding"],
                 peptides_per_chunk=pretrain_peptides_per_step,
                 compact_peptide_repeats=True,
-                peptide_amino_acid_encoding_torch=hyperparameters.get(
-                    "peptide_amino_acid_encoding_torch", True,
+                peptide_amino_acid_encoding_torch=(
+                    model.uses_peptide_torch_encoding()
                 ),
             )
 
