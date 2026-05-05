@@ -106,10 +106,10 @@ def setup_shared_random_negative_pools(
                     pool_epochs,
                 )
             )
-        # The shared mmap pool covers the first pool cycle. fit() opens
-        # it with the model's peptide encoder, so later cycles rebuild
-        # through the ordinary in-process path instead of requiring a
-        # max_epochs-sized mmap file.
+        # The orchestrator builds cycle 0 before forking. Workers open
+        # the pool with the model's peptide encoder, so later cycles
+        # are populated lazily under per-cycle mmap subdirectories and
+        # shared by the rest of the worker pool.
         cfg_key = _random_negative_config_key(hp)
         by_fold_and_cfg.setdefault((fold_num, cfg_key), hp)
 

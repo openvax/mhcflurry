@@ -365,15 +365,21 @@ def test_shared_pool_same_permutation_seed_reproducible(tmp_path):
         )
 
 
-def test_shared_pool_rebuilds_later_cycles_when_encoder_available(tmp_path):
+def test_shared_pool_populates_later_cycles_as_shared_mmaps(tmp_path):
     planner = _planner_with_ten_peptides()
     RandomNegativesPool.write_shared_pool(
         str(tmp_path), planner, _int8_encoder, pool_epochs=3, seed=42,
     )
+    calls = []
+
+    def tracking_encoder(encodable_sequences):
+        calls.append(len(encodable_sequences.sequences))
+        return _int8_encoder(encodable_sequences)
+
     pool = RandomNegativesPool.from_shared_mmap(
         str(tmp_path),
         planner,
-        peptide_encoder=_int8_encoder,
+        peptide_encoder=tracking_encoder,
         permutation_seed=None,
     )
     reference = RandomNegativesPool(
@@ -387,6 +393,28 @@ def test_shared_pool_rebuilds_later_cycles_when_encoder_available(tmp_path):
         loaded_peptides, loaded_encoded = pool.get_epoch_inputs(epoch)
         reference_peptides, reference_encoded = reference.get_epoch_inputs(epoch)
         assert loaded_peptides == reference_peptides
+        numpy.testing.assert_array_equal(
+            numpy.asarray(loaded_encoded),
+            numpy.asarray(reference_encoded),
+        )
+
+    assert calls == [planner.get_total_count()] * 3
+    cycle_dir = tmp_path / "cycles" / "cycle_000001"
+    assert (cycle_dir / "random_negatives_pool.json").exists()
+    assert (cycle_dir / "random_negatives_encoded.mmap").exists()
+
+    def forbidden_encoder(_encodable_sequences):
+        raise AssertionError("existing mmap cycle should be loaded, not encoded")
+
+    second_worker = RandomNegativesPool.from_shared_mmap(
+        str(tmp_path),
+        planner,
+        peptide_encoder=forbidden_encoder,
+        permutation_seed=None,
+    )
+    for epoch in range(3, 6):
+        _, loaded_encoded = second_worker.get_epoch_inputs(epoch)
+        _, reference_encoded = reference.get_epoch_inputs(epoch)
         numpy.testing.assert_array_equal(
             numpy.asarray(loaded_encoded),
             numpy.asarray(reference_encoded),

@@ -2,6 +2,7 @@ import json
 import logging
 import math
 import os
+import time
 
 import numpy
 import pandas
@@ -429,6 +430,9 @@ class RandomNegativesPool(object):
         return gen
 
     def _build_cycle(self, cycle):
+        if getattr(self, "_shared_mmap_root_dir", None) is not None:
+            self._build_cycle_shared_mmap(cycle)
+            return
         if self.device is not None:
             self._build_cycle_device(cycle)
             return
@@ -490,8 +494,7 @@ class RandomNegativesPool(object):
         Shared-mmap pools can be opened with a ``permutation_seed``. In that
         case this method reorders the slice by a per-worker permutation seeded
         by that value mixed with the epoch counter. Diversity is preserved even
-        though all workers read from the same byte-identical encoded array for
-        the mmap-backed cycle.
+        though all workers read from the same byte-identical encoded arrays.
         """
         max_epoch = getattr(self, "_mmap_max_epoch", None)
         if max_epoch is not None and int(epoch) > max_epoch:
@@ -544,26 +547,27 @@ class RandomNegativesPool(object):
     # (see the ``random_negative_seed`` threaded from work_item identity
     # in train_pan_allele_models_command).
     #
-    # The API below lets a coordinator (typically the training driver
-    # before it forks workers) encode a deterministic pool and persist it as
-    # a native-dtype memmap + JSON manifest. The writer streams one epoch-slice
-    # at a time so the coordinator never has to hold the full pool in RAM.
-    # Workers then load the pool with
-    # ``from_shared_mmap`` — the OS page cache backs all of them with
-    # a single resident copy, cutting RSS ~N× across a pool of size N.
-    # Within a worker, ``get_epoch_inputs`` continues to return an
-    # ordinary numpy view into the encoded array; optional
-    # ``permutation_seed`` shuffles that view deterministically per
-    # worker so diversity is preserved.
-    #
-    # Not yet wired into ``local_parallelism`` / ``fit()`` — this
-    # change just delivers the IPC primitive. Wiring it up needs a
-    # coordinator hook inside the NonDaemonPool that runs once per
-    # worker spawn; that's a follow-up PR.
+    # The API below lets a coordinator encode the first deterministic
+    # pool cycle before forking workers. Later cycles are written lazily
+    # under per-cycle subdirectories by the first worker that reaches
+    # them, guarded by a simple filesystem lock. Other workers then
+    # mmap the same files. This avoids a max_epochs-sized mmap while
+    # still sharing each pool_epochs-sized cycle across processes.
 
     _MANIFEST_NAME = "random_negatives_pool.json"
     _ENCODED_NAME = "random_negatives_encoded.mmap"
     _PEPTIDES_NAME = "random_negatives_peptides.json"
+    _CYCLES_DIR_NAME = "cycles"
+
+    @classmethod
+    def _cycle_dir(cls, output_dir, cycle):
+        if int(cycle) == 0:
+            return output_dir
+        return os.path.join(
+            output_dir,
+            cls._CYCLES_DIR_NAME,
+            "cycle_%06d" % int(cycle),
+        )
 
     @classmethod
     def write_shared_pool(
@@ -573,6 +577,25 @@ class RandomNegativesPool(object):
             peptide_encoder,
             pool_epochs,
             seed):
+        """Generate cycle 0 and persist it under ``output_dir``."""
+        return cls._write_shared_pool_cycle(
+            output_dir=output_dir,
+            planner=planner,
+            peptide_encoder=peptide_encoder,
+            pool_epochs=pool_epochs,
+            seed=seed,
+            cycle=0,
+        )
+
+    @classmethod
+    def _write_shared_pool_cycle(
+            cls,
+            output_dir,
+            planner,
+            peptide_encoder,
+            pool_epochs,
+            seed,
+            cycle):
         """Generate a deterministic pool and persist it under ``output_dir``.
 
         Creates three files:
@@ -611,7 +634,7 @@ class RandomNegativesPool(object):
         manifest_path = os.path.join(output_dir, cls._MANIFEST_NAME)
         manifest_tmp_path = f"{manifest_path}.tmp.{os.getpid()}"
 
-        rng = builder._rng_for_cycle(0)
+        rng = builder._rng_for_cycle(cycle)
         mm = None
         shape = None
         dtype = None
@@ -679,6 +702,7 @@ class RandomNegativesPool(object):
                 "pool_epochs": int(pool_epochs),
                 "total_count": int(total_count),
                 "seed": int(seed),
+                "cycle": int(cycle),
                 "encoded_file": cls._ENCODED_NAME,
                 "peptides_file": cls._PEPTIDES_NAME,
             }
@@ -697,6 +721,106 @@ class RandomNegativesPool(object):
                 except FileNotFoundError:
                     pass
         return manifest_path
+
+    @classmethod
+    def _load_shared_pool_cycle(cls, output_dir, planner):
+        manifest_path = os.path.join(output_dir, cls._MANIFEST_NAME)
+        with open(manifest_path, "r", encoding="utf-8") as fd:
+            manifest = json.load(fd)
+
+        encoded_path = os.path.join(output_dir, manifest["encoded_file"])
+        peptides_path = os.path.join(output_dir, manifest["peptides_file"])
+        with open(peptides_path, "r", encoding="utf-8") as fd:
+            peptides = json.load(fd)
+
+        shape = tuple(manifest["shape"])
+        expected_total = int(manifest["total_count"])
+        worker_total = int(planner.get_total_count())
+        if expected_total != worker_total:
+            raise ValueError(
+                "Shared pool total_count=%d does not match worker "
+                "planner total_count=%d — regenerate the pool or "
+                "align the planner hyperparameters." % (
+                    expected_total, worker_total,
+                )
+            )
+        encoded = numpy.memmap(
+            encoded_path, dtype=manifest["dtype"], mode="r", shape=shape
+        )
+        return manifest, peptides, encoded
+
+    def _build_cycle_shared_mmap(self, cycle):
+        output_dir = self._cycle_dir(self._shared_mmap_root_dir, cycle)
+        manifest_path = os.path.join(output_dir, self._MANIFEST_NAME)
+        if not os.path.exists(manifest_path):
+            if not self._shared_mmap_can_write:
+                raise ValueError(
+                    "Shared-mmap RandomNegativesPool was sized for "
+                    "pool_epochs=%d (epochs 0-%d); caller requested "
+                    "epoch cycle=%d. Pass a peptide_encoder to "
+                    "from_shared_mmap so later cycles can be written." % (
+                        self.pool_epochs, self.pool_epochs - 1, int(cycle),
+                    )
+                )
+            self._ensure_shared_mmap_cycle(cycle)
+
+        _manifest, peptides, encoded = self._load_shared_pool_cycle(
+            output_dir,
+            self.planner,
+        )
+        self._current_peptides = peptides
+        self._current_encoded = encoded
+        self._current_cycle = int(cycle)
+
+    def _ensure_shared_mmap_cycle(self, cycle):
+        output_dir = self._cycle_dir(self._shared_mmap_root_dir, cycle)
+        manifest_path = os.path.join(output_dir, self._MANIFEST_NAME)
+        if os.path.exists(manifest_path):
+            return
+        os.makedirs(os.path.dirname(output_dir), exist_ok=True)
+        lock_path = output_dir + ".lock"
+        timeout_seconds = float(os.environ.get(
+            "MHCFLURRY_SHARED_MMAP_LOCK_TIMEOUT_SECONDS",
+            "3600",
+        ))
+        sleep_seconds = float(os.environ.get(
+            "MHCFLURRY_SHARED_MMAP_LOCK_SLEEP_SECONDS",
+            "0.25",
+        ))
+        start = time.time()
+        while True:
+            if os.path.exists(manifest_path):
+                return
+            try:
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except FileExistsError:
+                if time.time() - start > timeout_seconds:
+                    raise TimeoutError(
+                        "Timed out waiting for shared random-negative mmap "
+                        "cycle %d lock: %s" % (int(cycle), lock_path)
+                    )
+                time.sleep(sleep_seconds)
+                continue
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as lock_fd:
+                    lock_fd.write("pid=%d\ncycle=%d\n" % (
+                        os.getpid(), int(cycle),
+                    ))
+                if not os.path.exists(manifest_path):
+                    self._write_shared_pool_cycle(
+                        output_dir=output_dir,
+                        planner=self.planner,
+                        peptide_encoder=self.peptide_encoder,
+                        pool_epochs=self.pool_epochs,
+                        seed=self.seed,
+                        cycle=cycle,
+                    )
+                return
+            finally:
+                try:
+                    os.unlink(lock_path)
+                except FileNotFoundError:
+                    pass
 
     @classmethod
     def from_shared_mmap(
@@ -728,30 +852,11 @@ class RandomNegativesPool(object):
             the epoch counter. Preserves cross-worker diversity when
             many workers share the same pool contents.
         """
-        manifest_path = os.path.join(output_dir, cls._MANIFEST_NAME)
-        with open(manifest_path, "r", encoding="utf-8") as fd:
-            manifest = json.load(fd)
-
-        encoded_path = os.path.join(output_dir, manifest["encoded_file"])
-        peptides_path = os.path.join(output_dir, manifest["peptides_file"])
-        with open(peptides_path, "r", encoding="utf-8") as fd:
-            peptides = json.load(fd)
-
-        shape = tuple(manifest["shape"])
-        pool_epochs = int(manifest["pool_epochs"])
-        expected_total = int(manifest["total_count"])
-        worker_total = int(planner.get_total_count())
-        if expected_total != worker_total:
-            raise ValueError(
-                "Shared pool total_count=%d does not match worker "
-                "planner total_count=%d — regenerate the pool or "
-                "align the planner hyperparameters." % (
-                    expected_total, worker_total,
-                )
-            )
-        encoded = numpy.memmap(
-            encoded_path, dtype=manifest["dtype"], mode="r", shape=shape
+        manifest, peptides, encoded = cls._load_shared_pool_cycle(
+            output_dir,
+            planner,
         )
+        pool_epochs = int(manifest["pool_epochs"])
 
         def _refuse_reencode(_encodable_sequences):
             raise RuntimeError(
@@ -775,6 +880,8 @@ class RandomNegativesPool(object):
         instance._current_encoded = encoded
         instance._current_cycle = 0  # single cycle — mmap covers it all
         instance._permutation_seed = permutation_seed
+        instance._shared_mmap_root_dir = output_dir
+        instance._shared_mmap_can_write = can_rebuild_later_cycles
         if not can_rebuild_later_cycles:
             # Pool-epoch cap the caller must respect. ``get_epoch_inputs``
             # checks this and raises with a useful message instead of
