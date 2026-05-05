@@ -365,6 +365,34 @@ def test_shared_pool_same_permutation_seed_reproducible(tmp_path):
         )
 
 
+def test_shared_pool_rebuilds_later_cycles_when_encoder_available(tmp_path):
+    planner = _planner_with_ten_peptides()
+    RandomNegativesPool.write_shared_pool(
+        str(tmp_path), planner, _int8_encoder, pool_epochs=3, seed=42,
+    )
+    pool = RandomNegativesPool.from_shared_mmap(
+        str(tmp_path),
+        planner,
+        peptide_encoder=_int8_encoder,
+        permutation_seed=None,
+    )
+    reference = RandomNegativesPool(
+        planner,
+        _int8_encoder,
+        pool_epochs=3,
+        seed=42,
+    )
+
+    for epoch in range(6):
+        loaded_peptides, loaded_encoded = pool.get_epoch_inputs(epoch)
+        reference_peptides, reference_encoded = reference.get_epoch_inputs(epoch)
+        assert loaded_peptides == reference_peptides
+        numpy.testing.assert_array_equal(
+            numpy.asarray(loaded_encoded),
+            numpy.asarray(reference_encoded),
+        )
+
+
 def test_shared_pool_mismatched_planner_raises(tmp_path):
     writer_planner = _planner_with_ten_peptides()
     RandomNegativesPool.write_shared_pool(
@@ -495,11 +523,8 @@ def test_fit_ignores_random_negative_seed_when_pool_epochs_is_one():
     assert bypass_seed == random_negative_seed
 
 
-def test_shared_pool_refuses_epochs_past_cycle_zero(tmp_path):
-    """``from_shared_mmap`` only holds one pool-cycle of peptides.
-    Asking for an epoch past that cycle must raise a clear ``ValueError``
-    explaining the fix (pre-size ``pool_epochs`` for the whole run, or
-    switch to an in-process pool)."""
+def test_shared_pool_refuses_later_cycles_without_encoder(tmp_path):
+    """Without an encoder, ``from_shared_mmap`` cannot rebuild later cycles."""
     planner = _planner_with_ten_peptides()
     RandomNegativesPool.write_shared_pool(
         str(tmp_path), planner, _int8_encoder, pool_epochs=3, seed=42,

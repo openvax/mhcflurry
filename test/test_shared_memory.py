@@ -126,51 +126,23 @@ def test_setup_shared_random_negative_pools_builds_files(tmp_path):
     assert os.path.exists(os.path.join(pool_dir, "random_negatives_peptides.json"))
 
 
-def test_setup_shared_random_negative_pools_rejects_max_epochs_exceeds_pool(tmp_path):
-    """Reject when ``max_epochs > pool_epochs`` — would crash mid-training.
-
-    The shared mmap pool covers only epochs 0..pool_epochs-1. If
-    ``max_epochs`` exceeds that, the worker's ``get_epoch_inputs``
-    would raise mid-training. Caught at orchestrator time so users
-    don't waste hours of training on a doomed run.
-    """
-    df, folds_df = _make_minimal_train_data(num_rows=20)
-    hp = _shared_pool_hyperparameters(
-        pool_epochs=3,
-        max_epochs=100,  # > pool_epochs=3 -> must reject
-    )
-    work_items = [
-        {"fold_num": 0, "hyperparameters": hp, "work_item_name": "wi"},
-    ]
-    with pytest.raises(ValueError, match="max_epochs"):
-        shm.setup_shared_random_negative_pools(
-            output_root_dir=str(tmp_path),
-            work_items=work_items,
-            train_data_df=df,
-            folds_df=folds_df,
-            peptide_encoder=_trivial_peptide_encoder,
-            pool_epochs=3,
-            seed=1,
-        )
-
-
-def test_setup_shared_random_negative_pools_rejects_default_max_epochs(tmp_path):
-    """Absent ``max_epochs`` resolves to the affinity default, not zero."""
+def test_setup_shared_random_negative_pools_allows_default_max_epochs(tmp_path):
+    """The mmap covers cycle 0; fit() rebuilds later cycles with its encoder."""
     df, folds_df = _make_minimal_train_data(num_rows=20)
     hp = _shared_pool_hyperparameters(pool_epochs=3)
     work_items = [
         {"fold_num": 0, "hyperparameters": hp, "work_item_name": "wi"},
     ]
-    with pytest.raises(ValueError, match="max_epochs=500 > pool_epochs=3"):
-        shm.setup_shared_random_negative_pools(
-            output_root_dir=str(tmp_path),
-            work_items=work_items,
-            train_data_df=df,
-            folds_df=folds_df,
-            peptide_encoder=_trivial_peptide_encoder,
-            pool_epochs=3,
-            seed=1,
-        )
+    fold_pool_dirs = shm.setup_shared_random_negative_pools(
+        output_root_dir=str(tmp_path),
+        work_items=work_items,
+        train_data_df=df,
+        folds_df=folds_df,
+        peptide_encoder=_trivial_peptide_encoder,
+        pool_epochs=3,
+        seed=1,
+    )
+    assert len(fold_pool_dirs) == 1
 
 
 def test_setup_shared_random_negative_pools_accepts_max_epochs_equals_pool(tmp_path):

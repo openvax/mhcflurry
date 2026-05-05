@@ -490,16 +490,17 @@ class RandomNegativesPool(object):
         Shared-mmap pools can be opened with a ``permutation_seed``. In that
         case this method reorders the slice by a per-worker permutation seeded
         by that value mixed with the epoch counter. Diversity is preserved even
-        though all workers read from the same byte-identical encoded array.
+        though all workers read from the same byte-identical encoded array for
+        the mmap-backed cycle.
         """
         max_epoch = getattr(self, "_mmap_max_epoch", None)
         if max_epoch is not None and int(epoch) > max_epoch:
             raise ValueError(
                 "Shared-mmap RandomNegativesPool was sized for "
                 "pool_epochs=%d (epochs 0-%d); caller requested "
-                "epoch=%d. Size the pool to max_epochs before "
-                "launching workers, or switch to an in-process "
-                "RandomNegativesPool that can rebuild per cycle." % (
+                "epoch=%d. Pass a peptide_encoder to from_shared_mmap "
+                "so later cycles can rebuild through the normal "
+                "in-process path." % (
                     self.pool_epochs, max_epoch, int(epoch),
                 )
             )
@@ -715,8 +716,12 @@ class RandomNegativesPool(object):
             the pool (same ``get_total_count()``); otherwise the slice
             bounds misalign.
         peptide_encoder : callable, optional
-            Kept for API symmetry with ``__init__``. Never called on
-            this path because the pool is already encoded.
+            Encoder used after the mmap-backed cycle is exhausted.
+            ``fit()`` passes the model's normal encoder here, so the
+            shared mmap saves the first cycle without forcing callers
+            to materialize a full ``max_epochs``-sized file. If omitted,
+            requesting an epoch beyond the mmap window raises a clear
+            ``ValueError``.
         permutation_seed : int, optional
             When provided, each epoch's slice is reordered by a
             per-worker permutation seeded with this value mixed into
@@ -753,27 +758,29 @@ class RandomNegativesPool(object):
                 "Shared-mmap RandomNegativesPool only holds cycle 0. "
                 "Training has advanced to a cycle >= pool_epochs=%d, but "
                 "the mmap pool cannot regenerate (no encoder available). "
-                "Size the shared pool's ``pool_epochs`` to at least the "
-                "training run's ``max_epochs`` so cycle 0 covers every "
-                "epoch, or switch this worker to an in-process "
-                "RandomNegativesPool that can rebuild." % pool_epochs
+                "Pass peptide_encoder to from_shared_mmap or use an "
+                "in-process RandomNegativesPool." % pool_epochs
             )
 
+        can_rebuild_later_cycles = peptide_encoder is not None
         instance = cls(
             planner=planner,
             peptide_encoder=peptide_encoder or _refuse_reencode,
             pool_epochs=pool_epochs,
-            seed=None,  # content is already deterministic in the mmap
+            seed=(
+                int(manifest["seed"]) if can_rebuild_later_cycles else None
+            ),
         )
         instance._current_peptides = peptides
         instance._current_encoded = encoded
         instance._current_cycle = 0  # single cycle — mmap covers it all
         instance._permutation_seed = permutation_seed
-        # Pool-epoch cap the caller must respect. ``get_epoch_inputs``
-        # checks this and raises with a useful message instead of
-        # blowing up with the generic _refuse_reencode RuntimeError
-        # when crossed.
-        instance._mmap_max_epoch = pool_epochs - 1
+        if not can_rebuild_later_cycles:
+            # Pool-epoch cap the caller must respect. ``get_epoch_inputs``
+            # checks this and raises with a useful message instead of
+            # blowing up with the generic _refuse_reencode RuntimeError
+            # when crossed.
+            instance._mmap_max_epoch = pool_epochs - 1
         return instance
 
     def _epoch_permutation(self, epoch):

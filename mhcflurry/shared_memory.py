@@ -26,20 +26,6 @@ from .random_negative_peptides import (
 )
 
 
-def _resolve_max_epochs(hyperparameters):
-    """Return the affinity model's effective ``max_epochs`` value."""
-    if hyperparameters.get("max_epochs") is not None:
-        return int(hyperparameters["max_epochs"])
-
-    # Keep this aligned with Class1NeuralNetwork.fit() without forcing
-    # callers to materialize the full hyperparameter dict before building
-    # shared random-negative pools.
-    from .class1_neural_network import Class1NeuralNetwork
-    return int(
-        Class1NeuralNetwork.fit_hyperparameter_defaults.defaults["max_epochs"]
-    )
-
-
 def _planner_from_hyperparameters(hyperparameters):
     """Build a ``RandomNegativePeptides`` planner from a hyperparameter dict.
 
@@ -120,27 +106,10 @@ def setup_shared_random_negative_pools(
                     pool_epochs,
                 )
             )
-        # The shared mmap pool holds exactly ``pool_epochs`` cycles
-        # (cycle 0 only — see RandomNegativesPool.from_shared_mmap).
-        # If a work item's ``max_epochs`` would advance training past
-        # epoch ``pool_epochs - 1``, the worker's
-        # ``RandomNegativesPool.get_epoch_inputs`` raises mid-training.
-        # Caught here so the orchestrator fails before forking workers
-        # rather than at random points hours into the run.
-        max_epochs = _resolve_max_epochs(hp)
-        if max_epochs > pool_epochs:
-            raise ValueError(
-                "setup_shared_random_negative_pools: work item %r has "
-                "max_epochs=%d > pool_epochs=%d. The shared mmap pool "
-                "covers epochs 0..pool_epochs-1; training would crash "
-                "at epoch %d. Either raise random_negative_pool_epochs "
-                "to >= max_epochs, lower max_epochs, or omit "
-                "--random-negative-shared-pool-dir to fall back to "
-                "the in-process pool." % (
-                    item.get("work_item_name"),
-                    max_epochs, pool_epochs, pool_epochs,
-                )
-            )
+        # The shared mmap pool covers the first pool cycle. fit() opens
+        # it with the model's peptide encoder, so later cycles rebuild
+        # through the ordinary in-process path instead of requiring a
+        # max_epochs-sized mmap file.
         cfg_key = _random_negative_config_key(hp)
         by_fold_and_cfg.setdefault((fold_num, cfg_key), hp)
 
