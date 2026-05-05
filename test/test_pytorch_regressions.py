@@ -536,6 +536,65 @@ def test_merged_network_serialization_preserves_dropout_keep_probability():
         assert subnet.dropouts[0].p == pytest.approx(0.2, abs=1e-12)
 
 
+def _serialized_merged_pan_network_with_allele_length(sequence_length):
+    allele_representations = np.zeros((2, sequence_length, 21), dtype=np.float32)
+    models = []
+    for seed in (101, 202):
+        _seed_all(seed)
+        model = Class1NeuralNetwork(
+            allele_amino_acid_encoding="BLOSUM62",
+            allele_dense_layer_sizes=[3],
+            peptide_dense_layer_sizes=[3],
+            peptide_allele_merge_method="concatenate",
+            peptide_allele_merge_activation="",
+            layer_sizes=[5],
+            locally_connected_layers=[],
+            batch_normalization=False,
+            dense_layer_l1_regularization=0.0,
+            dense_layer_l2_regularization=0.0,
+            dropout_probability=0.0,
+        )
+        model._network = model.make_network(
+            allele_representations=allele_representations,
+            **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+        )
+        model.clear_allele_representations()
+        models.append(model)
+
+    merged = Class1NeuralNetwork.merge(models, merge_method="concatenate")
+    return merged.get_config(), merged.get_weights()
+
+
+@pytest.mark.parametrize("sequence_length", [34, 37, 39])
+def test_merged_network_deserialization_preserves_saved_allele_width(
+        sequence_length):
+    config, weights = _serialized_merged_pan_network_with_allele_length(
+        sequence_length)
+
+    restored = Class1NeuralNetwork.from_config(config, weights=weights)
+    network = restored.network()
+
+    assert isinstance(network, MergedClass1NeuralNetwork)
+    for subnet in network.networks:
+        assert tuple(subnet.allele_embedding.weight.shape) == (
+            1, sequence_length * 21)
+
+
+def test_cached_merged_networks_include_saved_allele_width_in_key():
+    Class1NeuralNetwork.clear_model_cache()
+
+    for sequence_length in (34, 39):
+        config, weights = _serialized_merged_pan_network_with_allele_length(
+            sequence_length)
+        restored = Class1NeuralNetwork.from_config(config, weights=weights)
+        network = restored.network(borrow=True)
+
+        assert isinstance(network, MergedClass1NeuralNetwork)
+        for subnet in network.networks:
+            assert tuple(subnet.allele_embedding.weight.shape) == (
+                1, sequence_length * 21)
+
+
 def test_dense_regularization_excludes_output_layer():
     peptides = ["AAAAAAAAA", "CCCCCCCCC"]
 

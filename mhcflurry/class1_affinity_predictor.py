@@ -595,9 +595,15 @@ class Class1AffinityPredictor(object):
         # ----- Load pseudosequences first so we can canonicalize -----
         allele_to_sequence = None
         allele_to_canonical = {}
+        allele_sequences_filename = None
         if exists(join(models_dir, "allele_sequences.csv")):
+            allele_sequences_filename = "allele_sequences.csv"
+        elif exists(join(models_dir, "class1_pseudosequences.csv")):
+            allele_sequences_filename = "class1_pseudosequences.csv"
+
+        if allele_sequences_filename is not None:
             allele_to_sequence = pandas.read_csv(
-                join(models_dir, "allele_sequences.csv"),
+                join(models_dir, allele_sequences_filename),
                 index_col=0).iloc[:, 0].to_dict()
 
             # Re-normalize allele names. We first try without IMGT allele

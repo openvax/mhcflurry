@@ -2156,15 +2156,24 @@ class Class1NeuralNetwork(object):
         Class1NeuralNetworkModel
         """
         assert network_weights is not None
-        key = klass.model_cache_key(network_json)
         config = json.loads(network_json)
         # Detect if weights are from Keras or PyTorch format
         # Keras JSON has 'class_name': 'Model' or 'Functional'; PyTorch has 'hyperparameters'
         is_keras_format = config.get('class_name') in ('Model', 'Functional')
+        key = (
+            klass.model_cache_key(network_json),
+            klass._infer_allele_representation_dim_from_weights(
+                network_weights,
+                config.get("hyperparameters", {}),
+            ),
+        )
 
         if key not in klass.MODELS_CACHE:
             # Cache miss - create new model
-            network = klass._create_model_from_config(config)
+            network = klass._create_model_from_config(
+                config,
+                network_weights=network_weights,
+            )
             existing_weights = None
         else:
             # Cache hit
@@ -2302,7 +2311,59 @@ class Class1NeuralNetwork(object):
         return hyperparameters, keras_metadata
 
     @classmethod
-    def _create_model_from_config(cls, config, instance_hyperparameters=None):
+    def _infer_allele_representation_dim_from_weights(
+            cls, network_weights, hyperparameters):
+        """Infer flattened allele representation width from serialized weights."""
+        if not network_weights or not hyperparameters.get('allele_amino_acid_encoding'):
+            return None
+        from .amino_acid import get_vector_encoding_df
+        try:
+            encoding_dim = len(get_vector_encoding_df(
+                hyperparameters['allele_amino_acid_encoding']).columns)
+        except KeyError:
+            return None
+
+        for weight in network_weights:
+            if not isinstance(weight, numpy.ndarray) or len(weight.shape) != 2:
+                continue
+            dim = weight.shape[1]
+            if dim % encoding_dim != 0:
+                continue
+            sequence_length = dim // encoding_dim
+            if 20 <= sequence_length <= 60:
+                return dim
+        return None
+
+    @classmethod
+    def _placeholder_allele_representations(
+            cls, hyperparameters, network_weights=None,
+            default_sequence_length=39):
+        """Create a shape-compatible placeholder for pan-allele models.
+
+        Public artifacts have used several pseudosequence widths over time
+        (including 2.1.x-era weights). Prefer the width encoded in the saved
+        weights; fall back to the current 39-residue sequence only when no
+        weights are available to guide reconstruction.
+        """
+        if not hyperparameters.get('allele_amino_acid_encoding'):
+            return None
+        from .amino_acid import get_vector_encoding_df
+        encoding_name = hyperparameters['allele_amino_acid_encoding']
+        try:
+            encoding_df = get_vector_encoding_df(encoding_name)
+        except KeyError:
+            return None
+        embedding_dim = cls._infer_allele_representation_dim_from_weights(
+            network_weights,
+            hyperparameters,
+        )
+        if embedding_dim is None:
+            embedding_dim = default_sequence_length * len(encoding_df.columns)
+        return numpy.zeros((1, embedding_dim), dtype=numpy.float32)
+
+    @classmethod
+    def _create_model_from_config(
+            cls, config, instance_hyperparameters=None, network_weights=None):
         """Create a model from a configuration dictionary.
 
         Parameters
@@ -2317,7 +2378,11 @@ class Class1NeuralNetwork(object):
 
         # Check if this is a merged network config
         if config.get('merged_networks'):
-            return cls._create_merged_model_from_config(config, instance_hyperparameters)
+            return cls._create_merged_model_from_config(
+                config,
+                instance_hyperparameters,
+                network_weights=network_weights,
+            )
 
         # Check if this is a legacy Keras JSON config
         if config.get('class_name') in ('Model', 'Functional'):
@@ -2377,20 +2442,10 @@ class Class1NeuralNetwork(object):
         has_allele = config.get('has_allele', True)  # Default True for backward compat
         if (allele_representations is None and keras_metadata is None
                 and has_allele and hyperparameters.get('allele_amino_acid_encoding')):
-            # Compute embedding dimension from encoding
-            from .amino_acid import get_vector_encoding_df
-            encoding_name = hyperparameters['allele_amino_acid_encoding']
-            try:
-                encoding_df = get_vector_encoding_df(encoding_name)
-                # Production pan-allele models ship the 39-residue extended
-                # pseudosequence in `allele_sequences.csv` (loaded via
-                # `Class1AffinityPredictor.load`). The legacy 34-residue
-                # `class1_pseudosequences.csv` is no longer used at fit time.
-                allele_seq_length = 39
-                embedding_dim = allele_seq_length * len(encoding_df.columns)
-                allele_representations = numpy.zeros((1, embedding_dim), dtype=numpy.float32)
-            except KeyError:
-                pass
+            allele_representations = cls._placeholder_allele_representations(
+                hyperparameters,
+                network_weights=network_weights,
+            )
 
         model = Class1NeuralNetworkModel(
             peptide_encoding_shape=peptide_encoding_shape,
@@ -2421,7 +2476,8 @@ class Class1NeuralNetwork(object):
         return model
 
     @classmethod
-    def _create_merged_model_from_config(cls, config, instance_hyperparameters=None):
+    def _create_merged_model_from_config(
+            cls, config, instance_hyperparameters=None, network_weights=None):
         """Create a merged model from a configuration dictionary.
 
         Parameters
@@ -2454,17 +2510,10 @@ class Class1NeuralNetwork(object):
             )
 
         # Create placeholder allele representations for pan-allele models
-        allele_representations = None
-        if base_hyperparameters.get('allele_amino_acid_encoding'):
-            from .amino_acid import get_vector_encoding_df
-            encoding_name = base_hyperparameters['allele_amino_acid_encoding']
-            try:
-                encoding_df = get_vector_encoding_df(encoding_name)
-                allele_seq_length = 37
-                embedding_dim = allele_seq_length * len(encoding_df.columns)
-                allele_representations = numpy.zeros((1, embedding_dim), dtype=numpy.float32)
-            except KeyError:
-                pass
+        allele_representations = cls._placeholder_allele_representations(
+            base_hyperparameters,
+            network_weights=network_weights,
+        )
 
         # Create sub-networks
         sub_networks = []
@@ -2549,7 +2598,9 @@ class Class1NeuralNetwork(object):
                 is_keras_format = config.get('class_name') in ('Model', 'Functional')
                 # Pass this instance's hyperparameters to preserve peptide_encoding etc.
                 self._network = self._create_model_from_config(
-                    config, instance_hyperparameters=self.hyperparameters)
+                    config,
+                    instance_hyperparameters=self.hyperparameters,
+                    network_weights=self.network_weights)
                 if self.network_weights is not None:
                     self._network.set_weights_list(
                         self.network_weights,

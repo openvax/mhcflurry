@@ -99,6 +99,23 @@ def test_save_calibration_only_preserves_model_artifacts(tmp_path):
     assert "HLA-A*02:01" in percent_ranks.columns
 
 
+def test_load_accepts_legacy_class1_pseudosequences_file(tmp_path):
+    (tmp_path / "manifest.csv").write_text("model_name,allele,config_json\n")
+    (tmp_path / "class1_pseudosequences.csv").write_text(
+        "allele,pseudosequence\n"
+        "HLA-A*02:01,YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY\n"
+    )
+
+    predictor = Class1AffinityPredictor.load(
+        str(tmp_path),
+        optimization_level=0,
+    )
+
+    assert predictor.allele_to_sequence == {
+        "HLA-A*02:01": "YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY",
+    }
+
+
 def test_percent_rank_calibrated_allele_direct_equivalent_missing():
     transform = PercentRankTransform()
     transform.fit(numpy.array([10.0, 20.0, 30.0]), bins=3)
