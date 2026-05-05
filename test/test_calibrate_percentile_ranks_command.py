@@ -153,27 +153,29 @@ def test_percent_rank_status_helpers_count_sequence_equivalent_calibration():
     ]
 
 
-def test_filter_canonicalizable_alleles_call_sites_cover_both_predictor_kinds():
-    """Both run_class1_presentation_predictor and run_class1_affinity_predictor
-    invoke the filter on supported_alleles.
+def test_filter_canonicalizable_alleles_used_through_shared_selector():
+    """Both predictor kinds use the same canonicalizable-allele selector.
 
     Without coverage on both, a presentation-predictor calibration with a
     pseudogene allele in its coverage map would crash partway through the
-    same way the affinity path used to. Reading the source is the
-    cheapest regression test we can write here — running calibrate
-    end-to-end on a synthetic presentation predictor is too heavy for
-    a unit test.
+    same way the affinity path used to. The predictor-specific entry points
+    intentionally delegate allele selection to ``requested_calibration_alleles``
+    so the filter is not duplicated.
     """
     import inspect
     from mhcflurry import calibrate_percentile_ranks_command as mod
 
     affinity_src = inspect.getsource(mod.run_class1_affinity_predictor)
     presentation_src = inspect.getsource(mod.run_class1_presentation_predictor)
-    assert "filter_canonicalizable_alleles" in affinity_src, (
-        "affinity calibration path must call the filter helper"
+    selector_src = inspect.getsource(mod.requested_calibration_alleles)
+    assert "requested_calibration_alleles" in affinity_src, (
+        "affinity calibration path must call the shared allele selector"
     )
-    assert "filter_canonicalizable_alleles" in presentation_src, (
-        "presentation calibration path must call the filter helper"
+    assert "requested_calibration_alleles" in presentation_src, (
+        "presentation calibration path must call the shared allele selector"
+    )
+    assert "filter_canonicalizable_alleles" in selector_src, (
+        "shared allele selector must filter predictor-supported alleles"
     )
 
 

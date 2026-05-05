@@ -5,10 +5,10 @@
 
 ## The one-line summary
 
-The orchestrator owns the **shared resources** (parallel workers,
-shared-memory pools, encoding caches, env tuning); workers consume
-them. Workers never build shared state and never set env knobs that
-affect other workers.
+The orchestrator owns the **run-wide resources** (parallel workers,
+env tuning); workers consume those and own their per-fit device state.
+Workers never build shared state and never set env knobs that affect
+other workers.
 
 If you find yourself adding orchestrator-shaped logic inside
 `fit()`, `train_model()`, or any worker function, stop and think
@@ -27,12 +27,6 @@ build GLOBAL_DATA           ─┐
 hoist env knobs              │
   TORCHINDUCTOR_COMPILE_THREADS
                              │
-prebuild encoding cache      │     fit():
-  (opt-in mmap)              │       look up encoding cache
-                             │       (mmap hit, no rebuild)
-prebuild random-neg pool     │
-  (opt-in mmap)              │       look up random-neg pool
-                             │       (mmap hit, no replan)
 fork worker pool             ─┘
                                     fit() builds device-resident
                                       AffinityDeviceTrainingData
@@ -64,29 +58,19 @@ That's controlled by `dataloader_num_workers`; 0 means in-process. It
 feeds the pretrain generator only and does not affect the affinity row
 layout above.
 
-## Opt-in mmap pool for random negatives
+## Random negatives
 
-`mhcflurry/shared_memory.py` exposes one primitive: a per-run, file-mmap
-pool of pre-encoded random-negative peptides.
+Random negatives are worker-local. `RandomNegativesPool` amortizes
+generation over `random_negative_pool_epochs`, but it does not try to
+share encoded pools between model fits. This preserves the historical
+behavior where independently trained workers sample independent negative
+peptides.
 
-| | random-negative mmap pool |
-|---|---|
-| **Lifetime** | per-run; persists to disk; survives across runs |
-| **Mechanism** | `numpy.memmap` of files written by the orchestrator |
-| **Built by** | orchestrator (before forking workers) |
-| **Read by** | every training worker, opt-in via `--random-negative-shared-pool-dir` |
-| **Mutability** | read-only; per-worker permutation seed reorders the slice |
-
-When set, `--random-negative-shared-pool-dir <DIR>` makes the orchestrator
-pre-build per-fold pools under `<DIR>` before any worker forks. Each
-worker's `fit()` looks up its pool dir and does
-`numpy.memmap` so the operating-system page cache holds one resident copy
-across N workers. Diversity per worker is preserved by mixing a
-permutation seed with the epoch counter.
-
-Default is off; each worker's `RandomNegativesPool` builds an in-process
-pool. Useful when many workers fan out on one host and per-worker
-regeneration cost dominates; otherwise the in-process pool is simpler.
+For the default torch peptide-encoding path, the pool samples amino-acid
+indices directly on the worker's active torch device and writes fixed-length
+int8 rows. The model's embedding layer expands those indices to BLOSUM62 /
+PMBEC / physchem features during the forward pass. Legacy host-vector
+models fall back to the host encoder so their input shape remains unchanged.
 
 ## Parallelism backends
 
@@ -103,10 +87,7 @@ Two backends, one CLI surface:
   historical CPU-overflow behavior.
 - **Cluster** (`cluster_parallelism.py`): one job per work-item
   submitted via `bsub` / `sbatch` / `sh`. Workers serialize
-  GLOBAL_DATA to NFS, deserialize on the worker side. The mmap random
-  negative pool works ONLY when the pool dir is on a shared filesystem
-  reachable from every worker node — orchestrator emits a loud warning
-  when both flags are set so the user can verify.
+  GLOBAL_DATA to NFS and deserialize on the worker side.
 
 Worker-side code (`train_model()`, etc.) is identical between
 backends. Only the orchestrator branches on `args.cluster_parallelism`.
@@ -115,21 +96,15 @@ backends. Only the orchestrator branches on `args.cluster_parallelism`.
 
 The 2.3.0 modernization concentrates on the pan-allele affinity
 training + percentile calibration paths. Other components inherit
-parts of the stack but their orchestrators don't yet drive the mmap
-random-negative pool or encoding-cache prefetch — those are opt-in,
-not on by default.
+shared backend selection and worker orchestration, but their data
+paths remain intentionally smaller.
 
 | | pretrain | finetune | select | calibrate |
 |---|---|---|---|---|
-| **affinity (pan-allele)** | full stack ✓ | full stack ✓ | filter ✓; pool/cache n/a (no fit) | filter ✓; pool/cache n/a |
-| **affinity (allele-specific)** | n/a | local pool only; cache+mmap-pool are opt-in via `prebuild_encoding_caches` | filter ✓ | shares calibrate command |
-| **processing** | n/a | local+cluster pool; cache+mmap-pool are opt-in | local+cluster pool | n/a (allele-independent) |
+| **affinity (pan-allele)** | streaming DataLoader + compact torch-index peptide batches | device-resident tensors + worker-local RN pool | filter ✓; pool/cache n/a (no fit) | filter ✓; pool/cache n/a |
+| **affinity (allele-specific)** | n/a | device-resident tensors + worker-local RN pool | filter ✓ | shares calibrate command |
+| **processing** | n/a | local+cluster worker pool | local+cluster worker pool | n/a (allele-independent) |
 | **presentation** | n/a | serial only (single-process; no orchestration story today) | n/a | filter ✓ (shares calibrate command) |
-
-"Opt-in" cells aren't *broken* — they just don't yet have orchestrator-side
-mmap-pool prebuild. When their datasets grow to where prebuild matters,
-call `prebuild_encoding_caches` from the relevant `train_*_command` after
-`add_local_parallelism_args(...)`.
 
 ## Auto-tuned parallelism knobs
 
@@ -234,7 +209,7 @@ the environment?
 **Rule of thumb:**
 
 - **CLI flag** when the orchestrator owns it and propagates it.
-  (Examples: `--max-workers-per-gpu`, `--random-negative-shared-pool-dir`,
+  (Examples: `--max-workers-per-gpu`, `--random-negative-pool-epochs`,
   `--num-jobs`.)
 - **Env var with optional CLI relay** when the consumer is inside
   `fit()` or another worker-private code path, and the orchestrator
@@ -282,8 +257,7 @@ before compiling losses to avoid the PyTorch 2.4 / Triton
 - Calling `predict()` on individual alleles. The orchestrator
   builds work items; workers iterate.
 - Validating data shape consistency between work items beyond what
-  the mmap-pool helpers themselves require (uniform `pool_epochs`,
-  uniform `peptide_encoding`).
+  the worker-side fit/data constructors already check.
 
 ## Recipes
 
@@ -390,22 +364,14 @@ asymmetries to know about:
   `~/mhcflurry-results/`, with symlinks back into the repo. After
   that, rsync ships ~tiny symlinks instead of multi-GB directories.
 - **Down direction:** the post-run rsync has NO excludes — everything
-  under `out/` returns. The orchestrator script
-  (`scripts/training/pan_allele_release_affinity.sh`) places the
-  encoding cache OUTSIDE `$MHCFLURRY_OUT` (default
-  `$HOME/runplz-cache/encoding_cache/`) so the ~7 GB fixed-encoding mmap
-  doesn't ride back. Override with `MHCFLURRY_ENCODING_CACHE_DIR`.
-  Bonus: cache persists across runs on the same box, so the second
-  run hits a warm cache.
+  under `out/` returns. Keep large throwaway run artifacts outside
+  `out/` unless they are meant to ship back.
 
 ## Pointers to code
 
-- Random-negative mmap pool: `mhcflurry/shared_memory.py`
+- Random-negative planning and pooling: `mhcflurry/random_negative_peptides.py`
 - Affinity device-resident row space:
   `mhcflurry/class1_affinity_training_data.py` (`AffinityDeviceTrainingData`)
-- Encoding cache: `mhcflurry/encoding_cache.py` (generic
-  `prebuild_encoding_caches`; pan-allele wrapper in
-  `train_pan_allele_models_command._initialize_encoding_cache`)
 - Pseudogene/null filter: `mhcflurry/common.py`
   (`filter_canonicalizable_alleles`)
 - Worker pool sizing: `mhcflurry/local_parallelism.py`
@@ -421,15 +387,6 @@ These show up to readers as "why is this only done in pan-allele?"
 The answer in each case is "the other components don't yet need it
 and adding it would be feature work, not a fix":
 
-- **Encoding-cache prebuild** is pan-allele-only because no other
-  command sweeps enough architectures × folds × peptides for the
-  prebuild to matter at current scale. The shared helper
-  (`prebuild_encoding_caches`) makes adoption a one-line call when
-  this changes.
-- **Random-negative mmap pool** is pan-allele-only because only
-  pan-allele training does the per-epoch random-negative regeneration
-  at the scale where mmap-share is meaningful. Allele-specific
-  training does similar work but at smaller per-allele scale.
 - **`torch.compile`** is off by default everywhere; opt-in via
   `MHCFLURRY_TORCH_COMPILE=1` or `--torch-compile 1`. When enabled,
   the shared local-parallelism layer owns compile-thread sizing and
@@ -439,13 +396,6 @@ and adding it would be feature work, not a fix":
 
 ## Future tightening (not in 2.3.0)
 
-- **Random-negative mmap pool for allele-specific training.** Wire
-  `--random-negative-shared-pool-dir` through
-  `train_allele_specific_models_command`.
-- **Encoding-cache prebuild for processing/allele-specific.** When
-  datasets grow large enough to make the encoding pass dominate
-  fit() time, call `prebuild_encoding_caches` from each command's
-  `run()` before forking workers.
 - **Presentation-training orchestration.** Today
   `train_presentation_models_command` runs single-process; mirror the
   pan-allele orchestration shape if presentation retraining becomes

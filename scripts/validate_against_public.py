@@ -87,12 +87,11 @@ def swap_affinity_into_presentation(public_presentation, new_affinity):
     )
 
 
-def predict_affinity(pred, peptides, alleles, encoding_cache_dir=None) -> pd.DataFrame:
+def predict_affinity(pred, peptides, alleles) -> pd.DataFrame:
     """Tall DataFrame: peptide, allele, affinity_nM.
 
     Batches by allele so the full peptide list goes through predict()
-    once per allele (letting the encoding cache, if configured,
-    prepopulate once and reuse across alleles).
+    once per allele.
     """
     rows = []
     peptides = list(peptides)
@@ -100,7 +99,6 @@ def predict_affinity(pred, peptides, alleles, encoding_cache_dir=None) -> pd.Dat
         try:
             affs = pred.predict(
                 peptides=peptides, alleles=[a] * len(peptides),
-                encoding_cache_dir=encoding_cache_dir,
             )
         except Exception as exc:
             print(f"  [warn] affinity allele={a}: {exc!r}", file=sys.stderr)
@@ -110,16 +108,11 @@ def predict_affinity(pred, peptides, alleles, encoding_cache_dir=None) -> pd.Dat
     return pd.DataFrame(rows)
 
 
-def predict_presentation(pred, peptides, alleles, encoding_cache_dir=None) -> pd.DataFrame:
+def predict_presentation(pred, peptides, alleles) -> pd.DataFrame:
     """Tall DataFrame: peptide, allele, presentation_score. Uses the
     without-flanks processing model since our canonical peptide list
     doesn't carry true source-protein context. Higher = more likely
     presented."""
-    # Note: Class1PresentationPredictor.predict doesn't accept
-    # encoding_cache_dir yet — the affinity sub-predictor inside does.
-    # When the presentation predictor's own signature picks up the
-    # param, propagate it here; for now it's ignored (we share the
-    # affinity-side speedup via the shared cache on disk anyway).
     rows = []
     for a in alleles:
         try:
@@ -238,12 +231,6 @@ def main():
     p.add_argument("--public-presentation", default=None,
                    help="dir with public models_class1_presentation/models/. "
                         "If given, presentation Spearman is also reported.")
-    p.add_argument("--encoding-cache-dir", default=None,
-                   help="Shared BLOSUM62 peptide encoding cache directory. "
-                        "Populated once on the first predict() call, reused "
-                        "by all subsequent predicts — so comparing N "
-                        "predictors on the same peptide list costs 1 "
-                        "encoding pass instead of N.")
     args = p.parse_args()
 
     peptides = [pep for pep, _, _ in KNOWN_BINDERS]
@@ -261,12 +248,8 @@ def main():
 
     print(f"[predict] affinity: {len(peptides)} peptides × {len(alleles)} alleles = "
           f"{len(peptides)*len(alleles)} pairs, both models")
-    df_aff_ours = predict_affinity(
-        ours_aff, peptides, alleles, encoding_cache_dir=args.encoding_cache_dir
-    )
-    df_aff_public = predict_affinity(
-        public_aff, peptides, alleles, encoding_cache_dir=args.encoding_cache_dir
-    )
+    df_aff_ours = predict_affinity(ours_aff, peptides, alleles)
+    df_aff_public = predict_affinity(public_aff, peptides, alleles)
 
     out = Path("out/validation")
     out.mkdir(parents=True, exist_ok=True)
@@ -284,12 +267,8 @@ def main():
         print(f"[predict] presentation: {len(peptides)} peptides × {len(alleles)} alleles, "
               f"both models (without flanks — canonical peptide list has no true "
               f"source-protein flanking context)")
-        df_pres_ours = predict_presentation(
-            ours_pres, peptides, alleles, encoding_cache_dir=args.encoding_cache_dir
-        )
-        df_pres_public = predict_presentation(
-            public_pres, peptides, alleles, encoding_cache_dir=args.encoding_cache_dir
-        )
+        df_pres_ours = predict_presentation(ours_pres, peptides, alleles)
+        df_pres_public = predict_presentation(public_pres, peptides, alleles)
 
         merged_pres = run_comparison(
             df_pres_ours, df_pres_public, "presentation_score", False, "PRESENTATION"

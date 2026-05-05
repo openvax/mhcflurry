@@ -3030,12 +3030,9 @@ class Class1NeuralNetwork(object):
         # validation sets that's tens of ms/epoch of pure wasted bandwidth.
         # Hoist the copy to happen once before the epoch loop.
         #
-        # When the encoding cache stores compact int8 fixed-vector encodings,
-        # host-to-device transfer is 4x smaller; widening to fp32 on the active
-        # device is cheap. For fp32-native encodings the cast is a no-op.
-        # 2D int → index-encoded; keep dtype intact so the embedding lookup
-        # inside forward() sees int indices. 3D int is the compact
-        # vector-encoded cache payload; widen as before.
+        # 2D int -> index-encoded; keep dtype intact so the embedding lookup
+        # inside forward() sees int indices. Vector-encoded inputs are numeric
+        # feature tensors and should reach the network as fp32.
         _val_peptide_np = validation_x_dict["peptide"]
         if (
             _val_peptide_np.ndim == 2
@@ -3377,24 +3374,11 @@ class Class1NeuralNetwork(object):
             self,
             *,
             random_negatives_planner,
-            random_negative_shared_pool_dir,
             random_negative_pool_epochs,
             pool_seed,
-            random_negative_permutation_seed,
             device,
             requested_fit_tensor_residency):
         """Construct a shape-compatible random-negative pool for fit()."""
-        if random_negative_shared_pool_dir is not None:
-            return (
-                RandomNegativesPool.from_shared_mmap(
-                    output_dir=random_negative_shared_pool_dir,
-                    planner=random_negatives_planner,
-                    peptide_encoder=self.peptides_to_network_input,
-                    permutation_seed=random_negative_permutation_seed,
-                ),
-                "shared_mmap",
-            )
-
         use_device_pool = (
             requested_fit_tensor_residency != "host"
             and self.uses_peptide_torch_encoding()
@@ -3459,9 +3443,7 @@ class Class1NeuralNetwork(object):
             progress_callback=None,
             progress_preamble="",
             progress_print_interval=5.0,
-            random_negative_seed=None,
-            random_negative_shared_pool_dir=None,
-            random_negative_permutation_seed=None):
+            random_negative_seed=None):
         """
         Fit the neural network.
 
@@ -3481,21 +3463,11 @@ class Class1NeuralNetwork(object):
         progress_callback : function
         progress_preamble : string
         progress_print_interval : float
-        random_negative_shared_pool_dir : str, optional
-            Path to a directory containing a pre-built mmap random-
-            negative pool (the run mmap cache; see ``shared_memory.py``).
-            When set, ``RandomNegativesPool.from_shared_mmap`` is used in
-            place of the in-process constructor — workers consume an
-            OS-page-cache-shared encoded pool instead of regenerating
-            and re-encoding their own each cycle. The orchestrator is
-            responsible for matching the pool's ``pool_epochs`` /
-            random-negative config to this fit() call.
-        random_negative_permutation_seed : int, optional
-            Cross-worker diversity seed when reading from the shared
-            pool. Each fit() worker permutes its slice of the pool by
-            this seed mixed with the epoch counter, so identical pool
-            bytes still produce per-worker-distinct negative orderings.
-            Ignored when ``random_negative_shared_pool_dir`` is None.
+        random_negative_seed : int, optional
+            Seed for pooled random negatives when
+            ``random_negative_pool_epochs`` > 1. The default path
+            (pool_epochs == 1) ignores this so training keeps the
+            historical fresh-per-epoch random stream.
         """
         device = self.get_device()
         _configure_matmul_precision(device)
@@ -3551,31 +3523,20 @@ class Class1NeuralNetwork(object):
         requested_fit_tensor_residency = self.hyperparameters.get(
             "fit_tensor_residency"
         )
-        # Run mmap cache path (see shared_memory.py): when the
-        # orchestrator has pre-built an mmap pool for this work item's
-        # (fold, random-negative-config), construct via
-        # ``from_shared_mmap`` and let
-        # the OS page cache hold a single resident copy across all the
-        # outer training Pool's workers. Otherwise the in-process
-        # constructor either samples directly on device (for torch-index
-        # peptide inputs) or builds shape-compatible host encodings (for
-        # vector peptide inputs).
+        # Random negatives stay worker-local. For torch-index peptide
+        # inputs, the pool samples and aligns int8 AA indices directly on
+        # the active torch device. Host-vector models use the same encoder
+        # as their real peptides so the training input shape remains identical.
         (
             random_negatives_pool,
             random_negative_pool_residency,
         ) = self._random_negatives_pool_for_fit(
             random_negatives_planner=random_negatives_planner,
-            random_negative_shared_pool_dir=random_negative_shared_pool_dir,
             random_negative_pool_epochs=random_negative_pool_epochs,
             pool_seed=pool_seed,
-            random_negative_permutation_seed=random_negative_permutation_seed,
             device=device,
             requested_fit_tensor_residency=requested_fit_tensor_residency,
         )
-        if random_negative_shared_pool_dir is not None:
-            fit_info["random_negative_pool_shared_dir"] = (
-                random_negative_shared_pool_dir
-            )
         fit_info["random_negative_pool_residency"] = (
             random_negative_pool_residency
         )
@@ -3813,8 +3774,8 @@ class Class1NeuralNetwork(object):
         _val_device_tensors = None
         if _val_cache_safe:
             val_training_indices = val_indices - num_random_negatives
-            # 2D int is index-encoded (keep dtype); 3D int is a compact
-            # fixed-vector cache payload (widen to fp32).
+            # 2D int is index-encoded (keep dtype); 3D int is an already
+            # materialized vector-encoded payload (widen to fp32).
             _val_peptide_np = x_dict_without_random_negatives["peptide"][
                 val_training_indices
             ]

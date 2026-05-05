@@ -19,11 +19,6 @@ top of the legacy `--gpu-batched` allele batching. Recipe tightening
 noise tail. Auto-resolvers pick workers/dataloader/compile settings
 from hardware so per-box tuning stops being manual.
 
-Layered shared-memory infrastructure (run mmap cache, fit DataLoader
-SHM) is still present as the host-residency fallback when the model
-doesn't fit on-device, but is no longer the principal training path
-on CUDA boxes.
-
 The orchestrator-as-locus-of-control architecture is documented in
 [docs/orchestrator.md](docs/orchestrator.md) — read that for the
 "who owns what" picture across parallelism, shared memory, and env
@@ -35,9 +30,9 @@ models are trained.**
 
 ## Performance
 
-- **~2–3× per-task training speedup** from the fit DataLoader SHM
-  path (closes 0–30% GPU utilization observed on the 2026-04-25
-  8×A100 baseline run).
+- **~2–3× per-task training speedup** from device-resident affinity
+  training tensors (closes 0–30% GPU utilization observed on the
+  2026-04-25 8×A100 baseline run).
 - **~10–20× calibration speedup** from `--gpu-batched`, larger work
   chunks, and 50 K-peptides-per-length default (was 100 K).
 - **30–40% fewer wasted training epochs** from the recipe changes
@@ -46,16 +41,9 @@ models are trained.**
 
 ## New public API
 
-- `mhcflurry/shared_memory.py` — layered SHM primitives. Two layers
-  with different OS mechanisms but a uniform "build once, share with
-  many readers" pattern:
-  - **Run mmap cache** — per-run, file-mmap (orchestrator builds,
-    workers read). `setup_shared_random_negative_pools(...)`,
-    `lookup_pool_dir(...)`.
-  - **Fit DataLoader SHM** — per-fit() POSIX-shm via
-    `Tensor.share_memory_()`. `share_tensor`, `share_like`,
-    `update_shared`, `array_nbytes`, `numpy_batch_collate`,
-    `tensor_batch_collate`, `FitBacking`.
+- `mhcflurry/class1_affinity_training_data.py` — device-resident affinity
+  training row space. `AffinityDeviceTrainingData` keeps real examples and
+  random negatives as torch tensors on the active device for one `fit()` call.
 - `mhcflurry/training_benchmark.py` — micro-benchmarks for the
   training inner loop (used for sweep_workers analysis).
 
@@ -72,7 +60,7 @@ validation run completes.
 | `max_epochs` | 5000 | 500 | Median observed was 67; max 174. The 5000 ceiling was theatrical and let pathological patience-reset tasks burn unbounded compute. 500 leaves comfortable headroom. |
 | `min_delta` | 0.0 | 1e-7 | With `min_delta=0`, a 1e-9 RMSprop noise-floor improvement resets the 20-epoch patience counter, stretching some tasks to 174+ epochs at val_loss ~0.28 with no real signal. 1e-7 is two orders of magnitude above the observed noise rate; preserves real escape trajectories (typically ≥1e-3/epoch). |
 | `validation_interval` | 1 (always validated) | 5 | Skip the validation forward pass on 4 of 5 epochs; saves ~150 ms/epoch + a GPU sync barrier. The final epoch and any patience-trigger epoch are always measured (the saved model reflects an up-to-date val_loss). |
-| `dataloader_num_workers` (job-env default) | 0 | 1 | Was 0 because spawn workers OOM'd on the 600 MB per-fit dataset. The fit DataLoader SHM path eliminated that cost; auto-enables when `dataloader_num_workers > 0`. One worker per fit is the release wrapper default; tune upward only when CPU headroom and measurements justify it. |
+| `dataloader_num_workers` (job-env default) | 0 | 1 | Applies to streaming pretraining batches only. Affinity fine-tuning no longer uses a per-fit DataLoader; it batches from device-resident tensors. One streaming worker per fit is the release wrapper default; tune upward only when CPU headroom and measurements justify it. |
 | `peptide_amino_acid_encoding_torch` | n/a | `true` | Renamed replacement for the legacy `peptide_amino_acid_encoding_gpu` key, which is still accepted as an alias. Fixed peptide vector expansion moves from a numpy lookup at encode time to a frozen torch embedding table in the network's forward pass. `peptides_to_network_input` now returns int8 amino-acid indices by default; CUDA/MPS/CPU widens to the configured fixed vector encoding (`BLOSUM62`, `one-hot`, `PMBEC`, `contact`, `physchem` explicit descriptors, `atchley` factors, or composites such as `BLOSUM62+physchem`). Encodings may use a `:minmax` suffix, e.g. `PMBEC:minmax+contact:minmax`, to scale non-X values to [-1, 1] while preserving X as zero. Eliminates the ~17 sec/epoch CPU bottleneck in random-negative regeneration with `random_negative_pool_epochs=1`. Forward parity vs numpy path verified by `test_peptide_amino_acid_encoding_torch_forward_parity`. |
 
 `patience` stays at 20.
@@ -153,59 +141,18 @@ real measurement:
 3. when patience would trigger this epoch (so the saved val_loss
    reflects the actual stop state, not a stale carried-forward value).
 
-### Encoding cache lives outside `MHCFLURRY_OUT`
-
-`scripts/training/pan_allele_release_affinity.sh` now places the
-encoding cache at `$HOME/runplz-cache/encoding_cache/` (override
-with `MHCFLURRY_ENCODING_CACHE_DIR`) instead of inside
-`$MHCFLURRY_OUT`. Two upsides: the ~7 GB fixed-encoding mmap doesn't ride
-back on the post-run rsync, and the cache persists on the box so a
-second run on the same instance hits a warm cache.
-
 A new helper, `scripts/dev/relocate_run_outputs.sh`, moves
 `brev_runs/` and `results/` outside the repo (with symlinks) so
 runplz's rsync_up doesn't ship 15+ GB of stale prior-run artifacts
 to the box on every launch. Run with `--apply` once per workstation.
 
-### Fit DataLoader SHM auto-detects /dev/shm capacity
+### Affinity fit is device-resident
 
-When the orchestrator detects insufficient `/dev/shm` for the
-estimated `num_workers × per_fit_gb × 1.5 margin`, it now follows a
-four-layer recovery cascade:
-
-1. Print a live estimator breakdown plus a one-line capacity summary
-   every run (peptide encoding × alignment × max_length, fold rows,
-   random-negative rate). Override the headline footprint with
-   `MHCFLURRY_PER_FIT_SHM_FOOTPRINT_GB`.
-2. **Try torch's `file_descriptor` sharing strategy first** — this
-   bypasses `/dev/shm` entirely (anonymous FDs over Unix sockets) and
-   fully recovers fit DataLoader SHM throughput on Docker-default
-   8 GB tmpfs. Auto-bumps `RLIMIT_NOFILE`. Disable with
-   `MHCFLURRY_TORCH_SHM_AUTO=0`.
-3. If the strategy switch fails (rare; some platforms only ship the
-   default `file_system` strategy), auto-disable the fit DataLoader
-   SHM path (`MHCFLURRY_FIT_DATALOADER_SHM=0`) and continue with the
-   numpy DataLoader path (10–30% slower but functional).
-4. As a final defense, `fit()` catches resource-exhaustion errors from
-   torch tensor sharing and DataLoader setup (including FD exhaustion
-   sandbox/permission failures and torch RuntimeError variants) and
-   falls back to numpy / single-process mode for that one fit() call.
-
-Result: on the Docker-default 8 GB `/dev/shm` the typical 16-worker
-pan-allele run now keeps the full fit DataLoader SHM speedup
-automatically; no container reprovisioning needed. Force-pin with
-`MHCFLURRY_FIT_DATALOADER_SHM=1` to override the auto-recovery.
-
-### Layered SHM is auto-on with workers
-
-When `hyperparameters["dataloader_num_workers"] > 0`, fit() materializes
-the dataset's static backing arrays (x_peptide, x_allele, y_encoded,
-sample_weights, random_negative_x_allele) and a per-epoch
-random-negative buffer as CPU torch tensors via
-`Tensor.share_memory_()`. The DataLoader's spawn workers receive
-storage handles instead of byte copies. Force-on / force-off via
-`MHCFLURRY_FIT_DATALOADER_SHM=1/0`. Default detection is correct for
-all common configurations.
+Affinity `fit()` no longer routes minibatches through a per-fit
+DataLoader. `AffinityDeviceTrainingData` owns the row space for one
+fit call as torch tensors on the active backend, and the training loop
+forms batches by index-selecting from those resident tensors. Random
+negatives are refilled into the top slice of that row space each epoch.
 
 ## New tools
 
@@ -257,21 +204,9 @@ regressions before a multi-hour training run discovers them.
 
 ## Dependencies
 
-No required dependency version changes vs 2.2.x. PyTorch 2.0+ (already
-required) is needed for the `torch.compile` + `Tensor.share_memory_()`
-paths.
-
-## Known limitations / follow-ups
-
-- `persistent_workers=True` is not supported with the in-place
-  `update_shared` random-negative-buffer refill (would race). Comment
-  in `_make_fit_dataloader` documents this; tracked as a future-PR
-  item.
-- The shared mmap random-negative pool (run mmap cache) requires
-  `random_negative_pool_epochs >= max_epochs`; validated upfront in
-  `setup_shared_random_negative_pools`. To use the shared pool path,
-  set both `--random-negative-shared-pool-dir` and
-  `random_negative_pool_epochs >= max_epochs` in the recipe.
+No required dependency version changes vs 2.2.x. PyTorch 2.0+ is already
+required and is used for device-resident training and optional
+`torch.compile`.
 
 ## Migration notes
 
@@ -299,5 +234,5 @@ paths.
   inference on existing bundles.
 - The pan-allele release training pipeline is the
   primary thing that's changed. Allele-specific and processing
-  training paths inherit the perf primitives (encoding cache,
-  SHM dataloader) but their wrapper scripts are unaffected.
+  training paths inherit shared backend selection and worker sizing,
+  but their wrapper scripts are unaffected.

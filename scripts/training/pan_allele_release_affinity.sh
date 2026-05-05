@@ -263,9 +263,6 @@ echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU; requested=$
 # indefinitely inside one worker. Override with MAX_TASKS_PER_WORKER.
 MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
 
-# Enable the BLOSUM62 encoding cache by default; USE_ENCODING_CACHE=0
-# disables the global peptide encoding cache.
-USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
 # DataLoader prefetch workers per training worker. Default ``auto`` is
 # resolved by the orchestrator (mhcflurry-class1-train-pan-allele-models)
 # at planning time via ``--dataloader-num-workers auto`` →
@@ -323,20 +320,6 @@ PARALLELISM_ARGS=(
 )
 if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     PARALLELISM_ARGS+=(--enable-timing)
-fi
-
-CACHE_ARGS=()
-if [ "$USE_ENCODING_CACHE" = "1" ]; then
-    # Place the encoding cache OUTSIDE $MHCFLURRY_OUT so it
-    #   (a) doesn't ride back on the post-run rsync (~7 GB of mmap
-    #       BLOSUM62 we can rebuild locally in seconds), and
-    #   (b) persists across runs on the same box — the second run on a
-    #       reused instance hits a warm cache.
-    # Override with MHCFLURRY_ENCODING_CACHE_DIR=/path/to/dir.
-    ENCODING_CACHE_DIR="${MHCFLURRY_ENCODING_CACHE_DIR:-$HOME/runplz-cache/encoding_cache}"
-    mkdir -p "$ENCODING_CACHE_DIR"
-    CACHE_ARGS=(--use-encoding-cache --encoding-cache-dir "$ENCODING_CACHE_DIR")
-    log_release_event phase_info "encoding cache dir: $ENCODING_CACHE_DIR"
 fi
 
 # Auto-configure OMP / MKL / OPENBLAS thread budget uniformly based on
@@ -402,7 +385,6 @@ do
         --hyperparameters hyperparameters.yaml \
         --out-models-dir "$(pwd)/$UNSELECTED_DIR" \
         --worker-log-dir "$MHCFLURRY_OUT" \
-        "${CACHE_ARGS[@]}" \
         "${PARALLELISM_ARGS[@]}" \
         "${CONTINUE_ARGS[@]}"
 done

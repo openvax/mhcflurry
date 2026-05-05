@@ -25,7 +25,6 @@
 #   REPO                       path to the rsynced mhcflurry repo
 #                              (default: $HOME/runplz-repo)
 #   MAX_WORKERS_PER_GPU        per-GPU worker cap (default 2 on 80GB cards)
-#   USE_ENCODING_CACHE         enable BLOSUM62 mmap encoding cache (default 1)
 #   DATALOADER_NUM_WORKERS     'auto' (default) lets the orchestrator pick
 #   PROCESSING_HELD_OUT_SAMPLES  (default 50; subset script uses 10)
 #   PRESENTATION_DECOYS_PER_HIT (default 99 to match release; subset uses 2)
@@ -56,7 +55,6 @@ fi
 # pinned 2/GPU = 16, which preserves bit-for-bit replication of 2.2.0).
 MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
-USE_ENCODING_CACHE="${USE_ENCODING_CACHE:-1}"
 PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
 PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
 
@@ -104,11 +102,6 @@ if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     COMMON_PARALLELISM_ARGS+=(--enable-timing)
 fi
 
-CACHE_ARGS=()
-if [ "$USE_ENCODING_CACHE" = "1" ]; then
-    CACHE_ARGS=(--use-encoding-cache)
-fi
-
 # ============================================================
 # STAGE 1 — AFFINITY
 # ============================================================
@@ -119,7 +112,6 @@ MHCFLURRY_OUT="$BASE_OUT/affinity" \
     GPUS="$GPUS" \
     MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
     DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" \
-    USE_ENCODING_CACHE="$USE_ENCODING_CACHE" \
     bash "$SCRIPT_DIR/pan_allele_release_affinity.sh"
 AFFINITY_PREDICTOR="$BASE_OUT/affinity/models.combined"
 echo "STAGE 1 duration: $(( $(date +%s) - STAGE1_START )) sec"

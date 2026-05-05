@@ -2,8 +2,6 @@
 
 Covers:
 * ``mhcflurry.common.filter_canonicalizable_alleles``.
-* ``mhcflurry.encoding_cache.prebuild_encoding_caches`` and
-  ``deterministic_unique_peptide_list``.
 * ``mhcflurry.local_parallelism.hoist_torchinductor_compile_threads``.
 * Confirmation that the select commands' source actually invokes the
   shared filter (cheap regression for the same class of bug as the
@@ -38,39 +36,6 @@ def test_filter_select_call_sites():
     assert "filter_canonicalizable_alleles" in as_src, (
         "select_allele_specific must filter supported_alleles"
     )
-
-
-def test_deterministic_unique_peptide_list_preserves_first_seen_order():
-    from mhcflurry.encoding_cache import deterministic_unique_peptide_list
-    raw = ["ABC", "DEF", "ABC", "GHI", "DEF", "JKL"]
-    assert deterministic_unique_peptide_list(raw) == ["ABC", "DEF", "GHI", "JKL"]
-
-
-def test_prebuild_encoding_caches_idempotent(tmp_path):
-    """Calling prebuild twice should be a cheap cache-hit second time."""
-    from mhcflurry.encoding_cache import prebuild_encoding_caches
-
-    peptides = ["SIINFEKL", "GILGFVFTL", "NLVPMVATV"]
-    cfg = [{}]  # default EncodingParams
-
-    log_lines = []
-    prebuild_encoding_caches(
-        cache_dir=str(tmp_path),
-        peptides=peptides,
-        encoding_configs=cfg,
-        label="unit",
-        log=log_lines.append,
-    )
-    # Second call should hit cache for every config.
-    log_lines.clear()
-    prebuild_encoding_caches(
-        cache_dir=str(tmp_path),
-        peptides=peptides,
-        encoding_configs=cfg,
-        label="unit",
-        log=log_lines.append,
-    )
-    assert any("hit" in line for line in log_lines), log_lines
 
 
 def test_hoist_torchinductor_no_op_when_compile_disabled(monkeypatch):
@@ -543,20 +508,3 @@ def test_data_size_growth_does_not_change_dataloader_count():
     chosen = auto_dataloader_num_workers(**big_box)
     assert chosen == 4
     # Heuristic doesn't accept train_rows — explicit by design, not omission.
-
-
-def test_cluster_l1shm_warns(monkeypatch, capsys):
-    """When --cluster-parallelism + --random-negative-shared-pool-dir
-    are both passed, the orchestrator must loud-warn that the dir
-    must be NFS-shared. The message names the absolute pool path so
-    the user can verify it."""
-    from mhcflurry import train_pan_allele_models_command as mod
-
-    src = inspect.getsource(mod.train_models)
-    assert "WARNING" in src and "cluster_parallelism" in src and (
-        "random-negative-shared-pool-dir" in src
-        or "random_negative_shared_pool_dir" in src
-    ), (
-        "train_models must warn when cluster + run mmap cache are "
-        "combined; see docs/orchestrator.md"
-    )

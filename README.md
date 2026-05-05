@@ -29,7 +29,7 @@ prediction package with competitive accuracy and a fast and
 > If you are upgrading from 2.1.x or 2.2.x, simply
 > `pip install --upgrade mhcflurry`. The published pre-trained models are
 > unchanged and will be loaded automatically. Internal refactors (per-fit
-> DataLoader SHM scaffolding, `fit_dataloader_backing` hyperparameter) do not
+> device-resident training tensors, torch-side peptide encodings) do not
 > affect the public Python or CLI surface.
 >
 > Earlier release: **Version 2.2.0** was the first release to use PyTorch as

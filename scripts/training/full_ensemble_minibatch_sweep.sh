@@ -21,7 +21,7 @@
 #   PUBLIC_MODELS_DIR public 2.2.0 models.combined for eval comparison
 #   DATA_EVAL_DIR     data_evaluation/ for benchmark hits/decoys
 #   COMPARE_SCRIPT    path to compare_new_vs_public.py
-#   GPUS, MAX_TASKS_PER_WORKER, ENCODING_CACHE_DIR
+#   GPUS, MAX_TASKS_PER_WORKER
 #   MHCFLURRY_SCALE_LR_BASE_MB  reference minibatch for sqrt LR scaling
 #                                (default 128, matching the historical
 #                                2.0.0–2.2.x pan-allele recipe — the
@@ -65,7 +65,6 @@ MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
 # size (e.g. =3 → 12 models = 3/fold × 4 folds).
 MIN_MODELS_PER_FOLD="${MIN_MODELS_PER_FOLD:-2}"
 MAX_MODELS_PER_FOLD="${MAX_MODELS_PER_FOLD:-8}"
-ENCODING_CACHE_DIR="${ENCODING_CACHE_DIR:-$HOME/runplz-cache/encoding_cache}"
 MHCFLURRY_SCALE_LR="${MHCFLURRY_SCALE_LR:-0}"
 MHCFLURRY_SCALE_LR_BASE_MB="${MHCFLURRY_SCALE_LR_BASE_MB:-128}"
 # When 1, skip the calibrate phase entirely (eval doesn't need percentile
@@ -145,7 +144,6 @@ PY
         --hyperparameters hyperparameters.yaml \
         --out-models-dir "$SIZE_OUT/models.unselected.combined" \
         --worker-log-dir "$SIZE_OUT" \
-        --use-encoding-cache --encoding-cache-dir "$ENCODING_CACHE_DIR" \
         --num-jobs auto \
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
         --gpus "$GPUS" \
