@@ -81,6 +81,8 @@ def test_class1_neural_network_a0205_training_accuracy():
     assert predictor.network().to_json() == predictor2.network().to_json()
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_inequalities():
     """Test that inequality constraints are properly handled."""
     # Memorize the dataset.
@@ -163,6 +165,8 @@ def test_inequalities():
     print(df.groupby("value")[["prediction1", "prediction2"]].mean())
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_basic_training():
     """Test basic network training with synthetic data."""
     hyperparameters = dict(
@@ -467,6 +471,8 @@ def test_unsupported_device_random_negative_alignment_falls_back_to_host():
     assert fit_info["fit_tensor_residency"] == "device"
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_serialization():
     """Test that network weights can be serialized and deserialized."""
     hyperparameters = dict(
@@ -501,6 +507,8 @@ def test_serialization():
     numpy.testing.assert_allclose(preds_before, preds_after, rtol=1e-5)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_different_peptide_lengths():
     """Test that the network handles different peptide lengths correctly."""
     hyperparameters = dict(
@@ -526,6 +534,8 @@ def test_different_peptide_lengths():
     assert len(predictions) == len(peptides)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_early_stopping():
     """Test that early stopping works correctly."""
     hyperparameters = dict(
@@ -549,6 +559,8 @@ def test_early_stopping():
     assert len(predictions) == len(peptides)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_batch_normalization():
     """Test training with batch normalization."""
     hyperparameters = dict(
@@ -569,6 +581,8 @@ def test_batch_normalization():
     assert len(predictions) == len(peptides)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_dropout():
     """Test training with dropout."""
     hyperparameters = dict(
@@ -589,6 +603,8 @@ def test_dropout():
     assert len(predictions) == len(peptides)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_multiple_outputs():
     """Test network with multiple outputs."""
     hyperparameters = dict(

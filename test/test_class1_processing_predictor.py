@@ -32,10 +32,14 @@ def test_empty_prediction_returns_empty_array_and_dataframe():
 
 
 def test_basic():
-    network = train_basic_network(num=10000, do_assertions=False, max_epochs=10)
+    network = train_basic_network(
+        num=200,
+        do_assertions=False,
+        max_epochs=1,
+        minibatch_size=100000)
     predictor = Class1ProcessingPredictor(models=[network])
 
-    num=10000
+    num = 200
     df = pandas.DataFrame({
         "n_flank": random_peptides(num, 10),
         "c_flank": random_peptides(num, 10),

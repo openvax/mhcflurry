@@ -124,8 +124,10 @@ $ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
 ```
 
 `pytest test/` is the full test suite, not a fast unit-only loop. It includes
-small end-to-end training runs, command subprocess tests, downloaded-model
-smoke tests, and speed/regression checks, so it can take many minutes. Use
+small end-to-end training runs, command subprocess tests, public-model smoke
+tests that require cached MHCflurry download bundles, and speed/regression
+checks, so it can take many minutes. Use
+`pytest -q test -m "not slow and not downloads"` for the broad fast tier, and
 `pytest -q test --durations=25` when auditing slow tests. See the
 [testing documentation](http://openvax.github.io/mhcflurry/testing.html) for
 the current test tiers.

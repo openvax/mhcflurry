@@ -64,8 +64,10 @@ For quick feedback, run lint plus a focused unit subset:
     $ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
 
 The full command, ``pytest test/``, includes integration-style training,
-command, and downloaded-model smoke tests and can take many minutes. See
-:doc:`testing` for the test tiers and profiling commands.
+command, and public-model smoke tests that require cached MHCflurry download
+bundles. It can take many minutes. See :doc:`testing` for the test tiers,
+marker expressions such as ``pytest -q test -m "not slow and not downloads"``,
+and profiling commands.
 
 
 Using conda

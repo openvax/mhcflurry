@@ -91,6 +91,8 @@ print("Loaded %d training and %d ms hits" % (
     len(TRAIN_DF), len(MS_HITS_DF)))
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_train_simple():
     # Reset random seeds to ensure reproducibility regardless of test order
     import numpy
@@ -130,4 +132,3 @@ def test_train_simple():
     print("AUC", score)
 
     assert_(score > 0.6)
-

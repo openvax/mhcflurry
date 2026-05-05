@@ -216,6 +216,8 @@ def test_fast_calibration_output_aggregation_uses_first_normal_output():
     torch.testing.assert_close(contribution, expected, rtol=0, atol=0)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_calibrate_fast_optimized_merged_matches_unoptimized_fast():
     unoptimized = _load_downloaded_pan_allele()
     optimized = _load_downloaded_pan_allele()
@@ -244,6 +246,8 @@ def test_calibrate_fast_optimized_merged_matches_unoptimized_fast():
         numpy.testing.assert_allclose(a.cdf, b.cdf, rtol=0, atol=1e-12)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_calibrate_fast_parity_with_legacy_path():
     predictor = _load_downloaded_pan_allele()
     alleles = _pick_alleles(predictor, 4)
@@ -291,6 +295,8 @@ def test_calibrate_fast_parity_with_legacy_path():
         )
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_calibrate_fast_parity_with_motif_summary():
     predictor = _load_downloaded_pan_allele()
     alleles = _pick_alleles(predictor, 3)

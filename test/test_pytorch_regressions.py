@@ -176,6 +176,8 @@ def test_effective_validation_batch_size_uses_larger_cuda_default():
     assert _effective_validation_batch_size(torch.device("cuda"), 123, 512) == 123
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_sample_weights_affect_training():
     peptides = ["AAAAAAAAA", "CCCCCCCCC"]
     affinities = np.array([50.0, 50000.0])

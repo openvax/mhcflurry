@@ -16,6 +16,8 @@ from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import cleanup, startup
 
+pytestmark = [pytest.mark.slow, pytest.mark.downloads]
+
 def data_path(name):
     '''
     Return the absolute path to a file in the test/data directory.

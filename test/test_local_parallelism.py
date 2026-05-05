@@ -133,6 +133,8 @@ def test_nondaemonprocess_reports_not_daemon():
     assert p.daemon is False, "daemon setter should have been a no-op"
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_nondaemonpool_workers_are_not_daemonic():
     """The whole point: Pool workers must report daemon=False."""
     with NonDaemonPool(processes=2) as pool:
@@ -555,6 +557,8 @@ def test_detect_num_cuda_devices_returns_zero_when_smi_missing(monkeypatch):
     assert local_parallelism._detect_num_cuda_devices_no_torch() == 0
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_nondaemonpool_worker_can_spawn_children():
     """Non-daemon pool workers must be able to spawn multiprocessing children.
 

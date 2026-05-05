@@ -23,9 +23,9 @@ from mhcflurry.testing_utils import cleanup, startup
 DOWNLOADED_PREDICTOR = None
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="module")
 def setup_teardown():
-    """Setup and teardown for each test."""
+    """Load the downloaded predictor once for this module."""
     global DOWNLOADED_PREDICTOR
     startup()
     try:
@@ -202,6 +202,8 @@ def predict_and_check(
         assert prediction <= expected_range[1], (predictor, prediction, debug())
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_a1_known_epitopes_in_newly_trained_model():
     allele = "HLA-A*01:01"
     df = pandas.read_csv(
@@ -269,6 +271,8 @@ def test_a1_known_epitopes_in_newly_trained_model():
     shutil.rmtree(models_dir)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_class1_affinity_predictor_a0205_memorize_training_data():
     # Memorize the dataset.
     hyperparameters = dict(

@@ -70,14 +70,20 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
         print("Not deleting: %s" % dest_models_dir)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_run_serial():
     run_and_check(n_jobs=0)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_run_parallel():
     run_and_check(n_jobs=2)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_run_cluster_parallelism(delete=True):
     run_and_check(n_jobs=0, additional_args=[
         '--cluster-parallelism',

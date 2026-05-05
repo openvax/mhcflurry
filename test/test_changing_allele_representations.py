@@ -57,6 +57,8 @@ HYPERPARAMETERS = {
 }
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_changing_allele_representations():
     allele1 = "HLA-A*02:01"
     allele2 = "HLA-C*03:04"
@@ -97,7 +99,6 @@ def test_changing_allele_representations():
         alleles=[allele1, allele2, allele3])
     assert value1 < 100, value1
     assert value2 > 4000, value2
-
 
 
 

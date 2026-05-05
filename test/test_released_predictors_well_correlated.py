@@ -20,6 +20,8 @@ from mhcflurry.testing_utils import cleanup, startup
 logger = logging.getLogger("matplotlib")
 logger.disabled = True
 
+pytestmark = [pytest.mark.slow, pytest.mark.downloads]
+
 def setup():
     """Setup for running script directly (not via pytest)."""
     global PREDICTORS

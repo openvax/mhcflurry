@@ -16,6 +16,8 @@ import mhcflurry.class1_presentation_predictor
 
 from . import data_path
 
+pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.downloads]
+
 mhcflurry.class1_presentation_predictor.PREDICT_CHUNK_SIZE = 15
 
 

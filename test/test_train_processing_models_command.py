@@ -30,13 +30,15 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 HYPERPARAMETERS = [
     {
-        "max_epochs": 100,
+        "max_epochs": 1,
+        "minibatch_size": 100000,
         "n_flank_length": 5,
         "c_flank_length": 5,
         "convolutional_kernel_size": 3,
     },
     {
         "max_epochs": 1,
+        "minibatch_size": 100000,
         "n_flank_length": 5,
         "c_flank_length": 5,
         "convolutional_kernel_size": 3,
@@ -44,7 +46,7 @@ HYPERPARAMETERS = [
 ]
 
 
-def make_dataset(num=10000):
+def make_dataset(num=500):
     df = pandas.DataFrame({
         "n_flank": random_peptides(num / 2, 10) + random_peptides(num / 2, 1),
         "c_flank": random_peptides(num, 10),
@@ -150,5 +152,7 @@ def Xtest_run_parallel():
     run_and_check(n_jobs=2)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_run_serial():
     run_and_check(n_jobs=0)

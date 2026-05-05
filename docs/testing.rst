@@ -11,7 +11,7 @@ The suite intentionally covers several layers:
 * small neural-network training tests that verify numerical behavior;
 * command-level subprocess tests that train, select, and calibrate tiny
   predictors end-to-end;
-* downloaded-model and public-model smoke tests.
+* public-model smoke tests that require cached MHCflurry download bundles.
 
 That mix is useful before merging a release branch, but it makes a plain
 ``pytest test/`` run take many minutes on a laptop.
@@ -31,6 +31,13 @@ Run lint plus focused unit tests while iterating:
 
     $ ./lint.sh
     $ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
+
+To run the broad fast tier, skip the tests marked as slow integration,
+cached-bundle, or benchmark checks:
+
+.. code-block:: shell
+
+    $ pytest -q test -m "not slow and not downloads"
 
 When working on training internals, add the directly affected files rather
 than jumping immediately to the full suite. Useful examples:
@@ -70,9 +77,26 @@ integration tests that do real model work:
 * ``test/test_class1_neural_network.py`` contains full training behavior
   checks such as inequality handling, early stopping, and learned motif
   recovery.
-* downloaded-model tests load public model bundles and run prediction
-  smoke checks.
+* public-model tests load cached MHCflurry download bundles and run
+  prediction smoke checks.
 
 Mark new tests according to their cost. Keep small deterministic logic in
 unit tests, and reserve end-to-end command or training checks for behavior
 that cannot be covered at a narrower level.
+
+Markers
+-------
+
+``slow``
+    Tests that are too expensive for the fast local loop. These are
+    usually small training jobs or benchmark-style checks.
+
+``integration``
+    End-to-end command or training tests that exercise multiple modules
+    through the public CLI/API.
+
+``downloads``
+    Tests that require locally cached MHCflurry download bundles. These
+    tests should not fetch from the network; missing bundles should fail
+    or skip with an instruction to run ``mhcflurry-downloads fetch``
+    outside pytest.

@@ -9,6 +9,14 @@ initialize()
 def pytest_configure(config):
     # Register custom marks used across tests.
     config.addinivalue_line("markers", "slow: marks tests as slow")
+    config.addinivalue_line(
+        "markers",
+        "integration: marks end-to-end command/training tests",
+    )
+    config.addinivalue_line(
+        "markers",
+        "downloads: marks tests that require locally cached MHCflurry bundles",
+    )
 
     # PyTorch warns that padding='same' with even kernels may allocate a
     # temporary padded copy. This is expected for our processing defaults.

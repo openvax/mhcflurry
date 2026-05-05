@@ -224,6 +224,8 @@ def test_empty_and_populated_schemas_match():
         f"!= populated schema {list(full_df.columns)}")
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_parallel_output_globally_sorted():
     """Regression: parallel scan used to concat per-chunk sorted outputs
     without re-sorting globally, so output ranking diverged from serial.
@@ -270,6 +272,8 @@ def test_parallel_output_globally_sorted():
             "parallel output not globally sorted")
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_parallel_output_tie_break_is_deterministic():
     """Parallel output sorts ties by ``peptide`` ascending, so two runs
     with the same input produce identical row order even when several

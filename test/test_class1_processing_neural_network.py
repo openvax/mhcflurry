@@ -135,12 +135,15 @@ def test_neural_network_input():
         results['peptide_length'], df.peptide.str.len().values)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_small():
     """Test basic network training with small dataset."""
     train_basic_network(num=10000)
 
 
 @pytest.mark.slow
+@pytest.mark.integration
 def test_more():
     """Test network with different hyperparameters."""
     train_basic_network(
@@ -153,6 +156,7 @@ def test_more():
 
 
 @pytest.mark.slow
+@pytest.mark.integration
 def test_basic_indexing(num=10000, do_assertions=True, **hyperparameters):
     """Test that basic indexing patterns are learned."""
     def is_hit(n_flank, c_flank, peptide):
@@ -234,13 +238,13 @@ def train_basic_network(num, do_assertions=True, is_hit=None, **hyperparameters)
             df_subset.n_flank.values,
             df_subset.c_flank.values)
 
-    train_auc = roc_auc_score(train_df.hit.values, train_df.predictions.values)
-    test_auc = roc_auc_score(test_df.hit.values, test_df.predictions.values)
-
-    print("Train auc", train_auc)
-    print("Test auc", test_auc)
-
     if do_assertions:
+        train_auc = roc_auc_score(train_df.hit.values, train_df.predictions.values)
+        test_auc = roc_auc_score(test_df.hit.values, test_df.predictions.values)
+
+        print("Train auc", train_auc)
+        print("Test auc", test_auc)
+
         assert train_auc > 0.9
         assert test_auc > 0.85
 
@@ -250,7 +254,8 @@ def train_basic_network(num, do_assertions=True, is_hit=None, **hyperparameters)
 def test_serialization():
     """Test that network weights can be serialized and deserialized."""
     hyperparameters = {
-        "max_epochs": 10,
+        "max_epochs": 1,
+        "minibatch_size": 100000,
         "peptide_max_length": 12,
         "n_flank_length": 5,
         "c_flank_length": 5,
@@ -284,7 +289,8 @@ def test_serialization():
 def test_different_peptide_lengths():
     """Test that different peptide lengths are handled correctly."""
     hyperparameters = {
-        "max_epochs": 10,
+        "max_epochs": 1,
+        "minibatch_size": 100000,
         "peptide_max_length": 15,
         "n_flank_length": 5,
         "c_flank_length": 5,
@@ -312,7 +318,8 @@ def test_different_peptide_lengths():
 def test_empty_flanks():
     """Test that empty flanking sequences are handled correctly."""
     hyperparameters = {
-        "max_epochs": 10,
+        "max_epochs": 1,
+        "minibatch_size": 100000,
         "peptide_max_length": 12,
         "n_flank_length": 5,
         "c_flank_length": 5,
@@ -335,7 +342,8 @@ def test_empty_flanks():
 def test_prediction_range():
     """Test that predictions are in the expected range [0, 1]."""
     hyperparameters = {
-        "max_epochs": 20,
+        "max_epochs": 1,
+        "minibatch_size": 100000,
         "peptide_max_length": 12,
         "n_flank_length": 5,
         "c_flank_length": 5,
