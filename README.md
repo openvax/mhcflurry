@@ -22,6 +22,8 @@ prediction package with competitive accuracy and a fast and
 >   resolves `--num-jobs`, `--max-workers-per-gpu`, `--dataloader-num-workers`,
 >   and `random_negative_pool_epochs` from the box's hardware so the same
 >   recipe runs on a workstation, single-GPU node, or 8×A100 host.
+>   `--dataloader-num-workers` applies to streaming pretraining; affinity
+>   fine-tuning batches from device-resident tensors.
 > - **`torch.compile` + TF32 + matmul-precision** are first-class CLI flags
 >   on the train commands; the in-process Inductor cache is warmed by a single
 >   worker before the production pool launches.
@@ -105,6 +107,28 @@ Wrote: /tmp/predictions.csv
 
 See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
 
+## Development and tests
+
+From a checkout, source `develop.sh` to create and activate the editable
+environment:
+
+```
+$ source develop.sh
+```
+
+For quick feedback, run lint plus a focused unit subset:
+
+```
+$ ./lint.sh
+$ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
+```
+
+`pytest test/` is the full test suite, not a fast unit-only loop. It includes
+small end-to-end training runs, command subprocess tests, downloaded-model
+smoke tests, and speed/regression checks, so it can take many minutes. Use
+`pytest -q test --durations=25` when auditing slow tests. See the
+[testing documentation](http://openvax.github.io/mhcflurry/testing.html) for
+the current test tiers.
 
 ## Docker
 You can also try the latest (GitHub master) version of MHCflurry using the Docker

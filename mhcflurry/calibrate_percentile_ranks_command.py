@@ -44,8 +44,8 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # To avoid pickling large matrices to send to child processes when running in
 # parallel, we use this global variable as a place to store data. Data that is
 # stored here before creating the thread pool will be inherited to the child
-# processes upon fork() call, allowing us to share large data with the workers
-# via shared memory.
+# processes upon fork() call, allowing local workers to read the same
+# copy-on-write pages instead of receiving a pickled copy.
 GLOBAL_DATA = {}
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -534,8 +534,8 @@ def run_class1_affinity_predictor(args, peptides):
     assert encoded_peptides.encoding_cache  # must have cached the encoding
     print("Finished encoding peptides in %0.2f sec." % (time.time() - start))
 
-    # Store peptides in global variable so they are in shared memory
-    # after fork, instead of needing to be pickled (when doing a parallel run).
+    # Store peptides in GLOBAL_DATA so forked local workers inherit the same
+    # copy-on-write pages instead of receiving a pickled copy.
     GLOBAL_DATA["calibration_peptides"] = encoded_peptides
     GLOBAL_DATA["predictor"] = predictor
     model_kwargs = {

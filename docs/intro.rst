@@ -49,12 +49,23 @@ Then download our datasets and trained models:
 
     $ mhcflurry-downloads fetch
 
-From a checkout you can run the unit tests with:
+From a checkout, source ``develop.sh`` to create and activate the editable
+environment:
 
 .. code-block:: shell
 
-    $ pip install pytest
-    $ pytest
+    $ source develop.sh
+
+For quick feedback, run lint plus a focused unit subset:
+
+.. code-block:: shell
+
+    $ ./lint.sh
+    $ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
+
+The full command, ``pytest test/``, includes integration-style training,
+command, and downloaded-model smoke tests and can take many minutes. See
+:doc:`testing` for the test tiers and profiling commands.
 
 
 Using conda

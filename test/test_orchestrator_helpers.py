@@ -493,14 +493,14 @@ def test_apply_dataloader_num_workers_skips_items_without_hyperparameters():
 
 
 def test_data_size_growth_does_not_change_dataloader_count():
-    """Dataset growth scales SHM bytes, but DL worker count is hardware-bound.
+    """Dataset growth does not change the pretrain DataLoader worker count.
 
     The auto resolver is intentionally hardware-only — total dataset rows
-    affect the per-fit-worker SHM footprint (covered by the SHM
-    estimator), not the per-fit-worker prefetch count. Per-batch CPU work
-    is bounded by minibatch_size. This regression test pins that
-    independence: for the same Verda-like box, the resolver should pick
-    the same value whether train_rows is 700K (today) or 7M (10× growth).
+    do not enter the per-fit-worker prefetch count. Per-batch CPU work is
+    bounded by minibatch_size / pretrain chunk size. This regression test
+    pins that independence: for the same Verda-like box, the resolver
+    should pick the same value whether train_rows is 700K (today) or 7M
+    (10x growth).
     """
     from mhcflurry.local_parallelism import auto_dataloader_num_workers
 

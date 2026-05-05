@@ -9,7 +9,7 @@ and any last revisions land; will move to `CHANGELOG.md` at tag time.
 Pan-allele training pipeline modernization. ``fit()`` now defaults to
 **device-resident** tensors on CUDA — the inner training loop, random-
 negative pool, and validation forward pass all stay on-GPU, closing the
-GPU-starvation gap that the host/SHM DataLoader path was working
+GPU-starvation gap that the host-side batching path was working
 around. The post-training pipeline (select → calibrate → eval → plot)
 is unified into a single resumable script, and calibration runs on
 device end-to-end (`PercentRankTransform.fit_batch_torch`,
@@ -21,7 +21,7 @@ from hardware so per-box tuning stops being manual.
 
 The orchestrator-as-locus-of-control architecture is documented in
 [docs/orchestrator.md](docs/orchestrator.md) — read that for the
-"who owns what" picture across parallelism, shared memory, and env
+"who owns what" picture across parallelism, tensor residency, and env
 knobs.
 
 No changes to the prediction interface. **Saved 2.2.x model bundles

@@ -272,13 +272,14 @@ used to require manual tuning per-box:
 
 ``--max-workers-per-gpu auto``
     Number of training workers to schedule on each GPU. Resolved from
-    free VRAM and per-fit memory footprint. Override with the env var
+    free VRAM and a conservative per-worker VRAM budget. Override with the env var
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` (default 4 GB
     for fit, 12 GB for calibrate's ``cached_stages`` cache).
 
 ``--dataloader-num-workers auto``
-    Per-fit DataLoader child count. Resolved from cores, RAM, and the
-    per-child SHM cost.
+    DataLoader child count for the streaming pretraining path. Resolved
+    from cores, RAM, and the training-worker plan. Affinity fine-tuning is
+    device-resident and does not use this DataLoader.
 
 ``--torch-compile auto``
     Enables ``torch.compile`` only on CUDA/MPS where the warmup cost
@@ -297,16 +298,15 @@ post-mortem is visible in the log.
 Also new in 2.3.0
 -------------------------------------------------
 
-* ``fit()`` defaults to **device-resident** tensors on CUDA — the
-  previous host/SHM DataLoader path is the fallback when the model
-  doesn't fit on-device. Override with
-  ``MHCFLURRY_AUTO_FIT_RESIDENCY_VRAM_BUDGET_FRACTION`` or by passing
-  ``residency="host"`` to ``fit()``.
+* Affinity ``fit()`` uses **device-resident** tensors on the active
+  torch backend. Real examples and the mutable random-negative slice are
+  materialized once per fit and minibatches are formed by tensor indexing.
+  Set the ``fit_tensor_residency`` hyperparameter to ``"host"`` only for
+  compatibility/debugging of the legacy host random-negative encoder path.
 * The pan-allele calibrate command has a GPU fast path
   (``--gpu-batched``) that batches alleles into a single forward and
   computes the percent-rank histogram + motif summary on device. ~4×
   faster per worker than the legacy per-allele path; per-allele
   output (``percent_ranks.csv.bz2``, ``frequency_matrices.csv.bz2``,
   ``length_distributions.csv.bz2``) is bit-equal to the legacy schema.
-
 

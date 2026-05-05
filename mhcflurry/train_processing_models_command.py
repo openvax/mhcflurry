@@ -39,8 +39,8 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # To avoid pickling large matrices to send to child processes when running in
 # parallel, we use this global variable as a place to store data. Data that is
 # stored here before creating the thread pool will be inherited to the child
-# processes upon fork() call, allowing us to share large data with the workers
-# via shared memory.
+# processes upon fork() call, allowing local workers to read the same
+# copy-on-write pages instead of receiving a pickled copy.
 GLOBAL_DATA = {}
 
 # Note on parallelization:

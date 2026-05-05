@@ -51,20 +51,20 @@ _AUTO_MWPG_FREE_VRAM_FALLBACK_GB = 16.0
 
 # ----- Auto DataLoader prefetch worker count --------------------------------
 #
-# Per-fit() ``dataloader_num_workers`` controls how many child processes each
-# fit() worker spawns to prefetch minibatches. The trade-off:
+# ``dataloader_num_workers`` controls child processes for the streaming
+# pretraining DataLoader. The standard affinity fit() loop is device-resident
+# and forms minibatches by indexing tensors directly, so this knob does not
+# control affinity fine-tuning.
 #
-# * 0 → in-process batch building. No spawn cost; no parallel prefetch.
-#   GPU starves on CPU-heavy data prep (random-negative regeneration,
-#   fancy-indexing). Acceptable on tiny/CPU-only configs.
-# * 1 → one prefetcher per fit() worker. Hides single-step CPU prep behind
-#   the GPU step, but the lone prefetcher is the bottleneck when CPU prep
-#   dominates one step. This was the 2026-04-27 release recipe default and
-#   is what produced the 2× slowdown vs the 4-worker run on 8×A100.
-# * 2-4 → multiple prefetchers feed batches in parallel. Past 4 we hit
-#   diminishing returns on most boxes (PyTorch's MultiProcessingDataLoaderIter
-#   plus our shared-tensor backing share queue contention) and start losing
-#   to scheduler overhead.
+# The pretraining trade-off:
+#
+# * 0 -> in-process batch building. No spawn cost; no parallel prefetch.
+#   Acceptable on tiny/CPU-only configs.
+# * 1 -> one prefetcher per fit() worker. Hides some CSV/encoding/collation
+#   work behind the GPU step.
+# * 2-4 -> multiple prefetchers feed batches in parallel. Past 4 we hit
+#   diminishing returns on most boxes from PyTorch queue and process
+#   scheduling overhead.
 #
 # This auto-resolver picks per-fit-worker prefetch count from:
 #   * total vCPUs (default ``os.cpu_count()``)
@@ -76,21 +76,20 @@ _AUTO_MWPG_FREE_VRAM_FALLBACK_GB = 16.0
 # computes the right value per box. Hardware tier mismatches like the
 # L40S-tuned "1" landing on a 176-vCPU 8×A100 box can't recur.
 
-# Per-fit-worker DataLoader child cap. Past 4, PyTorch's queue contention +
-# our SHM backing's shared collator hit diminishing returns on tested boxes
-# (8×A100 / L40S / single-A100). Override with
+# Per-fit-worker DataLoader child cap for streaming pretraining. Past 4,
+# PyTorch queue/process overhead hit diminishing returns on tested boxes
+# (8xA100 / L40S / single-A100). Override with
 # ``MHCFLURRY_AUTO_DATALOADER_HARD_CAP``.
 _AUTO_DATALOADER_HARD_CAP_DEFAULT = 4
 
 # Approximate RSS that one DataLoader child holds: torch + mhcflurry imports
-# (~400 MB) plus a small per-batch buffer. The SHM-backed datasets share
-# storage handles, so we don't double-count tensor bytes.
+# (~400 MB) plus a small per-batch buffer.
 _AUTO_DATALOADER_RAM_PER_CHILD_GB = 0.5
 
 # Approximate RSS that the main fit() worker holds before any DataLoader
 # children. Used by the RAM guard to avoid over-allocating prefetchers when
 # RAM-per-fit is tight. ~2 GB covers torch, mhcflurry, the validation cache,
-# and per-fold backing arrays.
+# and pretraining batch state.
 _AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB = 2.0
 
 # Effective cores per DL child for the CPU budget. Each prefetcher does
@@ -1202,12 +1201,13 @@ def add_local_parallelism_args(parser):
         type=_dataloader_num_workers_arg,
         metavar="N",
         default="auto",
-        help="Per-fit-worker DataLoader prefetch child count. Pass "
+        help="Per-fit-worker DataLoader child count for streaming "
+             "pretraining. Pass "
              "'auto' (default) to derive from box vCPUs / RAM / "
              "fit-worker plan via "
              "``mhcflurry.local_parallelism.auto_dataloader_num_workers`` "
-             "(empirical hard cap = 4). Pass an integer to pin (0 disables "
-             "prefetch and runs batch building in-process). Overrides any "
+             "(empirical hard cap = 4). Pass an integer to pin (0 builds "
+             "pretraining batches in-process). Overrides any "
              "``dataloader_num_workers`` set in component-model "
              "hyperparameters when applicable; non-affinity train commands "
              "accept the flag for uniformity but currently no-op.")
