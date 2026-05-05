@@ -1670,9 +1670,7 @@ def validate_worker_pool_args(
         raise ValueError("num_gpus must be >= 0")
     if max_workers_per_gpu < 1:
         raise ValueError("max_workers_per_gpu must be >= 1")
-    if num_gpus:
-        if num_jobs == 0:
-            raise ValueError("num_gpus requires num_jobs > 0")
+    if num_gpus and num_jobs > 0:
         if backend not in ("auto", "gpu"):
             raise ValueError(
                 "num_gpus is only supported with backend 'auto' or 'gpu'")

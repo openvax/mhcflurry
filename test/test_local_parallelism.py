@@ -15,6 +15,7 @@ from mhcflurry.local_parallelism import (
     resolve_local_parallelism_args,
     resolve_max_workers_per_gpu,
     validate_worker_pool_args,
+    worker_pool_with_gpu_assignments_from_args,
     worker_init_kwargs_for_scheduler,
 )
 
@@ -79,14 +80,13 @@ def test_backend_default_alias_parses():
     assert args.backend == "default"
 
 
-def test_validate_worker_pool_args_requires_parallelism_for_gpus():
-    with pytest.raises(ValueError, match="num_jobs > 0"):
-        validate_worker_pool_args(
-            num_jobs=0,
-            num_gpus=1,
-            backend="auto",
-            max_workers_per_gpu=1,
-        )
+def test_validate_worker_pool_args_allows_serial_mode_with_gpus():
+    validate_worker_pool_args(
+        num_jobs=0,
+        num_gpus=1,
+        backend="auto",
+        max_workers_per_gpu=1,
+    )
 
 
 def test_validate_worker_pool_args_rejects_non_cuda_backends_for_gpus():
@@ -459,6 +459,35 @@ def test_resolve_local_parallelism_args_detects_gpus_before_explicit_jobs(
     assert args.gpus == 8
     assert args.max_workers_per_gpu == 2
     assert args.num_jobs == 16
+
+
+def test_worker_pool_from_args_preserves_serial_mode_with_auto_gpus(
+        monkeypatch):
+    """Explicit ``--num-jobs 0`` must not become invalid after GPU detect."""
+    from mhcflurry import local_parallelism
+
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    monkeypatch.setattr(
+        local_parallelism, "_detect_num_cuda_devices_no_torch", lambda: 2)
+    configured = []
+    monkeypatch.setattr(
+        local_parallelism, "configure_pytorch",
+        lambda backend: configured.append(backend))
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs=0,
+        gpus=None,
+        backend="auto",
+        max_tasks_per_worker=None,
+        worker_log_dir=None,
+    )
+
+    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+
+    assert worker_pool is None
+    assert args.gpus == 2
+    assert args.num_jobs == 0
+    assert configured == ["auto"]
 
 
 def test_resolve_local_parallelism_args_skips_auto_detect_with_explicit_gpus(

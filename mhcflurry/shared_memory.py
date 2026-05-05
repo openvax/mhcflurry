@@ -26,6 +26,20 @@ from .random_negative_peptides import (
 )
 
 
+def _resolve_max_epochs(hyperparameters):
+    """Return the affinity model's effective ``max_epochs`` value."""
+    if hyperparameters.get("max_epochs") is not None:
+        return int(hyperparameters["max_epochs"])
+
+    # Keep this aligned with Class1NeuralNetwork.fit() without forcing
+    # callers to materialize the full hyperparameter dict before building
+    # shared random-negative pools.
+    from .class1_neural_network import Class1NeuralNetwork
+    return int(
+        Class1NeuralNetwork.fit_hyperparameter_defaults.defaults["max_epochs"]
+    )
+
+
 def _planner_from_hyperparameters(hyperparameters):
     """Build a ``RandomNegativePeptides`` planner from a hyperparameter dict.
 
@@ -113,7 +127,7 @@ def setup_shared_random_negative_pools(
         # ``RandomNegativesPool.get_epoch_inputs`` raises mid-training.
         # Caught here so the orchestrator fails before forking workers
         # rather than at random points hours into the run.
-        max_epochs = int(hp.get("max_epochs", 0) or 0)
+        max_epochs = _resolve_max_epochs(hp)
         if max_epochs > pool_epochs:
             raise ValueError(
                 "setup_shared_random_negative_pools: work item %r has "

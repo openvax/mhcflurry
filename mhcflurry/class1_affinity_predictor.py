@@ -637,7 +637,7 @@ class Class1AffinityPredictor(object):
                 renormalized[normalized] = value
             allele_to_sequence = renormalized
             if skipped_non_class1:
-                logging.info(
+                logging.debug(
                     "Skipped %d non-class-I entries from pseudosequence "
                     "file (class II / TAP / pseudogene with incomplete "
                     "pseudosequences): %s",

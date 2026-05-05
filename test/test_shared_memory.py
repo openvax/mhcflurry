@@ -85,17 +85,24 @@ def _trivial_peptide_encoder(encodable_sequences):
     return np.zeros((len(seqs), 9), dtype=np.int8)
 
 
-def test_setup_shared_random_negative_pools_builds_files(tmp_path):
-    """Orchestrator helper writes manifest + encoded mmap per (fold, cfg)."""
-    df, folds_df = _make_minimal_train_data(num_rows=20)
+def _shared_pool_hyperparameters(pool_epochs, max_epochs=None):
     hp = {
         "random_negative_rate": 1.0,
         "random_negative_constant": 0,
         "random_negative_method": "by_allele",
         "random_negative_lengths": [9],
         "random_negative_match_distribution": False,
-        "random_negative_pool_epochs": 3,
+        "random_negative_pool_epochs": pool_epochs,
     }
+    if max_epochs is not None:
+        hp["max_epochs"] = max_epochs
+    return hp
+
+
+def test_setup_shared_random_negative_pools_builds_files(tmp_path):
+    """Orchestrator helper writes manifest + encoded mmap per (fold, cfg)."""
+    df, folds_df = _make_minimal_train_data(num_rows=20)
+    hp = _shared_pool_hyperparameters(pool_epochs=3, max_epochs=3)
     work_items = [
         {"fold_num": 0, "hyperparameters": hp, "work_item_name": "wi-0"},
         {"fold_num": 0, "hyperparameters": hp, "work_item_name": "wi-1"},
@@ -128,15 +135,10 @@ def test_setup_shared_random_negative_pools_rejects_max_epochs_exceeds_pool(tmp_
     don't waste hours of training on a doomed run.
     """
     df, folds_df = _make_minimal_train_data(num_rows=20)
-    hp = {
-        "random_negative_rate": 1.0,
-        "random_negative_constant": 0,
-        "random_negative_method": "by_allele",
-        "random_negative_lengths": [9],
-        "random_negative_match_distribution": False,
-        "random_negative_pool_epochs": 3,
-        "max_epochs": 100,  # > pool_epochs=3 → must reject
-    }
+    hp = _shared_pool_hyperparameters(
+        pool_epochs=3,
+        max_epochs=100,  # > pool_epochs=3 -> must reject
+    )
     work_items = [
         {"fold_num": 0, "hyperparameters": hp, "work_item_name": "wi"},
     ]
@@ -152,18 +154,32 @@ def test_setup_shared_random_negative_pools_rejects_max_epochs_exceeds_pool(tmp_
         )
 
 
+def test_setup_shared_random_negative_pools_rejects_default_max_epochs(tmp_path):
+    """Absent ``max_epochs`` resolves to the affinity default, not zero."""
+    df, folds_df = _make_minimal_train_data(num_rows=20)
+    hp = _shared_pool_hyperparameters(pool_epochs=3)
+    work_items = [
+        {"fold_num": 0, "hyperparameters": hp, "work_item_name": "wi"},
+    ]
+    with pytest.raises(ValueError, match="max_epochs=500 > pool_epochs=3"):
+        shm.setup_shared_random_negative_pools(
+            output_root_dir=str(tmp_path),
+            work_items=work_items,
+            train_data_df=df,
+            folds_df=folds_df,
+            peptide_encoder=_trivial_peptide_encoder,
+            pool_epochs=3,
+            seed=1,
+        )
+
+
 def test_setup_shared_random_negative_pools_accepts_max_epochs_equals_pool(tmp_path):
     """Boundary: ``max_epochs == pool_epochs`` is fine (epochs 0..N-1 covered)."""
     df, folds_df = _make_minimal_train_data(num_rows=20)
-    hp = {
-        "random_negative_rate": 1.0,
-        "random_negative_constant": 0,
-        "random_negative_method": "by_allele",
-        "random_negative_lengths": [9],
-        "random_negative_match_distribution": False,
-        "random_negative_pool_epochs": 5,
-        "max_epochs": 5,  # equal to pool_epochs → epochs 0..4 are covered
-    }
+    hp = _shared_pool_hyperparameters(
+        pool_epochs=5,
+        max_epochs=5,  # equal to pool_epochs -> epochs 0..4 are covered
+    )
     work_items = [
         {"fold_num": 0, "hyperparameters": hp, "work_item_name": "wi"},
     ]
@@ -182,15 +198,8 @@ def test_setup_shared_random_negative_pools_accepts_max_epochs_equals_pool(tmp_p
 def test_setup_shared_random_negative_pools_rejects_pool_epochs_mismatch(tmp_path):
     """All work items must share the same pool_epochs."""
     df, folds_df = _make_minimal_train_data(num_rows=20)
-    hp_3 = {
-        "random_negative_rate": 1.0,
-        "random_negative_constant": 0,
-        "random_negative_method": "by_allele",
-        "random_negative_lengths": [9],
-        "random_negative_match_distribution": False,
-        "random_negative_pool_epochs": 3,
-    }
-    hp_5 = dict(hp_3, random_negative_pool_epochs=5)
+    hp_3 = _shared_pool_hyperparameters(pool_epochs=3, max_epochs=3)
+    hp_5 = _shared_pool_hyperparameters(pool_epochs=5, max_epochs=5)
     work_items = [
         {"fold_num": 0, "hyperparameters": hp_3, "work_item_name": "a"},
         {"fold_num": 0, "hyperparameters": hp_5, "work_item_name": "b"},
@@ -210,14 +219,7 @@ def test_setup_shared_random_negative_pools_rejects_pool_epochs_mismatch(tmp_pat
 def test_lookup_pool_dir_round_trip(tmp_path):
     """Workers find their own (fold, cfg) pool via the lookup helper."""
     df, folds_df = _make_minimal_train_data(num_rows=20)
-    hp = {
-        "random_negative_rate": 1.0,
-        "random_negative_constant": 0,
-        "random_negative_method": "by_allele",
-        "random_negative_lengths": [9],
-        "random_negative_match_distribution": False,
-        "random_negative_pool_epochs": 2,
-    }
+    hp = _shared_pool_hyperparameters(pool_epochs=2, max_epochs=2)
     work_items = [
         {"fold_num": 0, "hyperparameters": hp, "work_item_name": "wi"},
     ]
@@ -258,14 +260,7 @@ def test_lookup_pool_dir_returns_none_when_no_pools():
 def test_lookup_pool_dir_returns_none_when_unmatched(tmp_path):
     """A work item whose (fold, cfg) was not pre-built returns None."""
     df, folds_df = _make_minimal_train_data(num_rows=20)
-    hp_built = {
-        "random_negative_rate": 1.0,
-        "random_negative_constant": 0,
-        "random_negative_method": "by_allele",
-        "random_negative_lengths": [9],
-        "random_negative_match_distribution": False,
-        "random_negative_pool_epochs": 2,
-    }
+    hp_built = _shared_pool_hyperparameters(pool_epochs=2, max_epochs=2)
     work_items_built = [
         {"fold_num": 0, "hyperparameters": hp_built, "work_item_name": "wi"},
     ]
