@@ -545,8 +545,8 @@ class RandomNegativesPool(object):
     #
     # The API below lets a coordinator (typically the training driver
     # before it forks workers) encode a deterministic pool and persist it as
-    # an int8 memmap + JSON manifest. The writer streams one epoch-slice at
-    # a time so the coordinator never has to hold the full pool in RAM.
+    # a native-dtype memmap + JSON manifest. The writer streams one epoch-slice
+    # at a time so the coordinator never has to hold the full pool in RAM.
     # Workers then load the pool with
     # ``from_shared_mmap`` — the OS page cache backs all of them with
     # a single resident copy, cutting RSS ~N× across a pool of size N.
@@ -561,7 +561,7 @@ class RandomNegativesPool(object):
     # worker spawn; that's a follow-up PR.
 
     _MANIFEST_NAME = "random_negatives_pool.json"
-    _ENCODED_NAME = "random_negatives_encoded.int8.mmap"
+    _ENCODED_NAME = "random_negatives_encoded.mmap"
     _PEPTIDES_NAME = "random_negatives_peptides.json"
 
     @classmethod
@@ -575,12 +575,10 @@ class RandomNegativesPool(object):
         """Generate a deterministic pool and persist it under ``output_dir``.
 
         Creates three files:
-          - ``random_negatives_encoded.int8.mmap`` — the (pool_epochs *
-            total_count, ...) encoded array, stored int8 (values are in
-            [-128, 127]; BLOSUM62 fits tightly in that range, index
-            payloads trivially so). Callers that need a non-int8
-            encoding can skip ``write_shared_pool`` and use the
-            in-process ``RandomNegativesPool`` directly.
+          - ``random_negatives_encoded.mmap`` — the (pool_epochs *
+            total_count, ...) encoded array, stored in the encoder's native
+            numeric dtype. This is int8 for the fixed torch-embedding path
+            and may be float32 for legacy host-side vector encodings.
           - ``random_negatives_peptides.json`` — the raw peptide strings
             in the same row order; kept for debugging/logging.
           - ``random_negatives_pool.json`` — manifest (shape, dtype,
@@ -615,6 +613,7 @@ class RandomNegativesPool(object):
         rng = builder._rng_for_cycle(0)
         mm = None
         shape = None
+        dtype = None
         tmp_paths = [encoded_tmp_path, peptides_tmp_path, manifest_tmp_path]
         try:
             with open(peptides_tmp_path, "w", encoding="utf-8") as peptides_fd:
@@ -631,31 +630,42 @@ class RandomNegativesPool(object):
                             "Random negative encoder returned %d rows for %d "
                             "peptides" % (len(encoded), total_count)
                         )
-                    encoded_int8 = encoded.astype("int8", copy=False)
+                    encoded_dtype = numpy.dtype(encoded.dtype)
+                    if not numpy.issubdtype(encoded_dtype, numpy.number):
+                        raise ValueError(
+                            "Random negative encoder returned non-numeric dtype "
+                            "%s" % encoded_dtype
+                        )
                     if mm is None:
+                        dtype = encoded_dtype
                         shape = (
                             pool_epochs * total_count,
-                            *encoded_int8.shape[1:],
+                            *encoded.shape[1:],
                         )
                         mm = numpy.memmap(
                             encoded_tmp_path,
-                            dtype="int8",
+                            dtype=dtype,
                             mode="w+",
                             shape=shape,
                         )
-                    elif encoded_int8.shape[1:] != shape[1:]:
+                    elif encoded.shape[1:] != shape[1:]:
                         raise ValueError(
                             "Random negative encoder shape changed from %r "
-                            "to %r" % (shape[1:], encoded_int8.shape[1:])
+                            "to %r" % (shape[1:], encoded.shape[1:])
+                        )
+                    elif encoded_dtype != dtype:
+                        raise ValueError(
+                            "Random negative encoder dtype changed from %s "
+                            "to %s" % (dtype, encoded_dtype)
                         )
                     start = epoch_offset * total_count
-                    mm[start : start + total_count] = encoded_int8
+                    mm[start : start + total_count] = encoded
                     for peptide in peptides:
                         if not first_peptide:
                             peptides_fd.write(",")
                         json.dump(peptide, peptides_fd)
                         first_peptide = False
-                    del encoded, encoded_int8, peptides
+                    del encoded, peptides
                 peptides_fd.write("]")
             if mm is not None:
                 mm.flush()
@@ -664,7 +674,7 @@ class RandomNegativesPool(object):
 
             manifest = {
                 "shape": list(shape),
-                "dtype": "int8",
+                "dtype": numpy.dtype(dtype).name,
                 "pool_epochs": int(pool_epochs),
                 "total_count": int(total_count),
                 "seed": int(seed),

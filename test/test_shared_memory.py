@@ -114,7 +114,7 @@ def test_setup_shared_random_negative_pools_builds_files(tmp_path):
     # Pool dir must contain manifest + encoded + peptides files.
     assert os.path.exists(os.path.join(pool_dir, "random_negatives_pool.json"))
     assert os.path.exists(
-        os.path.join(pool_dir, "random_negatives_encoded.int8.mmap")
+        os.path.join(pool_dir, "random_negatives_encoded.mmap")
     )
     assert os.path.exists(os.path.join(pool_dir, "random_negatives_peptides.json"))
 

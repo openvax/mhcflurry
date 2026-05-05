@@ -3,6 +3,7 @@
 import numpy
 import pandas
 import math
+import json
 
 from mhcflurry.common import random_peptides
 from mhcflurry.random_negative_peptides import (
@@ -229,6 +230,15 @@ def _int8_encoder(encodable_sequences):
     return arr
 
 
+def _float32_encoder(encodable_sequences):
+    seqs = list(encodable_sequences.sequences)
+    arr = numpy.zeros((len(seqs), 3), dtype="float32")
+    for i, pep in enumerate(seqs):
+        base = (ord(pep[0]) % 17) / 17.0
+        arr[i] = [base, base + 0.25, -base - 0.125]
+    return arr
+
+
 def _planner_with_ten_peptides():
     planner = RandomNegativePeptides(
         random_negative_rate=1.0,
@@ -265,6 +275,33 @@ def test_shared_pool_round_trip_preserves_content(tmp_path):
             numpy.asarray(loaded.get_epoch_inputs(epoch)[1]),
             numpy.asarray(reference.get_epoch_inputs(epoch)[1]),
         )
+
+
+def test_shared_pool_round_trip_preserves_float32_encoding(tmp_path):
+    planner = _planner_with_ten_peptides()
+    manifest_path = RandomNegativesPool.write_shared_pool(
+        str(tmp_path),
+        planner,
+        _float32_encoder,
+        pool_epochs=3,
+        seed=101,
+    )
+    with open(manifest_path, "r", encoding="utf-8") as fd:
+        manifest = json.load(fd)
+    assert manifest["dtype"] == "float32"
+
+    loaded = RandomNegativesPool.from_shared_mmap(
+        str(tmp_path), planner, permutation_seed=None
+    )
+    reference = RandomNegativesPool(
+        planner, _float32_encoder, pool_epochs=3, seed=101
+    )
+    for epoch in range(3):
+        loaded_encoded = numpy.asarray(loaded.get_epoch_inputs(epoch)[1])
+        reference_encoded = numpy.asarray(reference.get_epoch_inputs(epoch)[1])
+        assert loaded_encoded.dtype == numpy.dtype("float32")
+        numpy.testing.assert_allclose(loaded_encoded, reference_encoded)
+        assert numpy.any(loaded_encoded != loaded_encoded.astype("int8"))
 
 
 def test_shared_pool_writer_encodes_one_epoch_at_a_time(tmp_path):
