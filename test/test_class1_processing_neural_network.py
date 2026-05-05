@@ -31,6 +31,18 @@ table = dict([
     for amino_acid, encoding in BLOSUM62_MATRIX.iterrows()
 ])
 
+N_CLEAVAGE_REGEX = "[AILQSV][SINFEKLH][MNPQYK]"
+N_CLEAVAGE_FIRST = "AILQSV"
+N_CLEAVAGE_SECOND = "SINFEKLH"
+N_CLEAVAGE_THIRD = "MNPQYK"
+INDEX_FIRST_HITS = "SIQVL"
+INDEX_LAST_HITS = "YIPASD"
+
+
+def _cycle(letters, offset):
+    """Return a deterministic residue from ``letters``."""
+    return letters[offset % len(letters)]
+
 
 def decode_matrix(array):
     """
@@ -139,7 +151,15 @@ def test_neural_network_input():
 @pytest.mark.integration
 def test_small():
     """Test basic network training with small dataset."""
-    train_basic_network(num=10000)
+    train_basic_network(
+        num=512,
+        dataset_factory=make_cleavage_motif_dataset,
+        max_epochs=12,
+        minibatch_size=128,
+        validation_split=0.0,
+        dropout_rate=0.0,
+        convolutional_kernel_l1_l2=[0.0, 0.0],
+        learning_rate=0.01)
 
 
 @pytest.mark.slow
@@ -147,7 +167,14 @@ def test_small():
 def test_more():
     """Test network with different hyperparameters."""
     train_basic_network(
-        num=10000,
+        num=512,
+        dataset_factory=make_cleavage_motif_dataset,
+        max_epochs=12,
+        minibatch_size=128,
+        validation_split=0.0,
+        dropout_rate=0.0,
+        convolutional_kernel_l1_l2=[0.0, 0.0],
+        learning_rate=0.01,
         flanking_averages=False,
         convolutional_kernel_size=3,
         c_flank_length=0,
@@ -157,28 +184,126 @@ def test_more():
 
 @pytest.mark.slow
 @pytest.mark.integration
-def test_basic_indexing(num=10000, do_assertions=True, **hyperparameters):
+def test_basic_indexing():
     """Test that basic indexing patterns are learned."""
     def is_hit(n_flank, c_flank, peptide):
-        return peptide[0] in "SIQVL" and peptide[-1] in "YIPASD"
+        return peptide[0] in INDEX_FIRST_HITS and peptide[-1] in INDEX_LAST_HITS
 
     def is_hit1(n_flank, c_flank, peptide):
-        return peptide[0] in "SIQVL"
+        return peptide[0] in INDEX_FIRST_HITS
 
     def is_hit2(n_flank, c_flank, peptide):
-        return peptide[-1] in "YIPASD"
+        return peptide[-1] in INDEX_LAST_HITS
 
     hypers = {
         "convolutional_kernel_size": 1,
         "flanking_averages": False,
+        "max_epochs": 12,
+        "minibatch_size": 128,
+        "validation_split": 0.0,
+        "dropout_rate": 0.0,
+        "convolutional_kernel_l1_l2": [0.0, 0.0],
+        "learning_rate": 0.01,
     }
 
-    train_basic_network(num=10000, is_hit=is_hit1, **hypers)
-    train_basic_network(num=10000, is_hit=is_hit2, **hypers)
-    train_basic_network(num=10000, is_hit=is_hit, **hypers)
+    train_basic_network(
+        num=512,
+        is_hit=is_hit1,
+        dataset_factory=make_indexing_dataset_factory(first=True, last=False),
+        **hypers)
+    train_basic_network(
+        num=512,
+        is_hit=is_hit2,
+        dataset_factory=make_indexing_dataset_factory(first=False, last=True),
+        **hypers)
+    train_basic_network(
+        num=512,
+        is_hit=is_hit,
+        dataset_factory=make_indexing_dataset_factory(first=True, last=True),
+        **hypers)
 
 
-def train_basic_network(num, do_assertions=True, is_hit=None, **hyperparameters):
+def make_cleavage_motif_dataset(num, hyperparameters):
+    """Return balanced examples for the N-flank cleavage motif task."""
+    peptide_length = min(9, hyperparameters["peptide_max_length"])
+    n_flank_length = max(1, hyperparameters["n_flank_length"])
+    c_flank_length = hyperparameters["c_flank_length"]
+    rows = []
+
+    for i in range(num):
+        hit = i < num // 2
+        peptide = list("G" * peptide_length)
+        n_flank = list("G" * n_flank_length)
+
+        if hit:
+            n_flank[-1] = _cycle(N_CLEAVAGE_FIRST, i)
+            peptide[0] = _cycle(N_CLEAVAGE_SECOND, i)
+            peptide[1] = _cycle(N_CLEAVAGE_THIRD, i)
+        else:
+            negative_case = i % 3
+            n_flank[-1] = (
+                "D" if negative_case == 0 else _cycle(N_CLEAVAGE_FIRST, i)
+            )
+            peptide[0] = (
+                "D" if negative_case == 1 else _cycle(N_CLEAVAGE_SECOND, i)
+            )
+            peptide[1] = (
+                "D" if negative_case == 2 else _cycle(N_CLEAVAGE_THIRD, i)
+            )
+
+        rows.append({
+            "n_flank": "".join(n_flank),
+            "c_flank": "G" * c_flank_length,
+            "peptide": "".join(peptide),
+            "hit": hit,
+        })
+
+    return pandas.DataFrame(rows).sample(frac=1.0, random_state=0)
+
+
+def make_indexing_dataset_factory(first, last):
+    """Return a dataset factory for first/last peptide indexing tasks."""
+
+    def make_indexing_dataset(num, hyperparameters):
+        peptide_length = min(9, hyperparameters["peptide_max_length"])
+        rows = []
+
+        for i in range(num):
+            hit = i < num // 2
+            peptide = list("G" * peptide_length)
+
+            if hit or first:
+                peptide[0] = _cycle(INDEX_FIRST_HITS, i)
+            if hit or last:
+                peptide[-1] = _cycle(INDEX_LAST_HITS, i)
+
+            if not hit:
+                if first and last:
+                    negative_case = i % 3
+                    if negative_case in (0, 2):
+                        peptide[0] = "G"
+                    if negative_case in (1, 2):
+                        peptide[-1] = "G"
+                elif first:
+                    peptide[0] = "G"
+                elif last:
+                    peptide[-1] = "G"
+
+            rows.append({
+                "n_flank": "G" * hyperparameters["n_flank_length"],
+                "c_flank": "G" * hyperparameters["c_flank_length"],
+                "peptide": "".join(peptide),
+                "hit": hit,
+            })
+
+        return pandas.DataFrame(rows).sample(frac=1.0, random_state=0)
+
+    return make_indexing_dataset
+
+
+def train_basic_network(
+        num, do_assertions=True, is_hit=None, dataset_factory=None,
+        **hyperparameters):
     """Train a processing network and check performance."""
     use_hyperparameters = {
         "max_epochs": 100,
@@ -191,26 +316,40 @@ def train_basic_network(num, do_assertions=True, is_hit=None, **hyperparameters)
     }
     use_hyperparameters.update(hyperparameters)
 
-    df = pandas.DataFrame({
-        "n_flank": random_peptides(int(num / 2), 10) + random_peptides(int(num / 2), 1),
-        "c_flank": random_peptides(num, 10),
-        "peptide": random_peptides(int(num / 2), 11) + random_peptides(int(num / 2), 8),
-    }).sample(frac=1.0)
+    if dataset_factory is None:
+        df = pandas.DataFrame({
+            "n_flank": (
+                random_peptides(int(num / 2), 10) +
+                random_peptides(int(num / 2), 1)
+            ),
+            "c_flank": random_peptides(num, 10),
+            "peptide": (
+                random_peptides(int(num / 2), 11) +
+                random_peptides(int(num / 2), 8)
+            ),
+        }).sample(frac=1.0)
 
-    if is_hit is None:
-        n_cleavage_regex = "[AILQSV][SINFEKLH][MNPQYK]"
+        if is_hit is None:
+            def is_hit(n_flank, c_flank, peptide):
+                if re.search(N_CLEAVAGE_REGEX, peptide):
+                    return False  # peptide is cleaved
+                return bool(re.match(N_CLEAVAGE_REGEX, n_flank[-1:] + peptide))
 
-        def is_hit(n_flank, c_flank, peptide):
-            if re.search(n_cleavage_regex, peptide):
-                return False  # peptide is cleaved
-            return bool(re.match(n_cleavage_regex, n_flank[-1:] + peptide))
+        df["hit"] = [
+            is_hit(row.n_flank, row.c_flank, row.peptide)
+            for (_, row) in df.iterrows()
+        ]
+    else:
+        df = dataset_factory(num, use_hyperparameters)
+        if is_hit is not None:
+            numpy.testing.assert_array_equal(
+                df.hit.values,
+                [
+                    is_hit(row.n_flank, row.c_flank, row.peptide)
+                    for (_, row) in df.iterrows()
+                ])
 
-    df["hit"] = [
-        is_hit(row.n_flank, row.c_flank, row.peptide)
-        for (_, row) in df.iterrows()
-    ]
-
-    train_df = df.sample(frac=0.9).copy()
+    train_df = df.sample(frac=0.9, random_state=1).copy()
     test_df = df.loc[~df.index.isin(train_df.index)].copy()
 
     print(
