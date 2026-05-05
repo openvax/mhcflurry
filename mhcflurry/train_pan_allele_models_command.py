@@ -1748,22 +1748,19 @@ def train_model(
     # drops the bypass still can't silently flip training to
     # deterministic-per-work-item.
     #
-    # hash() is randomized per-process via PYTHONHASHSEED, so use a
-    # stable mix: SHA1 of the identity tuple truncated to 63 bits
-    # (numpy.random.SeedSequence accepts arbitrary non-negative ints).
+    work_item_for_random_negatives = {
+        "architecture_num": architecture_num,
+        "fold_num": fold_num,
+        "replicate_num": replicate_num,
+        "work_item_name": work_item_name,
+        "hyperparameters": hyperparameters,
+    }
     pool_epochs = int(hyperparameters.get("random_negative_pool_epochs", 1) or 1)
     random_negative_seed = None
     if pool_epochs > 1:
-        random_negative_seed = int(
-            hashlib.sha1(
-                ("|".join([
-                    str(architecture_num),
-                    str(fold_num),
-                    str(replicate_num),
-                    work_item_name or "",
-                ])).encode()
-            ).hexdigest()[:16],
-            16,
+        from .shared_memory import random_negative_seed_for_work_item
+        random_negative_seed = random_negative_seed_for_work_item(
+            work_item_for_random_negatives
         )
 
     # Run mmap cache lookup: if the orchestrator pre-built a per-fold
@@ -1778,11 +1775,13 @@ def train_model(
             fold_pool_dirs,
             fold_num=fold_num,
             hyperparameters=hyperparameters,
+            work_item=work_item_for_random_negatives,
         )
     else:
         pool_dir = None
-    # Cross-worker permutation diversity: distinct seed per work item so
-    # workers reading the same pool see distinct orderings.
+    # Shared mmap pools are keyed per work item to preserve legacy
+    # cross-worker random-negative diversity. Keep the permutation seed
+    # for deterministic row ordering within that work item's pool.
     pool_permutation_seed = (
         random_negative_seed if pool_dir is not None else None
     )

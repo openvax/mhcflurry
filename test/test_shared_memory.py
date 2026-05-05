@@ -1,5 +1,6 @@
 """Tests for the per-run shared mmap random-negative pool module."""
 
+import json
 import os
 import pytest
 
@@ -100,7 +101,7 @@ def _shared_pool_hyperparameters(pool_epochs, max_epochs=None):
 
 
 def test_setup_shared_random_negative_pools_builds_files(tmp_path):
-    """Orchestrator helper writes manifest + encoded mmap per (fold, cfg)."""
+    """Orchestrator helper writes manifest + encoded mmap per work item."""
     df, folds_df = _make_minimal_train_data(num_rows=20)
     hp = _shared_pool_hyperparameters(pool_epochs=3, max_epochs=3)
     work_items = [
@@ -116,14 +117,21 @@ def test_setup_shared_random_negative_pools_builds_files(tmp_path):
         pool_epochs=3,
         seed=12345,
     )
-    assert len(fold_pool_dirs) == 1  # one (fold, cfg) entry
-    pool_dir = list(fold_pool_dirs.values())[0]
-    # Pool dir must contain manifest + encoded + peptides files.
-    assert os.path.exists(os.path.join(pool_dir, "random_negatives_pool.json"))
-    assert os.path.exists(
-        os.path.join(pool_dir, "random_negatives_encoded.mmap")
-    )
-    assert os.path.exists(os.path.join(pool_dir, "random_negatives_peptides.json"))
+    assert len(fold_pool_dirs) == 2
+    seeds = []
+    for pool_dir in fold_pool_dirs.values():
+        # Pool dir must contain manifest + encoded + peptides files.
+        manifest_path = os.path.join(pool_dir, "random_negatives_pool.json")
+        assert os.path.exists(manifest_path)
+        assert os.path.exists(
+            os.path.join(pool_dir, "random_negatives_encoded.mmap")
+        )
+        assert os.path.exists(
+            os.path.join(pool_dir, "random_negatives_peptides.json")
+        )
+        with open(manifest_path, "r", encoding="utf-8") as fd:
+            seeds.append(json.load(fd)["seed"])
+    assert len(set(seeds)) == 2
 
 
 def test_setup_shared_random_negative_pools_allows_default_max_epochs(tmp_path):
@@ -208,9 +216,21 @@ def test_lookup_pool_dir_round_trip(tmp_path):
         fold_pool_dirs,
         fold_num=work_items[0]["fold_num"],
         hyperparameters=work_items[0]["hyperparameters"],
+        work_item=work_items[0],
     )
     assert found is not None
     assert os.path.isdir(found)
+    same_config_other_work_item = {
+        "fold_num": work_items[0]["fold_num"],
+        "hyperparameters": work_items[0]["hyperparameters"],
+        "work_item_name": "other",
+    }
+    assert shm.lookup_pool_dir(
+        fold_pool_dirs,
+        fold_num=same_config_other_work_item["fold_num"],
+        hyperparameters=same_config_other_work_item["hyperparameters"],
+        work_item=same_config_other_work_item,
+    ) is None
 
 
 def test_lookup_pool_dir_returns_none_when_no_pools():
@@ -222,10 +242,12 @@ def test_lookup_pool_dir_returns_none_when_no_pools():
     assert shm.lookup_pool_dir(
         None, fold_num=work_item["fold_num"],
         hyperparameters=work_item["hyperparameters"],
+        work_item=work_item,
     ) is None
     assert shm.lookup_pool_dir(
         {}, fold_num=work_item["fold_num"],
         hyperparameters=work_item["hyperparameters"],
+        work_item=work_item,
     ) is None
 
 
@@ -252,4 +274,5 @@ def test_lookup_pool_dir_returns_none_when_unmatched(tmp_path):
         fold_pool_dirs,
         fold_num=other_work_item["fold_num"],
         hyperparameters=other_work_item["hyperparameters"],
+        work_item=other_work_item,
     ) is None

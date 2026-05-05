@@ -538,21 +538,14 @@ class RandomNegativesPool(object):
 
     # --- Shared-mmap pool primitive -------------------------------------
     #
-    # In a multi-worker training pool (the pan-allele release_exact run
-    # spins up 16 training workers), each worker currently holds its own
-    # copy of the pool-epoch encoded array: ~17 MB × 16 = ~272 MB of RSS
-    # duplicated across processes. Workers shouldn't need distinct
-    # peptides — cross-worker diversity comes from the per-worker
-    # permutation over the pool, not from the pool contents themselves
-    # (see the ``random_negative_seed`` threaded from work_item identity
-    # in train_pan_allele_models_command).
-    #
-    # The API below lets a coordinator encode the first deterministic
-    # pool cycle before forking workers. Later cycles are written lazily
-    # under per-cycle subdirectories by the first worker that reaches
-    # them, guarded by a simple filesystem lock. Other workers then
-    # mmap the same files. This avoids a max_epochs-sized mmap while
-    # still sharing each pool_epochs-sized cycle across processes.
+    # The API below lets a coordinator encode one work item's first
+    # deterministic pool cycle before forking workers. Later cycles
+    # are written lazily under per-cycle subdirectories by the process
+    # training that work item, guarded by a simple filesystem lock so
+    # retries/resumes can reuse the same cycle. Work items intentionally
+    # get separate pool directories and seeds, preserving the 2.1/2.2
+    # behavior where independently trained models sample independent
+    # random negatives.
 
     _MANIFEST_NAME = "random_negatives_pool.json"
     _ENCODED_NAME = "random_negatives_encoded.mmap"
