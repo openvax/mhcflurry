@@ -1785,7 +1785,7 @@ class Class1AffinityPredictor(object):
     def _auto_size_calibration_batches(
             model, device, n_peptides, n_alleles,
             num_workers_per_gpu=1,
-            free_memory_fraction=0.6,
+            free_memory_fraction=0.85,
             num_cached_networks=1,
             peptide_stage_dim=None,
             num_sub_networks=None,
@@ -1804,17 +1804,17 @@ class Class1AffinityPredictor(object):
                                               # peak_bytes_per_row``
                  + small_state                # log-IC50 acc, ic50_unique,
                                               # motif state (~1 GB)
-            with the whole thing inflated by ``safety_multiplier`` to
-            absorb allocator fragmentation that ``mem_get_info`` can't see.
+            with explicit free-memory headroom plus a safety factor on
+            CUDA/runtime scratch allocations to absorb fragmentation that
+            ``mem_get_info`` can't see.
 
-        ``peak_bytes_per_row`` already factors in *all* sub-networks of
-        a merged ensemble (the recursive
-        :func:`_estimate_peak_bytes_per_row` sums per-sub-net peaks
-        because ``MergedClass1NeuralNetwork.forward_cartesian_from_peptide_stage``
-        keeps every sub-net's intermediate alive in a list comprehension
-        before the merge). The cartesian-intermediate term scales with
-        ``a_size × p_batch``, which is exactly the rate the budget
-        carves out — preserving the existing
+        ``peak_bytes_per_row`` is calibrated for the cartesian fast path.
+        For a merged ensemble it uses one sub-network's hidden activation
+        peak plus the small retained per-sub-network outputs, matching
+        ``MergedClass1NeuralNetwork.forward_cartesian_from_peptide_stage``
+        which runs each sub-network to completion before starting the next.
+        The cartesian-intermediate term scales with ``a_size × p_batch``,
+        which is exactly the rate the budget carves out — preserving the existing
         ``total_rows = forward_budget // peak_bytes`` math.
 
         Returns the chosen ``(peptide_batch, allele_batch)``.
@@ -1822,12 +1822,37 @@ class Class1AffinityPredictor(object):
         from .class1_neural_network import (
             compute_prediction_batch_size,
             _free_device_memory_bytes,
-            _estimate_peak_bytes_per_row,
             _AUTO_BATCH_MAX_ROWS,
             _AUTO_BATCH_MIN_ROWS,
         )
+        import torch
+
+        def env_float(name, default):
+            try:
+                return float(environ.get(name, default))
+            except (TypeError, ValueError):
+                logging.warning(
+                    "Ignoring invalid %s=%r; using %s",
+                    name, environ.get(name), default,
+                )
+                return float(default)
+
         if n_peptides == 0 or n_alleles == 0:
             return max(n_peptides, 1), max(n_alleles, 1)
+        free_memory_fraction = env_float(
+            "MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION",
+            free_memory_fraction,
+        )
+        reserve_fraction = env_float(
+            "MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", 0.10)
+        reserve_min_bytes = int(
+            env_float("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", 2.0)
+            * (1 << 30)
+        )
+        fixed_safety_multiplier = env_float(
+            "MHCFLURRY_CALIBRATE_AUTO_FIXED_SAFETY_MULTIPLIER",
+            safety_multiplier,
+        )
         if device.type != "cuda":
             total_rows = compute_prediction_batch_size(
                 device,
@@ -1838,8 +1863,28 @@ class Class1AffinityPredictor(object):
         else:
             workers = max(int(num_workers_per_gpu), 1)
             free = _free_device_memory_bytes(device)
-            peak_bytes = _estimate_peak_bytes_per_row(model)
-            per_worker_budget = int(free * float(free_memory_fraction) / workers)
+            total_memory = free
+            try:
+                props = torch.cuda.get_device_properties(device)
+                total_memory = int(props.total_memory)
+            except Exception:
+                # Tests and nonstandard CUDA wrappers may not expose device
+                # properties. Fall back to free memory; the explicit reserve
+                # still keeps the budget bounded.
+                pass
+            peak_bytes = (
+                Class1AffinityPredictor
+                ._estimate_calibration_peak_bytes_per_row(model)
+            )
+            reserve_bytes = max(
+                reserve_min_bytes,
+                int(total_memory * reserve_fraction),
+            )
+            fraction_budget = int(
+                free * float(free_memory_fraction) / workers)
+            reserved_headroom_budget = int(
+                max(free - reserve_bytes, 0) / workers)
+            per_worker_budget = max(fraction_budget, reserved_headroom_budget)
             stage_dim = peptide_stage_dim
             sub_networks = getattr(model, "networks", None)
             if num_sub_networks is None:
@@ -1891,45 +1936,53 @@ class Class1AffinityPredictor(object):
             # n_peptides; a 1 GB constant covers the production ranges
             # without further accounting. Cheap insurance vs OOM.
             small_state_bytes = 1 * (1 << 30)
-            fixed_overhead = (
-                int(cuda_overhead_bytes) + cache_bytes + small_state_bytes
+            # The peptide-stage cache estimate is shape-derived and
+            # persistent, so multiplying it by a fragmentation safety factor
+            # unnecessarily strands several GB on A100-40GB. Keep explicit
+            # global headroom, and safety-pad only CUDA/runtime scratch and
+            # small state whose allocation behavior is less predictable.
+            scratch_state_bytes = int(cuda_overhead_bytes) + small_state_bytes
+            guarded_fixed_overhead = (
+                cache_bytes
+                + int(scratch_state_bytes * fixed_safety_multiplier)
             )
-            # Inflate the FIXED side of the budget by the safety
-            # multiplier — that's where allocator fragmentation hits
-            # hardest (cache and CUDA workspace are pinned, while
-            # forward intermediates churn). The forward-budget side
-            # then represents only the marginal headroom available
-            # for batch-dependent allocations.
             forward_budget = (
-                per_worker_budget - int(fixed_overhead * safety_multiplier)
+                per_worker_budget - guarded_fixed_overhead
             )
             logging.info(
                 "calibrate auto-sizer: free=%.2f GB, workers=%d, "
-                "per_worker_budget=%.2f GB, stage_dim=%d "
+                "total=%.2f GB, reserve=%.2f GB, "
+                "fraction_budget=%.2f GB, per_worker_budget=%.2f GB, "
+                "stage_dim=%d "
                 "(sub_networks=%d, num_cached=%d), cache=%.2f GB, "
                 "cuda_overhead=%.2f GB, small_state=%.2f GB, "
-                "safety=%.2fx -> forward_budget=%.2f GB, "
+                "scratch_safety=%.2fx, guarded_fixed=%.2f GB "
+                "-> forward_budget=%.2f GB, "
                 "peak_bytes_per_row=%d (≈%.2f KB)",
-                free / 1e9, workers, per_worker_budget / 1e9, stage_dim,
+                free / 1e9, workers, total_memory / 1e9,
+                reserve_bytes / 1e9, fraction_budget / 1e9,
+                per_worker_budget / 1e9, stage_dim,
                 num_sub_networks, num_cached_networks,
                 cache_bytes / 1e9, cuda_overhead_bytes / 1e9,
-                small_state_bytes / 1e9, safety_multiplier,
+                small_state_bytes / 1e9, fixed_safety_multiplier,
+                guarded_fixed_overhead / 1e9,
                 forward_budget / 1e9, peak_bytes, peak_bytes / 1024,
             )
             if forward_budget < peak_bytes * _AUTO_BATCH_MIN_ROWS:
                 logging.warning(
                     "calibrate auto-sizer: fixed overhead "
-                    "(cuda %.2f GB + cache %.2f GB + state %.2f GB) "
-                    "× safety %.2fx exceeds per-worker budget "
-                    "(%.2f GB free × %.0f%% / %d workers). Falling back "
-                    "to minimum batch; reduce --max-workers-per-gpu or "
-                    "lower the peptide universe size.",
-                    cuda_overhead_bytes / 1e9,
+                    "(cache %.2f GB + scratch/state %.2f GB × safety %.2fx) "
+                    "exceeds per-worker budget %.2f GB "
+                    "(%.2f GB free, %.2f GB reserved, %d workers). "
+                    "Falling back to minimum batch; reduce "
+                    "--max-workers-per-gpu or lower the peptide universe "
+                    "size.",
                     cache_bytes / 1e9,
-                    small_state_bytes / 1e9,
-                    safety_multiplier,
+                    scratch_state_bytes / 1e9,
+                    fixed_safety_multiplier,
+                    per_worker_budget / 1e9,
                     free / 1e9,
-                    free_memory_fraction * 100,
+                    reserve_bytes / 1e9,
                     workers,
                 )
                 forward_budget = peak_bytes * _AUTO_BATCH_MIN_ROWS
@@ -1937,30 +1990,112 @@ class Class1AffinityPredictor(object):
                 _AUTO_BATCH_MIN_ROWS,
                 min(forward_budget // peak_bytes, _AUTO_BATCH_MAX_ROWS),
             )
-        # Joint (allele_batch, peptide_batch) optimization. Earlier code
-        # carved peptide off ``total_rows // 64`` and floored at 2000;
-        # for chunk sizes where n_alleles is small (the production
-        # workload uses 30 alleles per chunk) that left peptide_batch
-        # pinned at the floor while ``total_rows`` was 5-10× higher than
-        # what we used. Now pick allele_batch to fill the chunk
-        # (``min(n_alleles, total_rows / p_min)``) and peptide_batch to
-        # absorb the remaining budget — typical result on 8×A100-80GB
-        # is allele_batch=n_alleles, peptide_batch=10-30k vs the legacy
-        # allele_batch=8, peptide_batch=2000. Fewer Python-level inner
-        # loop iterations, fewer kernel launches, much better tensor-core
-        # utilization on the cartesian forward.
-        p_floor = max(_AUTO_BATCH_MIN_ROWS, 2_000)
-        allele_batch = min(int(n_alleles), max(1, int(total_rows // p_floor)))
-        allele_batch = min(allele_batch, 256)
-        peptide_batch = min(int(n_peptides), max(p_floor, total_rows // max(allele_batch, 1)))
-        # Final safety: make sure we don't exceed total_rows after the
-        # rounding above (can happen when allele_batch hits n_alleles
-        # before the floor).
-        while allele_batch * peptide_batch > total_rows and peptide_batch > p_floor:
-            peptide_batch = max(p_floor, peptide_batch // 2)
-        while allele_batch * peptide_batch > total_rows and allele_batch > 1:
-            allele_batch -= 1
-        return int(peptide_batch), int(allele_batch)
+        return Class1AffinityPredictor._choose_calibration_batch_shape(
+            total_rows,
+            n_peptides=n_peptides,
+            n_alleles=n_alleles,
+            min_peptide_batch=max(_AUTO_BATCH_MIN_ROWS, 2_000),
+        )
+
+    @staticmethod
+    def _estimate_calibration_peak_bytes_per_row(model):
+        """Estimate cartesian calibration forward peak bytes per row.
+
+        The generic prediction estimator is deliberately conservative for
+        arbitrary merged forwards. Calibration has a more specific execution
+        shape: ``MergedClass1NeuralNetwork.forward_cartesian_from_peptide_stage``
+        evaluates sub-networks serially and retains only their final outputs
+        before combining them. Hidden-layer peak memory is therefore the max
+        sub-network peak, not the sum of every sub-network peak.
+        """
+        from .class1_neural_network import _estimate_peak_bytes_per_row
+
+        if model is None:
+            return _estimate_peak_bytes_per_row(model)
+
+        sub_networks = getattr(model, "networks", None)
+        if sub_networks is None or hasattr(model, "peptide_encoding_shape"):
+            return _estimate_peak_bytes_per_row(model)
+
+        try:
+            sub_peaks = [
+                _estimate_peak_bytes_per_row(net)
+                for net in sub_networks
+            ]
+            if not sub_peaks:
+                return _estimate_peak_bytes_per_row(model)
+            output_channels = 0
+            for net in sub_networks:
+                output_layer = getattr(net, "output_layer", None)
+                output_channels += int(getattr(output_layer, "out_features", 1))
+            # Retained outputs are small compared with hidden activations but
+            # include them, padded for stack/cat/log-IC50 temporary tensors.
+            retained_output_bytes = max(output_channels, 1) * 8 * 4
+            return int(max(sub_peaks) + retained_output_bytes)
+        except (AttributeError, TypeError, ValueError) as exc:
+            logging.warning(
+                "Could not estimate calibration peak for merged ensemble; "
+                "falling back to generic estimator: %s",
+                exc,
+            )
+            return _estimate_peak_bytes_per_row(model)
+
+    @staticmethod
+    def _choose_calibration_batch_shape(
+            total_rows,
+            n_peptides,
+            n_alleles,
+            min_peptide_batch,
+            max_allele_batch=256):
+        """Choose ``(peptide_batch, allele_batch)`` under a row budget.
+
+        Minimize the number of cartesian forward chunks rather than filling
+        one axis greedily. This matters for the production shape
+        (tens of alleles × tens of thousands of peptides), where many
+        equivalent row budgets can differ by 20-40% in Python-level loop
+        count and kernel launches.
+        """
+        total_rows = max(int(total_rows), 1)
+        n_peptides = max(int(n_peptides), 1)
+        n_alleles = max(int(n_alleles), 1)
+        min_peptide_batch = max(int(min_peptide_batch), 1)
+        max_allele_batch = max(int(max_allele_batch), 1)
+
+        max_a = min(n_alleles, max_allele_batch, max(total_rows, 1))
+        best = None
+        for allele_batch in range(1, max_a + 1):
+            peptide_batch = total_rows // allele_batch
+            if peptide_batch < min_peptide_batch:
+                continue
+            peptide_batch = min(n_peptides, max(min_peptide_batch, peptide_batch))
+            chunk_count = (
+                int(numpy.ceil(n_alleles / float(allele_batch)))
+                * int(numpy.ceil(n_peptides / float(peptide_batch)))
+            )
+            used_rows = allele_batch * peptide_batch
+            candidate = (
+                chunk_count,
+                -used_rows,
+                -allele_batch,
+                -peptide_batch,
+                peptide_batch,
+                allele_batch,
+            )
+            if best is None or candidate < best:
+                best = candidate
+
+        if best is None:
+            allele_batch = min(n_alleles, max_a)
+            peptide_batch = min(n_peptides, max(min_peptide_batch, total_rows))
+            while allele_batch * peptide_batch > total_rows and allele_batch > 1:
+                allele_batch -= 1
+            while (
+                    allele_batch * peptide_batch > total_rows
+                    and peptide_batch > min_peptide_batch):
+                peptide_batch = max(min_peptide_batch, peptide_batch // 2)
+            return int(peptide_batch), int(allele_batch)
+
+        return int(best[4]), int(best[5])
 
     @staticmethod
     def _probe_peptide_stage_dim(net_obj, encoded_peptides, device):

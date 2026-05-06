@@ -612,6 +612,115 @@ def test_compute_prediction_batch_size_scales_with_memory_and_workers():
         assert shared <= single
 
 
+def test_calibrate_auto_size_uses_reserved_headroom_not_cache_safety(monkeypatch):
+    """A production-like A100-40GB calibration should not collapse to
+    the minimum batch just because the exact peptide-stage cache is large.
+
+    Regression for a 4xA100 run where the previous formula used only
+    60% of free memory and multiplied the entire fixed cache by 1.3,
+    forcing ``peptide_batch=2000, allele_batch=1`` despite ~28 GB free.
+    """
+    from mhcflurry import class1_neural_network as cnn
+
+    class FakeCUDA:
+        type = "cuda"
+
+    class Dense:
+        out_features = 7560
+
+    class SubNet:
+        peptide_encoding_shape = (15, 21)
+        lc_layers = []
+        peptide_dense_layers = [Dense()]
+        allele_embedding = None
+        allele_dense_layers = []
+        dense_layers = [Dense()]
+
+    class Merged:
+        networks = [SubNet() for _ in range(8)]
+
+    monkeypatch.delenv(
+        "MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION", raising=False)
+    monkeypatch.delenv(
+        "MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", raising=False)
+    monkeypatch.delenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", raising=False)
+    monkeypatch.delenv(
+        "MHCFLURRY_CALIBRATE_AUTO_FIXED_SAFETY_MULTIPLIER", raising=False)
+    monkeypatch.setattr(
+        cnn, "_free_device_memory_bytes",
+        lambda device: int(28.63 * (1 << 30)),
+    )
+
+    peptide_batch, allele_batch = (
+        Class1AffinityPredictor._auto_size_calibration_batches(
+            Merged(),
+            FakeCUDA(),
+            n_peptides=50_000,
+            n_alleles=30,
+            num_workers_per_gpu=1,
+            num_cached_networks=8,
+            peptide_stage_dim=7560,
+            num_sub_networks=8,
+        )
+    )
+
+    assert allele_batch >= 10
+    assert peptide_batch > 3000
+    assert allele_batch * peptide_batch > 40_000
+    assert (
+        numpy.ceil(30 / allele_batch)
+        * numpy.ceil(50_000 / peptide_batch)
+    ) <= 32
+
+
+def test_calibrate_auto_size_still_floors_when_cache_does_not_fit(
+        monkeypatch, caplog):
+    """The looser headroom budget still keeps the minimum-batch fallback
+    when the exact cache plus scratch genuinely exceeds available VRAM."""
+    import logging
+    from mhcflurry import class1_neural_network as cnn
+
+    class FakeCUDA:
+        type = "cuda"
+
+    class Dense:
+        out_features = 7560
+
+    class SubNet:
+        peptide_encoding_shape = (15, 21)
+        lc_layers = []
+        peptide_dense_layers = [Dense()]
+        allele_embedding = None
+        allele_dense_layers = []
+        dense_layers = [Dense()]
+
+    class Merged:
+        networks = [SubNet() for _ in range(8)]
+
+    monkeypatch.setattr(
+        cnn, "_free_device_memory_bytes",
+        lambda device: int(16 * (1 << 30)),
+    )
+
+    with caplog.at_level(logging.WARNING, logger="root"):
+        peptide_batch, allele_batch = (
+            Class1AffinityPredictor._auto_size_calibration_batches(
+                Merged(),
+                FakeCUDA(),
+                n_peptides=50_000,
+                n_alleles=30,
+                num_workers_per_gpu=1,
+                num_cached_networks=8,
+                peptide_stage_dim=7560,
+                num_sub_networks=8,
+            )
+        )
+
+    assert (peptide_batch, allele_batch) == (2000, 1)
+    assert "Falling back to minimum batch" in " ".join(
+        record.message for record in caplog.records)
+
+
 def test_peptide_sequences_fingerprint_distinguishes_middle_changes():
     """Same length, first, last → different middle must yield different keys.
 
