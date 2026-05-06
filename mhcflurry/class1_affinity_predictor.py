@@ -2098,6 +2098,15 @@ class Class1AffinityPredictor(object):
         return int(best[4]), int(best[5])
 
     @staticmethod
+    def _calibration_stage_cache_signature(encoded_peptides, networks, device):
+        """Return the key for a reusable peptide-stage calibration cache."""
+        return (
+            _peptide_sequences_fingerprint(encoded_peptides.sequences),
+            tuple(id(net) for net in networks),
+            str(device),
+        )
+
+    @staticmethod
     def _probe_peptide_stage_dim(net_obj, encoded_peptides, device):
         """Run a 1-row forward through ``forward_peptide_stage`` to
         record the actual feature dimension of the peptide-stage
@@ -2605,6 +2614,34 @@ class Class1AffinityPredictor(object):
         # move the eager (uncompiled) model to device, cache the
         # peptide-stage output.
         networks = self.class1_pan_allele_models
+
+        # Cross-task cached_stages reuse: when calibrate is sharded into
+        # many tasks, each task is a separate ``calibrate_percentile_ranks_fast``
+        # call inside the same worker process and re-builds
+        # ``cached_stages`` from scratch even though the peptide universe
+        # and the predictor are identical. Cache the built tensors on
+        # ``self._calibration_fast_cache`` and skip the rebuild whenever
+        # the signature matches. ``forward_peptide_stage`` runs once per
+        # peptide-batch per network, so for the production workload
+        # (~400k peptides × many allele chunks/worker) each saved rebuild
+        # is a couple-second-per-task win that compounds.
+        #
+        # The signature uses a SHA-256 fingerprint of the full peptide
+        # list rather than (count, first, last) — the latter would
+        # silently reuse a stale cache for two distinct peptide sets that
+        # share count/first/last (rare but real, and the failure mode is
+        # wrong PercentRankTransforms with no error). It intentionally
+        # omits ``peptide_batch_size``: that size only controls how the
+        # cache tensor is filled, not its contents or shape.
+        cache = self._calibration_fast_cache()
+        cache_signature = self._calibration_stage_cache_signature(
+            encoded_peptides, networks, device,
+        )
+        cache_hit = (
+            cache.stage_signature == cache_signature
+            and cache.cached_stages is not None
+        )
+
         if allele_batch_size in (None, "auto") or peptide_batch_size in (None, "auto"):
             # Resolve once, using the first network as the architecture
             # probe — all ensembles we serve have homogeneous layer
@@ -2624,7 +2661,11 @@ class Class1AffinityPredictor(object):
             auto_peptide, auto_allele = self._auto_size_calibration_batches(
                 probe_net, device, n_peptides, len(alleles),
                 num_workers_per_gpu=num_workers_per_gpu,
-                num_cached_networks=len(networks),
+                # If the peptide-stage cache is already resident in this
+                # worker, current CUDA free memory has already been reduced
+                # by that cache. Counting it again here makes later shards
+                # collapse to tiny fallback batches.
+                num_cached_networks=0 if cache_hit else len(networks),
                 peptide_stage_dim=probed_stage_dim,
                 num_sub_networks=num_sub_networks_probed,
             )
@@ -2645,30 +2686,7 @@ class Class1AffinityPredictor(object):
         peptide_batch_size = int(peptide_batch_size)
         allele_batch_size = int(allele_batch_size)
 
-        # Cross-task cached_stages reuse: when calibrate is sharded into
-        # many tasks, each task is a separate ``calibrate_percentile_ranks_fast``
-        # call inside the same worker process and re-builds
-        # ``cached_stages`` from scratch even though the peptide universe
-        # and the predictor are identical. Cache the built tensors on
-        # ``self._calibration_fast_cache`` and skip the rebuild whenever
-        # the signature matches. ``forward_peptide_stage`` runs once per
-        # peptide-batch per network, so for the production workload
-        # (~400k peptides × ~32 chunks/worker) each saved rebuild is
-        # a couple-second-per-task win that compounds.
-        #
-        # The signature uses a SHA-256 fingerprint of the full peptide
-        # list rather than (count, first, last) — the latter would
-        # silently reuse a stale cache for two distinct peptide sets that
-        # share count/first/last (rare but real, and the failure mode is
-        # wrong PercentRankTransforms with no error).
-        cache = self._calibration_fast_cache()
-        cache_signature = (
-            _peptide_sequences_fingerprint(encoded_peptides.sequences),
-            tuple(id(net) for net in networks),
-            str(device),
-            int(peptide_batch_size),
-        )
-        if cache.stage_signature == cache_signature and cache.cached_stages is not None:
+        if cache_hit:
             cached_stages = cache.cached_stages
         else:
             # Drop stale cache before building the new one — releases

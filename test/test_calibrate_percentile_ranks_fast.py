@@ -721,6 +721,61 @@ def test_calibrate_auto_size_still_floors_when_cache_does_not_fit(
         record.message for record in caplog.records)
 
 
+def test_calibrate_auto_size_reused_cache_uses_current_free_memory(
+        monkeypatch, caplog):
+    """A resident peptide-stage cache should not be counted twice.
+
+    Production calibration reuses the same peptide-stage cache across many
+    allele shards in each worker. After the first shard, CUDA free memory
+    already excludes the cache, so auto-sizing should reserve only scratch and
+    cartesian-forward memory instead of falling back to ``2000 x 1``.
+    """
+    import logging
+    from mhcflurry import class1_neural_network as cnn
+
+    class FakeCUDA:
+        type = "cuda"
+
+    class Dense:
+        out_features = 8505
+
+    class SubNet:
+        peptide_encoding_shape = (15, 21)
+        lc_layers = []
+        peptide_dense_layers = [Dense()]
+        allele_embedding = None
+        allele_dense_layers = []
+        dense_layers = [Dense()]
+
+    class Merged:
+        networks = [SubNet() for _ in range(9)]
+
+    monkeypatch.setattr(
+        cnn, "_free_device_memory_bytes",
+        lambda device: int(18.79 * (1 << 30)),
+    )
+
+    with caplog.at_level(logging.WARNING, logger="root"):
+        peptide_batch, allele_batch = (
+            Class1AffinityPredictor._auto_size_calibration_batches(
+                Merged(),
+                FakeCUDA(),
+                n_peptides=400_000,
+                n_alleles=30,
+                num_workers_per_gpu=1,
+                num_cached_networks=0,
+                peptide_stage_dim=8505,
+                num_sub_networks=9,
+            )
+        )
+
+    assert allele_batch > 1
+    assert peptide_batch > 2000
+    assert allele_batch * peptide_batch > 40_000
+    assert "Falling back to minimum batch" not in " ".join(
+        record.message for record in caplog.records)
+
+
 def test_peptide_sequences_fingerprint_distinguishes_middle_changes():
     """Same length, first, last → different middle must yield different keys.
 
@@ -760,6 +815,21 @@ def test_peptide_sequences_fingerprint_order_sensitive():
         _peptide_sequences_fingerprint(["A", "B"])
         != _peptide_sequences_fingerprint(["B", "A"])
     )
+
+
+def test_calibration_stage_cache_signature_omits_build_batch_size():
+    """The peptide-stage cache is independent of the fill chunk size."""
+    encoded = EncodableSequences.create(["AAAA", "CCCC"])
+    networks = [object()]
+    first = Class1AffinityPredictor._calibration_stage_cache_signature(
+        encoded, networks, torch.device("cpu"),
+    )
+    second = Class1AffinityPredictor._calibration_stage_cache_signature(
+        encoded, networks, torch.device("cpu"),
+    )
+
+    assert first == second
+    assert len(first) == 3
 
 
 def test_calibration_fast_cache_state_lifecycle():
