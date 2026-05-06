@@ -43,6 +43,20 @@ import numpy
 import pandas
 
 
+def _matplotlib_available():
+    """Return ``True`` when PNG plots can be written in this environment."""
+    try:
+        import matplotlib.pyplot  # noqa: F401
+    except ImportError as exc:
+        print(
+            "Skipping PNG loss plots: matplotlib is not installed "
+            f"({exc}). Summary CSV will still be written.",
+            flush=True,
+        )
+        return False
+    return True
+
+
 def _parse_config_json(raw):
     """Handle both JSON and Python-repr config_json encodings."""
     try:
@@ -298,21 +312,23 @@ def main():
         f"{len(selected_names)} selected."
     )
 
-    _plot_all_curves(
-        selected_names, all_models,
-        os.path.join(args.out, "loss_curves_by_model.png"),
-        title_suffix="(selected in color)",
-    )
-    _plot_by_arch(
-        all_models,
-        os.path.join(args.out, "loss_curves_by_arch.png"),
-    )
-    _plot_per_fold(
-        selected_names, all_models,
-        os.path.join(args.out, "per_fold_summary.png"),
-    )
+    wrote_plots = False
+    if _matplotlib_available():
+        _plot_all_curves(
+            selected_names, all_models,
+            os.path.join(args.out, "loss_curves_by_model.png"),
+            title_suffix="(selected in color)",
+        )
+        _plot_by_arch(
+            all_models,
+            os.path.join(args.out, "loss_curves_by_arch.png"),
+        )
+        _plot_per_fold(
+            selected_names, all_models,
+            os.path.join(args.out, "per_fold_summary.png"),
+        )
+        wrote_plots = True
 
-    # Summary CSV
     rows = []
     for m in all_models:
         for ph in m["phase_curves"]:
@@ -335,7 +351,10 @@ def main():
         os.path.join(args.out, "summary.csv"), index=False,
     )
 
-    print(f"Wrote plots + summary to {args.out}/")
+    if wrote_plots:
+        print(f"Wrote plots + summary to {args.out}/")
+    else:
+        print(f"Wrote summary to {args.out}/")
 
 
 if __name__ == "__main__":
