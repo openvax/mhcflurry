@@ -120,10 +120,12 @@ def filter_canonicalizable_alleles(alleles, log_label="alleles"):
         sample = ", ".join(dropped[:5]) + (
             ", ..." if len(dropped) > 5 else ""
         )
-        print(
+        logging.warning(
             "Skipping %d %s that fail canonicalization "
-            "(pseudogene/null/questionable): %s"
-            % (len(dropped), log_label, sample)
+            "(pseudogene/null/questionable): %s",
+            len(dropped),
+            log_label,
+            sample,
         )
     return filtered
 

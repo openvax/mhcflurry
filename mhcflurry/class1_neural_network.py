@@ -703,6 +703,139 @@ def _run_training_batch(
     return loss.detach()
 
 
+def _run_prepared_training_batches(
+    prepared_batches,
+    *,
+    optimizer,
+    loss_obj,
+    regularization_parameters,
+    l1_reg,
+    l2_reg,
+    timing_enabled,
+    device,
+):
+    """Run optimizer steps for a prepared batch stream.
+
+    Batch sources are responsible for efficient data plumbing. The in-memory
+    affinity path yields device-resident tensors selected by GPU indices; the
+    streaming pretrain path yields DataLoader chunks after its H2D copy. This
+    helper owns the learning step so fit() and fit_streaming_batches() share the
+    same optimizer/loss/timing behavior without forcing one data layout onto the
+    other.
+    """
+    losses = []
+    train_time = 0.0
+    train_rows = 0
+    first_batch_time = None
+    for prepared in prepared_batches:
+        batch_start = _timing_start(device, timing_enabled)
+        loss = _run_training_batch(
+            network=prepared["network"],
+            optimizer=optimizer,
+            loss_obj=loss_obj,
+            regularization_parameters=regularization_parameters,
+            l1_reg=l1_reg,
+            l2_reg=l2_reg,
+            inputs=prepared["inputs"],
+            y_batch=prepared["y_batch"],
+            weights_batch=prepared.get("weights_batch"),
+        )
+        batch_time = _timing_stop(batch_start, device, timing_enabled)
+        train_time += batch_time
+        if first_batch_time is None:
+            first_batch_time = batch_time
+        train_rows += int(prepared["row_count"])
+        losses.append(loss)
+    return {
+        "losses": losses,
+        "train_time": train_time,
+        "train_rows": train_rows,
+        "first_batch_time": first_batch_time,
+    }
+
+
+def _sync_mean_loss(losses, *, device, timing_enabled):
+    """Return mean detached loss with one device sync plus sync timing."""
+    loss_sync_start = _timing_start(device, timing_enabled)
+    train_loss = (
+        torch.stack(losses).mean().item()
+        if losses else float("nan")
+    )
+    loss_sync_time = _timing_stop(loss_sync_start, device, timing_enabled)
+    return train_loss, loss_sync_time
+
+
+def _validation_interval_from_hyperparameters(hyperparameters):
+    """Return normalized validation interval for both training paths."""
+    return max(1, int(hyperparameters.get("validation_interval", 1) or 1))
+
+
+def _early_stop_reached(
+    *,
+    epoch_index,
+    min_val_loss_epoch,
+    patience,
+    min_epochs=0,
+    early_stopping=True,
+):
+    """Shared early-stopping decision using zero-based epoch indices."""
+    if not early_stopping or min_val_loss_epoch is None:
+        return False
+    threshold = max(
+        int(min_val_loss_epoch) + int(patience),
+        int(min_epochs) - 1,
+    )
+    return int(epoch_index) > threshold
+
+
+def _should_validate_epoch(
+    *,
+    validation_enabled,
+    epoch_index,
+    max_epochs,
+    validation_interval,
+    early_stopping,
+    min_val_loss_epoch,
+    patience,
+    min_epochs=0,
+):
+    """Shared validation cadence for fit() and fit_streaming_batches()."""
+    if not validation_enabled:
+        return False
+    is_last_epoch = int(epoch_index) == int(max_epochs) - 1
+    patience_would_trigger = _early_stop_reached(
+        epoch_index=epoch_index,
+        min_val_loss_epoch=min_val_loss_epoch,
+        patience=patience,
+        min_epochs=min_epochs,
+        early_stopping=early_stopping,
+    )
+    return (
+        int(epoch_index) % int(validation_interval) == 0
+        or is_last_epoch
+        or patience_would_trigger
+    )
+
+
+def _carry_forward_validation_loss(fit_info):
+    """Keep val_loss aligned with epochs when validation is skipped."""
+    return fit_info["val_loss"][-1] if fit_info["val_loss"] else float("nan")
+
+
+def _update_min_validation_loss(
+    *,
+    val_loss,
+    epoch_index,
+    min_val_loss,
+    min_val_loss_epoch,
+    min_delta,
+):
+    """Update min validation state after a measured validation epoch."""
+    if min_val_loss is None or val_loss < min_val_loss - min_delta:
+        return val_loss, epoch_index
+    return min_val_loss, min_val_loss_epoch
+
+
 def _effective_num_workers(num_workers):
     """Downgrade ``num_workers`` to 0 when running inside a daemon process.
 
@@ -3198,7 +3331,6 @@ class Class1NeuralNetwork(object):
         min_val_loss_iteration = None
         min_val_loss = None
         last_progress_print = 0
-        epoch = 1
         first_batch_time = None
 
         # The first batch establishes the compiled fast-path shape.
@@ -3207,164 +3339,184 @@ class Class1NeuralNetwork(object):
         # triggering a second compile.
         expected_chunk_shape = None
 
-        while True:
+        validation_interval = _validation_interval_from_hyperparameters(
+            self.hyperparameters)
+
+        for epoch_index in range(int(epochs)):
+            epoch_num = epoch_index + 1
             epoch_start_time = time.time()
             epoch_wall_start = time.perf_counter()
             network.train()
 
-            epoch_losses = []
             epoch_fetch_time = 0.0
             epoch_h2d_time = 0.0
-            epoch_train_time = 0.0
-            epoch_num_train_rows = 0
-            for step in range(steps_per_epoch):
-                fetch_start = time.perf_counter()
-                try:
-                    batch = next(iterator)
-                except StopIteration:
-                    if generator_factory is None:
-                        break
-                    fit_info["iterator_restarts"] += 1
-                    iterator = make_iterator()
+
+            def prepared_streaming_batches():
+                nonlocal iterator
+                nonlocal expected_chunk_shape
+                nonlocal epoch_fetch_time
+                nonlocal epoch_h2d_time
+                for _step in range(steps_per_epoch):
+                    fetch_start = time.perf_counter()
                     try:
                         batch = next(iterator)
                     except StopIteration:
-                        break
-                epoch_fetch_time += time.perf_counter() - fetch_start
+                        if generator_factory is None:
+                            break
+                        fit_info["iterator_restarts"] += 1
+                        iterator = make_iterator()
+                        try:
+                            batch = next(iterator)
+                        except StopIteration:
+                            break
+                    epoch_fetch_time += time.perf_counter() - fetch_start
 
-                if expected_chunk_shape is None:
-                    expected_chunk_shape = batch["peptide"].shape
-                # Measure H2D separately from the training compute. Both paths
-                # pay a cuda.synchronize per
-                # batch when MHCFLURRY_ENABLE_TIMING=1; when disabled the
-                # _timing_start/stop calls are just time.perf_counter and
-                # the two sub-timers collapse into one.
-                h2d_start = _timing_start(device, timing_enabled)
-                inputs, y_tensor, weights_batch = _move_fit_batch_to_device(
-                    batch,
-                    device,
-                    non_blocking=non_blocking_h2d,
-                )
-                epoch_h2d_time += _timing_stop(
-                    h2d_start, device, timing_enabled
-                )
-                batch_start = _timing_start(device, timing_enabled)
-                loss = _run_training_batch(
-                    network=(
-                        network
-                        if batch["peptide"].shape == expected_chunk_shape
-                        else eager_network
-                    ),
-                    optimizer=optimizer,
-                    loss_obj=loss_obj,
-                    regularization_parameters=regularization_parameters,
-                    l1_reg=l1_reg,
-                    l2_reg=l2_reg,
-                    inputs=inputs,
-                    y_batch=y_tensor,
-                    weights_batch=weights_batch,
-                )
-                batch_time = _timing_stop(batch_start, device, timing_enabled)
-                epoch_train_time += batch_time
-                if first_batch_time is None:
-                    first_batch_time = batch_time
-                mutable_generator_state["yielded_values"] += len(batch["y"])
-                epoch_num_train_rows += len(batch["y"])
-                epoch_losses.append(loss)
+                    if expected_chunk_shape is None:
+                        expected_chunk_shape = batch["peptide"].shape
+                    # Measure H2D separately from training compute. When timing
+                    # is disabled, _timing_start/stop are cheap wall-clock reads;
+                    # when enabled, they synchronize around the copy.
+                    h2d_start = _timing_start(device, timing_enabled)
+                    inputs, y_tensor, weights_batch = _move_fit_batch_to_device(
+                        batch,
+                        device,
+                        non_blocking=non_blocking_h2d,
+                    )
+                    epoch_h2d_time += _timing_stop(
+                        h2d_start, device, timing_enabled
+                    )
+                    mutable_generator_state["yielded_values"] += len(batch["y"])
+                    yield {
+                        "network": (
+                            network
+                            if batch["peptide"].shape == expected_chunk_shape
+                            else eager_network
+                        ),
+                        "inputs": inputs,
+                        "y_batch": y_tensor,
+                        "weights_batch": weights_batch,
+                        "row_count": len(batch["y"]),
+                    }
 
-            # Compute validation loss in fixed-size batches — reuse the
-            # device tensors hoisted before the epoch loop (val data is
-            # static). Single-shot forward pass over the entire pretrain
-            # validation set (typically 50K+ rows) was dominating VRAM
-            # and defeating shape-stable optimization.
-            network.eval()
+            train_epoch_result = _run_prepared_training_batches(
+                prepared_streaming_batches(),
+                optimizer=optimizer,
+                loss_obj=loss_obj,
+                regularization_parameters=regularization_parameters,
+                l1_reg=l1_reg,
+                l2_reg=l2_reg,
+                timing_enabled=timing_enabled,
+                device=device,
+            )
+            if first_batch_time is None:
+                first_batch_time = train_epoch_result["first_batch_time"]
+
+            should_validate_this_epoch = _should_validate_epoch(
+                validation_enabled=True,
+                epoch_index=epoch_index,
+                max_epochs=epochs,
+                validation_interval=validation_interval,
+                early_stopping=True,
+                min_val_loss_epoch=min_val_loss_iteration,
+                patience=patience,
+                min_epochs=min_epochs,
+            )
             validation_time = 0.0
-            with torch.inference_mode():
-                validation_start = _timing_start(device, timing_enabled)
-                val_batch_size = _effective_validation_batch_size(
-                    device,
-                    self.hyperparameters["validation_batch_size"],
-                    self.hyperparameters["minibatch_size"],
-                    model=eager_network,
-                    num_workers_per_gpu=dataloader_num_workers + 1
-                    if dataloader_num_workers else 1,
+            val_batch_size = None
+            val_loss = _carry_forward_validation_loss(fit_info)
+            if should_validate_this_epoch:
+                # Compute validation loss in fixed-size batches — reuse the
+                # device tensors hoisted before the epoch loop (val data is
+                # static). Single-shot forward pass over the entire pretrain
+                # validation set (typically 50K+ rows) was dominating VRAM
+                # and defeating shape-stable optimization.
+                network.eval()
+                with torch.inference_mode():
+                    validation_start = _timing_start(device, timing_enabled)
+                    val_batch_size = _effective_validation_batch_size(
+                        device,
+                        self.hyperparameters["validation_batch_size"],
+                        self.hyperparameters["minibatch_size"],
+                        model=eager_network,
+                        num_workers_per_gpu=dataloader_num_workers + 1
+                        if dataloader_num_workers else 1,
+                    )
+                    fit_info["effective_validation_batch_size"] = val_batch_size
+                    val_loss = _batched_validation_loss(
+                        network=network,
+                        eager_network=eager_network,
+                        val_peptide=val_peptide_device,
+                        val_allele=val_allele_device,
+                        val_y=val_y_device,
+                        val_weights=None,
+                        loss_obj=loss_obj,
+                        batch_size=val_batch_size,
+                    )
+                    regularization_penalty = self._regularization_penalty(
+                        regularization_parameters,
+                        l1=l1_reg,
+                        l2=l2_reg,
+                    )
+                    if regularization_penalty is not None:
+                        val_loss = val_loss + regularization_penalty.item()
+                    validation_time = _timing_stop(
+                        validation_start, device, timing_enabled
+                    )
+                fit_info["val_loss"].append(val_loss)
+                (
+                    min_val_loss,
+                    min_val_loss_iteration,
+                ) = _update_min_validation_loss(
+                    val_loss=val_loss,
+                    epoch_index=epoch_index,
+                    min_val_loss=min_val_loss,
+                    min_val_loss_epoch=min_val_loss_iteration,
+                    min_delta=min_delta,
                 )
-                fit_info["effective_validation_batch_size"] = val_batch_size
-                val_loss = _batched_validation_loss(
-                    network=network,
-                    eager_network=eager_network,
-                    val_peptide=val_peptide_device,
-                    val_allele=val_allele_device,
-                    val_y=val_y_device,
-                    val_weights=None,
-                    loss_obj=loss_obj,
-                    batch_size=val_batch_size,
-                )
-                regularization_penalty = self._regularization_penalty(
-                    regularization_parameters,
-                    l1=l1_reg,
-                    l2=l2_reg,
-                )
-                if regularization_penalty is not None:
-                    val_loss = val_loss + regularization_penalty.item()
-                validation_time = _timing_stop(
-                    validation_start, device, timing_enabled
-                )
+            else:
+                fit_info["val_loss"].append(val_loss)
 
             epoch_time = time.time() - epoch_start_time
-            # Single GPU→CPU sync per epoch for the accumulated per-step
-            # loss tensors. See the ``epoch_losses.append(loss.detach())``
-            # comment inside the step loop above. When timing is disabled
-            # this .item() is the first CUDA sync of the epoch and blocks
-            # on the entire queued training pass; when enabled we already
-            # synced per-step so the drain is near-zero. The timing breakdown
-            # records it either way so fit_info sums to the wall clock.
-            loss_sync_start = _timing_start(device, timing_enabled)
-            train_loss = (
-                torch.stack(epoch_losses).mean().item()
-                if epoch_losses else float('nan')
-            )
-            epoch_loss_sync_time = _timing_stop(
-                loss_sync_start, device, timing_enabled
+            train_loss, epoch_loss_sync_time = _sync_mean_loss(
+                train_epoch_result["losses"],
+                device=device,
+                timing_enabled=timing_enabled,
             )
             fit_info["loss"].append(train_loss)
-            fit_info["val_loss"].append(val_loss)
             if timing_enabled:
                 fit_info["epoch_fetch_time"].append(epoch_fetch_time)
                 fit_info["epoch_h2d_time"].append(epoch_h2d_time)
-                fit_info["epoch_train_time"].append(epoch_train_time)
+                fit_info["epoch_train_time"].append(
+                    train_epoch_result["train_time"])
                 fit_info["epoch_loss_sync_time"].append(epoch_loss_sync_time)
                 fit_info["epoch_validation_time"].append(validation_time)
-                fit_info["epoch_num_train_batches"].append(len(epoch_losses))
-                fit_info["epoch_num_train_rows"].append(epoch_num_train_rows)
+                fit_info["epoch_num_train_batches"].append(
+                    len(train_epoch_result["losses"]))
+                fit_info["epoch_num_train_rows"].append(
+                    train_epoch_result["train_rows"])
                 fit_info["epoch_num_validation_batches"].append(
                     int(numpy.ceil(len(validation_affinities) / val_batch_size))
+                    if val_batch_size else 0
                 )
                 fit_info["epoch_total_time"].append(
                     time.perf_counter() - epoch_wall_start
                 )
 
-            if min_val_loss is None or val_loss < min_val_loss - min_delta:
-                min_val_loss = val_loss
-                min_val_loss_iteration = epoch
-
-            patience_epoch_threshold = min(
-                epochs, max(min_val_loss_iteration + patience, min_epochs)
-            )
-
             progress_message = (
                 "epoch %3d/%3d [%0.2f sec.]: loss=%g val_loss=%g. Min val "
-                "loss %g at epoch %s. Cum. points: %d. Stop at epoch %d."
+                "loss %g at epoch %s. Cum. points: %d."
                 % (
-                    epoch,
+                    epoch_num,
                     epochs,
                     epoch_time,
                     train_loss,
                     val_loss,
-                    min_val_loss,
-                    min_val_loss_iteration,
+                    min_val_loss if min_val_loss is not None else numpy.nan,
+                    (
+                        min_val_loss_iteration + 1
+                        if min_val_loss_iteration is not None else None
+                    ),
                     mutable_generator_state["yielded_values"],
-                    patience_epoch_threshold,
                 )
             ).strip()
 
@@ -3377,11 +3529,16 @@ class Class1NeuralNetwork(object):
             if progress_callback:
                 progress_callback()
 
-            if epoch >= patience_epoch_threshold:
+            if _early_stop_reached(
+                epoch_index=epoch_index,
+                min_val_loss_epoch=min_val_loss_iteration,
+                patience=patience,
+                min_epochs=min_epochs,
+                early_stopping=True,
+            ):
                 if progress_print_interval is not None:
                     print(progress_preamble, "STOPPING", progress_message)
                 break
-            epoch += 1
 
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = mutable_generator_state["yielded_values"]
@@ -3975,82 +4132,65 @@ class Class1NeuralNetwork(object):
             train_loop_wall_start = time.perf_counter()
 
             batch_size = _effective_minibatch
-            train_losses = []
-            epoch_num_train_rows = 0
             n_train_epoch = int(train_indices_dev_full.shape[0])
             full_batch_count = (n_train_epoch // batch_size) * batch_size
-            # --- Device-resident inner loop ---
-            # No DataLoader, no per-batch H2D. Indices live on device;
-            # batches are built by index_select into the combined
-            # buffer that holds [RN | real] rows.
-            if full_batch_count > 0:
-                train_indices_dev = train_indices_dev_full[:full_batch_count]
-                num_full_batches = full_batch_count // batch_size
-                for step in range(num_full_batches):
-                    batch_indices = train_indices_dev[
-                        step * batch_size : (step + 1) * batch_size
-                    ]
+
+            def prepared_device_batches():
+                # --- Device-resident inner loop ---
+                # No DataLoader, no per-batch H2D. Indices live on device;
+                # batches are built by index_select into the combined
+                # buffer that holds [RN | real] rows.
+                if full_batch_count > 0:
+                    train_indices_dev = train_indices_dev_full[:full_batch_count]
+                    num_full_batches = full_batch_count // batch_size
+                    for step in range(num_full_batches):
+                        batch_indices = train_indices_dev[
+                            step * batch_size : (step + 1) * batch_size
+                        ]
+                        inputs, y_batch, weights_batch = (
+                            affinity_training_data.batch_for_indices(batch_indices)
+                        )
+                        yield {
+                            "network": network,
+                            "inputs": inputs,
+                            "y_batch": y_batch,
+                            "weights_batch": weights_batch,
+                            "row_count": int(y_batch.shape[0]),
+                        }
+                tail_count = n_train_epoch - full_batch_count
+                if tail_count > 0:
+                    tail_indices_dev = train_indices_dev_full[full_batch_count:]
                     inputs, y_batch, weights_batch = (
-                        affinity_training_data.batch_for_indices(batch_indices)
+                        affinity_training_data.batch_for_indices(tail_indices_dev)
                     )
-                    batch_start = _timing_start(device, timing_enabled)
-                    loss = _run_training_batch(
-                        network=network,
-                        optimizer=optimizer,
-                        loss_obj=loss_obj,
-                        regularization_parameters=regularization_parameters,
-                        l1_reg=l1_reg,
-                        l2_reg=l2_reg,
-                        inputs=inputs,
-                        y_batch=y_batch,
-                        weights_batch=weights_batch,
-                    )
-                    batch_time = _timing_stop(
-                        batch_start, device, timing_enabled
-                    )
-                    train_loop_time += batch_time
-                    if first_batch_time is None:
-                        first_batch_time = batch_time
-                    epoch_num_train_rows += int(y_batch.shape[0])
-                    train_losses.append(loss)
-            tail_count = n_train_epoch - full_batch_count
-            if tail_count > 0:
-                tail_indices_dev = train_indices_dev_full[full_batch_count:]
-                inputs, y_batch, weights_batch = (
-                    affinity_training_data.batch_for_indices(tail_indices_dev)
-                )
-                batch_start = _timing_start(device, timing_enabled)
-                loss = _run_training_batch(
-                    network=eager_network,
-                    optimizer=optimizer,
-                    loss_obj=loss_obj,
-                    regularization_parameters=regularization_parameters,
-                    l1_reg=l1_reg,
-                    l2_reg=l2_reg,
-                    inputs=inputs,
-                    y_batch=y_batch,
-                    weights_batch=weights_batch,
-                )
-                train_loop_time += _timing_stop(
-                    batch_start, device, timing_enabled
-                )
-                epoch_num_train_rows += int(y_batch.shape[0])
-                train_losses.append(loss)
+                    yield {
+                        "network": eager_network,
+                        "inputs": inputs,
+                        "y_batch": y_batch,
+                        "weights_batch": weights_batch,
+                        "row_count": int(y_batch.shape[0]),
+                    }
+
+            train_epoch_result = _run_prepared_training_batches(
+                prepared_device_batches(),
+                optimizer=optimizer,
+                loss_obj=loss_obj,
+                regularization_parameters=regularization_parameters,
+                l1_reg=l1_reg,
+                l2_reg=l2_reg,
+                timing_enabled=timing_enabled,
+                device=device,
+            )
+            train_loop_time += train_epoch_result["train_time"]
+            if first_batch_time is None:
+                first_batch_time = train_epoch_result["first_batch_time"]
 
             epoch_time = time.time() - epoch_start
             train_loop_wall_time = time.perf_counter() - train_loop_wall_start
-            # Single GPU→CPU sync per epoch over accumulated loss tensors.
-            # Without timing, this .item() is the first sync of the
-            # epoch and blocks on the entire queued training pass; with timing
-            # we already synced per-batch so the drain is near-zero. The
-            # fit_info breakdown records either regime.
-            loss_sync_start = _timing_start(device, timing_enabled)
-            train_loss = (
-                torch.stack(train_losses).mean().item()
-                if train_losses else float('nan')
-            )
-            epoch_loss_sync_time = _timing_stop(
-                loss_sync_start, device, timing_enabled
+            train_loss, epoch_loss_sync_time = _sync_mean_loss(
+                train_epoch_result["losses"],
+                device=device,
+                timing_enabled=timing_enabled,
             )
             fit_info["loss"].append(train_loss)
 
@@ -4067,35 +4207,20 @@ class Class1NeuralNetwork(object):
             #   3. when patience would trigger this epoch (so the saved
             #      val_loss reflects the actual stop state, not a stale
             #      carried-forward value).
-            validation_interval = max(
-                1, int(self.hyperparameters.get("validation_interval", 1) or 1)
-            )
-            is_last_epoch = epoch == self.hyperparameters["max_epochs"] - 1
-            patience_would_trigger = (
-                val_split > 0
-                and self.hyperparameters.get("early_stopping", False)
-                and min_val_loss_iteration is not None
-                and epoch > (
-                    min_val_loss_iteration + self.hyperparameters["patience"]
-                )
-            )
-            should_validate_this_epoch = (
-                val_split > 0
-                and (
-                    epoch % validation_interval == 0
-                    or is_last_epoch
-                    or patience_would_trigger
-                )
+            validation_interval = _validation_interval_from_hyperparameters(
+                self.hyperparameters)
+            val_batch_size = None
+            should_validate_this_epoch = _should_validate_epoch(
+                validation_enabled=val_split > 0,
+                epoch_index=epoch,
+                max_epochs=self.hyperparameters["max_epochs"],
+                validation_interval=validation_interval,
+                early_stopping=self.hyperparameters.get("early_stopping", False),
+                min_val_loss_epoch=min_val_loss_iteration,
+                patience=self.hyperparameters["patience"],
             )
             if val_split > 0 and not should_validate_this_epoch:
-                # Carry forward the previous measurement so fit_info
-                # arrays stay aligned with epoch index. ``val_loss``
-                # equals the carried value, so the min-val update
-                # below cannot fire spuriously on a skipped epoch.
-                prev_val_loss = (
-                    fit_info["val_loss"][-1]
-                    if fit_info["val_loss"] else float("nan")
-                )
+                prev_val_loss = _carry_forward_validation_loss(fit_info)
                 fit_info["val_loss"].append(prev_val_loss)
                 val_loss = prev_val_loss
             if should_validate_this_epoch:
@@ -4190,16 +4315,24 @@ class Class1NeuralNetwork(object):
             # is anchored to the epoch the measurement was taken, not a
             # later epoch that copied the same value).
             if val_split > 0:
-                if should_validate_this_epoch and (
-                    min_val_loss is None
-                    or val_loss < min_val_loss - self.hyperparameters["min_delta"]
-                ):
-                    min_val_loss = val_loss
-                    min_val_loss_iteration = epoch
+                if should_validate_this_epoch:
+                    min_val_loss, min_val_loss_iteration = (
+                        _update_min_validation_loss(
+                            val_loss=val_loss,
+                            epoch_index=epoch,
+                            min_val_loss=min_val_loss,
+                            min_val_loss_epoch=min_val_loss_iteration,
+                            min_delta=self.hyperparameters["min_delta"],
+                        )
+                    )
 
                 if self.hyperparameters["early_stopping"]:
-                    threshold = min_val_loss_iteration + self.hyperparameters["patience"]
-                    if epoch > threshold:
+                    if _early_stop_reached(
+                        epoch_index=epoch,
+                        min_val_loss_epoch=min_val_loss_iteration,
+                        patience=self.hyperparameters["patience"],
+                        early_stopping=True,
+                    ):
                         if progress_print_interval is not None:
                             print(
                                 (
@@ -4274,13 +4407,16 @@ class Class1NeuralNetwork(object):
                 fit_info["epoch_validation_time"].append(
                     validation_compute_time
                 )
-                fit_info["epoch_num_train_batches"].append(len(train_losses))
-                fit_info["epoch_num_train_rows"].append(epoch_num_train_rows)
+                fit_info["epoch_num_train_batches"].append(
+                    len(train_epoch_result["losses"]))
+                fit_info["epoch_num_train_rows"].append(
+                    train_epoch_result["train_rows"])
                 fit_info["epoch_tail_train_rows"].append(
                     n_train_epoch - full_batch_count
                 )
                 fit_info["epoch_num_validation_batches"].append(
-                    int(numpy.ceil(n_val / val_batch_size)) if n_val > 0 else 0
+                    int(numpy.ceil(n_val / val_batch_size))
+                    if val_batch_size else 0
                 )
                 fit_info["epoch_callback_time"].append(callback_time)
                 fit_info["epoch_gc_time"].append(gc_time)

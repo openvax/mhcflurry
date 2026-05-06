@@ -248,6 +248,8 @@ def _predict_dataframe_chunk(predictor, df, options):
 
     predictions = predictions.reset_index(drop=True)
     predictions.index = df.index
+    if "peptide_num" in predictions.columns:
+        predictions["peptide_num"] = predictions.index
     return predictions
 
 

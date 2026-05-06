@@ -631,6 +631,41 @@ def test_fit_generator_restarts_factory_after_exhaustion():
     assert info["iterator_restarts"] >= 3
 
 
+def test_fit_generator_validation_interval_skips_off_interval_epochs():
+    """Streaming training should share fit() validation cadence semantics."""
+    _seed_everything(seed=19840)
+
+    peptides = EncodableSequences(TRAIN_PEPTIDES[:8])
+    affinities = numpy.linspace(50.0, 50000.0, 8)
+    allele_list = [TRAIN_ALLELES_CYCLE[i % 3] for i in range(8)]
+    alleles = AlleleEncoding(
+        alleles=allele_list, allele_to_sequence=ALLELE_TO_SEQUENCE,
+    )
+    hp = _tiny_hyperparameters()
+    hp["validation_interval"] = 3
+
+    net = Class1NeuralNetwork(**hp)
+    net.fit_generator(
+        generator=(),
+        generator_factory=_make_preencoded_fit_generator,
+        generator_batches_are_encoded=True,
+        validation_peptide_encoding=peptides,
+        validation_affinities=affinities,
+        validation_allele_encoding=alleles,
+        steps_per_epoch=1,
+        epochs=5,
+        min_epochs=5,
+        patience=100,
+        verbose=0,
+        progress_print_interval=None,
+    )
+
+    val_loss = net.fit_info[-1]["val_loss"]
+    assert len(val_loss) == 5
+    assert val_loss[1] == val_loss[0]
+    assert val_loss[2] == val_loss[0]
+
+
 def test_fit_generator_dataset_is_picklable_with_live_generator():
     """Dataset must pickle cleanly even when caller passes a live generator.
 

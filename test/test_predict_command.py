@@ -31,6 +31,44 @@ HLA-B4403,PPPPPPPP,18
 '''.strip()
 
 
+def test_predict_dataframe_chunk_preserves_global_peptide_num():
+    class FakePredictor:
+        def predict_affinity(
+                self,
+                peptides,
+                alleles,
+                sample_names,
+                throw,
+                include_affinity_percentile,
+                model_kwargs):
+            return pandas.DataFrame({
+                "peptide": list(peptides),
+                "peptide_num": list(range(len(peptides))),
+                "sample_name": list(sample_names),
+                "affinity": [1.0] * len(peptides),
+            })
+
+    df = pandas.DataFrame({
+        "allele": ["HLA-A*02:01", "HLA-A*02:01"],
+        "peptide": ["SIINFEKL", "GILGFVFTL"],
+    }, index=[4, 5])
+    predictions = predict_command._predict_dataframe_chunk(
+        FakePredictor(),
+        df,
+        {
+            "affinity_only": True,
+            "allele_column": "allele",
+            "peptide_column": "peptide",
+            "throw": True,
+            "include_affinity_percentile": False,
+            "affinity_model_kwargs": {},
+        },
+    )
+
+    assert list(predictions.index) == [4, 5]
+    assert list(predictions.peptide_num) == [4, 5]
+
+
 @pytest.mark.slow
 def test_csv():
     args = ["--allele-column", "Allele", "--peptide-column", "Peptide"]
