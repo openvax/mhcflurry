@@ -5,7 +5,8 @@ import logging
 import shlex
 import time
 import warnings
-from os.path import join, exists, abspath, dirname
+from glob import glob
+from os.path import join, exists, abspath, dirname, basename
 from os import mkdir, environ
 from socket import gethostname
 from getpass import getuser
@@ -37,6 +38,20 @@ DEFAULT_CENTRALITY_MEASURE = "mean"
 # Any value > 0 will result in attempting to optimize models after loading.
 OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 1))
 
+PSEUDOSEQUENCE_FILENAMES_BY_LENGTH = {
+    34: "pseudosequences.netmhcpan.34aa.csv",
+    37: "pseudosequences.mhcflurry.37aa.csv",
+    39: "pseudosequences.mhcflurry.39aa.csv",
+}
+
+PSEUDOSEQUENCE_FILENAME_PREFERENCE = (
+    "allele_sequences.csv",
+    "pseudosequences.mhcflurry.39aa.csv",
+    "pseudosequences.mhcflurry.37aa.csv",
+    "pseudosequences.netmhcpan.34aa.csv",
+    "class1_pseudosequences.csv",
+)
+
 
 def _peptide_sequences_fingerprint(sequences):
     """Order-and-content-sensitive SHA-256 of a peptide list.
@@ -52,6 +67,45 @@ def _peptide_sequences_fingerprint(sequences):
         h.update(len(b).to_bytes(8, "little"))
         h.update(b)
     return h.hexdigest()
+
+
+def _pseudosequence_length(allele_to_sequence):
+    """Return the common pseudosequence length, or ``None`` if ambiguous."""
+    if not allele_to_sequence:
+        return None
+    lengths = set()
+    for sequence in allele_to_sequence.values():
+        if pandas.isnull(sequence):
+            continue
+        lengths.add(len(str(sequence)))
+    if len(lengths) == 1:
+        return lengths.pop()
+    return None
+
+
+def _pseudosequence_filename_for_mapping(allele_to_sequence):
+    """Return the canonical pseudosequence filename for a saved mapping."""
+    return PSEUDOSEQUENCE_FILENAMES_BY_LENGTH.get(
+        _pseudosequence_length(allele_to_sequence))
+
+
+def _pseudosequence_filename_candidates(models_dir):
+    """
+    Pseudosequence files accepted when loading a saved predictor.
+
+    ``allele_sequences.csv`` and ``class1_pseudosequences.csv`` are legacy
+    artifact filenames. The ``pseudosequences.*.*aa.csv`` names make the source
+    and representation width explicit for newly-generated artifacts.
+    """
+    result = []
+    for filename in PSEUDOSEQUENCE_FILENAME_PREFERENCE:
+        if exists(join(models_dir, filename)):
+            result.append(filename)
+    for path in sorted(glob(join(models_dir, "pseudosequences.*.*aa.csv"))):
+        filename = basename(path)
+        if filename not in result:
+            result.append(filename)
+    return result
 
 
 class _CalibrationFastCache(object):
@@ -114,8 +168,7 @@ class Class1AffinityPredictor(object):
             Ensemble of pan-allele models.
 
         allele_to_sequence : dict of string -> string
-            MHC allele name to fixed-length amino acid sequence (sometimes
-            referred to as the pseudosequence). Required only if
+            MHC allele name to fixed-length pseudosequence. Required only if
             class1_pan_allele_models is specified.
 
         manifest_df : `pandas.DataFrame`, optional
@@ -428,8 +481,8 @@ class Class1AffinityPredictor(object):
         The serialization format consists of a file called "manifest.csv" with
         the configurations of each Class1NeuralNetwork, along with per-network
         files giving the model weights. If there are pan-allele predictors in
-        the ensemble, the allele sequences are also stored in the
-        directory. There is also a small file "index.txt" with basic metadata:
+        the ensemble, the pseudosequences are also stored in the
+        directory. There is also a small file "info.txt" with basic metadata:
         when the models were trained, by whom, on what host.
 
         Parameters
@@ -503,16 +556,35 @@ class Class1AffinityPredictor(object):
                 pandas.DataFrame(rows).to_csv(
                     info_path, sep="\t", header=False, index=False)
 
-            # Save allele sequences
+            # Save pseudosequences. New artifacts get an explicit
+            # pseudosequences.<source>.<length>aa.csv filename while still
+            # writing allele_sequences.csv for older MHCflurry releases and
+            # external tooling.
             if self.allele_to_sequence is not None:
                 allele_to_sequence_df = pandas.DataFrame(
                     list(self.allele_to_sequence.items()),
                     columns=['allele', 'sequence']
                 )
-                allele_to_sequence_df.to_csv(
-                    join(models_dir, "allele_sequences.csv"), index=False)
-                logging.info(
-                    "Wrote: %s", join(models_dir, "allele_sequences.csv"))
+                legacy_path = join(models_dir, "allele_sequences.csv")
+                allele_to_sequence_df.to_csv(legacy_path, index=False)
+                logging.info("Wrote: %s", legacy_path)
+
+                pseudosequences_filename = (
+                    _pseudosequence_filename_for_mapping(
+                        self.allele_to_sequence))
+                if pseudosequences_filename is not None:
+                    pseudosequences_path = join(
+                        models_dir, pseudosequences_filename)
+                    pseudosequences_df = pandas.DataFrame(
+                        list(self.allele_to_sequence.items()),
+                        columns=['allele', 'pseudosequence'])
+                    pseudosequences_df.to_csv(
+                        pseudosequences_path, index=False)
+                    logging.info("Wrote: %s", pseudosequences_path)
+                else:
+                    logging.info(
+                        "Pseudosequences have mixed or unknown lengths; "
+                        "skipping explicit pseudosequences.*.*aa.csv alias.")
 
         if write_metadata and self.metadata_dataframes:
             for (name, df) in self.metadata_dataframes.items():
@@ -596,10 +668,9 @@ class Class1AffinityPredictor(object):
         allele_to_sequence = None
         allele_to_canonical = {}
         allele_sequences_filename = None
-        if exists(join(models_dir, "allele_sequences.csv")):
-            allele_sequences_filename = "allele_sequences.csv"
-        elif exists(join(models_dir, "class1_pseudosequences.csv")):
-            allele_sequences_filename = "class1_pseudosequences.csv"
+        candidates = _pseudosequence_filename_candidates(models_dir)
+        if candidates:
+            allele_sequences_filename = candidates[0]
 
         if allele_sequences_filename is not None:
             allele_to_sequence = pandas.read_csv(

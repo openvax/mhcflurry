@@ -16,7 +16,7 @@
 #   MINIBATCH_SIZES   space-separated list (default: "256 512 1024 2048 4096 8192 16384")
 #   TRAIN_DATA        train_data.csv.bz2 from prior run
 #   HYPERPARAMS_TPL   template hyperparameters.yaml to patch
-#   ALLELE_SEQUENCES  path to allele_sequences.csv
+#   ALLELE_SEQUENCES  path to a pseudosequence CSV
 #   PRETRAIN_DATA     path to random_peptide_predictions/predictions.csv.bz2
 #   PUBLIC_MODELS_DIR public 2.2.0 models.combined for eval comparison
 #   DATA_EVAL_DIR     data_evaluation/ for benchmark hits/decoys
@@ -50,7 +50,13 @@ SWEEP_OUT="${SWEEP_OUT:-$MHCFLURRY_OUT/full_sweep}"
 MINIBATCH_SIZES="${MINIBATCH_SIZES:-256 512 1024 2048 4096 8192 16384}"
 TRAIN_DATA="${TRAIN_DATA:-$MHCFLURRY_OUT/train_data.csv.bz2}"
 HYPERPARAMS_TPL="${HYPERPARAMS_TPL:-$MHCFLURRY_OUT/hyperparameters.yaml}"
-ALLELE_SEQUENCES="${ALLELE_SEQUENCES:-$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv}"
+if [ -z "${ALLELE_SEQUENCES:-}" ]; then
+  ALLELE_SEQUENCES_DIR="$(mhcflurry-downloads path allele_sequences)"
+  ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/pseudosequences.mhcflurry.39aa.csv"
+  if [ ! -f "$ALLELE_SEQUENCES" ]; then
+    ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/allele_sequences.csv"
+  fi
+fi
 PRETRAIN_DATA="${PRETRAIN_DATA:-$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2}"
 PUBLIC_MODELS_DIR="${PUBLIC_MODELS_DIR:-$(mhcflurry-downloads path models_class1_pan)/models.combined}"
 DATA_EVAL_DIR="${DATA_EVAL_DIR:-$(mhcflurry-downloads path data_evaluation)}"

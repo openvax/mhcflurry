@@ -84,11 +84,15 @@ do
         CONTINUE_INCOMPLETE_ARGS="--continue-incomplete"
     fi
 
-    ALLELE_SEQUENCES="$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv"
+    ALLELE_SEQUENCES_DIR="$(mhcflurry-downloads path allele_sequences)"
+    ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/pseudosequences.mhcflurry.39aa.csv"
+    if [ ! -f "$ALLELE_SEQUENCES" ]; then
+        ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/allele_sequences.csv"
+    fi
     HYPERPARAMETERS=hyperparameters.$kind.yaml
     if [ "$kind" == "34mer_sequence" ]
     then
-        ALLELE_SEQUENCES="$(mhcflurry-downloads path allele_sequences)/allele_sequences.no_differentiation.csv"
+        ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/allele_sequences.no_differentiation.csv"
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
 

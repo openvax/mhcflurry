@@ -360,7 +360,11 @@ python generate_hyperparameters.py > hyperparameters.yaml
 ARCH_COUNT=$(python -c "import yaml; print(len(yaml.safe_load(open('hyperparameters.yaml'))))")
 echo "Architectures in sweep: $ARCH_COUNT"
 
-ALLELE_SEQUENCES="$(mhcflurry-downloads path allele_sequences)/allele_sequences.csv"
+ALLELE_SEQUENCES_DIR="$(mhcflurry-downloads path allele_sequences)"
+ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/pseudosequences.mhcflurry.39aa.csv"
+if [ ! -f "$ALLELE_SEQUENCES" ]; then
+    ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/allele_sequences.csv"
+fi
 PRETRAIN_DATA="$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2"
 
 # ---- train all candidates (4 folds × ARCH_COUNT architectures) ------

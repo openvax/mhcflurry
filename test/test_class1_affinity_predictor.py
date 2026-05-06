@@ -88,6 +88,7 @@ def test_save_calibration_only_preserves_model_artifacts(tmp_path):
     assert manifest_path.read_text() == manifest_text
     assert info_path.read_text() == info_text
     assert allele_sequences_path.read_text() == allele_sequences_text
+    assert not (tmp_path / "pseudosequences.mhcflurry.37aa.csv").exists()
     assert not optimization_info_path.exists()
 
     motif_summary = pandas.read_csv(motif_summary_path)
@@ -113,6 +114,69 @@ def test_load_accepts_legacy_class1_pseudosequences_file(tmp_path):
 
     assert predictor.allele_to_sequence == {
         "HLA-A*02:01": "YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY",
+    }
+
+
+@pytest.mark.parametrize("filename,sequence", [
+    (
+        "pseudosequences.netmhcpan.34aa.csv",
+        "YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY",
+    ),
+    (
+        "pseudosequences.mhcflurry.37aa.csv",
+        "YFAMYGEKVAHTHVDTLYGVRYDHYYTWAVLAYTWYA",
+    ),
+    (
+        "pseudosequences.mhcflurry.39aa.csv",
+        "YFGERAMPYGEKVAHTHVDTLYGVRYHYYTWAVLAYTWY",
+    ),
+])
+def test_load_accepts_named_pseudosequence_files(tmp_path, filename, sequence):
+    (tmp_path / "manifest.csv").write_text("model_name,allele,config_json\n")
+    (tmp_path / filename).write_text(
+        "allele,pseudosequence\n"
+        "HLA-A*02:01,%s\n" % sequence
+    )
+
+    predictor = Class1AffinityPredictor.load(
+        str(tmp_path),
+        optimization_level=0,
+    )
+
+    assert predictor.allele_to_sequence == {"HLA-A*02:01": sequence}
+
+
+@pytest.mark.parametrize("sequence,expected_filename", [
+    (
+        "YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY",
+        "pseudosequences.netmhcpan.34aa.csv",
+    ),
+    (
+        "YFAMYGEKVAHTHVDTLYGVRYDHYYTWAVLAYTWYA",
+        "pseudosequences.mhcflurry.37aa.csv",
+    ),
+    (
+        "YFGERAMPYGEKVAHTHVDTLYGVRYHYYTWAVLAYTWY",
+        "pseudosequences.mhcflurry.39aa.csv",
+    ),
+])
+def test_save_writes_named_pseudosequence_alias(
+        tmp_path, sequence, expected_filename):
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={"HLA-A*02:01": sequence},
+    )
+
+    predictor.save(str(tmp_path))
+
+    legacy_df = pandas.read_csv(tmp_path / "allele_sequences.csv")
+    assert legacy_df.to_dict("list") == {
+        "allele": ["HLA-A*02:01"],
+        "sequence": [sequence],
+    }
+    named_df = pandas.read_csv(tmp_path / expected_filename)
+    assert named_df.to_dict("list") == {
+        "allele": ["HLA-A*02:01"],
+        "pseudosequence": [sequence],
     }
 
 

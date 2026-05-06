@@ -24,8 +24,9 @@ belong.
 - **`validate_against_public.py`** — affinity + presentation rank-correlation
   against the public mhcflurry release on a peptide × allele grid. Quick
   smell test that a new training run hasn't regressed.
-- **`validate_allele_sequences.py`** — confirms the
-  `allele_sequences.csv → renormalized → pseudosequence` pipeline is
+- **`validate_allele_sequences.py`** — confirms the model-shipped
+  pseudosequence CSV (`allele_sequences.csv` in older artifacts,
+  `pseudosequences.<source>.<length>aa.csv` in newer artifacts) is
   bit-stable across releases. Catches regressions in the mhcgnomes parse
   layer that would silently misroute predictions.
 - **`validate_presentation_with_flanks.py`** — fixed 10-peptide regression
