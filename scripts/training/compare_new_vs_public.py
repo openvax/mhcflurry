@@ -104,7 +104,8 @@ def _read_supported_alleles(predictor_dir):
     """Enumerate supported alleles from the predictor's bundled
     allele_sequences.csv -- avoids importing the predictor in the parent
     process (which would initialize CUDA before workers can pin GPUs)."""
-    path = os.path.join(predictor_dir, "allele_sequences.csv")
+    from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
+    path = os.path.join(predictor_dir, LEGACY_ALLELE_SEQUENCES_FILENAME)
     if not os.path.exists(path):
         # Fall back to system download path; layout matches predictor.
         return set()

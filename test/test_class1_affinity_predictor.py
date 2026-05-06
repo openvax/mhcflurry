@@ -18,6 +18,11 @@ from numpy import testing
 
 from mhcflurry.downloads import get_path
 from mhcflurry.percent_rank_transform import PercentRankTransform
+from mhcflurry.pseudosequences import (
+    LEGACY_ALLELE_SEQUENCES_FILENAME,
+    LEGACY_CLASS1_PSEUDOSEQUENCES_FILENAME,
+    PSEUDOSEQUENCE_FILENAMES_BY_LENGTH,
+)
 from mhcflurry.testing_utils import cleanup, startup
 
 DOWNLOADED_PREDICTOR = None
@@ -51,7 +56,7 @@ warnings.showwarning = warn_with_traceback
 def test_save_calibration_only_preserves_model_artifacts(tmp_path):
     manifest_path = tmp_path / "manifest.csv"
     info_path = tmp_path / "info.txt"
-    allele_sequences_path = tmp_path / "allele_sequences.csv"
+    allele_sequences_path = tmp_path / LEGACY_ALLELE_SEQUENCES_FILENAME
     optimization_info_path = tmp_path / "optimization_info.json"
     motif_summary_path = tmp_path / "motif_summary.csv.bz2"
 
@@ -88,7 +93,7 @@ def test_save_calibration_only_preserves_model_artifacts(tmp_path):
     assert manifest_path.read_text() == manifest_text
     assert info_path.read_text() == info_text
     assert allele_sequences_path.read_text() == allele_sequences_text
-    assert not (tmp_path / "pseudosequences.mhcflurry.37aa.csv").exists()
+    assert not (tmp_path / PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[37]).exists()
     assert not optimization_info_path.exists()
 
     motif_summary = pandas.read_csv(motif_summary_path)
@@ -102,7 +107,7 @@ def test_save_calibration_only_preserves_model_artifacts(tmp_path):
 
 def test_load_accepts_legacy_class1_pseudosequences_file(tmp_path):
     (tmp_path / "manifest.csv").write_text("model_name,allele,config_json\n")
-    (tmp_path / "class1_pseudosequences.csv").write_text(
+    (tmp_path / LEGACY_CLASS1_PSEUDOSEQUENCES_FILENAME).write_text(
         "allele,pseudosequence\n"
         "HLA-A*02:01,YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY\n"
     )
@@ -119,15 +124,15 @@ def test_load_accepts_legacy_class1_pseudosequences_file(tmp_path):
 
 @pytest.mark.parametrize("filename,sequence", [
     (
-        "pseudosequences.netmhcpan.34aa.csv",
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[34],
         "YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY",
     ),
     (
-        "pseudosequences.mhcflurry.37aa.csv",
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[37],
         "YFAMYGEKVAHTHVDTLYGVRYDHYYTWAVLAYTWYA",
     ),
     (
-        "pseudosequences.mhcflurry.39aa.csv",
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[39],
         "YFGERAMPYGEKVAHTHVDTLYGVRYHYYTWAVLAYTWY",
     ),
 ])
@@ -149,15 +154,15 @@ def test_load_accepts_named_pseudosequence_files(tmp_path, filename, sequence):
 @pytest.mark.parametrize("sequence,expected_filename", [
     (
         "YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY",
-        "pseudosequences.netmhcpan.34aa.csv",
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[34],
     ),
     (
         "YFAMYGEKVAHTHVDTLYGVRYDHYYTWAVLAYTWYA",
-        "pseudosequences.mhcflurry.37aa.csv",
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[37],
     ),
     (
         "YFGERAMPYGEKVAHTHVDTLYGVRYHYYTWAVLAYTWY",
-        "pseudosequences.mhcflurry.39aa.csv",
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[39],
     ),
 ])
 def test_save_writes_named_pseudosequence_alias(
@@ -168,7 +173,8 @@ def test_save_writes_named_pseudosequence_alias(
 
     predictor.save(str(tmp_path))
 
-    legacy_df = pandas.read_csv(tmp_path / "allele_sequences.csv")
+    legacy_df = pandas.read_csv(
+        tmp_path / LEGACY_ALLELE_SEQUENCES_FILENAME)
     assert legacy_df.to_dict("list") == {
         "allele": ["HLA-A*02:01"],
         "sequence": [sequence],

@@ -60,7 +60,7 @@ one-off tuning runs do not belong here.
 - **`set_cpu_threads.sh`** — Auto-computes the per-training-worker BLAS
   thread budget and uniformly sets `OMP_NUM_THREADS` /
   `MKL_NUM_THREADS` / `OPENBLAS_NUM_THREADS`. Sourced by
-  `pan_allele_release_affinity.sh`.
+  the release-stage scripts before they fork training workers.
 
 ## Profiling
 

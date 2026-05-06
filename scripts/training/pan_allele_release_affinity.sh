@@ -5,7 +5,7 @@
 # cluster). Uses the same `generate_hyperparameters.py`,
 # `reassign_mass_spec_training_data.py`, `additional_alleles.txt`, the
 # same curated_training_data and pretrain data (random_peptide_predictions),
-# same 4 folds, same architecture sweep, same --min-models/--max-models
+# same 4 folds, same architecture sweep, same min/max-models-per-fold
 # selection, and runs percentile-rank calibration on the final ensemble.
 #
 # Env:
@@ -17,6 +17,10 @@
 #                              mhcflurry pairs jobs 1:1 with GPUs.
 set -euo pipefail
 set -x
+
+pseudosequence_lookup() {
+    python -c 'from mhcflurry.pseudosequences import main; main()' "$@"
+}
 
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 
@@ -264,43 +268,19 @@ echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU; requested=$
 MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
 
 # DataLoader prefetch workers per training worker. Default ``auto`` is
-# resolved by the orchestrator (mhcflurry-class1-train-pan-allele-models)
-# at planning time via ``--dataloader-num-workers auto`` →
-# ``auto_dataloader_num_workers`` (vCPU + RAM + fit-worker plan, capped
-# at 4). On 8×A100-80GB Verda (176v / 16fit / 400G) this lands at 4,
-# matching the 2026-04-26 production benchmark. Set
-# DATALOADER_NUM_WORKERS=N (int) only when intentionally re-benchmarking;
-# the auto resolver covers the production tiers tested in
-# test/test_orchestrator_helpers.py. ``set_cpu_threads.sh`` still reads
-# this for OMP/MKL sizing, so the shell-side value must be numeric here:
-# resolve "auto" via the same helper Python uses.
+# resolved via the same helper the orchestrator uses so the shell-side OMP
+# budget and the training hyperparameters stay in lockstep.
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
-if [ "$DATALOADER_NUM_WORKERS" = "auto" ]; then
-    # Same Python helper that the orchestrator uses (and that the unit
-    # tests cover) so the OMP-thread budget computed below sees the same
-    # number that mhcflurry-class1-train-pan-allele-models will choose.
-    DATALOADER_NUM_WORKERS="$(NUM_FIT_WORKERS="$NUM_JOBS" python -c '
-import os
-from mhcflurry.local_parallelism import (
-    auto_dataloader_num_workers,
-    _system_ram_gb,
-)
-print(
-    auto_dataloader_num_workers(
-        num_fit_workers=int(os.environ["NUM_FIT_WORKERS"]),
-        ram_gb=_system_ram_gb(),
-    )
-)
-')"
-    printf >&2 \
-        "[pan_allele_release_affinity.sh] DATALOADER_NUM_WORKERS=auto resolved to %s\n" \
-        "$DATALOADER_NUM_WORKERS"
-fi
+
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/set_cpu_threads.sh"
+DATALOADER_NUM_WORKERS_REQUESTED="$DATALOADER_NUM_WORKERS"
+DATALOADER_NUM_WORKERS="$(resolve_dataloader_num_workers "$NUM_JOBS")"
+printf >&2 \
+    "[pan_allele_release_affinity.sh] DATALOADER_NUM_WORKERS=%s resolved to %s\n" \
+    "$DATALOADER_NUM_WORKERS_REQUESTED" "$DATALOADER_NUM_WORKERS"
 
 # Now that DATALOADER_NUM_WORKERS is a resolved int, build PARALLELISM_ARGS.
-# The orchestrator could also resolve "auto" on its own — passing the int
-# we just computed keeps the shell-side OMP budget (set_cpu_threads) and
-# the orchestrator-side hyperparameter injection in lockstep.
 PARALLELISM_ARGS=(
     --num-jobs "$NUM_JOBS"
     --max-tasks-per-worker "$MAX_TASKS_PER_WORKER"
@@ -326,8 +306,6 @@ fi
 # nproc, GPU count, worker count, dataloader worker count. User can
 # override any of {OMP,MKL,OPENBLAS}_NUM_THREADS before invoking this
 # script; the helper respects manual settings.
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/set_cpu_threads.sh"
 NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
     DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
 
@@ -361,10 +339,10 @@ ARCH_COUNT=$(python -c "import yaml; print(len(yaml.safe_load(open('hyperparamet
 echo "Architectures in sweep: $ARCH_COUNT"
 
 ALLELE_SEQUENCES_DIR="$(mhcflurry-downloads path allele_sequences)"
-ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/pseudosequences.mhcflurry.39aa.csv"
-if [ ! -f "$ALLELE_SEQUENCES" ]; then
-    ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/allele_sequences.csv"
-fi
+ALLELE_SEQUENCES="$(pseudosequence_lookup path \
+    --directory "$ALLELE_SEQUENCES_DIR" \
+    --length 39 \
+    --fallback-legacy)"
 PRETRAIN_DATA="$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2"
 
 # ---- train all candidates (4 folds × ARCH_COUNT architectures) ------
@@ -405,8 +383,8 @@ do
         --data "$UNSELECTED_DIR/train_data.csv.bz2" \
         --models-dir "$UNSELECTED_DIR" \
         --out-models-dir "$SELECTED_DIR" \
-        --min-models 2 \
-        --max-models 8 \
+        --min-models-per-fold 2 \
+        --max-models-per-fold 8 \
         "${PARALLELISM_ARGS[@]}"
     cp "$UNSELECTED_DIR/train_data.csv.bz2" "$SELECTED_DIR/train_data.csv.bz2"
 

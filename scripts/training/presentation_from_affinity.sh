@@ -8,10 +8,9 @@
 # Required env:
 #   AFFINITY_PREDICTOR   path to existing models.combined dir
 #   BASE_OUT             where to write processing/, presentation/
-#   REPO                 mhcflurry repo root (for downloads-generation/)
 #
 # Optional env (all have defaults compatible with release_full):
-#   GPUS, MAX_WORKERS_PER_GPU, NUM_JOBS, DATALOADER_NUM_WORKERS,
+#   REPO, GPUS, MAX_WORKERS_PER_GPU, NUM_JOBS, DATALOADER_NUM_WORKERS,
 #   MATMUL_PRECISION, MHCFLURRY_TORCH_COMPILE,
 #   PROCESSING_HELD_OUT_SAMPLES, PRESENTATION_DECOYS_PER_HIT
 set -euo pipefail
@@ -19,7 +18,9 @@ set -x
 
 : "${AFFINITY_PREDICTOR:?AFFINITY_PREDICTOR must be set}"
 : "${BASE_OUT:?BASE_OUT must be set}"
-: "${REPO:?REPO must be set}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RECIPE_DIR="$SCRIPT_DIR/release_exact"
+: "${REPO:=$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 export PYTHONUNBUFFERED=1
 export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
@@ -53,6 +54,16 @@ else
     NUM_JOBS="${NUM_JOBS:-$(( GPUS * MAX_WORKERS_PER_GPU ))}"
 fi
 
+# Resolve DataLoader prefetch workers before building parallelism args so the
+# shell-side CPU thread budget matches the mhcflurry worker hyperparameters.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/set_cpu_threads.sh"
+DATALOADER_NUM_WORKERS_REQUESTED="$DATALOADER_NUM_WORKERS"
+DATALOADER_NUM_WORKERS="$(resolve_dataloader_num_workers "$NUM_JOBS")"
+printf >&2 \
+    "[presentation_from_affinity.sh] DATALOADER_NUM_WORKERS=%s resolved to %s\n" \
+    "$DATALOADER_NUM_WORKERS_REQUESTED" "$DATALOADER_NUM_WORKERS"
+
 COMMON_PARALLELISM_ARGS=(
     --num-jobs "$NUM_JOBS"
     --max-tasks-per-worker 1000
@@ -64,6 +75,9 @@ COMMON_PARALLELISM_ARGS=(
 )
 [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && COMMON_PARALLELISM_ARGS+=(--enable-timing)
 
+NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
+    DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
+
 # ============================================================
 # STAGE 2 — PROCESSING
 # ============================================================
@@ -74,9 +88,9 @@ mhcflurry-downloads fetch data_mass_spec_annotated data_references
 
 cp "$REPO/downloads-generation/models_class1_processing/annotate_hits_with_expression.py" .
 cp "$REPO/downloads-generation/models_class1_processing/write_proteome_peptides.py" .
-cp "$REPO/downloads-generation/models_class1_processing/make_train_data.py" make_train_data.processing.py
-cp "$REPO/downloads-generation/models_class1_processing/generate_hyperparameters.base.py" .
-cp "$REPO/downloads-generation/models_class1_processing/generate_hyperparameters.variants.py" .
+cp "$RECIPE_DIR/make_train_data.processing.py" .
+cp "$RECIPE_DIR/generate_hyperparameters.base.py" .
+cp "$RECIPE_DIR/generate_hyperparameters.variants.py" .
 
 python annotate_hits_with_expression.py \
     --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
@@ -131,8 +145,8 @@ PY
         --data "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
         --models-dir "$(pwd)/models.unselected.$kind" \
         --out-models-dir "$(pwd)/models.selected.$kind" \
-        --min-models 1 \
-        --max-models 2 \
+        --min-models-per-fold 1 \
+        --max-models-per-fold 2 \
         "${COMMON_PARALLELISM_ARGS[@]}"
     cp "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
         "$(pwd)/models.selected.$kind/train_data.csv.bz2"
@@ -146,7 +160,7 @@ echo "STAGE 2 duration: $(( $(date +%s) - STAGE2_START )) sec"
 STAGE3_START=$(date +%s)
 cd "$BASE_OUT/presentation"
 
-cp "$REPO/downloads-generation/models_class1_presentation/make_train_data.py" \
+cp "$RECIPE_DIR/make_train_data.presentation.py" \
     make_train_data.presentation.py
 
 python make_train_data.presentation.py \

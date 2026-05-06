@@ -16,6 +16,7 @@ import pytest
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
+from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 from mhcflurry.train_pan_allele_models_command import (
     _pop_train_param,
     pretrain_data_iterator,
@@ -259,7 +260,8 @@ def run_and_check(n_jobs=0, delete=True, additional_args=[]):
 
     args = mhcflurry_cli("mhcflurry-class1-train-pan-allele-models") + [
         "--data", os.path.join(models_dir, "_train_data.csv"),
-        "--allele-sequences", get_path("allele_sequences", "allele_sequences.csv"),
+        "--allele-sequences", get_path(
+            "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
         "--pretrain-data", pretrain_data_filename,
         "--hyperparameters", hyperparameters_filename,
         "--out-models-dir", models_dir,

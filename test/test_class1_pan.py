@@ -11,6 +11,7 @@ from numpy.testing import assert_
 from mhcflurry import Class1NeuralNetwork
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
+from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 
 from mhcflurry.testing_utils import cleanup, startup
 
@@ -62,7 +63,7 @@ HYPERPARAMETERS = {
 
 ALLELE_TO_SEQUENCE = pandas.read_csv(
     get_path(
-        "allele_sequences", "allele_sequences.csv"),
+        "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
     index_col=0).sequence.to_dict()
 
 

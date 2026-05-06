@@ -45,6 +45,10 @@
 set -euo pipefail
 set -x
 
+pseudosequence_lookup() {
+  python -c 'from mhcflurry.pseudosequences import main; main()' "$@"
+}
+
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 SWEEP_OUT="${SWEEP_OUT:-$MHCFLURRY_OUT/full_sweep}"
 MINIBATCH_SIZES="${MINIBATCH_SIZES:-256 512 1024 2048 4096 8192 16384}"
@@ -52,10 +56,10 @@ TRAIN_DATA="${TRAIN_DATA:-$MHCFLURRY_OUT/train_data.csv.bz2}"
 HYPERPARAMS_TPL="${HYPERPARAMS_TPL:-$MHCFLURRY_OUT/hyperparameters.yaml}"
 if [ -z "${ALLELE_SEQUENCES:-}" ]; then
   ALLELE_SEQUENCES_DIR="$(mhcflurry-downloads path allele_sequences)"
-  ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/pseudosequences.mhcflurry.39aa.csv"
-  if [ ! -f "$ALLELE_SEQUENCES" ]; then
-    ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/allele_sequences.csv"
-  fi
+  ALLELE_SEQUENCES="$(pseudosequence_lookup path \
+    --directory "$ALLELE_SEQUENCES_DIR" \
+    --length 39 \
+    --fallback-legacy)"
 fi
 PRETRAIN_DATA="${PRETRAIN_DATA:-$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2}"
 PUBLIC_MODELS_DIR="${PUBLIC_MODELS_DIR:-$(mhcflurry-downloads path models_class1_pan)/models.combined}"

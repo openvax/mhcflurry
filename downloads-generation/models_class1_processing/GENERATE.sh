@@ -149,8 +149,8 @@ do
             --data "$MODELS_DIR/train_data.csv.bz2" \
             --models-dir "$MODELS_DIR" \
             --out-models-dir "$(pwd)/models.selected.$kind" \
-            --min-models 1 \
-            --max-models 2 \
+            --min-models-per-fold 1 \
+            --max-models-per-fold 2 \
             $PARALLELISM_ARGS
         cp "$MODELS_DIR/train_data.csv.bz2" "models.selected.$kind/train_data.csv.bz2"
     fi

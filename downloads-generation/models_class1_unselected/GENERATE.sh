@@ -12,6 +12,10 @@ SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 
+pseudosequence_lookup() {
+    python -c 'from mhcflurry.pseudosequences import main; main()' "$@"
+}
+
 mkdir -p "$SCRATCH_DIR"
 rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
 mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
@@ -29,10 +33,11 @@ cd $SCRATCH_DIR/$DOWNLOAD_NAME
 
 mkdir models
 
-PSEUDOSEQUENCES=pseudosequences.netmhcpan.34aa.csv
-cp $SCRIPT_DIR/$PSEUDOSEQUENCES .
+PSEUDOSEQUENCES="$(pseudosequence_lookup filename --length 34)"
+LEGACY_CLASS1_PSEUDOSEQUENCES="$(pseudosequence_lookup legacy class1_pseudosequences)"
+cp "$SCRIPT_DIR/$PSEUDOSEQUENCES" .
 # Compatibility alias for older generated artifacts and external scripts.
-cp $SCRIPT_DIR/$PSEUDOSEQUENCES class1_pseudosequences.csv
+cp "$SCRIPT_DIR/$PSEUDOSEQUENCES" "$LEGACY_CLASS1_PSEUDOSEQUENCES"
 
 python $SCRIPT_DIR/generate_hyperparameters.py > hyperparameters.yaml
 
@@ -44,7 +49,7 @@ echo "Detected processors: $PROCESSORS"
 
 time mhcflurry-class1-train-allele-specific-models \
     --data "$(mhcflurry-downloads path data_curated)/curated_training_data.no_mass_spec.csv.bz2" \
-    --allele-sequences $PSEUDOSEQUENCES \
+    --allele-sequences "$PSEUDOSEQUENCES" \
     --hyperparameters hyperparameters.yaml \
     --out-models-dir models \
     --held-out-fraction-reciprocal 10 \

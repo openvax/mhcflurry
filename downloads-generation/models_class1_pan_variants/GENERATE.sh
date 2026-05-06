@@ -13,6 +13,10 @@ SCRATCH_DIR=${TMPDIR-/tmp}/mhcflurry-downloads-generation
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 
+pseudosequence_lookup() {
+    python -c 'from mhcflurry.pseudosequences import main; main()' "$@"
+}
+
 if [ "$1" != "cluster" ]
 then
     GPUS=$(nvidia-smi -L 2> /dev/null | wc -l) || GPUS=0
@@ -85,14 +89,15 @@ do
     fi
 
     ALLELE_SEQUENCES_DIR="$(mhcflurry-downloads path allele_sequences)"
-    ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/pseudosequences.mhcflurry.39aa.csv"
-    if [ ! -f "$ALLELE_SEQUENCES" ]; then
-        ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/allele_sequences.csv"
-    fi
+    ALLELE_SEQUENCES="$(pseudosequence_lookup path \
+        --directory "$ALLELE_SEQUENCES_DIR" \
+        --length 39 \
+        --fallback-legacy)"
     HYPERPARAMETERS=hyperparameters.$kind.yaml
     if [ "$kind" == "34mer_sequence" ]
     then
-        ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/allele_sequences.no_differentiation.csv"
+        LEGACY_NO_DIFFERENTIATION="$(pseudosequence_lookup legacy no_differentiation)"
+        ALLELE_SEQUENCES="$ALLELE_SEQUENCES_DIR/$LEGACY_NO_DIFFERENTIATION"
         HYPERPARAMETERS=hyperparameters.production.yaml
     fi
 
@@ -225,8 +230,8 @@ do
         --data "$MODELS_DIR/train_data.csv.bz2" \
         --models-dir "$MODELS_DIR" \
         --out-models-dir models.${kind} \
-        --min-models 2 \
-        --max-models 8 \
+        --min-models-per-fold 2 \
+        --max-models-per-fold 8 \
         $PARALLELISM_ARGS
     cp "$MODELS_DIR/train_data.csv.bz2" "models.${kind}/train_data.csv.bz2"
 done

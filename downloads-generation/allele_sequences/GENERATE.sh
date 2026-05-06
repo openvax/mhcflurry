@@ -14,6 +14,10 @@ SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "
 SCRIPT_DIR=$(dirname "$SCRIPT_ABSOLUTE_PATH")
 export PYTHONUNBUFFERED=1
 
+pseudosequence_lookup() {
+    python -c 'from mhcflurry.pseudosequences import main; main()' "$@"
+}
+
 mkdir -p "$SCRATCH_DIR"
 rm -rf "$SCRATCH_DIR/$DOWNLOAD_NAME"
 mkdir "$SCRATCH_DIR/$DOWNLOAD_NAME"
@@ -34,12 +38,15 @@ cp $SCRIPT_DIR/make_allele_sequences.py .
 cp $SCRIPT_DIR/select_alleles_to_disambiguate.py .
 cp $SCRIPT_DIR/filter_sequences.py .
 
-NETMHCPAN_PSEUDOSEQUENCES=pseudosequences.netmhcpan.34aa.csv
-MHCFLURRY_PSEUDOSEQUENCES=pseudosequences.mhcflurry.39aa.csv
+NETMHCPAN_PSEUDOSEQUENCES="$(pseudosequence_lookup filename --length 34)"
+MHCFLURRY_PSEUDOSEQUENCES="$(pseudosequence_lookup filename --length 39)"
+LEGACY_ALLELE_SEQUENCES="$(pseudosequence_lookup legacy allele_sequences)"
+LEGACY_CLASS1_PSEUDOSEQUENCES="$(pseudosequence_lookup legacy class1_pseudosequences)"
+LEGACY_NO_DIFFERENTIATION="$(pseudosequence_lookup legacy no_differentiation)"
 
-cp $SCRIPT_DIR/$NETMHCPAN_PSEUDOSEQUENCES .
+cp "$SCRIPT_DIR/$NETMHCPAN_PSEUDOSEQUENCES" .
 # Compatibility alias used by older generation scripts and model artifacts.
-cp $SCRIPT_DIR/$NETMHCPAN_PSEUDOSEQUENCES class1_pseudosequences.csv
+cp "$SCRIPT_DIR/$NETMHCPAN_PSEUDOSEQUENCES" "$LEGACY_CLASS1_PSEUDOSEQUENCES"
 
 cp $SCRIPT_ABSOLUTE_PATH .
 
@@ -86,15 +93,15 @@ time clustalo -i class1.fasta -o class1.aligned.fasta
 
 time python make_allele_sequences.py \
     class1.aligned.fasta \
-    --recapitulate-sequences $NETMHCPAN_PSEUDOSEQUENCES \
+    --recapitulate-sequences "$NETMHCPAN_PSEUDOSEQUENCES" \
     --differentiate-alleles training_data.alleles.txt \
-    --out-csv $MHCFLURRY_PSEUDOSEQUENCES
-cp $MHCFLURRY_PSEUDOSEQUENCES allele_sequences.csv
+    --out-csv "$MHCFLURRY_PSEUDOSEQUENCES"
+cp "$MHCFLURRY_PSEUDOSEQUENCES" "$LEGACY_ALLELE_SEQUENCES"
 
 time python make_allele_sequences.py \
     class1.aligned.fasta \
-    --recapitulate-sequences $NETMHCPAN_PSEUDOSEQUENCES \
-    --out-csv allele_sequences.no_differentiation.csv
+    --recapitulate-sequences "$NETMHCPAN_PSEUDOSEQUENCES" \
+    --out-csv "$LEGACY_NO_DIFFERENTIATION"
 
 # Cleanup
 gzip -f class1.fasta

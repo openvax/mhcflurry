@@ -16,6 +16,8 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 from mhcflurry.common import configure_logging
 from mhcflurry.local_parallelism import (
     add_local_parallelism_args,
+    attach_constant_data_to_work_items_if_needed,
+    resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from mhcflurry.cluster_parallelism import (
@@ -169,6 +171,10 @@ def run():
     args = parser.parse_args(sys.argv[1:])
 
     configure_logging()
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not args.cluster_parallelism,
+    )
 
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
 
@@ -272,6 +278,11 @@ def run():
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
         assert worker_pool is not None
+        attach_constant_data_to_work_items_if_needed(
+            tasks,
+            GLOBAL_DATA,
+            worker_pool,
+        )
         results = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, do_process_samples),
             tasks,

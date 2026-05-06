@@ -22,6 +22,7 @@ import pandas as pd
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.common import normalize_allele_name
 from mhcflurry.downloads import configure, get_path, get_default_class1_models_dir
+from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 
 
 def load_raw_csv(path):
@@ -58,7 +59,8 @@ def main():
     print("=" * 70)
     print("1. Loading standalone allele_sequences download")
     print("=" * 70)
-    standalone_csv = get_path("allele_sequences", "allele_sequences.csv")
+    standalone_csv = get_path(
+        "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME)
     standalone_raw = load_raw_csv(standalone_csv)
     print("  Raw entries: %d" % len(standalone_raw))
     standalone_norm, standalone_skipped, standalone_collisions = renormalize(
@@ -85,7 +87,7 @@ def main():
     print("=" * 70)
     print("3. Loading raw CSV from models directory")
     print("=" * 70)
-    models_csv = os.path.join(models_dir, "allele_sequences.csv")
+    models_csv = os.path.join(models_dir, LEGACY_ALLELE_SEQUENCES_FILENAME)
     models_raw = load_raw_csv(models_csv)
     print("  Raw entries: %d" % len(models_raw))
     models_norm, models_skipped, models_collisions = renormalize(models_raw)

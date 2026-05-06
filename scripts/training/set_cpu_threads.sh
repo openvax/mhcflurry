@@ -34,6 +34,38 @@
 # Prints one human-readable summary line on stderr so logs show the
 # decision and inputs that led to it.
 
+resolve_dataloader_num_workers() {
+    local num_fit_workers=${1:-${NUM_JOBS:-}}
+    local requested=${DATALOADER_NUM_WORKERS:-auto}
+
+    if [ "$requested" != "auto" ]; then
+        case "$requested" in
+            *[!0-9]*|"")
+                echo "resolve_dataloader_num_workers: value must be 'auto' or numeric, got '$requested'" >&2
+                return 2
+                ;;
+        esac
+        printf '%s\n' "$requested"
+        return 0
+    fi
+
+    case "$num_fit_workers" in
+        *[!0-9]*|"")
+            echo "resolve_dataloader_num_workers: NUM_JOBS must be numeric, got '$num_fit_workers'" >&2
+            return 2
+            ;;
+    esac
+
+    NUM_FIT_WORKERS="$num_fit_workers" python -c '
+import os
+from mhcflurry.local_parallelism import auto_dataloader_num_workers, _system_ram_gb
+print(auto_dataloader_num_workers(
+    num_fit_workers=int(os.environ["NUM_FIT_WORKERS"]),
+    ram_gb=_system_ram_gb(),
+))
+'
+}
+
 set_cpu_threads() {
     local cores
     cores=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
@@ -42,6 +74,13 @@ set_cpu_threads() {
     local wpg=${MAX_WORKERS_PER_GPU:-1}
     local num_jobs=${NUM_JOBS:-}
     local dl=${DATALOADER_NUM_WORKERS:-0}
+
+    case "$dl" in
+        *[!0-9]*|"")
+            echo "set_cpu_threads: DATALOADER_NUM_WORKERS must be numeric, got '$dl'" >&2
+            return 2
+            ;;
+    esac
 
     local total_workers
     if [ -n "$num_jobs" ]; then

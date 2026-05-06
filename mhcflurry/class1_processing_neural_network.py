@@ -730,7 +730,8 @@ class Class1ProcessingNeuralNetwork(object):
             ]
 
             batch_size = self.hyperparameters["minibatch_size"]
-            train_losses = []
+            train_loss_sum = torch.zeros((), device=device)
+            train_loss_count = 0
 
             for batch_start in range(0, n_train, batch_size):
                 batch_idx = shuffled_train[batch_start:batch_start + batch_size]
@@ -758,10 +759,13 @@ class Class1ProcessingNeuralNetwork(object):
                     loss = loss + regularization_penalty
                 loss.backward()
                 optimizer.step()
-                train_losses.append(loss.item())
+                train_loss_sum = train_loss_sum + loss.detach()
+                train_loss_count += 1
 
             epoch_time = time.time() - epoch_start
-            train_loss = numpy.mean(train_losses)
+            train_loss = (
+                (train_loss_sum / train_loss_count).item()
+                if train_loss_count else float("nan"))
             fit_info["loss"].append(train_loss)
 
             # Validation

@@ -4,7 +4,7 @@ Generate grid of hyperparameters
 
 from sys import stdout, argv
 from copy import deepcopy
-from yaml import dump, load
+from yaml import dump, unsafe_load
 import argparse
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -20,7 +20,7 @@ parser.add_argument(
 args = parser.parse_args(argv[1:])
 
 with open(args.production_hyperparameters) as fd:
-    production_hyperparameters_list = load(fd)
+    production_hyperparameters_list = unsafe_load(fd)
 
 
 def transform(kind, hyperparameters):
