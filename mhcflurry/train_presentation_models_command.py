@@ -13,6 +13,7 @@ import numpy
 import pandas
 import tqdm  # progress bar
 
+from .class1_neural_network import _estimate_peak_bytes_per_row
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
@@ -28,7 +29,14 @@ from .local_parallelism import (
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 GLOBAL_DATA = {}
-PRESENTATION_FEATURE_WORKER_GB = 12.0
+
+# Presentation feature workers keep affinity + processing predictors resident
+# and then run one model family at a time in auto-sized prediction batches.
+# These floors cover CUDA context, torch.compile/runtime caches, allocator
+# fragmentation, and non-model torch state that is not visible from parameters.
+_PRESENTATION_WORKER_RUNTIME_FLOOR_GB = 6.0
+_PRESENTATION_WORKER_SAFETY_FACTOR = 1.3
+_PRESENTATION_WORKER_TRANSIENT_ROWS = 65_536
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -111,10 +119,6 @@ def main(args):
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
     configure_logging(verbose=args.verbosity > 1)
-    resolve_local_parallelism_args(
-        args,
-        per_worker_gb=PRESENTATION_FEATURE_WORKER_GB,
-    )
 
     df = pandas.read_csv(
         args.data,
@@ -130,8 +134,6 @@ def main(args):
     df["experiment_id"] = df[args.hla_column]
     experiment_to_alleles = dict((
         key, key.split()) for key in df.experiment_id.unique())
-    if args.num_jobs:
-        df = df.sort_values("experiment_id", kind="stable").reset_index(drop=True)
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -176,6 +178,17 @@ def main(args):
     optimized = affinity_predictor.optimize()
     print("Optimization performed: ", optimized)
 
+    presentation_worker_gb = estimate_presentation_feature_worker_gb(
+        args,
+        predictor,
+    )
+    resolve_local_parallelism_args(
+        args,
+        per_worker_gb=presentation_worker_gb,
+    )
+    if args.num_jobs:
+        df = df.sort_values("experiment_id", kind="stable").reset_index(drop=True)
+
     print("Fitting.")
     start = time.time()
     if args.num_jobs:
@@ -212,6 +225,120 @@ def main(args):
         write_metdata = True)
     write_generate_sh(args.out_models_dir)
     print("Wrote", args.out_models_dir)
+
+
+def estimate_presentation_feature_worker_gb(args, predictor):
+    """Estimate steady per-worker VRAM for presentation feature generation.
+
+    Presentation workers are inference workers, not model-fit workers. Their
+    persistent device memory is the optimized affinity predictor plus the two
+    processing predictor ensembles. Transient activation memory is handled by
+    each predictor's auto batch-size resolver, but the local worker-count
+    resolver still needs a per-worker base footprint so it does not schedule
+    too many independent processes onto one GPU.
+    """
+    import os
+
+    def env_float(name, default):
+        try:
+            return float(os.environ.get(name, default))
+        except (TypeError, ValueError):
+            print(
+                "Ignoring invalid %s=%r; using %.2f" % (
+                    name, os.environ.get(name), float(default),
+                )
+            )
+            return float(default)
+
+    runtime_floor_gb = env_float(
+        "MHCFLURRY_PRESENTATION_WORKER_RUNTIME_FLOOR_GB",
+        _PRESENTATION_WORKER_RUNTIME_FLOOR_GB,
+    )
+    safety = env_float(
+        "MHCFLURRY_PRESENTATION_WORKER_SAFETY_FACTOR",
+        _PRESENTATION_WORKER_SAFETY_FACTOR,
+    )
+    transient_rows = max(
+        1,
+        min(
+            int(getattr(args, "feature_chunk_size", 0) or 0),
+            int(env_float(
+                "MHCFLURRY_PRESENTATION_WORKER_TRANSIENT_ROWS",
+                _PRESENTATION_WORKER_TRANSIENT_ROWS,
+            )),
+        ),
+    )
+
+    networks = list(iter_presentation_feature_networks(predictor))
+    parameter_bytes = sum(network_parameter_bytes(network) for network in networks)
+    peak_bytes_per_row = max(
+        [_estimate_peak_bytes_per_row(network) for network in networks] or [0]
+    )
+    transient_bytes = int(peak_bytes_per_row * transient_rows)
+    runtime_bytes = int(runtime_floor_gb * (1 << 30))
+    estimate_gb = (
+        (parameter_bytes + transient_bytes + runtime_bytes)
+        * safety
+        / float(1 << 30)
+    )
+    estimate_gb = max(estimate_gb, 4.0)
+    print(
+        "Estimated presentation feature worker VRAM: %.2f GB "
+        "(networks=%d, params=%.2f GB, peak_row=%.2f KB, "
+        "transient_rows=%d, transient=%.2f GB, runtime_floor=%.2f GB, "
+        "safety=%.1fx)" % (
+            estimate_gb,
+            len(networks),
+            parameter_bytes / float(1 << 30),
+            peak_bytes_per_row / 1024.0,
+            transient_rows,
+            transient_bytes / float(1 << 30),
+            runtime_floor_gb,
+            safety,
+        )
+    )
+    return estimate_gb
+
+
+def iter_presentation_feature_networks(predictor):
+    """Yield torch networks that can become GPU-resident in one worker."""
+    affinity_predictor = predictor.affinity_predictor
+    for model in getattr(affinity_predictor, "class1_pan_allele_models", []):
+        yield model.network(borrow=True)
+    for models in getattr(
+            affinity_predictor,
+            "allele_to_allele_specific_models",
+            {},
+    ).values():
+        for model in models:
+            yield model.network(borrow=True)
+
+    for processing_predictor in (
+            predictor.processing_predictor_without_flanks,
+            predictor.processing_predictor_with_flanks,
+    ):
+        if processing_predictor is None:
+            continue
+        for model in getattr(processing_predictor, "models", []):
+            yield model.network()
+
+
+def network_parameter_bytes(network):
+    """Return unique parameter + buffer bytes for a torch module."""
+    seen = set()
+    total = 0
+    tensors = list(network.parameters(recurse=True))
+    tensors.extend(network.buffers(recurse=True))
+    for tensor in tensors:
+        try:
+            key = (str(tensor.device), int(tensor.data_ptr()))
+        except RuntimeError:
+            key = id(tensor)
+        if key in seen:
+            continue
+        seen.add(key)
+        total += int(tensor.nelement()) * int(tensor.element_size())
+    return total
 
 
 def predict_features_parallel(args, predictor, df, experiment_to_alleles):

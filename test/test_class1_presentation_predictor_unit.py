@@ -1,5 +1,6 @@
 import numpy
 import pandas
+import torch
 
 import mhcflurry.class1_presentation_predictor as presentation_module
 import mhcflurry.train_presentation_models_command as train_presentation
@@ -232,3 +233,56 @@ def test_presentation_feature_chunks_use_global_data():
         result["processing_scores"]["without_flanks"], [100.0, 101.0])
     numpy.testing.assert_equal(
         result["processing_scores"]["with_flanks"], [200.0, 201.0])
+
+
+class FakeNetwork(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.zeros(4))
+
+
+class FakeNetworkModel:
+    def __init__(self, network):
+        self._network = network
+
+    def network(self, borrow=False):
+        del borrow
+        return self._network
+
+
+def test_estimate_presentation_feature_worker_gb_uses_model_shape(monkeypatch):
+    class FakeAffinity:
+        allele_to_allele_specific_models = {}
+
+        def __init__(self, network):
+            self.class1_pan_allele_models = [FakeNetworkModel(network)]
+
+    class FakeProcessingPredictor:
+        def __init__(self, network):
+            self.models = [FakeNetworkModel(network)]
+
+    class FakePresentation:
+        def __init__(self, affinity_network, processing_network):
+            self.affinity_predictor = FakeAffinity(affinity_network)
+            self.processing_predictor_without_flanks = FakeProcessingPredictor(
+                processing_network)
+            self.processing_predictor_with_flanks = None
+
+    affinity_network = FakeNetwork()
+    processing_network = FakeNetwork()
+    monkeypatch.setenv("MHCFLURRY_PRESENTATION_WORKER_RUNTIME_FLOOR_GB", "1")
+    monkeypatch.setenv("MHCFLURRY_PRESENTATION_WORKER_SAFETY_FACTOR", "1")
+    monkeypatch.setenv("MHCFLURRY_PRESENTATION_WORKER_TRANSIENT_ROWS", "10")
+    monkeypatch.setattr(
+        train_presentation,
+        "_estimate_peak_bytes_per_row",
+        lambda network: 512 * 1024 * 1024
+        if network is processing_network else 1024,
+    )
+
+    estimate = train_presentation.estimate_presentation_feature_worker_gb(
+        type("Args", (), {"feature_chunk_size": 20})(),
+        FakePresentation(affinity_network, processing_network),
+    )
+
+    assert 5.9 < estimate < 6.1
