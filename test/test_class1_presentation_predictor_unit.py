@@ -286,3 +286,24 @@ def test_estimate_presentation_feature_worker_gb_uses_model_shape(monkeypatch):
     )
 
     assert 5.9 < estimate < 6.1
+
+
+def test_presentation_worker_estimator_uses_cartesian_merged_peak(monkeypatch):
+    merged_network = FakeNetwork()
+    merged_network.networks = [FakeNetwork(), FakeNetwork()]
+    monkeypatch.setattr(
+        train_presentation.Class1AffinityPredictor,
+        "_estimate_calibration_peak_bytes_per_row",
+        staticmethod(lambda network: 123 if network is merged_network else 0),
+    )
+    monkeypatch.setattr(
+        train_presentation,
+        "_estimate_peak_bytes_per_row",
+        lambda network: 999,
+    )
+
+    assert (
+        train_presentation.presentation_network_peak_bytes_per_row(
+            merged_network)
+        == 123
+    )

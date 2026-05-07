@@ -272,7 +272,8 @@ def estimate_presentation_feature_worker_gb(args, predictor):
     networks = list(iter_presentation_feature_networks(predictor))
     parameter_bytes = sum(network_parameter_bytes(network) for network in networks)
     peak_bytes_per_row = max(
-        [_estimate_peak_bytes_per_row(network) for network in networks] or [0]
+        [presentation_network_peak_bytes_per_row(network) for network in networks]
+        or [0]
     )
     transient_bytes = int(peak_bytes_per_row * transient_rows)
     runtime_bytes = int(runtime_floor_gb * (1 << 30))
@@ -339,6 +340,16 @@ def network_parameter_bytes(network):
         seen.add(key)
         total += int(tensor.nelement()) * int(tensor.element_size())
     return total
+
+
+def presentation_network_peak_bytes_per_row(network):
+    """Estimate forward peak memory for a presentation feature network."""
+    sub_networks = getattr(network, "networks", None)
+    if sub_networks is not None and not hasattr(network, "peptide_encoding_shape"):
+        return Class1AffinityPredictor._estimate_calibration_peak_bytes_per_row(
+            network
+        )
+    return _estimate_peak_bytes_per_row(network)
 
 
 def predict_features_parallel(args, predictor, df, experiment_to_alleles):

@@ -1639,6 +1639,7 @@ def worker_pool_with_gpu_assignments(
                     kwargs.get("gpu_device_nums")))
 
     if worker_log_dir:
+        os.makedirs(worker_log_dir, exist_ok=True)
         for kwargs in worker_init_kwargs:
             kwargs["worker_log_dir"] = worker_log_dir
 
@@ -1824,6 +1825,7 @@ def worker_init(
         worker_log_dir=None, max_workers_per_gpu=None):
     del keras_backend  # legacy argument retained for API compatibility
     if worker_log_dir:
+        os.makedirs(worker_log_dir, exist_ok=True)
         # Line buffering (buffering=1) ensures every print/traceback flushes
         # to disk immediately. Without it, Python defaults to ~8 KB block
         # buffering on a regular file, which silently swallows worker

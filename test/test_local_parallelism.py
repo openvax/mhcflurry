@@ -15,6 +15,7 @@ from mhcflurry.local_parallelism import (
     resolve_local_parallelism_args,
     resolve_max_workers_per_gpu,
     validate_worker_pool_args,
+    worker_pool_with_gpu_assignments,
     worker_pool_with_gpu_assignments_from_args,
     worker_init_kwargs_for_scheduler,
 )
@@ -490,6 +491,34 @@ def test_worker_pool_from_args_preserves_serial_mode_with_auto_gpus(
     assert args.gpus == 2
     assert args.num_jobs == 0
     assert configured == ["auto"]
+
+
+def test_worker_pool_creates_worker_log_dir(tmp_path, monkeypatch):
+    from mhcflurry import local_parallelism
+
+    captured = {}
+
+    def fake_make_worker_pool(**kwargs):
+        captured.update(kwargs)
+        return "pool"
+
+    monkeypatch.setattr(local_parallelism, "make_worker_pool", fake_make_worker_pool)
+    worker_log_dir = tmp_path / "missing" / "worker-logs"
+
+    worker_pool = worker_pool_with_gpu_assignments(
+        num_jobs=1,
+        num_gpus=0,
+        backend="cpu",
+        max_workers_per_gpu=1,
+        worker_log_dir=str(worker_log_dir),
+    )
+
+    assert worker_pool == "pool"
+    assert worker_log_dir.is_dir()
+    assert (
+        captured["initializer_kwargs_per_process"][0]["worker_log_dir"]
+        == str(worker_log_dir)
+    )
 
 
 def test_resolve_local_parallelism_args_skips_auto_detect_with_explicit_gpus(
