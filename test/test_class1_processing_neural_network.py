@@ -5,12 +5,13 @@ import pytest
 
 import re
 import numpy
+import torch
 from sklearn.metrics import roc_auc_score
 import pandas
 
 from mhcflurry.class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from mhcflurry.common import random_peptides
-from mhcflurry.amino_acid import BLOSUM62_MATRIX
+from mhcflurry.amino_acid import AMINO_ACIDS, BLOSUM62_MATRIX
 from mhcflurry.flanking_encoding import FlankingEncoding
 
 from mhcflurry.testing_utils import cleanup, startup
@@ -68,6 +69,16 @@ def decode_matrix(array):
         ])
         results.append(item)
     return results
+
+
+def decode_sequence_array(array):
+    """Decode either vector-encoded or index-encoded sequence arrays."""
+    if array.ndim == 3:
+        return decode_matrix(array)
+    return [
+        "".join(AMINO_ACIDS[int(value)] for value in row)
+        for row in array
+    ]
 
 
 def test_neural_network_input():
@@ -132,7 +143,7 @@ def test_neural_network_input():
             c_flanks=[d['c_flank']])
 
         results = model.network_input(encoding)
-        (decoded,) = decode_matrix(results['sequence'])
+        (decoded,) = decode_sequence_array(results['sequence'])
 
         numpy.testing.assert_equal(decoded, d['sequence'])
         numpy.testing.assert_equal(results['peptide_length'], len(d['peptide']))
@@ -141,10 +152,65 @@ def test_neural_network_input():
     df = pandas.DataFrame(tests)
     encoding = FlankingEncoding(df.peptide, df.n_flank, df.c_flank)
     results = model.network_input(encoding)
-    df["decoded"] = decode_matrix(results['sequence'])
+    df["decoded"] = decode_sequence_array(results['sequence'])
     numpy.testing.assert_array_equal(df.decoded.to_numpy(), df.sequence.to_numpy())
     numpy.testing.assert_equal(
         results['peptide_length'], df.peptide.str.len().values)
+    assert results["sequence"].ndim == 2
+    assert results["sequence"].dtype == numpy.int8
+
+
+def test_processing_torch_amino_acid_encoding_matches_vector_path():
+    """Processing models should expand amino-acid indices inside torch."""
+    common_hyperparameters = dict(
+        peptide_max_length=12,
+        n_flank_length=2,
+        c_flank_length=2,
+        flanking_averages=True,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        dropout_rate=0.0,
+        post_convolutional_dense_layer_sizes=[3],
+    )
+    legacy = Class1ProcessingNeuralNetwork(
+        amino_acid_encoding_torch=False,
+        **common_hyperparameters)
+    indexed = Class1ProcessingNeuralNetwork(
+        amino_acid_encoding_torch=True,
+        **common_hyperparameters)
+    legacy._network = legacy.make_network(
+        **legacy.network_hyperparameter_defaults.subselect(legacy.hyperparameters)
+    )
+    indexed._network = indexed.make_network(
+        **indexed.network_hyperparameter_defaults.subselect(indexed.hyperparameters)
+    )
+    indexed.network().set_weights_list(
+        legacy.network().get_weights_list(),
+        auto_convert_keras=False,
+    )
+
+    encoding = FlankingEncoding(
+        peptides=["SIINFEKL", "QCVSQCVS", "PEPTIDE"],
+        n_flanks=["AA", "QWERTY", ""],
+        c_flanks=["GG", "MNV", ""],
+    )
+    legacy_x = legacy.network_input(encoding)
+    indexed_x = indexed.network_input(encoding)
+
+    assert legacy_x["sequence"].shape == indexed_x["sequence"].shape + (21,)
+    assert indexed_x["sequence"].dtype == numpy.int8
+    numpy.testing.assert_allclose(
+        legacy.network()(dict(
+            sequence=torch.from_numpy(legacy_x["sequence"]).float(),
+            peptide_length=torch.from_numpy(legacy_x["peptide_length"]),
+        )).detach().numpy(),
+        indexed.network()(dict(
+            sequence=torch.from_numpy(indexed_x["sequence"]),
+            peptide_length=torch.from_numpy(indexed_x["peptide_length"]),
+        )).detach().numpy(),
+        rtol=1e-6,
+        atol=1e-6,
+    )
 
 
 def test_processing_peak_estimate_scales_with_conv_shape():

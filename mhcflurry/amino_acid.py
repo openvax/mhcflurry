@@ -450,6 +450,19 @@ def vector_encoding_length(name):
     return get_vector_encoding_df(name).shape[1]
 
 
+def vector_encoding_index_table(name):
+    """
+    Return a float32 lookup table aligned to canonical amino-acid indices.
+
+    Rows are ordered so ``table[AMINO_ACID_INDEX[letter]]`` is the vector
+    encoding for ``letter``. Torch embedding layers and numpy materialization
+    paths should both use this helper to keep amino-acid index semantics
+    centralized.
+    """
+    return get_vector_encoding_df(name).loc[AMINO_ACIDS].to_numpy().astype(
+        numpy.float32)
+
+
 def index_encoding(sequences, letter_to_index_dict):
     """
     Encode a sequence of same-length strings to a matrix of integers of the

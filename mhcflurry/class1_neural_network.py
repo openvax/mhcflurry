@@ -585,9 +585,7 @@ def _peptide_uses_torch_encoding(hyperparameters):
 
 def _peptide_torch_encoding_table(encoding_name):
     """Return a float32 lookup table indexed by ``AMINO_ACID_INDEX``."""
-    return amino_acid.get_vector_encoding_df(encoding_name).loc[
-        amino_acid.AMINO_ACIDS
-    ].to_numpy().astype(numpy.float32)
+    return amino_acid.vector_encoding_index_table(encoding_name)
 
 
 def _peptide_torch_encoding_shape(index_shape, encoding_name):

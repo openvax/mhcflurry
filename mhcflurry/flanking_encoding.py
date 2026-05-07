@@ -5,6 +5,7 @@ fixed-size numerical matrices
 from collections import namedtuple
 import logging
 
+from . import amino_acid
 from .encodable_sequences import EncodingError, EncodableSequences
 
 import numpy
@@ -111,9 +112,40 @@ class FlankingEncoding(object):
             self.encoding_cache[cache_key] = result
         return self.encoding_cache[cache_key]
 
+    def categorical_encode(
+            self,
+            peptide_max_length,
+            n_flank_length,
+            c_flank_length,
+            allow_unsupported_amino_acids=True,
+            throw=True):
+        """
+        Encode variable-length sequences to fixed-size amino-acid indices.
+
+        This mirrors :meth:`vector_encode` but stops before expanding amino
+        acids to dense vector encodings. The resulting integer array is suited
+        for torch-side embedding lookup.
+        """
+        cache_key = (
+            "categorical_encode",
+            peptide_max_length,
+            n_flank_length,
+            c_flank_length,
+            allow_unsupported_amino_acids,
+            throw)
+        if cache_key not in self.encoding_cache:
+            result = self.encode_indices(
+                df=self.dataframe,
+                peptide_max_length=peptide_max_length,
+                n_flank_length=n_flank_length,
+                c_flank_length=c_flank_length,
+                allow_unsupported_amino_acids=allow_unsupported_amino_acids,
+                throw=throw)
+            self.encoding_cache[cache_key] = result
+        return self.encoding_cache[cache_key]
+
     @staticmethod
-    def encode(
-            vector_encoding_name,
+    def _fixed_length_index_encoding(
             df,
             peptide_max_length,
             n_flank_length,
@@ -135,9 +167,7 @@ class FlankingEncoding(object):
         allow_unsupported_amino_acids : bool
         throw : bool
 
-        Returns
-        -------
-        numpy.array
+        Returns a tuple ``(index_array, peptide_lengths, error_df)``.
         """
         error_df = df.loc[
             (df.peptide.str.len() > peptide_max_length) |
@@ -177,11 +207,74 @@ class FlankingEncoding(object):
         concatenated = n_flanks + peptides + c_flanks
 
         encoder = EncodableSequences.create(concatenated.values)
-        array = encoder.variable_length_to_fixed_length_vector_encoding(
-            vector_encoding_name=vector_encoding_name,
+        array = encoder.variable_length_to_fixed_length_categorical(
             alignment_method="right_pad",
             max_length=n_flank_length + peptide_max_length + c_flank_length,
             allow_unsupported_amino_acids=allow_unsupported_amino_acids)
+
+        return (array, peptides.str.len().values, error_df)
+
+    @staticmethod
+    def encode_indices(
+            df,
+            peptide_max_length,
+            n_flank_length,
+            c_flank_length,
+            allow_unsupported_amino_acids=False,
+            throw=True):
+        """
+        Encode variable-length sequences to fixed-size amino-acid indices.
+        """
+        array, peptide_lengths, _ = FlankingEncoding._fixed_length_index_encoding(
+            df=df,
+            peptide_max_length=peptide_max_length,
+            n_flank_length=n_flank_length,
+            c_flank_length=c_flank_length,
+            allow_unsupported_amino_acids=allow_unsupported_amino_acids,
+            throw=throw)
+        return EncodingResult(
+            array.astype("int8", copy=False),
+            peptide_lengths=peptide_lengths)
+
+    @staticmethod
+    def encode(
+            vector_encoding_name,
+            df,
+            peptide_max_length,
+            n_flank_length,
+            c_flank_length,
+            allow_unsupported_amino_acids=False,
+            throw=True):
+        """
+        Encode variable-length sequences to a fixed-size matrix.
+
+        Helper function. Users should use `vector_encode`.
+
+        Parameters
+        ----------
+        vector_encoding_name : string
+        df : pandas.DataFrame
+        peptide_max_length : int
+        n_flank_length : int
+        c_flank_length : int
+        allow_unsupported_amino_acids : bool
+        throw : bool
+
+        Returns
+        -------
+        numpy.array
+        """
+        index_array, peptide_lengths, error_df = (
+            FlankingEncoding._fixed_length_index_encoding(
+                df=df,
+                peptide_max_length=peptide_max_length,
+                n_flank_length=n_flank_length,
+                c_flank_length=c_flank_length,
+                allow_unsupported_amino_acids=allow_unsupported_amino_acids,
+                throw=throw))
+        array = amino_acid.fixed_vectors_encoding(
+            index_array,
+            amino_acid.get_vector_encoding_df(vector_encoding_name))
 
         array = array.astype("float32")  # So NaNs can be used.
 
@@ -189,6 +282,6 @@ class FlankingEncoding(object):
             array[error_df.index] = numpy.nan
 
         result = EncodingResult(
-            array, peptide_lengths=peptides.str.len().values)
+            array, peptide_lengths=peptide_lengths)
 
         return result

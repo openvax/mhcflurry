@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from . import amino_acid
 from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
@@ -39,16 +40,33 @@ class Class1ProcessingModel(nn.Module):
             convolutional_activation,
             convolutional_kernel_l1_l2,
             dropout_rate,
-            post_convolutional_dense_layer_sizes):
+            post_convolutional_dense_layer_sizes,
+            sequence_input_is_indices=False,
+            sequence_input_vector_encoding_name=None):
         super(Class1ProcessingModel, self).__init__()
 
         self.n_flank_length = n_flank_length
         self.c_flank_length = c_flank_length
         self.peptide_max_length = peptide_max_length
         self.flanking_averages = flanking_averages
+        self.sequence_input_is_indices = bool(sequence_input_is_indices)
+        if sequence_input_vector_encoding_name is None:
+            sequence_input_vector_encoding_name = "BLOSUM62"
 
         # Input channels from sequence encoding
-        in_channels = sequence_dims[1]
+        if self.sequence_input_is_indices:
+            in_channels = amino_acid.vector_encoding_length(
+                sequence_input_vector_encoding_name
+            )
+            self.register_buffer(
+                "sequence_embedding_table",
+                torch.from_numpy(amino_acid.vector_encoding_index_table(
+                    sequence_input_vector_encoding_name
+                )),
+                persistent=False,
+            )
+        else:
+            in_channels = sequence_dims[1]
 
         # Main convolutional layer
         self.conv1 = nn.Conv1d(
@@ -135,6 +153,11 @@ class Class1ProcessingModel(nn.Module):
         """
         sequence = inputs['sequence']  # (batch, seq_len, channels)
         peptide_length = inputs['peptide_length']  # (batch, 1)
+
+        if self.sequence_input_is_indices and sequence.dim() == 2:
+            sequence = torch.nn.functional.embedding(
+                sequence.long(), self.sequence_embedding_table
+            )
 
         # Transpose for Conv1d: (batch, channels, seq_len)
         x = sequence.permute(0, 2, 1)
@@ -343,9 +366,22 @@ class Class1ProcessingModel(nn.Module):
         weights = []
         for name, param in self.named_parameters():
             weights.append(param.detach().cpu().numpy())
-        for name, buffer in self.named_buffers():
+        for name, buffer in self._named_persistent_buffers():
             weights.append(buffer.detach().cpu().numpy())
         return weights
+
+    def _named_persistent_buffers(self):
+        """Yield named buffers that belong in mhcflurry's NPZ weights."""
+        modules = dict(self.named_modules())
+        for name, buffer in self.named_buffers():
+            module = self
+            buffer_name = name
+            if "." in name:
+                module_path, buffer_name = name.rsplit(".", 1)
+                module = modules[module_path]
+            if buffer_name in module._non_persistent_buffers_set:
+                continue
+            yield name, buffer
 
     def set_weights_list(self, weights, auto_convert_keras=True):
         """
@@ -393,12 +429,17 @@ class Class1ProcessingModel(nn.Module):
                 dtype=param.dtype,
             )
             idx += 1
-        for name, buffer in self.named_buffers():
+        named_modules_dict = dict(self.named_modules())
+        for name, buffer in self._named_persistent_buffers():
             tensor = torch.from_numpy(weights[idx]).to(
                 device=buffer.device,
                 dtype=buffer.dtype,
             )
-            self._buffers[name] = tensor
+            if "." in name:
+                module_path, buffer_name = name.rsplit(".", 1)
+                named_modules_dict[module_path]._buffers[buffer_name] = tensor
+            else:
+                self._buffers[name] = tensor
             idx += 1
 
     def _reorder_keras_weights(self, weights):
@@ -461,6 +502,7 @@ class Class1ProcessingNeuralNetwork(object):
 
     network_hyperparameter_defaults = HyperparameterDefaults(
         amino_acid_encoding="BLOSUM62",
+        amino_acid_encoding_torch=True,
         peptide_max_length=15,
         n_flank_length=10,
         c_flank_length=10,
@@ -703,7 +745,9 @@ class Class1ProcessingNeuralNetwork(object):
         # slicing by `batch_idx` on-device removes the per-step
         # numpy.from_numpy + astype + .to(device) trio that this loop
         # used to do every minibatch.
-        seq_dev = torch.from_numpy(x_dict["sequence"]).float().to(device)
+        seq_dev = torch.from_numpy(x_dict["sequence"]).to(device)
+        if not self.hyperparameters.get("amino_acid_encoding_torch"):
+            seq_dev = seq_dev.float()
         length_dev = torch.from_numpy(x_dict["peptide_length"]).to(device)
         targets_dev = torch.from_numpy(targets.astype(numpy.float32)).to(device)
         weights_dev = (
@@ -969,10 +1013,14 @@ class Class1ProcessingNeuralNetwork(object):
 
         all_predictions = []
 
-        def prediction_tensor(batch_array):
+        sequence_is_indices = self.hyperparameters.get("amino_acid_encoding_torch")
+
+        def prediction_tensor(batch_array, keep_int=False):
             batch_array = numpy.asarray(batch_array)
             if not batch_array.flags.writeable:
                 batch_array = batch_array.copy()
+            if not keep_int:
+                batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
             return torch.from_numpy(batch_array).to(device)
 
         with torch.no_grad():
@@ -980,10 +1028,12 @@ class Class1ProcessingNeuralNetwork(object):
                 batch_end = min(batch_start + batch_size, n_samples)
 
                 seq_batch = prediction_tensor(
-                    x_dict["sequence"][batch_start:batch_end]
-                ).float()
+                    x_dict["sequence"][batch_start:batch_end],
+                    keep_int=sequence_is_indices,
+                )
                 length_batch = prediction_tensor(
-                    x_dict["peptide_length"][batch_start:batch_end]
+                    x_dict["peptide_length"][batch_start:batch_end],
+                    keep_int=True,
                 )
 
                 inputs = {"sequence": seq_batch, "peptide_length": length_batch}
@@ -1010,14 +1060,23 @@ class Class1ProcessingNeuralNetwork(object):
         -------
         dict
         """
-        encoded = sequences.vector_encode(
-            self.hyperparameters["amino_acid_encoding"],
-            self.hyperparameters["peptide_max_length"],
-            n_flank_length=self.hyperparameters["n_flank_length"],
-            c_flank_length=self.hyperparameters["c_flank_length"],
-            allow_unsupported_amino_acids=True,
-            throw=throw,
-        )
+        if self.hyperparameters.get("amino_acid_encoding_torch"):
+            encoded = sequences.categorical_encode(
+                self.hyperparameters["peptide_max_length"],
+                n_flank_length=self.hyperparameters["n_flank_length"],
+                c_flank_length=self.hyperparameters["c_flank_length"],
+                allow_unsupported_amino_acids=True,
+                throw=throw,
+            )
+        else:
+            encoded = sequences.vector_encode(
+                self.hyperparameters["amino_acid_encoding"],
+                self.hyperparameters["peptide_max_length"],
+                n_flank_length=self.hyperparameters["n_flank_length"],
+                c_flank_length=self.hyperparameters["c_flank_length"],
+                allow_unsupported_amino_acids=True,
+                throw=throw,
+            )
 
         result = {
             "sequence": encoded.array,
@@ -1028,6 +1087,7 @@ class Class1ProcessingNeuralNetwork(object):
     def make_network(
         self,
         amino_acid_encoding,
+        amino_acid_encoding_torch,
         peptide_max_length,
         n_flank_length,
         c_flank_length,
@@ -1061,6 +1121,8 @@ class Class1ProcessingNeuralNetwork(object):
             convolutional_kernel_l1_l2=convolutional_kernel_l1_l2,
             dropout_rate=dropout_rate,
             post_convolutional_dense_layer_sizes=post_convolutional_dense_layer_sizes,
+            sequence_input_is_indices=amino_acid_encoding_torch,
+            sequence_input_vector_encoding_name=amino_acid_encoding,
         )
 
     def __getstate__(self):
