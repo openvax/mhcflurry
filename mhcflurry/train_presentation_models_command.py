@@ -137,7 +137,7 @@ def main(args):
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
-        os.mkdir(args.out_models_dir)
+        os.makedirs(args.out_models_dir)
         print("Done.")
 
     affinity_predictor = Class1AffinityPredictor.load(
