@@ -612,6 +612,35 @@ def _categorical_kwargs_for_peptide_encoding(peptide_encoding):
     }
 
 
+def peptide_sequences_to_network_input(
+        peptides,
+        peptide_encoding,
+        peptide_amino_acid_encoding_torch=True):
+    """Encode peptide strings to the representation consumed by a network.
+
+    This is the central peptide-only string-to-array conversion. When torch
+    amino-acid encoding is enabled it returns compact ``(N, L)`` int8
+    amino-acid indices; the fixed-vector lookup then happens through the
+    network's frozen torch embedding table. When disabled it returns the
+    legacy ``(N, L, V)`` numpy vector encoding for compatibility.
+    """
+    encoder = EncodableSequences.create(peptides)
+    hyperparameters = {
+        "peptide_encoding": peptide_encoding,
+        "peptide_amino_acid_encoding_torch": peptide_amino_acid_encoding_torch,
+    }
+    if _peptide_uses_torch_encoding(hyperparameters):
+        return (
+            encoder.variable_length_to_fixed_length_categorical(
+                **_categorical_kwargs_for_peptide_encoding(peptide_encoding)
+            )
+            .astype("int8", copy=False)
+        )
+    return encoder.variable_length_to_fixed_length_vector_encoding(
+        **peptide_encoding
+    )
+
+
 def _timing_enabled():
     """Return True when fine-grained training timing is enabled."""
     return os.environ.get("MHCFLURRY_ENABLE_TIMING", "0") == "1"
@@ -3017,31 +3046,15 @@ class Class1NeuralNetwork(object):
         numpy.array
         """
         encoder = EncodableSequences.create(peptides)
-        if _peptide_uses_torch_encoding(self.hyperparameters):
-            encoded = self._peptides_to_indices_raw(encoder)
-        else:
-            encoded = encoder.variable_length_to_fixed_length_vector_encoding(
-                **self.hyperparameters["peptide_encoding"]
-            )
+        encoded = peptide_sequences_to_network_input(
+            encoder,
+            peptide_encoding=self.hyperparameters["peptide_encoding"],
+            peptide_amino_acid_encoding_torch=(
+                self.hyperparameters.get("peptide_amino_acid_encoding_torch")
+            ),
+        )
         assert len(encoded) == len(peptides)
         return encoded
-
-    def _peptides_to_indices_raw(self, encoder):
-        """Produce (N, L) int8 amino-acid indices for ``encoder``.
-
-        Shares alignment/trim/unsupported-amino-acid semantics with the
-        configured vector encoding, but delays the final fixed-vector
-        lookup to the network's torch forward pass.
-        """
-        categorical_kwargs = _categorical_kwargs_for_peptide_encoding(
-            self.hyperparameters["peptide_encoding"]
-        )
-        return (
-            encoder.variable_length_to_fixed_length_categorical(
-                **categorical_kwargs
-            )
-            .astype("int8", copy=False)
-        )
 
     @property
     def supported_peptide_lengths(self):
@@ -4647,20 +4660,11 @@ class Class1NeuralNetwork(object):
             peptide_amino_acid_encoding_torch
         )
         peptide_torch_encoding_name = _peptide_torch_encoding_name(hyperparameters)
-        if peptide_torch_encoding_name:
-            peptide_encoding_shape = (
-                EncodableSequences.create([])
-                .variable_length_to_fixed_length_categorical(
-                    **_categorical_kwargs_for_peptide_encoding(peptide_encoding)
-                )
-                .shape[1:]
-            )
-        else:
-            peptide_encoding_shape = (
-                EncodableSequences.create([])
-                .variable_length_to_fixed_length_vector_encoding(**peptide_encoding)
-                .shape[1:]
-            )
+        peptide_encoding_shape = peptide_sequences_to_network_input(
+            [],
+            peptide_encoding=peptide_encoding,
+            peptide_amino_acid_encoding_torch=peptide_amino_acid_encoding_torch,
+        ).shape[1:]
         # Index-encoded peptides probe as 1D (L,), but dense layers still
         # size against the post-embedding (L, V) shape.
         if peptide_torch_encoding_name and len(peptide_encoding_shape) == 1:

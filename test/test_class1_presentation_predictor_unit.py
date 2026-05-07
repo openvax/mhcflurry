@@ -24,6 +24,27 @@ class FakeAffinityPredictor:
         return numpy.zeros(len(affinities), dtype=float)
 
 
+class FakeCartesianAffinityPredictor(FakeAffinityPredictor):
+    def __init__(self, scores):
+        super().__init__(scores)
+        self.cartesian_call_shapes = []
+
+    def predict_cartesian_pan_allele(
+            self,
+            peptides,
+            alleles,
+            throw=True,
+            model_kwargs=None):
+        del throw, model_kwargs
+        seqs = list(peptides.sequences)
+        alleles = list(alleles)
+        self.cartesian_call_shapes.append((len(seqs), len(alleles)))
+        return numpy.asarray([
+            [self.scores[(allele, peptide)] for allele in alleles]
+            for peptide in seqs
+        ], dtype=float)
+
+
 def test_predict_affinity_sample_names_none_streams_best_by_sample(monkeypatch):
     monkeypatch.setattr(
         presentation_module, "_PRESENTATION_PREDICT_TARGET_ROWS", 4,
@@ -64,6 +85,39 @@ def test_predict_affinity_sample_names_none_streams_best_by_sample(monkeypatch):
     pandas.testing.assert_frame_equal(result, expected)
     assert affinity_predictor.call_sizes
     assert max(affinity_predictor.call_sizes) <= 4
+
+
+def test_predict_affinity_uses_cartesian_fast_path(monkeypatch):
+    monkeypatch.setattr(
+        presentation_module, "_PRESENTATION_PREDICT_TARGET_ROWS", 4,
+    )
+    scores = {
+        ("A", "P0"): 3.0,
+        ("A", "P1"): 10.0,
+        ("B", "P0"): 5.0,
+        ("B", "P1"): 1.0,
+        ("C", "P0"): 2.0,
+        ("C", "P1"): 9.0,
+    }
+    affinity_predictor = FakeCartesianAffinityPredictor(scores)
+    predictor = Class1PresentationPredictor(
+        affinity_predictor=affinity_predictor,
+    )
+
+    result = predictor.predict_affinity(
+        peptides=["P0", "P1"],
+        alleles={
+            "s1": ["B", "A"],
+            "s2": ["C", "A"],
+        },
+        include_affinity_percentile=False,
+        verbose=0,
+    )
+
+    assert result.affinity.tolist() == [3.0, 1.0, 2.0, 9.0]
+    assert result.best_allele.tolist() == ["A", "B", "C", "C"]
+    assert affinity_predictor.cartesian_call_shapes
+    assert affinity_predictor.call_sizes == []
 
 
 def test_predict_affinity_sample_names_none_handles_no_peptides():

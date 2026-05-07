@@ -223,6 +223,11 @@ class Class1PresentationPredictor(object):
             "num_workers_per_gpu": _env_workers_per_gpu(1),
         }
         affinity_model_kwargs.update(model_kwargs)
+        predict_cartesian = getattr(
+            self.affinity_predictor,
+            "predict_cartesian_pan_allele",
+            None,
+        )
 
         df = pandas.DataFrame({
             "peptide": numpy.asarray(peptides),
@@ -274,22 +279,33 @@ class Class1PresentationPredictor(object):
                     chunk_end = min(chunk_start + allele_chunk, n_all)
                     chunk_alleles = all_alleles[chunk_start:chunk_end]
                     chunk_n = chunk_end - chunk_start
-                    peptides_repeated = EncodableSequences.create(
-                        numpy.tile(peptides.sequences, chunk_n)
-                    )
-                    alleles_repeated = numpy.repeat(
-                        numpy.asarray(chunk_alleles), n_peps,
-                    )
-                    flat_predictions = numpy.asarray(
-                        self.affinity_predictor.predict(
-                            peptides=peptides_repeated,
-                            alleles=alleles_repeated,
+                    chunk_matrix = (
+                        predict_cartesian(
+                            peptides=peptides,
+                            alleles=chunk_alleles,
                             model_kwargs=affinity_model_kwargs,
                             throw=throw,
-                        ),
-                        dtype=numpy.float64,
+                        )
+                        if predict_cartesian is not None
+                        else None
                     )
-                    chunk_matrix = flat_predictions.reshape(chunk_n, n_peps).T
+                    if chunk_matrix is None:
+                        peptides_repeated = EncodableSequences.create(
+                            numpy.tile(peptides.sequences, chunk_n)
+                        )
+                        alleles_repeated = numpy.repeat(
+                            numpy.asarray(chunk_alleles), n_peps,
+                        )
+                        flat_predictions = numpy.asarray(
+                            self.affinity_predictor.predict(
+                                peptides=peptides_repeated,
+                                alleles=alleles_repeated,
+                                model_kwargs=affinity_model_kwargs,
+                                throw=throw,
+                            ),
+                            dtype=numpy.float64,
+                        )
+                        chunk_matrix = flat_predictions.reshape(chunk_n, n_peps).T
                     for j, allele in enumerate(chunk_alleles):
                         sample_ranks = allele_to_sample_ranks.get(allele, ())
                         if not sample_ranks:
@@ -352,22 +368,33 @@ class Class1PresentationPredictor(object):
                     chunk_end = min(chunk_start + allele_chunk, n_all)
                     chunk_alleles = sample_alleles[chunk_start:chunk_end]
                     chunk_n = chunk_end - chunk_start
-                    peptides_repeated = EncodableSequences.create(
-                        numpy.tile(sample_peptides.sequences, chunk_n)
-                    )
-                    alleles_repeated = numpy.repeat(
-                        numpy.asarray(chunk_alleles), n_peps,
-                    )
-                    flat_predictions = numpy.asarray(
-                        self.affinity_predictor.predict(
-                            peptides=peptides_repeated,
-                            alleles=alleles_repeated,
+                    chunk_matrix = (
+                        predict_cartesian(
+                            peptides=sample_peptides,
+                            alleles=chunk_alleles,
                             model_kwargs=affinity_model_kwargs,
                             throw=throw,
-                        ),
-                        dtype=numpy.float64,
+                        )
+                        if predict_cartesian is not None
+                        else None
                     )
-                    chunk_matrix = flat_predictions.reshape(chunk_n, n_peps).T
+                    if chunk_matrix is None:
+                        peptides_repeated = EncodableSequences.create(
+                            numpy.tile(sample_peptides.sequences, chunk_n)
+                        )
+                        alleles_repeated = numpy.repeat(
+                            numpy.asarray(chunk_alleles), n_peps,
+                        )
+                        flat_predictions = numpy.asarray(
+                            self.affinity_predictor.predict(
+                                peptides=peptides_repeated,
+                                alleles=alleles_repeated,
+                                model_kwargs=affinity_model_kwargs,
+                                throw=throw,
+                            ),
+                            dtype=numpy.float64,
+                        )
+                        chunk_matrix = flat_predictions.reshape(chunk_n, n_peps).T
                     for j, allele in enumerate(chunk_alleles):
                         col = chunk_matrix[:, j]
                         valid = ~numpy.isnan(col)

@@ -1331,6 +1331,135 @@ class Class1AffinityPredictor(object):
         )
         return df.prediction.values
 
+    def predict_cartesian_pan_allele(
+            self,
+            peptides,
+            alleles,
+            throw=True,
+            centrality_measure=DEFAULT_CENTRALITY_MEASURE,
+            model_kwargs=None):
+        """
+        Predict a peptide x allele matrix using the optimized pan-allele path.
+
+        Returns ``None`` when the predictor is not a single optimized merged
+        pan-allele model. Callers can then fall back to ``predict``. This path
+        keeps peptide encodings unique, computes the peptide stage once per
+        peptide batch, and combines it with allele embeddings on-device.
+        """
+        if model_kwargs is None:
+            model_kwargs = {}
+        else:
+            model_kwargs = dict(model_kwargs)
+
+        if (
+                not self.optimization_info.get("pan_models_merged", False)
+                or len(self.class1_pan_allele_models) != 1
+                or self.allele_to_allele_specific_models):
+            return None
+
+        import torch
+        from .class1_neural_network import (
+            DEFAULT_PREDICT_BATCH_SIZE,
+            resolve_prediction_batch_size,
+        )
+        from .torch_training_loop import (
+            _configure_matmul_precision,
+            _maybe_compile_network,
+        )
+
+        peptides = EncodableSequences.create(peptides)
+        if len(peptides) == 0 or len(alleles) == 0:
+            return numpy.empty((len(peptides), len(alleles)), dtype="float64")
+
+        normalized_alleles = [
+            self.canonicalize_allele_name(allele)
+            for allele in alleles
+        ]
+        unsupported_alleles = [
+            allele for allele in normalized_alleles
+            if allele not in self.allele_to_sequence
+        ]
+        if unsupported_alleles:
+            msg = "No sequences for allele(s): %s." % " ".join(
+                unsupported_alleles)
+            logging.warning(msg)
+            if throw:
+                raise ValueError(msg)
+            return None
+
+        model_obj = self.class1_pan_allele_models[0]
+        master = self.master_allele_encoding
+        allele_encoding = AlleleEncoding(
+            normalized_alleles,
+            borrow_from=master,
+        ).compact()
+        (
+            allele_encoding_input,
+            allele_representations,
+        ) = model_obj.allele_encoding_to_network_input(allele_encoding)
+        model_obj.set_allele_representations(allele_representations)
+
+        device = model_obj.get_device()
+        _configure_matmul_precision(device)
+        network = model_obj.network(borrow=True)
+        network.to(device)
+        network = _maybe_compile_network(network, device)
+        network.eval()
+
+        peptide_input = model_obj.peptides_to_network_input(peptides)
+        batch_size = resolve_prediction_batch_size(
+            model_kwargs.get("batch_size", DEFAULT_PREDICT_BATCH_SIZE),
+            device,
+            model=network,
+            num_workers_per_gpu=model_kwargs.get("num_workers_per_gpu", 1),
+        )
+        batch_size = int(batch_size)
+
+        allele_idx = torch.from_numpy(allele_encoding_input).to(device)
+        peptide_is_indices = model_obj.uses_peptide_torch_encoding()
+        n_peptides = len(peptides)
+        n_alleles = len(normalized_alleles)
+        result = numpy.empty((n_peptides, n_alleles), dtype="float64")
+
+        if callable(centrality_measure):
+            centrality_function = centrality_measure
+        else:
+            centrality_function = CENTRALITY_MEASURES[centrality_measure]
+
+        def peptide_tensor(batch_array):
+            batch_array = numpy.asarray(batch_array)
+            if not batch_array.flags.writeable:
+                batch_array = batch_array.copy()
+            keep_int = (
+                peptide_is_indices
+                and batch_array.ndim == 2
+                and numpy.issubdtype(batch_array.dtype, numpy.integer)
+            )
+            if not keep_int:
+                batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
+            return torch.from_numpy(batch_array).to(device)
+
+        with torch.no_grad():
+            for start in range(0, n_peptides, batch_size):
+                end = min(start + batch_size, n_peptides)
+                peptide_batch = peptide_tensor(peptide_input[start:end])
+                peptide_stage = network.forward_peptide_stage(peptide_batch)
+                output = network.forward_cartesian_from_peptide_stage(
+                    peptide_stage,
+                    allele_idx,
+                )
+                affinities = to_ic50(output.detach().cpu().numpy())
+                if affinities.ndim == 3 and affinities.shape[2] > 1:
+                    log_values = numpy.log(
+                        affinities.reshape((-1, affinities.shape[2]))
+                    )
+                    centers = numpy.exp(centrality_function(log_values))
+                    affinities = centers.reshape(n_alleles, end - start)
+                else:
+                    affinities = affinities.reshape(n_alleles, end - start)
+                result[start:end] = affinities.T
+        return result
+
     def predict_to_dataframe(
             self,
             peptides,

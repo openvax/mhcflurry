@@ -24,7 +24,7 @@ import tqdm  # progress bar
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import (
     Class1NeuralNetwork,
-    _peptide_uses_torch_encoding,
+    peptide_sequences_to_network_input,
 )
 from .common import configure_logging, normalize_allele_name, write_generate_sh
 from .local_parallelism import (
@@ -394,14 +394,6 @@ def pretrain_network_input_iterator(
     )
     allele_encoding_cache = {}
     allele_indices_cache = {}
-    categorical_kwargs = {
-        k: v for k, v in peptide_encoding.items()
-        if k != "vector_encoding_name"
-    }
-    use_torch_peptide_encoding = _peptide_uses_torch_encoding({
-        "peptide_encoding": peptide_encoding,
-        "peptide_amino_acid_encoding_torch": peptide_amino_acid_encoding_torch,
-    })
 
     synthetic_iter = pandas.read_csv(
         filename, index_col=0, chunksize=peptides_per_chunk)
@@ -426,18 +418,11 @@ def pretrain_network_input_iterator(
             peptide_values = df.index.values
         else:
             peptide_values = numpy.repeat(df.index.values, len(usable_alleles))
-        peptides = EncodableSequences(peptide_values)
-        if use_torch_peptide_encoding:
-            peptide_rows = (
-                peptides.variable_length_to_fixed_length_categorical(
-                    **categorical_kwargs
-                )
-                .astype("int8", copy=False)
-            )
-        else:
-            peptide_rows = peptides.variable_length_to_fixed_length_vector_encoding(
-                **peptide_encoding
-            )
+        peptide_rows = peptide_sequences_to_network_input(
+            peptide_values,
+            peptide_encoding=peptide_encoding,
+            peptide_amino_acid_encoding_torch=peptide_amino_acid_encoding_torch,
+        )
         x_dict = {
             "peptide": peptide_rows,
             "allele": allele_indices_cache[chunk_len],

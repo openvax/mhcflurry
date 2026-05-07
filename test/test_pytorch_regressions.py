@@ -10,6 +10,8 @@ import pytest
 import numpy as np
 import torch
 
+from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
+from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.class1_neural_network import (
     Class1NeuralNetwork,
     Class1NeuralNetworkModel,
@@ -412,6 +414,62 @@ def test_forward_cartesian_from_peptide_stage_matches_expanded_path(merge_method
         rtol=0,
         atol=1e-6,
     )
+
+
+def test_predict_cartesian_pan_allele_matches_repeated_predict():
+    _seed_all(7)
+    allele_to_sequence = {
+        "HLA-A*02:01": "ACDEFG",
+        "HLA-B*07:02": "HIKLMN",
+    }
+    master = Class1AffinityPredictor(
+        allele_to_sequence=allele_to_sequence,
+    ).master_allele_encoding
+    allele_encoding = AlleleEncoding(
+        list(allele_to_sequence),
+        borrow_from=master,
+    )
+    models = []
+    for _ in range(2):
+        model = _make_simple_affinity_model(
+            peptide_allele_merge_method="concatenate",
+            peptide_dense_layer_sizes=[3],
+            allele_dense_layer_sizes=[3],
+            layer_sizes=[4],
+            peptide_amino_acid_encoding_torch=True,
+        )
+        _, allele_representations = model.allele_encoding_to_network_input(
+            allele_encoding
+        )
+        model._network = model.make_network(
+            allele_representations=allele_representations,
+            **model.network_hyperparameter_defaults.subselect(
+                model.hyperparameters
+            ),
+        )
+        models.append(model)
+
+    predictor = Class1AffinityPredictor(
+        class1_pan_allele_models=models,
+        allele_to_sequence=allele_to_sequence,
+    )
+    assert predictor.optimize()
+
+    peptides = np.asarray(["SIINFEKL", "PEPTIDES"])
+    alleles = np.asarray(["HLA-A*02:01", "HLA-B*07:02"])
+    actual = predictor.predict_cartesian_pan_allele(
+        peptides=peptides,
+        alleles=alleles,
+        model_kwargs={"batch_size": 2},
+    )
+    expected_flat = predictor.predict(
+        peptides=np.tile(peptides, len(alleles)),
+        alleles=np.repeat(alleles, len(peptides)),
+        model_kwargs={"batch_size": 2},
+    )
+    expected = expected_flat.reshape(len(alleles), len(peptides)).T
+
+    np.testing.assert_allclose(actual, expected, rtol=1e-6, atol=1e-6)
 
 
 @pytest.mark.parametrize("layer_sizes", [
