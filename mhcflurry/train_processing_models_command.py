@@ -22,6 +22,10 @@ import tqdm  # progress bar
 
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
+from .class1_neural_network import (
+    _TRAINING_PEAK_MULTIPLIER,
+    _estimate_peak_bytes_per_row,
+)
 from .common import configure_logging, write_generate_sh
 from .local_parallelism import (
     add_local_parallelism_args,
@@ -42,6 +46,9 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
 GLOBAL_DATA = {}
+
+_PROCESSING_WORKER_RUNTIME_FLOOR_GB = 2.0
+_PROCESSING_WORKER_SAFETY_FACTOR = 1.3
 
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
@@ -178,9 +185,11 @@ def main(args):
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
     configure_logging(verbose=args.verbosity > 1)
+    processing_worker_gb = estimate_processing_worker_gb(args)
     resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+        per_worker_gb=processing_worker_gb,
     )
 
     if not args.continue_incomplete:
@@ -188,6 +197,94 @@ def main(args):
 
     if not args.only_initialize:
         train_models(args)
+
+
+def estimate_processing_worker_gb(args):
+    """Estimate steady per-worker VRAM for processing training.
+
+    Processing is not shaped like affinity training: workers keep encoded
+    flank tensors resident on-device, then run Conv1d models whose peak
+    activation width scales with flank length and convolutional filters.
+    This estimate sizes worker concurrency from the actual data row count
+    and largest architecture in the hyperparameter sweep. Prediction-time
+    AUC scoring is separately auto-batched per call.
+    """
+    data_path = getattr(args, "data", None)
+    hyperparameters_path = getattr(args, "hyperparameters", None)
+    if not data_path or not hyperparameters_path:
+        return None
+    try:
+        row_count = len(pandas.read_csv(data_path, usecols=["peptide"]))
+        hyperparameters_lst = yaml.unsafe_load(open(hyperparameters_path))
+        if not isinstance(hyperparameters_lst, list):
+            return None
+
+        max_sequence_bytes_per_row = 0
+        max_forward_bytes_per_row = 0
+        max_minibatch_size = 0
+        for hyperparameters in hyperparameters_lst:
+            model = Class1ProcessingNeuralNetwork(**hyperparameters)
+            network = model.make_network(
+                **model.network_hyperparameter_defaults.subselect(
+                    model.hyperparameters
+                )
+            )
+            seq_len = (
+                int(network.n_flank_length)
+                + int(network.peptide_max_length)
+                + int(network.c_flank_length)
+            )
+            input_channels = int(network.conv1.in_channels)
+            # Encoded sequence + peptide_length + target + index tensors.
+            sequence_bytes_per_row = seq_len * input_channels * 4 + 4 + 4 + 8
+            max_sequence_bytes_per_row = max(
+                max_sequence_bytes_per_row,
+                sequence_bytes_per_row,
+            )
+            max_forward_bytes_per_row = max(
+                max_forward_bytes_per_row,
+                _estimate_peak_bytes_per_row(network),
+            )
+            max_minibatch_size = max(
+                max_minibatch_size,
+                int(model.hyperparameters["minibatch_size"]),
+            )
+
+        if not max_forward_bytes_per_row or not max_minibatch_size:
+            return None
+
+        dataset_bytes = row_count * max_sequence_bytes_per_row
+        training_batch_bytes = (
+            max_minibatch_size
+            * max_forward_bytes_per_row
+            * _TRAINING_PEAK_MULTIPLIER
+        )
+        runtime_bytes = int(_PROCESSING_WORKER_RUNTIME_FLOOR_GB * (1 << 30))
+        estimate_gb = (
+            (dataset_bytes + training_batch_bytes + runtime_bytes)
+            * _PROCESSING_WORKER_SAFETY_FACTOR
+            / float(1 << 30)
+        )
+        estimate_gb = max(estimate_gb, 4.0)
+        print(
+            "Estimated processing worker VRAM: %.2f GB "
+            "(rows=%d, sequence=%.2f GB, train_batch=%.2f GB, "
+            "runtime_floor=%.2f GB, safety=%.1fx)" % (
+                estimate_gb,
+                row_count,
+                dataset_bytes / float(1 << 30),
+                training_batch_bytes / float(1 << 30),
+                _PROCESSING_WORKER_RUNTIME_FLOOR_GB,
+                _PROCESSING_WORKER_SAFETY_FACTOR,
+            )
+        )
+        return estimate_gb
+    except Exception as exc:
+        print(
+            "Could not estimate processing worker VRAM; falling back to "
+            "default local parallelism estimate: %s" % (exc,)
+        )
+        return None
 
 
 def initialize_training(args):

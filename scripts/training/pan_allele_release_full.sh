@@ -113,6 +113,26 @@ if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     COMMON_PARALLELISM_ARGS+=(--enable-timing)
 fi
 
+# Processing has a different VRAM profile from affinity training: Conv1d
+# flank models keep encoded sequence tensors resident and run post-fit AUC
+# prediction over large fold splits. Leave worker packing as "auto" here so
+# mhcflurry-class1-train-processing-models can resolve it from the processing
+# data + hyperparameter sweep instead of inheriting affinity's resolved value.
+PROCESSING_NUM_JOBS="${PROCESSING_NUM_JOBS:-auto}"
+PROCESSING_MAX_WORKERS_PER_GPU="${PROCESSING_MAX_WORKERS_PER_GPU:-auto}"
+PROCESSING_PARALLELISM_ARGS=(
+    --num-jobs "$PROCESSING_NUM_JOBS"
+    --max-tasks-per-worker 1000
+    --gpus "$GPUS"
+    --max-workers-per-gpu "$PROCESSING_MAX_WORKERS_PER_GPU"
+    --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
+    --torch-compile auto
+    --matmul-precision "${MATMUL_PRECISION:-none}"
+)
+if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
+    PROCESSING_PARALLELISM_ARGS+=(--enable-timing)
+fi
+
 NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
     DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
 
@@ -197,7 +217,7 @@ PY
         --hyperparameters "hyperparameters.$kind.yaml" \
         --out-models-dir "$(pwd)/models.unselected.$kind" \
         --worker-log-dir "$BASE_OUT/processing" \
-        "${COMMON_PARALLELISM_ARGS[@]}"
+        "${PROCESSING_PARALLELISM_ARGS[@]}"
 
     mhcflurry-class1-select-processing-models \
         --data "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
@@ -205,7 +225,7 @@ PY
         --out-models-dir "$(pwd)/models.selected.$kind" \
         --min-models-per-fold 1 \
         --max-models-per-fold 2 \
-        "${COMMON_PARALLELISM_ARGS[@]}"
+        "${PROCESSING_PARALLELISM_ARGS[@]}"
     cp "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
         "$(pwd)/models.selected.$kind/train_data.csv.bz2"
 done

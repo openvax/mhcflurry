@@ -9,12 +9,14 @@ import tempfile
 import subprocess
 import re
 import pytest
+from types import SimpleNamespace
 
 from sklearn.metrics import roc_auc_score
 import pandas
 
 from mhcflurry.class1_processing_predictor import Class1ProcessingPredictor
 from mhcflurry.common import random_peptides
+from mhcflurry.train_processing_models_command import estimate_processing_worker_gb
 
 from mhcflurry.testing_utils import cleanup, startup
 from .pytest_helpers import mhcflurry_cli
@@ -147,6 +149,43 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
         print("Deleting: %s" % models_dir)
         shutil.rmtree(models_dir)
         shutil.rmtree(models_dir_selected)
+
+
+def test_processing_worker_estimate_uses_data_and_architecture(tmp_path):
+    df = pandas.DataFrame({
+        "n_flank": ["A" * 15, "C" * 15, "D" * 15],
+        "c_flank": ["E" * 15, "F" * 15, "G" * 15],
+        "peptide": ["SIINFEKL", "GILGFVFTL", "NLVPMVATV"],
+        "sample_id": ["s1", "s2", "s3"],
+        "hit": [1, 0, 1],
+    })
+    data = tmp_path / "training.csv"
+    df.to_csv(data, index=False)
+
+    hyperparameters = tmp_path / "hyperparameters.yaml"
+    hyperparameters.write_text(json.dumps([
+        {
+            "minibatch_size": 512,
+            "n_flank_length": 0,
+            "c_flank_length": 0,
+            "convolutional_filters": 16,
+        },
+        {
+            "minibatch_size": 512,
+            "n_flank_length": 5,
+            "c_flank_length": 5,
+            "convolutional_filters": 512,
+        },
+    ]))
+
+    estimate = estimate_processing_worker_gb(SimpleNamespace(
+        data=str(data),
+        hyperparameters=str(hyperparameters),
+    ))
+
+    assert estimate is not None
+    assert estimate >= 4.0
+
 
 def Xtest_run_parallel():
     run_and_check(n_jobs=2)

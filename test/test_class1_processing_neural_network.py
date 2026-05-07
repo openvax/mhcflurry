@@ -147,6 +147,73 @@ def test_neural_network_input():
         results['peptide_length'], df.peptide.str.len().values)
 
 
+def test_processing_peak_estimate_scales_with_conv_shape():
+    """Processing prediction autosizing should see Conv1d activation width."""
+    from mhcflurry.class1_neural_network import _estimate_peak_bytes_per_row
+
+    small = Class1ProcessingNeuralNetwork(
+        peptide_max_length=15,
+        n_flank_length=0,
+        c_flank_length=0,
+        convolutional_filters=16,
+    )
+    small_network = small.make_network(
+        **small.network_hyperparameter_defaults.subselect(small.hyperparameters)
+    )
+
+    large = Class1ProcessingNeuralNetwork(
+        peptide_max_length=15,
+        n_flank_length=5,
+        c_flank_length=5,
+        convolutional_filters=512,
+    )
+    large_network = large.make_network(
+        **large.network_hyperparameter_defaults.subselect(large.hyperparameters)
+    )
+
+    small_estimate = _estimate_peak_bytes_per_row(small_network)
+    large_estimate = _estimate_peak_bytes_per_row(large_network)
+
+    assert small_estimate == 15 * 21 * 4 * 2 * 4
+    assert large_estimate == 25 * 512 * 4 * 2 * 4
+    assert large_estimate > small_estimate * 40
+
+
+def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
+    """Pool workers expose co-resident workers/GPU through the env."""
+    from mhcflurry import class1_neural_network as cnn
+
+    captured = {}
+
+    def fake_resolve(value, device, model=None, num_workers_per_gpu=1):
+        del value, device, model
+        captured["num_workers_per_gpu"] = num_workers_per_gpu
+        return 2
+
+    monkeypatch.setenv("MHCFLURRY_MAX_WORKERS_PER_GPU", "4")
+    monkeypatch.setattr(cnn, "resolve_prediction_batch_size", fake_resolve)
+
+    model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=12,
+        n_flank_length=2,
+        c_flank_length=2,
+        convolutional_filters=8,
+    )
+    model._network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    peptides = ["SIINFEKL", "GILGFVFTL", "NLVPMVATV"]
+    predictions = model.predict(
+        peptides=peptides,
+        n_flanks=["AA"] * len(peptides),
+        c_flanks=["GG"] * len(peptides),
+        batch_size="auto",
+    )
+
+    assert len(predictions) == len(peptides)
+    assert captured["num_workers_per_gpu"] == 4
+
+
 @pytest.mark.slow
 @pytest.mark.integration
 def test_small():

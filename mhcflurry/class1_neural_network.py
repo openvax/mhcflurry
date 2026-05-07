@@ -64,6 +64,32 @@ def _estimate_peak_bytes_per_row(model):
     """
     if model is None:
         return 32 * 1024  # conservative 32 KB/row fallback
+    # Class1ProcessingModel is convolutional over the full
+    # flank+peptide sequence. Its peak activation is not represented by
+    # the affinity model's peptide_dense_layers/dense_layers attributes,
+    # so compute it from the Conv1d sequence width. This keeps prediction
+    # autosizing sensitive to future flank length / filter count changes
+    # instead of falling back to the generic 1024-width estimate.
+    try:
+        conv1 = model.conv1
+        seq_len = (
+            int(model.n_flank_length)
+            + int(model.peptide_max_length)
+            + int(model.c_flank_length)
+        )
+        widths = [
+            seq_len * int(conv1.in_channels),
+            seq_len * int(conv1.out_channels),
+        ]
+        for convs_name in ("n_flank_post_convs", "c_flank_post_convs"):
+            for layer in getattr(model, convs_name, []):
+                widths.append(seq_len * int(layer.out_channels))
+        if getattr(model, "flanking_averages", False):
+            widths.append(seq_len * int(conv1.out_channels))
+        peak = max(widths)
+        return int(peak * 4 * 2 * 4)  # fp32 × 2 buffers × 4x safety
+    except (AttributeError, TypeError, ValueError):
+        pass
     # MergedClass1NeuralNetwork wraps N sub-networks and runs each one's
     # forward independently in a list comprehension, then combines the
     # outputs. All N sub-networks' peak intermediates are alive

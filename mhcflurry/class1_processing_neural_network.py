@@ -942,7 +942,10 @@ class Class1ProcessingNeuralNetwork(object):
         -------
         numpy.array
         """
-        from .class1_neural_network import resolve_prediction_batch_size
+        from .class1_neural_network import (
+            _env_workers_per_gpu,
+            resolve_prediction_batch_size,
+        )
 
         device = self.get_device()
         _configure_matmul_precision(device)
@@ -954,7 +957,10 @@ class Class1ProcessingNeuralNetwork(object):
         network.eval()
 
         batch_size = resolve_prediction_batch_size(
-            batch_size, device, model=network,
+            batch_size,
+            device,
+            model=network,
+            num_workers_per_gpu=_env_workers_per_gpu(1),
         )
 
         n_samples = len(x_dict["sequence"])
