@@ -561,7 +561,19 @@ class Class1PresentationPredictor(object):
             model = self.get_model()
             if verbose > 0:
                 print("Fitting LR model.")
-                print(df)
+                print(
+                    "LR input rows=%d columns=%s target_mean=%.6f "
+                    "affinity_score_range=(%.6f, %.6f) "
+                    "processing_score_range=(%.6f, %.6f)" % (
+                        len(df),
+                        list(df.columns),
+                        float(df.target.mean()),
+                        float(df.affinity_score.min()),
+                        float(df.affinity_score.max()),
+                        float(df.processing_score.min()),
+                        float(df.processing_score.max()),
+                    )
+                )
 
             model.fit(
                 X=df[self.model_inputs].values,
