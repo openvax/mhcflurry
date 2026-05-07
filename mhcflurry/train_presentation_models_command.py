@@ -7,7 +7,9 @@ import signal
 import sys
 import time
 import traceback
+from functools import partial
 
+import numpy
 import pandas
 import tqdm  # progress bar
 
@@ -15,8 +17,18 @@ from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
 from .common import configure_logging, write_generate_sh
+from .local_parallelism import (
+    add_local_parallelism_args,
+    attach_constant_data_to_work_items_if_needed,
+    call_wrapped_kwargs,
+    resolve_local_parallelism_args,
+    worker_pool_with_gpu_assignments_from_args,
+)
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
+
+GLOBAL_DATA = {}
+PRESENTATION_FEATURE_WORKER_GB = 12.0
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -62,6 +74,17 @@ parser.add_argument(
     "--target-column",
     default="hit",
     help="Column in data giving hit (1) vs decoy (0)")
+parser.add_argument(
+    "--feature-chunk-size",
+    type=int,
+    default=250000,
+    metavar="N",
+    help=(
+        "Rows per parallel presentation feature-prediction task. Larger "
+        "chunks reduce scheduling overhead but increase worker memory. "
+        "Default: %(default)s"))
+
+add_local_parallelism_args(parser)
 
 def run(argv=sys.argv[1:]):
     # On sigusr1 print stack trace
@@ -88,8 +111,16 @@ def main(args):
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
     configure_logging(verbose=args.verbosity > 1)
+    resolve_local_parallelism_args(
+        args,
+        per_worker_gb=PRESENTATION_FEATURE_WORKER_GB,
+    )
 
-    df = pandas.read_csv(args.data)
+    df = pandas.read_csv(
+        args.data,
+        dtype={"sample_id": str},
+        low_memory=False,
+    )
     print("Loaded training data: %s" % (str(df.shape)))
     df = df.loc[
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
@@ -99,6 +130,8 @@ def main(args):
     df["experiment_id"] = df[args.hla_column]
     experiment_to_alleles = dict((
         key, key.split()) for key in df.experiment_id.unique())
+    if args.num_jobs:
+        df = df.sort_values("experiment_id", kind="stable").reset_index(drop=True)
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -145,14 +178,27 @@ def main(args):
 
     print("Fitting.")
     start = time.time()
-    predictor.fit(
-        targets=df[args.target_column].values,
-        peptides=df.peptide.values,
-        alleles=experiment_to_alleles,
-        sample_names=df.experiment_id,
-        n_flanks=df.n_flank.values,
-        c_flanks=df.c_flank.values,
-        verbose=args.verbosity)
+    if args.num_jobs:
+        scores = predict_features_parallel(
+            args=args,
+            predictor=predictor,
+            df=df,
+            experiment_to_alleles=experiment_to_alleles,
+        )
+        predictor.fit_from_scores(
+            targets=df[args.target_column].values,
+            affinities=scores["affinity"],
+            processing_scores_by_model=scores["processing_scores_by_model"],
+            verbose=args.verbosity)
+    else:
+        predictor.fit(
+            targets=df[args.target_column].values,
+            peptides=df.peptide.values,
+            alleles=experiment_to_alleles,
+            sample_names=df.experiment_id,
+            n_flanks=df.n_flank.values,
+            c_flanks=df.c_flank.values,
+            verbose=args.verbosity)
     print("Done fitting in", time.time() - start, "seconds")
 
     print("Saving weights and metadata.")
@@ -166,6 +212,167 @@ def main(args):
         write_metdata = True)
     write_generate_sh(args.out_models_dir)
     print("Wrote", args.out_models_dir)
+
+
+def predict_features_parallel(args, predictor, df, experiment_to_alleles):
+    """
+    Predict BA/AP features in local worker processes.
+
+    Presentation training fits only logistic-regression weights, but feature
+    generation is expensive: it runs the affinity predictor and both
+    processing predictors over tens of millions of rows. Split by sample and
+    row chunk so each worker can use its assigned GPU independently.
+    """
+    global GLOBAL_DATA
+
+    work_items = make_feature_work_items(df, args.feature_chunk_size)
+    print(
+        "Predicting presentation features in parallel: %d rows, %d chunks, "
+        "num_jobs=%d, gpus=%d, max_workers_per_gpu=%s" % (
+            len(df),
+            len(work_items),
+            args.num_jobs,
+            args.gpus,
+            args.max_workers_per_gpu,
+        )
+    )
+
+    include_without_flanks = (
+        predictor.processing_predictor_without_flanks is not None
+    )
+    include_with_flanks = (
+        predictor.processing_predictor_with_flanks is not None
+        and "n_flank" in df
+        and "c_flank" in df
+    )
+    for item in work_items:
+        item["include_without_flanks"] = include_without_flanks
+        item["include_with_flanks"] = include_with_flanks
+
+    GLOBAL_DATA.clear()
+    GLOBAL_DATA.update({
+        "predictor": predictor,
+        "data": df,
+        "experiment_to_alleles": experiment_to_alleles,
+    })
+
+    worker_pool = None
+    try:
+        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        print("Worker pool", worker_pool)
+        assert worker_pool is not None
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
+
+        affinity = numpy.empty(len(df), dtype="float64")
+        processing_scores_by_model = {}
+        if include_without_flanks:
+            processing_scores_by_model["without_flanks"] = numpy.empty(
+                len(df), dtype="float64")
+        if include_with_flanks:
+            processing_scores_by_model["with_flanks"] = numpy.empty(
+                len(df), dtype="float64")
+
+        results = worker_pool.imap_unordered(
+            partial(call_wrapped_kwargs, predict_feature_chunk),
+            work_items,
+            chunksize=1,
+        )
+        for result in tqdm.tqdm(results, total=len(work_items)):
+            start = result["start"]
+            end = result["end"]
+            affinity[start:end] = result["affinity"]
+            for (model_name, values) in result["processing_scores"].items():
+                processing_scores_by_model[model_name][start:end] = values
+
+        return {
+            "affinity": affinity,
+            "processing_scores_by_model": processing_scores_by_model,
+        }
+    finally:
+        if worker_pool is not None:
+            worker_pool.close()
+            worker_pool.join()
+
+
+def make_feature_work_items(df, chunk_size):
+    chunk_size = max(int(chunk_size or 0), 1)
+    work_items = []
+    for (sample_name, sub_df) in df.groupby("experiment_id", sort=False):
+        if len(sub_df) == 0:
+            continue
+        first = int(sub_df.index[0])
+        last = int(sub_df.index[-1])
+        if last - first + 1 != len(sub_df):
+            raise ValueError(
+                "Presentation feature chunks require experiment_id-contiguous "
+                "data. Sort by experiment_id before chunking.")
+        for start in range(first, last + 1, chunk_size):
+            end = min(start + chunk_size, last + 1)
+            work_items.append({
+                "chunk_num": len(work_items),
+                "start": start,
+                "end": end,
+                "sample_name": sample_name,
+            })
+    return work_items
+
+
+def predict_feature_chunk(
+        chunk_num,
+        start,
+        end,
+        sample_name,
+        include_without_flanks,
+        include_with_flanks,
+        constant_data=GLOBAL_DATA):
+    predictor = constant_data["predictor"]
+    df = constant_data["data"].iloc[start:end]
+    experiment_to_alleles = constant_data["experiment_to_alleles"]
+
+    print(
+        "Presentation feature chunk %d: rows [%d, %d), sample=%s" % (
+            chunk_num, start, end, sample_name)
+    )
+
+    affinity_df = predictor.predict_affinity(
+        peptides=df.peptide.values,
+        alleles={sample_name: experiment_to_alleles[sample_name]},
+        sample_names=numpy.repeat(sample_name, len(df)),
+        include_affinity_percentile=False,
+        verbose=0,
+        model_kwargs={"batch_size": "auto"},
+    )
+    result = {
+        "chunk_num": chunk_num,
+        "start": start,
+        "end": end,
+        "affinity": affinity_df.affinity.values.astype("float64", copy=False),
+        "processing_scores": {},
+    }
+
+    if include_without_flanks:
+        result["processing_scores"]["without_flanks"] = (
+            predictor.predict_processing(
+                peptides=df.peptide.values,
+                n_flanks=None,
+                c_flanks=None,
+                verbose=0,
+                batch_size="auto",
+            ).astype("float64", copy=False)
+        )
+    if include_with_flanks:
+        result["processing_scores"]["with_flanks"] = (
+            predictor.predict_processing(
+                peptides=df.peptide.values,
+                n_flanks=df.n_flank.values,
+                c_flanks=df.c_flank.values,
+                verbose=0,
+                batch_size="auto",
+            ).astype("float64", copy=False)
+        )
+    return result
 
 
 if __name__ == '__main__':

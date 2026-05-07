@@ -2,6 +2,7 @@ import numpy
 import pandas
 
 import mhcflurry.class1_presentation_predictor as presentation_module
+import mhcflurry.train_presentation_models_command as train_presentation
 from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
 
 
@@ -83,3 +84,97 @@ def test_predict_affinity_sample_names_none_handles_no_peptides():
     ]
     assert result.empty
     assert affinity_predictor.call_sizes == []
+
+
+def test_fit_from_scores_trains_expected_variants():
+    predictor = Class1PresentationPredictor()
+
+    predictor.fit_from_scores(
+        targets=[0, 1, 0, 1, 0, 1],
+        affinities=[50000, 50, 30000, 100, 40000, 75],
+        processing_scores_by_model={
+            "without_flanks": [0.1, 0.9, 0.2, 0.7, 0.1, 0.8],
+            "with_flanks": [0.2, 0.8, 0.3, 0.6, 0.2, 0.7],
+        },
+        verbose=0,
+    )
+
+    assert set(predictor.weights_dataframe.index) == {
+        "without_flanks",
+        "with_flanks",
+    }
+    assert set(predictor.weights_dataframe.columns) == {
+        "intercept",
+        "affinity_score",
+        "processing_score",
+    }
+
+
+class FakePresentationPredictor:
+    def predict_affinity(
+            self,
+            peptides,
+            alleles,
+            sample_names=None,
+            include_affinity_percentile=False,
+            verbose=0,
+            model_kwargs=None):
+        del alleles, sample_names, include_affinity_percentile, verbose
+        assert model_kwargs == {"batch_size": "auto"}
+        return pandas.DataFrame({
+            "affinity": numpy.arange(len(peptides), dtype=float) + 10.0,
+        })
+
+    def predict_processing(
+            self,
+            peptides,
+            n_flanks=None,
+            c_flanks=None,
+            verbose=0,
+            batch_size="auto"):
+        del c_flanks, verbose
+        assert batch_size == "auto"
+        offset = 100.0 if n_flanks is None else 200.0
+        return numpy.arange(len(peptides), dtype=float) + offset
+
+
+def test_presentation_feature_chunks_use_global_data():
+    df = pandas.DataFrame({
+        "experiment_id": ["s1", "s1", "s1", "s2", "s2"],
+        "peptide": ["A", "B", "C", "D", "E"],
+        "n_flank": ["N"] * 5,
+        "c_flank": ["C"] * 5,
+    })
+    work_items = train_presentation.make_feature_work_items(df, chunk_size=2)
+    assert [
+        (item["start"], item["end"], item["sample_name"])
+        for item in work_items
+    ] == [
+        (0, 2, "s1"),
+        (2, 3, "s1"),
+        (3, 5, "s2"),
+    ]
+
+    train_presentation.GLOBAL_DATA.clear()
+    train_presentation.GLOBAL_DATA.update({
+        "predictor": FakePresentationPredictor(),
+        "data": df,
+        "experiment_to_alleles": {
+            "s1": ["A*01:01"],
+            "s2": ["A*02:01"],
+        },
+    })
+    result = train_presentation.predict_feature_chunk(
+        chunk_num=0,
+        start=0,
+        end=2,
+        sample_name="s1",
+        include_without_flanks=True,
+        include_with_flanks=True,
+    )
+
+    numpy.testing.assert_equal(result["affinity"], [10.0, 11.0])
+    numpy.testing.assert_equal(
+        result["processing_scores"]["without_flanks"], [100.0, 101.0])
+    numpy.testing.assert_equal(
+        result["processing_scores"]["with_flanks"], [200.0, 201.0])

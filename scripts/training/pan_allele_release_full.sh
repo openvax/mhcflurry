@@ -58,6 +58,7 @@ MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
 PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
+PRESENTATION_FEATURE_CHUNK_SIZE="${PRESENTATION_FEATURE_CHUNK_SIZE:-250000}"
 
 if [ "$GPUS" -eq 0 ]; then
     NUM_JOBS=1
@@ -131,6 +132,25 @@ PROCESSING_PARALLELISM_ARGS=(
 )
 if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     PROCESSING_PARALLELISM_ARGS+=(--enable-timing)
+fi
+
+# Presentation training is mostly feature generation over a large
+# presentation CSV. Each worker loads the merged affinity predictor plus the
+# processing ensembles, so default to one worker per GPU; callers can raise
+# this after validating VRAM headroom for a given release artifact.
+PRESENTATION_NUM_JOBS="${PRESENTATION_NUM_JOBS:-auto}"
+PRESENTATION_MAX_WORKERS_PER_GPU="${PRESENTATION_MAX_WORKERS_PER_GPU:-1}"
+PRESENTATION_PARALLELISM_ARGS=(
+    --num-jobs "$PRESENTATION_NUM_JOBS"
+    --max-tasks-per-worker 1000
+    --gpus "$GPUS"
+    --max-workers-per-gpu "$PRESENTATION_MAX_WORKERS_PER_GPU"
+    --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
+    --torch-compile auto
+    --matmul-precision "${MATMUL_PRECISION:-none}"
+)
+if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
+    PRESENTATION_PARALLELISM_ARGS+=(--enable-timing)
 fi
 
 NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
@@ -256,7 +276,9 @@ mhcflurry-class1-train-presentation-models \
     --affinity-predictor "$AFFINITY_PREDICTOR" \
     --processing-predictor-with-flanks "$BASE_OUT/processing/models.selected.short_flanks" \
     --processing-predictor-without-flanks "$BASE_OUT/processing/models.selected.no_flank" \
-    --out-models-dir "$(pwd)/models"
+    --out-models-dir "$(pwd)/models" \
+    --feature-chunk-size "$PRESENTATION_FEATURE_CHUNK_SIZE" \
+    "${PRESENTATION_PARALLELISM_ARGS[@]}"
 
 mhcflurry-calibrate-percentile-ranks \
     --models-dir "$(pwd)/models" \

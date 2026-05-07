@@ -17,7 +17,10 @@ import tqdm
 from .version import __version__
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_processing_predictor import Class1ProcessingPredictor
-from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
+from .class1_neural_network import (
+    DEFAULT_PREDICT_BATCH_SIZE,
+    _env_workers_per_gpu,
+)
 from .encodable_sequences import EncodableSequences
 from .regression_target import from_ic50
 from .downloads import get_default_class1_presentation_models_dir
@@ -215,7 +218,10 @@ class Class1PresentationPredictor(object):
             model_kwargs = {}
         else:
             model_kwargs = dict(model_kwargs)
-        affinity_model_kwargs = {"batch_size": PREDICT_BATCH_SIZE}
+        affinity_model_kwargs = {
+            "batch_size": PREDICT_BATCH_SIZE,
+            "num_workers_per_gpu": _env_workers_per_gpu(1),
+        }
         affinity_model_kwargs.update(model_kwargs)
 
         df = pandas.DataFrame({
@@ -480,9 +486,8 @@ class Class1PresentationPredictor(object):
             peptides=peptides,
             alleles=alleles,
             sample_names=sample_names,
+            include_affinity_percentile=False,
             verbose=verbose)
-        df["affinity_score"] = from_ic50(df.affinity)
-        df["target"] = numpy.asarray(targets)
 
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
@@ -497,19 +502,61 @@ class Class1PresentationPredictor(object):
         if not with_flanks_list:
             raise RuntimeError("Can't fit any models")
 
-        if self.weights_dataframe is None:
-            self.weights_dataframe = pandas.DataFrame()
-
+        processing_scores_by_model = {}
         for with_flanks in with_flanks_list:
             model_name = 'with_flanks' if with_flanks else "without_flanks"
             if verbose > 0:
-                print("Training variant", model_name)
+                print("Predicting processing for variant", model_name)
 
-            df["processing_score"] = self.predict_processing(
+            processing_scores_by_model[model_name] = self.predict_processing(
                 peptides=df.peptide.values,
                 n_flanks=n_flanks if with_flanks else None,
                 c_flanks=c_flanks if with_flanks else None,
                 verbose=verbose)
+
+        self.fit_from_scores(
+            targets=targets,
+            affinities=df.affinity.values,
+            processing_scores_by_model=processing_scores_by_model,
+            verbose=verbose)
+
+    def fit_from_scores(
+            self,
+            targets,
+            affinities,
+            processing_scores_by_model,
+            verbose=1):
+        """
+        Fit presentation logistic-regression weights from precomputed scores.
+
+        Parameters
+        ----------
+        targets : list of int/float
+            1 indicates hit, 0 indicates decoy.
+        affinities : list of float
+            Best binding affinity predictions aligned to ``targets``.
+        processing_scores_by_model : dict
+            Mapping from model name (``"with_flanks"`` or
+            ``"without_flanks"``) to processing predictions aligned to
+            ``targets``.
+        verbose : int
+        """
+        if not processing_scores_by_model:
+            raise RuntimeError("Can't fit any models")
+
+        df = pandas.DataFrame({
+            "affinity_score": from_ic50(affinities),
+            "target": numpy.asarray(targets),
+        })
+
+        if self.weights_dataframe is None:
+            self.weights_dataframe = pandas.DataFrame()
+
+        for (model_name, processing_scores) in processing_scores_by_model.items():
+            if verbose > 0:
+                print("Training variant", model_name)
+
+            df["processing_score"] = numpy.asarray(processing_scores)
 
             model = self.get_model()
             if verbose > 0:
