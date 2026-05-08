@@ -444,6 +444,11 @@ def main():
     p.add_argument("--out", required=True)
     p.add_argument("--limit-files", type=int, default=None)
     p.add_argument(
+        "--skip-plots",
+        action="store_true",
+        help="Write metrics only. Intended for quick smoke tests.",
+    )
+    p.add_argument(
         "--modes",
         nargs="+",
         choices=["with_flanks", "without_flanks"],
@@ -537,13 +542,16 @@ def main():
     summary_table.to_csv(summary_table_path, index=False)
     _stamp(f"wrote {summary_table_path}")
 
-    _save_plots(
-        scored_by_mode,
-        summary_rows,
-        args.out,
-        max_points=args.max_plot_points,
-    )
-    _stamp(f"wrote plots under {os.path.join(args.out, 'plots')}")
+    if args.skip_plots:
+        _stamp("skipped plots")
+    else:
+        _save_plots(
+            scored_by_mode,
+            summary_rows,
+            args.out,
+            max_points=args.max_plot_points,
+        )
+        _stamp(f"wrote plots under {os.path.join(args.out, 'plots')}")
     print()
     print("=== SUMMARY TABLE ===")
     print(summary_table.to_string(index=False))
