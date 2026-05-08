@@ -1371,6 +1371,43 @@ class Class1AffinityPredictor(object):
         if len(peptides) == 0 or len(alleles) == 0:
             return numpy.empty((len(peptides), len(alleles)), dtype="float64")
 
+        (min_peptide_length, max_peptide_length) = (
+            self.supported_peptide_lengths)
+        peptide_df = pandas.DataFrame({"peptide": peptides.sequences})
+        sequence_length = peptide_df.peptide.str.len()
+        supported_peptide = (
+            (sequence_length >= min_peptide_length) &
+            (sequence_length <= max_peptide_length)
+        )
+        if (~supported_peptide).any():
+            msg = (
+                "%d peptides have lengths outside of supported range [%d, %d]: "
+                "%s" % (
+                    (~supported_peptide).sum(),
+                    min_peptide_length,
+                    max_peptide_length,
+                    str(peptide_df.loc[~supported_peptide].peptide.unique())))
+            logging.warning(msg)
+            if throw:
+                raise ValueError(msg)
+
+        peptide_has_valid_amino_acids = (
+            (~supported_peptide) |
+            peptide_df.peptide.str.upper().str.match("^[ACDEFGHIKLMNPQRSTVWY]+$")
+        )
+        supported_peptide = supported_peptide & peptide_has_valid_amino_acids
+        if (~peptide_has_valid_amino_acids).any():
+            msg = (
+                "%d peptides have nonstandard amino acids: "
+                "%s" % (
+                    (~peptide_has_valid_amino_acids).sum(),
+                    str(peptide_df.loc[
+                        ~peptide_has_valid_amino_acids
+                    ].peptide.unique())))
+            logging.warning(msg)
+            if throw:
+                raise ValueError(msg)
+
         normalized_alleles = [
             self.canonicalize_allele_name(allele)
             for allele in alleles
@@ -1406,7 +1443,15 @@ class Class1AffinityPredictor(object):
         network = _maybe_compile_network(network, device)
         network.eval()
 
-        peptide_input = model_obj.peptides_to_network_input(peptides)
+        n_peptides = len(peptides)
+        n_alleles = len(normalized_alleles)
+        result = numpy.full((n_peptides, n_alleles), numpy.nan, dtype="float64")
+        supported_indices = numpy.flatnonzero(supported_peptide.to_numpy())
+        if len(supported_indices) == 0:
+            return result
+        peptides_to_predict = EncodableSequences.create(
+            peptides.sequences[supported_indices])
+        peptide_input = model_obj.peptides_to_network_input(peptides_to_predict)
         batch_size = resolve_prediction_batch_size(
             model_kwargs.get("batch_size", DEFAULT_PREDICT_BATCH_SIZE),
             device,
@@ -1415,11 +1460,11 @@ class Class1AffinityPredictor(object):
         )
         batch_size = int(batch_size)
 
+        allele_encoding_input = numpy.asarray(allele_encoding_input)
+        if not allele_encoding_input.flags.writeable:
+            allele_encoding_input = allele_encoding_input.copy()
         allele_idx = torch.from_numpy(allele_encoding_input).to(device)
         peptide_is_indices = model_obj.uses_peptide_torch_encoding()
-        n_peptides = len(peptides)
-        n_alleles = len(normalized_alleles)
-        result = numpy.empty((n_peptides, n_alleles), dtype="float64")
 
         if callable(centrality_measure):
             centrality_function = centrality_measure
@@ -1440,8 +1485,8 @@ class Class1AffinityPredictor(object):
             return torch.from_numpy(batch_array).to(device)
 
         with torch.no_grad():
-            for start in range(0, n_peptides, batch_size):
-                end = min(start + batch_size, n_peptides)
+            for start in range(0, len(peptides_to_predict), batch_size):
+                end = min(start + batch_size, len(peptides_to_predict))
                 peptide_batch = peptide_tensor(peptide_input[start:end])
                 peptide_stage = network.forward_peptide_stage(peptide_batch)
                 output = network.forward_cartesian_from_peptide_stage(
@@ -1457,7 +1502,7 @@ class Class1AffinityPredictor(object):
                     affinities = centers.reshape(n_alleles, end - start)
                 else:
                     affinities = affinities.reshape(n_alleles, end - start)
-                result[start:end] = affinities.T
+                result[supported_indices[start:end]] = affinities.T
         return result
 
     def predict_to_dataframe(
@@ -2278,6 +2323,32 @@ class Class1AffinityPredictor(object):
             return None
 
     @staticmethod
+    def _cartesian_network_output(
+            model, peptide_stage, allele_idx, exact_forward=False):
+        if not exact_forward:
+            return model.forward_cartesian_from_peptide_stage(
+                peptide_stage,
+                allele_idx,
+            )
+
+        peptide_width = peptide_stage.shape[-1]
+        num_peptides = peptide_stage.shape[0]
+        num_alleles = allele_idx.shape[0]
+        expanded_stage = peptide_stage.unsqueeze(0).expand(
+            num_alleles,
+            num_peptides,
+            peptide_width,
+        ).reshape(num_alleles * num_peptides, peptide_width)
+        expanded_alleles = allele_idx.unsqueeze(1).expand(
+            num_alleles,
+            num_peptides,
+        ).reshape(-1)
+        return model.forward_from_peptide_stage(
+            expanded_stage,
+            expanded_alleles,
+        ).reshape(num_alleles, num_peptides, -1)
+
+    @staticmethod
     def _cartesian_output_log_ic50_sum(
             network_output, model, log50000, accum_dtype):
         """Convert cartesian network outputs to summed log(IC50).
@@ -2893,6 +2964,10 @@ class Class1AffinityPredictor(object):
         n_alleles = len(alleles)
         frequency_matrices = [] if motif_summary else None
         length_distributions = [] if motif_summary else None
+        # CPU parity tests compare against the legacy per-allele forward.
+        # Preserve that matmul order on CPU; GPU keeps the lower-memory
+        # factored cartesian path used by the production calibration run.
+        exact_cartesian_forward = device.type == "cpu"
         # Bin edges for the on-device batched histogram fit. Materialize
         # once outside the per-chunk loop — same edges across alleles.
         calibration_float_dtype = (
@@ -2951,11 +3026,11 @@ class Class1AffinityPredictor(object):
                     for start in range(0, n_peptides, peptide_batch_size):
                         end = min(start + peptide_batch_size, n_peptides)
                         p_chunk = peptide_stage[start:end]  # (chunk_n, d)
-                        network_output = (
-                            model.forward_cartesian_from_peptide_stage(
-                                p_chunk,
-                                batch_idx,
-                            )
+                        network_output = self._cartesian_network_output(
+                            model,
+                            p_chunk,
+                            batch_idx,
+                            exact_forward=exact_cartesian_forward,
                         )
                         (
                             log_ic50_chunk,
