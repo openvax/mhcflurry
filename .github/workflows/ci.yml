@@ -21,24 +21,41 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            docs/requirements.txt
+            setup.py
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc
+
+      - name: Cache Conda packages
+        uses: actions/cache@v4
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: ~/conda_pkgs_dir
+          key: conda-${{ runner.os }}-${{ matrix.python-version }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('test-environment.yml') }}
+          restore-keys: |
+            conda-${{ runner.os }}-${{ matrix.python-version }}-${{ env.CACHE_NUMBER }}-
+
       - name: Build Conda environment
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v4
         with:
           activate-environment: test-environment
           environment-file: test-environment.yml
           python-version: ${{ matrix.python-version }}
-          auto-activate-base: false
+          auto-activate: false
+          use-only-tar-bz2: true
 
       - name: Lint shell scripts
         run: |
