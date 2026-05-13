@@ -365,6 +365,11 @@ def run(argv=sys.argv[1:]):
                 "data_bytes": path_size_bytes(args.input),
                 "num_rows": len(df),
             },
+            # Predict-scan workers run PyTorch inference. On Linux, the default
+            # fork context can inherit a parent process where PyTorch has
+            # already been initialized by earlier command invocations/tests,
+            # which makes later model .to(...) calls unsafe in workers.
+            start_method="spawn",
         )
         affinity_model_kwargs = {}
         if getattr(args, "max_workers_per_gpu", None):

@@ -225,7 +225,7 @@ def test_empty_and_populated_schemas_match():
 
 
 def test_parallel_path_does_not_load_predictor_before_pool(monkeypatch):
-    """Fork-based pools must be created before PyTorch predictor state loads."""
+    """Parallel pools must be created before PyTorch predictor state loads."""
     class FakePool:
         def __init__(self):
             self.closed = False
@@ -257,8 +257,13 @@ def test_parallel_path_does_not_load_predictor_before_pool(monkeypatch):
         raise AssertionError(
             "parallel scan should not load predictor in parent")
 
-    def fake_worker_pool(args, workload_name, workload_hints):
+    def fake_worker_pool(
+            args,
+            workload_name,
+            workload_hints,
+            start_method=None):
         del workload_name, workload_hints
+        assert start_method == "spawn"
         args.num_jobs = 2
         args.max_workers_per_gpu = 1
         return FakePool()

@@ -14,7 +14,7 @@ import os
 import time
 import queue
 import subprocess
-from multiprocessing import Queue, cpu_count
+from multiprocessing import cpu_count
 from multiprocessing.util import Finalize
 from pprint import pprint
 import random
@@ -1007,15 +1007,7 @@ def hoist_torchinductor_compile_threads(args, phase="production"):
 # linger as zombies rather than being auto-reaped by init. The
 # training orchestrator's ``try/finally`` closes and joins the pool on
 # clean exit, so this only matters under unusual fault modes.
-class NonDaemonProcess(multiprocessing.Process):
-    """A ``multiprocessing.Process`` whose ``daemon`` flag cannot be set.
-
-    Reading ``.daemon`` always returns False; writes are no-ops. This
-    lets us instantiate ``multiprocessing.pool.Pool`` with a worker
-    class that declines to be a daemon, so the DataLoader inside each
-    worker can spawn its own prefetch children.
-    """
-
+class _NonDaemonProcessMixin:
     @property
     def daemon(self) -> bool:
         return False
@@ -1026,6 +1018,16 @@ class NonDaemonProcess(multiprocessing.Process):
         # daemon=True on every fresh worker, so we must tolerate the
         # assignment without raising.
         pass
+
+
+class NonDaemonProcess(_NonDaemonProcessMixin, multiprocessing.Process):
+    """A ``multiprocessing.Process`` whose ``daemon`` flag cannot be set.
+
+    Reading ``.daemon`` always returns False; writes are no-ops. This
+    lets us instantiate ``multiprocessing.pool.Pool`` with a worker
+    class that declines to be a daemon, so the DataLoader inside each
+    worker can spawn its own prefetch children.
+    """
 
 
 class NonDaemonContext(type(multiprocessing.get_context())):
@@ -1040,6 +1042,64 @@ class NonDaemonContext(type(multiprocessing.get_context())):
     Process = NonDaemonProcess
 
 
+class NonDaemonSpawnProcess(
+        _NonDaemonProcessMixin, multiprocessing.context.SpawnProcess):
+    pass
+
+
+class NonDaemonSpawnContext(multiprocessing.context.SpawnContext):
+    Process = NonDaemonSpawnProcess
+
+
+if hasattr(multiprocessing.context, "ForkProcess"):
+    class NonDaemonForkProcess(
+            _NonDaemonProcessMixin, multiprocessing.context.ForkProcess):
+        pass
+
+
+    class NonDaemonForkContext(multiprocessing.context.ForkContext):
+        Process = NonDaemonForkProcess
+else:
+    NonDaemonForkContext = None
+
+
+if hasattr(multiprocessing.context, "ForkServerProcess"):
+    class NonDaemonForkServerProcess(
+            _NonDaemonProcessMixin,
+            multiprocessing.context.ForkServerProcess):
+        pass
+
+
+    class NonDaemonForkServerContext(
+            multiprocessing.context.ForkServerContext):
+        Process = NonDaemonForkServerProcess
+else:
+    NonDaemonForkServerContext = None
+
+
+_NON_DAEMON_CONTEXT_BY_START_METHOD = {
+    "spawn": NonDaemonSpawnContext,
+}
+if NonDaemonForkContext is not None:
+    _NON_DAEMON_CONTEXT_BY_START_METHOD["fork"] = NonDaemonForkContext
+if NonDaemonForkServerContext is not None:
+    _NON_DAEMON_CONTEXT_BY_START_METHOD["forkserver"] = (
+        NonDaemonForkServerContext)
+
+
+def non_daemon_context(start_method=None):
+    """Return a multiprocessing context whose workers are non-daemonic."""
+    if start_method is None:
+        return NonDaemonContext()
+    try:
+        context_class = _NON_DAEMON_CONTEXT_BY_START_METHOD[start_method]
+    except KeyError:
+        raise ValueError(
+            "Unsupported multiprocessing start_method: %s" % (
+                start_method,)) from None
+    return context_class()
+
+
 class NonDaemonPool(multiprocessing.pool.Pool):
     """A ``multiprocessing.Pool`` that runs non-daemonic workers.
 
@@ -1050,8 +1110,11 @@ class NonDaemonPool(multiprocessing.pool.Pool):
     """
 
     def __init__(self, *args, **kwargs):
+        start_method = kwargs.pop("start_method", None)
+        if start_method is not None and "context" in kwargs:
+            raise ValueError("Pass either context or start_method, not both")
         # Callers may pass their own context; if not, use our non-daemon one.
-        kwargs.setdefault("context", NonDaemonContext())
+        kwargs.setdefault("context", non_daemon_context(start_method))
         super().__init__(*args, **kwargs)
 
 
@@ -1276,7 +1339,8 @@ def chunk_ranges_for_local_parallelism(
 def worker_pool_with_gpu_assignments_from_args(
         args,
         workload_name=WORKLOAD_GENERIC,
-        workload_hints=None):
+        workload_hints=None,
+        start_method=None):
     """
     Create a multiprocessing.Pool where each worker uses its own GPU.
 
@@ -1306,6 +1370,7 @@ def worker_pool_with_gpu_assignments_from_args(
         max_workers_per_gpu=args.max_workers_per_gpu,
         max_tasks_per_worker=args.max_tasks_per_worker,
         worker_log_dir=args.worker_log_dir,
+        start_method=start_method,
     )
 
 
@@ -1516,7 +1581,8 @@ def worker_pool_with_gpu_assignments(
         backend=None,
         max_workers_per_gpu=1,
         max_tasks_per_worker=None,
-        worker_log_dir=None):
+        worker_log_dir=None,
+        start_method=None):
     """
     Create a multiprocessing.Pool where each worker uses its own GPU.
 
@@ -1529,6 +1595,9 @@ def worker_pool_with_gpu_assignments(
     max_workers_per_gpu : int
     max_tasks_per_worker : int
     worker_log_dir : string
+    start_method : string
+        Optional multiprocessing start method, e.g. ``"spawn"`` when workers
+        must not inherit PyTorch state from the parent process.
 
     Returns
     -------
@@ -1571,7 +1640,8 @@ def worker_pool_with_gpu_assignments(
         processes=num_jobs,
         initializer=worker_init,
         initializer_kwargs_per_process=worker_init_kwargs,
-        max_tasks_per_worker=max_tasks_per_worker)
+        max_tasks_per_worker=max_tasks_per_worker,
+        start_method=start_method)
     return worker_pool
 
 
@@ -1650,7 +1720,8 @@ def make_worker_pool(
         processes=None,
         initializer=None,
         initializer_kwargs_per_process=None,
-        max_tasks_per_worker=None):
+        max_tasks_per_worker=None,
+        start_method=None):
     """
     Convenience wrapper to create a multiprocessing.Pool.
 
@@ -1688,6 +1759,9 @@ def make_worker_pool(
     max_tasks_per_worker : int, optional
         Restart workers after this many tasks. Requires Python >=3.2.
 
+    start_method : string, optional
+        Multiprocessing start method to use for the worker pool.
+
     Returns
     -------
     multiprocessing.Pool
@@ -1696,17 +1770,21 @@ def make_worker_pool(
     if not processes:
         processes = cpu_count()
 
+    pool_context = non_daemon_context(start_method) if start_method else None
     pool_kwargs = {
         'processes': processes,
     }
     if max_tasks_per_worker:
         pool_kwargs["maxtasksperchild"] = max_tasks_per_worker
+    if start_method:
+        pool_kwargs["context"] = pool_context
 
     if initializer:
         if initializer_kwargs_per_process:
             assert len(initializer_kwargs_per_process) == processes
-            kwargs_queue = Queue()
-            kwargs_queue_backup = Queue()
+            queue_context = pool_context or multiprocessing.get_context()
+            kwargs_queue = queue_context.Queue()
+            kwargs_queue_backup = queue_context.Queue()
             for kwargs in initializer_kwargs_per_process:
                 kwargs_queue.put(kwargs)
                 kwargs_queue_backup.put(kwargs)

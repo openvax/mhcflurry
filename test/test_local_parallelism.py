@@ -13,6 +13,7 @@ from mhcflurry.local_parallelism import (
     add_prediction_parallelism_args,
     auto_max_workers_per_gpu,
     chunk_ranges_for_local_parallelism,
+    non_daemon_context,
     resolve_local_parallelism_args,
     resolve_max_workers_per_gpu,
     validate_worker_pool_args,
@@ -142,6 +143,16 @@ def test_nondaemonprocess_reports_not_daemon():
     # tolerate the assignment silently without raising or flipping the flag.
     p.daemon = True
     assert p.daemon is False, "daemon setter should have been a no-op"
+
+
+def test_explicit_spawn_context_keeps_workers_non_daemonic():
+    context = non_daemon_context("spawn")
+    process = context.Process(target=_grandchild_entry)
+
+    assert context.get_start_method() == "spawn"
+    assert process.daemon is False
+    process.daemon = True
+    assert process.daemon is False
 
 
 @pytest.mark.slow
