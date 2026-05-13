@@ -23,6 +23,33 @@ def load_script(path):
     return module
 
 
+def test_generate_scripts_keep_packaged_proteome_peptide_artifacts():
+    """Guard download-generation artifact contracts.
+
+    These GENERATE.sh scripts package their working directory into download
+    bundles. The compressed proteome peptide CSVs are part of those bundles
+    and must not disappear just because newer training paths can avoid reading
+    them.
+    """
+    processing_generate = (
+        REPO_ROOT / "downloads-generation/models_class1_processing/GENERATE.sh"
+    ).read_text()
+    assert "write_proteome_peptides.py" in processing_generate
+    assert "--out \"$(pwd)/proteome_peptides.csv\"" in processing_generate
+    assert "bzip2 -f proteome_peptides.csv" in processing_generate
+    assert "--proteome-peptides \"$(pwd)/proteome_peptides.csv.bz2\"" in (
+        processing_generate
+    )
+
+    predictions_generate = (
+        REPO_ROOT / "downloads-generation/data_predictions/GENERATE.sh"
+    ).read_text()
+    assert "write_proteome_peptides.py" in predictions_generate
+    assert "--out proteome_peptides.$subset.csv" in predictions_generate
+    assert "bzip2 proteome_peptides.$subset.csv" in predictions_generate
+    assert "proteome_peptides.$subset.csv.bz2" in predictions_generate
+
+
 def test_annotate_tpm_matches_rowwise_expression_sum():
     module = load_script(
         REPO_ROOT / "downloads-generation/models_class1_processing"
