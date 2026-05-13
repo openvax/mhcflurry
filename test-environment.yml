@@ -3,4 +3,5 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - pip
+  - pip>=23.3
+  - setuptools>=68
