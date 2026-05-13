@@ -25,6 +25,10 @@ from .local_parallelism import (
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
+from .workload_planning import (
+    WORKLOAD_AFFINITY_TRAINING,
+    path_size_bytes,
+)
 from .hyperparameters import HyperparameterDefaults
 from .allele_encoding import AlleleEncoding
 
@@ -184,7 +188,14 @@ def run(argv=sys.argv[1:]):
 
     GLOBAL_DATA["train_data"] = df
     GLOBAL_DATA["args"] = args
-    resolve_local_parallelism_args(args)
+    resolve_local_parallelism_args(
+        args,
+        workload_name=WORKLOAD_AFFINITY_TRAINING,
+        workload_hints={
+            "data_bytes": path_size_bytes(args.data),
+            "num_rows": len(df),
+        },
+    )
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)

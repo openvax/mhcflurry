@@ -188,19 +188,25 @@ def _free_device_memory_bytes(device):
             import psutil
             free = min(free, int(psutil.virtual_memory().available))
         except ImportError:
-            # psutil isn't a hard dep. Log once per process so the
-            # skip is visible rather than silent — without this cap
-            # the MPS driver's "recommended max" can exceed what's
-            # actually safe to claim alongside other apps.
-            global _MPS_PSUTIL_WARNED
-            if not _MPS_PSUTIL_WARNED:
-                logging.warning(
-                    "psutil not available; MPS free-memory estimate "
-                    "will use torch.mps.recommended_max_memory alone, "
-                    "which may overshoot actual available RAM. "
-                    "`pip install psutil` to enable the OS-level cap."
-                )
-                _MPS_PSUTIL_WARNED = True
+            try:
+                from .workload_planning import system_memory_info_gb
+                available_gb = system_memory_info_gb().get("available_gb")
+                if available_gb is not None:
+                    free = min(free, int(available_gb * (1 << 30)))
+            except Exception:
+                # psutil isn't a hard dep. Log once per process so the
+                # skip is visible rather than silent — without this cap
+                # the MPS driver's "recommended max" can exceed what's
+                # actually safe to claim alongside other apps.
+                global _MPS_PSUTIL_WARNED
+                if not _MPS_PSUTIL_WARNED:
+                    logging.warning(
+                        "psutil not available and OS memory fallback failed; "
+                        "MPS free-memory estimate will use "
+                        "torch.mps.recommended_max_memory alone, which may "
+                        "overshoot actual available RAM."
+                    )
+                    _MPS_PSUTIL_WARNED = True
         except Exception:
             # Any other psutil failure (broken install, etc.) — skip
             # the cap but don't fail the whole batch-size query.
@@ -964,15 +970,14 @@ def _batched_validation_loss(
     loss_obj,
     batch_size,
 ):
-    """Compute validation loss with a compiled fast path and eager tail path.
+    """Compute validation loss with a fixed-size fast path and eager tail path.
 
     Every ``network(inputs)`` call inside this helper sees the same
-    shape (``batch_size``) so torch.compile / CUDA graphs / bf16
-    autocast can specialize once and reuse. That matters for H100 and
-    A100 training where single-shot forward passes over the full
-    validation set (up to ~185K rows for pan-allele training) were
-    eating 15+ GB of VRAM per worker and defeating any shape-stable
-    optimization.
+    shape (``batch_size``), so GPU validation stays memory-bounded and
+    optional compiled-validation paths can specialize once and reuse.
+    That matters for H100 and A100 training where single-shot forward
+    passes over the full validation set (up to ~185K rows for pan-allele
+    training) were eating 15+ GB of VRAM per worker.
 
     Semantics: iterate ``val_peptide`` in ``batch_size``-row chunks and
     return the exact mean validation loss across all rows. Full-size
@@ -1037,6 +1042,13 @@ def _batched_validation_loss(
         loss_accum += tail_loss.item() * tail_size
         weight_accum += tail_size
     return loss_accum / weight_accum
+
+
+def _validation_forward_network(network, eager_network):
+    """Choose the module used for validation forward passes during training."""
+    if os.environ.get("MHCFLURRY_TORCH_COMPILE_VALIDATION", "0") == "1":
+        return network
+    return eager_network
 
 
 class Class1NeuralNetworkModel(nn.Module):
@@ -3465,8 +3477,9 @@ class Class1NeuralNetwork(object):
                 # Compute validation loss in fixed-size batches — reuse the
                 # device tensors hoisted before the epoch loop (val data is
                 # static). Single-shot forward pass over the entire pretrain
-                # validation set (typically 50K+ rows) was dominating VRAM
-                # and defeating shape-stable optimization.
+                # validation set (typically 50K+ rows) was dominating VRAM.
+                # By default validation uses the eager network to avoid a
+                # second torch.compile specialization for grad-disabled eval.
                 network.eval()
                 with torch.inference_mode():
                     validation_start = _timing_start(device, timing_enabled)
@@ -3480,7 +3493,7 @@ class Class1NeuralNetwork(object):
                     )
                     fit_info["effective_validation_batch_size"] = val_batch_size
                     val_loss = _batched_validation_loss(
-                        network=network,
+                        network=_validation_forward_network(network, eager_network),
                         eager_network=eager_network,
                         val_peptide=val_peptide_device,
                         val_allele=val_allele_device,
@@ -4231,9 +4244,10 @@ class Class1NeuralNetwork(object):
             )
             fit_info["loss"].append(train_loss)
 
-            # Validation — batched so every GPU invocation is
-            # fixed-size (torch.compile-friendly) and peak VRAM stays
-            # bounded regardless of n_val.
+            # Validation — batched so every GPU invocation is fixed-size
+            # and peak VRAM stays bounded regardless of n_val. By default
+            # validation uses the eager network to avoid a second
+            # torch.compile specialization for grad-disabled eval.
             #
             # Three conditions trigger a measurement; otherwise the val
             # pass is skipped and the previous measurement is carried
@@ -4300,7 +4314,7 @@ class Class1NeuralNetwork(object):
                     fit_info["effective_validation_batch_size"] = val_batch_size
                     validation_start = _timing_start(device, timing_enabled)
                     val_loss = _batched_validation_loss(
-                        network=network,
+                        network=_validation_forward_network(network, eager_network),
                         eager_network=eager_network,
                         val_peptide=val_peptide,
                         val_allele=val_allele,

@@ -22,6 +22,12 @@ import random
 import numpy
 
 from .common import configure_pytorch, normalize_pytorch_backend
+from .workload_planning import (
+    HOST_RAM_PER_DATALOADER_CHILD_GB,
+    WORKLOAD_GENERIC,
+    plan_local_parallelism,
+    system_memory_info_gb,
+)
 
 
 # Per-worker VRAM upper bound (gigabytes) used by ``auto_max_workers_per_gpu``
@@ -84,7 +90,7 @@ _AUTO_DATALOADER_HARD_CAP_DEFAULT = 4
 
 # Approximate RSS that one DataLoader child holds: torch + mhcflurry imports
 # (~400 MB) plus a small per-batch buffer.
-_AUTO_DATALOADER_RAM_PER_CHILD_GB = 0.5
+_AUTO_DATALOADER_RAM_PER_CHILD_GB = HOST_RAM_PER_DATALOADER_CHILD_GB
 
 # Approximate RSS that the main fit() worker holds before any DataLoader
 # children. Used by the RAM guard to avoid over-allocating prefetchers when
@@ -363,23 +369,8 @@ def auto_max_workers_per_gpu(
 
 
 def _system_ram_gb():
-    """Best-effort total system RAM in GB. ``None`` if unknown.
-
-    Reads ``/proc/meminfo`` on Linux without importing ``psutil``. The fork-pool
-    parent must avoid heavyweight imports so we use a 5-line procfs read.
-    macOS does not expose /proc, so this returns ``None`` there — auto-tuning
-    falls through to the CPU-only path, which is fine for dev work.
-    """
-    try:
-        with open("/proc/meminfo", "r") as fh:
-            for line in fh:
-                if line.startswith("MemTotal:"):
-                    parts = line.split()
-                    # Format: ``MemTotal:   123456 kB``
-                    return float(parts[1]) / (1024 * 1024)
-    except (OSError, ValueError, IndexError):
-        return None
-    return None
+    """Best-effort total system RAM in GB. ``None`` if unknown."""
+    return system_memory_info_gb().get("total_gb")
 
 
 def auto_dataloader_num_workers(
@@ -725,117 +716,43 @@ def resolve_max_workers_per_gpu(
 
 
 def resolve_local_parallelism_args(
-        args, cap_auto_num_jobs=True, per_worker_gb=None):
-    """Resolve and normalize local parallelism arguments in one place.
-
-    This is the single pre-fork normalization point for local worker pools:
-
-    * resolves ``--max-workers-per-gpu=auto`` without touching CUDA;
-    * resolves ``--num-jobs=auto`` to ``gpus × max_workers_per_gpu`` (post-
-      MWPG resolution), so the worker count always matches GPU capacity by
-      default;
-    * caps any user-explicit ``--num-jobs`` that exceeds GPU capacity. CPU
-      overflow workers are almost never useful for GPU-bound mhcflurry
-      workloads (calibrate / pan-allele cartesian forwards) — they take
-      work items at GPU pace from the imap_unordered queue and then chew
-      on them at CPU pace, blocking GPU workers from idling out properly.
-      The legacy "explicit MWPG opts in to CPU overflow" exception was a
-      foot-gun in practice and is gone;
-    * hoists torch.compile's worker-thread cap before the Pool forks.
-    """
+        args,
+        cap_auto_num_jobs=True,
+        per_worker_gb=None,
+        workload_name=WORKLOAD_GENERIC,
+        workload_hints=None):
+    """Resolve and normalize local parallelism arguments through the planner."""
     if getattr(args, "_local_parallelism_args_resolved", False):
         return args
 
-    backend = normalize_pytorch_backend(getattr(args, "backend", "auto") or "auto")
-    num_gpus = resolve_num_gpus_for_local_parallelism(args, backend=backend)
-
-    original = getattr(args, "max_workers_per_gpu", None)
-    was_auto = (
-        original is None
-        or (isinstance(original, str) and original.lower() == "auto")
-    )
-    resolved = resolve_max_workers_per_gpu(
+    plan = plan_local_parallelism(
         args,
+        workload_name=workload_name,
+        workload_hints=workload_hints,
         per_worker_gb=per_worker_gb,
-        num_gpus=num_gpus,
-        backend=backend,
-    )
-    args.max_workers_per_gpu_was_auto = was_auto
-
-    num_jobs_raw = getattr(args, "num_jobs", "auto")
-    num_jobs_was_auto = (
-        num_jobs_raw is None
-        or (isinstance(num_jobs_raw, str) and num_jobs_raw.lower() == "auto")
+        cap_auto_num_jobs=cap_auto_num_jobs,
+        normalize_backend=normalize_pytorch_backend,
+        detect_num_cuda_devices=_detect_num_cuda_devices_no_torch,
+        auto_max_workers_per_gpu=auto_max_workers_per_gpu,
+        auto_num_jobs=auto_num_jobs,
+        resolve_dataloader_num_workers=resolve_dataloader_num_workers,
+        auto_random_negative_pool_epochs=auto_random_negative_pool_epochs,
     )
 
-    gpu_capacity = (
-        auto_num_jobs(num_gpus, resolved)
-        if backend in ("auto", "gpu") else 0
+    args.backend = plan.backend
+    args.gpus = plan.gpus
+    args.gpus_was_auto = plan.gpus_was_auto
+    args.max_workers_per_gpu = plan.max_workers_per_gpu
+    args.max_workers_per_gpu_was_auto = plan.max_workers_per_gpu_was_auto
+    args.num_jobs = plan.num_jobs
+    args.num_jobs_was_auto = plan.num_jobs_was_auto
+    args.dataloader_num_workers = plan.dataloader_num_workers
+    args.dataloader_num_workers_was_auto = plan.dataloader_num_workers_was_auto
+    args.random_negative_pool_epochs = plan.random_negative_pool_epochs
+    args.random_negative_pool_epochs_was_auto = (
+        plan.random_negative_pool_epochs_was_auto
     )
-    if num_jobs_was_auto:
-        # CPU-only / no-GPU plan keeps the historical 0 = serial default.
-        args.num_jobs = gpu_capacity
-    else:
-        args.num_jobs = int(num_jobs_raw)
-    args.num_jobs_was_auto = num_jobs_was_auto
-
-    num_jobs = int(args.num_jobs)
-    if (
-            cap_auto_num_jobs
-            and num_jobs > 0
-            and gpu_capacity > 0):
-        if num_jobs > gpu_capacity:
-            print(
-                "Local parallelism: capping num_jobs from %d to %d "
-                "(--gpus=%d × --max-workers-per-gpu=%d). CPU overflow "
-                "workers serialize the work queue and starve the GPU "
-                "workers, so excess --num-jobs is dropped rather than "
-                "spilling to CPU." % (
-                    num_jobs, gpu_capacity, num_gpus, resolved,
-                )
-            )
-            args.num_jobs = gpu_capacity
-
-    # Resolve --dataloader-num-workers=auto to an int. Done after num_jobs
-    # is finalized so the auto resolver sees the post-cap fit-worker count.
-    # Stored on args so each train_*_command can apply it to its work_items
-    # at planning time. Non-affinity commands (processing) accept the flag
-    # for argv uniformity but currently no-op when applying it; see
-    # ``apply_dataloader_num_workers_to_work_items``.
-    dl_value = getattr(args, "dataloader_num_workers", "auto")
-    final_num_jobs = int(getattr(args, "num_jobs", 0) or 0)
-    if final_num_jobs <= 0 and num_gpus > 0:
-        # Serial run on a GPU box: still resolve as if 1 fit-worker exists
-        # so a non-zero default lands. Tests pass num_jobs=0 frequently.
-        effective_fit_workers = 1
-    else:
-        effective_fit_workers = max(1, final_num_jobs)
-    args.dataloader_num_workers = resolve_dataloader_num_workers(
-        dl_value,
-        num_fit_workers=effective_fit_workers,
-        ram_gb=_system_ram_gb(),
-    )
-    args.dataloader_num_workers_was_auto = (
-        isinstance(dl_value, str) and dl_value.lower() == "auto"
-    )
-
-    # Resolve --random-negative-pool-epochs=auto to an int. Sized from
-    # system RAM and the post-cap fit-worker plan. Non-resolved here when
-    # we don't yet know num_random_negatives or peptide_max_length — the
-    # auto resolver tolerates None for those (see
-    # ``auto_random_negative_pool_epochs``).
-    rn_pool_value = getattr(args, "random_negative_pool_epochs", "auto")
-    if isinstance(rn_pool_value, str) and rn_pool_value.lower() == "auto":
-        args.random_negative_pool_epochs = auto_random_negative_pool_epochs(
-            num_random_negatives=None,
-            peptide_max_length=None,
-            num_workers=effective_fit_workers,
-            ram_gb=_system_ram_gb(),
-        )
-        args.random_negative_pool_epochs_was_auto = True
-    else:
-        args.random_negative_pool_epochs = int(rn_pool_value)
-        args.random_negative_pool_epochs_was_auto = False
+    args.workload_plan = plan
 
     # Promote orchestrator-owned tuning knobs from CLI to env so the
     # existing call sites (torch_training_loop._maybe_compile_network,
@@ -844,19 +761,19 @@ def resolve_local_parallelism_args(
     # Auto -> leave env untouched (preserves backward-compat for env-only
     # deploys); explicit CLI value -> overrides env. Workers inherit
     # via the multiprocessing fork done after this resolver runs.
-    torch_compile_cli = getattr(args, "torch_compile", "auto")
-    if torch_compile_cli in ("0", "1"):
-        os.environ["MHCFLURRY_TORCH_COMPILE"] = torch_compile_cli
-    torch_compile_loss_cli = getattr(args, "torch_compile_loss", "auto")
-    if torch_compile_loss_cli in ("0", "1"):
-        os.environ["MHCFLURRY_TORCH_COMPILE_LOSS"] = torch_compile_loss_cli
-    matmul_cli = getattr(args, "matmul_precision", "none")
-    if matmul_cli != "none":
-        os.environ["MHCFLURRY_MATMUL_PRECISION"] = matmul_cli
-    if getattr(args, "enable_timing", False):
+    if plan.torch_compile in ("0", "1"):
+        os.environ["MHCFLURRY_TORCH_COMPILE"] = plan.torch_compile
+    if plan.torch_compile_loss in ("0", "1"):
+        os.environ["MHCFLURRY_TORCH_COMPILE_LOSS"] = plan.torch_compile_loss
+    if plan.matmul_precision != "none":
+        os.environ["MHCFLURRY_MATMUL_PRECISION"] = plan.matmul_precision
+    if plan.enable_timing:
         os.environ["MHCFLURRY_ENABLE_TIMING"] = "1"
 
+    for warning in plan.warnings:
+        print("Local parallelism:", warning)
     hoist_torchinductor_compile_threads(args)
+    print("Local workload plan:", plan)
     args._local_parallelism_args_resolved = True
     return args
 
@@ -1356,7 +1273,10 @@ def chunk_ranges_for_local_parallelism(
     ]
 
 
-def worker_pool_with_gpu_assignments_from_args(args):
+def worker_pool_with_gpu_assignments_from_args(
+        args,
+        workload_name=WORKLOAD_GENERIC,
+        workload_hints=None):
     """
     Create a multiprocessing.Pool where each worker uses its own GPU.
 
@@ -1373,7 +1293,11 @@ def worker_pool_with_gpu_assignments_from_args(args):
     -------
     multiprocessing.Pool
     """
-    resolve_local_parallelism_args(args)
+    resolve_local_parallelism_args(
+        args,
+        workload_name=workload_name,
+        workload_hints=workload_hints,
+    )
 
     return worker_pool_with_gpu_assignments(
         num_jobs=args.num_jobs,

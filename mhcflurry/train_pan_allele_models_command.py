@@ -37,6 +37,10 @@ from .local_parallelism import (
     run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
 )
+from .workload_planning import (
+    WORKLOAD_AFFINITY_TRAINING,
+    path_size_bytes,
+)
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -460,6 +464,8 @@ def main(args):
     resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+        workload_name=WORKLOAD_AFFINITY_TRAINING,
+        workload_hints={"data_bytes": path_size_bytes(args.data)},
     )
 
     if not args.continue_incomplete:

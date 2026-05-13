@@ -14,7 +14,9 @@ giving MHCflurry predictions:
 $ mhcflurry-predict INPUT.csv --out RESULT.csv
 
 The input CSV file is expected to contain columns "allele", "peptide", and,
-optionally, "n_flank", and "c_flank".
+optionally, "n_flank", and "c_flank". An allele cell may contain one allele
+or a comma-, semicolon-, or whitespace-separated sample genotype. For
+multi-allele cells, the output row reports the strongest binding allele.
 
 If `--out` is not specified, results are written to stdout.
 
@@ -42,6 +44,7 @@ import argparse
 import itertools
 import logging
 import os
+import re
 
 import pandas
 
@@ -52,6 +55,11 @@ from .local_parallelism import (
     add_prediction_parallelism_args,
     chunk_ranges_for_local_parallelism,
     worker_pool_with_gpu_assignments_from_args,
+)
+from .workload_planning import (
+    WORKLOAD_AFFINITY_INFERENCE,
+    WORKLOAD_PRESENTATION_INFERENCE,
+    path_size_bytes,
 )
 from .version import __version__
 
@@ -181,6 +189,14 @@ add_prediction_parallelism_args(parser)
 
 
 _PREDICTOR_CACHE = {}
+_ALLELE_LIST_DELIMITER_RE = re.compile(r"[;,\s]+")
+
+
+def _split_allele_string(allele_string):
+    return [
+        allele for allele in _ALLELE_LIST_DELIMITER_RE.split(str(allele_string))
+        if allele
+    ]
 
 
 def _load_predictor_for_command(models_dir):
@@ -211,7 +227,7 @@ def _allele_string_to_alleles(df, allele_column):
         df.drop_duplicates(allele_column).set_index(
             allele_column, drop=False)[
                 allele_column
-        ].str.split(r"[,\s]+")).to_dict()
+        ].map(_split_allele_string)).to_dict()
 
 
 def _predict_dataframe_chunk(predictor, df, options):
@@ -335,7 +351,18 @@ def run(argv=sys.argv[1:]):
             "No flanking information provided. Specify --no-flanking "
             "to silence this warning")
 
-    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+    worker_pool = worker_pool_with_gpu_assignments_from_args(
+        args,
+        workload_name=(
+            WORKLOAD_AFFINITY_INFERENCE
+            if args.affinity_only
+            else WORKLOAD_PRESENTATION_INFERENCE
+        ),
+        workload_hints={
+            "data_bytes": path_size_bytes(args.input),
+            "prediction_rows": len(df),
+        },
+    )
 
     affinity_model_kwargs = {}
     if getattr(args, "max_workers_per_gpu", None):

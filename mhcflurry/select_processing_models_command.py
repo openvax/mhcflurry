@@ -28,6 +28,10 @@ from .local_parallelism import (
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)
+from .workload_planning import (
+    WORKLOAD_PROCESSING_SELECTION,
+    path_size_bytes,
+)
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -100,6 +104,8 @@ def run(argv=sys.argv[1:]):
     resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=not args.cluster_parallelism,
+        workload_name=WORKLOAD_PROCESSING_SELECTION,
+        workload_hints={"data_bytes": path_size_bytes(args.data)},
     )
 
     df = pandas.read_csv(args.data)

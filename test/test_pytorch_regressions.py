@@ -18,6 +18,7 @@ from mhcflurry.class1_neural_network import (
     MergedClass1NeuralNetwork,
     _batched_validation_loss,
     _effective_validation_batch_size,
+    _validation_forward_network,
 )
 from mhcflurry.torch_training_loop import _maybe_compile_loss
 from mhcflurry.class1_processing_neural_network import (
@@ -844,6 +845,17 @@ def test_batched_validation_loss_matches_single_shot_with_tail_batch():
     )
 
     assert actual == pytest.approx(expected, abs=1e-7)
+
+
+def test_validation_forward_network_uses_eager_by_default(monkeypatch):
+    compiled = object()
+    eager = object()
+
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE_VALIDATION", raising=False)
+    assert _validation_forward_network(compiled, eager) is eager
+
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE_VALIDATION", "1")
+    assert _validation_forward_network(compiled, eager) is compiled
 
 
 def test_optimizer_defaults_match_keras():

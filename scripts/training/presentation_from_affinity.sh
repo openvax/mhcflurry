@@ -75,8 +75,33 @@ COMMON_PARALLELISM_ARGS=(
 )
 [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && COMMON_PARALLELISM_ARGS+=(--enable-timing)
 
+PRESENTATION_CALIBRATION_NUM_JOBS="${PRESENTATION_CALIBRATION_NUM_JOBS:-auto}"
+PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU="${PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU:-auto}"
+PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE="${PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE:-auto}"
+PRESENTATION_CALIBRATION_PARALLELISM_ARGS=(
+    --num-jobs "$PRESENTATION_CALIBRATION_NUM_JOBS"
+    --max-tasks-per-worker 1000
+    --gpus "$GPUS"
+    --max-workers-per-gpu "$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU"
+    --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
+    --torch-compile auto
+    --matmul-precision "${MATMUL_PRECISION:-none}"
+)
+[ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && PRESENTATION_CALIBRATION_PARALLELISM_ARGS+=(--enable-timing)
+
 NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
     DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
+
+compress_csv_bzip2() {
+    local path="$1"
+    if command -v lbzip2 >/dev/null 2>&1; then
+        lbzip2 -f "$path"
+    elif command -v pbzip2 >/dev/null 2>&1; then
+        pbzip2 -f "$path"
+    else
+        bzip2 -f "$path"
+    fi
+}
 
 # ============================================================
 # STAGE 2 — PROCESSING
@@ -87,7 +112,6 @@ cd "$BASE_OUT/processing"
 mhcflurry-downloads fetch data_mass_spec_annotated data_references
 
 cp "$REPO/downloads-generation/models_class1_processing/annotate_hits_with_expression.py" .
-cp "$REPO/downloads-generation/models_class1_processing/write_proteome_peptides.py" .
 cp "$RECIPE_DIR/make_train_data.processing.py" .
 cp "$RECIPE_DIR/generate_hyperparameters.base.py" .
 cp "$RECIPE_DIR/generate_hyperparameters.variants.py" .
@@ -96,23 +120,17 @@ python annotate_hits_with_expression.py \
     --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
     --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
     --out "$(pwd)/hits_with_tpm.csv"
-bzip2 -f "$(pwd)/hits_with_tpm.csv"
-
-python write_proteome_peptides.py \
-    "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
-    "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
-    --out "$(pwd)/proteome_peptides.csv"
-bzip2 -f "$(pwd)/proteome_peptides.csv"
+compress_csv_bzip2 "$(pwd)/hits_with_tpm.csv"
 
 python make_train_data.processing.py \
     --hits "$(pwd)/hits_with_tpm.csv.bz2" \
     --affinity-predictor "$AFFINITY_PREDICTOR" \
-    --proteome-peptides "$(pwd)/proteome_peptides.csv.bz2" \
+    --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
     --ppv-multiplier 100 \
     --hit-multiplier-to-take 2 \
     --out "$(pwd)/train_data.csv" \
     "${COMMON_PARALLELISM_ARGS[@]}"
-bzip2 -f "$(pwd)/train_data.csv"
+compress_csv_bzip2 "$(pwd)/train_data.csv"
 
 python generate_hyperparameters.base.py > hyperparameters.base.yaml
 
@@ -165,12 +183,12 @@ cp "$RECIPE_DIR/make_train_data.presentation.py" \
 
 python make_train_data.presentation.py \
     --hits "$BASE_OUT/processing/hits_with_tpm.csv.bz2" \
-    --proteome-peptides "$BASE_OUT/processing/proteome_peptides.csv.bz2" \
+    --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
     --decoys-per-hit "$PRESENTATION_DECOYS_PER_HIT" \
     --exclude-pmid 31844290 31495665 31154438 \
     --only-format MULTIALLELIC \
     --out "$(pwd)/train_data.csv"
-bzip2 -f "$(pwd)/train_data.csv"
+compress_csv_bzip2 "$(pwd)/train_data.csv"
 
 mhcflurry-class1-train-presentation-models \
     --data "$(pwd)/train_data.csv.bz2" \
@@ -187,8 +205,9 @@ mhcflurry-calibrate-percentile-ranks \
     --num-peptides-per-length 100000 \
     --alleles-per-genotype 1 \
     --num-genotypes 50 \
+    --prediction-batch-size "$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE" \
     --verbosity 1 \
-    "${COMMON_PARALLELISM_ARGS[@]}"
+    "${PRESENTATION_CALIBRATION_PARALLELISM_ARGS[@]}"
 
 cp "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     "$(pwd)/models/affinity_predictor_train_data.csv.bz2"

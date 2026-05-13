@@ -69,6 +69,23 @@ def test_predict_dataframe_chunk_preserves_global_peptide_num():
     assert list(predictions.peptide_num) == [4, 5]
 
 
+def test_allele_string_to_alleles_accepts_semicolon_separated_csv_cells():
+    df = pandas.DataFrame({
+        "allele": [
+            "HLA-A*02:01;HLA-B*44:03",
+            "H-2-Kb, H-2-Db",
+            "HLA-C*07:02 HLA-A*01:01",
+            "HLA-A*02:01;HLA-B*44:03",
+        ],
+    })
+
+    assert predict_command._allele_string_to_alleles(df, "allele") == {
+        "HLA-A*02:01;HLA-B*44:03": ["HLA-A*02:01", "HLA-B*44:03"],
+        "H-2-Kb, H-2-Db": ["H-2-Kb", "H-2-Db"],
+        "HLA-C*07:02 HLA-A*01:01": ["HLA-C*07:02", "HLA-A*01:01"],
+    }
+
+
 @pytest.mark.slow
 def test_csv():
     args = ["--allele-column", "Allele", "--peptide-column", "Peptide"]

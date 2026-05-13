@@ -34,6 +34,11 @@ from .local_parallelism import (
     chunk_ranges_for_local_parallelism,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
+from .workload_planning import (
+    WORKLOAD_AFFINITY_CALIBRATION,
+    WORKLOAD_PRESENTATION_CALIBRATION,
+    path_size_bytes,
+)
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -217,19 +222,37 @@ def run(argv=sys.argv[1:]):
     # The shared helper also caps auto-sized local Pools to GPU capacity and
     # hoists torch.compile worker-thread defaults before forking.
     #
-    # ``per_worker_gb=24`` overrides the train-default (4 GB) because
-    # calibrate's per-worker footprint is dominated by the cached_stages
-    # peptide-side activation tensor (~15 GB) plus CUDA + working state
-    # (~3 GB) × 1.3x safety. Without this hint, auto MWPG picks 4
-    # workers/GPU based on training's footprint, then the calibrate
-    # auto-sizer falls back to the minimum peptide_batch (~2000 rows)
-    # because each worker's budget runs out — defeating the purpose of
-    # the joint (a, p) optimization.
+    # Workload profiles keep calibration from inheriting training's worker
+    # footprint. Presentation calibration in particular keeps the full
+    # presentation predictor stack resident while generating a large
+    # peptide-by-genotype score universe.
     from .local_parallelism import resolve_local_parallelism_args
+    num_lengths = args.length_range[1] - args.length_range[0] + 1
+    prediction_rows = int(args.num_peptides_per_length) * max(num_lengths, 1)
+    if args.predictor_kind == "class1_presentation":
+        prediction_rows *= max(int(args.num_genotypes), 1)
     resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
-        per_worker_gb=24.0,
+        workload_name=(
+            WORKLOAD_PRESENTATION_CALIBRATION
+            if args.predictor_kind == "class1_presentation"
+            else WORKLOAD_AFFINITY_CALIBRATION
+        ),
+        workload_hints={
+            "data_bytes": sum(
+                value or 0 for value in (
+                    path_size_bytes(args.match_amino_acid_distribution_data),
+                    path_size_bytes(args.alleles_file),
+                )
+            ) or None,
+            "num_work_items": (
+                args.num_genotypes
+                if args.predictor_kind == "class1_presentation"
+                else None
+            ),
+            "prediction_rows": prediction_rows,
+        },
     )
 
     # If we're going to run in-process (serial — no worker pool), the

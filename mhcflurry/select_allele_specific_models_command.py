@@ -28,7 +28,11 @@ from .common import (
     write_generate_sh,
 )
 from .encodable_sequences import EncodableSequences
-from .local_parallelism import worker_pool_with_gpu_assignments_from_args, add_local_parallelism_args
+from .local_parallelism import (
+    add_local_parallelism_args,
+    worker_pool_with_gpu_assignments_from_args,
+)
+from .workload_planning import WORKLOAD_AFFINITY_SELECTION, path_size_bytes
 from .regression_target import from_ic50
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
@@ -363,7 +367,18 @@ def run(argv=sys.argv[1:]):
 
     result_predictor = Class1AffinityPredictor(metadata_dataframes=metadata_dfs)
 
-    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+    worker_pool = worker_pool_with_gpu_assignments_from_args(
+        args,
+        workload_name=WORKLOAD_AFFINITY_SELECTION,
+        workload_hints={
+            "data_bytes": sum(
+                value or 0 for value in (
+                    path_size_bytes(args.data),
+                    path_size_bytes(args.exclude_data),
+                )
+            ) or None,
+        },
+    )
 
     start = time.time()
 

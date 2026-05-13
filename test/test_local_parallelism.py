@@ -2,6 +2,7 @@ from argparse import ArgumentParser, ArgumentTypeError, Namespace
 
 import multiprocessing
 import builtins
+import os
 import pytest
 
 from mhcflurry.local_parallelism import (
@@ -18,6 +19,15 @@ from mhcflurry.local_parallelism import (
     worker_pool_with_gpu_assignments,
     worker_pool_with_gpu_assignments_from_args,
     worker_init_kwargs_for_scheduler,
+)
+from mhcflurry.workload_planning import (
+    GIB,
+    HOST_RAM_PER_DATALOADER_CHILD_GB,
+    WORKLOAD_PRESENTATION_CALIBRATION,
+    WORKLOAD_PROCESSING_TRAINING,
+    estimate_workload_memory,
+    host_memory_num_jobs_cap,
+    system_memory_info_gb,
 )
 
 
@@ -295,16 +305,16 @@ def test_resolve_max_workers_per_gpu_is_idempotent(monkeypatch):
 
 def test_resolve_local_parallelism_args_caps_auto_num_jobs(monkeypatch):
     # Force a VRAM cap by pinning per-worker GB high so by_vram=1 and the
-    # auto MWPG resolves below by_jobs (which would otherwise pin to 2 here).
-    # 40 GB free / 0.6 / 24 GB/worker = 1 worker. by_jobs=16/8=2.
-    # min(1, 2, 4) = 1 -> num_jobs capped to 8.
+    # auto MWPG resolves to 1; auto num_jobs follows GPU capacity.
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
     monkeypatch.setenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "24"
     )
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
     args = Namespace(
-        max_workers_per_gpu="auto", num_jobs=16, gpus=8, backend="auto"
+        max_workers_per_gpu="auto", num_jobs="auto", gpus=8, backend="auto"
     )
     resolve_local_parallelism_args(args)
     assert args.max_workers_per_gpu == 1
@@ -353,23 +363,21 @@ def test_auto_max_workers_per_gpu_pins_to_by_jobs_when_num_jobs_explicit(
     assert chosen == 2
 
 
-def test_resolve_local_parallelism_args_caps_explicit_num_jobs_to_capacity(
+def test_resolve_local_parallelism_args_honors_explicit_num_jobs_override(
     monkeypatch,
 ):
-    # Even with an explicit numeric ``--max-workers-per-gpu``, an
-    # oversized ``--num-jobs`` is now capped to GPU capacity rather than
-    # silently spilling to CPU. The CPU-overflow workers used to chew on
-    # GPU-shaped work items at CPU speed and starve the GPU workers'
-    # imap_unordered queue (see release-2.3.0 sweep mb_1024 calibrate
-    # hang at 91% on 24 CPU stragglers) so we drop them.
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
     args = Namespace(
         max_workers_per_gpu=1, num_jobs=16, gpus=8, backend="auto"
     )
     resolve_local_parallelism_args(args)
     assert args.max_workers_per_gpu == 1
-    assert args.num_jobs == 8  # 8 GPUs × 1 worker/GPU
+    assert args.num_jobs == 16
     assert args.max_workers_per_gpu_was_auto is False
+    assert "num_jobs" in args.workload_plan.cli_overrides
+    assert any("honoring CLI override" in w for w in args.workload_plan.warnings)
 
 
 def test_resolve_local_parallelism_args_num_jobs_auto_resolves_to_capacity(
@@ -379,6 +387,8 @@ def test_resolve_local_parallelism_args_num_jobs_auto_resolves_to_capacity(
     # production no longer has to hand-pick a value that may not match
     # the resolver's MWPG choice.
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
     monkeypatch.delenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", raising=False
     )
@@ -393,6 +403,134 @@ def test_resolve_local_parallelism_args_num_jobs_auto_resolves_to_capacity(
     assert args.max_workers_per_gpu == 4  # by_vram=12, hard_cap=4
     assert args.num_jobs == 32  # 8 × 4
     assert args.num_jobs_was_auto is True
+
+
+def test_resolve_local_parallelism_args_uses_workload_profile(monkeypatch):
+    # Presentation calibration keeps a full presentation predictor stack
+    # resident, so its auto plan should be much more conservative than the
+    # generic training fallback on 40 GB GPUs.
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "256")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "256")
+    monkeypatch.delenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", raising=False
+    )
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs="auto",
+        gpus=4,
+        backend="auto",
+    )
+    resolve_local_parallelism_args(
+        args,
+        workload_name=WORKLOAD_PRESENTATION_CALIBRATION,
+        workload_hints={"prediction_rows": 40_000_000},
+    )
+    assert args.max_workers_per_gpu == 1
+    assert args.num_jobs == 4
+    assert args.workload_plan.workload_name == WORKLOAD_PRESENTATION_CALIBRATION
+    assert args.workload_plan.device_worker_gb == 24.0
+
+
+def test_resolve_local_parallelism_args_caps_auto_jobs_by_available_host_memory(
+    monkeypatch,
+):
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "32")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "10")
+    monkeypatch.setenv("MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION", "0.70")
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs="auto",
+        gpus=4,
+        backend="auto",
+    )
+    resolve_local_parallelism_args(
+        args,
+        workload_name=WORKLOAD_PRESENTATION_CALIBRATION,
+    )
+    assert args.num_jobs == 1
+    assert args.workload_plan.host_memory_available_gb == 10.0
+    assert args.workload_plan.host_memory_num_jobs_cap == 1
+    assert args.workload_plan.host_worker_gb == (
+        6.0 + args.dataloader_num_workers * HOST_RAM_PER_DATALOADER_CHILD_GB
+    )
+
+
+def test_system_memory_info_uses_env_override(monkeypatch):
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "32")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "9.5")
+    info = system_memory_info_gb()
+    assert info["total_gb"] == 32.0
+    assert info["available_gb"] == 9.5
+    assert info["source"] == "env"
+
+
+def test_host_memory_num_jobs_cap_uses_available_memory(monkeypatch):
+    monkeypatch.setenv("MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION", "0.50")
+    sizing = estimate_workload_memory(WORKLOAD_PRESENTATION_CALIBRATION)
+    cap = host_memory_num_jobs_cap(
+        {"total_gb": 32.0, "available_gb": 10.0, "source": "test"},
+        sizing["host_worker_gb"],
+    )
+    assert cap == 1
+
+
+def test_workload_memory_accepts_plain_hint_dict():
+    small = estimate_workload_memory(
+        WORKLOAD_PROCESSING_TRAINING,
+        {"data_bytes": int(1 * GIB)},
+    )
+    large = estimate_workload_memory(
+        WORKLOAD_PROCESSING_TRAINING,
+        {"data_bytes": int(20 * GIB)},
+    )
+    assert small["device_worker_gb"] == 8.0
+    assert large["device_worker_gb"] > small["device_worker_gb"]
+    assert large["data_pressure_gb"] > 0
+
+
+def test_explicit_cli_flags_flow_through_workload_plan(monkeypatch):
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE_LOSS", raising=False)
+    monkeypatch.delenv("MHCFLURRY_MATMUL_PRECISION", raising=False)
+    args = Namespace(
+        max_workers_per_gpu=2,
+        num_jobs=8,
+        gpus=4,
+        backend="auto",
+        dataloader_num_workers=3,
+        random_negative_pool_epochs=5,
+        torch_compile="1",
+        torch_compile_loss="0",
+        matmul_precision="high",
+        enable_timing=True,
+    )
+
+    resolve_local_parallelism_args(args)
+
+    assert args.num_jobs == 8
+    assert args.max_workers_per_gpu == 2
+    assert args.dataloader_num_workers == 3
+    assert args.random_negative_pool_epochs == 5
+    for name in (
+        "num_jobs",
+        "max_workers_per_gpu",
+        "dataloader_num_workers",
+        "random_negative_pool_epochs",
+        "torch_compile",
+        "torch_compile_loss",
+        "matmul_precision",
+        "enable_timing",
+    ):
+        assert name in args.workload_plan.cli_overrides
+    assert os.environ["MHCFLURRY_TORCH_COMPILE"] == "1"
+    assert os.environ["MHCFLURRY_TORCH_COMPILE_LOSS"] == "0"
+    assert os.environ["MHCFLURRY_MATMUL_PRECISION"] == "high"
 
 
 def test_resolve_local_parallelism_args_num_jobs_auto_cpu_only(
@@ -420,6 +558,8 @@ def test_resolve_local_parallelism_args_auto_detects_gpus(monkeypatch):
     from mhcflurry import local_parallelism
 
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
     monkeypatch.delenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", raising=False
     )

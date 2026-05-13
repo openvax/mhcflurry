@@ -414,23 +414,19 @@ do
     # auto-resolver pick: it'll choose 1 on small-VRAM cards or
     # workloads that hit the cache hard, and >1 only when there's
     # genuine slack. Override with CALIBRATE_MAX_WORKERS_PER_GPU.
+    # Keep --num-jobs on auto by default too: if we manufacture a numeric
+    # ceiling here, the planner must honor it as an explicit CLI override
+    # and overflow workers spill to CPU when MWPG resolves lower.
+    # Override with CALIBRATE_NUM_JOBS only when deliberately pinning.
     # CALIBRATE_PER_WORKER_GB tells the resolver how much VRAM to
     # budget per worker (default 12 — the cache + ~2 GB working
     # set on 8-network ensembles). Bumped from the training
     # default of 4 because the calibrate cache is much larger.
+    CALIBRATE_NUM_JOBS="${CALIBRATE_NUM_JOBS:-auto}"
     CALIBRATE_MAX_WORKERS_PER_GPU="${CALIBRATE_MAX_WORKERS_PER_GPU:-auto}"
     CALIBRATE_PER_WORKER_GB="${CALIBRATE_PER_WORKER_GB:-12}"
-    if [ "$CALIBRATE_MAX_WORKERS_PER_GPU" = "auto" ]; then
-        # Pass a high ceiling and let resolve_local_parallelism_args
-        # cap to ``GPUs × resolved_max_workers_per_gpu`` after the
-        # auto-resolver runs (cap_auto_num_jobs=True path). Hard cap on
-        # max_workers_per_gpu is 4, so 4×GPUs is a sufficient ceiling.
-        CALIBRATE_NUM_JOBS_VALUE=$(( GPUS * 4 ))
-    else
-        CALIBRATE_NUM_JOBS_VALUE=$(( GPUS * CALIBRATE_MAX_WORKERS_PER_GPU ))
-    fi
     CALIBRATE_PARALLELISM_ARGS=(
-        --num-jobs "$CALIBRATE_NUM_JOBS_VALUE"
+        --num-jobs "$CALIBRATE_NUM_JOBS"
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER"
         --gpus "$GPUS"
         --max-workers-per-gpu "$CALIBRATE_MAX_WORKERS_PER_GPU"

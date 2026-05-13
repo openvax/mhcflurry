@@ -48,6 +48,11 @@ from .local_parallelism import (
     chunk_ranges_for_local_parallelism,
     worker_pool_with_gpu_assignments_from_args,
 )
+from .workload_planning import (
+    WORKLOAD_PRESENTATION_INFERENCE,
+    WORKLOAD_PROCESSING_INFERENCE,
+    path_size_bytes,
+)
 from .version import __version__
 
 
@@ -335,7 +340,18 @@ def run(argv=sys.argv[1:]):
         alleles = {}
 
     sequences = df[args.sequence_column].to_dict()
-    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+    worker_pool = worker_pool_with_gpu_assignments_from_args(
+        args,
+        workload_name=(
+            WORKLOAD_PRESENTATION_INFERENCE
+            if alleles
+            else WORKLOAD_PROCESSING_INFERENCE
+        ),
+        workload_hints={
+            "data_bytes": path_size_bytes(args.input),
+            "num_rows": len(df),
+        },
+    )
     affinity_model_kwargs = {}
     if getattr(args, "max_workers_per_gpu", None):
         affinity_model_kwargs["num_workers_per_gpu"] = int(

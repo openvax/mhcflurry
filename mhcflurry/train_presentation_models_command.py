@@ -25,6 +25,10 @@ from .local_parallelism import (
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
 )
+from .workload_planning import (
+    WORKLOAD_PRESENTATION_TRAINING,
+    path_size_bytes,
+)
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -184,7 +188,12 @@ def main(args):
     )
     resolve_local_parallelism_args(
         args,
-        per_worker_gb=presentation_worker_gb,
+        workload_name=WORKLOAD_PRESENTATION_TRAINING,
+        workload_hints={
+            "data_bytes": path_size_bytes(args.data),
+            "per_worker_gb": presentation_worker_gb,
+            "transient_rows": args.feature_chunk_size,
+        },
     )
     if args.num_jobs:
         df = df.sort_values("experiment_id", kind="stable").reset_index(drop=True)

@@ -19,6 +19,16 @@ from mhcflurry.local_parallelism import (
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
+from mhcflurry.workload_planning import (
+    WORKLOAD_PROCESSING_DATA,
+    path_size_bytes,
+)
+from mhcflurry.proteome_decoys import (
+    infer_flanking_length,
+    load_reference_sequences,
+    peptides_by_length_from_frame,
+    sample_peptide_frame_for_accessions,
+)
 from mhcflurry.cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -44,11 +54,18 @@ parser.add_argument(
     required=True,
     metavar="CSV",
     help="Class 1 affinity predictor to use")
-parser.add_argument(
+proteome_source_group = parser.add_mutually_exclusive_group(required=True)
+proteome_source_group.add_argument(
     "--proteome-peptides",
     metavar="CSV",
-    required=True,
     help="Proteome peptides")
+proteome_source_group.add_argument(
+    "--proteome-reference-csv",
+    metavar="CSV",
+    help=(
+        "Protein reference CSV with accession and seq columns. If specified, "
+        "decoy peptide candidates are generated inside workers instead of "
+        "materializing a proteome peptide CSV."))
 parser.add_argument(
     "--hit-multiplier-to-take",
     type=float,
@@ -99,7 +116,9 @@ def do_process_samples(samples, constant_data=None):
 
     args = constant_data['args']
     lengths = constant_data['lengths']
-    all_peptides_by_length = constant_data['all_peptides_by_length']
+    all_peptides_by_length = constant_data.get('all_peptides_by_length')
+    proteome_sequences = constant_data.get('proteome_sequences')
+    flanking_length = constant_data.get('flanking_length')
     sample_table = constant_data['sample_table']
 
     hit_df = constant_data['hit_df']
@@ -117,17 +136,32 @@ def do_process_samples(samples, constant_data=None):
 
         sub_hit_df = sub_hit_df.copy()
         sub_hit_df["hit"] = 1
+        sample_peptides = sub_hit_df.peptide.unique()
+        sample_accessions = sub_hit_df.protein_accession.unique()
 
         decoys_df = []
         for length in lengths:
-            universe = all_peptides_by_length[length]
+            num_decoys = int(
+                len(sub_hit_df) * args.ppv_multiplier / len(lengths))
+            if all_peptides_by_length is None:
+                selected_decoys = sample_peptide_frame_for_accessions(
+                    sample_accessions,
+                    proteome_sequences,
+                    lengths=[length],
+                    flanking_length=flanking_length,
+                    exclude_peptides=sample_peptides,
+                    n=num_decoys,
+                )
+            else:
+                universe = all_peptides_by_length[length]
+                possible_universe = universe.loc[
+                    (~universe.peptide.isin(sample_peptides)) &
+                    (universe.protein_accession.isin(sample_accessions))
+                ]
+                selected_decoys = possible_universe.sample(n=num_decoys)
             decoys_df.append(
-                universe.loc[
-                    (~universe.peptide.isin(sub_hit_df.peptide.unique())) &
-                    (universe.protein_accession.isin(sub_hit_df.protein_accession.unique()))
-                ].sample(
-                    n=int(len(sub_hit_df) * args.ppv_multiplier / len(lengths)))[[
-                        "protein_accession", "peptide", "n_flank", "c_flank"
+                selected_decoys[[
+                    "protein_accession", "peptide", "n_flank", "c_flank"
                 ]].drop_duplicates("peptide"))
 
         merged_df = pandas.concat(
@@ -173,6 +207,16 @@ def run():
     resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=not args.cluster_parallelism,
+        workload_name=WORKLOAD_PROCESSING_DATA,
+        workload_hints={
+            "data_bytes": sum(
+                value or 0 for value in (
+                    path_size_bytes(args.hits),
+                    path_size_bytes(args.proteome_peptides),
+                    path_size_bytes(args.proteome_reference_csv),
+                )
+            ) or None,
+        },
     )
 
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
@@ -229,25 +273,41 @@ def run():
             del sample_table[col]
     sample_table["total_hits"] = hit_df.groupby("sample_id").peptide.nunique()
 
-    print("Loading proteome peptides")
-    all_peptides_df = pandas.read_csv(args.proteome_peptides)
-    print("Loaded: ", all_peptides_df.shape)
+    if args.proteome_peptides:
+        print("Loading proteome peptides")
+        all_peptides_df = pandas.read_csv(args.proteome_peptides)
+        print("Loaded: ", all_peptides_df.shape)
 
-    all_peptides_df = all_peptides_df.loc[
-        all_peptides_df.protein_accession.isin(hit_df.protein_accession.unique()) &
-        all_peptides_df.peptide.str.match("^[%s]+$" % "".join(
-            mhcflurry.amino_acid.COMMON_AMINO_ACIDS))
-    ].copy()
-    all_peptides_df["length"] = all_peptides_df.peptide.str.len()
-    print("Subselected proteome peptides by accession: ", all_peptides_df.shape)
-
-    all_peptides_by_length = dict(iter(all_peptides_df.groupby("length")))
+        all_peptides_df = all_peptides_df.loc[
+            all_peptides_df.protein_accession.isin(
+                hit_df.protein_accession.unique()) &
+            all_peptides_df.peptide.str.match("^[%s]+$" % "".join(
+                mhcflurry.amino_acid.COMMON_AMINO_ACIDS))
+        ].copy()
+        all_peptides_by_length = peptides_by_length_from_frame(all_peptides_df)
+        print(
+            "Subselected proteome peptides by accession: ",
+            all_peptides_df.shape)
+        proteome_sequences = None
+        flanking_length = None
+    else:
+        print("Loading protein reference sequences")
+        proteome_sequences = load_reference_sequences(
+            args.proteome_reference_csv,
+            hit_df.protein_accession.unique())
+        print("Loaded %d protein sequences" % len(proteome_sequences))
+        all_peptides_by_length = None
+        flanking_length = infer_flanking_length(hit_df)
+        print("Will generate proteome peptides in workers with flank length",
+              flanking_length)
 
     print("Selecting decoys.")
 
     GLOBAL_DATA['args'] = args
     GLOBAL_DATA['lengths'] = [8, 9, 10, 11]
     GLOBAL_DATA['all_peptides_by_length'] = all_peptides_by_length
+    GLOBAL_DATA['proteome_sequences'] = proteome_sequences
+    GLOBAL_DATA['flanking_length'] = flanking_length
     GLOBAL_DATA['sample_table'] = sample_table
     GLOBAL_DATA['hit_df'] = hit_df
 
