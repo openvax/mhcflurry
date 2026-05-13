@@ -153,10 +153,9 @@ def test_sample_peptide_frame_for_accessions_excludes_peptides():
     }
 
 
-def test_presentation_train_data_uses_reference_csv_decoys(tmp_path):
+def write_presentation_like_inputs(tmp_path):
     hits_csv = tmp_path / "hits.csv"
     reference_csv = tmp_path / "proteins.csv"
-    out_csv = tmp_path / "train_data.csv"
     pandas.DataFrame(
         {
             "hit_id": ["hit1"],
@@ -179,14 +178,16 @@ def test_presentation_train_data_uses_reference_csv_decoys(tmp_path):
             "seq": ["ACDEFGHIKLMNPQRSTVWY"],
         }
     ).to_csv(reference_csv, index=False)
+    return hits_csv, reference_csv
 
+
+def run_reference_decoy_script(script_path, tmp_path):
+    hits_csv, reference_csv = write_presentation_like_inputs(tmp_path)
+    out_csv = tmp_path / "train_data.csv"
     subprocess.run(
         [
             sys.executable,
-            str(
-                REPO_ROOT / "scripts/training/release_exact"
-                / "make_train_data.presentation.py"
-            ),
+            str(script_path),
             "--hits",
             str(hits_csv),
             "--proteome-reference-csv",
@@ -200,9 +201,37 @@ def test_presentation_train_data_uses_reference_csv_decoys(tmp_path):
         ],
         check=True,
     )
+    return pandas.read_csv(out_csv)
 
-    result = pandas.read_csv(out_csv)
 
+def assert_reference_decoy_output(result):
     assert len(result) == 5
     assert result.hit.value_counts().to_dict() == {0: 4, 1: 1}
     assert set(result.protein_accession) == {"P1"}
+
+
+def test_release_presentation_train_data_uses_reference_csv_decoys(tmp_path):
+    result = run_reference_decoy_script(
+        REPO_ROOT / "scripts/training/release_exact"
+        / "make_train_data.presentation.py",
+        tmp_path,
+    )
+    assert_reference_decoy_output(result)
+
+
+def test_download_presentation_train_data_uses_reference_csv_decoys(tmp_path):
+    result = run_reference_decoy_script(
+        REPO_ROOT / "downloads-generation/models_class1_presentation"
+        / "make_train_data.py",
+        tmp_path,
+    )
+    assert_reference_decoy_output(result)
+
+
+def test_data_evaluation_benchmark_uses_reference_csv_decoys(tmp_path):
+    result = run_reference_decoy_script(
+        REPO_ROOT / "downloads-generation/data_evaluation"
+        / "make_benchmark.py",
+        tmp_path,
+    )
+    assert_reference_decoy_output(result)
