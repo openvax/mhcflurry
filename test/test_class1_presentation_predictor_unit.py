@@ -1,3 +1,5 @@
+import warnings
+
 import numpy
 import pandas
 import torch
@@ -144,15 +146,17 @@ def test_predict_affinity_sample_names_none_handles_no_peptides():
 def test_fit_from_scores_trains_expected_variants():
     predictor = Class1PresentationPredictor()
 
-    predictor.fit_from_scores(
-        targets=[0, 1, 0, 1, 0, 1],
-        affinities=[50000, 50, 30000, 100, 40000, 75],
-        processing_scores_by_model={
-            "without_flanks": [0.1, 0.9, 0.2, 0.7, 0.1, 0.8],
-            "with_flanks": [0.2, 0.8, 0.3, 0.6, 0.2, 0.7],
-        },
-        verbose=0,
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        predictor.fit_from_scores(
+            targets=[0, 1, 0, 1, 0, 1],
+            affinities=[50000, 50, 30000, 100, 40000, 75],
+            processing_scores_by_model={
+                "without_flanks": [0.1, 0.9, 0.2, 0.7, 0.1, 0.8],
+                "with_flanks": [0.2, 0.8, 0.3, 0.6, 0.2, 0.7],
+            },
+            verbose=0,
+        )
 
     assert set(predictor.weights_dataframe.index) == {
         "without_flanks",

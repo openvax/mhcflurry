@@ -40,6 +40,13 @@ _PRESENTATION_PREDICT_TARGET_ROWS = int(
     os.environ.get("MHCFLURRY_PRESENTATION_PREDICT_TARGET_ROWS", "1000000")
 )
 
+_PRESENTATION_LOGISTIC_REGRESSION_KWARGS = {
+    # The presentation combiner has a tiny dense feature matrix; Newton-CG is
+    # deterministic and avoids sklearn's SciPy L-BFGS-B wrapper warnings.
+    "solver": "newton-cg",
+    "max_iter": 1000,
+}
+
 
 class Class1PresentationPredictor(object):
     """
@@ -628,7 +635,8 @@ class Class1PresentationPredictor(object):
         sklearn.linear_model.LogisticRegression
         """
         if name is None or name not in self._models_cache:
-            model = sklearn.linear_model.LogisticRegression(solver="lbfgs")
+            model = sklearn.linear_model.LogisticRegression(
+                **_PRESENTATION_LOGISTIC_REGRESSION_KWARGS)
             if name is not None:
                 row = self.weights_dataframe.loc[name]
                 model.intercept_ = row.intercept
