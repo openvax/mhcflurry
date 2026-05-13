@@ -268,13 +268,13 @@ def run(argv=sys.argv[1:]):
         # message instructing them to download the models if needed.
         models_dir = get_default_class1_presentation_models_dir(test_exists=True)
 
-    predictor = _load_predictor_for_command(models_dir)
-
     if args.list_supported_alleles:
+        predictor = _load_predictor_for_command(models_dir)
         print("\n".join(predictor.supported_alleles))
         return
 
     if args.list_supported_peptide_lengths:
+        predictor = _load_predictor_for_command(models_dir)
         min_len, max_len = predictor.supported_peptide_lengths
         print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
         return
@@ -340,95 +340,95 @@ def run(argv=sys.argv[1:]):
         alleles = {}
 
     sequences = df[args.sequence_column].to_dict()
-    worker_pool = worker_pool_with_gpu_assignments_from_args(
-        args,
-        workload_name=(
-            WORKLOAD_PRESENTATION_INFERENCE
-            if alleles
-            else WORKLOAD_PROCESSING_INFERENCE
-        ),
-        workload_hints={
-            "data_bytes": path_size_bytes(args.input),
-            "num_rows": len(df),
-        },
-    )
-    affinity_model_kwargs = {}
-    if getattr(args, "max_workers_per_gpu", None):
-        affinity_model_kwargs["num_workers_per_gpu"] = int(
-            args.max_workers_per_gpu)
     if not sequences:
-        if worker_pool is not None:
-            worker_pool.close()
-            worker_pool.join()
         # Empty input: return a DataFrame with the same schema the
         # predictor would have produced for non-empty input, so
         # threshold filters and downstream readers don't see a
         # schema-less object. The column list is derived from the
         # predictor (single source of truth) — see test_empty_and_populated_schemas_match.
+        predictor = _load_predictor_for_command(models_dir)
         result_df = pandas.DataFrame(
             columns=predictor.predict_sequences_columns(
                 alleles=alleles,
                 use_flanks=not args.no_flanking,
                 include_affinity_percentile=not args.no_affinity_percentile,
             ))
-    elif worker_pool is None:
-        result_df = predictor.predict_sequences(
-            sequences=sequences,
-            alleles=alleles,
-            result="all",
-            peptide_lengths=peptide_lengths,
-            use_flanks=not args.no_flanking,
-            include_affinity_percentile=not args.no_affinity_percentile,
-            throw=not args.no_throw,
-            affinity_model_kwargs=affinity_model_kwargs,
-            processing_batch_size="auto")
     else:
-        sequence_items = list(sequences.items())
-        ranges = chunk_ranges_for_local_parallelism(
-            len(sequence_items), args.num_jobs)
-        work_items = []
-        for (chunk_num, start, end) in ranges:
-            work_items.append({
-                "chunk_num": chunk_num,
-                "models_dir": models_dir,
-                "sequences": dict(sequence_items[start:end]),
-                "alleles": alleles,
-                "peptide_lengths": peptide_lengths,
-                "use_flanks": not args.no_flanking,
-                "include_affinity_percentile": (
-                    not args.no_affinity_percentile),
-                "throw": not args.no_throw,
-                "affinity_model_kwargs": affinity_model_kwargs,
-                "processing_batch_size": "auto",
-            })
-        try:
-            results = worker_pool.imap_unordered(
-                _predict_sequences_chunk_worker, work_items, chunksize=1)
-            chunks = [result for result in results]
-        finally:
-            worker_pool.close()
-            worker_pool.join()
-        result_df = pandas.concat(
-            [chunk for (_, chunk) in sorted(chunks)],
-            ignore_index=True)
-        # Match the global sort that serial predict_sequences(result="all")
-        # applies in class1_presentation_predictor.predict_sequences().
-        # Each chunk is sorted within its sequence subset; after concat we
-        # need a stable global sort so parallel output ranking == serial.
-        # ``peptide`` is the secondary key so tied scores resolve in the
-        # same order regardless of how chunks were partitioned.
-        if "presentation_score" in result_df.columns:
-            result_df = result_df.sort_values(
-                ["presentation_score", "peptide"],
-                ascending=[False, True],
-                kind="stable",
-            ).reset_index(drop=True)
-        elif "processing_score" in result_df.columns:
-            result_df = result_df.sort_values(
-                ["processing_score", "peptide"],
-                ascending=[False, True],
-                kind="stable",
-            ).reset_index(drop=True)
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            workload_name=(
+                WORKLOAD_PRESENTATION_INFERENCE
+                if alleles
+                else WORKLOAD_PROCESSING_INFERENCE
+            ),
+            workload_hints={
+                "data_bytes": path_size_bytes(args.input),
+                "num_rows": len(df),
+            },
+        )
+        affinity_model_kwargs = {}
+        if getattr(args, "max_workers_per_gpu", None):
+            affinity_model_kwargs["num_workers_per_gpu"] = int(
+                args.max_workers_per_gpu)
+        if worker_pool is None:
+            predictor = _load_predictor_for_command(models_dir)
+            result_df = predictor.predict_sequences(
+                sequences=sequences,
+                alleles=alleles,
+                result="all",
+                peptide_lengths=peptide_lengths,
+                use_flanks=not args.no_flanking,
+                include_affinity_percentile=not args.no_affinity_percentile,
+                throw=not args.no_throw,
+                affinity_model_kwargs=affinity_model_kwargs,
+                processing_batch_size="auto")
+        else:
+            sequence_items = list(sequences.items())
+            ranges = chunk_ranges_for_local_parallelism(
+                len(sequence_items), args.num_jobs)
+            work_items = []
+            for (chunk_num, start, end) in ranges:
+                work_items.append({
+                    "chunk_num": chunk_num,
+                    "models_dir": models_dir,
+                    "sequences": dict(sequence_items[start:end]),
+                    "alleles": alleles,
+                    "peptide_lengths": peptide_lengths,
+                    "use_flanks": not args.no_flanking,
+                    "include_affinity_percentile": (
+                        not args.no_affinity_percentile),
+                    "throw": not args.no_throw,
+                    "affinity_model_kwargs": affinity_model_kwargs,
+                    "processing_batch_size": "auto",
+                })
+            try:
+                results = worker_pool.imap_unordered(
+                    _predict_sequences_chunk_worker, work_items, chunksize=1)
+                chunks = [result for result in results]
+            finally:
+                worker_pool.close()
+                worker_pool.join()
+            result_df = pandas.concat(
+                [chunk for (_, chunk) in sorted(chunks)],
+                ignore_index=True)
+            # Match the global sort that serial predict_sequences(result="all")
+            # applies in class1_presentation_predictor.predict_sequences().
+            # Each chunk is sorted within its sequence subset; after concat we
+            # need a stable global sort so parallel output ranking == serial.
+            # ``peptide`` is the secondary key so tied scores resolve in the
+            # same order regardless of how chunks were partitioned.
+            if "presentation_score" in result_df.columns:
+                result_df = result_df.sort_values(
+                    ["presentation_score", "peptide"],
+                    ascending=[False, True],
+                    kind="stable",
+                ).reset_index(drop=True)
+            elif "processing_score" in result_df.columns:
+                result_df = result_df.sort_values(
+                    ["processing_score", "peptide"],
+                    ascending=[False, True],
+                    kind="stable",
+                ).reset_index(drop=True)
 
     # Apply thresholds, skipping ones whose column is missing (e.g.
     # processing-only run with no alleles, or --no-affinity-percentile

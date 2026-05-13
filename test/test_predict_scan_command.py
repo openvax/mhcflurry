@@ -224,6 +224,75 @@ def test_empty_and_populated_schemas_match():
         f"!= populated schema {list(full_df.columns)}")
 
 
+def test_parallel_path_does_not_load_predictor_before_pool(monkeypatch):
+    """Fork-based pools must be created before PyTorch predictor state loads."""
+    class FakePool:
+        def __init__(self):
+            self.closed = False
+            self.joined = False
+
+        def imap_unordered(self, fn, work_items, chunksize=1):
+            del fn, chunksize
+            return [
+                (
+                    item["chunk_num"],
+                    pandas.DataFrame({
+                        "sequence_name": ["sequence_0"],
+                        "pos": [0],
+                        "peptide": ["ASDFGHKL"],
+                        "sample_name": ["genotype_00"],
+                        "presentation_score": [0.5],
+                    }),
+                )
+                for item in work_items
+            ]
+
+        def close(self):
+            self.closed = True
+
+        def join(self):
+            self.joined = True
+
+    def fail_parent_predictor_load(models_dir):
+        raise AssertionError(
+            "parallel scan should not load predictor in parent")
+
+    def fake_worker_pool(args, workload_name, workload_hints):
+        del workload_name, workload_hints
+        args.num_jobs = 2
+        args.max_workers_per_gpu = 1
+        return FakePool()
+
+    monkeypatch.setattr(
+        predict_scan_command,
+        "_load_predictor_for_command",
+        fail_parent_predictor_load)
+    monkeypatch.setattr(
+        predict_scan_command,
+        "worker_pool_with_gpu_assignments_from_args",
+        fake_worker_pool)
+
+    deletes = []
+    try:
+        fd_out = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        deletes.append(fd_out.name)
+        predict_scan_command.run([
+            "--sequences", "ASDFGHKL",
+            "--alleles", "HLA-A0201",
+            "--peptide-lengths", "8",
+            "--results-all",
+            "--num-jobs", "2",
+            "--backend", "cpu",
+            "--out", fd_out.name,
+        ])
+        result = read_output_csv(fd_out.name)
+    finally:
+        for delete in deletes:
+            os.unlink(delete)
+
+    assert result.peptide.tolist() == ["ASDFGHKL"]
+
+
 @pytest.mark.slow
 @pytest.mark.integration
 def test_parallel_output_globally_sorted():
