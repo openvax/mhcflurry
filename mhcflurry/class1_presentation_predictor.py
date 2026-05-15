@@ -1102,7 +1102,8 @@ class Class1PresentationPredictor(object):
             write_weights=True,
             write_percent_ranks=True,
             write_info=True,
-            write_metdata=True):
+            write_metdata=True,
+            write_metadata=None):
         """
         Save the predictor to a directory on disk. If the directory does
         not exist it will be created.
@@ -1115,6 +1116,8 @@ class Class1PresentationPredictor(object):
         models_dir : string
             Path to directory. It will be created if it doesn't exist.
         """
+        if write_metadata is not None:
+            write_metdata = write_metadata
 
         if write_weights and self.weights_dataframe is None:
             raise RuntimeError("Can't save before fitting")

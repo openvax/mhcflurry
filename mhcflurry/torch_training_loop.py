@@ -179,6 +179,18 @@ def _warm_cuda_autograd_for_triton(device):
     _TRITON_AUTOGRAD_WARMED_DEVICES.add(key)
 
 
+def _uncompiled_network(network):
+    """Return the eager module behind ``network``."""
+    return network._orig_mod if hasattr(network, "_orig_mod") else network
+
+
+def _validation_forward_network(network, eager_network):
+    """Choose the module used for validation forward passes during training."""
+    if os.environ.get("MHCFLURRY_TORCH_COMPILE_VALIDATION", "0") == "1":
+        return network
+    return eager_network
+
+
 def _effective_validation_batch_size(
         device, configured_batch_size, minibatch_size,
         model=None, num_workers_per_gpu=1):

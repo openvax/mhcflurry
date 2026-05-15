@@ -160,6 +160,63 @@ def test_neural_network_input():
     assert results["sequence"].dtype == numpy.int8
 
 
+def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
+    """Avoid torch.compile recompiles from train/eval grad-mode changes."""
+    import mhcflurry.class1_processing_neural_network as processing_module
+
+    class CompiledWrapper(torch.nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self._orig_mod = module
+            self.train_forwards = 0
+            self.eval_forwards = 0
+
+        def forward(self, inputs):
+            if self.training:
+                self.train_forwards += 1
+            else:
+                self.eval_forwards += 1
+            return self._orig_mod(inputs)
+
+    compiled_wrappers = []
+
+    def fake_compile(network, device):
+        del device
+        wrapper = CompiledWrapper(network)
+        compiled_wrappers.append(wrapper)
+        return wrapper
+
+    monkeypatch.setattr(processing_module, "_maybe_compile_network", fake_compile)
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE_VALIDATION", raising=False)
+
+    model = Class1ProcessingNeuralNetwork(
+        max_epochs=1,
+        validation_split=0.5,
+        early_stopping=False,
+        minibatch_size=2,
+        peptide_max_length=9,
+        n_flank_length=4,
+        c_flank_length=4,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+    )
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=["SIINFEKL", "SIINFEKA", "SIINFEKY", "SIINFEKF"],
+            n_flanks=["AAAA", "CCCC", "DDDD", "EEEE"],
+            c_flanks=["FFFF", "GGGG", "HHHH", "IIII"],
+        ),
+        targets=numpy.array([1, 0, 1, 0], dtype=numpy.float32),
+        verbose=-1,
+        progress_print_interval=None,
+    )
+
+    assert len(compiled_wrappers) == 1
+    assert compiled_wrappers[0].train_forwards > 0
+    assert compiled_wrappers[0].eval_forwards == 0
+
+
 def test_processing_torch_amino_acid_encoding_matches_vector_path():
     """Processing models should expand amino-acid indices inside torch."""
     common_hyperparameters = dict(

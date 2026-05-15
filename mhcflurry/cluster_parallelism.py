@@ -12,17 +12,13 @@ import argparse
 import pickle
 import subprocess
 import shutil
+from shlex import quote
 
 from .local_parallelism import (
     call_wrapped_kwargs,
     configure_cluster_worker_torch_compile_threads,
 )
 from .class1_affinity_predictor import Class1AffinityPredictor
-
-try:
-    from shlex import quote
-except ImportError:
-    from pipes import quote
 
 
 def add_cluster_parallelism_args(parser):

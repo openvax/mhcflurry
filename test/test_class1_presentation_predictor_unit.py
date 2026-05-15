@@ -169,6 +169,23 @@ def test_fit_from_scores_trains_expected_variants():
     }
 
 
+def test_save_accepts_write_metadata_alias(tmp_path):
+    predictor = Class1PresentationPredictor(
+        metadata_dataframes={"extra": pandas.DataFrame({"x": [1]})})
+
+    predictor.save(
+        str(tmp_path),
+        write_affinity_predictor=False,
+        write_processing_predictor=False,
+        write_weights=False,
+        write_percent_ranks=False,
+        write_info=False,
+        write_metadata=False,
+    )
+
+    assert not (tmp_path / "extra.csv.bz2").exists()
+
+
 class FakePresentationPredictor:
     def predict_affinity(
             self,

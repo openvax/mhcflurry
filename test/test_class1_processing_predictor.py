@@ -2,6 +2,7 @@
 import pandas
 import tempfile
 import pickle
+import pytest
 
 from numpy.testing import assert_array_equal
 
@@ -29,6 +30,12 @@ def test_empty_prediction_returns_empty_array_and_dataframe():
     df = predictor.predict_to_dataframe([])
     assert list(df.columns) == ["peptide", "n_flank", "c_flank", "score"]
     assert len(df) == 0
+
+
+def test_predict_rejects_string_peptides():
+    predictor = Class1ProcessingPredictor(models=[])
+    with pytest.raises(TypeError, match="peptides must be a list"):
+        predictor.predict_to_dataframe("SIINFEKL")
 
 
 def test_basic():

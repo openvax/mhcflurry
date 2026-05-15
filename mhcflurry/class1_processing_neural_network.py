@@ -20,6 +20,8 @@ from .torch_training_loop import (
     _configure_matmul_precision,
     _maybe_compile_loss,
     _maybe_compile_network,
+    _uncompiled_network,
+    _validation_forward_network,
 )
 
 
@@ -718,6 +720,7 @@ class Class1ProcessingNeuralNetwork(object):
         # paths so production opt-ins (MHCFLURRY_TORCH_COMPILE=1) light up
         # both trainers.
         network = _maybe_compile_network(network, device)
+        eager_network = _uncompiled_network(network)
 
         # Setup optimizer
         optimizer = self._create_optimizer(network)
@@ -814,14 +817,16 @@ class Class1ProcessingNeuralNetwork(object):
 
             # Validation
             if val_split > 0:
-                network.eval()
+                validation_network = _validation_forward_network(
+                    network, eager_network)
+                validation_network.eval()
                 with torch.no_grad():
                     val_seq = seq_dev.index_select(0, val_indices_dev)
                     val_length = length_dev.index_select(0, val_indices_dev)
                     val_targets = targets_dev.index_select(0, val_indices_dev)
 
                     val_inputs = {"sequence": val_seq, "peptide_length": val_length}
-                    val_predictions = network(val_inputs)
+                    val_predictions = validation_network(val_inputs)
                     val_loss = loss_fn(val_predictions, val_targets)
                     if weights_dev is not None:
                         val_loss = val_loss * weights_dev.index_select(

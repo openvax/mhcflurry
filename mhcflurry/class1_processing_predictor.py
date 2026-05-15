@@ -231,6 +231,8 @@ class Class1ProcessingPredictor(object):
         Processing predictions are in the "score" column. Also includes
         peptides and flanking sequences.
         """
+        if isinstance(peptides, str):
+            raise TypeError("peptides must be a list or array, not a string")
 
         if n_flanks is None:
             n_flanks = [""] * len(peptides)

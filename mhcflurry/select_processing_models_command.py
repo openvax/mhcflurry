@@ -8,6 +8,7 @@ selected models across all folds. AUC is used as the metric.
 """
 import argparse
 import os
+import re
 import signal
 import sys
 import time
@@ -116,10 +117,12 @@ def run(argv=sys.argv[1:]):
 
     metadata_dfs = {}
 
-    fold_cols = [c for c in df if c.startswith("fold_")]
+    fold_cols = [c for c in df if re.match(r"^fold_\d+$", c)]
     num_folds = len(fold_cols)
     if num_folds <= 1:
-        raise ValueError("Too few folds: ", num_folds)
+        raise ValueError(
+            "Too few clean ``fold_<int>`` columns: %d (saw: %s)" % (
+                num_folds, [c for c in df if c.startswith("fold_")]))
 
     print("Num folds: ", num_folds, "fraction included:")
     print(df[fold_cols].mean())

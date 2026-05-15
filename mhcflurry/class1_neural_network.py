@@ -37,6 +37,8 @@ from .torch_training_loop import (
     _effective_validation_batch_size,
     _maybe_compile_loss,
     _maybe_compile_network,
+    _uncompiled_network,
+    _validation_forward_network,
 )
 
 
@@ -672,11 +674,6 @@ def _timing_stop(start, device, enabled):
     return time.perf_counter() - start
 
 
-def _uncompiled_network(network):
-    """Return the eager module behind ``network``."""
-    return network._orig_mod if hasattr(network, "_orig_mod") else network
-
-
 def _move_fit_batch_to_device(batch, device, *, non_blocking):
     """Move a training batch dict to ``device``.
 
@@ -1042,13 +1039,6 @@ def _batched_validation_loss(
         loss_accum += tail_loss.item() * tail_size
         weight_accum += tail_size
     return loss_accum / weight_accum
-
-
-def _validation_forward_network(network, eager_network):
-    """Choose the module used for validation forward passes during training."""
-    if os.environ.get("MHCFLURRY_TORCH_COMPILE_VALIDATION", "0") == "1":
-        return network
-    return eager_network
 
 
 class Class1NeuralNetworkModel(nn.Module):
