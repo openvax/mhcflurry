@@ -991,15 +991,38 @@ class Class1ProcessingNeuralNetwork(object):
         -------
         numpy.array
         """
+        predictions = self.predict_encoded_tensor(
+            sequences=sequences, throw=throw, batch_size=batch_size)
+        return predictions.detach().cpu().numpy().astype("float64", copy=False)
+
+    def predict_encoded_tensor(
+        self,
+        sequences,
+        throw=True,
+        batch_size=DEFAULT_PREDICT_BATCH_SIZE,
+        device=None,
+    ):
+        """
+        Predict antigen processing and return a torch tensor.
+
+        This tensor-native path keeps encoded inputs resident on the target
+        device when ``FlankingEncoding`` can provide a compatible tensor cache.
+        ``predict_encoded`` delegates here and converts the final result to
+        numpy for the public API.
+        """
         from .class1_neural_network import (
             _env_workers_per_gpu,
             resolve_prediction_batch_size,
         )
 
-        device = self.get_device()
+        if device is None:
+            device = self.get_device()
+        else:
+            device = torch.device(device)
         _configure_matmul_precision(device)
 
-        x_dict = self.network_input(sequences, throw=throw)
+        x_dict = self.network_input_tensors(
+            sequences=sequences, device=device, throw=throw)
         network = self.network()
         network.to(device)
         network = _maybe_compile_network(network, device)
@@ -1014,40 +1037,57 @@ class Class1ProcessingNeuralNetwork(object):
 
         n_samples = len(x_dict["sequence"])
         if n_samples == 0:
-            return numpy.array([], dtype="float64")
+            return torch.empty((0,), dtype=torch.float32, device=device)
 
-        all_predictions = []
-
-        sequence_is_indices = self.hyperparameters.get("amino_acid_encoding_torch")
-
-        def prediction_tensor(batch_array, keep_int=False):
-            batch_array = numpy.asarray(batch_array)
-            if not batch_array.flags.writeable:
-                batch_array = batch_array.copy()
-            if not keep_int:
-                batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
-            return torch.from_numpy(batch_array).to(device)
+        predictions = torch.empty(
+            (n_samples,), dtype=torch.float32, device=device)
 
         with torch.no_grad():
             for batch_start in range(0, n_samples, batch_size):
                 batch_end = min(batch_start + batch_size, n_samples)
 
-                seq_batch = prediction_tensor(
-                    x_dict["sequence"][batch_start:batch_end],
-                    keep_int=sequence_is_indices,
-                )
-                length_batch = prediction_tensor(
-                    x_dict["peptide_length"][batch_start:batch_end],
-                    keep_int=True,
-                )
+                seq_batch = x_dict["sequence"][batch_start:batch_end]
+                length_batch = x_dict["peptide_length"][batch_start:batch_end]
 
                 inputs = {"sequence": seq_batch, "peptide_length": length_batch}
                 batch_predictions = network(inputs)
-                all_predictions.append(batch_predictions.cpu().numpy())
+                predictions[batch_start:batch_end] = batch_predictions
 
-        raw_predictions = numpy.concatenate(all_predictions, axis=0)
-        predictions = numpy.array(raw_predictions, dtype="float64")
         return predictions
+
+    def network_input_tensors(self, sequences, device, throw=True):
+        """
+        Encode peptides to the target-device tensors expected by the network.
+        """
+        device = torch.device(device)
+        if self.hyperparameters.get("amino_acid_encoding_torch"):
+            encoded = sequences.categorical_encode_tensors(
+                self.hyperparameters["peptide_max_length"],
+                n_flank_length=self.hyperparameters["n_flank_length"],
+                c_flank_length=self.hyperparameters["c_flank_length"],
+                device=device,
+                allow_unsupported_amino_acids=True,
+                throw=throw,
+            )
+            return {
+                "sequence": encoded.array,
+                "peptide_length": encoded.peptide_lengths,
+            }
+
+        x_dict = self.network_input(sequences, throw=throw)
+        sequence = numpy.asarray(x_dict["sequence"], dtype=numpy.float32)
+        if not sequence.flags.writeable:
+            sequence = sequence.copy()
+        peptide_length = numpy.asarray(x_dict["peptide_length"])
+        if not peptide_length.flags.writeable:
+            peptide_length = peptide_length.copy()
+        non_blocking = device.type == "cuda"
+        return {
+            "sequence": torch.from_numpy(sequence).to(
+                device, non_blocking=non_blocking),
+            "peptide_length": torch.from_numpy(peptide_length).to(
+                device, non_blocking=non_blocking),
+        }
 
     def network_input(self, sequences, throw=True):
         """

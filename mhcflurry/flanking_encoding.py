@@ -48,12 +48,23 @@ class FlankingEncoding(object):
             "c_flank": c_flanks,
         }, dtype=str)
         self.encoding_cache = {}
+        self.tensor_cache = {}
+
+    def __getstate__(self):
+        """Drop device tensors when pickling."""
+        state = self.__dict__.copy()
+        state["tensor_cache"] = {}
+        return state
 
     def __len__(self):
         """
         Number of peptides.
         """
         return len(self.dataframe)
+
+    def clear_tensor_cache(self):
+        """Release cached torch tensors held by this encoding."""
+        self.tensor_cache.clear()
 
     def vector_encode(
             self,
@@ -143,6 +154,60 @@ class FlankingEncoding(object):
                 throw=throw)
             self.encoding_cache[cache_key] = result
         return self.encoding_cache[cache_key]
+
+    def categorical_encode_tensors(
+            self,
+            peptide_max_length,
+            n_flank_length,
+            c_flank_length,
+            device,
+            allow_unsupported_amino_acids=True,
+            throw=True):
+        """
+        Encode variable-length sequences to cached torch tensors.
+
+        The CPU numpy encoding remains the source of truth. This method keeps
+        a device-resident view/copy keyed by encoding parameters and device so
+        repeated processing models can slice the same tensors without per-batch
+        host-to-device transfers.
+        """
+        import torch
+
+        device = torch.device(device)
+        if device.type == "cuda" and device.index is None:
+            device = torch.device("cuda", torch.cuda.current_device())
+
+        cache_key = (
+            "categorical_encode_tensors",
+            peptide_max_length,
+            n_flank_length,
+            c_flank_length,
+            allow_unsupported_amino_acids,
+            throw,
+            device.type,
+            device.index)
+        if cache_key not in self.tensor_cache:
+            encoded = self.categorical_encode(
+                peptide_max_length=peptide_max_length,
+                n_flank_length=n_flank_length,
+                c_flank_length=c_flank_length,
+                allow_unsupported_amino_acids=allow_unsupported_amino_acids,
+                throw=throw)
+
+            sequence_array = encoded.array
+            if not sequence_array.flags.writeable:
+                sequence_array = sequence_array.copy()
+            peptide_lengths = numpy.asarray(encoded.peptide_lengths)
+            if not peptide_lengths.flags.writeable:
+                peptide_lengths = peptide_lengths.copy()
+
+            non_blocking = device.type == "cuda"
+            self.tensor_cache[cache_key] = EncodingResult(
+                array=torch.from_numpy(sequence_array).to(
+                    device, non_blocking=non_blocking),
+                peptide_lengths=torch.from_numpy(peptide_lengths).to(
+                    device, non_blocking=non_blocking))
+        return self.tensor_cache[cache_key]
 
     @staticmethod
     def _fixed_length_index_encoding(

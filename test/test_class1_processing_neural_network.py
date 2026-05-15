@@ -159,6 +159,20 @@ def test_neural_network_input():
     assert results["sequence"].ndim == 2
     assert results["sequence"].dtype == numpy.int8
 
+    tensor_results = model.network_input_tensors(encoding, device="cpu")
+    numpy.testing.assert_array_equal(
+        tensor_results["sequence"].numpy(), results["sequence"])
+    numpy.testing.assert_array_equal(
+        tensor_results["peptide_length"].numpy(), results["peptide_length"])
+    assert tensor_results["sequence"].dtype == torch.int8
+
+    tensor_results2 = model.network_input_tensors(encoding, device="cpu")
+    assert tensor_results2["sequence"] is tensor_results["sequence"]
+
+    encoding.clear_tensor_cache()
+    tensor_results3 = model.network_input_tensors(encoding, device="cpu")
+    assert tensor_results3["sequence"] is not tensor_results["sequence"]
+
 
 def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
     """Avoid torch.compile recompiles from train/eval grad-mode changes."""
@@ -335,6 +349,32 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
 
     assert len(predictions) == len(peptides)
     assert captured["num_workers_per_gpu"] == 4
+
+
+def test_processing_predict_encoded_tensor_public_numpy_wrapper():
+    """Public numpy predictions delegate through the tensor path."""
+    model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=12,
+        n_flank_length=2,
+        c_flank_length=2,
+        convolutional_filters=8,
+    )
+    model._network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    flanking = FlankingEncoding(
+        peptides=["SIINFEKL", "GILGFVFTL", "NLVPMVATV"],
+        n_flanks=["AA", "CC", "DD"],
+        c_flanks=["GG", "HH", "II"])
+
+    tensor_predictions = model.predict_encoded_tensor(
+        flanking, batch_size=2, device="cpu")
+    numpy_predictions = model.predict_encoded(flanking, batch_size=2)
+
+    assert isinstance(tensor_predictions, torch.Tensor)
+    assert tensor_predictions.device.type == "cpu"
+    numpy.testing.assert_allclose(
+        numpy_predictions, tensor_predictions.detach().numpy())
 
 
 @pytest.mark.slow
