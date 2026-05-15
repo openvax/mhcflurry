@@ -273,23 +273,29 @@ def model_select(
         n_flanks=df.n_flank.values,
         c_flanks=df.c_flank.values)
 
-    predictions_df = df.copy()
+    targets = df.hit.values
+    prediction_matrix = numpy.empty((len(df), len(models)), dtype=numpy.float32)
     for (i, model) in enumerate(models):
-        predictions_df[i] = model.predict_encoded(sequences)
+        prediction_matrix[:, i] = model.predict_encoded(sequences)
 
     selected = []
-    selected_score = 0
-    remaining_models = set(numpy.arange(len(models)))
+    selected_sum = None
+    selected_score = -numpy.inf
+    remaining_models = set(range(len(models)))
     individual_model_scores = {}
     selected_in_round = {}
     ensemble_score_when_selected = {}
     while remaining_models and len(selected) < max_models:
         best_model = None
-        best_model_score = 0
+        best_model_score = -numpy.inf
         for i in remaining_models:
-            possible_ensemble = list(selected) + [i]
-            predictions = predictions_df[possible_ensemble].mean(axis=1)
-            auc_score = roc_auc_score(df.hit.values, predictions.values)
+            if selected_sum is None:
+                predictions = prediction_matrix[:, i]
+            else:
+                predictions = (
+                    selected_sum + prediction_matrix[:, i]
+                ) / float(len(selected) + 1)
+            auc_score = roc_auc_score(targets, predictions)
             if auc_score > best_model_score:
                 best_model = i
                 best_model_score = auc_score
@@ -300,6 +306,10 @@ def model_select(
             selected_score = best_model_score
             remaining_models.remove(best_model)
             selected.append(best_model)
+            if selected_sum is None:
+                selected_sum = prediction_matrix[:, best_model].copy()
+            else:
+                selected_sum += prediction_matrix[:, best_model]
             selected_in_round[best_model] = len(selected)
             ensemble_score_when_selected[best_model] = selected_score
         else:
