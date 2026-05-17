@@ -130,6 +130,31 @@ def test_hoist_torchinductor_accepts_auto_env(monkeypatch):
     assert os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] == "1"
 
 
+def test_resolve_torchinductor_env_accepts_auto_when_compile_disabled(monkeypatch):
+    from mhcflurry.local_parallelism import resolve_torchinductor_compile_threads_env
+
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "auto")
+    monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
+    monkeypatch.setattr(os, "cpu_count", lambda: 64)
+
+    threads = resolve_torchinductor_compile_threads_env(num_jobs=8)
+
+    assert threads == 8
+    assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "8"
+    assert os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] == "1"
+
+
+def test_resolve_torchinductor_env_rejects_invalid_user_pin(monkeypatch):
+    from mhcflurry.local_parallelism import resolve_torchinductor_compile_threads_env
+
+    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "autoish")
+    monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
+
+    with pytest.raises(ValueError, match="TORCHINDUCTOR_COMPILE_THREADS"):
+        resolve_torchinductor_compile_threads_env(num_jobs=8)
+
+
 def test_hoist_torchinductor_warmup_uses_larger_single_worker_budget(monkeypatch):
     from mhcflurry.local_parallelism import (
         hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,

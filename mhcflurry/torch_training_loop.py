@@ -17,6 +17,8 @@ import os
 
 import torch
 
+from .local_parallelism import resolve_torchinductor_compile_threads_env
+
 _TRITON_AUTOGRAD_WARMED_DEVICES = set()
 
 
@@ -100,6 +102,7 @@ def _maybe_compile_network(network, device):
     if hasattr(network, "_orig_mod"):
         return network
     mode = os.environ.get("MHCFLURRY_TORCH_COMPILE_MODE", "default")
+    resolve_torchinductor_compile_threads_env()
     # ``dynamic=True`` tells dynamo to generate one shape-polymorphic
     # graph instead of specializing on every batch shape it sees.
     # mhcflurry's forward is called with at least three distinct row
@@ -154,6 +157,7 @@ def _maybe_compile_loss(loss_obj, device):
         "MHCFLURRY_TORCH_COMPILE_LOSS_MODE",
         os.environ.get("MHCFLURRY_TORCH_COMPILE_MODE", "default"),
     )
+    resolve_torchinductor_compile_threads_env()
     # Loss takes (y_pred, y_true) and optionally sample_weights with
     # dynamic-batch shapes that mirror the network's forward. Match the
     # network's dynamic/static policy via the same env knob.

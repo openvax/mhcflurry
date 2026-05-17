@@ -906,6 +906,50 @@ def _set_auto_torchinductor_compile_threads(num_jobs, phase="production"):
     return threads
 
 
+def _compile_threads_num_jobs(num_jobs):
+    if num_jobs is None:
+        return 1
+    if isinstance(num_jobs, str) and num_jobs.strip().lower() == "auto":
+        return 1
+    return max(int(num_jobs), 1)
+
+
+def resolve_torchinductor_compile_threads_env(num_jobs=1, phase="production"):
+    """Ensure ``TORCHINDUCTOR_COMPILE_THREADS`` is parseable by PyTorch.
+
+    MHCflurry launchers accept ``TORCHINDUCTOR_COMPILE_THREADS=auto`` as an
+    orchestrator-owned sentinel so each command can size the Inductor compiler
+    helper pool after it knows its local worker count. PyTorch itself does not
+    accept that sentinel: Inductor parses the env var with ``int(...)``.
+
+    This helper is for entry points that do not run the full local-parallelism
+    resolver before importing or spawning PyTorch work. It leaves unset and
+    user-pinned integer values alone, resolves orchestrator-owned ``auto`` to a
+    numeric value, and fails early on other invalid values with a clearer
+    message than the downstream Inductor traceback.
+    """
+    value = os.environ.get("TORCHINDUCTOR_COMPILE_THREADS")
+    if value in (None, ""):
+        return None
+    auto_owned = (
+        value == "auto"
+        or os.environ.get("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO") == "1"
+    )
+    if auto_owned:
+        return _set_auto_torchinductor_compile_threads(
+            num_jobs=_compile_threads_num_jobs(num_jobs),
+            phase=phase,
+        )
+    try:
+        int(value)
+    except (TypeError, ValueError):
+        raise ValueError(
+            "TORCHINDUCTOR_COMPILE_THREADS must be an integer or the "
+            "MHCflurry-owned sentinel 'auto'; got %r" % (value,)
+        )
+    return int(value)
+
+
 def configure_cluster_worker_torch_compile_threads():
     """Auto-size Inductor helper threads inside one cluster worker process.
 
@@ -922,9 +966,11 @@ def configure_cluster_worker_torch_compile_threads():
     work process owns its scheduler CPU allocation.
     """
     if not _torch_compile_enabled():
+        resolve_torchinductor_compile_threads_env(num_jobs=1)
         return
     if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ and not (
             _compile_threads_env_is_auto_owned()):
+        resolve_torchinductor_compile_threads_env(num_jobs=1)
         return
     workers_per_node = int(os.environ.get(
         "MHCFLURRY_CLUSTER_WORKERS_PER_NODE", "1"
@@ -965,18 +1011,27 @@ def hoist_torchinductor_compile_threads(args, phase="production"):
     way.
     """
     if not _torch_compile_enabled():
-        # No compile = no compile pool to size; leave env untouched.
+        # No compile = no compile pool to size, but still normalize any
+        # inherited MHCflurry-owned sentinel before a worker imports PyTorch.
+        resolve_torchinductor_compile_threads_env(
+            num_jobs=getattr(args, "num_jobs", 1),
+            phase=phase,
+        )
         return
     auto_owned = _compile_threads_env_is_auto_owned()
     if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ and not auto_owned:
         # User pinned explicitly; don't second-guess.
+        resolve_torchinductor_compile_threads_env(
+            num_jobs=getattr(args, "num_jobs", 1),
+            phase=phase,
+        )
         print(
             "torch.compile: TORCHINDUCTOR_COMPILE_THREADS=%s "
             "(user-pinned, orchestrator hoist skipped)"
             % os.environ["TORCHINDUCTOR_COMPILE_THREADS"]
         )
         return
-    num_jobs = max(int(getattr(args, "num_jobs", 0) or 0), 1)
+    num_jobs = _compile_threads_num_jobs(getattr(args, "num_jobs", 1))
     cpu_count_ = os.cpu_count() or 1
     threads = _auto_torchinductor_compile_threads(num_jobs, phase=phase)
     if (

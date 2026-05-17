@@ -50,6 +50,20 @@ def test_resolve_torchinductor_compile_threads_skips_pinned(monkeypatch):
     assert "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO" not in os.environ
 
 
+def test_resolve_torchinductor_compile_threads_recomputes_auto_owned(monkeypatch):
+    """A numeric value from a previous auto resolution is still owned by
+    MHCflurry and should be resized for this eval pool."""
+    mod = _load_module()
+    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "1")
+    monkeypatch.setenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", "1")
+    monkeypatch.setenv(
+        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP", "16")
+    monkeypatch.setattr(os, "cpu_count", lambda: 64)
+    mod._resolve_torchinductor_compile_threads(num_jobs=8)
+    assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "8"
+    assert os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] == "1"
+
+
 def test_resolve_torchinductor_compile_threads_no_op_when_unset(monkeypatch):
     """If the env var is unset, leave it unset; the worker's torch import
     will fall back to its own default."""

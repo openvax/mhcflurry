@@ -61,7 +61,15 @@ def _detect_gpu_count():
 
 
 def _resolve_torchinductor_compile_threads(num_jobs):
-    if os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") != "auto":
+    value = os.environ.get("TORCHINDUCTOR_COMPILE_THREADS")
+    if value in (None, ""):
+        return
+    auto_owned = (
+        value == "auto"
+        or os.environ.get("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO") == "1"
+    )
+    if not auto_owned:
+        int(value)
         return
     cap = int(os.environ.get(
         "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP", "16"))
