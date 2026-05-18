@@ -714,6 +714,11 @@ class Class1ProcessingNeuralNetwork(object):
 
         network = self.network()
         network.to(device)
+        reg_l1, reg_l2 = self.hyperparameters.get(
+            "convolutional_kernel_l1_l2",
+            [0.0, 0.0],
+        )
+        regularization_parameters = tuple(self._regularized_parameters(network))
         # torch.compile + TF32 are gated by env vars (off by default). Wiring
         # them in keeps processing at parity with affinity fit /
         # fit_streaming_batches()
@@ -730,11 +735,6 @@ class Class1ProcessingNeuralNetwork(object):
         # and affinity finetune use one torch performance policy. Presentation
         # training is a separate model family and does not enter this path.
         loss_fn = _maybe_compile_loss(nn.BCELoss(reduction='none'), device)
-        reg_l1, reg_l2 = self.hyperparameters.get(
-            "convolutional_kernel_l1_l2",
-            [0.0, 0.0],
-        )
-        regularization_parameters = tuple(self._regularized_parameters(network))
 
         # Validation split
         val_split = self.hyperparameters["validation_split"]
@@ -1053,6 +1053,12 @@ class Class1ProcessingNeuralNetwork(object):
                 batch_predictions = network(inputs)
                 predictions[batch_start:batch_end] = batch_predictions
 
+        unsupported_mask = x_dict.get("unsupported_mask")
+        if unsupported_mask is not None:
+            predictions = predictions.masked_fill(
+                unsupported_mask.to(device=device, dtype=torch.bool),
+                float("nan"),
+            )
         return predictions
 
     def network_input_tensors(self, sequences, device, throw=True):
@@ -1072,6 +1078,7 @@ class Class1ProcessingNeuralNetwork(object):
             return {
                 "sequence": encoded.array,
                 "peptide_length": encoded.peptide_lengths,
+                "unsupported_mask": encoded.unsupported_mask,
             }
 
         x_dict = self.network_input(sequences, throw=throw)
@@ -1082,12 +1089,17 @@ class Class1ProcessingNeuralNetwork(object):
         if not peptide_length.flags.writeable:
             peptide_length = peptide_length.copy()
         non_blocking = device.type == "cuda"
-        return {
+        result = {
             "sequence": torch.from_numpy(sequence).to(
                 device, non_blocking=non_blocking),
             "peptide_length": torch.from_numpy(peptide_length).to(
                 device, non_blocking=non_blocking),
         }
+        if x_dict.get("unsupported_mask") is not None:
+            result["unsupported_mask"] = torch.from_numpy(numpy.asarray(
+                x_dict["unsupported_mask"], dtype=bool,
+            )).to(device, non_blocking=non_blocking)
+        return result
 
     def network_input(self, sequences, throw=True):
         """
@@ -1127,6 +1139,8 @@ class Class1ProcessingNeuralNetwork(object):
             "sequence": encoded.array,
             "peptide_length": encoded.peptide_lengths,
         }
+        if encoded.unsupported_mask is not None:
+            result["unsupported_mask"] = encoded.unsupported_mask
         return result
 
     def make_network(

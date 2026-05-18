@@ -200,7 +200,21 @@ def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
         compiled_wrappers.append(wrapper)
         return wrapper
 
+    captured_regularization_parameters = []
+    original_regularization_penalty = (
+        processing_module.Class1ProcessingNeuralNetwork._regularization_penalty
+    )
+
+    def fake_regularization_penalty(parameters, l1=0.0, l2=0.0):
+        captured_regularization_parameters.append(tuple(parameters))
+        return original_regularization_penalty(parameters, l1=l1, l2=l2)
+
     monkeypatch.setattr(processing_module, "_maybe_compile_network", fake_compile)
+    monkeypatch.setattr(
+        processing_module.Class1ProcessingNeuralNetwork,
+        "_regularization_penalty",
+        staticmethod(fake_regularization_penalty),
+    )
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE_VALIDATION", raising=False)
 
     model = Class1ProcessingNeuralNetwork(
@@ -213,6 +227,7 @@ def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
         c_flank_length=4,
         convolutional_filters=4,
         convolutional_kernel_size=3,
+        convolutional_kernel_l1_l2=[0.01, 0.0],
         post_convolutional_dense_layer_sizes=[],
     )
     model.fit(
@@ -229,6 +244,11 @@ def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
     assert len(compiled_wrappers) == 1
     assert compiled_wrappers[0].train_forwards > 0
     assert compiled_wrappers[0].eval_forwards == 0
+    conv1_weight = model.network().conv1.weight
+    assert any(
+        any(param is conv1_weight for param in params)
+        for params in captured_regularization_parameters
+    )
 
 
 def test_processing_torch_amino_acid_encoding_matches_vector_path():
@@ -375,6 +395,35 @@ def test_processing_predict_encoded_tensor_public_numpy_wrapper():
     assert tensor_predictions.device.type == "cpu"
     numpy.testing.assert_allclose(
         numpy_predictions, tensor_predictions.detach().numpy())
+
+
+def test_processing_tensor_path_preserves_nan_for_unsupported_peptides():
+    model = Class1ProcessingNeuralNetwork(
+        amino_acid_encoding_torch=True,
+        peptide_max_length=9,
+        n_flank_length=2,
+        c_flank_length=2,
+        convolutional_filters=8,
+    )
+    model._network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    flanking = FlankingEncoding(
+        peptides=["SIINFEKL", "AAAAAAAAAA", "GILGFVFTL"],
+        n_flanks=["AA", "CC", "DD"],
+        c_flanks=["GG", "HH", "II"])
+
+    tensor_predictions = model.predict_encoded_tensor(
+        flanking, throw=False, batch_size=2, device="cpu")
+    numpy_predictions = model.predict_encoded(
+        flanking, throw=False, batch_size=2)
+
+    assert torch.isfinite(tensor_predictions[0])
+    assert torch.isnan(tensor_predictions[1])
+    assert torch.isfinite(tensor_predictions[2])
+    assert numpy.isfinite(numpy_predictions[0])
+    assert numpy.isnan(numpy_predictions[1])
+    assert numpy.isfinite(numpy_predictions[2])
 
 
 @pytest.mark.slow

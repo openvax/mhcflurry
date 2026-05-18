@@ -12,8 +12,10 @@ import numpy
 import pandas
 
 
-EncodingResult =  namedtuple(
-    "EncodingResult", ["array", "peptide_lengths"])
+EncodingResult = namedtuple(
+    "EncodingResult",
+    ["array", "peptide_lengths", "unsupported_mask"],
+    defaults=(None,))
 
 
 class FlankingEncoding(object):
@@ -206,7 +208,14 @@ class FlankingEncoding(object):
                 array=torch.from_numpy(sequence_array).to(
                     device, non_blocking=non_blocking),
                 peptide_lengths=torch.from_numpy(peptide_lengths).to(
-                    device, non_blocking=non_blocking))
+                    device, non_blocking=non_blocking),
+                unsupported_mask=(
+                    torch.from_numpy(numpy.asarray(
+                        encoded.unsupported_mask, dtype=bool,
+                    )).to(device, non_blocking=non_blocking)
+                    if encoded.unsupported_mask is not None
+                    else None
+                ))
         return self.tensor_cache[cache_key]
 
     @staticmethod
@@ -234,6 +243,7 @@ class FlankingEncoding(object):
 
         Returns a tuple ``(index_array, peptide_lengths, error_df)``.
         """
+        df = df.reset_index(drop=True).copy()
         error_df = df.loc[
             (df.peptide.str.len() > peptide_max_length) |
             (df.peptide.str.len() < 1)
@@ -290,16 +300,20 @@ class FlankingEncoding(object):
         """
         Encode variable-length sequences to fixed-size amino-acid indices.
         """
-        array, peptide_lengths, _ = FlankingEncoding._fixed_length_index_encoding(
+        array, peptide_lengths, error_df = FlankingEncoding._fixed_length_index_encoding(
             df=df,
             peptide_max_length=peptide_max_length,
             n_flank_length=n_flank_length,
             c_flank_length=c_flank_length,
             allow_unsupported_amino_acids=allow_unsupported_amino_acids,
             throw=throw)
+        unsupported_mask = numpy.zeros(len(array), dtype=bool)
+        if len(error_df) > 0:
+            unsupported_mask[error_df.index] = True
         return EncodingResult(
             array.astype("int8", copy=False),
-            peptide_lengths=peptide_lengths)
+            peptide_lengths=peptide_lengths,
+            unsupported_mask=unsupported_mask)
 
     @staticmethod
     def encode(
@@ -346,7 +360,12 @@ class FlankingEncoding(object):
         if len(error_df) > 0:
             array[error_df.index] = numpy.nan
 
+        unsupported_mask = numpy.zeros(len(array), dtype=bool)
+        if len(error_df) > 0:
+            unsupported_mask[error_df.index] = True
         result = EncodingResult(
-            array, peptide_lengths=peptide_lengths)
+            array,
+            peptide_lengths=peptide_lengths,
+            unsupported_mask=unsupported_mask)
 
         return result
