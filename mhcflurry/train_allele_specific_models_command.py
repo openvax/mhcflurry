@@ -21,6 +21,7 @@ from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import configure_logging, write_generate_sh
 from .local_parallelism import (
     add_local_parallelism_args,
+    apply_resolved_training_hyperparameters_to_work_items,
     attach_constant_data_to_work_items_if_needed,
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
@@ -221,9 +222,6 @@ def run(argv=sys.argv[1:]):
 
         if args.max_epochs:
             hyperparameters['max_epochs'] = args.max_epochs
-        hyperparameters["dataloader_num_workers"] = int(
-            args.dataloader_num_workers
-        )
 
         hyperparameters['train_data'] = (
             TRAIN_DATA_HYPERPARAMETER_DEFAULTS.with_defaults(
@@ -273,6 +271,8 @@ def run(argv=sys.argv[1:]):
                     'save_to': args.out_models_dir if serial_run else None,
                 }
                 work_items.append(work_dict)
+
+    apply_resolved_training_hyperparameters_to_work_items(work_items, args)
 
     start = time.time()
 

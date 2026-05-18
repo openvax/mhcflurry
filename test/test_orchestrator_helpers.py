@@ -517,6 +517,42 @@ def test_apply_dataloader_num_workers_skips_items_without_hyperparameters():
     assert work_items[1]["hyperparameters"]["dataloader_num_workers"] == 2
 
 
+def test_apply_resolved_training_hyperparameters_to_work_items():
+    from mhcflurry.local_parallelism import (
+        apply_resolved_training_hyperparameters_to_work_items,
+    )
+
+    work_items = [
+        {"hyperparameters": {"dataloader_num_workers": 1}},
+        {"hyperparameters": {"random_negative_pool_epochs": 2}},
+    ]
+    args = argparse.Namespace(
+        dataloader_num_workers=4,
+        random_negative_pool_epochs=6,
+    )
+
+    apply_resolved_training_hyperparameters_to_work_items(
+        work_items, args, log=lambda _: None,
+    )
+
+    for item in work_items:
+        assert item["hyperparameters"]["dataloader_num_workers"] == 4
+        assert item["hyperparameters"]["random_negative_pool_epochs"] == 6
+
+
+def test_affinity_trainers_use_shared_resolved_hyperparameter_helper():
+    import inspect
+    from mhcflurry import train_pan_allele_models_command as pan_mod
+    from mhcflurry import train_allele_specific_models_command as as_mod
+
+    assert "apply_resolved_training_hyperparameters_to_work_items" in (
+        inspect.getsource(pan_mod.train_models)
+    )
+    assert "apply_resolved_training_hyperparameters_to_work_items" in (
+        inspect.getsource(as_mod.run)
+    )
+
+
 def test_data_size_growth_does_not_change_dataloader_count():
     """Dataset growth does not change the pretrain DataLoader worker count.
 

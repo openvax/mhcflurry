@@ -2058,7 +2058,7 @@ class Class1AffinityPredictor(object):
                 free * float(free_memory_fraction) / workers)
             reserved_headroom_budget = int(
                 max(free - reserve_bytes, 0) / workers)
-            per_worker_budget = max(fraction_budget, reserved_headroom_budget)
+            per_worker_budget = min(fraction_budget, reserved_headroom_budget)
             stage_dim = peptide_stage_dim
             sub_networks = getattr(model, "networks", None)
             if num_sub_networks is None:

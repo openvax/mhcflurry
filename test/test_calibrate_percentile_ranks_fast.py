@@ -667,12 +667,12 @@ def test_calibrate_auto_size_uses_reserved_headroom_not_cache_safety(monkeypatch
     )
 
     assert allele_batch >= 10
-    assert peptide_batch > 3000
+    assert peptide_batch > 2500
     assert allele_batch * peptide_batch > 40_000
     assert (
         numpy.ceil(30 / allele_batch)
         * numpy.ceil(50_000 / peptide_batch)
-    ) <= 32
+    ) <= 40
 
 
 def test_calibrate_auto_size_still_floors_when_cache_does_not_fit(
@@ -721,6 +721,125 @@ def test_calibrate_auto_size_still_floors_when_cache_does_not_fit(
     assert (peptide_batch, allele_batch) == (2000, 1)
     assert "Falling back to minimum batch" in " ".join(
         record.message for record in caplog.records)
+
+
+def test_calibrate_auto_size_honors_lower_fraction_budget(monkeypatch):
+    """When the free-memory fraction is lower than reserved headroom,
+    calibration auto-sizing must use the lower budget."""
+    from mhcflurry import class1_neural_network as cnn
+
+    class FakeCUDA:
+        type = "cuda"
+
+    class Dense:
+        out_features = 1024
+
+    class Model:
+        peptide_encoding_shape = (15, 21)
+        lc_layers = []
+        peptide_dense_layers = [Dense()]
+        allele_embedding = None
+        allele_dense_layers = []
+        dense_layers = [Dense()]
+
+    monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION", "0.25")
+    monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", "0.10")
+    monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", "1.0")
+    monkeypatch.setattr(
+        cnn, "_free_device_memory_bytes",
+        lambda device: int(40 * (1 << 30)),
+    )
+
+    low_fraction_batch = (
+        Class1AffinityPredictor._auto_size_calibration_batches(
+            Model(),
+            FakeCUDA(),
+            n_peptides=50_000,
+            n_alleles=100,
+            num_workers_per_gpu=1,
+            num_cached_networks=0,
+            peptide_stage_dim=1024,
+            num_sub_networks=1,
+        )
+    )
+
+    monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION", "0.85")
+    default_fraction_batch = (
+        Class1AffinityPredictor._auto_size_calibration_batches(
+            Model(),
+            FakeCUDA(),
+            n_peptides=50_000,
+            n_alleles=100,
+            num_workers_per_gpu=1,
+            num_cached_networks=0,
+            peptide_stage_dim=1024,
+            num_sub_networks=1,
+        )
+    )
+
+    assert (
+        low_fraction_batch[0] * low_fraction_batch[1]
+        < default_fraction_batch[0] * default_fraction_batch[1]
+    )
+
+
+def test_calibrate_auto_size_honors_lower_reserved_headroom(monkeypatch):
+    """When reserved headroom is lower than the fraction budget,
+    calibration auto-sizing must use the lower budget."""
+    from mhcflurry import class1_neural_network as cnn
+
+    class FakeCUDA:
+        type = "cuda"
+
+    class Dense:
+        out_features = 1024
+
+    class Model:
+        peptide_encoding_shape = (15, 21)
+        lc_layers = []
+        peptide_dense_layers = [Dense()]
+        allele_embedding = None
+        allele_dense_layers = []
+        dense_layers = [Dense()]
+
+    monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION", "0.95")
+    monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", "20.0")
+    monkeypatch.setattr(
+        cnn, "_free_device_memory_bytes",
+        lambda device: int(40 * (1 << 30)),
+    )
+
+    high_reserve_batch = (
+        Class1AffinityPredictor._auto_size_calibration_batches(
+            Model(),
+            FakeCUDA(),
+            n_peptides=50_000,
+            n_alleles=100,
+            num_workers_per_gpu=1,
+            num_cached_networks=0,
+            peptide_stage_dim=1024,
+            num_sub_networks=1,
+        )
+    )
+
+    monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", "1.0")
+    low_reserve_batch = (
+        Class1AffinityPredictor._auto_size_calibration_batches(
+            Model(),
+            FakeCUDA(),
+            n_peptides=50_000,
+            n_alleles=100,
+            num_workers_per_gpu=1,
+            num_cached_networks=0,
+            peptide_stage_dim=1024,
+            num_sub_networks=1,
+        )
+    )
+
+    assert (
+        high_reserve_batch[0] * high_reserve_batch[1]
+        < low_reserve_batch[0] * low_reserve_batch[1]
+    )
 
 
 def test_calibrate_auto_size_reused_cache_uses_current_free_memory(

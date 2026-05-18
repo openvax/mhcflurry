@@ -862,6 +862,25 @@ def apply_dataloader_num_workers_to_work_items(work_items, num_workers, *, log=N
     )
 
 
+def apply_resolved_training_hyperparameters_to_work_items(
+        work_items, args, *, log=None):
+    """Inject resolved per-model training knobs into work item hyperparameters.
+
+    ``resolve_local_parallelism_args`` owns hardware-dependent CLI resolution.
+    Trainers should call this once after constructing work items so pan-allele,
+    allele-specific, and future affinity trainers all persist the same resolved
+    settings in component-model hyperparameters.
+    """
+    if getattr(args, "dataloader_num_workers", None) is not None:
+        apply_dataloader_num_workers_to_work_items(
+            work_items, int(args.dataloader_num_workers), log=log,
+        )
+    if getattr(args, "random_negative_pool_epochs", None) is not None:
+        apply_random_negative_pool_epochs_to_work_items(
+            work_items, int(args.random_negative_pool_epochs), log=log,
+        )
+
+
 # Inductor's compile worker pool defaults to ``os.cpu_count()``; that's fine
 # for one process but stacks badly when N fit() workers each spawn their own
 # pool. Production auto-sizing budgets roughly ``cpu_count // num_jobs`` helper

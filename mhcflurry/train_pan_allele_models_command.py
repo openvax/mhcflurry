@@ -29,8 +29,7 @@ from .class1_neural_network import (
 from .common import configure_logging, normalize_allele_name, write_generate_sh
 from .local_parallelism import (
     add_local_parallelism_args,
-    apply_dataloader_num_workers_to_work_items,
-    apply_random_negative_pool_epochs_to_work_items,
+    apply_resolved_training_hyperparameters_to_work_items,
     attach_constant_data_to_work_items_if_needed,
     call_wrapped_kwargs,
     resolve_local_parallelism_args,
@@ -650,23 +649,7 @@ def train_models(args):
 
     all_work_items = GLOBAL_DATA["work_items"]
 
-    # Apply the resolved --dataloader-num-workers (auto or pinned) to every
-    # work item's hyperparameters. The resolver in
-    # resolve_local_parallelism_args computed an int from box capacity;
-    # injecting it here means the saved component-model configs reflect
-    # the value the orchestrator actually chose for this run.
-    if getattr(args, "dataloader_num_workers", None) is not None:
-        apply_dataloader_num_workers_to_work_items(
-            all_work_items, int(args.dataloader_num_workers)
-        )
-
-    # Inject the resolved (orchestrator-chosen) random_negative_pool_epochs
-    # into every work item's hyperparameters. fit() reads the int from
-    # ``self.hyperparameters`` when constructing its RandomNegativesPool.
-    if getattr(args, "random_negative_pool_epochs", None) is not None:
-        apply_random_negative_pool_epochs_to_work_items(
-            all_work_items, int(args.random_negative_pool_epochs)
-        )
+    apply_resolved_training_hyperparameters_to_work_items(all_work_items, args)
 
     complete_work_item_names = [
         network.fit_info[-1]["training_info"]["work_item_name"] for network in
