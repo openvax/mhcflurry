@@ -242,9 +242,12 @@ def estimate_processing_worker_gb(args):
                 + int(network.peptide_max_length)
                 + int(network.c_flank_length)
             )
-            input_channels = int(network.conv1.in_channels)
             # Encoded sequence + peptide_length + target + index tensors.
-            sequence_bytes_per_row = seq_len * input_channels * 4 + 4 + 4 + 8
+            if model.hyperparameters.get("amino_acid_encoding_torch", True):
+                sequence_bytes_per_row = seq_len * 1 + 8 + 4 + 8
+            else:
+                input_channels = int(network.conv1.in_channels)
+                sequence_bytes_per_row = seq_len * input_channels * 4 + 4 + 4 + 8
             max_sequence_bytes_per_row = max(
                 max_sequence_bytes_per_row,
                 sequence_bytes_per_row,

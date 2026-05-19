@@ -434,6 +434,12 @@ def run(argv=sys.argv[1:]):
                     ascending=[False, True],
                     kind="stable",
                 ).reset_index(drop=True)
+            elif "affinity" in result_df.columns:
+                result_df = result_df.sort_values(
+                    ["affinity", "peptide"],
+                    ascending=[True, True],
+                    kind="stable",
+                ).reset_index(drop=True)
 
     # Apply thresholds, skipping ones whose column is missing (e.g.
     # processing-only run with no alleles, or --no-affinity-percentile

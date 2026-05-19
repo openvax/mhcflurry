@@ -127,6 +127,8 @@ def pseudosequence_length(allele_to_sequence):
 
 def pseudosequence_filename_for_length(length):
     """Return the canonical pseudosequence filename for a representation length."""
+    if length is None:
+        return None
     return PSEUDOSEQUENCE_FILENAMES_BY_LENGTH.get(int(length))
 
 

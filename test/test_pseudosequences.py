@@ -3,6 +3,7 @@ from mhcflurry.pseudosequences import (
     LEGACY_ALLELE_SEQUENCES_FILENAME,
     main,
     pseudosequence_filename_for_length,
+    pseudosequence_filename_for_mapping,
     pseudosequence_path,
 )
 
@@ -20,6 +21,16 @@ def test_pseudosequence_filename_for_length():
         pseudosequence_filename_for_length(39)
         == "pseudosequences.mhcflurry.39aa.csv"
     )
+    assert pseudosequence_filename_for_length(None) is None
+
+
+def test_pseudosequence_filename_for_ambiguous_mapping():
+    assert pseudosequence_filename_for_mapping({}) is None
+    assert pseudosequence_filename_for_mapping({"HLA-A*02:01": None}) is None
+    assert pseudosequence_filename_for_mapping({
+        "HLA-A*02:01": "A" * 34,
+        "HLA-A*03:01": "A" * 39,
+    }) is None
 
 
 def test_pseudosequence_path_prefers_canonical(tmp_path):

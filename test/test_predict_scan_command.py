@@ -298,6 +298,88 @@ def test_parallel_path_does_not_load_predictor_before_pool(monkeypatch):
     assert result.peptide.tolist() == ["ASDFGHKL"]
 
 
+def test_parallel_affinity_only_output_globally_sorted(monkeypatch):
+    """Parallel affinity-only output must be sorted strongest-first globally."""
+    class FakePool:
+        def imap_unordered(self, fn, work_items, chunksize=1):
+            del fn, work_items, chunksize
+            return [
+                (
+                    1,
+                    pandas.DataFrame({
+                        "sequence_name": ["sequence_1"],
+                        "pos": [0],
+                        "peptide": ["BEST"],
+                        "sample_name": ["genotype_00"],
+                        "best_allele": ["HLA-A*02:01"],
+                        "affinity": [10.0],
+                    }),
+                ),
+                (
+                    0,
+                    pandas.DataFrame({
+                        "sequence_name": ["sequence_0"],
+                        "pos": [0],
+                        "peptide": ["WORST"],
+                        "sample_name": ["genotype_00"],
+                        "best_allele": ["HLA-A*02:01"],
+                        "affinity": [500.0],
+                    }),
+                ),
+            ]
+
+        def close(self):
+            pass
+
+        def join(self):
+            pass
+
+    def fail_parent_predictor_load(models_dir):
+        raise AssertionError(
+            "parallel scan should not load predictor in parent")
+
+    def fake_worker_pool(
+            args,
+            workload_name,
+            workload_hints,
+            start_method=None):
+        del workload_name, workload_hints
+        assert start_method == "spawn"
+        args.num_jobs = 2
+        args.max_workers_per_gpu = 1
+        return FakePool()
+
+    monkeypatch.setattr(
+        predict_scan_command,
+        "_load_predictor_for_command",
+        fail_parent_predictor_load)
+    monkeypatch.setattr(
+        predict_scan_command,
+        "worker_pool_with_gpu_assignments_from_args",
+        fake_worker_pool)
+
+    deletes = []
+    try:
+        fd_out = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        deletes.append(fd_out.name)
+        predict_scan_command.run([
+            "--sequences", "AAAAAAAA", "CCCCCCCC",
+            "--alleles", "HLA-A0201",
+            "--peptide-lengths", "8",
+            "--results-all",
+            "--num-jobs", "2",
+            "--backend", "cpu",
+            "--out", fd_out.name,
+        ])
+        result = read_output_csv(fd_out.name)
+    finally:
+        for delete in deletes:
+            os.unlink(delete)
+
+    assert result.peptide.tolist() == ["BEST", "WORST"]
+    assert result.affinity.tolist() == [10.0, 500.0]
+
+
 @pytest.mark.slow
 @pytest.mark.integration
 def test_parallel_output_globally_sorted():
