@@ -6,6 +6,8 @@ from pathlib import Path
 import pandas
 import pytest
 
+from mhcflurry import peptide_reference
+
 
 ANNOTATE_PATH = (
     Path(__file__).resolve().parents[1]
@@ -24,8 +26,8 @@ def load_annotate_module():
     return module
 
 
-def sorted_annotation_rows(path):
-    df = pandas.read_csv(path)
+def sorted_annotation_rows(data):
+    df = pandas.read_csv(data) if isinstance(data, Path) else data
     cols = [
         "hit_id",
         "peptide",
@@ -59,7 +61,23 @@ def write_inputs(tmp_path):
     return peptides, reference
 
 
-def test_annotation_sliding_backend(tmp_path):
+def read_reference_dataframe(reference):
+    return pandas.read_csv(reference, index_col=0)
+
+
+def annotate_with_backend(peptides, reference, backend, flanking_length=2):
+    peptide_df = pandas.read_csv(peptides)
+    peptide_df["hit_id"] = "hit." + peptide_df.index.map("{0:07d}".format)
+    peptide_df = peptide_df.set_index("hit_id")
+    reference_df = read_reference_dataframe(reference)
+    return peptide_reference._annotate_peptide_references(
+        peptide_df,
+        reference_df,
+        flanking_length=flanking_length,
+        backend=backend)
+
+
+def test_annotation_script_uses_library_default(tmp_path):
     annotate = load_annotate_module()
     peptides, reference = write_inputs(tmp_path)
     out = tmp_path / "annotated.csv"
@@ -67,7 +85,6 @@ def test_annotation_sliding_backend(tmp_path):
     annotate.run([
         str(peptides),
         str(reference),
-        "--backend", "sliding",
         "--flanking-length", "2",
         "--out", str(out),
     ])
@@ -87,19 +104,33 @@ def test_annotation_sliding_backend(tmp_path):
     assert set(p3_rows.num_occurrences_in_protein) == {1}
 
 
-def test_annotation_auto_matches_sliding(tmp_path):
+def test_annotation_cli_does_not_expose_backend(tmp_path):
     annotate = load_annotate_module()
     peptides, reference = write_inputs(tmp_path)
-    sliding = tmp_path / "sliding.csv"
-    auto = tmp_path / "auto.csv"
 
-    common = [
-        str(peptides),
-        str(reference),
-        "--flanking-length", "2",
-    ]
-    annotate.run(common + ["--backend", "sliding", "--out", str(sliding)])
-    annotate.run(common + ["--backend", "auto", "--out", str(auto)])
+    with pytest.raises(SystemExit):
+        annotate.run([
+            str(peptides),
+            str(reference),
+            "--backend", "sliding",
+            "--flanking-length", "2",
+            "--out", str(tmp_path / "out.csv"),
+        ])
+
+
+def test_annotation_helper_default_matches_sliding(tmp_path):
+    peptides, reference = write_inputs(tmp_path)
+
+    peptide_df = pandas.read_csv(peptides)
+    peptide_df["hit_id"] = "hit." + peptide_df.index.map("{0:07d}".format)
+    peptide_df = peptide_df.set_index("hit_id")
+    reference_df = read_reference_dataframe(reference)
+
+    sliding = annotate_with_backend(peptides, reference, "sliding")
+    auto = peptide_reference.annotate_peptide_references(
+        peptide_df,
+        reference_df,
+        flanking_length=2)
 
     pandas.testing.assert_frame_equal(
         sorted_annotation_rows(sliding),
@@ -109,19 +140,9 @@ def test_annotation_auto_matches_sliding(tmp_path):
 
 def test_annotation_ahocorasick_matches_sliding_when_available(tmp_path):
     pytest.importorskip("ahocorasick_rs")
-    annotate = load_annotate_module()
     peptides, reference = write_inputs(tmp_path)
-    sliding = tmp_path / "sliding.csv"
-    ahocorasick = tmp_path / "ahocorasick.csv"
-
-    common = [
-        str(peptides),
-        str(reference),
-        "--flanking-length", "2",
-    ]
-    annotate.run(common + ["--backend", "sliding", "--out", str(sliding)])
-    annotate.run(
-        common + ["--backend", "ahocorasick", "--out", str(ahocorasick)])
+    sliding = annotate_with_backend(peptides, reference, "sliding")
+    ahocorasick = annotate_with_backend(peptides, reference, "ahocorasick")
 
     pandas.testing.assert_frame_equal(
         sorted_annotation_rows(sliding),
