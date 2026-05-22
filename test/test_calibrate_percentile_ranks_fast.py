@@ -29,13 +29,25 @@ def _load_downloaded_pan_allele():
 
 
 def _pick_alleles(predictor, n):
-    # deterministic, covers multiple class-I families
-    candidates = [
-        a for a in sorted(predictor.allele_to_sequence)
-        if a.startswith("HLA-")
-    ][:n]
+    # Deterministic, and prefer alleles with clearly different motifs so
+    # end-to-end motif-summary tests don't depend on near-identical A*01
+    # variants being separated by random peptide sampling noise.
+    available = set(predictor.allele_to_sequence)
+    preferred = [
+        "HLA-A*02:01",
+        "HLA-B*07:02",
+        "HLA-C*07:02",
+        "HLA-A*01:01",
+        "HLA-B*08:01",
+        "HLA-C*04:01",
+    ]
+    candidates = [allele for allele in preferred if allele in available]
+    candidates.extend(
+        allele for allele in sorted(available)
+        if allele not in candidates
+    )
     assert len(candidates) >= 2, "Need at least 2 HLA alleles for parity"
-    return candidates
+    return candidates[:n]
 
 
 def _legacy_motif_summary_from_predictions(
@@ -303,10 +315,11 @@ def test_calibrate_fast_parity_with_motif_summary():
     predictor = _load_downloaded_pan_allele()
     alleles = _pick_alleles(predictor, 3)
     # Multi-length peptides so length_distributions is non-trivial
+    rng = numpy.random.default_rng(123)
     peptides = (
-        random_peptides(800, length=9)
-        + random_peptides(400, length=10)
-        + random_peptides(200, length=11)
+        random_peptides(800, length=9, rng=rng)
+        + random_peptides(400, length=10, rng=rng)
+        + random_peptides(200, length=11, rng=rng)
     )
 
     legacy = Class1AffinityPredictor.load(
