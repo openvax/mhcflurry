@@ -69,6 +69,58 @@ def test_predict_dataframe_chunk_preserves_global_peptide_num():
     assert list(predictions.peptide_num) == [4, 5]
 
 
+def test_predict_dataframe_chunk_passes_flanks_positionally():
+    class FakePredictor:
+        def predict(
+                self,
+                peptides,
+                n_flanks,
+                c_flanks,
+                alleles,
+                sample_names,
+                throw,
+                include_affinity_percentile,
+                affinity_model_kwargs,
+                processing_batch_size):
+            peptide_nums = pandas.Series(range(len(peptides)))
+            return pandas.DataFrame({
+                "peptide": list(peptides),
+                "peptide_num": peptide_nums,
+                "sample_name": list(sample_names),
+                "n_flank": peptide_nums.map(pandas.Series(n_flanks)),
+                "c_flank": peptide_nums.map(pandas.Series(c_flanks)),
+                "processing_score": [0.1] * len(peptides),
+            })
+
+    df = pandas.DataFrame({
+        "allele": ["HLA-A*02:01", "HLA-A*02:01"],
+        "peptide": ["SIINFEKL", "GILGFVFTL"],
+        "n_flank": ["NNN", "AAA"],
+        "c_flank": ["CCC", "TTT"],
+    }, index=[4, 5])
+    predictions = predict_command._predict_dataframe_chunk(
+        FakePredictor(),
+        df,
+        {
+            "affinity_only": False,
+            "allele_column": "allele",
+            "peptide_column": "peptide",
+            "n_flank_column": "n_flank",
+            "c_flank_column": "c_flank",
+            "use_flanking": True,
+            "throw": True,
+            "include_affinity_percentile": False,
+            "affinity_model_kwargs": {},
+            "processing_batch_size": "auto",
+        },
+    )
+
+    assert list(predictions.index) == [4, 5]
+    assert list(predictions.peptide_num) == [4, 5]
+    assert list(predictions.n_flank) == ["NNN", "AAA"]
+    assert list(predictions.c_flank) == ["CCC", "TTT"]
+
+
 def test_allele_string_to_alleles_accepts_semicolon_separated_csv_cells():
     df = pandas.DataFrame({
         "allele": [

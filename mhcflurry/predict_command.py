@@ -247,8 +247,8 @@ def _predict_dataframe_chunk(predictor, df, options):
         n_flanks = None
         c_flanks = None
         if options["use_flanking"]:
-            n_flanks = df[options["n_flank_column"]]
-            c_flanks = df[options["c_flank_column"]]
+            n_flanks = df[options["n_flank_column"]].values
+            c_flanks = df[options["c_flank_column"]].values
 
         predictions = predictor.predict(
             peptides=df[options["peptide_column"]].values,
