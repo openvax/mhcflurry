@@ -70,6 +70,30 @@ one-off tuning runs do not belong here.
   regressions; the long-lived value is that it's the documented entry
   point if/when someone needs to repeat the analysis.
 
+## Candidates for `downloads-generation/`
+
+Keep scripts here while they are maintainer tooling. Move or wrap them
+with a `downloads-generation/<download_name>/GENERATE.sh` once their
+outputs are release artifacts that should be reproducible and
+downloadable.
+
+- **`compare_new_vs_public.py`** and
+  **`compare_presentation_new_vs_public.py`** — if the summary tables,
+  plots, or row-level new-vs-public predictions are used as release
+  evidence, make a generated analysis download that pins the new model
+  paths, public download versions, data-evaluation version, git SHA, and
+  command arguments.
+- **`pan_allele_release_full.sh`** /
+  **`pan_allele_release_affinity.sh`** /
+  **`presentation_from_affinity.sh`** — once the 2.3.x recipe is final,
+  fold the canonical recipe back into the relevant model
+  `downloads-generation/` directories rather than relying only on this
+  maintainer pipeline.
+- **`full_ensemble_minibatch_sweep.sh`** and
+  **`plot_minibatch_sweep.py`** — keep as scripts unless the sweep CSV,
+  plots, or conclusions are published as a downloadable analysis
+  artifact.
+
 ## What used to live here (deleted)
 
 - `pan_allele_smoketest.sh`, `pan_allele_omp_smoketest.sh` — smoketests.

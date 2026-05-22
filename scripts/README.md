@@ -19,6 +19,16 @@ belong.
   or its own pseudosequence loader) and is meant to be re-run by any
   future contributor doing the same diligence.
 
+## Boundary with local jobs and downloads
+
+- **`jobs/`** is intentionally ignored. Use it for local run launchers,
+  Brev/runplz scratch scripts, interrupted experiments, and other
+  machine-specific work. Do not add it to source control.
+- Promote anything worth maintaining from `jobs/` into `scripts/`.
+- Promote anything that produces a reproducible artifact users or
+  reviewers should fetch into `downloads-generation/<download_name>/`
+  with a `GENERATE.sh`.
+
 ## Top-level files
 
 - **`validate_against_public.py`** — affinity + presentation rank-correlation
