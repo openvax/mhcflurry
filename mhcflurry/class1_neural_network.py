@@ -998,10 +998,11 @@ def _batched_validation_loss(
         n_val < batch_size
         or val_weights is not None
         or not getattr(loss_obj, "supports_independent_samples", True)
+        or _validation_loss_has_legacy_inequality_denominator(loss_obj, val_y)
     ):
         # Fallback for tiny val sets (typical in unit tests) and for
-        # weighted / cross-example losses whose reductions are not
-        # decomposable batchwise.
+        # weighted / cross-example / inequality losses whose reductions are
+        # not decomposable batchwise without changing the legacy denominator.
         inputs = {"peptide": val_peptide}
         if val_allele is not None:
             inputs["allele"] = val_allele
@@ -1039,6 +1040,24 @@ def _batched_validation_loss(
         loss_accum += tail_loss.item() * tail_size
         weight_accum += tail_size
     return loss_accum / weight_accum
+
+
+def _validation_loss_has_legacy_inequality_denominator(loss_obj, val_y):
+    """Return True when batch-size weighting would change inequality loss.
+
+    ``MSEWithInequalities`` and its multi-output variant keep 2.1.x behavior:
+    encoded ``2.0`` targets are excluded from the denominator. If such rows
+    are split unevenly across validation batches, averaging batch means by raw
+    batch size changes ``val_loss``. Use the old single-shot path only for that
+    case; all other independent-sample inequality rows remain batchable.
+    """
+    if not getattr(loss_obj, "supports_inequalities", False):
+        return False
+    y_t = val_y.reshape(-1)
+    if getattr(loss_obj, "supports_multiple_outputs", False):
+        output_indices = (y_t / 10.0).long()
+        y_t = y_t - output_indices.to(y_t.dtype) * 10.0
+    return bool(torch.any(y_t == 2.0).item())
 
 
 class Class1NeuralNetworkModel(nn.Module):
@@ -2353,6 +2372,7 @@ class Class1NeuralNetwork(object):
             klass._infer_allele_representation_dim_from_weights(
                 network_weights,
                 config.get("hyperparameters", {}),
+                network_config=config,
             ),
         )
 
@@ -2500,7 +2520,7 @@ class Class1NeuralNetwork(object):
 
     @classmethod
     def _infer_allele_representation_dim_from_weights(
-            cls, network_weights, hyperparameters):
+            cls, network_weights, hyperparameters, network_config=None):
         """Infer flattened allele representation width from serialized weights."""
         if not network_weights or not hyperparameters.get('allele_amino_acid_encoding'):
             return None
@@ -2511,20 +2531,61 @@ class Class1NeuralNetwork(object):
         except KeyError:
             return None
 
-        for weight in network_weights:
-            if not isinstance(weight, numpy.ndarray) or len(weight.shape) != 2:
-                continue
-            dim = weight.shape[1]
+        if network_config and network_config.get("merged_networks"):
+            architecture = network_config["merged_networks"][0]
+        elif network_config:
+            architecture = network_config.get("hyperparameters", network_config)
+        else:
+            architecture = hyperparameters
+
+        def valid_dim(dim):
             if dim % encoding_dim != 0:
-                continue
+                return False
             sequence_length = dim // encoding_dim
-            if 20 <= sequence_length <= 60:
-                return dim
+            return 20 <= sequence_length <= 60
+
+        # PyTorch-format weights are serialized in named_parameter order:
+        # peptide-stage params, batch_norm_early params, allele_embedding,
+        # then allele_dense params. Infer only from the allele slots. A broad
+        # shape scan can confuse left_pad_centered_right_pad peptide-dense
+        # matrices (45 * encoding_dim) for allele pseudosequences.
+        idx = 0
+        idx += 2 * len(architecture.get(
+            'locally_connected_layers',
+            hyperparameters.get('locally_connected_layers', []),
+        ))
+        idx += 2 * len(architecture.get(
+            'peptide_dense_layer_sizes',
+            hyperparameters.get('peptide_dense_layer_sizes', []),
+        ))
+        if architecture.get(
+                'batch_normalization',
+                hyperparameters.get('batch_normalization', False)):
+            idx += 2
+
+        if idx < len(network_weights):
+            weight = network_weights[idx]
+            if isinstance(weight, numpy.ndarray) and len(weight.shape) == 2:
+                dim = weight.shape[1]
+                if valid_dim(dim):
+                    return dim
+
+        allele_dense_sizes = architecture.get(
+            'allele_dense_layer_sizes',
+            hyperparameters.get('allele_dense_layer_sizes', []),
+        )
+        idx += 1
+        if allele_dense_sizes and idx < len(network_weights):
+            weight = network_weights[idx]
+            if isinstance(weight, numpy.ndarray) and len(weight.shape) == 2:
+                dim = weight.shape[1]
+                if valid_dim(dim):
+                    return dim
         return None
 
     @classmethod
     def _placeholder_allele_representations(
-            cls, hyperparameters, network_weights=None,
+            cls, hyperparameters, network_weights=None, network_config=None,
             default_sequence_length=39):
         """Create a shape-compatible placeholder for pan-allele models.
 
@@ -2544,6 +2605,7 @@ class Class1NeuralNetwork(object):
         embedding_dim = cls._infer_allele_representation_dim_from_weights(
             network_weights,
             hyperparameters,
+            network_config=network_config,
         )
         if embedding_dim is None:
             embedding_dim = default_sequence_length * len(encoding_df.columns)
@@ -2633,6 +2695,7 @@ class Class1NeuralNetwork(object):
             allele_representations = cls._placeholder_allele_representations(
                 hyperparameters,
                 network_weights=network_weights,
+                network_config=config,
             )
 
         model = Class1NeuralNetworkModel(
@@ -2701,6 +2764,7 @@ class Class1NeuralNetwork(object):
         allele_representations = cls._placeholder_allele_representations(
             base_hyperparameters,
             network_weights=network_weights,
+            network_config=config,
         )
 
         # Create sub-networks

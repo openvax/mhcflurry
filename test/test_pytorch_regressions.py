@@ -595,13 +595,23 @@ def test_merged_network_serialization_preserves_dropout_keep_probability():
         assert subnet.dropouts[0].p == pytest.approx(0.2, abs=1e-12)
 
 
-def _serialized_merged_pan_network_with_allele_length(sequence_length):
+def _serialized_merged_pan_network_with_allele_length(
+        sequence_length, peptide_encoding=None):
+    if peptide_encoding is None:
+        peptide_encoding = {
+            "vector_encoding_name": "BLOSUM62",
+            "alignment_method": "pad_middle",
+            "left_edge": 4,
+            "right_edge": 4,
+            "max_length": 15,
+        }
     allele_representations = np.zeros((2, sequence_length, 21), dtype=np.float32)
     models = []
     for seed in (101, 202):
         _seed_all(seed)
         model = Class1NeuralNetwork(
             allele_amino_acid_encoding="BLOSUM62",
+            peptide_encoding=peptide_encoding,
             allele_dense_layer_sizes=[3],
             peptide_dense_layer_sizes=[3],
             peptide_allele_merge_method="concatenate",
@@ -652,6 +662,61 @@ def test_cached_merged_networks_include_saved_allele_width_in_key():
         for subnet in network.networks:
             assert tuple(subnet.allele_embedding.weight.shape) == (
                 1, sequence_length * 21)
+
+
+def test_merged_network_deserialization_ignores_left_pad_peptide_dense_width():
+    config, weights = _serialized_merged_pan_network_with_allele_length(
+        39,
+        peptide_encoding={
+            "vector_encoding_name": "BLOSUM62",
+            "alignment_method": "left_pad_centered_right_pad",
+            "max_length": 15,
+        },
+    )
+
+    restored = Class1NeuralNetwork.from_config(config, weights=weights)
+    network = restored.network()
+
+    assert isinstance(network, MergedClass1NeuralNetwork)
+    for subnet in network.networks:
+        assert tuple(subnet.allele_embedding.weight.shape) == (1, 39 * 21)
+
+
+def test_pan_network_deserialization_ignores_left_pad_peptide_dense_width():
+    allele_representations = np.zeros((2, 39, 21), dtype=np.float32)
+    model = Class1NeuralNetwork(
+        allele_amino_acid_encoding="BLOSUM62",
+        peptide_encoding={
+            "vector_encoding_name": "BLOSUM62",
+            "alignment_method": "left_pad_centered_right_pad",
+            "max_length": 15,
+        },
+        allele_dense_layer_sizes=[3],
+        peptide_dense_layer_sizes=[3],
+        peptide_allele_merge_method="concatenate",
+        peptide_allele_merge_activation="",
+        layer_sizes=[5],
+        locally_connected_layers=[],
+        batch_normalization=False,
+        dense_layer_l1_regularization=0.0,
+        dense_layer_l2_regularization=0.0,
+        dropout_probability=0.0,
+    )
+    model._network = model.make_network(
+        allele_representations=allele_representations,
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    model.clear_allele_representations()
+    config = model.get_config()
+    weights = model.get_weights()
+    network_config = json.loads(config["network_json"])
+    network_config.pop("allele_representations", None)
+    config["network_json"] = json.dumps(network_config)
+
+    restored = Class1NeuralNetwork.from_config(config, weights=weights)
+    network = restored.network()
+
+    assert tuple(network.allele_embedding.weight.shape) == (1, 39 * 21)
 
 
 def test_dense_regularization_excludes_output_layer():
@@ -804,6 +869,49 @@ def test_batched_validation_loss_multiallelic_falls_back_to_single_shot():
     )
     val_y = torch.tensor([1.0, 0.0, 1.0, 0.0], dtype=torch.float32)
     loss_obj = get_pytorch_loss("custom:multiallelic_mass_spec_loss")
+
+    expected = loss_obj(network({"peptide": val_peptide}), val_y).item()
+    actual = _batched_validation_loss(
+        network=network,
+        eager_network=network,
+        val_peptide=val_peptide,
+        val_allele=None,
+        val_y=val_y,
+        val_weights=None,
+        loss_obj=loss_obj,
+        batch_size=2,
+    )
+
+    assert actual == pytest.approx(expected, abs=1e-7)
+
+
+@pytest.mark.parametrize(
+    "loss_name,val_y",
+    [
+        (
+            "custom:mse_with_inequalities",
+            torch.tensor([0.0, 2.0, 0.0, 0.0], dtype=torch.float32),
+        ),
+        (
+            "custom:mse_with_inequalities_and_multiple_outputs",
+            torch.tensor([10.0, 12.0, 10.0, 10.0], dtype=torch.float32),
+        ),
+    ],
+)
+def test_batched_validation_loss_inequality_denominator_matches_single_shot(
+        loss_name, val_y):
+    class TwoOutputNet(torch.nn.Module):
+        def forward(self, inputs):
+            base = inputs["peptide"][:, 0, 0]
+            if "multiple_outputs" not in loss_name:
+                return base
+            return torch.stack([base, base], dim=1)
+
+    network = TwoOutputNet()
+    val_peptide = torch.tensor(
+        [[[-1.0]], [[0.0]], [[0.0]], [[0.0]]], dtype=torch.float32
+    )
+    loss_obj = get_pytorch_loss(loss_name)
 
     expected = loss_obj(network({"peptide": val_peptide}), val_y).item()
     actual = _batched_validation_loss(
