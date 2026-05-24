@@ -199,6 +199,19 @@ def _split_allele_string(allele_string):
     ]
 
 
+def _detect_affinity_only_models(models_dir):
+    """
+    Detect whether ``models_dir`` is an affinity-only bundle without
+    importing torch or loading the predictor.
+
+    We need this in the CLI before deciding whether to fork worker
+    processes: on Linux the parent must stay CUDA-clean so per-worker
+    ``CUDA_VISIBLE_DEVICES`` pinning takes effect. A presentation bundle
+    is identified by the presence of ``weights.csv`` at the top level.
+    """
+    return not os.path.exists(os.path.join(models_dir, "weights.csv"))
+
+
 def _load_predictor_for_command(models_dir):
     """
     Load a presentation predictor or wrap an affinity-only predictor.
@@ -293,7 +306,11 @@ def run(argv=sys.argv[1:]):
         # message instructing them to download the models if needed.
         models_dir = get_default_class1_presentation_models_dir(test_exists=True)
 
-    predictor, affinity_only_models = _load_predictor_for_command(models_dir)
+    # Detect models type by file presence so the parent stays torch-free
+    # on paths that will fork workers. Workers pin to GPUs via
+    # CUDA_VISIBLE_DEVICES, which only works when the parent has not
+    # initialized CUDA.
+    affinity_only_models = _detect_affinity_only_models(models_dir)
     if affinity_only_models and not args.affinity_only:
         logging.warning(
             "Specified models are an affinity predictor, which implies "
@@ -301,10 +318,12 @@ def run(argv=sys.argv[1:]):
         args.affinity_only = True
 
     if args.list_supported_alleles:
+        predictor, _ = _load_predictor_for_command(models_dir)
         print("\n".join(predictor.supported_alleles))
         return
 
     if args.list_supported_peptide_lengths:
+        predictor, _ = _load_predictor_for_command(models_dir)
         min_len, max_len = predictor.supported_peptide_lengths
         print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
         return
@@ -351,19 +370,6 @@ def run(argv=sys.argv[1:]):
             "No flanking information provided. Specify --no-flanking "
             "to silence this warning")
 
-    worker_pool = worker_pool_with_gpu_assignments_from_args(
-        args,
-        workload_name=(
-            WORKLOAD_AFFINITY_INFERENCE
-            if args.affinity_only
-            else WORKLOAD_PRESENTATION_INFERENCE
-        ),
-        workload_hints={
-            "data_bytes": path_size_bytes(args.input),
-            "prediction_rows": len(df),
-        },
-    )
-
     affinity_model_kwargs = {}
     if getattr(args, "max_workers_per_gpu", None):
         affinity_model_kwargs["num_workers_per_gpu"] = int(
@@ -383,35 +389,71 @@ def run(argv=sys.argv[1:]):
     }
 
     if len(df) == 0:
-        if worker_pool is not None:
-            worker_pool.close()
-            worker_pool.join()
-        predictions = pandas.DataFrame(index=df.index)
-    elif worker_pool is None:
-        predictions = _predict_dataframe_chunk(
-            predictor, df, prediction_options)
+        # No rows means no worker pool. Build a zero-row DataFrame that
+        # carries the same prediction-column schema the populated path
+        # would have produced, so downstream readers and threshold
+        # filters don't choke on a schema-less object. Mirrors the
+        # predict-scan empty-input fast path.
+        predictor, _ = _load_predictor_for_command(models_dir)
+        predictions = pandas.DataFrame(
+            columns=predictor.predict_columns(
+                affinity_only=args.affinity_only,
+                use_flanking=use_flanking,
+                include_affinity_percentile=(
+                    not args.no_affinity_percentile),
+            ))
+        predictions.index = df.index
     else:
-        ranges = chunk_ranges_for_local_parallelism(len(df), args.num_jobs)
-        work_items = [
-            {
-                "chunk_num": chunk_num,
-                "models_dir": models_dir,
-                "dataframe": df.iloc[start:end].copy(),
-                "options": prediction_options,
-            }
-            for (chunk_num, start, end) in ranges
-        ]
-        try:
-            results = worker_pool.imap_unordered(
-                _predict_dataframe_chunk_worker, work_items, chunksize=1)
-            chunks = [result for result in results]
-        finally:
-            worker_pool.close()
-            worker_pool.join()
-        predictions = pandas.concat(
-            [chunk for (_, chunk) in sorted(chunks)],
-            axis=0,
-        ).sort_index()
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            workload_name=(
+                WORKLOAD_AFFINITY_INFERENCE
+                if args.affinity_only
+                else WORKLOAD_PRESENTATION_INFERENCE
+            ),
+            workload_hints={
+                "data_bytes": path_size_bytes(args.input),
+                "prediction_rows": len(df),
+            },
+            # Workers run PyTorch inference and pin to GPUs via
+            # CUDA_VISIBLE_DEVICES. Force spawn so they don't inherit
+            # any PyTorch / CUDA state from the parent (matches predict-scan).
+            start_method="spawn",
+        )
+        if worker_pool is None:
+            # Serial path: no fork will happen, so loading the predictor
+            # in this process is safe.
+            predictor, _ = _load_predictor_for_command(models_dir)
+            predictions = _predict_dataframe_chunk(
+                predictor, df, prediction_options)
+        else:
+            # Parallel path: do NOT load the predictor in this process.
+            # Each worker loads it after CUDA_VISIBLE_DEVICES is set,
+            # so per-worker GPU pinning takes effect.
+            ranges = chunk_ranges_for_local_parallelism(len(df), args.num_jobs)
+            work_items = [
+                {
+                    "chunk_num": chunk_num,
+                    "models_dir": models_dir,
+                    "dataframe": df.iloc[start:end].copy(),
+                    "options": prediction_options,
+                }
+                for (chunk_num, start, end) in ranges
+            ]
+            try:
+                results = worker_pool.imap_unordered(
+                    _predict_dataframe_chunk_worker, work_items, chunksize=1)
+                chunks = [result for result in results]
+            finally:
+                worker_pool.close()
+                worker_pool.join()
+            # ``df.reset_index(drop=True)`` above guarantees the chunks'
+            # row indices form a monotonic 0..N-1 partition, so a
+            # chunk_num-ordered concat already preserves input order.
+            predictions = pandas.concat(
+                [chunk for (_, chunk) in sorted(chunks)],
+                axis=0,
+            )
 
     # If each query is just for a single allele, the "best_allele" column
     # is redundant so we remove it.

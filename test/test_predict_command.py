@@ -121,6 +121,101 @@ def test_predict_dataframe_chunk_passes_flanks_positionally():
     assert list(predictions.c_flank) == ["CCC", "TTT"]
 
 
+def test_detect_affinity_only_models_uses_file_presence(tmp_path):
+    # Presentation bundle: has weights.csv
+    pres = tmp_path / "pres"
+    pres.mkdir()
+    (pres / "weights.csv").write_text("")
+    assert predict_command._detect_affinity_only_models(str(pres)) is False
+
+    # Affinity-only bundle: no weights.csv
+    aff = tmp_path / "aff"
+    aff.mkdir()
+    assert predict_command._detect_affinity_only_models(str(aff)) is True
+
+
+def test_predict_columns_schema_parity_for_affinity_only():
+    """Empty-input schema must enumerate every prediction column the
+    populated path would emit, so downstream readers see a stable schema."""
+
+    class FakePredictor:
+        @property
+        def supports_processing_prediction(self):
+            return False
+
+        @property
+        def supports_presentation_prediction(self):
+            return False
+
+    cols = type(FakePredictor()).__bases__  # noqa: F841 (sanity probe)
+
+    # Import the live class for the real method under test.
+    from mhcflurry.class1_presentation_predictor import (
+        Class1PresentationPredictor,
+    )
+
+    class NoPresentationPredictor(Class1PresentationPredictor):
+        def __init__(self):
+            pass
+
+        @property
+        def supports_processing_prediction(self):
+            return False
+
+        @property
+        def supports_presentation_prediction(self):
+            return False
+
+    p = NoPresentationPredictor()
+    affinity_cols = p.predict_columns(
+        affinity_only=True,
+        use_flanking=False,
+        include_affinity_percentile=False)
+    assert "affinity" in affinity_cols
+    assert "best_allele" in affinity_cols
+    assert "peptide_num" in affinity_cols
+    assert "affinity_percentile" not in affinity_cols
+    assert "processing_score" not in affinity_cols
+
+    affinity_cols_with_pct = p.predict_columns(
+        affinity_only=True, include_affinity_percentile=True)
+    assert "affinity_percentile" in affinity_cols_with_pct
+
+
+def test_predict_columns_schema_parity_for_presentation():
+    from mhcflurry.class1_presentation_predictor import (
+        Class1PresentationPredictor,
+    )
+
+    class FullPredictor(Class1PresentationPredictor):
+        def __init__(self):
+            pass
+
+        @property
+        def supports_processing_prediction(self):
+            return True
+
+        @property
+        def supports_presentation_prediction(self):
+            return True
+
+    cols = FullPredictor().predict_columns(
+        affinity_only=False,
+        use_flanking=True,
+        include_affinity_percentile=True)
+    for col in (
+            "peptide", "peptide_num", "sample_name", "affinity", "best_allele",
+            "affinity_percentile", "n_flank", "c_flank", "processing_score",
+            "presentation_score", "presentation_percentile"):
+        assert col in cols, "Missing column: %s" % col
+
+    no_flank_cols = FullPredictor().predict_columns(
+        affinity_only=False, use_flanking=False)
+    assert "n_flank" not in no_flank_cols
+    assert "c_flank" not in no_flank_cols
+    assert "processing_score" in no_flank_cols
+
+
 def test_allele_string_to_alleles_accepts_semicolon_separated_csv_cells():
     df = pandas.DataFrame({
         "allele": [

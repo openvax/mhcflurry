@@ -144,6 +144,35 @@ class Class1PresentationPredictor(object):
             cols += ["presentation_score", "presentation_percentile"]
         return cols
 
+    def predict_columns(
+            self,
+            affinity_only=False,
+            use_flanking=True,
+            include_affinity_percentile=False):
+        """
+        Column names that ``predict()`` / ``predict_affinity()`` emit when
+        called with non-empty inputs.
+
+        Used by ``mhcflurry-predict`` to give empty inputs the same output
+        schema as populated ones. Mirrors the columns assembled by
+        ``predict_affinity`` and the additional columns layered on by
+        ``predict``.
+        """
+        cols = ["peptide", "peptide_num", "sample_name"]
+        cols += ["affinity", "best_allele"]
+        if include_affinity_percentile:
+            cols.append("affinity_percentile")
+        if affinity_only:
+            return cols
+        emits_processing = self.supports_processing_prediction
+        if emits_processing:
+            if use_flanking:
+                cols += ["n_flank", "c_flank"]
+            cols.append("processing_score")
+            if self.supports_presentation_prediction:
+                cols += ["presentation_score", "presentation_percentile"]
+        return cols
+
     def predict_affinity(
             self,
             peptides,

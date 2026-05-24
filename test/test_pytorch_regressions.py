@@ -719,6 +719,108 @@ def test_pan_network_deserialization_ignores_left_pad_peptide_dense_width():
     assert tuple(network.allele_embedding.weight.shape) == (1, 39 * 21)
 
 
+def test_infer_allele_width_via_position_lookup():
+    # encoding_dim = 21 for BLOSUM62. With no peptide-stage layers
+    # and no allele_dense layers, weights[0] = allele_embedding.
+    weights = [
+        np.zeros((1, 39 * 21), dtype=np.float32),  # allele_embedding
+    ]
+    hp = {"allele_amino_acid_encoding": "BLOSUM62"}
+    config = {"hyperparameters": {}}
+    assert (
+        Class1NeuralNetwork._infer_allele_representation_dim_from_weights(
+            weights, hp, network_config=config) == 39 * 21
+    )
+
+
+def test_infer_allele_width_real_layout():
+    # Mirror the real named_parameter order observed at runtime:
+    #   peptide_dense (W, b) → allele_dense (W, b) → allele_embedding (W)
+    #   → dense_layers (W, b) → output (W, b)
+    weights = [
+        np.zeros((3, 15 * 21), dtype=np.float32),  # peptide_dense W
+        np.zeros((3,), dtype=np.float32),          # peptide_dense b
+        np.zeros((3, 39 * 21), dtype=np.float32),  # allele_dense W
+        np.zeros((3,), dtype=np.float32),          # allele_dense b
+        np.zeros((1, 39 * 21), dtype=np.float32),  # allele_embedding W
+        np.zeros((5, 6), dtype=np.float32),        # dense_layers W
+        np.zeros((5,), dtype=np.float32),          # dense_layers b
+        np.zeros((1, 5), dtype=np.float32),        # output W
+        np.zeros((1,), dtype=np.float32),          # output b
+    ]
+    hp = {"allele_amino_acid_encoding": "BLOSUM62"}
+    config = {"hyperparameters": {
+        "peptide_dense_layer_sizes": [3],
+        "allele_dense_layer_sizes": [3],
+    }}
+    assert (
+        Class1NeuralNetwork._infer_allele_representation_dim_from_weights(
+            weights, hp, network_config=config) == 39 * 21
+    )
+
+
+def test_infer_allele_width_duplicate_scan_handles_layer_drift():
+    # An unexpected extra peptide-stage layer slips into the weights
+    # without being counted in the config. The position-based primary
+    # lookup lands on the wrong slot, but the duplicate-shape[1] scan
+    # still finds the allele block (allele_dense + allele_embedding
+    # are the only pair with matching shape[1]).
+    weights = [
+        np.zeros((3, 15 * 21), dtype=np.float32),  # counted peptide_dense W
+        np.zeros((3,), dtype=np.float32),          # counted peptide_dense b
+        # Unaccounted extra peptide-stage 2D weight
+        np.zeros((4, 45 * 21), dtype=np.float32),
+        np.zeros((4,), dtype=np.float32),
+        # allele block — shape[1] = 39*21 appears twice
+        np.zeros((3, 39 * 21), dtype=np.float32),  # allele_dense W
+        np.zeros((3,), dtype=np.float32),
+        np.zeros((1, 39 * 21), dtype=np.float32),  # allele_embedding W
+        np.zeros((5, 6), dtype=np.float32),
+        np.zeros((5,), dtype=np.float32),
+    ]
+    hp = {"allele_amino_acid_encoding": "BLOSUM62"}
+    config = {"hyperparameters": {
+        "peptide_dense_layer_sizes": [3],
+        "allele_dense_layer_sizes": [3],
+    }}
+    assert (
+        Class1NeuralNetwork._infer_allele_representation_dim_from_weights(
+            weights, hp, network_config=config) == 39 * 21
+    )
+
+
+def test_infer_allele_width_ignores_lone_peptide_stage_match():
+    # With allele_dense present but no embedding weight in the right
+    # place, the duplicate-shape[1] scan should NOT mistake a lone
+    # peptide-stage 2D weight for the allele block.
+    weights = [
+        np.zeros((3, 45 * 21), dtype=np.float32),  # lone peptide_dense W
+        np.zeros((3,), dtype=np.float32),
+        np.zeros((1, 5), dtype=np.float32),        # output W
+    ]
+    hp = {"allele_amino_acid_encoding": "BLOSUM62"}
+    config = {"hyperparameters": {
+        "peptide_dense_layer_sizes": [3],
+        "allele_dense_layer_sizes": [3],
+    }}
+    assert (
+        Class1NeuralNetwork._infer_allele_representation_dim_from_weights(
+            weights, hp, network_config=config) is None
+    )
+
+
+def test_infer_allele_width_returns_none_for_empty_inputs():
+    assert (
+        Class1NeuralNetwork._infer_allele_representation_dim_from_weights(
+            [], {"allele_amino_acid_encoding": "BLOSUM62"}) is None
+    )
+    assert (
+        Class1NeuralNetwork._infer_allele_representation_dim_from_weights(
+            [np.zeros((1, 39 * 21), dtype=np.float32)],
+            {}) is None
+    )
+
+
 def test_dense_regularization_excludes_output_layer():
     peptides = ["AAAAAAAAA", "CCCCCCCCC"]
 
@@ -953,6 +1055,132 @@ def test_batched_validation_loss_matches_single_shot_with_tail_batch():
     )
 
     assert actual == pytest.approx(expected, abs=1e-7)
+
+
+@pytest.mark.parametrize(
+    "loss_name,val_y_factory,description",
+    [
+        (
+            "custom:mse_with_inequalities",
+            lambda: torch.tensor(
+                [2.0, 2.0, 0.0, 0.0, 0.0, 0.0], dtype=torch.float32),
+            "inequality rows clustered in first batch",
+        ),
+        (
+            "custom:mse_with_inequalities",
+            lambda: torch.tensor(
+                [0.0, 0.0, 0.0, 0.0, 2.0, 2.0], dtype=torch.float32),
+            "inequality rows clustered in last batch",
+        ),
+        (
+            "custom:mse_with_inequalities",
+            lambda: torch.tensor(
+                [0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=torch.float32),
+            "single inequality at non-aligned batch boundary",
+        ),
+        (
+            "custom:mse_with_inequalities",
+            lambda: torch.tensor(
+                [2.0, 2.0, 2.0, 2.0], dtype=torch.float32),
+            "all rows are inequalities",
+        ),
+        (
+            "custom:mse_with_inequalities_and_multiple_outputs",
+            lambda: torch.tensor(
+                [12.0, 10.0, 22.0, 20.0, 10.0, 20.0], dtype=torch.float32),
+            "inequalities in mixed output indices",
+        ),
+    ],
+)
+def test_batched_validation_loss_inequality_imbalanced_distribution(
+        loss_name, val_y_factory, description):
+    """When ``2.0`` (encoded ``>``) rows are unevenly distributed across
+    batches, the batched mean would diverge from the legacy denominator.
+    Verify the fallback engages so batched == single-shot in every case."""
+
+    val_y = val_y_factory()
+
+    class StubNet(torch.nn.Module):
+        def __init__(self, multi):
+            super().__init__()
+            self.multi = multi
+
+        def forward(self, inputs):
+            base = inputs["peptide"][:, 0, 0]
+            if not self.multi:
+                return base
+            return torch.stack([base, base], dim=1)
+
+    multi = "multiple_outputs" in loss_name
+    network = StubNet(multi=multi)
+    val_peptide = torch.tensor(
+        [[[0.0]]] * len(val_y), dtype=torch.float32)
+    loss_obj = get_pytorch_loss(loss_name)
+
+    expected = loss_obj(network({"peptide": val_peptide}), val_y).item()
+    actual = _batched_validation_loss(
+        network=network,
+        eager_network=network,
+        val_peptide=val_peptide,
+        val_allele=None,
+        val_y=val_y,
+        val_weights=None,
+        loss_obj=loss_obj,
+        batch_size=2,
+    )
+    assert actual == pytest.approx(expected, abs=1e-6), (
+        "batched and single-shot diverge for %s" % description)
+
+
+def test_batched_validation_loss_inequality_free_targets_use_batched_path():
+    """When the inequality loss is configured but the validation targets
+    contain no encoded inequality markers, batched is mathematically
+    equivalent to single-shot, so the fast path should be allowed to
+    run. This protects the optimization from collapsing to single-shot
+    on every validation step."""
+    from mhcflurry.class1_neural_network import (
+        _validation_loss_has_legacy_inequality_denominator,
+    )
+
+    loss_obj = get_pytorch_loss("custom:mse_with_inequalities")
+    no_inequality = torch.tensor([0.0, 0.1, 0.5, 0.9], dtype=torch.float32)
+    has_inequality = torch.tensor([0.0, 2.0, 0.5, 0.9], dtype=torch.float32)
+
+    assert _validation_loss_has_legacy_inequality_denominator(
+        loss_obj, no_inequality) is False
+    assert _validation_loss_has_legacy_inequality_denominator(
+        loss_obj, has_inequality) is True
+
+
+def test_batched_validation_loss_multi_output_inequality_only_in_one_output():
+    """Inequality markers in one output index only — batched must still
+    match single-shot. Tests the decoding logic that splits the encoded
+    ``y / 10`` index from the residual target value."""
+
+    val_y = torch.tensor([12.0, 10.0, 21.0, 20.0], dtype=torch.float32)
+
+    class TwoOutputNet(torch.nn.Module):
+        def forward(self, inputs):
+            base = inputs["peptide"][:, 0, 0]
+            return torch.stack([base, base], dim=1)
+
+    network = TwoOutputNet()
+    val_peptide = torch.tensor(
+        [[[0.4]], [[0.5]], [[0.6]], [[0.7]]], dtype=torch.float32)
+    loss_obj = get_pytorch_loss(
+        "custom:mse_with_inequalities_and_multiple_outputs")
+    expected = loss_obj(network({"peptide": val_peptide}), val_y).item()
+    actual = _batched_validation_loss(
+        network=network,
+        eager_network=network,
+        val_peptide=val_peptide,
+        val_allele=None,
+        val_y=val_y,
+        val_weights=None,
+        loss_obj=loss_obj,
+        batch_size=2,
+    )
+    assert actual == pytest.approx(expected, abs=1e-6)
 
 
 def test_validation_forward_network_uses_eager_by_default(monkeypatch):

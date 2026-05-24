@@ -2521,7 +2521,34 @@ class Class1NeuralNetwork(object):
     @classmethod
     def _infer_allele_representation_dim_from_weights(
             cls, network_weights, hyperparameters, network_config=None):
-        """Infer flattened allele representation width from serialized weights."""
+        """Infer flattened allele representation width from serialized weights.
+
+        Strategy:
+          1. Compute the position of the first allele-stage weight from
+             the architecture config. In ``named_parameters()`` order the
+             layout is::
+
+                locally_connected → peptide_dense → batch_norm_early?
+                  → allele_dense → allele_embedding → dense_layers
+                  → output
+
+             so ``weights[peptide_offset]`` is the first allele_dense
+             weight (when allele_dense layers exist) or the
+             allele_embedding weight (otherwise). Either way its
+             ``shape[1]`` equals the flattened allele representation
+             width.
+
+          2. Cross-check using a structural invariant: when allele_dense
+             layers exist, both the allele_dense first-layer weight and
+             the allele_embedding weight have ``shape[1]`` equal to
+             ``allele_rep_width``. That value appears at two distinct
+             positions in the weight list. Peptide-stage Linear weights
+             chain through different shape[1] values, so no peptide
+             weight will produce a duplicate match.
+
+          3. Return ``None`` if neither check is conclusive. The caller
+             falls back to ``default_sequence_length`` (39).
+        """
         if not network_weights or not hyperparameters.get('allele_amino_acid_encoding'):
             return None
         from .amino_acid import get_vector_encoding_df
@@ -2544,43 +2571,70 @@ class Class1NeuralNetwork(object):
             sequence_length = dim // encoding_dim
             return 20 <= sequence_length <= 60
 
-        # PyTorch-format weights are serialized in named_parameter order:
-        # peptide-stage params, batch_norm_early params, allele_embedding,
-        # then allele_dense params. Infer only from the allele slots. A broad
-        # shape scan can confuse left_pad_centered_right_pad peptide-dense
-        # matrices (45 * encoding_dim) for allele pseudosequences.
-        idx = 0
-        idx += 2 * len(architecture.get(
+        def candidate_dim(weight):
+            if isinstance(weight, numpy.ndarray) and len(weight.shape) == 2:
+                dim = weight.shape[1]
+                if valid_dim(dim):
+                    return dim
+            return None
+
+        allele_dense_sizes = architecture.get(
+            'allele_dense_layer_sizes',
+            hyperparameters.get('allele_dense_layer_sizes', []),
+        )
+
+        peptide_offset = 0
+        peptide_offset += 2 * len(architecture.get(
             'locally_connected_layers',
             hyperparameters.get('locally_connected_layers', []),
         ))
-        idx += 2 * len(architecture.get(
+        peptide_offset += 2 * len(architecture.get(
             'peptide_dense_layer_sizes',
             hyperparameters.get('peptide_dense_layer_sizes', []),
         ))
         if architecture.get(
                 'batch_normalization',
                 hyperparameters.get('batch_normalization', False)):
-            idx += 2
+            peptide_offset += 2
 
-        if idx < len(network_weights):
-            weight = network_weights[idx]
-            if isinstance(weight, numpy.ndarray) and len(weight.shape) == 2:
-                dim = weight.shape[1]
-                if valid_dim(dim):
-                    return dim
+        n = len(network_weights)
 
-        allele_dense_sizes = architecture.get(
-            'allele_dense_layer_sizes',
-            hyperparameters.get('allele_dense_layer_sizes', []),
-        )
-        idx += 1
-        if allele_dense_sizes and idx < len(network_weights):
-            weight = network_weights[idx]
-            if isinstance(weight, numpy.ndarray) and len(weight.shape) == 2:
-                dim = weight.shape[1]
-                if valid_dim(dim):
+        # Position-based primary lookup.
+        primary_dim = (
+            candidate_dim(network_weights[peptide_offset])
+            if peptide_offset < n else None)
+
+        # Cross-check: when allele_dense layers exist, the same shape[1]
+        # must appear at the embedding position (peptide_offset +
+        # 2*n_allele_dense_layers). If they disagree, the offset is
+        # wrong and we fall back to a duplicate-shape scan.
+        if primary_dim is not None and allele_dense_sizes:
+            embedding_idx = (
+                peptide_offset + 2 * len(allele_dense_sizes))
+            if embedding_idx < n:
+                embedding_dim = candidate_dim(network_weights[embedding_idx])
+                if embedding_dim == primary_dim:
+                    return primary_dim
+                # Disagreement: don't trust either value here, scan below.
+            else:
+                # Can't confirm via embedding slot; trust the primary.
+                return primary_dim
+        elif primary_dim is not None:
+            # No allele_dense — only one matching slot exists.
+            return primary_dim
+
+        # Fallback: duplicate-shape[1] scan. Only the allele block
+        # (allele_dense weight + allele_embedding weight) produces two
+        # 2D weights with the same shape[1] in this architecture.
+        if allele_dense_sizes:
+            seen = {}
+            for i in range(n):
+                dim = candidate_dim(network_weights[i])
+                if dim is None:
+                    continue
+                if dim in seen:
                     return dim
+                seen[dim] = i
         return None
 
     @classmethod

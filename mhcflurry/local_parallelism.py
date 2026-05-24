@@ -342,6 +342,17 @@ def auto_max_workers_per_gpu(
         num_jobs_int = 0
     else:
         num_jobs_int = int(num_jobs)
+    # 40% VRAM headroom (multiply by 0.6) absorbs three sources of
+    # transient pressure that ``per_worker_gb`` does not model:
+    #   (1) spawn-startup race — workers create their CUDA context and
+    #       allocate model state in parallel, briefly holding more memory
+    #       than steady-state;
+    #   (2) activation peaks during torch.compile inductor codegen;
+    #   (3) nvidia-smi's reported ``free`` lags actual contention when
+    #       another process on the same card is also allocating.
+    # The headroom is intentionally generous: an OOM during a multi-hour
+    # training run costs far more than leaving a worker slot on the
+    # table, and the cap is bounded above by ``hard_cap`` anyway.
     by_vram = max(1, int(free_vram_gb_used * 0.6 / per_worker_gb))
     if num_jobs_int > 0:
         by_jobs = max(1, num_jobs_int // max(int(num_gpus), 1))
