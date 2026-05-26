@@ -12,6 +12,63 @@ from typing import Optional, Tuple
 GIB = float(1 << 30)
 HOST_RAM_PER_DATALOADER_CHILD_GB = 0.5
 
+
+def env_float(name, default, bounds=None):
+    """Read ``name`` from the environment as float, falling back to ``default``.
+
+    ``bounds`` is an optional ``(low, high)`` tuple; either side may be
+    ``None``. Both endpoints are inclusive. Bad values are reported with the
+    offending variable name so users don't get a bare ``ValueError``.
+    """
+    raw = os.environ.get(name)
+    if raw in (None, ""):
+        value = float(default)
+    else:
+        try:
+            value = float(raw)
+        except ValueError as exc:
+            raise ValueError(
+                "Environment variable %s=%r is not a valid float: %s"
+                % (name, raw, exc)
+            ) from None
+    if bounds is not None:
+        low, high = bounds
+        if (low is not None and value < low) or (
+                high is not None and value > high):
+            raise ValueError(
+                "Environment variable %s=%r is outside allowed range %s"
+                % (name, raw if raw not in (None, "") else value, bounds)
+            )
+    return value
+
+
+def env_int(name, default, bounds=None):
+    """Read ``name`` from the environment as int, falling back to ``default``.
+
+    Bad values surface with the offending variable name. ``bounds`` works the
+    same as :func:`env_float`.
+    """
+    raw = os.environ.get(name)
+    if raw in (None, ""):
+        value = int(default)
+    else:
+        try:
+            value = int(raw)
+        except ValueError as exc:
+            raise ValueError(
+                "Environment variable %s=%r is not a valid int: %s"
+                % (name, raw, exc)
+            ) from None
+    if bounds is not None:
+        low, high = bounds
+        if (low is not None and value < low) or (
+                high is not None and value > high):
+            raise ValueError(
+                "Environment variable %s=%r is outside allowed range %s"
+                % (name, raw if raw not in (None, "") else value, bounds)
+            )
+    return value
+
 WORKLOAD_GENERIC = "generic"
 WORKLOAD_AFFINITY_TRAINING = "affinity_training"
 WORKLOAD_AFFINITY_INFERENCE = "affinity_inference"
@@ -246,13 +303,17 @@ def _memory_info(total_gb=None, available_gb=None, source="unknown"):
 
 
 def _memory_env_override():
-    total = os.environ.get("MHCFLURRY_SYSTEM_RAM_GB")
-    available = os.environ.get("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB")
-    if total in (None, "") and available in (None, ""):
+    total_raw = os.environ.get("MHCFLURRY_SYSTEM_RAM_GB")
+    available_raw = os.environ.get("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB")
+    if total_raw in (None, "") and available_raw in (None, ""):
         return None
     return _memory_info(
-        total_gb=float(total) if total not in (None, "") else None,
-        available_gb=float(available) if available not in (None, "") else None,
+        total_gb=env_float(
+            "MHCFLURRY_SYSTEM_RAM_GB", 0.0, bounds=(0.0, None))
+            if total_raw not in (None, "") else None,
+        available_gb=env_float(
+            "MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", 0.0, bounds=(0.0, None))
+            if available_raw not in (None, "") else None,
         source="env",
     )
 
@@ -367,9 +428,9 @@ def estimate_workload_memory(workload_name=WORKLOAD_GENERIC, hints=None):
     notes = []
     data_gb = (hints.get("data_bytes") or 0) / GIB
 
-    env_value = os.environ.get(_workload_env_name(profile.name))
-    if env_value not in (None, ""):
-        device_worker_gb = float(env_value)
+    workload_env = _workload_env_name(profile.name)
+    if os.environ.get(workload_env) not in (None, ""):
+        device_worker_gb = env_float(workload_env, 0.0, bounds=(0.0, None))
         notes.append("env override")
     elif hints.get("per_worker_gb") is not None:
         device_worker_gb = float(hints["per_worker_gb"])
@@ -418,10 +479,11 @@ def host_memory_num_jobs_cap(
     if available_gb is None:
         return None
     if safety_fraction is None:
-        safety_fraction = float(os.environ.get(
+        safety_fraction = env_float(
             "MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION",
             "0.70",
-        ))
+            bounds=(0.0, 1.0),
+        )
     worker_gb = (
         float(host_worker_gb)
         + int(dataloader_num_workers) * HOST_RAM_PER_DATALOADER_CHILD_GB
