@@ -54,6 +54,7 @@ from .class1_presentation_predictor import Class1PresentationPredictor
 from .local_parallelism import (
     add_prediction_parallelism_args,
     chunk_ranges_for_local_parallelism,
+    num_workers_per_gpu_from_args,
     worker_pool_with_gpu_assignments_from_args,
 )
 from .workload_planning import (
@@ -370,22 +371,14 @@ def run(argv=sys.argv[1:]):
             "No flanking information provided. Specify --no-flanking "
             "to silence this warning")
 
-    affinity_model_kwargs = {}
-    if getattr(args, "max_workers_per_gpu", None):
-        affinity_model_kwargs["num_workers_per_gpu"] = int(
-            args.max_workers_per_gpu)
-
-    prediction_options = {
-        "affinity_only": args.affinity_only,
-        "allele_column": args.allele_column,
-        "peptide_column": args.peptide_column,
-        "n_flank_column": args.n_flank_column,
-        "c_flank_column": args.c_flank_column,
-        "use_flanking": use_flanking,
-        "throw": not args.no_throw,
-        "include_affinity_percentile": not args.no_affinity_percentile,
-        "affinity_model_kwargs": affinity_model_kwargs,
-        "processing_batch_size": "auto",
+    workload_name = (
+        WORKLOAD_AFFINITY_INFERENCE
+        if args.affinity_only
+        else WORKLOAD_PRESENTATION_INFERENCE
+    )
+    workload_hints = {
+        "data_bytes": path_size_bytes(args.input),
+        "prediction_rows": len(df),
     }
 
     if len(df) == 0:
@@ -406,20 +399,31 @@ def run(argv=sys.argv[1:]):
     else:
         worker_pool = worker_pool_with_gpu_assignments_from_args(
             args,
-            workload_name=(
-                WORKLOAD_AFFINITY_INFERENCE
-                if args.affinity_only
-                else WORKLOAD_PRESENTATION_INFERENCE
-            ),
-            workload_hints={
-                "data_bytes": path_size_bytes(args.input),
-                "prediction_rows": len(df),
-            },
+            workload_name=workload_name,
+            workload_hints=workload_hints,
             # Workers run PyTorch inference and pin to GPUs via
             # CUDA_VISIBLE_DEVICES. Force spawn so they don't inherit
             # any PyTorch / CUDA state from the parent (matches predict-scan).
             start_method="spawn",
         )
+        affinity_model_kwargs = {}
+        if hasattr(args, "max_workers_per_gpu"):
+            affinity_model_kwargs["num_workers_per_gpu"] = (
+                num_workers_per_gpu_from_args(args)
+            )
+
+        prediction_options = {
+            "affinity_only": args.affinity_only,
+            "allele_column": args.allele_column,
+            "peptide_column": args.peptide_column,
+            "n_flank_column": args.n_flank_column,
+            "c_flank_column": args.c_flank_column,
+            "use_flanking": use_flanking,
+            "throw": not args.no_throw,
+            "include_affinity_percentile": not args.no_affinity_percentile,
+            "affinity_model_kwargs": affinity_model_kwargs,
+            "processing_batch_size": "auto",
+        }
         if worker_pool is None:
             # Serial path: no fork will happen, so loading the predictor
             # in this process is safe.

@@ -25,6 +25,8 @@ from .common import configure_pytorch, normalize_pytorch_backend
 from .workload_planning import (
     HOST_RAM_PER_DATALOADER_CHILD_GB,
     WORKLOAD_GENERIC,
+    env_float,
+    env_int,
     plan_local_parallelism,
     system_memory_info_gb,
 )
@@ -187,13 +189,20 @@ def _free_vram_override_gb(num_gpus):
     tests and unusual launchers where ``nvidia-smi`` is hidden but the caller
     knows the device budget.
     """
-    value = os.environ.get("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB")
+    name = "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB"
+    value = os.environ.get(name)
     if not value:
         return None
     parts = [p for p in value.replace(",", " ").split() if p]
     if not parts:
         return None
-    vals = [float(p) for p in parts]
+    try:
+        vals = [float(p) for p in parts]
+    except ValueError as exc:
+        raise ValueError(
+            "Environment variable %s=%r contains a non-float entry: %s"
+            % (name, value, exc)
+        ) from None
     return min(vals[:max(int(num_gpus), 1)])
 
 
@@ -303,16 +312,18 @@ def auto_max_workers_per_gpu(
         return 1
 
     if per_worker_gb is None:
-        per_worker_gb = float(os.environ.get(
+        per_worker_gb = env_float(
             "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB",
-            str(_AUTO_MWPG_PER_WORKER_GB_DEFAULT),
-        ))
+            _AUTO_MWPG_PER_WORKER_GB_DEFAULT,
+            bounds=(0.0, None),
+        )
     else:
         per_worker_gb = float(per_worker_gb)
-    hard_cap = int(os.environ.get(
+    hard_cap = env_int(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP",
-        str(_AUTO_MWPG_HARD_CAP_DEFAULT),
-    ))
+        _AUTO_MWPG_HARD_CAP_DEFAULT,
+        bounds=(1, None),
+    )
 
     free_vram_gb = (
         _free_vram_override_gb(num_gpus)
@@ -461,10 +472,11 @@ def auto_dataloader_num_workers(
     vcpus = int(vcpus)
 
     if hard_cap is None:
-        hard_cap = int(os.environ.get(
+        hard_cap = env_int(
             "MHCFLURRY_AUTO_DATALOADER_HARD_CAP",
             _AUTO_DATALOADER_HARD_CAP_DEFAULT,
-        ))
+            bounds=(0, None),
+        )
     hard_cap = int(hard_cap)
 
     cpu_per_fit = max(0, vcpus // num_fit_workers)
@@ -625,16 +637,20 @@ def auto_random_negative_pool_epochs(
     if ram_gb is None:
         return 1
     if safety_fraction is None:
-        safety_fraction = float(os.environ.get(
-            "MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION", "0.5"))
+        safety_fraction = env_float(
+            "MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION", "0.5",
+            bounds=(0.0, 1.0),
+        )
     if per_pool_epoch_per_worker_bytes is None:
-        per_pool_epoch_per_worker_bytes = float(os.environ.get(
-            "MHCFLURRY_AUTO_RN_POOL_PER_EPOCH_PER_WORKER_GB", "1.0"
-        )) * (1024 ** 3)
+        per_pool_epoch_per_worker_bytes = env_float(
+            "MHCFLURRY_AUTO_RN_POOL_PER_EPOCH_PER_WORKER_GB", "1.0",
+            bounds=(0.0, None),
+        ) * (1024 ** 3)
     if hard_cap is None:
-        hard_cap = int(os.environ.get(
-            "MHCFLURRY_AUTO_RN_POOL_HARD_CAP", "10"
-        ))
+        hard_cap = env_int(
+            "MHCFLURRY_AUTO_RN_POOL_HARD_CAP", "10",
+            bounds=(1, None),
+        )
     available_bytes = float(ram_gb) * (1024 ** 3) * float(safety_fraction)
     per_worker_budget = available_bytes / max(int(num_workers), 1)
     by_memory = max(1, int(per_worker_budget / max(
@@ -644,6 +660,14 @@ def auto_random_negative_pool_epochs(
     # encodings); the empirical per-pool-epoch figure already covers them.
     del num_random_negatives, peptide_max_length
     return min(by_memory, max(1, int(hard_cap)))
+
+
+def _resolved_int(value, name):
+    if isinstance(value, str) and value.strip().lower() == "auto":
+        raise ValueError(
+            "%s must be resolved to an int before use; got 'auto'" % name
+        )
+    return int(value)
 
 
 def auto_num_jobs(num_gpus, max_workers_per_gpu):
@@ -656,14 +680,9 @@ def auto_num_jobs(num_gpus, max_workers_per_gpu):
     """
     if not num_gpus or int(num_gpus) <= 0:
         return 0
-    if isinstance(max_workers_per_gpu, str):
-        if max_workers_per_gpu.strip().lower() == "auto":
-            raise ValueError(
-                "auto_num_jobs: max_workers_per_gpu must be resolved to an int "
-                "before computing num_jobs (call auto_max_workers_per_gpu first)."
-            )
-        max_workers_per_gpu = int(max_workers_per_gpu)
-    return int(num_gpus) * int(max_workers_per_gpu)
+    max_workers_per_gpu = _resolved_int(
+        max_workers_per_gpu, "max_workers_per_gpu")
+    return int(num_gpus) * max_workers_per_gpu
 
 
 def resolve_num_gpus_for_local_parallelism(args, backend=None):
@@ -724,6 +743,25 @@ def resolve_max_workers_per_gpu(
         resolved = int(value)
     args.max_workers_per_gpu = resolved
     return resolved
+
+
+def num_workers_per_gpu_from_args(args):
+    """Return resolved ``max_workers_per_gpu`` for model auto-sizing.
+
+    Callers must run ``resolve_local_parallelism_args`` first so workload- and
+    hardware-aware defaults have already converted the CLI sentinel ``"auto"``
+    into an integer.
+    """
+    value = getattr(args, "max_workers_per_gpu", 1)
+    if value is None:
+        return 1
+    if isinstance(value, str) and value.strip().lower() == "auto":
+        raise ValueError(
+            "max_workers_per_gpu is still 'auto'; call "
+            "resolve_local_parallelism_args before using it as "
+            "num_workers_per_gpu."
+        )
+    return _resolved_int(value, "max_workers_per_gpu")
 
 
 def resolve_local_parallelism_args(
@@ -909,15 +947,17 @@ def _auto_torchinductor_compile_threads(num_jobs, phase="production"):
     """Return auto-sized Inductor compile helper count for this phase."""
     cpu_count_ = os.cpu_count() or 1
     if phase == "warmup":
-        cap = int(os.environ.get(
+        cap = env_int(
             "MHCFLURRY_TORCHINDUCTOR_WARMUP_COMPILE_THREADS_CAP",
-            str(_INDUCTOR_WARMUP_THREAD_HARD_CAP),
-        ))
+            _INDUCTOR_WARMUP_THREAD_HARD_CAP,
+            bounds=(1, None),
+        )
         return max(1, min(cap, cpu_count_))
-    cap = int(os.environ.get(
+    cap = env_int(
         "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP",
-        str(_INDUCTOR_THREAD_HARD_CAP),
-    ))
+        _INDUCTOR_THREAD_HARD_CAP,
+        bounds=(1, None),
+    )
     return max(1, min(cap, cpu_count_ // max(int(num_jobs), 1)))
 
 
@@ -1002,9 +1042,10 @@ def configure_cluster_worker_torch_compile_threads():
             _compile_threads_env_is_auto_owned()):
         resolve_torchinductor_compile_threads_env(num_jobs=1)
         return
-    workers_per_node = int(os.environ.get(
-        "MHCFLURRY_CLUSTER_WORKERS_PER_NODE", "1"
-    ))
+    workers_per_node = env_int(
+        "MHCFLURRY_CLUSTER_WORKERS_PER_NODE", "1",
+        bounds=(1, None),
+    )
     threads = _set_auto_torchinductor_compile_threads(
         num_jobs=max(workers_per_node, 1),
         phase="production",
@@ -1624,9 +1665,7 @@ def run_single_worker_torch_compile_warmup(
             num_jobs=1,
             num_gpus=1 if int(getattr(args, "gpus", 0) or 0) > 0 else 0,
             backend=backend,
-            max_workers_per_gpu=max(
-                int(getattr(args, "max_workers_per_gpu", 1) or 1), 1,
-            ),
+            max_workers_per_gpu=max(num_workers_per_gpu_from_args(args), 1),
             max_tasks_per_worker=len(unique_warmup_items) + 1,
             worker_log_dir=getattr(args, "worker_log_dir", None),
         )
@@ -1939,7 +1978,8 @@ def worker_init(
     # check_training_batch_fits) can partition VRAM correctly when
     # multiple fit()/predict() calls are co-resident on one GPU.
     if max_workers_per_gpu is not None:
-        os.environ["MHCFLURRY_MAX_WORKERS_PER_GPU"] = str(int(max_workers_per_gpu))
+        os.environ["MHCFLURRY_MAX_WORKERS_PER_GPU"] = str(
+            _resolved_int(max_workers_per_gpu, "max_workers_per_gpu"))
 
 
 # Solution suggested in https://bugs.python.org/issue13831

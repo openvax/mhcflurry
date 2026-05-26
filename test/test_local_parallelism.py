@@ -14,6 +14,7 @@ from mhcflurry.local_parallelism import (
     auto_max_workers_per_gpu,
     chunk_ranges_for_local_parallelism,
     non_daemon_context,
+    num_workers_per_gpu_from_args,
     resolve_local_parallelism_args,
     resolve_max_workers_per_gpu,
     validate_worker_pool_args,
@@ -312,6 +313,15 @@ def test_resolve_max_workers_per_gpu_is_idempotent(monkeypatch):
     first = resolve_max_workers_per_gpu(args)
     second = resolve_max_workers_per_gpu(args)
     assert first == second
+
+
+def test_num_workers_per_gpu_from_args_requires_resolved_value():
+    args = Namespace(max_workers_per_gpu="auto")
+    with pytest.raises(ValueError, match="resolve_local_parallelism_args"):
+        num_workers_per_gpu_from_args(args)
+
+    args.max_workers_per_gpu = 3
+    assert num_workers_per_gpu_from_args(args) == 3
 
 
 def test_resolve_local_parallelism_args_caps_auto_num_jobs(monkeypatch):

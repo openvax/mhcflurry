@@ -46,6 +46,7 @@ from .fasta import read_fasta_to_dataframe
 from .local_parallelism import (
     add_prediction_parallelism_args,
     chunk_ranges_for_local_parallelism,
+    num_workers_per_gpu_from_args,
     worker_pool_with_gpu_assignments_from_args,
 )
 from .workload_planning import (
@@ -372,9 +373,10 @@ def run(argv=sys.argv[1:]):
             start_method="spawn",
         )
         affinity_model_kwargs = {}
-        if getattr(args, "max_workers_per_gpu", None):
-            affinity_model_kwargs["num_workers_per_gpu"] = int(
-                args.max_workers_per_gpu)
+        if hasattr(args, "max_workers_per_gpu"):
+            affinity_model_kwargs["num_workers_per_gpu"] = (
+                num_workers_per_gpu_from_args(args)
+            )
         if worker_pool is None:
             predictor = _load_predictor_for_command(models_dir)
             result_df = predictor.predict_sequences(

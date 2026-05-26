@@ -134,6 +134,51 @@ def test_detect_affinity_only_models_uses_file_presence(tmp_path):
     assert predict_command._detect_affinity_only_models(str(aff)) is True
 
 
+def test_default_auto_workers_are_resolved_before_prediction_kwargs(
+        tmp_path, monkeypatch):
+    """Default --max-workers-per-gpu=auto must not reach int(...) directly."""
+    captured = {}
+
+    class FakePredictor:
+        def predict_affinity(
+                self,
+                peptides,
+                alleles,
+                sample_names,
+                throw,
+                include_affinity_percentile,
+                model_kwargs):
+            del alleles, throw, include_affinity_percentile
+            captured["model_kwargs"] = dict(model_kwargs)
+            return pandas.DataFrame({
+                "peptide": list(peptides),
+                "peptide_num": list(range(len(peptides))),
+                "sample_name": list(sample_names),
+                "best_allele": ["HLA-A*02:01"] * len(peptides),
+                "affinity": [1.0] * len(peptides),
+            })
+
+    models_dir = tmp_path / "affinity-models"
+    models_dir.mkdir()
+    out = tmp_path / "predictions.csv"
+
+    monkeypatch.setattr(
+        predict_command,
+        "_load_predictor_for_command",
+        lambda models_dir: (FakePredictor(), True),
+    )
+
+    predict_command.run([
+        "--models", str(models_dir),
+        "--alleles", "HLA-A0201",
+        "--peptides", "SIINFEKL",
+        "--backend", "cpu",
+        "--out", str(out),
+    ])
+
+    assert captured["model_kwargs"]["num_workers_per_gpu"] == 1
+
+
 def test_predict_columns_schema_parity_for_affinity_only():
     """Empty-input schema must enumerate every prediction column the
     populated path would emit, so downstream readers see a stable schema."""

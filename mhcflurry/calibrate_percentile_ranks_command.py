@@ -32,6 +32,7 @@ from .local_parallelism import (
     attach_constant_data_to_work_items_if_needed,
     add_local_parallelism_args,
     chunk_ranges_for_local_parallelism,
+    num_workers_per_gpu_from_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from .workload_planning import (
@@ -384,9 +385,10 @@ def run_class1_presentation_predictor(args, peptides):
     GLOBAL_DATA["presentation_models_dir"] = args.models_dir
     GLOBAL_DATA["presentation_peptides"] = peptides
     affinity_model_kwargs = {"batch_size": args.prediction_batch_size}
-    if getattr(args, "max_workers_per_gpu", None):
-        affinity_model_kwargs["num_workers_per_gpu"] = int(
-            args.max_workers_per_gpu)
+    if hasattr(args, "max_workers_per_gpu"):
+        affinity_model_kwargs["num_workers_per_gpu"] = (
+            num_workers_per_gpu_from_args(args)
+        )
     GLOBAL_DATA["presentation_predict_kwargs"] = {
         "affinity_model_kwargs": affinity_model_kwargs,
         "processing_batch_size": args.prediction_batch_size,
@@ -425,7 +427,13 @@ def run_class1_presentation_predictor(args, peptides):
             result_serialization_method="pickle",
             clear_constant_data=True)
     else:
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            # Workers pin to GPUs via CUDA_VISIBLE_DEVICES. Force spawn so
+            # they don't inherit any PyTorch / CUDA state from the parent,
+            # matching predict / predict-scan.
+            start_method="spawn",
+        )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
         attach_constant_data_to_work_items_if_needed(
@@ -568,8 +576,9 @@ def run_class1_affinity_predictor(args, peptides):
     # partition across co-resident workers matters only when the
     # underlying predict path resolves ``"auto"`` — but it's cheap to
     # always pass it through.
-    if getattr(args, 'max_workers_per_gpu', None):
-        model_kwargs['num_workers_per_gpu'] = int(args.max_workers_per_gpu)
+    if hasattr(args, 'max_workers_per_gpu'):
+        model_kwargs['num_workers_per_gpu'] = num_workers_per_gpu_from_args(args)
+    num_workers_per_gpu = num_workers_per_gpu_from_args(args)
     GLOBAL_DATA["args"] = {
         'motif_summary': args.motif_summary,
         'summary_top_peptide_fractions': args.summary_top_peptide_fraction,
@@ -578,7 +587,7 @@ def run_class1_affinity_predictor(args, peptides):
         'gpu_batched': getattr(args, 'gpu_batched', False),
         'gpu_allele_batch_size': getattr(args, 'gpu_allele_batch_size', 'auto'),
         'gpu_peptide_batch_size': getattr(args, 'gpu_peptide_batch_size', 'auto'),
-        'num_workers_per_gpu': int(getattr(args, 'max_workers_per_gpu', 1) or 1),
+        'num_workers_per_gpu': num_workers_per_gpu,
     }
     del encoded_peptides
 
@@ -609,7 +618,11 @@ def run_class1_affinity_predictor(args, peptides):
             result_serialization_method="pickle",
             clear_constant_data=True)
     else:
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            # Same CUDA-fork-safety rationale as the presentation path above.
+            start_method="spawn",
+        )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
 
