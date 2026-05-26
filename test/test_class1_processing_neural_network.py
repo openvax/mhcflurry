@@ -387,14 +387,18 @@ def test_processing_predict_encoded_tensor_public_numpy_wrapper():
         n_flanks=["AA", "CC", "DD"],
         c_flanks=["GG", "HH", "II"])
 
+    device = model.get_device()
     tensor_predictions = model.predict_encoded_tensor(
-        flanking, batch_size=2, device="cpu")
+        flanking, batch_size=2, device=device)
     numpy_predictions = model.predict_encoded(flanking, batch_size=2)
 
     assert isinstance(tensor_predictions, torch.Tensor)
-    assert tensor_predictions.device.type == "cpu"
+    assert tensor_predictions.device.type == device.type
     numpy.testing.assert_allclose(
-        numpy_predictions, tensor_predictions.detach().numpy())
+        numpy_predictions,
+        tensor_predictions.detach().cpu().numpy(),
+        rtol=1e-6,
+        atol=1e-7)
 
 
 def test_processing_tensor_path_preserves_nan_for_unsupported_peptides():
