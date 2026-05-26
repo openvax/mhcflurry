@@ -17,18 +17,27 @@ Usage:
         --new-models-dir results/new_run/models.combined \\
         --public-models-dir "$HOME/Library/Application Support/mhcflurry/4/2.2.0/models_class1_pan/models.combined" \\
         --data-dir "$HOME/Library/Application Support/mhcflurry/4/2.2.0/data_evaluation" \\
-        --out results/comparison
+        --out results/comparison \\
+        --num-jobs auto
 """
 import argparse
 import glob
 import json
 import os
-import sys
 import time
+from functools import partial
 
 import numpy
 import pandas
 from sklearn.metrics import average_precision_score, roc_auc_score
+
+from mhcflurry.local_parallelism import (
+    add_prediction_parallelism_args,
+    call_wrapped_kwargs,
+    chunk_ranges_for_local_parallelism,
+    worker_pool_with_gpu_assignments_from_args,
+)
+from mhcflurry.workload_planning import WORKLOAD_AFFINITY_INFERENCE
 
 
 _T0 = time.time()
@@ -38,73 +47,11 @@ def _stamp(msg):
     print(f"[+{time.time() - _T0:6.1f}s] {msg}", flush=True)
 
 
-def _detect_gpu_count():
-    """Probe GPU count in a subprocess so the parent never imports torch
-    or initializes CUDA -- otherwise the spawn-context children can't
-    independently set CUDA_VISIBLE_DEVICES."""
-    import subprocess
-    out = subprocess.run(
-        [sys.executable, "-c",
-         "import torch; print(torch.cuda.device_count() if torch.cuda.is_available() else 0)"],
-        check=False, capture_output=True, text=True,
-    )
-    try:
-        return int(out.stdout.strip())
-    except ValueError:
-        return 0
-
-
-def _resolve_torchinductor_compile_threads(num_jobs):
-    """Resolve ``TORCHINDUCTOR_COMPILE_THREADS=auto`` to an integer in
-    the parent env so spawned workers inherit a value PyTorch can parse.
-
-    The orchestrator launchers export ``TORCHINDUCTOR_COMPILE_THREADS=auto``
-    so each train CLI's ``hoist_torchinductor_compile_threads`` can size
-    inductor against its ``num_jobs``. The eval script spawns its own
-    ``multiprocessing.Pool`` outside that hoist path, and PyTorch's
-    ``decide_compile_threads()`` does ``int(os.environ[...])`` on import
-    -- ``int("auto")`` raises and the workers crash before predict().
-
-    Mirrors the formula in
-    ``mhcflurry.local_parallelism._auto_torchinductor_compile_threads``
-    (production phase): ``max(1, min(cap, cpu_count // num_jobs))`` with
-    ``cap`` from ``MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP`` (default
-    16). Inlined to keep this module torch-free in the parent.
-    """
-    value = os.environ.get("TORCHINDUCTOR_COMPILE_THREADS")
-    if value in (None, ""):
-        return
-    auto_owned = (
-        value == "auto"
-        or os.environ.get("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO") == "1"
-    )
-    if not auto_owned:
-        int(value)
-        return
-    cap = int(os.environ.get(
-        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP", "16"))
-    cpu_count = os.cpu_count() or 1
-    threads = max(1, min(cap, cpu_count // max(int(num_jobs), 1)))
-    os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = str(threads)
-    os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] = "1"
-    _stamp(
-        f"resolved TORCHINDUCTOR_COMPILE_THREADS=auto -> {threads} "
-        f"(cpu={cpu_count}, num_jobs={num_jobs}, cap={cap})"
-    )
-
-
-def _predict_chunk_worker(args):
-    """Run inside a spawned worker pinned to a single GPU. Loads the
-    predictor and runs predict() on the assigned chunk."""
-    predictor_dir, peptides, alleles, gpu_id = args
-    import os as _os
-    _os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-    import numpy as _np
-    from mhcflurry.common import configure_pytorch
-    configure_pytorch(backend="gpu")
+def _predict_chunk(predictor_dir, peptides, alleles, chunk_num):
+    """Load the predictor in the configured process and score one chunk."""
     from mhcflurry import Class1AffinityPredictor
     predictor = Class1AffinityPredictor.load(predictor_dir)
-    return _np.asarray(predictor.predict(
+    return chunk_num, numpy.asarray(predictor.predict(
         peptides=peptides, alleles=alleles, throw=False))
 
 
@@ -122,34 +69,60 @@ def _read_supported_alleles(predictor_dir):
     return set(df[col].astype(str).tolist())
 
 
-def parallel_predict(predictor_dir, peptides, alleles, n_gpus):
-    """Spread predictions across n_gpus worker processes, each pinned
-    to one GPU via CUDA_VISIBLE_DEVICES. Reassembles the results in
-    original order. Falls back to in-process predict if n_gpus<=1."""
-    import multiprocessing as mp
-    if n_gpus <= 1 or len(peptides) < 100_000:
-        from mhcflurry.common import configure_pytorch
-        configure_pytorch(backend="gpu" if n_gpus >= 1 else "auto")
-        from mhcflurry import Class1AffinityPredictor
-        predictor = Class1AffinityPredictor.load(predictor_dir)
-        return numpy.asarray(predictor.predict(
-            peptides=peptides, alleles=alleles, throw=False))
+def parallel_predict(args, predictor_dir, peptides, alleles):
+    """Score peptides using mhcflurry's shared prediction parallelism plan."""
+    if len(peptides) == 0:
+        return numpy.asarray([], dtype=float)
 
-    chunk_idxs = numpy.array_split(numpy.arange(len(peptides)), n_gpus)
-    chunks = [
-        (predictor_dir,
-         peptides[idxs],
-         alleles[idxs],
-         gpu)
-        for gpu, idxs in enumerate(chunk_idxs)
-    ]
-    ctx = mp.get_context("spawn")
-    with ctx.Pool(n_gpus) as pool:
-        results = pool.map(_predict_chunk_worker, chunks)
-    out = numpy.empty(len(peptides), dtype=results[0].dtype)
-    for idxs, vals in zip(chunk_idxs, results):
-        out[idxs] = vals
-    return out
+    worker_pool = worker_pool_with_gpu_assignments_from_args(
+        args,
+        workload_name=WORKLOAD_AFFINITY_INFERENCE,
+        workload_hints={"prediction_rows": len(peptides)},
+        start_method="spawn",
+    )
+    _stamp(
+        "      prediction plan: jobs=%d, gpus=%d, workers/gpu=%d, backend=%s"
+        % (
+            int(args.num_jobs),
+            int(args.gpus or 0),
+            int(args.max_workers_per_gpu),
+            args.backend,
+        )
+    )
+
+    if worker_pool is None:
+        _, predictions = _predict_chunk(
+            predictor_dir=predictor_dir,
+            peptides=peptides,
+            alleles=alleles,
+            chunk_num=0,
+        )
+        return predictions
+
+    work_items = []
+    for (chunk_num, start, end) in chunk_ranges_for_local_parallelism(
+            len(peptides), args.num_jobs):
+        work_items.append({
+            "chunk_num": chunk_num,
+            "predictor_dir": predictor_dir,
+            "peptides": peptides[start:end],
+            "alleles": alleles[start:end],
+        })
+    try:
+        results = worker_pool.imap_unordered(
+            partial(call_wrapped_kwargs, _predict_chunk),
+            work_items,
+            chunksize=1,
+        )
+        chunks = [result for result in results]
+    finally:
+        worker_pool.close()
+        worker_pool.join()
+    # chunk_num is unique per work item, so the int comparator wins and
+    # sorted() never needs to compare the ndarray values.
+    return numpy.concatenate([
+        values for (_, values) in sorted(chunks)
+    ])
 
 
 def ppv_at_n(y_true, y_score, n):
@@ -188,22 +161,10 @@ def main():
     p.add_argument("--out", required=True)
     p.add_argument("--limit-alleles", type=int, default=None,
                    help="Debug/dry-run: only evaluate first N allele files")
+    add_prediction_parallelism_args(p)
     args = p.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
-
-    # Detect GPUs without importing torch in the parent. Workers will
-    # each set CUDA_VISIBLE_DEVICES before importing torch.
-    n_gpus = _detect_gpu_count()
-    _stamp(f"detected {n_gpus} GPUs (parallel predict if >1)")
-
-    # Workers inherit env from parent. Launchers set
-    # TORCHINDUCTOR_COMPILE_THREADS=auto so the train CLIs' orchestrator
-    # hoist can size it against num_jobs. This script bypasses that hoist
-    # (it spawns its own mp.Pool), and PyTorch's decide_compile_threads()
-    # does int(os.environ[...]) which raises on the literal "auto".
-    # Resolve in the parent so children inherit a numeric value.
-    _resolve_torchinductor_compile_threads(num_jobs=max(n_gpus, 1))
 
     # We need supported_alleles for the new/public ensembles before we
     # know what rows to evaluate, but we don't want to import torch in
@@ -253,27 +214,28 @@ def main():
     test = test[(test.peptide_len >= 8) & (test.peptide_len <= 15)].copy()
     print(f"      evaluable rows after filter: {len(test):,}")
 
-    _stamp(f"[4a/5] Predicting NEW ensemble ({len(test):,} rows, "
-           f"{n_gpus} GPUs)...")
+    _stamp(f"[4a/5] Predicting NEW ensemble ({len(test):,} rows)...")
     test["new_pred"] = parallel_predict(
+        args,
         args.new_models_dir,
         test.peptide.values,
         test.hla.values,
-        n_gpus,
     )
-    _stamp(f"[4b/5] Predicting PUBLIC ensemble ({len(test):,} rows, "
-           f"{n_gpus} GPUs)...")
+    _stamp(f"[4b/5] Predicting PUBLIC ensemble ({len(test):,} rows)...")
     test["public_pred"] = parallel_predict(
+        args,
         args.public_models_dir,
         test.peptide.values,
         test.hla.values,
-        n_gpus,
     )
     test = test.dropna(subset=["new_pred", "public_pred"])
     _stamp(f"      rows with both predictions: {len(test):,}")
     # Score = -log10(predicted nM) (higher = binder-like)
     test["new_score"] = -numpy.log10(numpy.clip(test.new_pred, 1e-3, 1e8))
     test["public_score"] = -numpy.log10(numpy.clip(test.public_pred, 1e-3, 1e8))
+    predictions_path = os.path.join(args.out, "predictions.csv.bz2")
+    test.to_csv(predictions_path, index=False)
+    _stamp(f"      wrote {predictions_path}")
 
     _stamp("[5/5] Computing metrics per allele...")
     rows = []

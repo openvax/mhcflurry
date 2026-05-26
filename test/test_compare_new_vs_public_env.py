@@ -1,12 +1,11 @@
-"""Tests for the small env-resolution helper in
-``scripts/training/compare_new_vs_public.py``.
-
-The script is not a package, so we load it via importlib rather than
-importing through ``mhcflurry``.
-"""
+"""Tests for ``scripts/training/compare_new_vs_public.py``."""
+import argparse
 import importlib.util
-import os
 import pathlib
+
+import numpy
+
+from mhcflurry.workload_planning import WORKLOAD_AFFINITY_INFERENCE
 
 
 def _load_module():
@@ -21,55 +20,107 @@ def _load_module():
     return mod
 
 
-def test_resolve_torchinductor_compile_threads_replaces_auto(monkeypatch):
-    """Regression: TORCHINDUCTOR_COMPILE_THREADS=auto must be replaced
-    with an integer in the parent env before the spawn-pool fires;
-    PyTorch's decide_compile_threads() does int(os.environ[...]) on
-    import and crashes on "auto", taking out every eval worker."""
+def _args():
+    return argparse.Namespace(
+        num_jobs="auto",
+        gpus=None,
+        max_workers_per_gpu="auto",
+        backend="auto",
+        max_tasks_per_worker=None,
+        worker_log_dir=None,
+        torch_compile="auto",
+        matmul_precision="none",
+    )
+
+
+def test_parallel_predict_uses_shared_worker_pool(monkeypatch):
     mod = _load_module()
-    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "auto")
-    monkeypatch.delenv(
-        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
-    monkeypatch.setenv(
-        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP", "16")
-    mod._resolve_torchinductor_compile_threads(num_jobs=8)
-    val = os.environ["TORCHINDUCTOR_COMPILE_THREADS"]
-    assert val.isdigit(), f"expected integer, got {val!r}"
-    assert int(val) >= 1
-    assert os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] == "1"
+    calls = {}
+
+    class FakePool:
+        def imap_unordered(self, fn, work_items, chunksize=1):
+            del fn
+            calls["work_items"] = list(work_items)
+            calls["chunksize"] = chunksize
+            return [
+                (item["chunk_num"], numpy.asarray([item["chunk_num"]]))
+                for item in reversed(work_items)
+            ]
+
+        def close(self):
+            calls["closed"] = True
+
+        def join(self):
+            calls["joined"] = True
+
+    def fake_worker_pool(args, workload_name, workload_hints, start_method=None):
+        calls["workload_name"] = workload_name
+        calls["workload_hints"] = workload_hints
+        calls["start_method"] = start_method
+        args.num_jobs = 2
+        args.gpus = 2
+        args.max_workers_per_gpu = 1
+        args.backend = "gpu"
+        return FakePool()
+
+    monkeypatch.setattr(
+        mod,
+        "worker_pool_with_gpu_assignments_from_args",
+        fake_worker_pool)
+
+    predictions = mod.parallel_predict(
+        _args(),
+        predictor_dir="/models",
+        peptides=numpy.asarray(["A", "B", "C", "D"]),
+        alleles=numpy.asarray(["HLA-A*02:01"] * 4),
+    )
+
+    assert calls["workload_name"] == WORKLOAD_AFFINITY_INFERENCE
+    assert calls["workload_hints"] == {"prediction_rows": 4}
+    assert calls["start_method"] == "spawn"
+    assert calls["chunksize"] == 1
+    assert calls["closed"] is True
+    assert calls["joined"] is True
+    assert [item["chunk_num"] for item in calls["work_items"]] == [0, 1, 2, 3]
+    assert predictions.tolist() == [0, 1, 2, 3]
 
 
-def test_resolve_torchinductor_compile_threads_skips_pinned(monkeypatch):
-    """If the user pinned a numeric value, leave it alone."""
+def test_parallel_predict_serial_path_uses_configured_process(monkeypatch):
     mod = _load_module()
-    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "12")
-    monkeypatch.delenv(
-        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
-    mod._resolve_torchinductor_compile_threads(num_jobs=8)
-    assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "12"
-    assert "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO" not in os.environ
+    calls = {}
 
+    def fake_worker_pool(args, workload_name, workload_hints, start_method=None):
+        del workload_name, workload_hints, start_method
+        args.num_jobs = 0
+        args.gpus = 0
+        args.max_workers_per_gpu = 1
+        args.backend = "cpu"
+        return None
 
-def test_resolve_torchinductor_compile_threads_recomputes_auto_owned(monkeypatch):
-    """A numeric value from a previous auto resolution is still owned by
-    MHCflurry and should be resized for this eval pool."""
-    mod = _load_module()
-    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "1")
-    monkeypatch.setenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", "1")
-    monkeypatch.setenv(
-        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP", "16")
-    monkeypatch.setattr(os, "cpu_count", lambda: 64)
-    mod._resolve_torchinductor_compile_threads(num_jobs=8)
-    assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "8"
-    assert os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] == "1"
+    def fake_predict_chunk(predictor_dir, peptides, alleles, chunk_num):
+        calls["predictor_dir"] = predictor_dir
+        calls["peptides"] = peptides.tolist()
+        calls["alleles"] = alleles.tolist()
+        calls["chunk_num"] = chunk_num
+        return chunk_num, numpy.asarray([10.0, 20.0])
 
+    monkeypatch.setattr(
+        mod,
+        "worker_pool_with_gpu_assignments_from_args",
+        fake_worker_pool)
+    monkeypatch.setattr(mod, "_predict_chunk", fake_predict_chunk)
 
-def test_resolve_torchinductor_compile_threads_no_op_when_unset(monkeypatch):
-    """If the env var is unset, leave it unset; the worker's torch import
-    will fall back to its own default."""
-    mod = _load_module()
-    monkeypatch.delenv("TORCHINDUCTOR_COMPILE_THREADS", raising=False)
-    monkeypatch.delenv(
-        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
-    mod._resolve_torchinductor_compile_threads(num_jobs=8)
-    assert "TORCHINDUCTOR_COMPILE_THREADS" not in os.environ
+    predictions = mod.parallel_predict(
+        _args(),
+        predictor_dir="/models",
+        peptides=numpy.asarray(["A", "B"]),
+        alleles=numpy.asarray(["HLA-A*02:01", "HLA-B*07:02"]),
+    )
+
+    assert calls == {
+        "predictor_dir": "/models",
+        "peptides": ["A", "B"],
+        "alleles": ["HLA-A*02:01", "HLA-B*07:02"],
+        "chunk_num": 0,
+    }
+    assert predictions.tolist() == [10.0, 20.0]
