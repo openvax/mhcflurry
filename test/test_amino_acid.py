@@ -159,6 +159,55 @@ def test_peptide_index_round_trip_preserves_string():
         assert recovered == peptide.upper()
 
 
+def test_blosum62_reference_values():
+    """Pin canonical NCBI BLOSUM62 entries so silent matrix drift is caught."""
+    m = amino_acid.BLOSUM62_MATRIX
+    expected_diagonal = {
+        "A": 4, "R": 5, "N": 6, "D": 6, "C": 9, "Q": 5, "E": 5, "G": 6,
+        "H": 8, "I": 4, "L": 4, "K": 5, "M": 5, "F": 6, "P": 7, "S": 4,
+        "T": 5, "W": 11, "Y": 7, "V": 4,
+    }
+    for aa, value in expected_diagonal.items():
+        assert m.loc[aa, aa] == value, (aa, m.loc[aa, aa])
+    # A few well-known off-diagonals.
+    assert m.loc["W", "Y"] == 2
+    assert m.loc["F", "Y"] == 3
+    assert m.loc["I", "L"] == 2
+    assert m.loc["K", "R"] == 2
+    # Local X convention (self-similarity 1, all others 0).
+    assert m.loc["X", "X"] == 1
+    assert (m.loc["X"].drop("X") == 0).all()
+    # Symmetry.
+    assert (m.values == m.values.T).all()
+
+
+def test_atchley_reference_rows():
+    """Pin Atchley et al. (2005, PNAS) factor-1..5 values for spot rows."""
+    a = amino_acid.ATCHLEY_FACTORS
+    references = {
+        "A": [-0.591, -1.302, -0.733, 1.570, -0.146],
+        "R": [1.538, -0.055, 1.502, 0.440, 2.897],
+        "W": [-0.595, 0.009, 0.672, -2.128, -0.184],
+        "V": [-1.337, -0.279, -0.544, 1.242, -1.262],
+    }
+    for aa, ref in references.items():
+        numpy.testing.assert_allclose(a.loc[aa].values, ref, atol=1e-6)
+    # X is the neutral row.
+    assert (a.loc["X"].values == 0.0).all()
+
+
+def test_vector_encoding_index_table_matches_fixed_vectors_encoding():
+    """int8 indices + embedding-table lookup must equal the legacy widening."""
+    table = amino_acid.vector_encoding_index_table("BLOSUM62")
+    assert table.dtype == numpy.float32
+    indices = amino_acid.peptide_to_indices("SIINFEKL")
+    assert indices.dtype == numpy.dtype("int8")
+    via_embedding = table[indices.astype(numpy.int64)]
+    via_legacy = amino_acid.fixed_vectors_encoding(
+        indices.reshape(1, -1), amino_acid.BLOSUM62_MATRIX)[0].astype(numpy.float32)
+    numpy.testing.assert_array_equal(via_embedding, via_legacy)
+
+
 def test_peptide_index_alphabet_anchors():
     """Position of letters in AMINO_ACIDS is the contract device-resident
     code relies on. Pin the well-known anchors so a future reorder breaks

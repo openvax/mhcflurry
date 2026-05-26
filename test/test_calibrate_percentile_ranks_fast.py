@@ -298,6 +298,13 @@ def test_calibrate_fast_parity_with_legacy_path():
         # path preserves the legacy semantics, but it uses torch kernels for
         # the batched schedule; a prediction that lands numerically on a bin
         # edge can fall on the other side on one Python / dependency stack.
+        #
+        # Tolerance is calibrated to this test's peptide count (one peptide
+        # shift = 100/N percentile points). If you change ``peptides`` above,
+        # the tolerance scales with it automatically — but the relative
+        # tolerance per peptide should stay constant. Bin edges remain exact
+        # because they're computed in float64 and not subject to bin-boundary
+        # rounding.
         one_peptide_percent = 100.0 / len(peptides)
         numpy.testing.assert_allclose(
             a.cdf, b.cdf, rtol=0, atol=one_peptide_percent + 1e-9,
