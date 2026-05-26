@@ -63,6 +63,13 @@ def _stamp(msg):
 # ---------------------------------------------------------------------------
 
 
+def make_parser():
+    """Return a standalone parser for documentation tooling (autoprogram)."""
+    parser = argparse.ArgumentParser(prog="mhcflurry compare-models")
+    register_subparser(parser)
+    return parser
+
+
 def register_subparser(parser):
     parser.description = __doc__
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
@@ -1131,3 +1138,8 @@ def _default_data_evaluation_dir() -> Optional[str]:
         return downloads.get_path("data_evaluation")
     except RuntimeError:
         return None
+
+
+# Module-level parser for sphinx autoprogram; behaves like the legacy
+# ``mhcflurry-*`` command modules.
+parser = make_parser()

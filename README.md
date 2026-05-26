@@ -104,6 +104,31 @@ $ mhcflurry-predict-scan \
 Wrote: /tmp/predictions.csv
 ```
 
+### Unified `mhcflurry` parent command
+
+Starting in 2.3.0 there is also a single `mhcflurry` command that dispatches
+to subcommands. Two new tools live exclusively under the parent:
+
+```
+$ mhcflurry compare-models \
+        --a results/new_run/ \
+        --b public \
+        --out results/comparison/
+
+$ mhcflurry plot-model-comparison --input results/comparison/
+```
+
+`compare-models` compares two training runs (or one run vs the currently-
+installed public release) across affinity, presentation, and training-stats
+components. `plot-model-comparison` renders the ROC/PR/scatter/delta plots
+from those outputs.
+
+All historical commands (`mhcflurry-predict`, `mhcflurry-predict-scan`,
+`mhcflurry-downloads`, `mhcflurry-calibrate-percentile-ranks`,
+`mhcflurry-class1-*-models`, `mhcflurry-pseudosequences`) remain installed
+as standalone entry points and are not changing. Migration of those under
+the unified `mhcflurry` dispatcher is tracked in
+[#291](https://github.com/openvax/mhcflurry/issues/291).
 
 See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
 

@@ -295,6 +295,42 @@ hard-pin the value with an integer instead and the resolver is
 bypassed. The auto-sizer logs every input it used at INFO so the
 post-mortem is visible in the log.
 
+Unified ``mhcflurry`` command (new in 2.3.0)
+-------------------------------------------------
+
+The new ``mhcflurry`` parent command dispatches to subcommands. Two
+tools live exclusively under it:
+
+* :ref:`mhcflurry compare-models <mhcflurry-compare-models>` — compares
+  two ensembles (run-vs-run or run-vs-public) across affinity,
+  presentation, and training-stats components.
+* :ref:`mhcflurry plot-model-comparison <mhcflurry-plot-model-comparison>`
+  — renders ROC/PR/scatter/delta plots from a ``compare-models``
+  output directory.
+
+Example:
+
+.. code-block:: shell
+
+    $ mhcflurry compare-models \
+            --a results/new_run/ \
+            --b public \
+            --out results/comparison/
+
+    $ mhcflurry plot-model-comparison --input results/comparison/
+
+``--b`` defaults to ``public``, which resolves to the currently-installed
+mhcflurry release. Use ``public:<release_name>`` to pin a specific
+release. Component autoskip: training_stats / affinity / presentation
+each run only when both sides have the corresponding artifact.
+
+All existing ``mhcflurry-*`` commands (``mhcflurry-predict``,
+``mhcflurry-downloads``, ``mhcflurry-calibrate-percentile-ranks``,
+``mhcflurry-class1-*-models``, ``mhcflurry-pseudosequences``) remain
+installed as standalone entry points. Migration of those under the
+unified dispatcher is tracked in
+`#291 <https://github.com/openvax/mhcflurry/issues/291>`_.
+
 Also new in 2.3.0
 -------------------------------------------------
 

@@ -3,6 +3,34 @@ Command-line reference
 
 See also the :ref:`tutorial <commandline_tutorial>`.
 
+Starting in 2.3.0, MHCflurry installs a unified ``mhcflurry`` parent
+command whose subcommands share one help surface (``mhcflurry --help``).
+The historical standalone scripts (``mhcflurry-predict``,
+``mhcflurry-downloads``, ``mhcflurry-class1-*``, etc.) remain installed
+unchanged — they are listed below the parent-command section. Migration
+of the legacy entry points under the unified dispatcher is tracked in
+`#291 <https://github.com/openvax/mhcflurry/issues/291>`_.
+
+Unified ``mhcflurry`` command
+-----------------------------
+
+.. _mhcflurry-compare-models:
+
+.. autoprogram:: mhcflurry.cli.compare_models:parser
+    :prog: mhcflurry compare-models
+
+.. _mhcflurry-plot-model-comparison:
+
+.. autoprogram:: mhcflurry.cli.plot_model_comparison:parser
+    :prog: mhcflurry plot-model-comparison
+
+Legacy standalone commands
+--------------------------
+
+These are the historical ``mhcflurry-*`` entry points. They are still
+installed and supported; new functionality may land here, under the
+parent ``mhcflurry`` command, or both.
+
 .. _mhcflurry-predict:
 
 .. autoprogram:: mhcflurry.predict_command:parser
@@ -52,4 +80,15 @@ See also the :ref:`tutorial <commandline_tutorial>`.
 
 .. autoprogram:: mhcflurry.train_presentation_models_command:parser
     :prog: mhcflurry-class1-train-presentation-models
+
+.. _mhcflurry-calibrate-percentile-ranks:
+
+.. autoprogram:: mhcflurry.calibrate_percentile_ranks_command:parser
+    :prog: mhcflurry-calibrate-percentile-ranks
+
+.. note::
+
+    ``mhcflurry-pseudosequences`` is a shell-helper CLI for the
+    pseudosequence CSV registry (filename / path / list subcommands).
+    Run ``mhcflurry-pseudosequences --help`` for its argument forms.
 

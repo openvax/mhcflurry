@@ -15,6 +15,13 @@ import numpy
 import pandas
 
 
+def make_parser():
+    """Return a standalone parser for documentation tooling (autoprogram)."""
+    parser = argparse.ArgumentParser(prog="mhcflurry plot-model-comparison")
+    register_subparser(parser)
+    return parser
+
+
 def register_subparser(parser):
     parser.description = __doc__
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
@@ -279,3 +286,8 @@ def _save_scatter(plt, x_score, y_score, x_label, y_label,
     fig.tight_layout()
     fig.savefig(out_path)
     plt.close(fig)
+
+
+# Module-level parser for sphinx autoprogram; behaves like the legacy
+# ``mhcflurry-*`` command modules.
+parser = make_parser()
