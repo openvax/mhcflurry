@@ -23,8 +23,10 @@ if os.environ.get("READTHEDOCS"):
     # For rtd builds, call "make generate" first.
     subprocess.check_call("make generate", shell=True)
 
-# Disable logging (added by tim)
-logging.disable(logging.ERROR)
+# Quiet matplotlib's verbose font-cache logging during doctests; leave
+# Sphinx's own progress + warning output alone so sphinx-build -W
+# diagnostics are actually visible.
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -122,7 +124,7 @@ suppress_warnings = ['image.nonlocal_uri']
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:

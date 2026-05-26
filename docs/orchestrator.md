@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Orchestrator architecture
 
 > Internals doc — for contributors. End users running

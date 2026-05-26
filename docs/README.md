@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # MHCflurry documentation
 
 To generate Sphinx documentation, from this directory run:
