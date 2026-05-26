@@ -16,17 +16,12 @@
 import sys
 import os
 import re
-import textwrap
 import logging
 import subprocess
 
 if os.environ.get("READTHEDOCS"):
     # For rtd builds, call "make generate" first.
     subprocess.check_call("make generate", shell=True)
-
-# Hack added by tim for bug in autoprogram extension under Python 2.
-from sphinx.util.pycompat import indent  # pylint: disable=import-error
-textwrap.indent = indent
 
 # Disable logging (added by tim)
 logging.disable(logging.ERROR)
@@ -51,10 +46,19 @@ extensions = [
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
+    'myst_parser',
     'numpydoc',
     'sphinxcontrib.programoutput',
     'sphinxcontrib.autoprogram',
     'sphinx.ext.githubpages',
+]
+
+# myst-parser settings. ``colon_fence`` lets us write ``:::{note}`` blocks
+# alongside ```` ```{note} ```` blocks; ``deflist`` keeps RST-style
+# definition lists working in Markdown.
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
 ]
 
 doctest_global_setup = '''
@@ -72,10 +76,12 @@ doctest_test_doctest_blocks = ''
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
-# The suffix(es) of source filenames.
-# You can specify multiple suffix as a list of string:
-# source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+# The suffix(es) of source filenames. Both .rst and .md are accepted;
+# myst-parser owns the .md path.
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.md': 'markdown',
+}
 
 # The encoding of source files.
 #source_encoding = 'utf-8-sig'

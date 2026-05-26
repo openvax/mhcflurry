@@ -1,5 +1,4 @@
-Introduction and setup
-=======================
+# Introduction and setup
 
 MHCflurry is an open source package for peptide/MHC I binding affinity prediction. It
 aims to provide competitive accuracy with a fast and documented implementation.
@@ -17,73 +16,71 @@ cleavage and a "presentation" predictor that integrates processing predictions
 with binding affinity predictions to give a composite "presentation score." Both
 models are trained on mass spec-identified MHC ligands.
 
-MHCflurry supports Python 3.10+. It uses the `PyTorch <https://pytorch.org/>`__
+MHCflurry supports Python 3.10+. It uses the [PyTorch](https://pytorch.org/)
 neural network library. GPUs and Apple Silicon (MPS) may optionally be used for
 a speed improvement and are auto-detected.
 
 If you find MHCflurry useful in your research, please cite:
 
-    T. J. O'Donnell, et al. "MHCflurry 2.0: Improved pan-allele prediction of MHC
-    I-presented peptides by incorporating antigen processing,"
-    *Cell Systems*, 2020. https://doi.org/10.1016/j.cels.2020.06.010
-
-    T. J. O'Donnell, et al., "MHCflurry: Open-Source Class I MHC Binding Affinity
-    Prediction," *Cell Systems*, 2018. https://doi.org/10.1016/j.cels.2018.05.014
+> T. J. O'Donnell, et al. "MHCflurry 2.0: Improved pan-allele prediction of MHC
+> I-presented peptides by incorporating antigen processing,"
+> *Cell Systems*, 2020. <https://doi.org/10.1016/j.cels.2020.06.010>
+>
+> T. J. O'Donnell, et al., "MHCflurry: Open-Source Class I MHC Binding Affinity
+> Prediction," *Cell Systems*, 2018. <https://doi.org/10.1016/j.cels.2018.05.014>
 
 If you have questions or encounter problems, please file an issue at the
-MHCflurry github repo: https://github.com/openvax/mhcflurry
+MHCflurry github repo: <https://github.com/openvax/mhcflurry>
 
 
-Installation (pip)
--------------------
+## Installation (pip)
 
 Install the package:
 
-.. code-block:: shell
-
-    $ pip install mhcflurry
+```shell
+$ pip install mhcflurry
+```
 
 Then download our datasets and trained models:
 
-.. code-block:: shell
+```shell
+$ mhcflurry-downloads fetch
+```
 
-    $ mhcflurry-downloads fetch
-
-From a checkout, source ``develop.sh`` to create and activate the editable
+From a checkout, source `develop.sh` to create and activate the editable
 environment:
 
-.. code-block:: shell
-
-    $ source develop.sh
+```shell
+$ source develop.sh
+```
 
 For quick feedback, run lint plus a focused unit subset:
 
-.. code-block:: shell
+```shell
+$ ./lint.sh
+$ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
+```
 
-    $ ./lint.sh
-    $ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
-
-The full command, ``pytest test/``, includes integration-style training,
+The full command, `pytest test/`, includes integration-style training,
 command, and public-model smoke tests that require cached MHCflurry download
-bundles. It can take many minutes. See :doc:`testing` for the test tiers,
-marker expressions such as ``pytest -q test -m "not slow and not downloads"``,
+bundles. It can take many minutes. See {doc}`testing` for the test tiers,
+marker expressions such as `pytest -q test -m "not slow and not downloads"`,
 and profiling commands.
 
 
-Using conda
--------------
+## Using conda
 
-You can alternatively get up and running with a `conda <https://conda.io/docs/>`__
+You can alternatively get up and running with a [conda](https://conda.io/docs/)
 environment as follows.
 
-.. code-block:: shell
-
-    $ conda create -q -n mhcflurry-env python=3.10
-    $ source activate mhcflurry-env
+```shell
+$ conda create -q -n mhcflurry-env python=3.10
+$ source activate mhcflurry-env
+```
 
 Then continue as above:
 
-.. code-block:: shell
-
-    $ pip install mhcflurry
-    $ mhcflurry-downloads fetch
+```shell
+$ pip install mhcflurry
+$ mhcflurry-downloads fetch
+```
