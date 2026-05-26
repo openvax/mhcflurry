@@ -95,6 +95,21 @@ def test_resolve_side_explicit_label_overrides_default():
     assert side["label"] == "baseline"
 
 
+def test_resolve_side_publicy_path_is_not_public_sentinel(tmp_path):
+    """A user-named directory like ``public_data/`` must not be mistaken
+    for the public-install sentinel."""
+    run_dir = tmp_path / "public_data"
+    run_dir.mkdir()
+    side = compare_models._resolve_side(
+        "a", str(run_dir), label=None, args=_make_args())
+    # Label derives from basename, not the literal "public" sentinel.
+    assert side["label"] == "public_data"
+    # And no role paths were resolved through the public-download lookup.
+    for role, path in side["paths"].items():
+        if path is not None:
+            assert path.startswith(str(tmp_path)), (role, path)
+
+
 def test_resolve_side_override_paths_win(tmp_path):
     override = tmp_path / "overridden_affinity"
     override.mkdir()
@@ -248,6 +263,74 @@ def test_training_stats_component_end_to_end(tmp_path):
     # Side A wall-time was double B's.
     assert headline["side_a_finetune_total_wall_min"] == pytest.approx(2.0)
     assert headline["side_b_finetune_total_wall_min"] == pytest.approx(1.0)
+
+
+def test_training_stats_handles_colliding_labels(tmp_path):
+    """If --a-label and --b-label collide, positional indexing keeps the
+    headline pointing at the correct side."""
+    a_dir = tmp_path / "run_a" / "models.unselected.combined"
+    _write_synthetic_manifest(a_dir, "model_a", wall_time_sec=120.0,
+                              n_finetune_epochs=10)
+    b_dir = tmp_path / "run_b" / "models.unselected.combined"
+    _write_synthetic_manifest(b_dir, "model_b", wall_time_sec=60.0,
+                              n_finetune_epochs=20)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    side_a = compare_models._resolve_side(
+        "a", str(tmp_path / "run_a"), "collision", _make_args())
+    side_b = compare_models._resolve_side(
+        "b", str(tmp_path / "run_b"), "collision", _make_args())
+    headline = compare_models._run_training_stats(
+        side_a, side_b, str(out_dir))
+    # 2.0 vs 1.0 must map to A vs B by position, not by label lookup.
+    assert headline["side_a_finetune_total_wall_min"] == pytest.approx(2.0)
+    assert headline["side_b_finetune_total_wall_min"] == pytest.approx(1.0)
+
+
+def test_load_training_summary_rejects_bad_manifest_schema(tmp_path):
+    """A manifest missing required columns should fail loudly with the
+    missing column names + the manifest path, not AttributeError."""
+    bad_dir = tmp_path / "run"
+    bad_dir.mkdir()
+    # Manifest is missing 'config_json'.
+    (bad_dir / "manifest.csv").write_text("model_name,something_else\nx,1\n")
+    with pytest.raises(ValueError, match="config_json"):
+        compare_models._load_training_summary(str(bad_dir))
+
+
+def test_run_orchestrator_training_stats_only(tmp_path):
+    """End-to-end smoke for run(): training_stats only, both sides
+    synthetic. Catches regressions in is_public, _stamp, and the
+    headline-by-label bugs all at once."""
+    for letter in ("a", "b"):
+        target = tmp_path / ("run_" + letter) / "models.unselected.combined"
+        _write_synthetic_manifest(
+            target, "model_" + letter,
+            wall_time_sec=180.0 if letter == "a" else 90.0,
+            n_finetune_epochs=10,
+        )
+    out_dir = tmp_path / "out"
+    args = _make_args(
+        a=str(tmp_path / "run_a"),
+        b=str(tmp_path / "run_b"),
+        a_label="candidate",
+        b_label="baseline",
+        out=str(out_dir),
+        include="training_stats",
+    )
+    assert compare_models.run(args) == 0
+    # Side files written.
+    assert json.loads((out_dir / "side_a.json").read_text())["label"] == "candidate"
+    assert json.loads((out_dir / "side_b.json").read_text())["label"] == "baseline"
+    # Top-level summary mentions both labels.
+    summary_md = (out_dir / "summary.md").read_text()
+    assert "candidate" in summary_md
+    assert "baseline" in summary_md
+    assert "training_stats" in summary_md
+    # Component CSVs landed.
+    per_task = pandas.read_csv(out_dir / "training_stats" / "per_task.csv")
+    assert set(per_task["side"]) == {"candidate", "baseline"}
 
 
 # ---------------------------------------------------------------------------

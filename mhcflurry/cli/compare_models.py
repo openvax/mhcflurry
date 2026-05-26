@@ -154,7 +154,7 @@ def run(args):
         json.dump(_side_to_json(side_b), fd, indent=2, sort_keys=True)
 
     components = _resolve_components(args.include, side_a, side_b)
-    _stamp("running components: %s" % ", ".join(components) or "(none)")
+    _stamp("running components: %s" % (", ".join(components) or "(none)"))
 
     headline = {"side_a": side_a["label"], "side_b": side_b["label"]}
 
@@ -187,7 +187,11 @@ def _resolve_side(letter, spec, label, args):
         "presentation": getattr(args, "%s_presentation_dir" % letter),
         "training": getattr(args, "%s_training_dir" % letter),
     }
-    is_public = isinstance(spec, str) and spec.startswith("public")
+    # Match the public sentinel exactly so user-named directories like
+    # ``public_models/`` or ``publication_data/`` still resolve as run dirs.
+    is_public = isinstance(spec, str) and (
+        spec == "public" or spec.startswith("public:")
+    )
     release_pin = None
     if is_public and ":" in spec:
         _, release_pin = spec.split(":", 1)
@@ -388,6 +392,8 @@ def _run_training_stats(side_a, side_b, out_dir):
     per_task = pandas.concat([a_summary, b_summary], ignore_index=True)
     per_task.to_csv(os.path.join(component_dir, "per_task.csv"), index=False)
 
+    # ``agg`` is built in (side_a, side_b) order, so positional .iloc lookups
+    # are robust even when the two labels happen to collide.
     agg = pandas.DataFrame([
         _aggregate_training_summary(side_a["label"], a_summary),
         _aggregate_training_summary(side_b["label"], b_summary),
@@ -396,17 +402,11 @@ def _run_training_stats(side_a, side_b, out_dir):
     _stamp("wrote training_stats per_task.csv + summary.csv")
     return {
         "side_a_finetune_total_wall_min": float(
-            agg.loc[agg.side == side_a["label"], "finetune_total_wall_min"].iat[0]
-        ),
+            agg.iloc[0]["finetune_total_wall_min"]),
         "side_b_finetune_total_wall_min": float(
-            agg.loc[agg.side == side_b["label"], "finetune_total_wall_min"].iat[0]
-        ),
-        "side_a_n_models": int(
-            agg.loc[agg.side == side_a["label"], "n_models"].iat[0]
-        ),
-        "side_b_n_models": int(
-            agg.loc[agg.side == side_b["label"], "n_models"].iat[0]
-        ),
+            agg.iloc[1]["finetune_total_wall_min"]),
+        "side_a_n_models": int(agg.iloc[0]["n_models"]),
+        "side_b_n_models": int(agg.iloc[1]["n_models"]),
     }
 
 
@@ -421,6 +421,13 @@ def _load_training_summary(training_dir):
     rows = []
     manifest_path = os.path.join(training_dir, "manifest.csv")
     df = pandas.read_csv(manifest_path)
+    required = {"model_name", "config_json"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(
+            "manifest %s missing required columns: %s"
+            % (manifest_path, sorted(missing))
+        )
     for r in df.itertuples():
         cfg = _parse_config_json(r.config_json)
         layer_sizes = tuple(cfg["hyperparameters"].get("layer_sizes") or ())
