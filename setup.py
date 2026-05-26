@@ -54,6 +54,7 @@ if __name__ == "__main__":
         license="Apache-2.0",
         entry_points={
             "console_scripts": [
+                "mhcflurry = mhcflurry.cli.main:main",
                 "mhcflurry-downloads = mhcflurry.downloads_command:run",
                 "mhcflurry-pseudosequences = mhcflurry.pseudosequences:main",
                 "mhcflurry-predict = mhcflurry.predict_command:run",
