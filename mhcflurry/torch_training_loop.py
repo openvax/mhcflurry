@@ -196,32 +196,21 @@ def _validation_forward_network(network, eager_network):
 
 
 def _effective_validation_batch_size(
-        device, configured_batch_size, minibatch_size,
-        model=None, num_workers_per_gpu=1):
+        device, configured_batch_size, minibatch_size):
     """Return the validation batch size to use for the current device.
 
     Static heuristic. MUST be deterministic across calls — fit() /
     fit_streaming_batches() call this per-epoch, and torch.compile caches
-    specializations by input shape. A validation batch that varies
-    with live free-VRAM (the auto-sized approach) forces the
-    compiled graph to re-codegen every epoch and with 16 training
-    workers × 32 inductor compile workers on a 128-vCPU box pins the
-    CPU at hundreds of concurrent compile jobs — observed to stall
-    training indefinitely. The auto-sized prediction batch size in
-    ``compute_prediction_batch_size`` is fine for mhcflurry-predict
-    where each call is a single forward; training-time validation is
-    not that shape.
-
-    ``model`` and ``num_workers_per_gpu`` kwargs are retained for API
-    compatibility with the call sites but are intentionally unused.
+    specializations by input shape. A validation batch that varies with live
+    free-VRAM (the auto-sized approach) forces the compiled graph to
+    re-codegen every epoch; with 16 training workers × 32 inductor compile
+    workers on a 128-vCPU box that pins the CPU at hundreds of concurrent
+    compile jobs — observed to stall training indefinitely.
     """
-    del model, num_workers_per_gpu
     if configured_batch_size:
         return int(configured_batch_size)
     if device.type == "cuda":
-        # Validation is forward-only and the networks are tiny relative
-        # to modern GPU memory. A much larger default batch dramatically
-        # cuts kernel-launch / Python-loop overhead versus 4 *
-        # minibatch_size, while staying deterministic across epochs.
+        # Forward-only validation: kernel-launch overhead matters more than
+        # peak VRAM, so a much larger default batch wins over 4 * minibatch.
         return max(4 * minibatch_size, 4096)
     return 4 * minibatch_size

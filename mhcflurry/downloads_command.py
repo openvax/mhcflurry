@@ -142,14 +142,13 @@ def yes_no(boolean):
 def suspicious_tar_member(member):
     """Return whether a tar member should not be extracted."""
     name = member.name.strip()
+    if not name or posixpath.isabs(name):
+        return True
+    # ``posixpath.normpath`` collapses interior ``..`` so any remaining
+    # ``..`` segment must be at the start (or be the whole path) and means
+    # the member escapes the destination directory.
     normalized = posixpath.normpath(name)
-    if (
-        not name or
-        posixpath.isabs(name) or
-        normalized in (".", "..") or
-        normalized.startswith("../") or
-        "/../" in ("/" + normalized + "/")
-    ):
+    if normalized == ".." or normalized.startswith("../"):
         return True
     return member.issym() or member.islnk()
 

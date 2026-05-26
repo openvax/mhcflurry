@@ -225,15 +225,12 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
     """
     result_df = pandas.DataFrame(index=df.index)
 
-    # Per-allele invariants (medians, low/high peptides, held-out count)
-    # are invariant across folds. The original loop recomputed them
-    # num_folds times. Precompute once; the fold loop only does the
-    # RNG-dependent sampling step, which is what bisects the
-    # bit-identical behavior we need to preserve across this refactor.
-    #
-    # groupby("allele") without sort=False defaults to sort=True →
-    # deterministic iteration order. We materialize the list so the
-    # same order is reused across folds below.
+    # Per-allele invariants (medians, low/high peptides, held-out count) are
+    # fold-independent. Precompute once outside the fold loop; the fold loop
+    # then only does the RNG-dependent sampling. ``groupby("allele")`` defaults
+    # to sort=True, so iteration order is deterministic — must be materialized
+    # so the same order is reused across folds and sample() advances pandas'
+    # global RNG in the same sequence as the pre-refactor implementation.
     allele_groups = list(df.groupby("allele"))
     allele_precomputed = {}
     for (allele, sub_df) in allele_groups:
@@ -249,10 +246,6 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
             "sub_df_peptide": sub_df.peptide,
         }
 
-    # Fold loop: identical structure + identical sample() order as the
-    # original (fold-outer, allele-inner), so pandas' global RNG is
-    # advanced in the same sequence. Output is bit-identical to the
-    # pre-refactor implementation.
     for fold in range(num_folds):
         result_df["fold_%d" % fold] = True
         for (allele, _sub_df) in allele_groups:
