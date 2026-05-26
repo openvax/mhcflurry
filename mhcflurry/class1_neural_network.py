@@ -956,6 +956,30 @@ def _make_streaming_batch_dataloader(
     return torch.utils.data.DataLoader(**kwargs)
 
 
+_VALIDATION_INEQUALITY_FALLBACK_WARNED = False
+
+
+def _warn_validation_inequality_fallback_once(loss_name):
+    """Log once per process when val_loss drops to the single-shot inequality path.
+
+    The fallback exists to preserve 2.1.x semantics: ``MSEWithInequalities`` and
+    its multi-output variant exclude encoded ``2.0`` targets from the
+    denominator, and batchwise averaging would change that count. Users should
+    know that validation is then unbatched so they can size ``batch_size``
+    knowing the cost.
+    """
+    global _VALIDATION_INEQUALITY_FALLBACK_WARNED
+    if _VALIDATION_INEQUALITY_FALLBACK_WARNED:
+        return
+    _VALIDATION_INEQUALITY_FALLBACK_WARNED = True
+    logging.warning(
+        "validation loss running single-shot (no batching) because "
+        "%s has inequality targets that would change the legacy denominator "
+        "if split across batches. This log fires once per process.",
+        loss_name,
+    )
+
+
 def _batched_validation_loss(
     *,
     network,
@@ -994,15 +1018,23 @@ def _batched_validation_loss(
     if n_val == 0:
         return float("nan")
 
-    if (
+    # Short-circuit cheap predicates first so we only sync the device for the
+    # inequality-denominator check when none of the basic conditions apply.
+    needs_basic_fallback = (
         n_val < batch_size
         or val_weights is not None
         or not getattr(loss_obj, "supports_independent_samples", True)
-        or _validation_loss_has_legacy_inequality_denominator(loss_obj, val_y)
-    ):
+    )
+    inequality_fallback = (
+        not needs_basic_fallback
+        and _validation_loss_has_legacy_inequality_denominator(loss_obj, val_y)
+    )
+    if needs_basic_fallback or inequality_fallback:
         # Fallback for tiny val sets (typical in unit tests) and for
         # weighted / cross-example / inequality losses whose reductions are
         # not decomposable batchwise without changing the legacy denominator.
+        if inequality_fallback:
+            _warn_validation_inequality_fallback_once(type(loss_obj).__name__)
         inputs = {"peptide": val_peptide}
         if val_allele is not None:
             inputs["allele"] = val_allele
@@ -2633,6 +2665,15 @@ class Class1NeuralNetwork(object):
                 if dim is None:
                     continue
                 if dim in seen:
+                    logging.warning(
+                        "Allele width inferred via duplicate-shape fallback "
+                        "(positions %d and %d -> width %d). Position-based "
+                        "lookup failed: the saved layer count may not match "
+                        "the architecture used to write these weights.",
+                        seen[dim],
+                        i,
+                        dim,
+                    )
                     return dim
                 seen[dim] = i
         return None
@@ -3595,9 +3636,6 @@ class Class1NeuralNetwork(object):
                         device,
                         self.hyperparameters["validation_batch_size"],
                         self.hyperparameters["minibatch_size"],
-                        model=eager_network,
-                        num_workers_per_gpu=dataloader_num_workers + 1
-                        if dataloader_num_workers else 1,
                     )
                     fit_info["effective_validation_batch_size"] = val_batch_size
                     val_loss = _batched_validation_loss(
@@ -4416,8 +4454,6 @@ class Class1NeuralNetwork(object):
                         device,
                         self.hyperparameters["validation_batch_size"],
                         batch_size,
-                        model=eager_network,
-                        num_workers_per_gpu=1,
                     )
                     fit_info["effective_validation_batch_size"] = val_batch_size
                     validation_start = _timing_start(device, timing_enabled)

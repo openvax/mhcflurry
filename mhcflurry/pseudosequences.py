@@ -36,6 +36,7 @@ Expected locations:
 from __future__ import annotations
 
 import argparse
+import logging
 from dataclasses import dataclass
 from glob import glob
 from os.path import basename, exists, join
@@ -158,14 +159,30 @@ def pseudosequence_filename_candidates(models_dir):
 
 
 def pseudosequence_path(directory, length, fallback_legacy=True):
-    """Return the preferred pseudosequence path in ``directory``."""
+    """Return the preferred pseudosequence path in ``directory``.
+
+    When the canonical ``pseudosequences.*.<length>aa.csv`` is absent and
+    ``fallback_legacy`` is true, returns the legacy
+    ``allele_sequences.csv`` path and logs a warning so callers don't
+    silently read a different sequence set than requested.
+    """
     filename = pseudosequence_filename_for_length(length)
     if filename is None:
         raise ValueError("No canonical pseudosequence filename for %saa" % length)
     path = join(directory, filename)
     if exists(path) or not fallback_legacy:
         return path
-    return join(directory, LEGACY_ALLELE_SEQUENCES_FILENAME)
+    legacy_path = join(directory, LEGACY_ALLELE_SEQUENCES_FILENAME)
+    logging.warning(
+        "Canonical pseudosequence file %s not found in %s; falling back to "
+        "legacy %s. The legacy file may carry a different representation "
+        "width than requested (%saa).",
+        filename,
+        directory,
+        LEGACY_ALLELE_SEQUENCES_FILENAME,
+        length,
+    )
+    return legacy_path
 
 
 def _run_filename(args):
