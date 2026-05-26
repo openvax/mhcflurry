@@ -41,14 +41,16 @@ one-off tuning runs do not belong here.
   Phase-idempotent (`.train.done` / `.select.done` / `.calibrate.done` /
   `.eval.done` sentinels) and supports `MHCFLURRY_SCALE_LR`,
   `MHCFLURRY_SKIP_CALIBRATE` for the variants we routinely run.
-- **`compare_new_vs_public.py`** — Multi-GPU eval against the public 2.2.0
-  release on the `data_evaluation` benchmark. Per-allele + per-peptide-
-  length micro/macro ROC AUC, PR AUC, PPV@N. Used by the sweep eval
-  phase and as a standalone tool.
-- **`compare_runs.py`** — Two-run comparator (read each run's
-  `manifest.csv` + `eval_comparison/` outputs, emit markdown table +
-  CSV). Useful any time you train a new ensemble and want a side-by-
-  side against an older one.
+- **`mhcflurry compare-models`** — Unified two-side comparator covering
+  training stats (per-task wall-time / epoch / loss deltas), affinity
+  (per-allele + per-length ROC/PR/PPV on `data_evaluation` monoallelic),
+  and presentation (per-sample + per-length on multiallelic with/without
+  flanks). Each side can be a training-run directory, `public` (current
+  install), or `public:<release_name>`. Default `--b public`. Replaces
+  the three legacy `scripts/training/compare_*.py` tools.
+- **`mhcflurry plot-model-comparison`** — Renders ROC/PR/scatter/delta
+  plots from a `compare-models` output directory. Separate subcommand so
+  the metric pipeline doesn't pay the matplotlib import cost.
 - **`plot_minibatch_sweep.py`** — Stylized plots from a `sweep_summary.csv`
   (gradient-color dots by mb, lin-lin + log-log only, adjustText
   de-overlap). Invoked by the sweep wrapper after completion.
@@ -77,12 +79,11 @@ with a `downloads-generation/<download_name>/GENERATE.sh` once their
 outputs are release artifacts that should be reproducible and
 downloadable.
 
-- **`compare_new_vs_public.py`** and
-  **`compare_presentation_new_vs_public.py`** — if the summary tables,
-  plots, or row-level new-vs-public predictions are used as release
-  evidence, make a generated analysis download that pins the new model
-  paths, public download versions, data-evaluation version, git SHA, and
-  command arguments.
+- **`mhcflurry compare-models`** (affinity + presentation components) —
+  if the summary tables, plots, or row-level new-vs-public predictions
+  are used as release evidence, make a generated analysis download that
+  pins the new model paths, public download versions, data-evaluation
+  version, git SHA, and command arguments.
 - **`pan_allele_release_full.sh`** /
   **`pan_allele_release_affinity.sh`** /
   **`presentation_from_affinity.sh`** — once the 2.3.x recipe is final,

@@ -18,9 +18,7 @@
 #   HYPERPARAMS_TPL   template hyperparameters.yaml to patch
 #   ALLELE_SEQUENCES  path to a pseudosequence CSV
 #   PRETRAIN_DATA     path to random_peptide_predictions/predictions.csv.bz2
-#   PUBLIC_MODELS_DIR public 2.2.0 models.combined for eval comparison
 #   DATA_EVAL_DIR     data_evaluation/ for benchmark hits/decoys
-#   COMPARE_SCRIPT    path to compare_new_vs_public.py
 #   GPUS, MAX_TASKS_PER_WORKER
 #   MHCFLURRY_SCALE_LR_BASE_MB  reference minibatch for sqrt LR scaling
 #                                (default 128, matching the historical
@@ -62,9 +60,7 @@ if [ -z "${ALLELE_SEQUENCES:-}" ]; then
     --fallback-legacy)"
 fi
 PRETRAIN_DATA="${PRETRAIN_DATA:-$(mhcflurry-downloads path random_peptide_predictions)/predictions.csv.bz2}"
-PUBLIC_MODELS_DIR="${PUBLIC_MODELS_DIR:-$(mhcflurry-downloads path models_class1_pan)/models.combined}"
 DATA_EVAL_DIR="${DATA_EVAL_DIR:-$(mhcflurry-downloads path data_evaluation)}"
-COMPARE_SCRIPT="${COMPARE_SCRIPT:?COMPARE_SCRIPT must point at compare_new_vs_public.py}"
 GPUS="${GPUS:-8}"
 MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
 # Model selection bounds. mhcflurry-class1-select-pan-allele-models picks
@@ -231,10 +227,12 @@ PY
     else
     eval_start=$(date +%s)
     mkdir -p "$SIZE_OUT/eval_comparison"
-    python3 "$COMPARE_SCRIPT" \
-        --new-models-dir "$SIZE_OUT/models.combined" \
-        --public-models-dir "$PUBLIC_MODELS_DIR" \
+    mhcflurry compare-models \
+        --a "$SIZE_OUT/models.combined" \
+        --a-label "mb_$MB" \
+        --b public \
         --data-dir "$DATA_EVAL_DIR" \
+        --include affinity \
         --out "$SIZE_OUT/eval_comparison" \
         2>&1 | tee "$SIZE_OUT/eval.log"
     eval_end=$(date +%s)

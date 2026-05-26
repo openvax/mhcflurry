@@ -469,21 +469,17 @@ else
     # the per-allele eval output stays unpolluted by extraction progress.
     run_logged_step "fetch_eval_data" "$FETCH_LOG" \
         mhcflurry-downloads fetch data_evaluation models_class1_pan
-    PUBLIC_MODELS_DIR="$(mhcflurry-downloads path models_class1_pan)/models.combined"
     DATA_EVAL_DIR="$(mhcflurry-downloads path data_evaluation)"
     EVAL_OUT="$MHCFLURRY_OUT/eval_comparison"
     mkdir -p "$EVAL_OUT"
-    COMPARE_SCRIPT="$SCRIPT_DIR/compare_new_vs_public.py"
-    if [ ! -f "$COMPARE_SCRIPT" ]; then
-        log_release_event eval_skipped "missing compare_new_vs_public.py"
-    else
-        run_logged_step "eval_compare_new_vs_public" "$EVAL_LOG" \
-            python3 "$COMPARE_SCRIPT" \
-            --new-models-dir "$MHCFLURRY_OUT/models.combined" \
-            --public-models-dir "$PUBLIC_MODELS_DIR" \
+    run_logged_step "eval_compare_new_vs_public" "$EVAL_LOG" \
+        mhcflurry compare-models \
+            --a "$MHCFLURRY_OUT/models.combined" \
+            --a-label new \
+            --b public \
             --data-dir "$DATA_EVAL_DIR" \
+            --include affinity \
             --out "$EVAL_OUT"
-    fi
 fi
 
 # ---- loss-curve plots -----------------------------------------------
