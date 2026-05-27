@@ -102,6 +102,31 @@ def test_main_unknown_subcommand_exits():
         cli_main.main(["does-not-exist"])
 
 
+def test_version_flag(capsys):
+    """``mhcflurry --version`` and ``-V`` print the package version + exit 0."""
+    from mhcflurry.version import __version__
+    for flag in ("--version", "-V"):
+        assert cli_main.main([flag]) == 0
+        out = capsys.readouterr().out
+        assert out.strip() == "mhcflurry %s" % __version__
+
+
+def test_bare_invocation_shows_grouped_help(capsys):
+    """Bare ``mhcflurry`` prints the grouped help screen to stdout + exits 0
+    (treats no-args as 'user asked for help')."""
+    assert cli_main.main([]) == 0
+    out = capsys.readouterr().out
+    assert "MHCflurry " in out  # version banner
+    for group in (
+            "Prediction:", "Calibration:", "Class I training:",
+            "Class I selection:", "Model comparison",
+    ):
+        assert group in out, "missing group header: %s" % group
+    # The example block should also surface.
+    assert "Examples:" in out
+    assert "mhcflurry compare-models" in out
+
+
 def test_subsubcommand_help_shows_full_prog(capsys):
     """``mhcflurry pseudosequences filename --help`` must show the full
     ``mhcflurry pseudosequences filename`` prog, not the inherited

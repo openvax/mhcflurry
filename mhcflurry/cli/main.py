@@ -109,6 +109,15 @@ _HELP_GROUPS = (
 
 
 def _check_help_groups():
+    """Fail-fast at import time if _HELP_GROUPS drifts from _SUBCOMMANDS.
+
+    Cost of import-time enforcement: a malformed edit to either constant
+    breaks ``import mhcflurry.cli.main`` for everyone, including the
+    legacy ``mhcflurry-*`` console scripts (which don't otherwise depend
+    on this module — they import their command module directly). The
+    upside is that drift can't ship: the help screen always lists every
+    registered subcommand in exactly one group.
+    """
     grouped = {name for _, names in _HELP_GROUPS for name in names}
     missing = set(_SUBCOMMANDS) - grouped
     extra = grouped - set(_SUBCOMMANDS)
@@ -133,8 +142,8 @@ def build_parser():
             "any subcommand."
         ),
     )
-    parser.add_argument(
-        "--version", action="version", version="mhcflurry %s" % __version__)
+    # ``--version`` / ``-V`` is handled by main()'s early-exit before
+    # parse_args runs; no argparse action needed here.
     sub = parser.add_subparsers(dest="subcommand", required=True)
     for name, (_module, _entry, help_text) in _SUBCOMMANDS.items():
         sub.add_parser(name, help=help_text, add_help=False)
@@ -174,8 +183,8 @@ def format_help():
         "  mhcflurry <subcommand> --help",
         "",
         "Options:",
-        "  -h, --help     show this screen and exit",
-        "  --version      show 'mhcflurry %s' and exit" % __version__,
+        "  -h, --help     show this help message and exit",
+        "  --version, -V  show 'mhcflurry %s' and exit" % __version__,
     ])
     return "\n".join(lines)
 
@@ -196,6 +205,10 @@ def _rewrite_parser_prog(parser, prog):
         return saved
     saved.append((parser, parser.prog))
     parser.prog = prog
+    # argparse._SubParsersAction is technically a private name (underscore
+    # prefix), but the class has been stable across Python releases and is
+    # the standard handle every CLI tool that walks subparser trees uses
+    # (sphinx-autoprogram, click->argparse adapters, etc).
     for action in parser._actions:
         if isinstance(action, argparse._SubParsersAction):
             for sub_name, sub_parser in action.choices.items():
@@ -215,11 +228,12 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
     if not argv:
-        # Bare ``mhcflurry``: print the friendly help and exit. Non-zero
-        # exit matches argparse's "missing required positional" convention
-        # (and how git, kubectl, etc. behave).
+        # Bare ``mhcflurry``: treat as "user asked for help". stdout +
+        # exit 0 so the screen can be piped into ``less`` and so
+        # tab-completion shells that probe ``mhcflurry`` don't see a
+        # spurious error.
         print(format_help())
-        return 2
+        return 0
     if argv[0] in ("-h", "--help"):
         print(format_help())
         return 0
