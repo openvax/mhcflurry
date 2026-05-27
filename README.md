@@ -107,9 +107,14 @@ Wrote: /tmp/predictions.csv
 ### Unified `mhcflurry` parent command
 
 Starting in 2.3.0 there is also a single `mhcflurry` command that dispatches
-to subcommands. Two new tools live exclusively under the parent:
+to every subcommand:
 
 ```
+$ mhcflurry predict \
+        --alleles HLA-A0201 HLA-A0301 \
+        --peptides SIINFEKL SIINFEKD SIINFEKQ \
+        --out /tmp/predictions.csv
+
 $ mhcflurry compare-models \
         --a results/new_run/ \
         --b public \
@@ -118,17 +123,16 @@ $ mhcflurry compare-models \
 $ mhcflurry plot-model-comparison --input results/comparison/
 ```
 
-`compare-models` compares two training runs (or one run vs the currently-
-installed public release) across affinity, presentation, and training-stats
-components. `plot-model-comparison` renders the ROC/PR/scatter/delta plots
-from those outputs.
+Every historical command is reachable as a subcommand
+(`mhcflurry-predict` ↔ `mhcflurry predict`, `mhcflurry-downloads` ↔
+`mhcflurry downloads`, `mhcflurry-class1-train-pan-allele-models` ↔
+`mhcflurry class1-train-pan-allele-models`, etc.). Both forms run the
+same underlying entry point; the legacy `mhcflurry-*` scripts remain
+installed as compat shims and are not changing. `mhcflurry --help`
+lists every available subcommand.
 
-All historical commands (`mhcflurry-predict`, `mhcflurry-predict-scan`,
-`mhcflurry-downloads`, `mhcflurry-calibrate-percentile-ranks`,
-`mhcflurry-class1-*-models`, `mhcflurry-pseudosequences`) remain installed
-as standalone entry points and are not changing. Migration of those under
-the unified `mhcflurry` dispatcher is tracked in
-[#291](https://github.com/openvax/mhcflurry/issues/291).
+The two new-in-2.3.0 model-comparison tools, `compare-models` and
+`plot-model-comparison`, only have the unified form.
 
 See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
 

@@ -24,10 +24,14 @@ def test_top_level_parser_lists_subcommands():
 
 
 def test_compare_models_help_runs(capsys):
-    """The compare-models help text exposes the documented flags."""
-    parser = cli_main.build_parser()
+    """The compare-models help text exposes the documented flags.
+
+    Goes through ``main()`` rather than ``build_parser`` because subparsers
+    are name-only (lazy import); per-subcommand args are only built when
+    the legacy module is actually invoked.
+    """
     with pytest.raises(SystemExit):
-        parser.parse_args(["compare-models", "--help"])
+        cli_main.main(["compare-models", "--help"])
     captured = capsys.readouterr().out
     for flag in ["--a", "--b", "--include", "--out", "--data-dir",
                  "--num-jobs", "--gpus", "--max-workers-per-gpu",
@@ -36,9 +40,8 @@ def test_compare_models_help_runs(capsys):
 
 
 def test_plot_help_runs(capsys):
-    parser = cli_main.build_parser()
     with pytest.raises(SystemExit):
-        parser.parse_args(["plot-model-comparison", "--help"])
+        cli_main.main(["plot-model-comparison", "--help"])
     captured = capsys.readouterr().out
     assert "--input" in captured
 
@@ -47,6 +50,56 @@ def test_unknown_subcommand_errors():
     parser = cli_main.build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["does-not-exist"])
+
+
+def test_all_legacy_commands_registered():
+    """All 12 legacy mhcflurry-* commands are reachable as subcommands."""
+    expected = {
+        "predict", "predict-scan", "downloads",
+        "calibrate-percentile-ranks",
+        "class1-train-allele-specific-models",
+        "class1-select-allele-specific-models",
+        "class1-train-pan-allele-models",
+        "class1-select-pan-allele-models",
+        "class1-train-processing-models",
+        "class1-select-processing-models",
+        "class1-train-presentation-models",
+        "pseudosequences",
+    }
+    assert expected.issubset(set(cli_main._SUBCOMMANDS))
+
+
+def test_main_help_does_not_import_predict_command():
+    """``mhcflurry --help`` must not pay the cost of importing every
+    legacy command module. Lazy-import is the whole reason build_parser
+    only registers subcommand names."""
+    import subprocess
+    import sys as _sys
+    result = subprocess.run(
+        [_sys.executable, "-c",
+         "import sys; from mhcflurry.cli.main import build_parser; "
+         "build_parser(); "
+         "print(int('mhcflurry.predict_command' in sys.modules))"],
+        capture_output=True, text=True, check=True,
+    )
+    assert result.stdout.strip() == "0", (
+        "predict_command was imported by build_parser(); should be lazy: %s"
+        % result.stdout
+    )
+
+
+def test_main_dispatches_pseudosequences_list(capsys):
+    """End-to-end: ``mhcflurry pseudosequences list`` runs the legacy
+    module's main(argv) and prints the registry rows."""
+    cli_main.main(["pseudosequences", "list"])
+    out = capsys.readouterr().out
+    assert "netmhcpan" in out
+    assert "pseudosequences.mhcflurry.39aa.csv" in out
+
+
+def test_main_unknown_subcommand_exits():
+    with pytest.raises(SystemExit):
+        cli_main.main(["does-not-exist"])
 
 
 # ---------------------------------------------------------------------------

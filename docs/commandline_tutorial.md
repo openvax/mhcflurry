@@ -282,8 +282,16 @@ post-mortem is visible in the log.
 
 ## Unified `mhcflurry` command (new in 2.3.0)
 
-The new `mhcflurry` parent command dispatches to subcommands. Two
-tools live exclusively under it:
+Every command on this page is now reachable two ways:
+
+* `mhcflurry <subcommand>` — the unified form (`mhcflurry predict`,
+  `mhcflurry downloads fetch`, `mhcflurry class1-train-pan-allele-models`,
+  etc.). One help surface via `mhcflurry --help`.
+* `mhcflurry-<subcommand>` — the historical standalone form
+  (`mhcflurry-predict`, `mhcflurry-downloads`, etc.). Still installed
+  as a compat shim; both forms run the same underlying entry point.
+
+Two tools are new in 2.3.0 and only have the unified form:
 
 * {ref}`mhcflurry compare-models <ref-mhcflurry-compare-models>` — compares
   two ensembles (run-vs-run or run-vs-public) across affinity,
@@ -307,13 +315,6 @@ $ mhcflurry plot-model-comparison --input results/comparison/
 mhcflurry release. Use `public:<release_name>` to pin a specific
 release. Component autoskip: training_stats / affinity / presentation
 each run only when both sides have the corresponding artifact.
-
-All existing `mhcflurry-*` commands (`mhcflurry-predict`,
-`mhcflurry-downloads`, `mhcflurry-calibrate-percentile-ranks`,
-`mhcflurry-class1-*-models`, `mhcflurry-pseudosequences`) remain
-installed as standalone entry points. Migration of those under the
-unified dispatcher is tracked in
-[#291](https://github.com/openvax/mhcflurry/issues/291).
 
 ## Also new in 2.3.0
 

@@ -71,6 +71,11 @@ def make_parser():
     return parser
 
 
+def run_argv(argv):
+    """Entry point for the lazy ``mhcflurry compare-models`` dispatcher."""
+    return run(make_parser().parse_args(argv))
+
+
 def register_subparser(parser):
     parser.description = __doc__
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
