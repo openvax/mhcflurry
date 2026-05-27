@@ -144,9 +144,10 @@ def suspicious_tar_member(member):
     name = member.name.strip()
     if not name or posixpath.isabs(name):
         return True
-    # ``posixpath.normpath`` collapses interior ``..`` so any remaining
-    # ``..`` segment must be at the start (or be the whole path) and means
-    # the member escapes the destination directory.
+    if ".." in name.split("/"):
+        return True
+    # Keep a normalized guard for unusual path spellings that still resolve
+    # above the extraction directory.
     normalized = posixpath.normpath(name)
     if normalized == ".." or normalized.startswith("../"):
         return True

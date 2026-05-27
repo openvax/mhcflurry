@@ -8,6 +8,7 @@ integration suites, not here.
 
 import argparse
 import json
+import os
 
 import pandas
 import pytest
@@ -191,6 +192,33 @@ def test_resolve_side_public_pinned_release_label():
     side = compare_models._resolve_side(
         "b", "public:4-pre-2.2.0", label=None, args=_make_args())
     assert side["label"] == "public:4-pre-2.2.0"
+
+
+def test_resolve_side_public_pin_does_not_leak(monkeypatch):
+    from mhcflurry import downloads
+
+    release_env = "MHCFLURRY_DOWNLOADS_CURRENT_RELEASE"
+    monkeypatch.delenv(release_env, raising=False)
+
+    def fake_configure():
+        pass
+
+    def fake_get_path(download_name, sub):
+        release = os.environ.get(release_env, "current")
+        return "/downloads/%s/%s/%s" % (release, download_name, sub)
+
+    monkeypatch.setattr(downloads, "configure", fake_configure)
+    monkeypatch.setattr(downloads, "get_path", fake_get_path)
+
+    side_a = compare_models._resolve_side(
+        "a", "public:pinned-release", label=None, args=_make_args())
+    side_b = compare_models._resolve_side(
+        "b", "public", label=None, args=_make_args())
+
+    assert side_a["paths"]["affinity"].startswith(
+        "/downloads/pinned-release/")
+    assert side_b["paths"]["affinity"].startswith("/downloads/current/")
+    assert release_env not in os.environ
 
 
 def test_resolve_side_explicit_label_overrides_default():

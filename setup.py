@@ -13,7 +13,7 @@ import os
 import logging
 import re
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 
 readme_dir = os.path.dirname(__file__)
@@ -97,7 +97,5 @@ if __name__ == "__main__":
         install_requires=required_packages,
         long_description=readme,
         long_description_content_type="text/markdown",
-        packages=[
-            "mhcflurry",
-        ],
+        packages=find_packages(include=["mhcflurry", "mhcflurry.*"]),
     )
