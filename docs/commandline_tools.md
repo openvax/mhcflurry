@@ -42,7 +42,7 @@ The two commands new in 2.3.0 — `mhcflurry compare-models` and
     :prog: mhcflurry calibrate-percentile-ranks
 ```
 
-## Class1 training and selection
+## Class I training and selection
 
 ```{eval-rst}
 .. _ref-mhcflurry-class1-train-allele-specific-models:
