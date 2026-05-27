@@ -180,6 +180,36 @@ def format_help():
     return "\n".join(lines)
 
 
+def _rewrite_parser_prog(parser, prog):
+    """Recursively rewrite ``parser.prog`` and its subparsers' progs.
+
+    Returns a list of ``(parser, original_prog)`` pairs that
+    :func:`_restore_parser_progs` can use to undo the change. Walking the
+    subparser tree is necessary because sub-subcommands (``downloads
+    fetch``, ``pseudosequences filename``, …) take their prog from the
+    parent at parser-build time, which for legacy modules is import
+    time — before the unified dispatcher gets to rename the top-level
+    parser.
+    """
+    saved = []
+    if parser is None or not hasattr(parser, "prog"):
+        return saved
+    saved.append((parser, parser.prog))
+    parser.prog = prog
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for sub_name, sub_parser in action.choices.items():
+                saved.extend(_rewrite_parser_prog(
+                    sub_parser, "%s %s" % (prog, sub_name)))
+    return saved
+
+
+def _restore_parser_progs(saved):
+    """Reverse :func:`_rewrite_parser_prog`; used as a tests-friendly finally."""
+    for parser, original_prog in saved:
+        parser.prog = original_prog
+
+
 def main(argv=None):
     """Dispatch entry point for the ``mhcflurry`` console script."""
     if argv is None:
@@ -204,21 +234,19 @@ def main(argv=None):
         # Subcommands' parsers default ``prog`` to ``sys.argv[0]`` (the
         # console script name). When dispatched under the parent, fix
         # the displayed name so ``--help`` shows ``mhcflurry
-        # <subcommand>`` instead of just ``mhcflurry``.
+        # <subcommand>`` (and ``mhcflurry <subcommand> <subsub>`` for
+        # commands like ``downloads`` and ``pseudosequences`` that have
+        # their own subparsers) instead of just ``mhcflurry``.
         prog = "mhcflurry %s" % subcommand
         saved_argv0 = sys.argv[0]
         sys.argv[0] = prog
-        if hasattr(module, "parser") and hasattr(module.parser, "prog"):
-            saved_prog = module.parser.prog
-            module.parser.prog = prog
-        else:
-            saved_prog = None
+        saved_progs = _rewrite_parser_prog(
+            getattr(module, "parser", None), prog)
         try:
             return getattr(module, entry)(remaining)
         finally:
             sys.argv[0] = saved_argv0
-            if saved_prog is not None:
-                module.parser.prog = saved_prog
+            _restore_parser_progs(saved_progs)
     # Unknown subcommand — let argparse emit the standard error + usage.
     build_parser().parse_args(argv)
     return 2  # unreachable; parse_args exits

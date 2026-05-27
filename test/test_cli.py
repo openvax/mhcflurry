@@ -102,6 +102,32 @@ def test_main_unknown_subcommand_exits():
         cli_main.main(["does-not-exist"])
 
 
+def test_subsubcommand_help_shows_full_prog(capsys):
+    """``mhcflurry pseudosequences filename --help`` must show the full
+    ``mhcflurry pseudosequences filename`` prog, not the inherited
+    ``sys.argv[0]`` from the parent. Regression for sub-subparsers
+    inheriting prog at parser-build time."""
+    with pytest.raises(SystemExit):
+        cli_main.main(["pseudosequences", "filename", "--help"])
+    captured = capsys.readouterr().out
+    assert "usage: mhcflurry pseudosequences filename" in captured, captured
+
+
+def test_rewrite_parser_prog_restores_on_exit(capsys):
+    """Two consecutive dispatches must each see their own prog — i.e.
+    the saved/restore cycle in _rewrite_parser_prog actually undoes
+    the rewrite. Catches a regression where the second call would
+    leak the first call's prog."""
+    with pytest.raises(SystemExit):
+        cli_main.main(["pseudosequences", "filename", "--help"])
+    first = capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        cli_main.main(["pseudosequences", "filename", "--help"])
+    second = capsys.readouterr().out
+    assert "usage: mhcflurry pseudosequences filename" in first
+    assert "usage: mhcflurry pseudosequences filename" in second
+
+
 # ---------------------------------------------------------------------------
 # Side resolution
 # ---------------------------------------------------------------------------
