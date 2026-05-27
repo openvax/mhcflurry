@@ -148,7 +148,7 @@ output_args.add_argument(
     "--prediction-column-prefix",
     metavar="NAME",
     default="mhcflurry_",
-    help="Prefix for output column names. Default: '%(default)s'")
+    help="Prefix for output column names. Default: ``%(default)s``")
 output_args.add_argument(
     "--output-delimiter",
     metavar="CHAR",

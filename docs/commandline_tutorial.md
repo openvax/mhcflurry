@@ -8,13 +8,13 @@
 
 Most users will use pre-trained MHCflurry models that we release. These models
 are distributed separately from the pip package and may be downloaded with the
-{ref}`mhcflurry-downloads` tool:
+{ref}`mhcflurry-downloads <ref-mhcflurry-downloads>` tool:
 
 ```shell
 $ mhcflurry-downloads fetch models_class1_presentation
 ```
 
-Files downloaded with {ref}`mhcflurry-downloads` are stored in a platform-specific
+Files downloaded with {ref}`mhcflurry-downloads <ref-mhcflurry-downloads>` are stored in a platform-specific
 directory. To get the path to downloaded data, you can use:
 
 ```{command-output} mhcflurry-downloads path models_class1_presentation
@@ -38,7 +38,7 @@ The code we use for *generating* the downloads is in the
 
 ## Generating predictions
 
-The {ref}`mhcflurry-predict` command generates predictions for individual peptides
+The {ref}`mhcflurry-predict <ref-mhcflurry-predict>` command generates predictions for individual peptides
 (see the next section for how to scan protein sequences for epitopes). By
 default it will use the pre-trained models you downloaded above. Other
 models can be used by specifying the `--models` argument.
@@ -81,7 +81,7 @@ In most cases you'll want to specify the input as a CSV file instead of passing
 peptides and alleles as commandline arguments. If you're relying on the
 processing or presentation scores, you may also want to pass the upstream and
 downstream sequences of the peptides from their source proteins for potentially more
-accurate cleavage prediction. See the {ref}`mhcflurry-predict` docs.
+accurate cleavage prediction. See the {ref}`mhcflurry-predict <ref-mhcflurry-predict>` docs.
 
 
 ## Using the older, allele-specific models
@@ -126,7 +126,7 @@ binders to either of two MHC I genotypes (using a 100 nM threshold):
 :nostderr:
 ```
 
-See the {ref}`mhcflurry-predict-scan` docs for more options.
+See the {ref}`mhcflurry-predict-scan <ref-mhcflurry-predict-scan>` docs for more options.
 
 
 ## Fitting your own models
@@ -134,13 +134,13 @@ See the {ref}`mhcflurry-predict-scan` docs for more options.
 If you have your own data and want to fit your own MHCflurry models, you have
 a few options. If you have data for only one or a few MHC I alleles, the best
 approach is to use the
-{ref}`mhcflurry-class1-train-allele-specific-models` command to fit an
+{ref}`mhcflurry-class1-train-allele-specific-models <ref-mhcflurry-class1-train-allele-specific-models>` command to fit an
 "allele-specific" predictor, in which separate neural networks are used for
 each allele.
 
-To call {ref}`mhcflurry-class1-train-allele-specific-models` you'll need some
+To call {ref}`mhcflurry-class1-train-allele-specific-models <ref-mhcflurry-class1-train-allele-specific-models>` you'll need some
 training data. The data we use for our released predictors can be downloaded with
-{ref}`mhcflurry-downloads`:
+{ref}`mhcflurry-downloads <ref-mhcflurry-downloads>`:
 
 ```shell
 $ mhcflurry-downloads fetch data_curated
@@ -210,7 +210,7 @@ peptides. It is used for generating the percent ranks at prediction time.
 :::
 
 To fit pan-allele models like the ones released with MHCflurry, you can use
-a similar tool, {ref}`mhcflurry-class1-train-pan-allele-models`. You'll probably
+a similar tool, {ref}`mhcflurry-class1-train-pan-allele-models <ref-mhcflurry-class1-train-pan-allele-models>`. You'll probably
 also want to take a look at the scripts used to generate the production models,
 which are available in the *downloads-generation* directory in the MHCflurry
 repository. See the scripts in the *models_class1_pan* subdirectory to see how the
@@ -285,10 +285,10 @@ post-mortem is visible in the log.
 The new `mhcflurry` parent command dispatches to subcommands. Two
 tools live exclusively under it:
 
-* {ref}`mhcflurry compare-models <mhcflurry-compare-models>` — compares
+* {ref}`mhcflurry compare-models <ref-mhcflurry-compare-models>` — compares
   two ensembles (run-vs-run or run-vs-public) across affinity,
   presentation, and training-stats components.
-* {ref}`mhcflurry plot-model-comparison <mhcflurry-plot-model-comparison>`
+* {ref}`mhcflurry plot-model-comparison <ref-mhcflurry-plot-model-comparison>`
   — renders ROC/PR/scatter/delta plots from a `compare-models`
   output directory.
 

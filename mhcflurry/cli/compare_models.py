@@ -7,6 +7,7 @@ or ``public:<release_name>`` (pin a non-default release). ``--b`` defaults
 to ``public``.
 
 Runs whichever components are available on both sides:
+
 * ``training_stats`` — per-task wall-time, epoch-count, final-loss
   deltas from each side's ``manifest.csv``. Skipped when either side is
   public (no manifest).

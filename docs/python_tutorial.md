@@ -10,8 +10,8 @@ details.
 
 Most prediction tasks can be performed using the
 {class}`~mhcflurry.Class1PresentationPredictor` class, which provides a programmatic API
-to the functionality in the {ref}`mhcflurry-predict` and
-{ref}`mhcflurry-predict-scan` commands.
+to the functionality in the {ref}`mhcflurry-predict <ref-mhcflurry-predict>` and
+{ref}`mhcflurry-predict-scan <ref-mhcflurry-predict-scan>` commands.
 
 Instances of {class}`~mhcflurry.Class1PresentationPredictor` wrap a
 {class}`~mhcflurry.Class1AffinityPredictor` to generate binding affinity predictions

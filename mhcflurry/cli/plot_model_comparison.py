@@ -27,7 +27,7 @@ def register_subparser(parser):
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
     parser.add_argument(
         "--input", required=True,
-        help="Output directory produced by `mhcflurry compare-models`.",
+        help="Output directory produced by ``mhcflurry compare-models``.",
     )
     parser.add_argument(
         "--max-scatter-points", type=int, default=100_000,
