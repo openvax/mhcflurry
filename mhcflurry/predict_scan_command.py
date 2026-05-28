@@ -258,8 +258,12 @@ def run(argv=sys.argv[1:]):
         args.threshold_affinity_percentile,
     ]
     if not args.results_all and all(x is None for x in threshold_args):
-        print("Filtering by affinity-percentile < %s" % default_thresholds["affinity_percentile"])
-        print("to show all predictions, pass --results-all")
+        print(
+            "Filtering by affinity-percentile < %s" % default_thresholds["affinity_percentile"],
+            file=sys.stderr)
+        print(
+            "to show all predictions, pass --results-all",
+            file=sys.stderr)
         args.threshold_affinity_percentile = default_thresholds["affinity_percentile"]
 
     models_dir = args.models
@@ -300,12 +304,16 @@ def run(argv=sys.argv[1:]):
                     "Couldn't guess input format from file extension: %s\n"
                     "Pass the --input-format argument to specify if it is a "
                     "CSV or fasta file" % args.input)
-            print("Guessed input file format:", input_format)
+            print(
+                "Guessed input file format:", input_format,
+                file=sys.stderr)
 
         if input_format == "csv":
             df = pandas.read_csv(args.input)
-            print("Read input CSV with %d rows, columns are: %s" % (
-                len(df), ", ".join(df.columns)))
+            print(
+                "Read input CSV with %d rows, columns are: %s" % (
+                    len(df), ", ".join(df.columns)),
+                file=sys.stderr)
             for col in [args.sequence_column,]:
                 if col not in df.columns:
                     raise ValueError(
@@ -314,8 +322,10 @@ def run(argv=sys.argv[1:]):
 
         elif input_format == "fasta":
             df = read_fasta_to_dataframe(args.input)
-            print("Read input fasta with %d sequences" % len(df))
-            print(df)
+            print(
+                "Read input fasta with %d sequences" % len(df),
+                file=sys.stderr)
+            print(df, file=sys.stderr)
         else:
             raise ValueError("Unsupported input format", input_format)
     else:
@@ -337,7 +347,9 @@ def run(argv=sys.argv[1:]):
         genotypes.index = genotypes.index.map(lambda i: "genotype_%02d" % i)
         alleles = genotypes.to_dict()
     else:
-        print("No alleles specified. Will perform processing prediction only.")
+        print(
+            "No alleles specified. Will perform processing prediction only.",
+            file=sys.stderr)
         alleles = {}
 
     sequences = df[args.sequence_column].to_dict()
@@ -463,6 +475,6 @@ def run(argv=sys.argv[1:]):
     # Write results
     if args.out:
         result_df.to_csv(args.out, index=False, sep=args.output_delimiter)
-        print("Wrote: %s" % args.out)
+        print("Wrote: %s" % args.out, file=sys.stderr)
     else:
         result_df.to_csv(sys.stdout, index=False, sep=args.output_delimiter)

@@ -820,9 +820,9 @@ def resolve_local_parallelism_args(
         os.environ["MHCFLURRY_ENABLE_TIMING"] = "1"
 
     for warning in plan.warnings:
-        print("Local parallelism:", warning)
+        print("Local parallelism:", warning, file=sys.stderr)
     hoist_torchinductor_compile_threads(args)
-    print("Local workload plan:", plan)
+    print("Local workload plan:", plan, file=sys.stderr)
     args._local_parallelism_args_resolved = True
     return args
 
@@ -1055,7 +1055,8 @@ def configure_cluster_worker_torch_compile_threads():
         "TORCHINDUCTOR_COMPILE_THREADS=%d "
         "(MHCFLURRY_CLUSTER_WORKERS_PER_NODE=%d)" % (
             threads, workers_per_node,
-        )
+        ),
+        file=sys.stderr,
     )
 
 
@@ -1099,7 +1100,8 @@ def hoist_torchinductor_compile_threads(args, phase="production"):
         print(
             "torch.compile: TORCHINDUCTOR_COMPILE_THREADS=%s "
             "(user-pinned, orchestrator hoist skipped)"
-            % os.environ["TORCHINDUCTOR_COMPILE_THREADS"]
+            % os.environ["TORCHINDUCTOR_COMPILE_THREADS"],
+            file=sys.stderr,
         )
         return
     num_jobs = _compile_threads_num_jobs(getattr(args, "num_jobs", 1))
@@ -1114,7 +1116,8 @@ def hoist_torchinductor_compile_threads(args, phase="production"):
         "torch.compile: hoisted TORCHINDUCTOR_COMPILE_THREADS=%d "
         "(phase=%s, num_jobs=%d, cpu_count=%d)" % (
             threads, phase, num_jobs, cpu_count_,
-        )
+        ),
+        file=sys.stderr,
     )
 
 
@@ -1643,7 +1646,8 @@ def run_single_worker_torch_compile_warmup(
         "architecture(s) of %d work items "
         "(1 forward+backward per architecture, single-worker phase)" % (
             len(unique_warmup_items), len(work_items),
-        )
+        ),
+        file=sys.stderr,
     )
 
     explicit_threads = (
@@ -1656,7 +1660,8 @@ def run_single_worker_torch_compile_warmup(
         )
         print(
             "torch.compile warmup: TORCHINDUCTOR_COMPILE_THREADS=%d "
-            "(single-worker codegen phase)" % threads
+            "(single-worker codegen phase)" % threads,
+            file=sys.stderr,
         )
 
     warmup_pool = None
@@ -1688,7 +1693,8 @@ def run_single_worker_torch_compile_warmup(
             "torch.compile warmup: completed %d architecture warmup(s) in "
             "%.1f sec." % (
                 len(unique_warmup_items), time.time() - warmup_started_at,
-            )
+            ),
+            file=sys.stderr,
         )
     finally:
         if warmup_pool is not None:
@@ -1747,13 +1753,15 @@ def worker_pool_with_gpu_assignments(
         print(
             "Assigning %d workers across %d CUDA GPUs (%d workers max per GPU). "
             "Overflow workers will run on CPU." % (
-                num_jobs, num_gpus, max_workers_per_gpu))
+                num_jobs, num_gpus, max_workers_per_gpu),
+            file=sys.stderr)
         for (worker_num, kwargs) in enumerate(worker_init_kwargs):
             print(
                 "Worker %d assigned backend=%s GPUs=%s" % (
                     worker_num,
                     kwargs["backend"],
-                    kwargs.get("gpu_device_nums")))
+                    kwargs.get("gpu_device_nums")),
+                file=sys.stderr)
 
     if worker_log_dir:
         os.makedirs(worker_log_dir, exist_ok=True)
@@ -1921,8 +1929,8 @@ def make_worker_pool(
     # Use a non-daemonic pool so workers can spawn DataLoader children.
     # See NonDaemonPool for the rationale.
     worker_pool = NonDaemonPool(**pool_kwargs)
-    print("Started pool: %s" % str(worker_pool))
-    pprint(pool_kwargs)
+    print("Started pool: %s" % str(worker_pool), file=sys.stderr)
+    pprint(pool_kwargs, stream=sys.stderr)
     return worker_pool
 
 
@@ -1933,7 +1941,9 @@ def worker_init_entry_point(
         try:
             kwargs = arg_queue.get(block=False)
         except queue.Empty:
-            print("Argument queue empty. Using round robin arg queue.")
+            print(
+                "Argument queue empty. Using round robin arg queue.",
+                file=sys.stderr)
             kwargs = backup_arg_queue.get(block=True)
             backup_arg_queue.put(kwargs)
 
@@ -1942,7 +1952,7 @@ def worker_init_entry_point(
         # arguments from a previously exited worker.
         Finalize(None, arg_queue.put, (kwargs,), exitpriority=1)
 
-    print("Initializing worker: %s" % str(kwargs))
+    print("Initializing worker: %s" % str(kwargs), file=sys.stderr)
     init_function(**kwargs)
 
 
@@ -1969,7 +1979,7 @@ def worker_init(
     random.seed()
     if gpu_device_nums is not None:
         print("WORKER pid=%d assigned GPU devices: %s" % (
-            os.getpid(), gpu_device_nums))
+            os.getpid(), gpu_device_nums), file=sys.stderr)
         configure_pytorch(backend=backend, gpu_device_nums=gpu_device_nums)
     else:
         configure_pytorch(backend=backend)

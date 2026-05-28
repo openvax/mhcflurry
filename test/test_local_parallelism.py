@@ -426,6 +426,23 @@ def test_resolve_local_parallelism_args_num_jobs_auto_resolves_to_capacity(
     assert args.num_jobs_was_auto is True
 
 
+def test_resolve_local_parallelism_args_keeps_stdout_clean(monkeypatch, capsys):
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
+    monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs="auto",
+        gpus=1,
+        backend="auto",
+    )
+    resolve_local_parallelism_args(args)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Local workload plan:" in captured.err
+
+
 def test_resolve_local_parallelism_args_uses_workload_profile(monkeypatch):
     # Presentation calibration keeps a full presentation predictor stack
     # resident, so its auto plan should be much more conservative than the

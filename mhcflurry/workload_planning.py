@@ -499,10 +499,18 @@ def _is_auto(value):
 
 def _clip_auto_num_jobs_to_host_memory(
         num_jobs, max_workers_per_gpu, num_gpus, was_auto_mwpg,
-        memory, memory_plan, warnings):
-    cap = host_memory_num_jobs_cap(memory, memory_plan["host_worker_gb"])
+        memory, memory_plan, warnings, dataloader_num_workers=0):
+    cap = host_memory_num_jobs_cap(
+        memory,
+        memory_plan["host_worker_gb"],
+        dataloader_num_workers=dataloader_num_workers,
+    )
     if cap is None or int(num_jobs) <= cap:
         return num_jobs, max_workers_per_gpu, None
+    worker_gb = (
+        memory_plan["host_worker_gb"]
+        + int(dataloader_num_workers) * HOST_RAM_PER_DATALOADER_CHILD_GB
+    )
     warnings.append(
         "auto num_jobs capped from %d to %d by available host memory "
         "(%.1f GB from %s, workload=%s, %.1f GB/worker)" % (
@@ -511,7 +519,7 @@ def _clip_auto_num_jobs_to_host_memory(
             memory.get("available_gb") or memory.get("total_gb"),
             memory.get("source"),
             memory_plan["workload_name"],
-            memory_plan["host_worker_gb"],
+            worker_gb,
         )
     )
     num_jobs = cap
@@ -602,12 +610,6 @@ def plan_local_parallelism(
                 "explicit num_jobs=%d exceeds GPU capacity estimate %d; "
                 "honoring CLI override" % (num_jobs, capacity)
             )
-        host_cap = host_memory_num_jobs_cap(memory, memory_plan["host_worker_gb"])
-        if host_cap is not None and num_jobs > host_cap:
-            warnings.append(
-                "explicit num_jobs=%d exceeds host-memory estimate %d; "
-                "honoring CLI override" % (num_jobs, host_cap)
-            )
 
     effective_fit_workers = max(1, int(num_jobs))
     if int(num_jobs) <= 0 and gpus > 0:
@@ -624,19 +626,6 @@ def plan_local_parallelism(
     else:
         dataloader_num_workers = int(dl_raw)
         cli_overrides.append("dataloader_num_workers")
-
-    rn_raw = getattr(args, "random_negative_pool_epochs", "auto")
-    rn_was_auto = _is_auto(rn_raw)
-    if rn_was_auto:
-        random_negative_pool_epochs = int(auto_random_negative_pool_epochs(
-            num_random_negatives=None,
-            peptide_max_length=None,
-            num_workers=effective_fit_workers,
-            ram_gb=memory.get("available_gb") or memory.get("total_gb"),
-        ))
-    else:
-        random_negative_pool_epochs = int(rn_raw)
-        cli_overrides.append("random_negative_pool_epochs")
 
     torch_compile = getattr(args, "torch_compile", "auto")
     if torch_compile != "auto":
@@ -655,6 +644,57 @@ def plan_local_parallelism(
         memory_plan["host_worker_gb"]
         + int(dataloader_num_workers) * HOST_RAM_PER_DATALOADER_CHILD_GB
     )
+    host_memory_cap = host_memory_num_jobs_cap(
+        memory,
+        memory_plan["host_worker_gb"],
+        dataloader_num_workers=dataloader_num_workers,
+    )
+    if host_memory_cap is not None:
+        if (
+                cap_auto_num_jobs
+                and num_jobs_was_auto
+                and int(num_jobs) > host_memory_cap):
+            num_jobs, max_workers_per_gpu, _ = _clip_auto_num_jobs_to_host_memory(
+                num_jobs,
+                max_workers_per_gpu,
+                gpus,
+                mwpg_was_auto,
+                memory,
+                memory_plan,
+                warnings,
+                dataloader_num_workers=dataloader_num_workers,
+            )
+            capacity = (
+                int(auto_num_jobs(gpus, max_workers_per_gpu))
+                if backend in ("auto", "gpu") else 0
+            )
+            effective_fit_workers = max(1, int(num_jobs))
+            if int(num_jobs) <= 0 and gpus > 0:
+                effective_fit_workers = 1
+            host_memory_cap = host_memory_num_jobs_cap(
+                memory,
+                memory_plan["host_worker_gb"],
+                dataloader_num_workers=dataloader_num_workers,
+            )
+        elif (not num_jobs_was_auto) and int(num_jobs) > host_memory_cap:
+            warnings.append(
+                "explicit num_jobs=%d exceeds host-memory estimate %d; "
+                "honoring CLI override" % (num_jobs, host_memory_cap)
+            )
+
+    rn_raw = getattr(args, "random_negative_pool_epochs", "auto")
+    rn_was_auto = _is_auto(rn_raw)
+    if rn_was_auto:
+        random_negative_pool_epochs = int(auto_random_negative_pool_epochs(
+            num_random_negatives=None,
+            peptide_max_length=None,
+            num_workers=effective_fit_workers,
+            ram_gb=memory.get("available_gb") or memory.get("total_gb"),
+        ))
+    else:
+        random_negative_pool_epochs = int(rn_raw)
+        cli_overrides.append("random_negative_pool_epochs")
+
     return LocalParallelismPlan(
         workload_name=memory_plan["workload_name"],
         backend=backend,
@@ -679,11 +719,7 @@ def plan_local_parallelism(
         host_memory_total_gb=memory.get("total_gb"),
         host_memory_available_gb=memory.get("available_gb"),
         host_memory_source=memory.get("source", "unknown"),
-        host_memory_num_jobs_cap=host_memory_num_jobs_cap(
-            memory,
-            memory_plan["host_worker_gb"],
-            dataloader_num_workers=dataloader_num_workers,
-        ),
+        host_memory_num_jobs_cap=host_memory_cap,
         cli_overrides=tuple(cli_overrides),
         warnings=tuple(warnings),
         hints=memory_plan["hints"],

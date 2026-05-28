@@ -549,6 +549,24 @@ def test_plan_auto_num_jobs_clipped_by_host_memory(monkeypatch):
     assert any("capped from" in w for w in plan.warnings), plan.warnings
 
 
+def test_plan_auto_num_jobs_reclipped_after_dataloader_sizing(monkeypatch):
+    """Auto jobs must include per-DataLoader-child RAM in the final cap."""
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "16.0")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "16.0")
+    monkeypatch.setenv("MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION", "1.0")
+    plan = wp.plan_local_parallelism(
+        _args(),
+        workload_name=wp.WORKLOAD_AFFINITY_INFERENCE,
+        **_planner_fakes(num_gpus=8, mwpg_value=2, dataloader_workers=4),
+    )
+    assert plan.dataloader_num_workers == 4
+    assert plan.host_worker_gb == 5.0
+    assert plan.host_memory_num_jobs_cap == 3
+    assert plan.num_jobs == 3
+    assert plan.num_jobs <= plan.host_memory_num_jobs_cap
+    assert any("capped from 5 to 3" in w for w in plan.warnings), plan.warnings
+
+
 def test_plan_explicit_num_jobs_above_host_memory_warns_but_honors(monkeypatch):
     """User CLI override is respected; the planner just records a warning."""
     monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "8.0")
@@ -560,6 +578,35 @@ def test_plan_explicit_num_jobs_above_host_memory_warns_but_honors(monkeypatch):
     )
     assert plan.num_jobs == 8  # CLI override respected
     assert any("host-memory estimate" in w for w in plan.warnings), plan.warnings
+
+
+def test_plan_explicit_num_jobs_warning_uses_dataloader_inflated_cap(monkeypatch):
+    """Explicit-num_jobs warning cap must include per-DataLoader-child RAM.
+
+    Without the in-loop reclip the explicit path would compare against the
+    raw host_worker_gb cap and silently undercount memory pressure from
+    DataLoader children. The cap reported in the warning must match the
+    one returned in the plan (both inflated by dataloader_num_workers).
+    """
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "16.0")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "16.0")
+    monkeypatch.setenv("MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION", "1.0")
+    plan = wp.plan_local_parallelism(
+        _args(num_jobs=8),  # explicit, above the inflated cap
+        workload_name=wp.WORKLOAD_AFFINITY_INFERENCE,  # host_worker_gb=3.0
+        **_planner_fakes(num_gpus=8, mwpg_value=2, dataloader_workers=4),
+    )
+    # 16 GB * 1.0 / (3.0 + 4*0.5) = 16/5 = 3.2 → cap=3.
+    # Without the dataloader inflation it would be 16/3 = 5.33 → cap=5,
+    # so the cap reported in the warning must be 3, not 5.
+    assert plan.num_jobs == 8  # CLI override honored
+    assert plan.host_memory_num_jobs_cap == 3
+    assert plan.host_worker_gb == 5.0
+    cap_warnings = [w for w in plan.warnings if "host-memory estimate" in w]
+    assert len(cap_warnings) == 1, plan.warnings
+    assert "exceeds host-memory estimate 3" in cap_warnings[0], cap_warnings[0]
+    assert "exceeds host-memory estimate 5" not in cap_warnings[0], (
+        cap_warnings[0])
 
 
 def test_plan_cap_auto_num_jobs_false_disables_clip(monkeypatch):

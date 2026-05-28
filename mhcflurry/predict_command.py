@@ -335,8 +335,10 @@ def run(argv=sys.argv[1:]):
                 "If an input file is specified, do not specify --alleles "
                 "or --peptides")
         df = pandas.read_csv(args.input)
-        print("Read input CSV with %d rows, columns are: %s" % (
-            len(df), ", ".join(df.columns)))
+        print(
+            "Read input CSV with %d rows, columns are: %s" % (
+                len(df), ", ".join(df.columns)),
+            file=sys.stderr)
         for col in [args.allele_column, args.peptide_column]:
             if col not in df.columns:
                 raise ValueError(
@@ -472,6 +474,6 @@ def run(argv=sys.argv[1:]):
 
     if args.out:
         df.to_csv(args.out, index=False, sep=args.output_delimiter)
-        print("Wrote: %s" % args.out)
+        print("Wrote: %s" % args.out, file=sys.stderr)
     else:
         df.to_csv(sys.stdout, index=False, sep=args.output_delimiter)
