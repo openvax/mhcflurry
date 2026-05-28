@@ -383,8 +383,6 @@ def initialize_training(args):
 
 
 def train_models(args):
-    global GLOBAL_DATA
-
     print("Beginning training.")
     predictor = Class1ProcessingPredictor.load(args.out_models_dir)
     print("Loaded predictor with %d networks" % len(predictor.models))

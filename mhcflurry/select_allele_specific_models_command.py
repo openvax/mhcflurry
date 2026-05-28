@@ -192,8 +192,6 @@ add_local_parallelism_args(parser)
 
 
 def run(argv=sys.argv[1:]):
-    global GLOBAL_DATA
-
     # On sigusr1 print stack trace
     print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
     signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())

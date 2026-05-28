@@ -4564,10 +4564,6 @@ class Class1NeuralNetwork(object):
                 fit_info["epoch_random_negative_refill_time"].append(
                     rn_refill_time
                 )
-                # Backward-compatible telemetry key from the earlier shared
-                # memory implementation. The value is now the in-place device
-                # random-negative refill time, not a POSIX SHM update.
-                fit_info["epoch_rn_shm_update_time"].append(rn_refill_time)
                 fit_info["epoch_dataset_construction_time"].append(
                     dataset_construction_time
                 )

@@ -629,8 +629,6 @@ def initialize_training(args):
 
 
 def train_models(args):
-    global GLOBAL_DATA
-
     print("Beginning training.")
     predictor = Class1AffinityPredictor.load(
         args.out_models_dir, optimization_level=0)

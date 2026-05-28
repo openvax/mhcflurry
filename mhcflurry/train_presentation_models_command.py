@@ -370,8 +370,6 @@ def predict_features_parallel(args, predictor, df, experiment_to_alleles):
     processing predictors over tens of millions of rows. Split by sample and
     row chunk so each worker can use its assigned GPU independently.
     """
-    global GLOBAL_DATA
-
     work_items = make_feature_work_items(df, args.feature_chunk_size)
     print(
         "Predicting presentation features in parallel: %d rows, %d chunks, "

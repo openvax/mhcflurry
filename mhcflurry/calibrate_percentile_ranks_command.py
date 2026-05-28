@@ -205,8 +205,6 @@ add_cluster_parallelism_args(parser)
 
 
 def run(argv=sys.argv[1:]):
-    global GLOBAL_DATA
-
     args = parser.parse_args(argv)
 
     if not args.list_percent_rank_status:
@@ -499,8 +497,6 @@ def do_class1_presentation_percent_rank_scores(
 
 
 def run_class1_affinity_predictor(args, peptides):
-    global GLOBAL_DATA
-
     # Load with optimization_level=0 so we can optimize per-worker later.
     predictor = Class1AffinityPredictor.load(
         args.models_dir,
