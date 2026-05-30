@@ -17,6 +17,12 @@ from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene
 from . import amino_acid
 
 
+# Default master seed for every CLI command that involves randomness. Fixed
+# (not entropy) so runs are reproducible out of the box; pass --random-seed N
+# to get a different, still-reproducible run.
+DEFAULT_RANDOM_SEED = 42
+
+
 def add_random_seed_arg(parser):
     """Add the standard ``--random-seed`` argument to a CLI parser.
 
@@ -28,13 +34,13 @@ def add_random_seed_arg(parser):
         "--random-seed",
         type=int,
         metavar="N",
-        default=None,
+        default=DEFAULT_RANDOM_SEED,
         help="Master random seed controlling all randomness in this command "
         "(numpy, Python `random`, and torch): data shuffles, fold/held-out "
         "sampling, weight initialization, and random peptide/negative "
-        "sampling. Two runs with the same seed and inputs produce identical "
-        "output. If omitted, a seed is drawn from system entropy and logged, "
-        "so any run can be reproduced by passing the value back.")
+        "sampling. Defaults to %(default)s, so runs are reproducible out of "
+        "the box; pass a different integer for a different (still "
+        "reproducible) run.")
 
 
 def configure_random_seed(seed=None, name="mhcflurry"):

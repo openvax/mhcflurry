@@ -197,3 +197,62 @@ def test_train_calibrate_and_select_commands():
         print("Deleting: %s" % models_dir2)
         shutil.rmtree(models_dir1, ignore_errors=True)
         shutil.rmtree(models_dir2, ignore_errors=True)
+
+
+def _allele_specific_weights_by_allele(models_dir):
+    predictor = Class1AffinityPredictor.load(models_dir)
+    out = {}
+    for allele, networks in predictor.allele_to_allele_specific_models.items():
+        out[allele] = numpy.concatenate([
+            value.detach().cpu().numpy().ravel()
+            for nn in networks
+            for value in nn.network().state_dict().values()])
+    return out
+
+
+def test_train_allele_specific_reproducible_from_seed():
+    """Same --random-seed -> bit-identical allele-specific models; a different
+    seed -> different. Exercises the per-fit seed threading (weight init,
+    shuffles) end-to-end through the train command."""
+    workdir = tempfile.mkdtemp(prefix="mhcflurry-test-seed-as")
+    old_backend = common._pytorch_backend
+    try:
+        hp_filename = os.path.join(workdir, "hp.yaml")
+        with open(hp_filename, "w") as fd:
+            json.dump([deepcopy(HYPERPARAMETERS[0])], fd)
+        data_filename = os.path.join(workdir, "data.csv")
+        write_tiny_affinity_data(data_filename)
+
+        def train(run_name, seed):
+            out_dir = os.path.join(workdir, run_name)
+            os.makedirs(out_dir)
+            run_command(
+                train_allele_specific_models_command,
+                [
+                    "--data", data_filename,
+                    "--hyperparameters", hp_filename,
+                    "--allele", "HLA-A*02:01", "HLA-A*03:01",
+                    "--out-models-dir", out_dir,
+                    "--num-jobs", "0",
+                    "--backend", "cpu",
+                    "--n-models", "1",
+                    "--random-seed", str(seed),
+                ],
+            )
+            return _allele_specific_weights_by_allele(out_dir)
+
+        same_a = train("a", 7)
+        same_b = train("b", 7)
+        different = train("c", 8)
+
+        assert same_a and set(same_a) == set(same_b) == set(different)
+        for allele in same_a:
+            assert numpy.array_equal(same_a[allele], same_b[allele]), (
+                "same --random-seed must reproduce identical weights for %s"
+                % allele)
+        assert any(
+            not numpy.array_equal(same_a[a], different[a]) for a in same_a), (
+            "a different --random-seed must change the trained weights")
+    finally:
+        common.configure_pytorch(backend=old_backend)
+        shutil.rmtree(workdir, ignore_errors=True)

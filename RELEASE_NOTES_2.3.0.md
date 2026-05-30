@@ -104,6 +104,29 @@ validation run completes.
 
 ## Behavioral changes worth knowing
 
+### Training and calibration are reproducible by default (`--random-seed`)
+
+Every CLI command that involves randomness — `mhcflurry-class1-train-pan-allele-models`,
+`-train-allele-specific-models`, `-train-processing-models`,
+`-select-allele-specific-models`, and `mhcflurry-calibrate-percentile-ranks` —
+now takes a single `--random-seed` that controls **all** of its randomness:
+fold/held-out assignment, weight initialization, example/batch shuffles,
+random-negative sampling, random peptide universes, and genotype sampling.
+The master seed is logged and, for the two-phase pan-allele/processing
+pipelines, persisted into `training_init_info.pkl` so it survives an
+`--only-initialize` / `--continue-incomplete` split.
+
+**The default is `42`, not entropy** — so a run reproduces bit-for-bit out of
+the box (same data, folds, replicates, hyperparameters → identical models).
+This is a change from 2.2.x, where each fit drew independent OS entropy and
+runs were not reproducible. Pass `--random-seed N` for a different, still
+reproducible run. Ensemble members and per-fit work stay decorrelated (each
+derives a distinct sub-seed from the master), so seeding does not reduce
+diversity. The neural-network `fit()` / `fit_streaming_batches()` and
+`Class1AffinityPredictor.fit_allele_specific_predictors()` APIs gained a
+matching `seed=` keyword (defaults to `None` = the prior stochastic behavior
+for direct API callers).
+
 ### Calibrate silently filters unsupported alleles
 
 `mhcflurry-calibrate-percentile-ranks` now drops alleles from

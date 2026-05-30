@@ -347,8 +347,8 @@ def initialize_training(args):
     # Resolve the master seed once for the whole run and seed this process's
     # global RNGs (so fold assignment below is reproducible). Per-fit weight
     # init and the train-data shuffle in train_model derive from the same
-    # value via derive_seed. If --random-seed was omitted, a seed is drawn
-    # from entropy and logged so the run can be reproduced.
+    # value via derive_seed. --random-seed defaults to 42 (reproducible out
+    # of the box); the resolved value is logged either way.
     master_seed = configure_random_seed(
         args.random_seed, name="train-processing")
 

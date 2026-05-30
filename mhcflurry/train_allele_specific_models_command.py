@@ -10,6 +10,7 @@ import traceback
 import random
 from functools import partial
 
+import numpy
 import pandas
 import yaml
 from sklearn.metrics.pairwise import cosine_similarity
@@ -161,9 +162,9 @@ def run(argv=sys.argv[1:]):
     # shuffles in train_model, the ``random.shuffle(work_items)`` dispatch
     # ordering, and alleles_by_similarity's ``.sample``. Per-fit weight init
     # and shuffles happen inside workers (which reseed from entropy), so
-    # those are pinned separately via derive_seed below. If --random-seed
-    # was omitted, a seed is drawn from entropy and logged so the run can be
-    # reproduced.
+    # those are pinned separately via derive_seed below. --random-seed
+    # defaults to 42 (reproducible out of the box); the resolved value is
+    # logged either way.
     master_seed = configure_random_seed(
         args.random_seed, name="train-allele-specific")
 
@@ -419,6 +420,23 @@ def train_model(
     if predictor is None:
         predictor = Class1AffinityPredictor()
 
+    # One stable per-fit seed controls every stochastic step of this work
+    # item. Seed the worker's global RNG from it up front — workers reseed
+    # from entropy in worker_init, so the main process's global seeding does
+    # not reach here. This pins the randomness that runs before fit(): the
+    # similar-allele selection in alleles_by_similarity (pretrain path) and
+    # the data shuffle below. Derived from the run's master seed plus this
+    # fit's identity coordinates, so the whole run is reproducible from
+    # --random-seed regardless of dispatch order. When no master seed was
+    # recorded (legacy run) training is left stochastic.
+    master_seed = constant_data.get("seed")
+    work_item_seed = (
+        None if master_seed is None
+        else derive_seed(
+            master_seed, allele, hyperparameter_set_num, model_num))
+    if work_item_seed is not None:
+        numpy.random.seed(work_item_seed % (2 ** 32))
+
     pretrain_min_points = hyperparameters['train_data']['pretrain_min_points']
 
     data = constant_data["train_data"]
@@ -456,23 +474,9 @@ def train_model(
             n_alleles,
             allele))
 
-    # One stable per-fit seed controls every stochastic step of this work
-    # item: the data shuffle below and the weight init / train-val split /
-    # random sampling inside fit(). Derived from the run's master seed plus
-    # this fit's identity coordinates (allele, architecture, replicate), so
-    # the whole run is reproducible from --random-seed regardless of dispatch
-    # order across workers, which reseed from entropy in worker_init. When no
-    # master seed was recorded (legacy run) derive_seed still returns a stable
-    # value; we keep training stochastic in that case by leaving it unseeded.
-    master_seed = constant_data.get("seed")
-    work_item_seed = (
-        None if master_seed is None
-        else derive_seed(
-            master_seed, allele, hyperparameter_set_num, model_num))
-
-    # Seed the data shuffle from the work-item seed so it's reproducible in
-    # workers (which don't inherit the main process's global seeding). When
-    # unseeded, fall back to the prior unseeded global-state shuffle.
+    # Shuffle with an explicit random_state derived from the work-item seed,
+    # so the data order is reproducible and decoupled from however many draws
+    # alleles_by_similarity took from the global RNG above.
     train_data = data.sample(
         frac=1.0,
         random_state=(
