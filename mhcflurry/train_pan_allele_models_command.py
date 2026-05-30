@@ -26,7 +26,14 @@ from .class1_neural_network import (
     Class1NeuralNetwork,
     peptide_sequences_to_network_input,
 )
-from .common import configure_logging, normalize_allele_name, write_generate_sh
+from .common import (
+    add_random_seed_arg,
+    configure_random_seed,
+    configure_logging,
+    derive_seed,
+    normalize_allele_name,
+    write_generate_sh,
+)
 from .local_parallelism import (
     add_local_parallelism_args,
     apply_resolved_training_hyperparameters_to_work_items,
@@ -157,6 +164,7 @@ parser.add_argument(
     metavar="N",
     default=1,
     help="Number of replicates per (architecture, fold) pair to train.")
+add_random_seed_arg(parser)
 parser.add_argument(
     "--max-epochs",
     type=int,
@@ -193,7 +201,7 @@ add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
 
 
-def assign_folds(df, num_folds, held_out_fraction, held_out_max):
+def assign_folds(df, num_folds, held_out_fraction, held_out_max, seed=None):
     """
     Split training data into multple test/train pairs, which we refer to as
     folds. Note that a given data point may be assigned to multiple test or
@@ -216,6 +224,11 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
     held_out_max
         For a given allele, do not hold out more than held_out_max number of
         data points in any fold.
+    seed : int, optional
+        Master seed. When given, numpy's global RNG (which the per-allele
+        ``.sample()`` calls below draw from) is seeded up front, so fold
+        membership is reproducible. When None, fold assignment is left
+        entropy-random as before.
 
     Returns
     -------
@@ -223,6 +236,9 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
         index is same as df.index, columns are "fold_0", ... "fold_N" giving
         whether the data point is in the training data for the fold
     """
+    if seed is not None:
+        numpy.random.seed(int(seed) % (2 ** 32))
+
     result_df = pandas.DataFrame(index=df.index)
 
     # Per-allele invariants (medians, low/high peptides, held-out count) are
@@ -528,6 +544,14 @@ def initialize_training(args):
     # Allele names in data are assumed to be already normalized.
     print("Training data: %s" % (str(df.shape)))
 
+    # Resolve the master seed once for the whole run and seed this process's
+    # global RNGs (so fold assignment below is reproducible). Per-fit weight
+    # init, shuffles, and random negatives in train_model derive from the
+    # same value via derive_seed. If --random-seed was omitted, a seed is
+    # drawn from entropy and logged so the run can be reproduced.
+    master_seed = configure_random_seed(
+        args.random_seed, name="train-pan-allele")
+
     (held_out_fraction, held_out_max) = (
         args.held_out_measurements_per_allele_fraction_and_max)
 
@@ -535,7 +559,8 @@ def initialize_training(args):
         df=df,
         num_folds=args.num_folds,
         held_out_fraction=held_out_fraction,
-        held_out_max=held_out_max)
+        held_out_max=held_out_max,
+        seed=master_seed)
     print(f"TIMING_MARKER data_loaded {time.time():.3f}")
 
     allele_sequences_in_use = allele_sequences[
@@ -616,6 +641,10 @@ def initialize_training(args):
     training_init_info["allele_encoding"] = allele_encoding
     training_init_info["full_allele_encoding"] = full_allele_encoding
     training_init_info["work_items"] = work_items
+    # Persist the master seed so the train_models phase (which may run in a
+    # separate invocation via --continue-incomplete) derives per-fit seeds
+    # from the same value used for fold assignment.
+    training_init_info["seed"] = master_seed
 
     # Save empty predictor (for metadata)
     predictor.save(args.out_models_dir)
@@ -656,8 +685,12 @@ def train_models(args):
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
 
     # The estimated time to completion is more accurate if we randomize
-    # the order of the work.
-    random.shuffle(work_items)
+    # the order of the work. Seed from the master seed so even the dispatch
+    # order is reproducible (per-fit results don't depend on order — each
+    # fit reseeds from its own work-item seed — but this keeps the whole
+    # run deterministic).
+    master_seed = GLOBAL_DATA.get("seed")
+    random.Random(master_seed).shuffle(work_items)
     for (work_item_num, item) in enumerate(work_items):
         item['work_item_num'] = work_item_num
         item['num_work_items'] = len(work_items)
@@ -818,18 +851,6 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     print("compile_warmup_only: completed in %.1f sec" % (time.time() - started))
 
 
-def _random_negative_seed_for_work_item(
-        architecture_num, fold_num, replicate_num, work_item_name):
-    """Stable per-fit seed used only when random-negative pooling is enabled."""
-    identity = (
-        str(architecture_num),
-        str(fold_num),
-        str(replicate_num),
-        str(work_item_name),
-    )
-    return int(hashlib.sha1("|".join(identity).encode()).hexdigest()[:16], 16)
-
-
 def train_model(
         work_item_name,
         work_item_num,
@@ -863,9 +884,12 @@ def train_model(
 
     numpy.testing.assert_equal(len(df), len(folds_df))
 
-    train_data = df.loc[
-        folds_df["fold_%d" % fold_num]
-    ].sample(frac=1.0)
+    # Don't shuffle here: fit() owns ordering via its seeded
+    # ``shuffle_permutation`` (host, for the train/val split) and an
+    # on-device ``torch.randperm`` each epoch. A host-side ``.sample()``
+    # would just add an unseeded numpy-global shuffle ahead of fit's
+    # seeding, breaking single-seed reproducibility.
+    train_data = df.loc[folds_df["fold_%d" % fold_num]]
 
     train_peptides = _build_train_peptides(train_data.peptide.values)
     train_alleles = AlleleEncoding(
@@ -931,6 +955,15 @@ def train_model(
             mem = torch.cuda.memory_allocated() / 10**9
             print("Current used GPU memory: ", mem, "gb")
 
+    # One stable per-work-item seed controls every stochastic step of this
+    # fit — pretrain weight init + batch order, then the finetune shuffles
+    # and random negatives. Derived from the run's master seed plus this
+    # fit's identity coordinates, so the whole run is reproducible from
+    # --seed regardless of dispatch order across workers.
+    work_item_seed = derive_seed(
+        constant_data.get("seed"),
+        architecture_num, fold_num, replicate_num)
+
     if get_train_param("pretrain", False):
         pretrain_patience = get_train_param("pretrain_patience", 10)
         pretrain_min_delta = get_train_param("pretrain_min_delta", 0.0)
@@ -991,6 +1024,10 @@ def train_model(
                 progress_callback=progress_callback,
                 progress_preamble=progress_preamble + "PRETRAIN",
                 progress_print_interval=progress_print_interval,
+                # Per-attempt offset so a rejected init (val loss too high)
+                # is followed by a *different* init on retry, while the
+                # attempt sequence stays reproducible from the work-item seed.
+                seed=work_item_seed + attempt,
             )
             model.fit_info[-1].setdefault(
                 "training_info", {}).update({
@@ -1014,19 +1051,6 @@ def train_model(
     else:
         model = Class1NeuralNetwork(**hyperparameters)
 
-    # Derive a per-work-item random-negative seed only when pooled negatives
-    # are in use. fit() bypasses ``random_negative_seed`` when pool_epochs == 1,
-    # but keeping None here protects the default fresh-per-epoch random stream.
-    pool_epochs = int(hyperparameters.get("random_negative_pool_epochs", 1) or 1)
-    random_negative_seed = None
-    if pool_epochs > 1:
-        random_negative_seed = _random_negative_seed_for_work_item(
-            architecture_num=architecture_num,
-            fold_num=fold_num,
-            replicate_num=replicate_num,
-            work_item_name=work_item_name,
-        )
-
     model.fit(
         peptides=train_peptides,
         affinities=train_data.measurement_value.values,
@@ -1037,7 +1061,7 @@ def train_model(
         progress_preamble=progress_preamble,
         progress_callback=progress_callback,
         progress_print_interval=progress_print_interval,
-        random_negative_seed=random_negative_seed,
+        seed=work_item_seed,
         verbose=verbose)
 
     # Save model-specific training info

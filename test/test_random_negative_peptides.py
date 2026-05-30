@@ -267,7 +267,7 @@ def test_fit_end_to_end_pool_epochs_one_draws_from_global_rng(monkeypatch):
     try:
         predictor.fit(
             peptides, affinities,
-            random_negative_seed=424242,  # driver passed a seed
+            seed=424242,  # driver passed a master seed
             verbose=0,
         )
     except Exception:
@@ -278,9 +278,10 @@ def test_fit_end_to_end_pool_epochs_one_draws_from_global_rng(monkeypatch):
 
     # At least one get_peptides call must have happened.
     assert captured_rngs, "spy never saw a planner.get_peptides call"
-    # Every rng must be None — pool_epochs=1 path bypasses the seed
-    # and routes through numpy's global RNG. If any is a
-    # default_rng instance, the bypass is broken.
+    # Every rng must be None — at pool_epochs=1 the pool routes through
+    # numpy's global RNG (which fit() seeds from the master seed up front),
+    # rather than building a per-cycle seeded default_rng. If any is a
+    # default_rng instance, the global-RNG contract is broken.
     non_none = [r for r in captured_rngs if r is not None]
     assert not non_none, (
         "fit() with pool_epochs=1 must call planner.get_peptides(rng=None) "

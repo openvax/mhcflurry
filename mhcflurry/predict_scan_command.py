@@ -424,9 +424,16 @@ def run(argv=sys.argv[1:]):
                 results = worker_pool.imap_unordered(
                     _predict_sequences_chunk_worker, work_items, chunksize=1)
                 chunks = [result for result in results]
-            finally:
                 worker_pool.close()
                 worker_pool.join()
+                worker_pool = None
+            finally:
+                # On failure mid-iteration, terminate() rather than
+                # close()/join() (which can hang on a wedged worker) and
+                # leave non-daemon workers behind.
+                if worker_pool is not None:
+                    worker_pool.terminate()
+                    worker_pool.join()
             result_df = pandas.concat(
                 [chunk for (_, chunk) in sorted(chunks)],
                 ignore_index=True)

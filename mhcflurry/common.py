@@ -1,6 +1,8 @@
 import collections
 import datetime
+import hashlib
 import logging
+import random
 import shlex
 import sys
 import os
@@ -13,6 +15,61 @@ from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene
 
 
 from . import amino_acid
+
+
+def add_random_seed_arg(parser):
+    """Add the standard ``--random-seed`` argument to a CLI parser.
+
+    Every mhcflurry command that involves randomness exposes this flag so a
+    single value reproduces the whole run. Pair with :func:`configure_random_seed`
+    at the start of the command's ``run``/``main``.
+    """
+    parser.add_argument(
+        "--random-seed",
+        type=int,
+        metavar="N",
+        default=None,
+        help="Master random seed controlling all randomness in this command "
+        "(numpy, Python `random`, and torch): data shuffles, fold/held-out "
+        "sampling, weight initialization, and random peptide/negative "
+        "sampling. Two runs with the same seed and inputs produce identical "
+        "output. If omitted, a seed is drawn from system entropy and logged, "
+        "so any run can be reproduced by passing the value back.")
+
+
+def configure_random_seed(seed=None, name="mhcflurry"):
+    """Resolve, apply, and log a master random seed.
+
+    Seeds numpy's, Python's, and torch's *global* RNGs so every randomness
+    source in this process derives from one value. When ``seed`` is None a
+    value is drawn from system entropy. Returns the resolved seed so callers
+    can derive worker-local sub-seeds via :func:`derive_seed`.
+    """
+    resolved = (
+        int(seed) if seed is not None
+        else int.from_bytes(os.urandom(4), "little"))
+    numpy.random.seed(resolved % (2 ** 32))
+    random.seed(resolved)
+    try:
+        import torch
+        torch.manual_seed(resolved & ((1 << 63) - 1))
+    except ImportError:
+        pass
+    print("%s random seed: %d%s" % (
+        name, resolved, "" if seed is not None else " (drawn from entropy)"))
+    return resolved
+
+
+def derive_seed(master_seed, *parts):
+    """Derive a stable sub-seed from a master seed and identity ``parts``.
+
+    Gives independent units of work (e.g. one training fit, keyed by
+    architecture/fold/replicate) decorrelated but reproducible seeds, all
+    rooted in the run's single master seed. ``master_seed`` may be None
+    (e.g. a legacy run with no recorded seed); the result is still stable.
+    """
+    identity = "|".join(str(p) for p in ((master_seed,) + parts))
+    return int(hashlib.sha1(identity.encode()).hexdigest()[:16], 16)
 
 
 def normalize_allele_name(

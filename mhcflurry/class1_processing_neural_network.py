@@ -663,6 +663,7 @@ class Class1ProcessingNeuralNetwork(object):
         progress_callback=None,
         progress_preamble="",
         progress_print_interval=5.0,
+        seed=None,
     ):
         """
         Fit the neural network.
@@ -687,9 +688,29 @@ class Class1ProcessingNeuralNetwork(object):
         progress_print_interval : float
             How often (in seconds) to print progress update. Set to None to
             disable.
+        seed : int, optional
+            Master seed for this fit. When given, it seeds numpy's and
+            torch's global RNGs at the start of the call, so every
+            stochastic step downstream flows from this one value: weight
+            initialization, the initial example shuffle, and the per-epoch
+            training-batch shuffle. When None (the default) the RNGs are
+            left as the worker configured them (entropy-seeded), so
+            training stays stochastic and decorrelated across workers, as
+            it always has been. Mirrors
+            :meth:`mhcflurry.class1_neural_network.Class1NeuralNetwork.fit`'s
+            ``seed`` so one value can drive both trainers.
         """
         device = self.get_device()
         _configure_matmul_precision(device)
+
+        # One seed controls every stochastic step in this fit. Seed numpy's
+        # and torch's global RNGs up front so weight init, the example
+        # shuffle, and the per-epoch batch shuffle all derive from it. Left
+        # untouched when seed is None (entropy-seeded by the worker), keeping
+        # training stochastic.
+        if seed is not None:
+            numpy.random.seed(int(seed) % (2 ** 32))
+            torch.manual_seed(int(seed) & ((1 << 63) - 1))
 
         x_dict = self.network_input(sequences)
 

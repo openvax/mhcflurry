@@ -19,9 +19,11 @@ import tqdm  # progress bar
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
 from .common import (
+    add_random_seed_arg,
     amino_acid_distribution,
     configure_logging,
     configure_pytorch,
+    configure_random_seed,
     filter_canonicalizable_alleles,
     normalize_allele_name,
     random_peptides,
@@ -202,6 +204,7 @@ parser.add_argument(
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
+add_random_seed_arg(parser)
 
 
 def run(argv=sys.argv[1:]):
@@ -215,6 +218,11 @@ def run(argv=sys.argv[1:]):
     args.models_dir = os.path.abspath(args.models_dir)
 
     configure_logging(verbose=args.verbosity > 1)
+
+    # Seed all randomness up front (random peptide universe + genotype
+    # sampling below both run in this process). Inference in workers is
+    # deterministic, so global seeding here makes calibration reproducible.
+    configure_random_seed(args.random_seed, name="calibrate-percentile-ranks")
 
     # Resolve --max-workers-per-gpu='auto' to an int now, before any
     # downstream consumer reads it (model_kwargs below + pool creation).
@@ -443,12 +451,20 @@ def run_class1_presentation_predictor(args, peptides):
             work_items,
             chunksize=1)
 
-    score_chunks = [
-        scores for scores in tqdm.tqdm(results, total=len(work_items))
-    ]
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
+    try:
+        score_chunks = [
+            scores for scores in tqdm.tqdm(results, total=len(work_items))
+        ]
+        if worker_pool:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+    finally:
+        # On any failure mid-iteration, tear the pool down rather than
+        # leaking non-daemon workers.
+        if worker_pool is not None:
+            worker_pool.terminate()
+            worker_pool.join()
     print("Finished in %0.2f sec." % (time.time() - start))
     scores = (
         numpy.concatenate(score_chunks, axis=0)
@@ -630,29 +646,37 @@ def run_class1_affinity_predictor(args, peptides):
             work_items,
             chunksize=1)
 
-    summary_results_lists = collections.defaultdict(list)
-    for work_item in tqdm.tqdm(results, total=len(work_items)):
-        for (transforms, summary_results) in work_item:
-            predictor.allele_to_percent_rank_transform.update(transforms)
-            if summary_results is not None:
-                for (item, value) in summary_results.items():
-                    summary_results_lists[item].append(value)
-    print("Done calibrating %d alleles." % len(alleles))
-    if summary_results_lists:
-        for (name, lst) in summary_results_lists.items():
-            df = pandas.concat(lst, ignore_index=True)
-            predictor.metadata_dataframes[name] = df
-            print("Including summary result: %s" % name)
-            print(df)
+    try:
+        summary_results_lists = collections.defaultdict(list)
+        for work_item in tqdm.tqdm(results, total=len(work_items)):
+            for (transforms, summary_results) in work_item:
+                predictor.allele_to_percent_rank_transform.update(transforms)
+                if summary_results is not None:
+                    for (item, value) in summary_results.items():
+                        summary_results_lists[item].append(value)
+        print("Done calibrating %d alleles." % len(alleles))
+        if summary_results_lists:
+            for (name, lst) in summary_results_lists.items():
+                df = pandas.concat(lst, ignore_index=True)
+                predictor.metadata_dataframes[name] = df
+                print("Including summary result: %s" % name)
+                print(df)
 
-    predictor.save(args.models_dir, model_names_to_write=[])
-    write_generate_sh(args.models_dir)
+        predictor.save(args.models_dir, model_names_to_write=[])
+        write_generate_sh(args.models_dir)
 
-    percent_rank_calibration_time = time.time() - start
+        percent_rank_calibration_time = time.time() - start
 
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
+        if worker_pool:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+    finally:
+        # On any failure mid-iteration, tear the pool down rather than
+        # leaking non-daemon workers.
+        if worker_pool is not None:
+            worker_pool.terminate()
+            worker_pool.join()
 
     print("Percent rank calibration time: %0.2f min." % (
         percent_rank_calibration_time / 60.0))

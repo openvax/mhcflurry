@@ -16,6 +16,7 @@ import pandas
 
 from .class1_neural_network import Class1NeuralNetwork
 from .common import (
+    derive_seed,
     random_peptides,
     positional_frequency_matrix,
     normalize_allele_name
@@ -896,7 +897,8 @@ class Class1AffinityPredictor(object):
             models_dir_for_save=None,
             verbose=0,
             progress_preamble="",
-            progress_print_interval=5.0):
+            progress_print_interval=5.0,
+            seed=None):
         """
         Fit one or more allele specific predictors for a single allele using one
         or more neural network architectures.
@@ -938,6 +940,13 @@ class Class1AffinityPredictor(object):
 
         progress_print_interval : float
             How often (in seconds) to print progress. Set to None to disable.
+
+        seed : int, optional
+            Base seed for this allele's fits. When given, each (model_num,
+            architecture_num) pair gets a distinct sub-seed derived from it,
+            so ensemble members are decorrelated but the whole call is
+            reproducible. When None, each `Class1NeuralNetwork.fit` is left
+            entropy-seeded as before.
 
         Returns
         -------
@@ -987,6 +996,17 @@ class Class1AffinityPredictor(object):
                     architecture_hyperparameters_list):
                 model = Class1NeuralNetwork(**architecture_hyperparameters)
                 for round_num in range(n_rounds):
+                    # Distinct sub-seed per (ensemble member, architecture,
+                    # round) so members don't initialize identically and each
+                    # round sees a different shuffle / random-negative draw,
+                    # while the whole call stays reproducible from the
+                    # caller's base seed. fit() re-seeds the global RNG at its
+                    # start, so the round_num must be part of the mix —
+                    # otherwise every round would replay round 0's randomness.
+                    fit_seed = (
+                        None if seed is None
+                        else derive_seed(
+                            seed, model_num, architecture_num, round_num))
                     (round_peptides, round_affinities, round_inequalities) = (
                         peptides_affinities_inequalities_per_round[round_num]
                     )
@@ -995,6 +1015,7 @@ class Class1AffinityPredictor(object):
                         round_affinities,
                         inequalities=round_inequalities,
                         verbose=verbose,
+                        seed=fit_seed,
                         progress_preamble=progress_preamble_template.format(
                             n_peptides=len(round_peptides),
                             round=round_num,

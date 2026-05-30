@@ -325,9 +325,13 @@ def auto_max_workers_per_gpu(
         bounds=(1, None),
     )
 
+    # Honor an explicit env override even when it resolves to 0.0 (falsy);
+    # only fall through to nvidia-smi when no override was set at all.
+    free_vram_override = _free_vram_override_gb(num_gpus)
     free_vram_gb = (
-        _free_vram_override_gb(num_gpus)
-        or _free_vram_from_nvidia_smi_gb(num_gpus)
+        free_vram_override
+        if free_vram_override is not None
+        else _free_vram_from_nvidia_smi_gb(num_gpus)
     )
 
     free_vram_gb_used = (
@@ -1673,6 +1677,9 @@ def run_single_worker_torch_compile_warmup(
             max_workers_per_gpu=max(num_workers_per_gpu_from_args(args), 1),
             max_tasks_per_worker=len(unique_warmup_items) + 1,
             worker_log_dir=getattr(args, "worker_log_dir", None),
+            # Spawn (not fork) for parity with the production pools below;
+            # forked CUDA workers break if the parent has touched CUDA.
+            start_method="spawn",
         )
         warmup_started_at = time.time()
         for warmup_item in unique_warmup_items:
@@ -1983,6 +1990,14 @@ def worker_init(
         configure_pytorch(backend=backend, gpu_device_nums=gpu_device_nums)
     else:
         configure_pytorch(backend=backend)
+    # Reseed torch's global RNG too (numpy/random above don't touch it).
+    # Torch RNG drives weight init and any tensor op without an explicit
+    # generator; without this, forked workers would share a stream. Seed
+    # from the freshly-reseeded numpy RNG so the value is per-worker
+    # distinct. Done after configure_pytorch so any visible CUDA device is
+    # seeded; a no-op for CUDA generators when the worker is CPU-pinned.
+    import torch
+    torch.manual_seed(int(numpy.random.randint(0, 2 ** 31 - 1)))
     # Propagate workers-per-GPU into the process env so auto-sized
     # batching (Class1NeuralNetwork.predict / fit's
     # check_training_batch_fits) can partition VRAM correctly when

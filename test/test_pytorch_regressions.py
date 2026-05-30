@@ -209,6 +209,37 @@ def test_sample_weights_affect_training():
     assert not np.allclose(pred_unweighted, pred_weighted, rtol=0.01, atol=0.0)
 
 
+def test_fit_seed_makes_training_reproducible():
+    """A single ``seed`` controls every stochastic step of fit() — weight
+    initialization, the example shuffle, and random-negative sampling — so
+    two fits with the same seed produce identical weights even when the
+    ambient RNG state differs, and different seeds diverge."""
+    peptides = ["SIINFEKL", "LLFGYPVYV", "KLGGALQAK", "GILGFVFTL",
+                "NLVPMVATV", "GLCTLVAML"]
+    affinities = np.array([10.0, 50000.0, 500.0, 25000.0, 100.0, 40000.0])
+
+    def train(seed, ambient):
+        # Deliberately vary ambient RNG state across calls: only ``seed``
+        # should determine the trained weights. If anything stochastic
+        # leaks past the seed (e.g. an unseeded shuffle), same-seed runs
+        # would differ and this test fails.
+        _seed_all(ambient)
+        model = _make_simple_affinity_model(
+            max_epochs=3, random_negative_rate=1.0)
+        model.fit(peptides, affinities, seed=seed, verbose=0)
+        return torch.cat(
+            [p.detach().reshape(-1) for p in model.network().parameters()])
+
+    same_a = train(seed=123, ambient=1)
+    same_b = train(seed=123, ambient=98765)  # different ambient, same seed
+    different = train(seed=456, ambient=1)
+
+    assert torch.equal(same_a, same_b), (
+        "fit(seed=S) must be reproducible regardless of ambient RNG state")
+    assert not torch.equal(same_a, different), (
+        "fit() with a different seed must produce different weights")
+
+
 def test_validation_split_is_fixed_when_lr_zero():
     peptides = ["AAAAAAAAA", "CCCCCCCCC", "DDDDDDDDD", "EEEEEEEEE"]
     affinities = np.array([50.0, 50000.0, 50000.0, 50.0])

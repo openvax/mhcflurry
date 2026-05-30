@@ -26,7 +26,13 @@ from .class1_neural_network import (
     _TRAINING_PEAK_MULTIPLIER,
     _estimate_peak_bytes_per_row,
 )
-from .common import configure_logging, write_generate_sh
+from .common import (
+    add_random_seed_arg,
+    configure_random_seed,
+    configure_logging,
+    derive_seed,
+    write_generate_sh,
+)
 from .local_parallelism import (
     add_local_parallelism_args,
     attach_constant_data_to_work_items_if_needed,
@@ -91,6 +97,7 @@ parser.add_argument(
     metavar="N",
     default=1,
     help="Number of replicates per (architecture, fold) pair to train.")
+add_random_seed_arg(parser)
 parser.add_argument(
     "--max-epochs",
     type=int,
@@ -124,7 +131,7 @@ add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
 
 
-def assign_folds(df, num_folds, held_out_samples):
+def assign_folds(df, num_folds, held_out_samples, seed=None):
     """
     Split training data into mulitple test/train pairs, which we refer to as
     folds. Note that a given data point may be assigned to multiple test or
@@ -141,6 +148,11 @@ def assign_folds(df, num_folds, held_out_samples):
         training data
     num_folds : int
     held_out_samples : int
+    seed : int, optional
+        Master seed. When given, numpy's global RNG (which the per-fold
+        ``.sample()`` call below draws from) is seeded up front, so
+        held-out-sample membership is reproducible. When None, fold
+        assignment is left entropy-random as before.
 
     Returns
     -------
@@ -148,6 +160,9 @@ def assign_folds(df, num_folds, held_out_samples):
         index is same as df.index, columns are "fold_0", ... "fold_N" giving
         whether the data point is in the training data for the fold
     """
+    if seed is not None:
+        numpy.random.seed(int(seed) % (2 ** 32))
+
     result_df = pandas.DataFrame(index=df.index)
     sample_names = pandas.Series(df.sample_id.unique())
 
@@ -328,10 +343,20 @@ def initialize_training(args):
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
+
+    # Resolve the master seed once for the whole run and seed this process's
+    # global RNGs (so fold assignment below is reproducible). Per-fit weight
+    # init and the train-data shuffle in train_model derive from the same
+    # value via derive_seed. If --random-seed was omitted, a seed is drawn
+    # from entropy and logged so the run can be reproduced.
+    master_seed = configure_random_seed(
+        args.random_seed, name="train-processing")
+
     folds_df = assign_folds(
         df=df,
         num_folds=args.num_folds,
-        held_out_samples=args.held_out_samples)
+        held_out_samples=args.held_out_samples,
+        seed=master_seed)
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -371,6 +396,10 @@ def initialize_training(args):
     training_init_info["train_data"] = df
     training_init_info["folds_df"] = folds_df
     training_init_info["work_items"] = work_items
+    # Persist the master seed so the train_models phase (which may run in a
+    # separate invocation via --continue-incomplete) derives per-fit seeds
+    # from the same value used for fold assignment.
+    training_init_info["seed"] = master_seed
 
     # Save empty predictor (for metadata)
     predictor.save(args.out_models_dir)
@@ -406,8 +435,12 @@ def train_models(args):
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
 
     # The estimated time to completion is more accurate if we randomize
-    # the order of the work.
-    random.shuffle(work_items)
+    # the order of the work. Seed from the master seed so even the dispatch
+    # order is reproducible (per-fit results don't depend on order — each
+    # fit reseeds from its own work-item seed — but this keeps the whole
+    # run deterministic).
+    master_seed = GLOBAL_DATA.get("seed")
+    random.Random(master_seed).shuffle(work_items)
     for (work_item_num, item) in enumerate(work_items):
         item['work_item_num'] = work_item_num
         item['num_work_items'] = len(work_items)
@@ -580,9 +613,12 @@ def train_model(
 
     numpy.testing.assert_equal(len(df), len(folds_df))
 
-    train_data = df.loc[
-        folds_df["fold_%d" % fold_num]
-    ].sample(frac=1.0).copy()
+    # Don't shuffle here: fit() owns ordering via its seeded
+    # ``shuffle_permutation`` (a ``numpy.random.permutation`` drawn from the
+    # global RNG that fit() seeds from the work-item seed). A host-side
+    # ``.sample()`` would just add an unseeded numpy-global shuffle ahead of
+    # fit's seeding, breaking single-seed reproducibility.
+    train_data = df.loc[folds_df["fold_%d" % fold_num]].copy()
 
     test_data = df.loc[~folds_df["fold_%d" % fold_num]].copy()
 
@@ -606,6 +642,15 @@ def train_model(
     print("%s [pid %d]. Hyperparameters:" % (progress_preamble, os.getpid()))
     pprint.pprint(hyperparameters)
 
+    # One stable per-work-item seed controls every stochastic step of this
+    # fit — weight init plus the train/val shuffles. Derived from the run's
+    # master seed plus this fit's identity coordinates, so the whole run is
+    # reproducible from --random-seed regardless of dispatch order across
+    # workers.
+    work_item_seed = derive_seed(
+        constant_data.get("seed"),
+        architecture_num, fold_num, replicate_num)
+
     model = Class1ProcessingNeuralNetwork(**hyperparameters)
     model.fit(
         sequences=FlankingEncoding(
@@ -615,6 +660,7 @@ def train_model(
         targets=train_data.hit.values,
         progress_preamble=progress_preamble,
         progress_print_interval=progress_print_interval,
+        seed=work_item_seed,
         verbose=verbose)
 
     # Save model-specific training info

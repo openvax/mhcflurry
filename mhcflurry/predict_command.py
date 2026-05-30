@@ -450,9 +450,16 @@ def run(argv=sys.argv[1:]):
                 results = worker_pool.imap_unordered(
                     _predict_dataframe_chunk_worker, work_items, chunksize=1)
                 chunks = [result for result in results]
-            finally:
                 worker_pool.close()
                 worker_pool.join()
+                worker_pool = None
+            finally:
+                # On failure mid-iteration, terminate() rather than
+                # close()/join() (which can hang on a wedged worker) and
+                # leave non-daemon workers behind.
+                if worker_pool is not None:
+                    worker_pool.terminate()
+                    worker_pool.join()
             # ``df.reset_index(drop=True)`` above guarantees the chunks'
             # row indices form a monotonic 0..N-1 partition, so a
             # chunk_num-ordered concat already preserves input order.

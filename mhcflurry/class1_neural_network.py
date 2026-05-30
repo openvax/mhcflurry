@@ -3333,7 +3333,8 @@ class Class1NeuralNetwork(object):
             progress_preamble="",
             progress_print_interval=5.0,
             generator_factory=None,
-            generator_batches_are_encoded=False):
+            generator_batches_are_encoded=False,
+            seed=None):
         """Pretrain from a stream of already batched examples.
 
         This is the streaming pretraining path used by pan-allele training. It
@@ -3355,9 +3356,21 @@ class Class1NeuralNetwork(object):
         production pipeline. ``generator_factory`` enables DataLoader
         worker prefetch: each worker calls it with ``worker_id`` and
         ``num_workers`` to read a disjoint shard.
+
+        ``seed`` (int, optional) seeds numpy's and torch's global RNGs up
+        front, so weight initialization and any shuffling in this pretrain
+        pass derive from it; None leaves the worker's entropy seeding in
+        place. Mirrors :meth:`fit`'s ``seed`` so one value can drive both
+        phases of a pan-allele fit.
         """
         device = self.get_device()
         _configure_matmul_precision(device)
+
+        # Single-seed control, mirroring fit(): seed up front so weight init
+        # and shuffling in this pass are reproducible. See fit() for detail.
+        if seed is not None:
+            numpy.random.seed(int(seed) % (2 ** 32))
+            torch.manual_seed(int(seed) & ((1 << 63) - 1))
 
         fit_info = collections.defaultdict(list)
         timing_enabled = _timing_enabled()
@@ -3861,7 +3874,7 @@ class Class1NeuralNetwork(object):
             progress_callback=None,
             progress_preamble="",
             progress_print_interval=5.0,
-            random_negative_seed=None):
+            seed=None):
         """
         Fit the neural network.
 
@@ -3881,14 +3894,28 @@ class Class1NeuralNetwork(object):
         progress_callback : function
         progress_preamble : string
         progress_print_interval : float
-        random_negative_seed : int, optional
-            Seed for pooled random negatives when
-            ``random_negative_pool_epochs`` > 1. The default path
-            (pool_epochs == 1) ignores this so training keeps the
-            historical fresh-per-epoch random stream.
+        seed : int, optional
+            Master seed for this fit. When given, it seeds numpy's and
+            torch's global RNGs at the start of the call, so every
+            stochastic step downstream flows from this one value:
+            data-dependent weight initialization, the initial
+            example shuffle, the per-epoch training-batch shuffle, and
+            random-negative sampling. When None (the default) the RNGs are
+            left as the worker configured them (entropy-seeded), so
+            training stays stochastic and decorrelated across workers, as
+            it always has been.
         """
         device = self.get_device()
         _configure_matmul_precision(device)
+
+        # One seed controls every stochastic step in this fit. Seed numpy's
+        # and torch's global RNGs up front so weight init, the example
+        # shuffle, the per-epoch batch shuffle, and random-negative
+        # sampling all derive from it. Left untouched when seed is None
+        # (entropy-seeded by the worker), keeping training stochastic.
+        if seed is not None:
+            numpy.random.seed(int(seed) % (2 ** 32))
+            torch.manual_seed(int(seed) & ((1 << 63) - 1))
 
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
@@ -3927,14 +3954,13 @@ class Class1NeuralNetwork(object):
         )
         if random_negative_pool_epochs < 1:
             random_negative_pool_epochs = 1
-        # ``random_negative_seed`` is the pool's cross-cycle determinism
-        # knob — ignore it when pool_epochs == 1 so the default path
-        # stays on numpy's global RNG stream. Otherwise a seed passed by
-        # the training driver would silently change default-path training
-        # semantics to deterministic-per-work-item, which is a
-        # prediction-affecting change.
+        # When negatives are pooled across cycles the pool needs an explicit
+        # seed (it pre-generates once and slices), so feed it the master
+        # seed. At pool_epochs == 1 the pool regenerates every epoch from
+        # numpy's global RNG, which the master seed above already pins — so
+        # leave pool_seed None and let the global stream drive it.
         pool_seed = (
-            random_negative_seed
+            seed
             if random_negative_pool_epochs > 1
             else None
         )

@@ -18,7 +18,13 @@ from .common import normalize_allele_name
 import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .common import configure_logging, write_generate_sh
+from .common import (
+    add_random_seed_arg,
+    configure_logging,
+    configure_random_seed,
+    derive_seed,
+    write_generate_sh,
+)
 from .local_parallelism import (
     add_local_parallelism_args,
     apply_resolved_training_hyperparameters_to_work_items,
@@ -91,7 +97,10 @@ parser.add_argument(
     metavar="N",
     default=0,
     help="Seed for randomizing which measurements are held out. Only matters "
-    "when --held-out-fraction is specified. Default: %(default)s.")
+    "when --held-out-fraction is specified. Default: %(default)s. Subsumed by "
+    "--random-seed, which also makes the held-out split reproducible; kept for "
+    "backward compatibility.")
+add_random_seed_arg(parser)
 parser.add_argument(
     "--ignore-inequalities",
     action="store_true",
@@ -146,6 +155,18 @@ def run(argv=sys.argv[1:]):
 
     configure_logging(verbose=args.verbosity > 1)
 
+    # Resolve the master seed once for the whole run and seed this process's
+    # global RNGs before any main-process randomness: the held-out split
+    # (subselect_df_held_out), the per-allele ``.sample(frac=1.0)`` data
+    # shuffles in train_model, the ``random.shuffle(work_items)`` dispatch
+    # ordering, and alleles_by_similarity's ``.sample``. Per-fit weight init
+    # and shuffles happen inside workers (which reseed from entropy), so
+    # those are pinned separately via derive_seed below. If --random-seed
+    # was omitted, a seed is drawn from entropy and logged so the run can be
+    # reproduced.
+    master_seed = configure_random_seed(
+        args.random_seed, name="train-allele-specific")
+
     hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
     assert isinstance(hyperparameters_lst, list), hyperparameters_lst
     print("Loaded hyperparameters list: %s" % str(hyperparameters_lst))
@@ -178,15 +199,27 @@ def run(argv=sys.argv[1:]):
     df = df.loc[df.allele.isin(alleles)].dropna()
 
     if args.held_out_fraction_reciprocal:
+        # When --random-seed is given it governs the held-out split too, so
+        # the whole run reproduces from one value; derive a stable sub-seed
+        # so it's decorrelated from the per-fit seeds. When --random-seed is
+        # omitted, fall back to the legacy --held-out-fraction-seed.
+        held_out_seed = (
+            derive_seed(master_seed, "held_out_fraction")
+            if args.random_seed is not None
+            else args.held_out_fraction_seed)
         df = subselect_df_held_out(
             df,
             recriprocal_held_out_fraction=args.held_out_fraction_reciprocal,
-            seed=args.held_out_fraction_seed)
+            seed=held_out_seed % (2 ** 32))
 
     print("Training data: %s" % (str(df.shape)))
 
     GLOBAL_DATA["train_data"] = df
     GLOBAL_DATA["args"] = args
+    # Persist the resolved master seed so workers (which reseed from entropy
+    # in worker_init) can derive a stable per-fit seed via derive_seed. The
+    # main-process global seeding above doesn't reach worker fits.
+    GLOBAL_DATA["seed"] = master_seed
     resolve_local_parallelism_args(
         args,
         workload_name=WORKLOAD_AFFINITY_TRAINING,
@@ -259,6 +292,7 @@ def run(argv=sys.argv[1:]):
                     'n_models': 1,
                     'allele_num': i,
                     'n_alleles': len(alleles),
+                    'model_num': model_num,
                     'hyperparameter_set_num': h,
                     'num_hyperparameter_sets': len(hyperparameters_lst),
                     'allele': allele,
@@ -371,6 +405,7 @@ def train_model(
         n_models,
         allele_num,
         n_alleles,
+        model_num,
         hyperparameter_set_num,
         num_hyperparameter_sets,
         allele,
@@ -421,7 +456,28 @@ def train_model(
             n_alleles,
             allele))
 
-    train_data = data.sample(frac=1.0)
+    # One stable per-fit seed controls every stochastic step of this work
+    # item: the data shuffle below and the weight init / train-val split /
+    # random sampling inside fit(). Derived from the run's master seed plus
+    # this fit's identity coordinates (allele, architecture, replicate), so
+    # the whole run is reproducible from --random-seed regardless of dispatch
+    # order across workers, which reseed from entropy in worker_init. When no
+    # master seed was recorded (legacy run) derive_seed still returns a stable
+    # value; we keep training stochastic in that case by leaving it unseeded.
+    master_seed = constant_data.get("seed")
+    work_item_seed = (
+        None if master_seed is None
+        else derive_seed(
+            master_seed, allele, hyperparameter_set_num, model_num))
+
+    # Seed the data shuffle from the work-item seed so it's reproducible in
+    # workers (which don't inherit the main process's global seeding). When
+    # unseeded, fall back to the prior unseeded global-state shuffle.
+    train_data = data.sample(
+        frac=1.0,
+        random_state=(
+            None if work_item_seed is None
+            else work_item_seed % (2 ** 32)))
     predictor.fit_allele_specific_predictors(
         n_models=n_models,
         architecture_hyperparameters_list=[hyperparameters],
@@ -435,6 +491,7 @@ def train_model(
         models_dir_for_save=save_to,
         progress_preamble=progress_preamble,
         progress_print_interval=progress_print_interval,
+        seed=work_item_seed,
         verbose=verbose)
 
     return predictor

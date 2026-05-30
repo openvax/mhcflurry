@@ -320,6 +320,76 @@ def test_run_cluster_parallelism():
     ])
 
 
+def _network_weights_by_identity(predictor):
+    """Map each trained network's (architecture, fold, replicate) identity
+    to a flat vector of all its weights."""
+    out = {}
+    for nn in predictor.neural_networks:
+        info = nn.fit_info[-1]["training_info"]
+        key = (
+            info["architecture_num"], info["fold_num"], info["replicate_num"])
+        state = nn.network().state_dict()
+        out[key] = numpy.concatenate(
+            [v.detach().cpu().numpy().ravel() for v in state.values()])
+    return out
+
+
+@pytest.mark.slow
+@pytest.mark.integration
+def test_training_is_reproducible_from_seed():
+    """End-to-end: --seed pins every stochastic step (fold assignment,
+    weight init, shuffles, random negatives), so two full training runs with
+    the same seed produce bit-identical models, and a different seed
+    diverges."""
+    workdir = tempfile.mkdtemp(prefix="mhcflurry-test-seed")
+
+    hyperparameters_filename = os.path.join(workdir, "hyperparameters.yaml")
+    with open(hyperparameters_filename, "w") as fd:
+        json.dump(HYPERPARAMETERS_LIST, fd)
+
+    pretrain_data_filename = os.path.join(workdir, "pretrain_data.csv")
+    with open(pretrain_data_filename, "w") as fd:
+        fd.write(PRETRAIN_DATA + "\n")
+
+    data_csv = os.path.join(workdir, "_train_data.csv")
+    pandas.read_csv(
+        get_path("data_curated", "curated_training_data.affinity.csv.bz2")
+    ).sample(n=50, random_state=0).to_csv(data_csv, index=False)
+
+    def train(run_name, seed):
+        out_dir = os.path.join(workdir, run_name)
+        os.makedirs(out_dir)
+        subprocess.check_call(
+            mhcflurry_cli("mhcflurry-class1-train-pan-allele-models") + [
+                "--data", data_csv,
+                "--allele-sequences", get_path(
+                    "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
+                "--pretrain-data", pretrain_data_filename,
+                "--hyperparameters", hyperparameters_filename,
+                "--out-models-dir", out_dir,
+                "--num-jobs", "0",
+                "--num-folds", "2",
+                "--random-seed", str(seed),
+                "--verbosity", "1",
+            ])
+        return _network_weights_by_identity(
+            Class1AffinityPredictor.load(out_dir, optimization_level=0))
+
+    same_a = train("run_a", seed=42)
+    same_b = train("run_b", seed=42)
+    different = train("run_c", seed=43)
+
+    assert same_a and set(same_a) == set(same_b) == set(different)
+    for key in same_a:
+        assert numpy.array_equal(same_a[key], same_b[key]), (
+            "same --seed must reproduce identical weights for %r" % (key,))
+    assert any(
+        not numpy.array_equal(same_a[key], different[key]) for key in same_a), (
+        "a different --seed must change the trained weights")
+
+    shutil.rmtree(workdir)
+
+
 if __name__ == "__main__":
     # run_and_check(n_jobs=0, delete=False)
     test_run_cluster_parallelism()
