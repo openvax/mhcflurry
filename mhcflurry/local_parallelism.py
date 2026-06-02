@@ -397,7 +397,13 @@ def auto_max_workers_per_gpu(
     # The headroom is intentionally generous: an OOM during a multi-hour
     # training run costs far more than leaving a worker slot on the
     # table, and the cap is bounded above by ``hard_cap`` anyway.
-    by_vram = max(1, int(free_vram_gb_used * 0.6 / per_worker_gb))
+    if per_worker_gb <= 0:
+        # A non-positive per-worker budget (e.g. the env override set to 0)
+        # disables the VRAM-based cap rather than dividing by zero; ``hard_cap``
+        # still bounds the result. Mirrors host_memory_num_jobs_cap's guard.
+        by_vram = hard_cap
+    else:
+        by_vram = max(1, int(free_vram_gb_used * 0.6 / per_worker_gb))
     if num_jobs_int > 0:
         by_jobs = max(1, num_jobs_int // max(int(num_gpus), 1))
         chosen = max(1, min(by_jobs, by_vram, hard_cap))

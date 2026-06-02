@@ -96,11 +96,12 @@ parser.add_argument(
     "--held-out-fraction-seed",
     type=int,
     metavar="N",
-    default=0,
+    default=None,
     help="Seed for randomizing which measurements are held out. Only matters "
-    "when --held-out-fraction is specified. Default: %(default)s. Subsumed by "
-    "--random-seed, which also makes the held-out split reproducible; kept for "
-    "backward compatibility.")
+    "when --held-out-fraction is specified. When omitted, the held-out split "
+    "is derived from --random-seed (so the whole run reproduces from one "
+    "value). Pass this explicitly to control the split directly — e.g. to "
+    "reproduce a pre-2.3.0 split — overriding --random-seed for the split.")
 add_random_seed_arg(parser)
 parser.add_argument(
     "--ignore-inequalities",
@@ -200,14 +201,15 @@ def run(argv=sys.argv[1:]):
     df = df.loc[df.allele.isin(alleles)].dropna()
 
     if args.held_out_fraction_reciprocal:
-        # When --random-seed is given it governs the held-out split too, so
-        # the whole run reproduces from one value; derive a stable sub-seed
-        # so it's decorrelated from the per-fit seeds. When --random-seed is
-        # omitted, fall back to the legacy --held-out-fraction-seed.
+        # An explicit --held-out-fraction-seed controls the split directly
+        # (legacy behavior, e.g. to reproduce a pre-2.3.0 split). Otherwise
+        # --random-seed governs the split too, so the whole run reproduces
+        # from one value; derive a stable sub-seed so it's decorrelated from
+        # the per-fit seeds.
         held_out_seed = (
-            derive_seed(master_seed, "held_out_fraction")
-            if args.random_seed is not None
-            else args.held_out_fraction_seed)
+            args.held_out_fraction_seed
+            if args.held_out_fraction_seed is not None
+            else derive_seed(master_seed, "held_out_fraction"))
         df = subselect_df_held_out(
             df,
             recriprocal_held_out_fraction=args.held_out_fraction_reciprocal,
