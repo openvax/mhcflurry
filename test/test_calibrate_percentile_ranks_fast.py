@@ -14,10 +14,12 @@ import pandas
 import pytest
 
 from mhcflurry import Class1AffinityPredictor
+from mhcflurry import common
 from mhcflurry.common import positional_frequency_matrix, random_peptides
 from mhcflurry.downloads import get_path
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.regression_target import to_ic50
+from . import available_torch_accelerators
 
 
 def _load_downloaded_pan_allele():
@@ -475,29 +477,34 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
         cnn._free_device_memory_bytes = saved
 
 
-def test_fit_end_to_end_shrinks_minibatch_when_vram_too_small(caplog):
+@pytest.mark.parametrize(
+    "backend,device_type",
+    available_torch_accelerators(),
+    ids=lambda value: value,
+)
+def test_fit_end_to_end_shrinks_minibatch_when_vram_too_small(
+        caplog, backend, device_type):
     """End-to-end: a tiny fit() on a mocked small-VRAM device should
     invoke ``check_training_batch_fits``, shrink the configured
     minibatch, record it in fit_info, and *not* mutate the predictor's
     saved hyperparameters dict.
 
-    Exercises MPS (the only non-CPU device reliably available in the
-    test env); MPS's guard path is identical to CUDA's, modulo the
-    dtype fallback tested elsewhere.
+    Exercises each available non-CPU backend. Ordinary tests default to CPU;
+    accelerator coverage opts in explicitly.
     """
     import logging
-    if not torch.backends.mps.is_available():
-        pytest.skip("MPS not available — guard end-to-end test needs a non-CPU device")
 
     from mhcflurry import class1_neural_network as cnn
     from mhcflurry.class1_neural_network import Class1NeuralNetwork
     from mhcflurry.common import random_peptides
 
-    # Override MPS free-memory to be tiny so the shrink fires.
+    # Override accelerator free-memory to be tiny so the shrink fires.
     saved_free = cnn._free_device_memory_bytes
+    old_backend = common._pytorch_backend
     try:
+        common.configure_pytorch(backend=backend)
         cnn._free_device_memory_bytes = lambda device: (
-            128 * (1 << 20) if device.type == "mps" else saved_free(device)
+            128 * (1 << 20) if device.type == device_type else saved_free(device)
         )
 
         hyperparameters = dict(
@@ -548,6 +555,7 @@ def test_fit_end_to_end_shrinks_minibatch_when_vram_too_small(caplog):
         )
     finally:
         cnn._free_device_memory_bytes = saved_free
+        common.configure_pytorch(backend=old_backend)
 
 
 def test_processing_nn_auto_batch_matches_explicit_size():

@@ -512,13 +512,19 @@ def _batch_value_to_device(value, device, *, non_blocking, cast_float):
     fp32 via embedding lookup inside the network's forward pass.
     """
     if isinstance(value, numpy.ndarray):
-        value = torch.from_numpy(value)
+        value = _torch_from_numpy(value)
     if cast_float and value.dtype == torch.float64:
         value = value.float()
     value = value.to(device, non_blocking=non_blocking)
     if cast_float:
         value = value.float()
     return value
+
+
+def _torch_from_numpy(value):
+    if not value.flags.writeable:
+        value = value.copy()
+    return torch.from_numpy(value)
 
 
 _DEVICE_PEPTIDE_ENCODING_TRUE_VALUES = {
@@ -3433,15 +3439,17 @@ class Class1NeuralNetwork(object):
             _val_peptide_np.ndim == 2
             and numpy.issubdtype(_val_peptide_np.dtype, numpy.integer)
         ):
-            val_peptide_device = torch.from_numpy(_val_peptide_np).to(device)
+            val_peptide_device = _torch_from_numpy(_val_peptide_np).to(device)
         else:
-            val_peptide_device = torch.from_numpy(_val_peptide_np).to(device).float()
+            val_peptide_device = _torch_from_numpy(
+                _val_peptide_np).to(device).float()
         val_allele_device = None
         if "allele" in validation_x_dict:
-            val_allele_device = torch.from_numpy(
+            val_allele_device = _torch_from_numpy(
                 validation_x_dict["allele"]
             ).to(device).float()
-        val_y_device = torch.from_numpy(output.astype(numpy.float32)).to(device)
+        val_y_device = _torch_from_numpy(
+            output.astype(numpy.float32)).to(device)
 
         # Streaming-pretrain batches stay as numpy arrays until the parent
         # training loop moves them to the device. That keeps worker-side
@@ -4227,20 +4235,21 @@ class Class1NeuralNetwork(object):
                 _val_peptide_np.ndim == 2
                 and numpy.issubdtype(_val_peptide_np.dtype, numpy.integer)
             ):
-                _val_peptide_device = torch.from_numpy(_val_peptide_np).to(device)
+                _val_peptide_device = _torch_from_numpy(_val_peptide_np).to(device)
             else:
-                _val_peptide_device = torch.from_numpy(_val_peptide_np).float().to(device)
-            _val_y_device = torch.from_numpy(
+                _val_peptide_device = _torch_from_numpy(
+                    _val_peptide_np).float().to(device)
+            _val_y_device = _torch_from_numpy(
                 y_encoded[val_indices].astype(numpy.float32)
             ).to(device)
             _val_allele_device = None
             if "allele" in x_dict_without_random_negatives:
-                _val_allele_device = torch.from_numpy(
+                _val_allele_device = _torch_from_numpy(
                     x_dict_without_random_negatives["allele"][val_training_indices]
                 ).float().to(device)
             _val_weights_device = None
             if sample_weights_with_negatives is not None:
-                _val_weights_device = torch.from_numpy(
+                _val_weights_device = _torch_from_numpy(
                     sample_weights_with_negatives[val_indices]
                 ).float().to(device)
             _val_device_tensors = (

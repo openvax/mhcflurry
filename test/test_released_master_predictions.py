@@ -11,8 +11,6 @@ import os
 import numpy as np
 import pytest
 
-from mhcflurry import Class1AffinityPredictor
-from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import startup, cleanup
 
 pytestmark = pytest.mark.downloads
@@ -32,12 +30,11 @@ def _load_expected(name):
         return json.load(f)
 
 
-def test_allele_specific_affinity_predictions():
+def test_allele_specific_affinity_predictions(released_affinity_predictors):
     expected = _load_expected(
         "master_released_class1_affinity_predictions.json")["allele_specific"]
 
-    predictor = Class1AffinityPredictor.load(
-        get_path("models_class1", "models"))
+    predictor = released_affinity_predictors["allele-specific"]
 
     predictions = predictor.predict(
         peptides=expected["peptides"],
@@ -52,12 +49,11 @@ def test_allele_specific_affinity_predictions():
     )
 
 
-def test_pan_allele_affinity_predictions():
+def test_pan_allele_affinity_predictions(released_affinity_predictors):
     expected = _load_expected(
         "master_released_class1_affinity_predictions.json")["pan_allele"]
 
-    predictor = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined"))
+    predictor = released_affinity_predictors["pan-allele"]
 
     predictions = predictor.predict(
         peptides=expected["peptides"],

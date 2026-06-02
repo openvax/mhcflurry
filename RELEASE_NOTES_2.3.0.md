@@ -143,11 +143,11 @@ a specific predictor:
 ```python
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.calibrate_percentile_ranks_command import (
-    _filter_canonicalizable_alleles,
+    filter_canonicalizable_alleles,
 )
 predictor = Class1AffinityPredictor.load(models_dir)
 all_alleles = predictor.supported_alleles
-kept = _filter_canonicalizable_alleles(all_alleles)
+kept = filter_canonicalizable_alleles(all_alleles)
 dropped = sorted(set(all_alleles) - set(kept))
 print(f"{len(dropped)} dropped:", dropped[:10])
 ```

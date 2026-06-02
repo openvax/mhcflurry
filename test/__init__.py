@@ -40,3 +40,19 @@ def initialize():
 
     # Enable deterministic operations where possible
     torch.use_deterministic_algorithms(False)  # Some ops don't have deterministic impl
+
+
+def available_torch_accelerators():
+    """
+    Return available non-CPU torch backends as (mhcflurry backend, torch device).
+    """
+    import torch
+
+    backends = []
+    if torch.cuda.is_available():
+        backends.append(("gpu", "cuda"))
+    if (
+            hasattr(torch.backends, "mps")
+            and torch.backends.mps.is_available()):
+        backends.append(("mps", "mps"))
+    return backends

@@ -1,5 +1,7 @@
 """Tests for affinity-model device-resident training data."""
 
+import warnings
+
 import numpy
 import torch
 
@@ -69,6 +71,33 @@ def test_affinity_device_training_data_no_random_negatives():
     assert data.random_negative_x_peptide is None
     assert data.random_negative_count == 0
     numpy.testing.assert_array_equal(data.x_peptide.numpy(), x_peptide)
+
+
+def test_affinity_device_training_data_accepts_readonly_numpy_arrays():
+    x_peptide = numpy.arange(4 * 3, dtype=numpy.int8).reshape(4, 3)
+    x_allele = numpy.arange(4 * 2, dtype=numpy.int64).reshape(4, 2)
+    rn_template = numpy.zeros((2, 3), dtype=numpy.int8)
+    rn_allele = numpy.array([[10, 11], [12, 13]], dtype=numpy.int64)
+    y_encoded = numpy.arange(6, dtype=numpy.float32)
+    weights = numpy.ones(6, dtype=numpy.float32)
+    for array in (x_peptide, x_allele, rn_template, rn_allele, y_encoded, weights):
+        array.setflags(write=False)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        data = AffinityDeviceTrainingData.from_arrays(
+            x_peptide=x_peptide,
+            x_allele=x_allele,
+            y_encoded=y_encoded,
+            sample_weights=weights,
+            random_negative_x_peptide_template=rn_template,
+            random_negative_x_allele=rn_allele,
+            device="cpu",
+        )
+
+    assert data.row_count == 6
+    numpy.testing.assert_array_equal(data.combined_allele[:2].numpy(), rn_allele)
+    numpy.testing.assert_array_equal(data.combined_allele[2:].numpy(), x_allele)
 
 
 def test_affinity_device_training_data_batch_for_indices():

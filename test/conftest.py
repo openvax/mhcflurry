@@ -1,10 +1,70 @@
 """
 Pytest configuration and session-wide initialization.
 """
+import pytest
+
 from . import initialize
 
 # Ensure deterministic test setup without per-file initialize() calls.
 initialize()
+
+from mhcflurry.common import configure_pytorch  # noqa: E402
+
+# Unit tests default to CPU for speed and determinism. Tests that exercise
+# CUDA/MPS opt into those backends explicitly.
+configure_pytorch(backend="cpu")
+
+
+@pytest.fixture(autouse=True)
+def _default_pytorch_backend_cpu():
+    configure_pytorch(backend="cpu")
+    yield
+    configure_pytorch(backend="cpu")
+
+
+@pytest.fixture(scope="session")
+def released_allele_specific_predictor():
+    from mhcflurry import Class1AffinityPredictor
+    from mhcflurry.downloads import get_path
+    return Class1AffinityPredictor.load(get_path("models_class1", "models"))
+
+
+@pytest.fixture(scope="session")
+def released_pan_allele_predictor():
+    from mhcflurry import Class1AffinityPredictor
+    from mhcflurry.downloads import get_path
+    return Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.combined"))
+
+
+@pytest.fixture(scope="session")
+def released_pan_allele_predictor_two_models():
+    from mhcflurry import Class1AffinityPredictor
+    from mhcflurry.downloads import get_path
+    return Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.combined"),
+        max_models=2)
+
+
+@pytest.fixture(scope="session")
+def released_affinity_predictors(
+        released_allele_specific_predictor,
+        released_pan_allele_predictor):
+    return {
+        "allele-specific": released_allele_specific_predictor,
+        "pan-allele": released_pan_allele_predictor,
+    }
+
+
+@pytest.fixture(scope="session")
+def released_affinity_predictors_two_pan_models(
+        released_allele_specific_predictor,
+        released_pan_allele_predictor_two_models):
+    return {
+        "allele-specific": released_allele_specific_predictor,
+        "pan-allele": released_pan_allele_predictor_two_models,
+    }
+
 
 def pytest_configure(config):
     # Register custom marks used across tests.

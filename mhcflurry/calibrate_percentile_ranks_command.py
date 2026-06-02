@@ -219,6 +219,13 @@ def run(argv=sys.argv[1:]):
 
     configure_logging(verbose=args.verbosity > 1)
 
+    if args.list_percent_rank_status:
+        if args.predictor_kind != "class1_affinity":
+            raise ValueError(
+                "--list-percent-rank-status is only supported for "
+                "class1_affinity predictors")
+        return run_class1_affinity_percent_rank_status(args)
+
     # Seed all randomness up front (random peptide universe + genotype
     # sampling below both run in this process). Inference in workers is
     # deterministic, so global seeding here makes calibration reproducible.
@@ -276,13 +283,6 @@ def run(argv=sys.argv[1:]):
             and args.predictor_kind != "class1_affinity"):
         raise ValueError(
             "--only-missing is only supported for class1_affinity predictors")
-
-    if args.list_percent_rank_status:
-        if args.predictor_kind != "class1_affinity":
-            raise ValueError(
-                "--list-percent-rank-status is only supported for "
-                "class1_affinity predictors")
-        return run_class1_affinity_percent_rank_status(args)
 
     aa_distribution = None
     if args.match_amino_acid_distribution_data:

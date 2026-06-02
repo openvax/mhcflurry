@@ -33,6 +33,11 @@ from mhcflurry.workload_planning import (
 )
 
 
+@pytest.fixture(autouse=True)
+def clear_cuda_visible_devices(monkeypatch):
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+
+
 def test_worker_init_kwargs_round_robin_across_gpus():
     assert worker_init_kwargs_for_scheduler(
         num_jobs=5,
@@ -44,6 +49,22 @@ def test_worker_init_kwargs_round_robin_across_gpus():
         {"backend": "gpu", "gpu_device_nums": [1], "max_workers_per_gpu": 2},
         {"backend": "gpu", "gpu_device_nums": [0], "max_workers_per_gpu": 2},
         {"backend": "gpu", "gpu_device_nums": [1], "max_workers_per_gpu": 2},
+        {"backend": "cpu", "gpu_device_nums": [], "max_workers_per_gpu": 2},
+    ]
+
+
+def test_worker_init_kwargs_honors_cuda_visible_devices(monkeypatch):
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
+    assert worker_init_kwargs_for_scheduler(
+        num_jobs=5,
+        num_gpus=2,
+        backend="auto",
+        max_workers_per_gpu=2,
+    ) == [
+        {"backend": "gpu", "gpu_device_nums": ["2"], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": ["3"], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": ["2"], "max_workers_per_gpu": 2},
+        {"backend": "gpu", "gpu_device_nums": ["3"], "max_workers_per_gpu": 2},
         {"backend": "cpu", "gpu_device_nums": [], "max_workers_per_gpu": 2},
     ]
 
@@ -362,10 +383,7 @@ def test_resolve_local_parallelism_args_unlocks_4_per_gpu_on_80gb(
     )
     resolve_local_parallelism_args(args)
     assert args.max_workers_per_gpu == 4
-    # num_jobs="auto" (here num_jobs=0 in the older signature treated as
-    # auto-equivalent for the resolver's CPU-only branch — but with the
-    # new resolver, num_jobs=0 is taken at face value). For the new auto
-    # path see ``test_resolve_local_parallelism_args_num_jobs_auto``.
+    assert args.num_jobs == 0
     assert args.max_workers_per_gpu_was_auto is True
 
 
@@ -617,6 +635,30 @@ def test_resolve_local_parallelism_args_auto_detects_gpus(monkeypatch):
     assert args.num_jobs == 16
 
 
+def test_resolve_local_parallelism_args_counts_cuda_visible_devices(monkeypatch):
+    """Scheduler CUDA masks are authoritative for GPU auto-detection."""
+    from mhcflurry import local_parallelism
+
+    def boom(*args, **kwargs):
+        raise AssertionError("nvidia-smi should not be called when masked")
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
+    monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
+    monkeypatch.setattr(local_parallelism.subprocess, "check_output", boom)
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs="auto",
+        gpus=None,
+        backend="auto",
+    )
+    resolve_local_parallelism_args(args)
+    assert args.gpus == 2
+    assert args.gpus_was_auto is True
+    assert args.num_jobs == 8
+
+
 def test_resolve_local_parallelism_args_detects_gpus_before_explicit_jobs(
         monkeypatch):
     """Auto MWPG must see auto-detected GPUs before explicit num_jobs is
@@ -736,6 +778,41 @@ def test_resolve_local_parallelism_args_no_auto_detect_for_cpu_backend(
     resolve_local_parallelism_args(args)
     assert (args.gpus or 0) == 0
     assert args.gpus_was_auto is False
+
+
+def test_detect_num_cuda_devices_uses_empty_cuda_visible_devices(monkeypatch):
+    """An empty CUDA mask means no visible GPUs, even if nvidia-smi exists."""
+    from mhcflurry import local_parallelism
+
+    def boom(*args, **kwargs):
+        raise AssertionError("nvidia-smi should not be called when masked")
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setattr(local_parallelism.subprocess, "check_output", boom)
+    assert local_parallelism._detect_num_cuda_devices_no_torch() == 0
+
+
+def test_free_vram_from_nvidia_smi_uses_cuda_visible_devices(monkeypatch):
+    """Free-VRAM sizing should query scheduler-visible physical GPUs."""
+    from mhcflurry import local_parallelism
+
+    calls = []
+
+    def fake_check_output(args, **kwargs):
+        calls.append(args)
+        return b"1024\n2048\n"
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
+    monkeypatch.setattr(
+        local_parallelism.subprocess, "check_output", fake_check_output)
+    assert local_parallelism._free_vram_from_nvidia_smi_gb(2) == 1.0
+    assert calls == [[
+        "nvidia-smi",
+        "-i",
+        "2,3",
+        "--query-gpu=memory.free",
+        "--format=csv,noheader,nounits",
+    ]]
 
 
 def test_detect_num_cuda_devices_parses_nvidia_smi_l(monkeypatch):

@@ -15,12 +15,14 @@ from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
-from mhcflurry.testing_utils import cleanup, startup
+from mhcflurry.testing_utils import startup
 
 logger = logging.getLogger("matplotlib")
 logger.disabled = True
 
 pytestmark = [pytest.mark.slow, pytest.mark.downloads]
+
+PREDICTORS = None
 
 def setup():
     """Setup for running script directly (not via pytest)."""
@@ -32,31 +34,7 @@ def setup():
     }
 
 
-@pytest.fixture(autouse=True)
-def setup_teardown():
-    """Setup and teardown for each test."""
-    global PREDICTORS
-    startup()
-    try:
-        PREDICTORS = {
-            'allele-specific': Class1AffinityPredictor.load(
-                get_path("models_class1", "models")),
-            'pan-allele': Class1AffinityPredictor.load(
-                get_path("models_class1_pan", "models.combined"), max_models=2)
-        }
-    except Exception:
-        PREDICTORS = None
-    yield
-    PREDICTORS = None
-    cleanup()
-
-
-@pytest.fixture
-def predictors():
-    return PREDICTORS
-
-
-def test_correlation(
+def _correlation(
         predictors,
         alleles=None,
         num_peptides_per_length=1000,
@@ -106,6 +84,10 @@ def test_correlation(
         return results_df
 
 
+def test_correlation(released_affinity_predictors_two_pan_models):
+    _correlation(released_affinity_predictors_two_pan_models)
+
+
 parser = argparse.ArgumentParser(usage=__doc__)
 parser.add_argument(
     "--alleles",
@@ -117,7 +99,9 @@ if __name__ == '__main__':
     # If run directly from python, leave the user in a shell to explore results.
     startup()
     args = parser.parse_args(sys.argv[1:])
-    result = test_correlation(alleles=args.alleles, debug=True, return_result=True)
+    setup()
+    result = _correlation(
+        PREDICTORS, alleles=args.alleles, debug=True, return_result=True)
 
     # Leave in ipython
     import ipdb  # pylint: disable=import-error

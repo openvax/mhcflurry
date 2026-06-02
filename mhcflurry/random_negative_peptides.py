@@ -414,13 +414,10 @@ class RandomNegativesPool(object):
             entropy=int(self.seed), spawn_key=(int(cycle),)
         )
         # Squeeze the SeedSequence into a 64-bit unsigned int seed.
-        seed64 = int(seed_seq.generate_state(2, dtype=numpy.uint32).astype(
+        state = seed_seq.generate_state(2, dtype=numpy.uint32).astype(
             numpy.uint64
-        )[0]) | (
-            int(seed_seq.generate_state(2, dtype=numpy.uint32).astype(
-                numpy.uint64
-            )[1]) << 32
         )
+        seed64 = int(state[0]) | (int(state[1]) << 32)
         seed64 &= (1 << 63) - 1  # torch wants signed positive 64-bit
         gen = _torch.Generator(device=self.device)
         gen.manual_seed(seed64)

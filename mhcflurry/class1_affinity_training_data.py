@@ -93,6 +93,8 @@ class AffinityDeviceTrainingData:
             if isinstance(value, torch.Tensor):
                 tensor = value
             else:
+                if isinstance(value, numpy.ndarray) and not value.flags.writeable:
+                    value = value.copy()
                 tensor = torch.as_tensor(value)
             if dtype is not None and tensor.dtype != dtype:
                 tensor = tensor.to(dtype)
@@ -109,13 +111,18 @@ class AffinityDeviceTrainingData:
 
         def _peptide_template_shape_dtype(value):
             if isinstance(value, torch.Tensor):
-                tensor = value
+                shape = tuple(value.shape)
+                dtype = value.dtype
+            elif isinstance(value, numpy.ndarray):
+                shape = value.shape
+                dtype = torch.from_numpy(numpy.empty((), dtype=value.dtype)).dtype
             else:
                 tensor = torch.as_tensor(value)
-            dtype = tensor.dtype
-            if tensor.ndim > 2 and not dtype.is_floating_point:
+                shape = tuple(tensor.shape)
+                dtype = tensor.dtype
+            if len(shape) > 2 and not dtype.is_floating_point:
                 dtype = torch.float32
-            return tuple(tensor.shape), dtype
+            return tuple(shape), dtype
 
         x_peptide_dev = _peptide_to_device(x_peptide)
         x_allele_dev = _to_device(x_allele)

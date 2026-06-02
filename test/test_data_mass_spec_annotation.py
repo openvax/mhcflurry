@@ -138,8 +138,27 @@ def test_annotation_helper_default_matches_sliding(tmp_path):
         check_dtype=False)
 
 
-def test_annotation_ahocorasick_matches_sliding_when_available(tmp_path):
-    pytest.importorskip("ahocorasick_rs")
+def test_annotation_helper_default_matches_ahocorasick(tmp_path):
+    peptides, reference = write_inputs(tmp_path)
+
+    peptide_df = pandas.read_csv(peptides)
+    peptide_df["hit_id"] = "hit." + peptide_df.index.map("{0:07d}".format)
+    peptide_df = peptide_df.set_index("hit_id")
+    reference_df = read_reference_dataframe(reference)
+
+    ahocorasick = annotate_with_backend(peptides, reference, "ahocorasick")
+    auto = peptide_reference.annotate_peptide_references(
+        peptide_df,
+        reference_df,
+        flanking_length=2)
+
+    pandas.testing.assert_frame_equal(
+        sorted_annotation_rows(ahocorasick),
+        sorted_annotation_rows(auto),
+        check_dtype=False)
+
+
+def test_annotation_ahocorasick_matches_sliding(tmp_path):
     peptides, reference = write_inputs(tmp_path)
     sliding = annotate_with_backend(peptides, reference, "sliding")
     ahocorasick = annotate_with_backend(peptides, reference, "ahocorasick")

@@ -314,7 +314,7 @@ def _looks_like_affinity_dir(path):
 
 def _looks_like_presentation_dir(path):
     return os.path.isdir(path) and os.path.isfile(
-        os.path.join(path, "presentation_predictor.json")
+        os.path.join(path, "weights.csv")
     )
 
 
@@ -390,6 +390,47 @@ def _add_diffs(df, metric_names, a_prefix="a", b_prefix="b"):
         if a_col in df.columns and b_col in df.columns:
             df["%s_diff" % metric] = df[a_col] - df[b_col]
     return df
+
+
+def _metric_table_columns(id_columns, metric_names=_METRIC_NAMES):
+    columns = list(id_columns) + ["n", "n_pos"]
+    for metric in metric_names:
+        columns.extend(["a_%s" % metric, "b_%s" % metric, "%s_diff" % metric])
+    return columns
+
+
+def _metric_table(rows, id_columns, metric_names=_METRIC_NAMES):
+    df = pandas.DataFrame(rows, columns=_metric_table_columns(
+        id_columns, metric_names))
+    return _add_diffs(df, metric_names)
+
+
+def _per_length_columns(metric_names=_METRIC_NAMES):
+    columns = ["length", "n", "n_pos", "n_alleles_reported"]
+    for metric in metric_names:
+        columns.extend([
+            "a_micro_%s" % metric,
+            "b_micro_%s" % metric,
+            "a_macro_%s" % metric,
+            "b_macro_%s" % metric,
+            "micro_%s_diff" % metric,
+            "macro_%s_diff" % metric,
+        ])
+    return columns
+
+
+def _presentation_per_length_columns(metric_names=_METRIC_NAMES):
+    columns = ["length", "n", "n_pos", "n_samples_reported"]
+    for metric in metric_names:
+        columns.extend([
+            "a_micro_%s" % metric,
+            "b_micro_%s" % metric,
+            "micro_%s_diff" % metric,
+            "a_macro_%s" % metric,
+            "b_macro_%s" % metric,
+            "macro_%s_diff" % metric,
+        ])
+    return columns
 
 
 # ---------------------------------------------------------------------------
@@ -668,9 +709,7 @@ def _affinity_per_allele(test):
             row["a_%s" % metric] = m_a[metric]
             row["b_%s" % metric] = m_b[metric]
         rows.append(row)
-    return _add_diffs(
-        pandas.DataFrame(rows), _METRIC_NAMES,
-    ).sort_values("n", ascending=False)
+    return _metric_table(rows, ["allele"]).sort_values("n", ascending=False)
 
 
 def _affinity_per_length(test):
@@ -719,9 +758,10 @@ def _affinity_per_length(test):
                 row["a_macro_%s" % metric] - row["b_macro_%s" % metric]
             )
         rows.append(row)
-    per_length = pandas.DataFrame(rows)
-    per_length_per_allele = _add_diffs(
-        pandas.DataFrame(per_allele_rows), _METRIC_NAMES,
+    per_length = pandas.DataFrame(
+        rows, columns=_per_length_columns()).sort_values("length")
+    per_length_per_allele = _metric_table(
+        per_allele_rows, ["allele", "length"],
     ).sort_values(["length", "n"], ascending=[True, False])
     return per_length, per_length_per_allele
 
@@ -908,9 +948,8 @@ def _presentation_per_sample(scored, score_kind):
             row["a_%s" % metric] = m_a[metric]
             row["b_%s" % metric] = m_b[metric]
         rows.append(row)
-    return _add_diffs(
-        pandas.DataFrame(rows), _METRIC_NAMES,
-    ).sort_values("n", ascending=False)
+    return _metric_table(rows, ["sample_id", "hla"]).sort_values(
+        "n", ascending=False)
 
 
 def _presentation_per_length(scored, score_kind):
@@ -937,12 +976,16 @@ def _presentation_per_length(scored, score_kind):
             row["b_macro_%s" % metric] = macro_b
             row["macro_%s_diff" % metric] = macro_a - macro_b
         rows.append(row)
-    per_length = pandas.DataFrame(rows).sort_values("length")
+    per_length = pandas.DataFrame(
+        rows,
+        columns=_presentation_per_length_columns(),
+    ).sort_values("length")
     if per_length_per_sample:
         per_length_per_sample = pandas.concat(
             per_length_per_sample, ignore_index=True)
     else:
-        per_length_per_sample = pandas.DataFrame()
+        per_length_per_sample = pandas.DataFrame(
+            columns=_metric_table_columns(["sample_id", "hla", "length"]))
     return per_length, per_length_per_sample
 
 

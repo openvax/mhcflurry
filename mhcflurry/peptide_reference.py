@@ -148,7 +148,7 @@ def _find_occurrences_sliding(peptides, reference_df):
 
 
 def _find_occurrences_ahocorasick(peptides, reference_df):
-    """Use Rust-backed Aho-Corasick exact matching when available."""
+    """Use Rust-backed Aho-Corasick exact matching."""
     import ahocorasick_rs
 
     peptides = sorted(peptides)
@@ -172,14 +172,7 @@ def _find_occurrences_ahocorasick(peptides, reference_df):
 
 def _find_peptide_occurrences(peptides, reference_df, backend="auto"):
     if backend == "auto":
-        try:
-            import ahocorasick_rs  # noqa: F401
-            backend = "ahocorasick"
-        except ImportError:
-            backend = "sliding"
-            print(
-                "ahocorasick-rs unavailable; using sliding-window backend",
-                flush=True)
+        backend = "ahocorasick"
 
     if backend == "ahocorasick":
         print("Using ahocorasick-rs peptide reference lookup", flush=True)

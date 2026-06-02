@@ -28,7 +28,6 @@ from .workload_planning import (
     env_float,
     env_int,
     plan_local_parallelism,
-    system_memory_info_gb,
 )
 
 
@@ -104,6 +103,22 @@ _AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB = 2.0
 # fancy-indexing + collation in one process; with ~50% blocking on the work
 # queue, two physical cores per child is a comfortable upper bound.
 _AUTO_DATALOADER_CORES_PER_CHILD = 2
+
+
+def _cuda_visible_devices_from_env():
+    """Return CUDA_VISIBLE_DEVICES entries, or ``None`` when unset."""
+    value = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return []
+    devices = [part.strip() for part in value.split(",") if part.strip()]
+    if not devices:
+        return []
+    if devices[0].lower() in ("-1", "none", "void", "nodevfiles"):
+        return []
+    return devices
 
 
 def _max_workers_per_gpu_arg(value):
@@ -207,12 +222,17 @@ def _free_vram_override_gb(num_gpus):
 
 
 def _detect_num_cuda_devices_no_torch():
-    """Return the number of visible CUDA devices via ``nvidia-smi -L``.
+    """Return the number of visible CUDA devices without importing torch.
 
-    Subprocess so the orchestrator can size a fork-based worker pool
-    without initializing CUDA in the parent process. Returns 0 when
-    nvidia-smi is unavailable or no GPUs are visible.
+    ``CUDA_VISIBLE_DEVICES`` is authoritative when set by a scheduler or
+    container. Otherwise shell out so the orchestrator can size a fork-based
+    worker pool without initializing CUDA in the parent process. Returns 0
+    when nvidia-smi is unavailable or no GPUs are visible.
     """
+    cuda_visible_devices = _cuda_visible_devices_from_env()
+    if cuda_visible_devices is not None:
+        return len(cuda_visible_devices)
+
     try:
         output = subprocess.check_output(
             ["nvidia-smi", "-L"],
@@ -243,13 +263,22 @@ def _free_vram_from_nvidia_smi_gb(num_gpus):
     orchestrator can size a fork-based worker pool without initializing CUDA in
     the parent process.
     """
+    cuda_visible_devices = _cuda_visible_devices_from_env()
+    if cuda_visible_devices is not None:
+        cuda_visible_devices = cuda_visible_devices[:max(int(num_gpus), 1)]
+        if not cuda_visible_devices:
+            return None
+        device_args = ["-i", ",".join(cuda_visible_devices)]
+    else:
+        device_args = []
+
+    command = ["nvidia-smi"] + device_args + [
+        "--query-gpu=memory.free",
+        "--format=csv,noheader,nounits",
+    ]
     try:
         output = subprocess.check_output(
-            [
-                "nvidia-smi",
-                "--query-gpu=memory.free",
-                "--format=csv,noheader,nounits",
-            ],
+            command,
             stderr=subprocess.DEVNULL,
             timeout=5,
         )
@@ -392,11 +421,6 @@ def auto_max_workers_per_gpu(
         hard_cap,
     )
     return chosen
-
-
-def _system_ram_gb():
-    """Best-effort total system RAM in GB. ``None`` if unknown."""
-    return system_memory_info_gb().get("total_gb")
 
 
 def auto_dataloader_num_workers(
@@ -687,29 +711,6 @@ def auto_num_jobs(num_gpus, max_workers_per_gpu):
     max_workers_per_gpu = _resolved_int(
         max_workers_per_gpu, "max_workers_per_gpu")
     return int(num_gpus) * max_workers_per_gpu
-
-
-def resolve_num_gpus_for_local_parallelism(args, backend=None):
-    """Resolve ``args.gpus`` for local worker scheduling.
-
-    ``--gpus`` historically defaulted to ``None`` and most call sites only
-    knew the final device count after the worker pool was created. Resolve it
-    once, before sizing max-workers-per-GPU, so every downstream resolver sees
-    the same capacity.
-    """
-    if backend is None:
-        backend = normalize_pytorch_backend(
-            getattr(args, "backend", "auto") or "auto"
-        )
-    num_gpus_raw = getattr(args, "gpus", None)
-    gpus_was_auto = num_gpus_raw is None and backend in ("auto", "gpu")
-    if gpus_was_auto:
-        num_gpus = _detect_num_cuda_devices_no_torch()
-    else:
-        num_gpus = int(num_gpus_raw or 0)
-    args.gpus = int(num_gpus)
-    args.gpus_was_auto = gpus_was_auto
-    return int(num_gpus)
 
 
 def resolve_max_workers_per_gpu(
@@ -1284,10 +1285,11 @@ def add_local_parallelism_args(parser):
         "--gpus",
         type=int,
         metavar="N",
-        help="Number of CUDA GPUs, starting at index 0, to assign across "
-             "parallel workers. Requires --num-jobs > 0. Each assigned worker "
-             "gets one GPU; workers beyond --gpus * --max-workers-per-gpu run "
-             "on CPU.")
+        help="Number of CUDA GPUs to assign across parallel workers. When "
+             "CUDA_VISIBLE_DEVICES is set, this is a count within that "
+             "scheduler-visible mask. Requires --num-jobs > 0. Each assigned "
+             "worker gets one GPU; workers beyond "
+             "--gpus * --max-workers-per-gpu run on CPU.")
     group.add_argument(
         "--max-workers-per-gpu",
         type=_max_workers_per_gpu_arg,
@@ -1404,8 +1406,9 @@ def add_prediction_parallelism_args(parser):
         "--gpus",
         type=int,
         metavar="N",
-        help="Number of CUDA GPUs, starting at index 0, to assign across "
-             "parallel prediction workers. Requires --num-jobs > 0.")
+        help="Number of CUDA GPUs to assign across parallel prediction "
+             "workers. When CUDA_VISIBLE_DEVICES is set, this is a count "
+             "within that scheduler-visible mask. Requires --num-jobs > 0.")
     group.add_argument(
         "--max-workers-per-gpu",
         type=_max_workers_per_gpu_arg,
@@ -1835,8 +1838,22 @@ def worker_init_kwargs_for_scheduler(
             for _ in range(num_jobs)
         ]
 
+    cuda_visible_devices = _cuda_visible_devices_from_env()
+    if cuda_visible_devices is None:
+        gpu_device_nums = list(range(num_gpus))
+    else:
+        gpu_device_nums = cuda_visible_devices[:num_gpus]
+        if len(gpu_device_nums) < num_gpus:
+            logging.warning(
+                "num_gpus=%d exceeds CUDA_VISIBLE_DEVICES=%r; assigning "
+                "only the %d scheduler-visible GPU(s)",
+                num_gpus,
+                os.environ.get("CUDA_VISIBLE_DEVICES"),
+                len(gpu_device_nums),
+            )
+
     gpu_assignments = list(itertools.chain.from_iterable(
-        range(num_gpus) for _ in range(max_workers_per_gpu)))
+        gpu_device_nums for _ in range(max_workers_per_gpu)))
 
     worker_kwargs = []
     for worker_num in range(num_jobs):

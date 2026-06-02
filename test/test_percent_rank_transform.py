@@ -6,6 +6,7 @@ import torch
 from mhcflurry.percent_rank_transform import PercentRankTransform
 
 from numpy.testing import assert_allclose, assert_equal
+from . import available_torch_accelerators
 
 
 def test_percent_rank_transform():
@@ -82,15 +83,18 @@ def test_fit_batch_torch_rejects_all_out_of_range_rows():
         )
 
 
-def test_fit_batch_torch_runs_on_mps_without_float64():
-    if not torch.backends.mps.is_available():
-        pytest.skip("MPS not available")
-
+@pytest.mark.parametrize(
+    "_backend,device_type",
+    available_torch_accelerators(),
+    ids=lambda value: value,
+)
+def test_fit_batch_torch_runs_on_accelerator_without_float64(
+        _backend, device_type):
     values = torch.as_tensor(
-        [[12.0, 22.0, 32.0, 38.0]], dtype=torch.float32, device="mps",
+        [[12.0, 22.0, 32.0, 38.0]], dtype=torch.float32, device=device_type,
     )
     bin_edges = torch.as_tensor(
-        [10.0, 20.0, 30.0, 40.0], dtype=torch.float32, device="mps",
+        [10.0, 20.0, 30.0, 40.0], dtype=torch.float32, device=device_type,
     )
     transforms = PercentRankTransform.fit_batch_torch(values, bin_edges)
     assert_allclose(transforms[0].cdf[2:-1], [25.0, 50.0, 100.0], atol=1e-5)

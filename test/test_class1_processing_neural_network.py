@@ -293,11 +293,13 @@ def test_processing_torch_amino_acid_encoding_matches_vector_path():
     numpy.testing.assert_allclose(
         legacy.network()(dict(
             sequence=torch.from_numpy(legacy_x["sequence"]).float(),
-            peptide_length=torch.from_numpy(legacy_x["peptide_length"]),
+            peptide_length=torch.from_numpy(
+                legacy_x["peptide_length"].copy()),
         )).detach().numpy(),
         indexed.network()(dict(
             sequence=torch.from_numpy(indexed_x["sequence"]),
-            peptide_length=torch.from_numpy(indexed_x["peptide_length"]),
+            peptide_length=torch.from_numpy(
+                indexed_x["peptide_length"].copy()),
         )).detach().numpy(),
         rtol=1e-6,
         atol=1e-6,

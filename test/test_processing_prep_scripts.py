@@ -1,4 +1,5 @@
 import importlib.util
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -211,6 +212,10 @@ def write_presentation_like_inputs(tmp_path):
 def run_reference_decoy_script(script_path, tmp_path):
     hits_csv, reference_csv = write_presentation_like_inputs(tmp_path)
     out_csv = tmp_path / "train_data.csv"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(REPO_ROOT)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else [])
+    )
     subprocess.run(
         [
             sys.executable,
@@ -226,6 +231,7 @@ def run_reference_decoy_script(script_path, tmp_path):
             "--out",
             str(out_csv),
         ],
+        env=env,
         check=True,
     )
     return pandas.read_csv(out_csv)

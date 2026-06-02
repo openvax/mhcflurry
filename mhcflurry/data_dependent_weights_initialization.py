@@ -117,6 +117,8 @@ def get_activations_pytorch(model, layer_name, x_dict, device=None):
         inputs = {}
         for key, value in x_dict.items():
             if isinstance(value, numpy.ndarray):
+                if not value.flags.writeable:
+                    value = value.copy()
                 inputs[key] = torch.from_numpy(value).to(device)
             else:
                 inputs[key] = value.to(device)

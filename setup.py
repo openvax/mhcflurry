@@ -36,6 +36,7 @@ if __name__ == "__main__":
     required_packages = [
         "pandas>=2.0",
         "appdirs",
+        "ahocorasick-rs",
         "scikit-learn",
         "mhcgnomes>=3.0.1",
         "numpy>=1.22.4",

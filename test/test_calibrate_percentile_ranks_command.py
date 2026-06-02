@@ -159,6 +159,28 @@ def test_percent_rank_status_helpers_count_sequence_equivalent_calibration():
     ]
 
 
+def test_list_percent_rank_status_stdout_starts_with_csv_header(
+        monkeypatch, tmp_path, capsys):
+    from mhcflurry import calibrate_percentile_ranks_command as mod
+
+    def fake_status(args):
+        print("allele,normalized_allele")
+        print("HLA-A*02:01,HLA-A*02:01")
+        return 0
+
+    monkeypatch.setattr(
+        mod, "run_class1_affinity_percent_rank_status", fake_status)
+
+    assert mod.run([
+        "--models-dir", str(tmp_path),
+        "--list-percent-rank-status",
+    ]) == 0
+
+    stdout = capsys.readouterr().out
+    assert stdout.startswith("allele,normalized_allele\n")
+    assert "random seed" not in stdout
+
+
 def test_filter_canonicalizable_alleles_used_through_shared_selector():
     """Both predictor kinds use the same canonicalizable-allele selector.
 

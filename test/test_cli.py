@@ -272,6 +272,16 @@ def test_probe_run_dir_finds_affinity_via_allele_sequences(tmp_path):
     assert resolved == str(target)
 
 
+def test_probe_run_dir_finds_presentation_via_weights_csv(tmp_path):
+    target = tmp_path / "run" / "presentation" / "models.combined"
+    target.mkdir(parents=True)
+    # Class1PresentationPredictor.save() writes weights.csv at the top level.
+    (target / "weights.csv").write_text(",kind\npresentation_score,affinity\n")
+    resolved = compare_models._probe_run_dir(
+        str(tmp_path / "run"), "presentation")
+    assert resolved == str(target)
+
+
 def test_resolve_components_auto_picks_available(tmp_path):
     a_train = tmp_path / "a_train"
     a_train.mkdir()
@@ -344,6 +354,38 @@ def test_metrics_ignores_nans_in_scores():
     s = [0.9, np.nan, 0.1, np.nan]
     m = compare_models._metrics(y, s)
     assert m["n"] == 2
+
+
+def test_affinity_metrics_handle_no_reportable_alleles():
+    """Sparse smoke-test inputs may leave every allele below reporting
+    filters. The component should still write schema-valid empty tables.
+    """
+    test = pandas.DataFrame({
+        "hla": ["HLA-A*02:01", "HLA-A*02:01"],
+        "peptide": ["SIINFEKL", "SLYNTVATL"],
+        "peptide_len": [8, 9],
+        "hit": [1, 0],
+        "a_score": [0.9, 0.1],
+        "b_score": [0.8, 0.2],
+    })
+
+    per_allele = compare_models._affinity_per_allele(test)
+    assert per_allele.empty
+    assert {"allele", "n", "n_pos", "roc_auc_diff"}.issubset(
+        per_allele.columns)
+
+    per_length, per_length_per_allele = compare_models._affinity_per_length(test)
+    assert list(per_length["length"]) == [8, 9]
+    assert list(per_length["n_alleles_reported"]) == [0, 0]
+    assert per_length_per_allele.empty
+    assert {"length", "allele", "n", "n_pos", "roc_auc_diff"}.issubset(
+        per_length_per_allele.columns)
+
+    summary = compare_models._affinity_summary(test, per_allele, per_length)
+    assert summary["n_rows"] == 2
+    assert summary["n_alleles_reported"] == 0
+    assert summary["allele_count"]["a_better_roc_auc"] == 0
+    assert summary["allele_count"]["b_better_roc_auc"] == 0
 
 
 # ---------------------------------------------------------------------------

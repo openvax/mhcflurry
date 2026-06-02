@@ -242,9 +242,9 @@ def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
     backend : str, optional
         Device backend: "auto", "gpu", "mps", or "cpu".
         "auto" selects the best available device (GPU > MPS > CPU).
-    gpu_device_nums : list of int, optional
-        CUDA devices to expose via CUDA_VISIBLE_DEVICES. An empty list hides
-        CUDA entirely for the current process.
+    gpu_device_nums : list of str or int, optional
+        CUDA device identifiers to expose via CUDA_VISIBLE_DEVICES. An empty
+        list hides CUDA entirely for the current process.
     num_threads : int, optional
         Number of threads for PyTorch operations
     """
@@ -271,8 +271,8 @@ def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
         Legacy backend value retained for API compatibility. TensorFlow-era
         names such as "tensorflow-cpu" are translated to the equivalent
         PyTorch backend and emit a deprecation warning.
-    gpu_device_nums : list of int, optional
-        GPU devices to potentially use.
+    gpu_device_nums : list of str or int, optional
+        GPU device identifiers to potentially use.
     num_threads : int, optional
         Number of threads for backend operations.
     """
