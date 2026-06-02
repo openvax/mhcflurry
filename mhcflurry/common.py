@@ -219,83 +219,88 @@ def build_allele_alias_map(valid_keys):
     return alias_map
 
 
+class AlleleKeyResolver(object):
+    """Resolves allele names to a fixed set of keys, no-alias-first.
+
+    Resolution order for a name (each step checked against ``valid_keys``):
+
+      1. its own no-alias normalization, if that is already a key — so an
+         allele with its own pseudosequence isn't remapped onto an alias target
+         (e.g. retired ``HLA-B*44:01`` keeps its own entry rather than
+         collapsing to ``HLA-B*44:02``);
+      2. its alias-applied normalization, if *that* is a key;
+      3. the key it is a retired alias of, via the reverse alias map.
+
+    Otherwise ``resolve`` returns the normalized-but-unknown name (best effort,
+    for callers that handle unsupported alleles downstream) or None when the
+    name can't be normalized at all.
+
+    The reverse alias map (``build_allele_alias_map``, an O(len(valid_keys))
+    scan) is built once and cached on first use — so already-canonical inputs,
+    which resolve at step 1 or 2, never pay for it. Pass it prebuilt (e.g. a
+    predictor's load-time ``allele_to_canonical``) to skip the scan entirely.
+
+    ``valid_keys`` should support O(1) ``in`` (a dict or set); an empty/falsy
+    value skips step 1 (e.g. allele-specific predictors with no pseudosequences).
+    """
+
+    def __init__(self, valid_keys, alias_map=None):
+        self.valid_keys = valid_keys
+        self._alias_map = alias_map  # built lazily by reverse_alias_map()
+
+    def reverse_alias_map(self):
+        if self._alias_map is None:
+            self._alias_map = build_allele_alias_map(self.valid_keys)
+        return self._alias_map
+
+    def resolve(self, raw_name, raise_on_error=False):
+        if self.valid_keys:
+            no_alias = normalize_allele_name(
+                raw_name, raise_on_error=False, use_allele_aliases=False)
+            if no_alias is not None and no_alias in self.valid_keys:
+                return no_alias
+        normalized = normalize_allele_name(
+            raw_name, raise_on_error=raise_on_error)
+        if normalized is None:
+            return None
+        if self.valid_keys and normalized in self.valid_keys:
+            return normalized
+        return self.reverse_alias_map().get(normalized, normalized)
+
+
 def canonicalize_allele_to_keys(
         raw_name, valid_keys, alias_map, raise_on_error=True):
-    """Resolve ``raw_name`` to a key in ``valid_keys``, by priority.
+    """Resolve a single ``raw_name`` to a key in ``valid_keys``, no-alias-first.
 
-    Resolution order — each step is checked against ``valid_keys`` explicitly,
-    so the result is self-consistent regardless of how ``alias_map`` was built:
-
-      1. ``raw_name``'s own no-alias normalization, if that is already a key
-         (so an allele with its own pseudosequence isn't remapped onto an alias
-         target — e.g. the retired ``HLA-B*44:01`` keeps its own entry rather
-         than collapsing to ``HLA-B*44:02``);
-      2. its alias-applied normalization, if *that* is a key;
-      3. the key it is a retired alias of, via ``alias_map`` (reverse lookup).
-
-    Otherwise returns the normalized-but-unknown name (best effort, for callers
-    that handle unsupported alleles downstream), or None when the name can't be
-    normalized at all (only possible with ``raise_on_error=False``).
-
-    ``valid_keys`` may be empty/falsy to skip the no-alias-first branch (e.g.
-    allele-specific predictors with no pseudosequences). ``alias_map`` may be a
-    dict (built eagerly, e.g. the predictor's load-time ``allele_to_canonical``)
-    or a zero-arg callable returning the dict, which is invoked only if step 3
-    is reached — letting callers defer the ``build_allele_alias_map`` scan until
-    a name actually needs it (see ``canonicalize_allele_series``).
+    Thin wrapper over :class:`AlleleKeyResolver` for callers that already hold a
+    prebuilt ``alias_map`` (e.g. the affinity predictor's ``allele_to_canonical``
+    built at load time). See that class for the resolution priority.
     """
-    if valid_keys:
-        no_alias = normalize_allele_name(
-            raw_name, raise_on_error=False, use_allele_aliases=False)
-        if no_alias is not None and no_alias in valid_keys:
-            return no_alias
-    normalized = normalize_allele_name(raw_name, raise_on_error=raise_on_error)
-    if normalized is None:
-        return None
-    if valid_keys and normalized in valid_keys:
-        return normalized
-    resolved_alias_map = alias_map() if callable(alias_map) else alias_map
-    return resolved_alias_map.get(normalized, normalized)
+    return AlleleKeyResolver(valid_keys, alias_map).resolve(
+        raw_name, raise_on_error=raise_on_error)
 
 
 def canonicalize_allele_series(alleles, valid_keys, log_label="alleles"):
     """Map allele names to canonical keys (no-alias-first), strictly.
 
     Returns a list parallel to ``alleles`` with each name resolved to a key in
-    ``valid_keys`` (preferring the allele's own no-alias form when that is a
-    key, else its alias target), or None when it resolves to no key. Memoizes
-    per unique input, so it is cheap over a long training column with few
-    distinct alleles. Logs a sample of names that did not resolve. Use this for
-    training ingestion, where rows that map to no pseudosequence key must be
-    dropped rather than carried through verbatim.
-
-    The reverse alias map (``build_allele_alias_map``, an ~O(len(valid_keys))
-    scan) is built **lazily, only on the first name that needs it** — i.e. a
-    name stored under a *retired* key but requested by its *current* name (e.g.
-    key ``HLA-B*44:01`` requested as ``HLA-B*44:02``). Already-canonical data
-    resolves via the earlier priority steps without the scan; for the real
-    ~20K-key set the map holds only ~7 entries that nothing would read. The
-    per-name resolution itself is shared with ``canonicalize_allele_to_keys``;
-    here we pass a lazy map-builder and apply strict key membership.
+    ``valid_keys``, or None when it resolves to no key (so the row can be
+    dropped). Memoizes per unique input, so it is cheap over a long training
+    column with few distinct alleles, and the reverse alias map is built lazily
+    (only if some name is a current-name request for a retired key) — so
+    already-canonical data never pays the ~O(len(valid_keys)) scan. Logs a
+    sample of names that did not resolve. Use this for training ingestion.
     """
-    valid = set(valid_keys)
+    resolver = AlleleKeyResolver(set(valid_keys))  # alias map built lazily
     resolved = {}
     dropped = []
-    lazy_alias_map = []  # one-element cache; built on first name that needs it
-
-    def alias_map():
-        if not lazy_alias_map:
-            lazy_alias_map.append(build_allele_alias_map(valid))
-        return lazy_alias_map[0]
 
     def _resolve(name):
         if name not in resolved:
-            key = canonicalize_allele_to_keys(
-                name, valid, alias_map, raise_on_error=False)
-            # Strict: keep only names that resolved to an actual key; the
-            # helper's best-effort fallback (a normalized-but-unknown name) and
-            # unparseable None both become None -> dropped.
-            resolved[name] = key if key in valid else None
+            key = resolver.resolve(name, raise_on_error=False)
+            # Strict membership: the resolver's best-effort fallback (a
+            # normalized-but-unknown name) and unparseable None both drop out.
+            resolved[name] = key if key in resolver.valid_keys else None
             if resolved[name] is None:
                 dropped.append(name)
         return resolved[name]
