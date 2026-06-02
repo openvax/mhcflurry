@@ -191,6 +191,9 @@ def run(argv=sys.argv[1:]):
     # into several. Unparseable names are dropped. Allele-specific models have no
     # shared pseudosequence space, so plain normalization (mhcgnomes aliases
     # applied) is the canonical form here.
+    # Drop null alleles up front (curated data has none, but a user-supplied
+    # CSV might) so they don't reach the dict-keyed map below.
+    df = df.dropna(subset=["allele"])
     allele_norm = {
         a: normalize_allele_name(a, raise_on_error=False)
         for a in df.allele.unique()

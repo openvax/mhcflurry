@@ -320,6 +320,79 @@ def test_run_cluster_parallelism():
     ])
 
 
+@pytest.mark.slow
+@pytest.mark.integration
+def test_training_retains_noncanonical_allele_names():
+    """End-to-end: a training row whose allele is spelled non-canonically
+    (e.g. ``HLA-A0201``) is canonicalized to its pseudosequence key
+    (``HLA-A*02:01``) and retained, rather than being silently dropped by the
+    old exact-string ``isin`` filter."""
+    from mhcflurry.common import (
+        build_allele_alias_map, canonicalize_allele_to_keys)
+
+    allele_sequences_path = get_path(
+        "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME)
+    keys = set(pandas.read_csv(allele_sequences_path, index_col=0).index)
+    alias_map = build_allele_alias_map(keys)
+
+    data_df = pandas.read_csv(
+        get_path("data_curated", "curated_training_data.affinity.csv.bz2"))
+    sample = data_df.sample(n=50, random_state=0).copy()
+
+    # Find a canonical allele in the sample whose de-punctuated spelling
+    # round-trips back to it, so the rewrite is a genuine non-canonical alias
+    # of a key (robust to which alleles the random sample happened to draw).
+    target = noncanon = None
+    for allele in sample.allele.unique():
+        candidate = str(allele).replace("*", "").replace(":", "")
+        if candidate == allele:
+            continue
+        if canonicalize_allele_to_keys(candidate, keys, alias_map) == allele:
+            target, noncanon = allele, candidate
+            break
+    if target is None:
+        pytest.skip("no round-trippable allele in the sampled training rows")
+
+    n_target_rows = int((sample.allele == target).sum())
+    sample.loc[sample.allele == target, "allele"] = noncanon
+
+    models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-canon")
+    try:
+        hyperparameters_filename = os.path.join(
+            models_dir, "hyperparameters.yaml")
+        with open(hyperparameters_filename, "w") as fd:
+            json.dump(HYPERPARAMETERS_LIST, fd)
+        pretrain_data_filename = os.path.join(models_dir, "pretrain_data.csv")
+        with open(pretrain_data_filename, "w") as fd:
+            fd.write(PRETRAIN_DATA)
+            fd.write("\n")
+        sample.to_csv(os.path.join(models_dir, "_train_data.csv"), index=False)
+
+        args = mhcflurry_cli("mhcflurry-class1-train-pan-allele-models") + [
+            "--data", os.path.join(models_dir, "_train_data.csv"),
+            "--allele-sequences", allele_sequences_path,
+            "--pretrain-data", pretrain_data_filename,
+            "--hyperparameters", hyperparameters_filename,
+            "--out-models-dir", models_dir,
+            "--num-jobs", "0",
+            "--num-folds", "2",
+            "--verbosity", "1",
+        ]
+        subprocess.check_call(args)
+
+        written = pandas.read_csv(
+            os.path.join(models_dir, "train_data.csv.bz2"))
+        # The non-canonical spelling must not survive; its rows are retained
+        # under the canonical key instead of being dropped.
+        assert noncanon not in set(written.allele), (
+            "non-canonical spelling %r leaked into training data" % noncanon)
+        assert int((written.allele == target).sum()) >= n_target_rows, (
+            "rows spelled %r were dropped instead of canonicalized to %r"
+            % (noncanon, target))
+    finally:
+        shutil.rmtree(models_dir, ignore_errors=True)
+
+
 def _network_weights_by_identity(predictor):
     """Map each trained network's (architecture, fold, replicate) identity
     to a flat vector of all its weights."""

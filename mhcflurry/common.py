@@ -167,10 +167,10 @@ def filter_canonicalizable_alleles(alleles, log_label="alleles"):
     alias-applying normalization here would silently remap retired alleles
     (e.g. ``HLA-B*44:01`` -> ``HLA-B*44:02``) away from their own key.
 
-    A local memo keeps the per-allele ``normalize_allele_name`` cost
-    bounded — the predictor's allele set is ~20K entries and
-    mhcgnomes' parse is millisecond-scale, so without caching this
-    pre-pass alone would add ~20 sec of single-threaded startup.
+    A local memo keeps the per-allele ``normalize_allele_name`` cost bounded.
+    mhcgnomes also caches its own parses, so even the full ~20K-allele predictor
+    set is a one-time ~1-2 sec single-threaded pre-pass (measured), not the
+    minutes a naive uncached parse would cost.
     """
     seen = {}
 
