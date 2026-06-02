@@ -185,6 +185,22 @@ def run(argv=sys.argv[1:]):
         print("Dropping measurement_inequality column")
         del df["measurement_inequality"]
 
+    # Canonicalize allele names (merge aliased / retired / alternative spellings
+    # to one canonical name) before counting and grouping, so the same allele
+    # under different spellings trains as a single model rather than fragmenting
+    # into several. Unparseable names are dropped. Allele-specific models have no
+    # shared pseudosequence space, so plain normalization (mhcgnomes aliases
+    # applied) is the canonical form here.
+    allele_norm = {
+        a: normalize_allele_name(a, raise_on_error=False)
+        for a in df.allele.unique()
+    }
+    n_unparseable = sum(1 for v in allele_norm.values() if v is None)
+    if n_unparseable:
+        print("Dropping %d unparseable allele name(s) from training data"
+              % n_unparseable)
+    df = df.assign(allele=df.allele.map(allele_norm)).dropna(subset=["allele"])
+
     # Allele counts are in terms of quantitative data only.
     allele_counts = (
         df.loc[df.measurement_type == "quantitative"].allele.value_counts())
@@ -196,7 +212,6 @@ def run(argv=sys.argv[1:]):
             allele_counts > args.min_measurements_per_allele
         ].index)
 
-    # Allele names in data are assumed to be already normalized.
     print("Selected %d/%d alleles: %s" % (len(alleles), df.allele.nunique(), ' '.join(alleles)))
     df = df.loc[df.allele.isin(alleles)].dropna()
 

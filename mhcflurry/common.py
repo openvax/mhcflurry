@@ -201,6 +201,88 @@ def filter_canonicalizable_alleles(alleles, log_label="alleles"):
     return filtered
 
 
+def build_allele_alias_map(valid_keys):
+    """Map mhcgnomes-aliased names back to the canonical keys in ``valid_keys``.
+
+    For each key, compute its alias-applied normalization; if that differs from
+    the key and isn't itself a key, record ``alias -> key``. Mirrors the map the
+    affinity predictor builds at load time (``allele_to_canonical``), but for an
+    arbitrary key set — e.g. an allele-sequences table at training time.
+    """
+    valid = set(valid_keys)
+    alias_map = {}
+    for key in valid:
+        aliased = normalize_allele_name(
+            key, raise_on_error=False, use_allele_aliases=True)
+        if aliased is not None and aliased != key and aliased not in valid:
+            alias_map[aliased] = key
+    return alias_map
+
+
+def canonicalize_allele_to_keys(
+        raw_name, valid_keys, alias_map, raise_on_error=True):
+    """Resolve ``raw_name`` to a key in ``valid_keys``, no-alias-first.
+
+    Prefers ``raw_name``'s own no-alias normalization when that is already a key
+    (so an allele with its own pseudosequence isn't remapped onto an alias
+    target, e.g. the retired ``HLA-B*44:01`` keeping its own entry rather than
+    collapsing to ``HLA-B*44:02``); otherwise applies mhcgnomes aliases and maps
+    through ``alias_map``. ``valid_keys`` may be empty/falsy to skip the
+    no-alias-first branch (e.g. allele-specific predictors with no
+    pseudosequences). Returns the resolved name, or None (only when
+    ``raise_on_error`` is False) for names that don't normalize at all.
+
+    Note: the returned name is guaranteed to be in ``valid_keys`` only when it
+    came from the no-alias-first branch or ``alias_map``; the fallback may
+    return a normalized-but-unknown name. Callers needing strict membership
+    should check ``result in valid_keys`` (see ``canonicalize_allele_series``).
+    """
+    if valid_keys:
+        no_alias = normalize_allele_name(
+            raw_name, raise_on_error=False, use_allele_aliases=False)
+        if no_alias is not None and no_alias in valid_keys:
+            return no_alias
+    normalized = normalize_allele_name(raw_name, raise_on_error=raise_on_error)
+    if normalized is None:
+        return None
+    return alias_map.get(normalized, normalized)
+
+
+def canonicalize_allele_series(alleles, valid_keys, log_label="alleles"):
+    """Map allele names to canonical keys (no-alias-first), strictly.
+
+    Returns a list parallel to ``alleles`` with each name resolved to a key in
+    ``valid_keys`` (preferring the allele's own no-alias form when that is a
+    key, else its alias target), or None when it resolves to no key. Builds the
+    alias map once and memoizes per unique input, so it is cheap over a long
+    training column with few distinct alleles. Logs a sample of names that did
+    not resolve. Use this for training ingestion, where rows that map to no
+    pseudosequence key must be dropped rather than carried through verbatim.
+    """
+    valid = set(valid_keys)
+    alias_map = build_allele_alias_map(valid)
+    resolved = {}
+    dropped = []
+
+    def _resolve(name):
+        if name not in resolved:
+            key = canonicalize_allele_to_keys(
+                name, valid, alias_map, raise_on_error=False)
+            resolved[name] = key if (key is not None and key in valid) else None
+            if resolved[name] is None:
+                dropped.append(name)
+        return resolved[name]
+
+    out = [_resolve(a) for a in alleles]
+    if dropped:
+        sample = ", ".join(map(str, dropped[:5])) + (
+            ", ..." if len(dropped) > 5 else "")
+        logging.warning(
+            "Dropping %d %s that resolve to no supported allele key: %s",
+            len(dropped), log_label, sample)
+    return out
+
+
 _pytorch_backend = "auto"
 _PYTORCH_BACKEND_ALIASES = {
     "default": "auto",

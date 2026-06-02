@@ -19,7 +19,8 @@ from .common import (
     derive_seed,
     random_peptides,
     positional_frequency_matrix,
-    normalize_allele_name
+    normalize_allele_name,
+    canonicalize_allele_to_keys,
 )
 from .downloads import get_default_class1_models_dir
 from .encodable_sequences import EncodableSequences
@@ -347,6 +348,11 @@ class Class1AffinityPredictor(object):
         (which aliases map to C*01:02) resolve to their own pseudosequence
         when one exists.
 
+        Raises on names that cannot be normalized (loud failure for explicit
+        prediction/calibration inputs). The shared ``canonicalize_allele_to_keys``
+        helper holds the no-alias-first logic; training ingestion uses the same
+        helper via ``canonicalize_allele_series``.
+
         Parameters
         ----------
         raw_name : str
@@ -355,16 +361,11 @@ class Class1AffinityPredictor(object):
         -------
         str
         """
-        # Try without aliases first — this matches pseudosequence keys
-        # directly and avoids mhcgnomes alias remapping or Q/N annotations.
-        if self.allele_to_sequence:
-            no_alias = normalize_allele_name(
-                raw_name, raise_on_error=False, use_allele_aliases=False)
-            if no_alias is not None and no_alias in self.allele_to_sequence:
-                return no_alias
-        # Fall back to aliases and map through canonical lookup.
-        normalized = normalize_allele_name(raw_name)
-        return self.allele_to_canonical.get(normalized, normalized)
+        return canonicalize_allele_to_keys(
+            raw_name,
+            self.allele_to_sequence,
+            self.allele_to_canonical,
+            raise_on_error=True)
 
     @property
     def supported_alleles(self):

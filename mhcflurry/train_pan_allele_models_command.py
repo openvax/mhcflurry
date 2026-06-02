@@ -28,6 +28,7 @@ from .class1_neural_network import (
 )
 from .common import (
     add_random_seed_arg,
+    canonicalize_allele_series,
     configure_random_seed,
     configure_logging,
     derive_seed,
@@ -521,16 +522,27 @@ def initialize_training(args):
         df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
 
+    # Canonicalize allele names to the pseudosequence key set (no-alias-first),
+    # so aliased / retired / alternative spellings resolve to their canonical
+    # key instead of being silently dropped or fragmented into separate
+    # embedding rows. Rows that resolve to no key become NaN and are filtered
+    # out below. (The minimal canonical set is whatever keys allele_sequences
+    # provides; every alias of a key routes back to it.)
+    df = df.assign(allele=canonicalize_allele_series(
+        df.allele.values, allele_sequences.index, log_label="training alleles"))
+
     # Collapse the filter chain into a single boolean mask. The original
     # code chained 3 ``.loc[]`` calls which each materialize a full
     # DataFrame copy. Single-mask form scans each column once and allocates
-    # one result buffer.
+    # one result buffer. ``allele.notnull()`` keeps only rows that resolved to
+    # a known pseudosequence key (canonicalize_allele_series guarantees a
+    # resolved value is in allele_sequences.index).
     peptide_len = df.peptide.str.len()
     mask = (
         (peptide_len >= 8)
         & (peptide_len <= 15)
         & df.measurement_value.notnull()
-        & df.allele.isin(allele_sequences.index)
+        & df.allele.notnull()
     )
     df = df.loc[mask]
     print("Filtered to valid (len, non-null, known-allele): %s" % (str(df.shape)))
@@ -541,7 +553,7 @@ def initialize_training(args):
     if args.ignore_inequalities and "measurement_inequality" in df.columns:
         print("Dropping measurement_inequality column")
         del df["measurement_inequality"]
-    # Allele names in data are assumed to be already normalized.
+    # Allele names were canonicalized to pseudosequence keys above.
     print("Training data: %s" % (str(df.shape)))
 
     # Resolve the master seed once for the whole run and seed this process's
