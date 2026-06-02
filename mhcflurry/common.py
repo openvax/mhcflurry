@@ -105,9 +105,10 @@ def normalize_allele_name(
         If True, use mhcgnomes allele alias table (IMGT historical name
         reassignments). Some old allele names (e.g. B*44:01, Cw*0201) were
         retired by IMGT when the original sequences were found to contain
-        errors. Defaults to False to preserve current IMGT nomenclature;
-        the pseudosequence loading code explicitly handles aliases with
-        fallback logic.
+        errors. Defaults to True, so retired/aliased names resolve to their
+        current canonical form. Callers that must preserve current IMGT
+        nomenclature (e.g. pseudosequence-key matching, which is no-alias-first
+        with explicit fallback) pass use_allele_aliases=False.
 
     Returns
     -------
