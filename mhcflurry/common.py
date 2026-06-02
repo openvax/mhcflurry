@@ -221,21 +221,28 @@ def build_allele_alias_map(valid_keys):
 
 def canonicalize_allele_to_keys(
         raw_name, valid_keys, alias_map, raise_on_error=True):
-    """Resolve ``raw_name`` to a key in ``valid_keys``, no-alias-first.
+    """Resolve ``raw_name`` to a key in ``valid_keys``, by priority.
 
-    Prefers ``raw_name``'s own no-alias normalization when that is already a key
-    (so an allele with its own pseudosequence isn't remapped onto an alias
-    target, e.g. the retired ``HLA-B*44:01`` keeping its own entry rather than
-    collapsing to ``HLA-B*44:02``); otherwise applies mhcgnomes aliases and maps
-    through ``alias_map``. ``valid_keys`` may be empty/falsy to skip the
-    no-alias-first branch (e.g. allele-specific predictors with no
-    pseudosequences). Returns the resolved name, or None (only when
-    ``raise_on_error`` is False) for names that don't normalize at all.
+    Resolution order — each step is checked against ``valid_keys`` explicitly,
+    so the result is self-consistent regardless of how ``alias_map`` was built:
 
-    Note: the returned name is guaranteed to be in ``valid_keys`` only when it
-    came from the no-alias-first branch or ``alias_map``; the fallback may
-    return a normalized-but-unknown name. Callers needing strict membership
-    should check ``result in valid_keys`` (see ``canonicalize_allele_series``).
+      1. ``raw_name``'s own no-alias normalization, if that is already a key
+         (so an allele with its own pseudosequence isn't remapped onto an alias
+         target — e.g. the retired ``HLA-B*44:01`` keeps its own entry rather
+         than collapsing to ``HLA-B*44:02``);
+      2. its alias-applied normalization, if *that* is a key;
+      3. the key it is a retired alias of, via ``alias_map`` (reverse lookup).
+
+    Otherwise returns the normalized-but-unknown name (best effort, for callers
+    that handle unsupported alleles downstream), or None when the name can't be
+    normalized at all (only possible with ``raise_on_error=False``).
+
+    ``valid_keys`` may be empty/falsy to skip the no-alias-first branch (e.g.
+    allele-specific predictors with no pseudosequences). ``alias_map`` may be a
+    dict (built eagerly, e.g. the predictor's load-time ``allele_to_canonical``)
+    or a zero-arg callable returning the dict, which is invoked only if step 3
+    is reached — letting callers defer the ``build_allele_alias_map`` scan until
+    a name actually needs it (see ``canonicalize_allele_series``).
     """
     if valid_keys:
         no_alias = normalize_allele_name(
@@ -245,7 +252,10 @@ def canonicalize_allele_to_keys(
     normalized = normalize_allele_name(raw_name, raise_on_error=raise_on_error)
     if normalized is None:
         return None
-    return alias_map.get(normalized, normalized)
+    if valid_keys and normalized in valid_keys:
+        return normalized
+    resolved_alias_map = alias_map() if callable(alias_map) else alias_map
+    return resolved_alias_map.get(normalized, normalized)
 
 
 def canonicalize_allele_series(alleles, valid_keys, log_label="alleles"):
@@ -263,45 +273,31 @@ def canonicalize_allele_series(alleles, valid_keys, log_label="alleles"):
     scan) is built **lazily, only on the first name that needs it** — i.e. a
     name stored under a *retired* key but requested by its *current* name (e.g.
     key ``HLA-B*44:01`` requested as ``HLA-B*44:02``). Already-canonical data
-    resolves entirely via the two cheap per-name paths below, so the scan is
-    skipped — for the real ~20K-key set it builds a map of only ~7 entries that
-    nothing would read. (Mirrors ``canonicalize_allele_to_keys``'s logic but
-    defers the map build; that helper takes a prebuilt map for the predictor's
-    load-time path.)
+    resolves via the earlier priority steps without the scan; for the real
+    ~20K-key set the map holds only ~7 entries that nothing would read. The
+    per-name resolution itself is shared with ``canonicalize_allele_to_keys``;
+    here we pass a lazy map-builder and apply strict key membership.
     """
     valid = set(valid_keys)
     resolved = {}
     dropped = []
-    alias_map = None  # built lazily on the first name needing the reverse map
+    lazy_alias_map = []  # one-element cache; built on first name that needs it
+
+    def alias_map():
+        if not lazy_alias_map:
+            lazy_alias_map.append(build_allele_alias_map(valid))
+        return lazy_alias_map[0]
 
     def _resolve(name):
-        nonlocal alias_map
-        if name in resolved:
-            return resolved[name]
-        # Cheap path 1: the name's own no-alias form is already a key, so an
-        # allele keeps its own pseudosequence rather than collapsing onto an
-        # alias target.
-        no_alias = normalize_allele_name(
-            name, raise_on_error=False, use_allele_aliases=False)
-        if no_alias is not None and no_alias in valid:
-            resolved[name] = no_alias
-            return no_alias
-        # Cheap path 2: the alias-applied normalization is itself a key.
-        normalized = normalize_allele_name(name, raise_on_error=False)
-        if normalized is not None and normalized in valid:
-            resolved[name] = normalized
-            return normalized
-        # Reverse-map path: a name that is neither its own key nor a key after
-        # aliasing may still be the current name of a retired key. Build the
-        # reverse map once, on demand.
-        key = None
-        if normalized is not None:
-            if alias_map is None:
-                alias_map = build_allele_alias_map(valid)
-            key = alias_map.get(normalized)
-        resolved[name] = key if key in valid else None
-        if resolved[name] is None:
-            dropped.append(name)
+        if name not in resolved:
+            key = canonicalize_allele_to_keys(
+                name, valid, alias_map, raise_on_error=False)
+            # Strict: keep only names that resolved to an actual key; the
+            # helper's best-effort fallback (a normalized-but-unknown name) and
+            # unparseable None both become None -> dropped.
+            resolved[name] = key if key in valid else None
+            if resolved[name] is None:
+                dropped.append(name)
         return resolved[name]
 
     out = [_resolve(a) for a in alleles]
