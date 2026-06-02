@@ -274,11 +274,35 @@ used to require manual tuning per-box:
 `--num-jobs auto`
 : Total worker pool size; resolved as `gpus × max_workers_per_gpu`.
 
+`--gpus N`
+: Number of CUDA GPUs to fan workers across (prediction and training
+  commands). Not an `auto` knob — it defaults to every visible device.
+  When `CUDA_VISIBLE_DEVICES` is set, `N` is a count *within* that set.
+  Workers are spawn-context and GPU-pinned via `CUDA_VISIBLE_DEVICES`.
+
 When these resolvers misjudge (most often the calibrate auto-sizer's
 cache-bytes estimate when the merged ensemble has many sub-networks),
 hard-pin the value with an integer instead and the resolver is
 bypassed. The auto-sizer logs every input it used at INFO so the
 post-mortem is visible in the log.
+
+## Reproducibility (`--random-seed`, new in 2.3.0)
+
+Every command that involves randomness — `class1-train-pan-allele-models`,
+`class1-train-allele-specific-models`, `class1-train-processing-models`,
+`class1-select-allele-specific-models`, and `calibrate-percentile-ranks` —
+takes a single `--random-seed N` that controls **all** of that command's
+randomness (fold assignment, dispatch/data shuffles, weight init, random
+negatives, allele sampling, and the calibration peptide universe).
+
+`--random-seed` defaults to **42**, so training and calibration reproduce
+bit-for-bit out of the box. Pass `--random-seed N` for a different but
+still reproducible run; the resolved master seed is logged at startup.
+Ensemble members and per-fit work derive distinct sub-seeds from the
+master, so seeding does not reduce diversity. The direct Python APIs
+(`fit()`, `fit_streaming_batches()`, `fit_allele_specific_predictors()`)
+take a matching `seed=` keyword that defaults to `None` — i.e. the prior
+stochastic behavior — so library callers are unaffected unless they opt in.
 
 ## Unified `mhcflurry` command (new in 2.3.0)
 
