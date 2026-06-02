@@ -252,6 +252,18 @@ required and is used for device-resident training and optional
        running it does advance the global RNG before training proper
        starts. Pin a per-arch seed if you need bit-equivalence across
        runs.
+- **Training ingestion now canonicalizes allele names**, so retraining on
+  data that contained aliased / retired / alternative spellings can change
+  which rows are included and therefore the resulting weights. Previously the
+  training commands exact-string-matched the `allele` column and assumed it was
+  pre-normalized: non-canonical rows were silently dropped (pan-allele, no
+  matching pseudosequence key) or fragmented into separate models
+  (allele-specific). 2.3.0 maps each name to its canonical key no-alias-first —
+  an allele keeps its own pseudosequence when it has one, otherwise its alias
+  target — matching how prediction already resolves names. If your training
+  CSVs were already fully normalized this is a no-op; otherwise expect more
+  rows retained and previously-fragmented alleles merged. (Prediction and
+  calibration behavior is unchanged.)
 - **Saved 2.2.x model bundles still work unchanged** in 2.3.0 for
   prediction; no migration needed for downstream users running
   inference on existing bundles.
