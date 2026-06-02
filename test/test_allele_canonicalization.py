@@ -92,6 +92,31 @@ def test_predictor_canonicalize_delegates_to_shared_helper():
         assert predictor.canonicalize_allele_name(name) == expected
 
 
+def test_canonicalize_allele_series_builds_reverse_map_lazily(monkeypatch):
+    # The ~O(keys) reverse alias map must be built only when a name actually
+    # needs it (a current-name request for a retired key), never for data that
+    # resolves via the two cheap per-name paths.
+    import mhcflurry.common as common
+    calls = []
+    real = common.build_allele_alias_map
+    monkeypatch.setattr(
+        common, "build_allele_alias_map",
+        lambda keys: calls.append(1) or real(keys))
+
+    keys = ["HLA-A*02:01", "HLA-B*44:01"]
+
+    # Canonical / alternative-spelling / junk inputs: no reverse map needed.
+    out = common.canonicalize_allele_series(
+        ["HLA-A*02:01", "HLA-A0201", "NONSENSE"], keys)
+    assert out == ["HLA-A*02:01", "HLA-A*02:01", None]
+    assert calls == [], "reverse map built for already-resolvable input"
+
+    # A retired key requested by its current name forces a single lazy build.
+    out2 = common.canonicalize_allele_series(["HLA-B*44:02"], keys)
+    assert out2 == ["HLA-B*44:01"]
+    assert len(calls) == 1, "reverse map should build exactly once, on demand"
+
+
 def test_allele_specific_normalization_merges_spellings():
     # The allele-specific ingestion path canonicalizes with plain normalization
     # (aliases applied) so different spellings of one allele collapse to a
