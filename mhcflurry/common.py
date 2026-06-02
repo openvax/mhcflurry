@@ -148,24 +148,23 @@ def normalize_allele_name(
 
 
 def filter_canonicalizable_alleles(alleles, log_label="alleles"):
-    """Return the *canonical* names of ``alleles`` that normalize cleanly.
+    """Drop alleles that ``normalize_allele_name`` refuses to canonicalize.
 
-    Drops entries that ``normalize_allele_name`` refuses to canonicalize and
-    maps the survivors to their canonical form. ``predictor.supported_alleles``
-    (and any user-supplied ``--alleles-file``) can contain pseudogenes / null
+    Returns the surviving names **unchanged** (raw input strings), having only
+    removed the un-canonicalizable ones. ``predictor.supported_alleles`` (and
+    any user-supplied ``--alleles-file``) can contain pseudogenes / null
     alleles / questionable annotations — those are real entries in the public
     ``allele_sequences.csv`` (which aims to be exhaustive), but
     ``predict_to_dataframe`` raises on them mid-iteration. Filter once up front
-    so iteration doesn't crash partway through, and log the dropped sample (by
-    its original name) so the missing rows in the resulting output table are
-    explainable.
+    so iteration doesn't crash partway through, and log the dropped sample so
+    the missing rows in the resulting output table are explainable.
 
-    Returning canonical names — rather than the raw input strings — keeps
-    callers consistent with ``allele_to_sequence`` (which is keyed by canonical
-    names), so a canonicalizable-but-non-canonical entry from an alleles file
-    is calibrated rather than spuriously rejected as "unsupported". The
-    normalization is computed here anyway to test canonicalizability, so
-    returning it is free.
+    Survivors are returned verbatim rather than canonicalized: callers that
+    need names to match a predictor's pseudosequence keys must map them through
+    ``predictor.canonicalize_allele_name`` (which prefers the no-alias form,
+    matching how ``allele_to_sequence`` keys are built). A generic
+    alias-applying normalization here would silently remap retired alleles
+    (e.g. ``HLA-B*44:01`` -> ``HLA-B*44:02``) away from their own key.
 
     A local memo keeps the per-allele ``normalize_allele_name`` cost
     bounded — the predictor's allele set is ~20K entries and
@@ -174,22 +173,19 @@ def filter_canonicalizable_alleles(alleles, log_label="alleles"):
     """
     seen = {}
 
-    def _canonical(allele):
+    def _ok(allele):
         if allele not in seen:
             try:
-                seen[allele] = normalize_allele_name(allele)
+                normalize_allele_name(allele)
+                seen[allele] = True
             except (ValueError, TypeError):
-                seen[allele] = None
+                seen[allele] = False
         return seen[allele]
 
     filtered = []
     dropped = []
     for a in alleles:
-        canonical = _canonical(a)
-        if canonical is None:
-            dropped.append(a)
-        else:
-            filtered.append(canonical)
+        (filtered if _ok(a) else dropped).append(a)
     if dropped:
         sample = ", ".join(dropped[:5]) + (
             ", ..." if len(dropped) > 5 else ""

@@ -25,7 +25,6 @@ from .common import (
     configure_pytorch,
     configure_random_seed,
     filter_canonicalizable_alleles,
-    normalize_allele_name,
     random_peptides,
     write_generate_sh,
 )
@@ -315,14 +314,28 @@ def run(argv=sys.argv[1:]):
 
 
 def requested_calibration_alleles(args, predictor):
-    """Return normalized alleles selected by CLI arguments."""
+    """Return predictor-canonical alleles selected by CLI arguments.
+
+    User-supplied names (``--allele`` / ``--alleles-file``) are mapped through
+    ``predictor.canonicalize_allele_name`` so a canonicalizable-but-non-
+    canonical entry resolves to the predictor's own pseudosequence key (which
+    is built no-alias-first) instead of being rejected as "unsupported" by the
+    key lookup below. ``predictor.supported_alleles`` are already keys, so the
+    default path only needs the pseudogene/null filter.
+    """
     if args.allele:
-        # Explicit CLI alleles should fail loudly if they cannot be normalized.
-        return [normalize_allele_name(a) for a in args.allele]
+        # Pass raw names so canonicalize_allele_name's no-alias-first lookup
+        # isn't defeated by an upfront alias remap; it still raises on names
+        # that cannot be normalized, so bad --allele values fail loudly.
+        return [predictor.canonicalize_allele_name(a) for a in args.allele]
     if args.alleles_file:
-        return filter_canonicalizable_alleles(
-            pandas.read_csv(args.alleles_file).allele.unique()
-        )
+        requested = pandas.read_csv(args.alleles_file).allele.unique()
+        # Drop pseudogene/null/questionable entries first (predictor-agnostic),
+        # then map survivors to the predictor's own key form.
+        canonicalizable = filter_canonicalizable_alleles(
+            requested, log_label="alleles-file alleles")
+        return [predictor.canonicalize_allele_name(a)
+                for a in canonicalizable]
     return filter_canonicalizable_alleles(predictor.supported_alleles)
 
 
