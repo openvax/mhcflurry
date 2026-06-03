@@ -578,12 +578,13 @@ class Class1ProcessingNeuralNetwork(object):
             hyperparameters
         )
         # The legacy dense-vector sequence encoding path is gone: sequences are
-        # always index-encoded and embedded on device. Coerce a falsy value to
-        # True (with a one-time deprecation warning) so existing configs load.
+        # always index-encoded and embedded on device. A falsy
+        # ``amino_acid_encoding_torch`` is accepted but ignored (with a one-time
+        # deprecation warning) so existing configs still load; the value is left
+        # untouched in ``self.hyperparameters``.
         if not self.hyperparameters.get("amino_acid_encoding_torch"):
             _warn_legacy_sequence_vector_encoding(
                 self.hyperparameters.get("amino_acid_encoding_torch"))
-            self.hyperparameters["amino_acid_encoding_torch"] = True
         self._network = None
         self.network_json = None
         self.network_weights = None
@@ -791,8 +792,6 @@ class Class1ProcessingNeuralNetwork(object):
         # numpy.from_numpy + astype + .to(device) trio that this loop
         # used to do every minibatch.
         seq_dev = torch.from_numpy(x_dict["sequence"]).to(device)
-        if not self.hyperparameters.get("amino_acid_encoding_torch"):
-            seq_dev = seq_dev.float()
         length_dev = torch.from_numpy(x_dict["peptide_length"]).to(device)
         targets_dev = torch.from_numpy(targets.astype(numpy.float32)).to(device)
         weights_dev = (
@@ -1108,40 +1107,19 @@ class Class1ProcessingNeuralNetwork(object):
         Encode peptides to the target-device tensors expected by the network.
         """
         device = torch.device(device)
-        if self.hyperparameters.get("amino_acid_encoding_torch"):
-            encoded = sequences.categorical_encode_tensors(
-                self.hyperparameters["peptide_max_length"],
-                n_flank_length=self.hyperparameters["n_flank_length"],
-                c_flank_length=self.hyperparameters["c_flank_length"],
-                device=device,
-                allow_unsupported_amino_acids=True,
-                throw=throw,
-            )
-            return {
-                "sequence": encoded.array,
-                "peptide_length": encoded.peptide_lengths,
-                "unsupported_mask": encoded.unsupported_mask,
-            }
-
-        x_dict = self.network_input(sequences, throw=throw)
-        sequence = numpy.asarray(x_dict["sequence"], dtype=numpy.float32)
-        if not sequence.flags.writeable:
-            sequence = sequence.copy()
-        peptide_length = numpy.asarray(x_dict["peptide_length"])
-        if not peptide_length.flags.writeable:
-            peptide_length = peptide_length.copy()
-        non_blocking = device.type == "cuda"
-        result = {
-            "sequence": torch.from_numpy(sequence).to(
-                device, non_blocking=non_blocking),
-            "peptide_length": torch.from_numpy(peptide_length).to(
-                device, non_blocking=non_blocking),
+        encoded = sequences.categorical_encode_tensors(
+            self.hyperparameters["peptide_max_length"],
+            n_flank_length=self.hyperparameters["n_flank_length"],
+            c_flank_length=self.hyperparameters["c_flank_length"],
+            device=device,
+            allow_unsupported_amino_acids=True,
+            throw=throw,
+        )
+        return {
+            "sequence": encoded.array,
+            "peptide_length": encoded.peptide_lengths,
+            "unsupported_mask": encoded.unsupported_mask,
         }
-        if x_dict.get("unsupported_mask") is not None:
-            result["unsupported_mask"] = torch.from_numpy(numpy.asarray(
-                x_dict["unsupported_mask"], dtype=bool,
-            )).to(device, non_blocking=non_blocking)
-        return result
 
     def network_input(self, sequences, throw=True):
         """
@@ -1159,23 +1137,13 @@ class Class1ProcessingNeuralNetwork(object):
         -------
         dict
         """
-        if self.hyperparameters.get("amino_acid_encoding_torch"):
-            encoded = sequences.categorical_encode(
-                self.hyperparameters["peptide_max_length"],
-                n_flank_length=self.hyperparameters["n_flank_length"],
-                c_flank_length=self.hyperparameters["c_flank_length"],
-                allow_unsupported_amino_acids=True,
-                throw=throw,
-            )
-        else:
-            encoded = sequences.vector_encode(
-                self.hyperparameters["amino_acid_encoding"],
-                self.hyperparameters["peptide_max_length"],
-                n_flank_length=self.hyperparameters["n_flank_length"],
-                c_flank_length=self.hyperparameters["c_flank_length"],
-                allow_unsupported_amino_acids=True,
-                throw=throw,
-            )
+        encoded = sequences.categorical_encode(
+            self.hyperparameters["peptide_max_length"],
+            n_flank_length=self.hyperparameters["n_flank_length"],
+            c_flank_length=self.hyperparameters["c_flank_length"],
+            allow_unsupported_amino_acids=True,
+            throw=throw,
+        )
 
         result = {
             "sequence": encoded.array,
@@ -1222,7 +1190,9 @@ class Class1ProcessingNeuralNetwork(object):
             convolutional_kernel_l1_l2=convolutional_kernel_l1_l2,
             dropout_rate=dropout_rate,
             post_convolutional_dense_layer_sizes=post_convolutional_dense_layer_sizes,
-            sequence_input_is_indices=amino_acid_encoding_torch,
+            # Sequences are always index-encoded now; the amino_acid_encoding_torch
+            # arg is retained for signature/config compatibility but ignored.
+            sequence_input_is_indices=True,
             sequence_input_vector_encoding_name=amino_acid_encoding,
         )
 

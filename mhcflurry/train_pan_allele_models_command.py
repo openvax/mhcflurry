@@ -477,6 +477,9 @@ def _estimate_training_per_worker_gb(args):
     """
     try:
         hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
+        # One-column read just to count rows; ``initialize_training`` re-reads
+        # the full file later. A deliberate, one-time decompression pass at
+        # planning time (negligible against a multi-hour training run).
         num_rows = len(pandas.read_csv(args.data, usecols=[0]))
     except Exception:
         return None
