@@ -528,6 +528,86 @@ def _clip_auto_num_jobs_to_host_memory(
     return num_jobs, max_workers_per_gpu, cap
 
 
+# Free VRAM below this multiple of the per-worker estimate is flagged as
+# "way below safe operating range" — the auto batch-sizer can still shrink to
+# fit, but the margin for a worker's minimum working set is thin.
+_CAPACITY_VRAM_SAFE_FRACTION = 1.0
+# Free VRAM this many times larger on the biggest GPU than the smallest is
+# flagged as heterogeneous (the plan sizes everything to the smallest card).
+_CAPACITY_VRAM_HETEROGENEITY_RATIO = 1.5
+
+
+def capacity_warnings(
+        *,
+        workload_name,
+        backend,
+        gpus,
+        num_jobs,
+        per_gpu_free_vram_gb,
+        device_worker_gb,
+        available_ram_gb,
+        host_worker_gb,
+        cpu_count):
+    """Compare a resolved plan against measured machine capacity.
+
+    Returns a list of human-readable warning strings for resources that are
+    below a safe operating range (small / uneven / undetectable GPU VRAM,
+    host RAM below the per-worker estimate, more workers than CPUs). Pure: no
+    I/O and no side effects — the caller decides how to surface the strings.
+    All measured inputs may be ``None`` when detection failed; each check is
+    skipped when its inputs are missing.
+    """
+    out = []
+    gpu_backend = backend in ("auto", "gpu") and gpus and int(gpus) > 0
+
+    if gpu_backend:
+        if per_gpu_free_vram_gb is None:
+            out.append(
+                "could not detect free GPU VRAM (nvidia-smi unavailable and no "
+                "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB override); "
+                "worker and batch sizing fall back to conservative defaults — "
+                "pin --max-workers-per-gpu / the batch-size flags if you OOM.")
+        else:
+            free = [float(g) for g in per_gpu_free_vram_gb if g is not None]
+            if free and device_worker_gb:
+                min_free = min(free)
+                if min_free < _CAPACITY_VRAM_SAFE_FRACTION * float(device_worker_gb):
+                    out.append(
+                        "free GPU VRAM is below the per-worker estimate for "
+                        "workload %r: smallest free %.1f GB vs ~%.1f GB/worker. "
+                        "The auto batch-sizer shrinks batches to fit, but "
+                        "throughput drops and a worker can OOM if its minimum "
+                        "working set exceeds free VRAM — reduce the batch-size "
+                        "flags or use a larger GPU."
+                        % (workload_name, min_free, float(device_worker_gb)))
+                if (len(free) > 1 and min_free > 0
+                        and max(free) / min_free >= _CAPACITY_VRAM_HETEROGENEITY_RATIO):
+                    out.append(
+                        "free GPU VRAM is uneven across GPUs (%s GB); the plan "
+                        "sizes every GPU to the smallest (%.1f GB), "
+                        "underutilizing the larger card(s)."
+                        % (", ".join("%.0f" % g for g in free), min_free))
+
+    if (num_jobs and int(num_jobs) > 0 and available_ram_gb is not None
+            and host_worker_gb):
+        needed = float(host_worker_gb) * int(num_jobs)
+        if float(available_ram_gb) < needed:
+            out.append(
+                "available host RAM (%.0f GB) is below the ~%.0f GB estimate "
+                "for %d workers (~%.1f GB each); workers may be OOM-killed "
+                "under memory pressure — reduce --num-jobs."
+                % (float(available_ram_gb), needed, int(num_jobs),
+                   float(host_worker_gb)))
+
+    if num_jobs and cpu_count and int(num_jobs) > int(cpu_count):
+        out.append(
+            "planned %d worker processes exceed detected CPUs (%d); workers "
+            "will contend for cores — consider --num-jobs <= %d."
+            % (int(num_jobs), int(cpu_count), int(cpu_count)))
+
+    return out
+
+
 def plan_local_parallelism(
         args,
         *,

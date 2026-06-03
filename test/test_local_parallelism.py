@@ -815,6 +815,85 @@ def test_free_vram_from_nvidia_smi_uses_cuda_visible_devices(monkeypatch):
     ]]
 
 
+def test_detect_free_vram_per_gpu_preserves_heterogeneity(monkeypatch):
+    """Per-GPU detection returns the vector; the scalar helper still mins it."""
+    from mhcflurry import local_parallelism
+
+    monkeypatch.delenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", raising=False)
+    monkeypatch.setattr(
+        local_parallelism.subprocess, "check_output",
+        lambda args, **kw: b"8192\n71680\n")  # 8 GB, 70 GB
+    assert local_parallelism.detect_free_vram_per_gpu_gb(2) == [8.0, 70.0]
+    assert local_parallelism._free_vram_from_nvidia_smi_gb(2) == 8.0
+
+
+def test_free_vram_env_override_single_value_broadcasts(monkeypatch):
+    from mhcflurry import local_parallelism
+
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "12")
+    assert local_parallelism._free_vram_per_gpu_override_gb(4) == [12.0] * 4
+    assert local_parallelism._free_vram_override_gb(4) == 12.0
+
+
+def test_capacity_warnings_flags_below_safe_range():
+    from mhcflurry.workload_planning import capacity_warnings
+
+    common = dict(host_worker_gb=4.0, cpu_count=32)
+
+    # Small GPU vs a heavy per-worker estimate.
+    small = capacity_warnings(
+        workload_name="affinity_calibration", backend="gpu", gpus=1,
+        num_jobs=1, per_gpu_free_vram_gb=[8.0], device_worker_gb=24.0,
+        available_ram_gb=64.0, **common)
+    assert any("below the per-worker estimate" in m for m in small)
+
+    # Uneven GPUs.
+    hetero = capacity_warnings(
+        workload_name="affinity_training", backend="gpu", gpus=2, num_jobs=2,
+        per_gpu_free_vram_gb=[8.0, 70.0], device_worker_gb=4.0,
+        available_ram_gb=256.0, **common)
+    assert any("uneven across GPUs" in m for m in hetero)
+
+    # Undetectable VRAM.
+    blind = capacity_warnings(
+        workload_name="affinity_training", backend="gpu", gpus=1, num_jobs=1,
+        per_gpu_free_vram_gb=None, device_worker_gb=4.0,
+        available_ram_gb=64.0, **common)
+    assert any("could not detect free GPU VRAM" in m for m in blind)
+
+    # Host RAM below the per-worker estimate (4 workers x 4 GB > 8 GB).
+    low_ram = capacity_warnings(
+        workload_name="affinity_training", backend="gpu", gpus=2, num_jobs=4,
+        per_gpu_free_vram_gb=[80.0, 80.0], device_worker_gb=4.0,
+        available_ram_gb=8.0, **common)
+    assert any("available host RAM" in m for m in low_ram)
+
+    # More workers than CPUs.
+    cpu_short = capacity_warnings(
+        workload_name="affinity_training", backend="gpu", gpus=8, num_jobs=8,
+        per_gpu_free_vram_gb=[80.0] * 8, device_worker_gb=4.0,
+        available_ram_gb=512.0, host_worker_gb=3.0, cpu_count=4)
+    assert any("exceed detected CPUs" in m for m in cpu_short)
+
+
+def test_capacity_warnings_silent_on_healthy_machine():
+    from mhcflurry.workload_planning import capacity_warnings
+
+    # Ample 8x80GB box: nothing below safe range.
+    assert capacity_warnings(
+        workload_name="affinity_calibration", backend="gpu", gpus=8,
+        num_jobs=16, per_gpu_free_vram_gb=[78.0] * 8, device_worker_gb=24.0,
+        available_ram_gb=900.0, host_worker_gb=4.0, cpu_count=176) == []
+
+    # CPU backend skips all GPU checks.
+    assert capacity_warnings(
+        workload_name="affinity_training", backend="cpu", gpus=0, num_jobs=0,
+        per_gpu_free_vram_gb=None, device_worker_gb=4.0, available_ram_gb=8.0,
+        host_worker_gb=3.0, cpu_count=2) == []
+
+
 def test_detect_num_cuda_devices_parses_nvidia_smi_l(monkeypatch):
     """Counts only ``GPU N:``-prefixed lines, not MIG sub-devices or any
     diagnostic lines that happen to start with ``GPU ``."""

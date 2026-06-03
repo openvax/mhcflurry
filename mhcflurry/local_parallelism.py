@@ -25,6 +25,7 @@ from .common import configure_pytorch, normalize_pytorch_backend
 from .workload_planning import (
     HOST_RAM_PER_DATALOADER_CHILD_GB,
     WORKLOAD_GENERIC,
+    capacity_warnings,
     env_float,
     env_int,
     plan_local_parallelism,
@@ -197,8 +198,8 @@ def _random_negative_pool_epochs_arg(value):
     return v
 
 
-def _free_vram_override_gb(num_gpus):
-    """Return env-pinned free VRAM in GB, or ``None``.
+def _free_vram_per_gpu_override_gb(num_gpus):
+    """Return env-pinned free VRAM in GB as a per-GPU list, or ``None``.
 
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB`` accepts either one
     value applied to every GPU or a comma/space-separated list. It exists for
@@ -219,7 +220,16 @@ def _free_vram_override_gb(num_gpus):
             "Environment variable %s=%r contains a non-float entry: %s"
             % (name, value, exc)
         ) from None
-    return min(vals[:max(int(num_gpus), 1)])
+    if len(vals) == 1:
+        # A single value applies to every GPU.
+        vals = vals * max(int(num_gpus), 1)
+    return vals[:max(int(num_gpus), 1)]
+
+
+def _free_vram_override_gb(num_gpus):
+    """Minimum env-pinned free VRAM in GB, or ``None``."""
+    vals = _free_vram_per_gpu_override_gb(num_gpus)
+    return min(vals) if vals else None
 
 
 def _detect_num_cuda_devices_no_torch():
@@ -257,8 +267,13 @@ def _detect_num_cuda_devices_no_torch():
     return n
 
 
-def _free_vram_from_nvidia_smi_gb(num_gpus):
-    """Return minimum free VRAM across visible GPUs using ``nvidia-smi``.
+def _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus):
+    """Return a list of free VRAM (GB) per visible GPU using ``nvidia-smi``.
+
+    Returns ``None`` if ``nvidia-smi`` is unavailable or returns nothing. The
+    per-GPU list (not collapsed to a scalar) lets capacity diagnostics see
+    heterogeneous / partially-occupied cards; the worker-count math separately
+    takes the ``min`` via ``_free_vram_from_nvidia_smi_gb``.
 
     This is intentionally a subprocess call instead of ``torch.cuda`` so the
     orchestrator can size a fork-based worker pool without initializing CUDA in
@@ -301,7 +316,27 @@ def _free_vram_from_nvidia_smi_gb(num_gpus):
             continue
     if not vals:
         return None
-    return min(vals[:max(int(num_gpus), 1)])
+    return vals[:max(int(num_gpus), 1)]
+
+
+def _free_vram_from_nvidia_smi_gb(num_gpus):
+    """Minimum free VRAM (GB) across visible GPUs, or ``None``."""
+    vals = _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus)
+    return min(vals) if vals else None
+
+
+def detect_free_vram_per_gpu_gb(num_gpus):
+    """Per-GPU free VRAM (GB) as a list, or ``None`` if undetectable.
+
+    Env override (``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB``) first,
+    then ``nvidia-smi``. Unlike the scalar helpers used by the worker-count
+    math, this preserves the per-GPU values so capacity warnings can flag
+    small or uneven cards.
+    """
+    override = _free_vram_per_gpu_override_gb(num_gpus)
+    if override is not None:
+        return override
+    return _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus)
 
 
 def auto_max_workers_per_gpu(
@@ -831,7 +866,21 @@ def resolve_local_parallelism_args(
     if plan.enable_timing:
         os.environ["MHCFLURRY_ENABLE_TIMING"] = "1"
 
-    for warning in plan.warnings:
+    # Preflight: compare the resolved plan against measured machine capacity
+    # (per-GPU free VRAM, available RAM, CPU count) and warn when we are below
+    # a safe operating range, so a future OOM/contention is diagnosable.
+    preflight = capacity_warnings(
+        workload_name=plan.workload_name,
+        backend=plan.backend,
+        gpus=plan.gpus,
+        num_jobs=plan.num_jobs,
+        per_gpu_free_vram_gb=detect_free_vram_per_gpu_gb(plan.gpus),
+        device_worker_gb=plan.device_worker_gb,
+        available_ram_gb=plan.host_memory_available_gb,
+        host_worker_gb=plan.host_worker_gb,
+        cpu_count=os.cpu_count(),
+    )
+    for warning in list(plan.warnings) + preflight:
         print("Local parallelism:", warning, file=sys.stderr)
     hoist_torchinductor_compile_threads(args)
     print("Local workload plan:", plan, file=sys.stderr)
