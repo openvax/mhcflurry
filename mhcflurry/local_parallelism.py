@@ -38,8 +38,9 @@ from .workload_planning import (
 # value was set before the fixed-encoding + indices-on-device work landed
 # and was producing only 2 workers/GPU on 80 GB cards (well below the
 # hard_cap of 4). Lowered to 4.0 GB which keeps a 2x safety margin over
-# observed and unlocks the 4-worker tier on 80 GB cards. 40 GB cards still
-# resolve to 1-2 (60% headroom × 40 / 4 = 6, hard-capped). Override with
+# observed and unlocks the 4-worker tier on 80 GB cards. 40 GB cards also
+# reach the hard cap at full free VRAM (0.6 × 40 / 4 = 6, capped to 4); fewer
+# only when free VRAM is already partly used. Override with
 # ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` for re-benchmarking.
 _AUTO_MWPG_PER_WORKER_GB_DEFAULT = 4.0
 
@@ -90,7 +91,7 @@ _AUTO_MWPG_FREE_VRAM_FALLBACK_GB = 16.0
 _AUTO_DATALOADER_HARD_CAP_DEFAULT = 4
 
 # Approximate RSS that one DataLoader child holds: torch + mhcflurry imports
-# (~400 MB) plus a small per-batch buffer.
+# (~0.5 GB) plus a small per-batch buffer.
 _AUTO_DATALOADER_RAM_PER_CHILD_GB = HOST_RAM_PER_DATALOADER_CHILD_GB
 
 # Approximate RSS that the main fit() worker holds before any DataLoader
@@ -328,11 +329,11 @@ def auto_max_workers_per_gpu(
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP``.
 
     Calibrate's per-worker footprint is dominated by the cached_stages
-    tensor (~15 GB at production peptide universe / ensemble size), so
-    callers in the calibrate path pass ``per_worker_gb`` explicitly to
-    override the train-default of 4 GB. When given, the explicit hint
-    wins over the env var. (No env var override: the workload-specific
-    knowledge belongs in the workload's command, not in a global env.)
+    tensor, so the planner passes ``per_worker_gb`` explicitly — the affinity
+    calibration workload profile's ``device_worker_gb`` of 24 GB — overriding
+    the 4 GB train default. When given, the explicit hint wins over the env
+    var. (No env var for it: the workload-specific knowledge belongs in the
+    workload profile, not in a global env.)
 
     The result is logged so the chosen value is visible in the worker
     log alongside the reasoning.
@@ -1311,8 +1312,7 @@ def add_local_parallelism_args(parser):
         type=int,
         metavar="N",
         default=None,
-        help="Restart workers after N tasks. Workaround for memory "
-             "leaks. Requires Python >=3.2.")
+        help="Restart workers after N tasks. Workaround for memory leaks.")
     group.add_argument(
         "--worker-log-dir",
         default=None,
@@ -1428,7 +1428,7 @@ def add_prediction_parallelism_args(parser):
         type=int,
         metavar="N",
         default=None,
-        help="Restart workers after N prediction chunks. Requires Python >=3.2.")
+        help="Restart workers after N prediction chunks.")
     group.add_argument(
         "--worker-log-dir",
         default=None,
@@ -1919,7 +1919,7 @@ def make_worker_pool(
         list must equal the number of workers.
 
     max_tasks_per_worker : int, optional
-        Restart workers after this many tasks. Requires Python >=3.2.
+        Restart workers after this many tasks.
 
     start_method : string, optional
         Multiprocessing start method to use for the worker pool.

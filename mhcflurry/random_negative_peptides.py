@@ -719,8 +719,9 @@ def encode_random_negatives_on_device(
     if not supports_device_random_negative_encoding(peptide_encoding):
         raise NotImplementedError(
             "encode_random_negatives_on_device: alignment_method %r not "
-            "supported on device. Falls back to host encoding via "
-            "EncodableSequences." % (alignment,)
+            "supported on device. Callers should gate on "
+            "supports_device_random_negative_encoding() and use the host "
+            "EncodableSequences path instead." % (alignment,)
         )
     left_edge = int(peptide_encoding.get("left_edge", 4))
     right_edge = int(peptide_encoding.get("right_edge", 4))

@@ -34,7 +34,9 @@ models are trained.**
   training tensors (closes 0–30% GPU utilization observed on the
   2026-04-25 8×A100 baseline run).
 - **~10–20× calibration speedup** from `--gpu-batched`, larger work
-  chunks, and 50 K-peptides-per-length default (was 100 K).
+  chunks, and the affinity release wrapper calibrating at 50 K peptides
+  per length (the `--num-peptides-per-length` CLI default is unchanged at
+  100 K).
 - **30–40% fewer wasted training epochs** from the recipe changes
   (`min_delta=1e-7`, `max_epochs=500`) terminating noise-floor
   patience-reset trajectories.
@@ -67,17 +69,23 @@ validation run completes.
 
 ## CLI changes
 
+- **Unified `mhcflurry` parent command.** Every tool is now reachable as
+  `mhcflurry <subcommand>` (`mhcflurry predict`, `mhcflurry downloads fetch`,
+  `mhcflurry class1-train-pan-allele-models`, …) under one `mhcflurry --help`
+  surface. The historical `mhcflurry-<subcommand>` console scripts still work
+  as compat shims (same entry points). Two tools are new and unified-only:
+  `mhcflurry compare-models` and `mhcflurry plot-model-comparison`.
 - **`mhcflurry-class1-train-pan-allele-models --max-workers-per-gpu`**
   default changed from `1000` (effectively unlimited per-GPU) to
   `auto`. Auto-detect picks `min(num_jobs/num_gpus,
-  0.6×free_vram/16GB, hard_cap=4)` without importing torch or
-  initializing CUDA in the parent process.
+  0.6×free_vram/per_worker_gb, hard_cap=4)` without importing torch or
+  initializing CUDA in the parent process. `per_worker_gb` defaults to
+  4 GB (the affinity-fit footprint).
 
-  Cross-checks: 8×A100-80GB + 16 jobs → 2 (matches old production
-  setting); 8×A100-40GB + 16 jobs → 1; 1×A100-80GB + 8 jobs → 3;
-  CPU-only → 1.
+  Cross-checks: 8 GPUs + 16 jobs → 2 (num-jobs-limited); 8 GPUs +
+  32 jobs → 4 (hard cap, ample VRAM); CPU-only → 1.
 
-  `MAX_WORKERS_PER_GPU=N` env var still pins explicitly.
+  Pass `--max-workers-per-gpu N` to pin explicitly.
 - **`mhcflurry-class1-train-pan-allele-models --dataloader-num-workers`**
   new flag, default `auto`. Orchestrator derives the per-fit-worker
   DataLoader prefetch child count from the box's vCPUs / RAM /
@@ -164,11 +172,6 @@ real measurement:
 3. when patience would trigger this epoch (so the saved val_loss
    reflects the actual stop state, not a stale carried-forward value).
 
-A new helper, `scripts/dev/relocate_run_outputs.sh`, moves
-`brev_runs/` and `results/` outside the repo (with symlinks) so
-runplz's rsync_up doesn't ship 15+ GB of stale prior-run artifacts
-to the box on every launch. Run with `--apply` once per workstation.
-
 ### Affinity fit is device-resident
 
 Affinity `fit()` no longer routes minibatches through a per-fit
@@ -181,18 +184,23 @@ negatives are refilled into the top slice of that row space each epoch.
 
 | Tool | Purpose |
 |---|---|
-| `scripts/training/compare_runs.py` | Compare two training runs side-by-side. Reads each run's `models.unselected.combined/manifest.csv` to compute per-task wall-time / epoch-count / final-loss aggregates; compares `eval_comparison/` outputs for per-allele ROC-AUC / PR-AUC / PPV@N deltas. Markdown to stdout, CSV to `--out`. |
-| `scripts/training/compare_new_vs_public.py` | Compare a freshly-trained ensemble vs the published 2.2.0 release on the data_evaluation hit/decoy benchmark. Per-allele metrics, used as the in-pipeline eval stage. |
+| `mhcflurry compare-models` | Compare two ensembles (run-vs-run or run-vs-public) across affinity, presentation, and training-stats components. Markdown to stdout, CSVs to `--out`. Each component runs only when both sides have the matching artifact. |
+| `mhcflurry plot-model-comparison` | Render ROC/PR/scatter/delta plots from a `compare-models` output directory. |
 | `scripts/training/plot_loss_curves.py` | Per-model train + val loss curves from manifest (no weight files needed). Three PNGs + summary CSV. |
 
 When to use which:
-- **`compare_new_vs_public.py`** — single run vs the published 2.2.0
-  baseline. The eval stage of `pan_allele_release_affinity.sh` runs this
-  by default.
-- **`compare_runs.py`** — any two runs against each other. Use when
-  comparing recipe variants, hyperparameter sweeps, or 2.3.0
+- **`compare-models --b public`** — a single run vs the published 2.2.0
+  baseline (`--b` defaults to `public`). The eval stage of
+  `pan_allele_release_affinity.sh` runs this by default.
+- **`compare-models --a run1 --b run2`** — any two runs against each other.
+  Use when comparing recipe variants, hyperparameter sweeps, or 2.3.0
   candidates against each other.
 - **`plot_loss_curves.py`** — diagnostic. Doesn't need a baseline.
+
+Dev-workstation helper: `scripts/dev/relocate_run_outputs.sh` moves
+`brev_runs/` and `results/` outside the repo (with symlinks) so runplz's
+rsync_up doesn't ship 15+ GB of stale prior-run artifacts to the box on every
+launch. Run with `--apply` once per workstation.
 
 ## Pipeline orchestration
 
@@ -214,8 +222,8 @@ regressions before a multi-hour training run discovers them.
 
 > **TODO: filled in after the 2.3.0 validation training run completes.**
 >
-> Will include `compare_runs.py` output comparing the 2.3.0 candidate
-> vs the 2026-04-25 baseline run:
+> Will include `mhcflurry compare-models` output comparing the 2.3.0
+> candidate vs the 2026-04-25 baseline run:
 >
 > - End-to-end wall time delta.
 > - Per-task training time distribution shift.

@@ -103,7 +103,7 @@ and specify `--models` when you call `mhcflurry-predict`:
 $ mhcflurry-predict \
     --alleles HLA-A0201 HLA-A0301 \
     --peptides SIINFEKL SIINFEKD SIINFEKQ \
-    --models "$(mhcflurry-downloads path models_class1)/models"
+    --models "$(mhcflurry-downloads path models_class1)/models" \
     --out /tmp/predictions.csv
 ```
 
@@ -257,9 +257,11 @@ used to require manual tuning per-box:
 
 `--max-workers-per-gpu auto`
 : Number of training workers to schedule on each GPU. Resolved from
-  free VRAM and a conservative per-worker VRAM budget. Override with the env var
-  `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB` (default 4 GB
-  for fit, 12 GB for calibrate's `cached_stages` cache).
+  free VRAM and a per-worker VRAM budget. The budget defaults to 4 GB (the
+  affinity-fit footprint) and is tunable via the env var
+  `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`; the calibrate path uses a
+  larger budget (24 GB, for its `cached_stages` cache) supplied by the workload
+  planner rather than the env default.
 
 `--dataloader-num-workers auto`
 : DataLoader child count for the streaming pretraining path. Resolved

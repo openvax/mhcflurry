@@ -124,9 +124,10 @@ intentionally re-benchmarking.
 Picks the per-GPU worker concurrency from `min(num_jobs / num_gpus,
 floor(0.6 × free_vram_gb / per_worker_gb), hard_cap=4)`. Free VRAM is
 read from `nvidia-smi` (no torch import — the parent process must not
-initialize CUDA before forking). Per-worker VRAM upper bound is
-conservative (16 GB) and tunable via
-`MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`.
+initialize CUDA before forking). The per-worker VRAM upper bound defaults to
+4 GB (the affinity-fit footprint) and is tunable via
+`MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`; heavier workloads (e.g.
+calibration at 24 GB) pass their own value through the planner.
 
 | Box | num_gpus | free_vram | resolved |
 |---|---|---|---|
@@ -182,10 +183,9 @@ bounded by `minibatch_size`, not total dataset rows.
 
 ### `--num-jobs` (auto-derives from MWPG × GPUs)
 
-Today the recipe explicitly sets `--num-jobs $((GPUS * MAX_WORKERS_PER_GPU))`
-in the shell. `mhcflurry.local_parallelism.auto_num_jobs(num_gpus,
-max_workers_per_gpu)` is the in-Python equivalent for callers that
-want to derive it after `auto_max_workers_per_gpu` has resolved.
+`--num-jobs` defaults to `auto`, which resolves to `gpus × max_workers_per_gpu`
+via `mhcflurry.local_parallelism.auto_num_jobs(num_gpus, max_workers_per_gpu)`
+once `auto_max_workers_per_gpu` has resolved. Pass an integer to pin it.
 
 ### Cross-model coverage
 
@@ -200,7 +200,7 @@ want to derive it after `auto_max_workers_per_gpu` has resolved.
 
 | Env var | Default | Effect |
 |---|---|---|
-| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB` | 16.0 | Per-worker VRAM upper bound for the MWPG resolver |
+| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB` | 4.0 | Per-worker VRAM upper bound for the MWPG resolver (affinity-fit footprint; heavier workloads pass their own via the planner) |
 | `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP` | 4 | SM-scheduler ceiling for MWPG |
 | `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB` | (auto-detect) | Pin free VRAM (CSV per GPU); for tests / hidden-`nvidia-smi` launchers |
 | `MHCFLURRY_AUTO_DATALOADER_HARD_CAP` | 4 | DL child cap for `auto_dataloader_num_workers` |

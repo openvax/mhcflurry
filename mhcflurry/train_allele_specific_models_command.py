@@ -98,7 +98,8 @@ parser.add_argument(
     metavar="N",
     default=None,
     help="Seed for randomizing which measurements are held out. Only matters "
-    "when --held-out-fraction is specified. When omitted, the held-out split "
+    "when --held-out-fraction-reciprocal is specified. When omitted, the "
+    "held-out split "
     "is derived from --random-seed (so the whole run reproduces from one "
     "value). Pass this explicitly to control the split directly — e.g. to "
     "reproduce a pre-2.3.0 split — overriding --random-seed for the split.")
