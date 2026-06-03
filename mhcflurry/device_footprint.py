@@ -17,10 +17,13 @@ Sanity anchors (release pan-allele config, live diagnostics from the 2026-04-28
 ``release_exact`` run):
 
   * Affinity TRAINING — ~250k curated rows, minibatch 128 — measured steady-state
-    ~1.85-2.4 GB. Dominated by the device-resident peptide-vector tensor
-    ``(N, L, V) float32`` (alleles are a shared index-embedding, so cheap) plus a
-    fixed base (CUDA context + torch.compile workspace + weights + optimizer +
-    embedding). ``estimate_affinity_training_device_worker_gb`` reproduces this.
+    ~1.85-2.4 GB. Peptides are stored device-resident as compact ``(N, L)`` int8
+    indices (``peptide_amino_acid_encoding_torch``, default True) and embedded
+    per-batch, and alleles are a shared index-embedding — so the resident dataset
+    is tiny. The footprint is dominated by a fixed base (CUDA context +
+    torch.compile workspace + weights + optimizer + embedding) plus per-batch
+    activations; it barely scales with dataset size (only at extreme row
+    counts). ``estimate_affinity_training_device_worker_gb`` reproduces this.
   * Affinity CALIBRATION — 800k-row peptide universe, 10-net ensemble — the
     cached peptide-stage tensor is ~12 GB (the static profile assumed 24 GB).
     ``estimate_affinity_calibration_device_worker_gb`` reproduces this.
@@ -45,18 +48,28 @@ _CALIBRATION_DEFAULT_STAGE_DIM = 1024     # when the encoding can't be derived
 _CALIBRATION_OVERHEAD_GB = 3.0            # model weights + activation headroom
 _CALIBRATION_MIN_DEVICE_WORKER_GB = 4.0   # don't over-pack from a tiny estimate
 
-# ---- Affinity training (device-resident dataset + activations) -------------
-# Fixed per-worker cost that does NOT scale with the dataset: CUDA context,
-# torch.compile inductor workspace, model weights + Adam optimizer state, and
-# the shared allele index-embedding. Calibrated so the release config lands in
-# the measured ~2 GB band; the residual after the resident + activation terms.
-_TRAINING_BASE_GB = 1.5
+# ---- Affinity training -----------------------------------------------------
+# Peptides are stored device-resident as compact (N, L) int8 indices
+# (``peptide_amino_acid_encoding_torch``, default True) and embedded to float32
+# vectors per-batch via a frozen table. So the resident dataset is tiny; the
+# footprint is dominated by a fixed base + per-batch activations, NOT by dataset
+# size. The dataset term only matters at extreme row counts.
+#
+# Fixed per-worker cost that does NOT scale with the dataset or batch: CUDA
+# context, torch.compile inductor workspace, model weights + Adam optimizer
+# state, the embedding table. Calibrated so the release config lands in the
+# measured ~2 GB band (resident + activation terms are negligible there).
+_TRAINING_BASE_GB = 1.8
+# Per resident row beyond the peptide: allele index + target + sample weight.
+_TRAINING_PER_ROW_SCALAR_BYTES = 12
 # The device fit materializes real rows AND a random-negative slice in one
 # combined buffer (~2x rows). Conservative.
 _TRAINING_RANDOM_NEGATIVE_FACTOR = 2.0
 # Forward activations + gradients + backward working set, as a multiple of the
 # single-forward activation bytes.
 _TRAINING_ACTIVATION_BACKWARD_FACTOR = 3.0
+_PEPTIDE_INDEX_BYTES = 1  # int8 per position when index-encoded
+_PEPTIDE_ENCODING_FALSE_VALUES = {"false", "no", "off", "0", "none", ""}
 _TRAINING_DEFAULT_MINIBATCH = 128
 _TRAINING_DEFAULT_MERGE_WIDTH = 1024      # when layer widths can't be derived
 # Applied to the whole estimate; keeps margin over the measured peak.
@@ -112,12 +125,45 @@ def _peptide_stage_dim(hyperparameters):
     return None
 
 
-def _peptide_row_bytes(hyperparameters):
-    """Bytes for one peptide's resident ``(L, V) float32`` encoding, or None."""
+def _peptides_are_index_encoded(hyperparameters):
+    """True when peptides live device-resident as compact int8 indices.
+
+    Mirrors ``_peptide_torch_encoding_name``: the
+    ``peptide_amino_acid_encoding_torch`` knob defaults to True, and any value
+    that isn't an explicit false disables nothing — peptides are stored as
+    ``(N, L)`` int8 and embedded per-batch.
+    """
+    mode = hyperparameters.get("peptide_amino_acid_encoding_torch", True)
+    if isinstance(mode, str):
+        return mode.strip().lower() not in _PEPTIDE_ENCODING_FALSE_VALUES
+    return bool(mode)
+
+
+def _peptide_embedded_row_bytes(hyperparameters):
+    """Bytes for one peptide's embedded ``(L, V) float32`` representation (the
+    per-batch activation, regardless of how it is stored resident), or None."""
     encoding = hyperparameters.get("peptide_encoding", {})
     max_length = int(encoding.get("max_length", 0) or 0)
     width = _peptide_vector_encoding_width(encoding.get("vector_encoding_name"))
     if max_length and width:
+        return max_length * width * _FLOAT32_BYTES
+    return None
+
+
+def _peptide_resident_row_bytes(hyperparameters):
+    """Bytes for one peptide's *device-resident* encoding, or None.
+
+    Index-encoded (the default): ``L`` int8 bytes. Legacy fixed-vector path:
+    ``L x V x 4`` float32 bytes.
+    """
+    encoding = hyperparameters.get("peptide_encoding", {})
+    max_length = int(encoding.get("max_length", 0) or 0)
+    if not max_length:
+        return None
+    if _peptides_are_index_encoded(hyperparameters):
+        return max_length * _PEPTIDE_INDEX_BYTES
+    width = _peptide_vector_encoding_width(encoding.get("vector_encoding_name"))
+    if width:
         return max_length * width * _FLOAT32_BYTES
     return None
 
@@ -163,25 +209,30 @@ def estimate_affinity_training_device_worker_gb(
 
     Takes the ``hyperparameters`` dict directly (the model doesn't exist yet at
     training time — it's read from the hyperparameters YAML the command loaded).
-    Models the three terms that actually scale:
 
-      * resident dataset tensor: the full fit's peptide vectors live on device as
-        ``(N, L, V) float32``, plus a random-negative slice (~2x rows). Alleles
-        are a shared index-embedding, so they are part of the fixed base.
-      * batch activations: ``minibatch x merge_width x 4`` x a backward factor.
+    Peptides are stored device-resident as compact ``(N, L)`` int8 indices
+    (default) and embedded per-batch, so unlike calibration the footprint is NOT
+    dominated by the dataset — it is dominated by a fixed base plus per-batch
+    activations. The terms:
+
+      * resident dataset: ``rn_factor x rows x (peptide_index_bytes + scalars)``
+        — tiny at normal scale (int8), only material at extreme row counts.
+      * per-batch activations: ``minibatch x (embedded_peptide + merge_width) x 4
+        x backward_factor`` — the live batch's float32 embedded vectors and
+        hidden activations. This is what scales with batch size / network width.
       * a fixed base (CUDA context + compile workspace + weights + optimizer +
-        embedding) that does not scale with the dataset.
+        embedding table) that does not scale with either.
 
     A safety multiplier and a floor keep it conservative.
     """
     if not num_rows or hyperparameters is None:
         return None
 
-    peptide_row_bytes = _peptide_row_bytes(hyperparameters)
-    if peptide_row_bytes is None:
-        # Index-encoded peptides (or an unknown encoding) are cheap to keep
-        # resident; the base dominates. Fall back to the floor rather than a
-        # bogus huge/small estimate.
+    resident_row_bytes = _peptide_resident_row_bytes(hyperparameters)
+    embedded_row_bytes = _peptide_embedded_row_bytes(hyperparameters)
+    if resident_row_bytes is None or embedded_row_bytes is None:
+        # Unknown encoding: the base dominates anyway, so use the floor rather
+        # than a bogus estimate.
         return _TRAINING_MIN_DEVICE_WORKER_GB
 
     minibatch = int(minibatch_size or hyperparameters.get("minibatch_size")
@@ -189,11 +240,11 @@ def estimate_affinity_training_device_worker_gb(
     merge_width = _merge_width(hyperparameters)
 
     resident_gb = (
-        _TRAINING_RANDOM_NEGATIVE_FACTOR * int(num_rows) * peptide_row_bytes
-        / _GIB
+        _TRAINING_RANDOM_NEGATIVE_FACTOR * int(num_rows)
+        * (resident_row_bytes + _TRAINING_PER_ROW_SCALAR_BYTES) / _GIB
     )
     activation_gb = (
-        minibatch * merge_width * _FLOAT32_BYTES
+        minibatch * (embedded_row_bytes + merge_width * _FLOAT32_BYTES)
         * _TRAINING_ACTIVATION_BACKWARD_FACTOR / _GIB
     )
     footprint = (

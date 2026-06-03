@@ -83,29 +83,35 @@ def test_training_sanity_anchor():
     assert 2.0 < gb < 4.0, gb
 
 
-def test_training_scales_with_dataset_batch_and_falls_back():
-    small = training_gb(RELEASE_HYPERPARAMETERS, 25000)
+def test_training_is_base_dominated_for_index_encoded_peptides():
+    # Peptides are int8 indices device-resident (the default), so the dataset
+    # barely affects the footprint at normal scale: it is base-dominated.
     release = training_gb(RELEASE_HYPERPARAMETERS, RELEASE_TRAINING_ROWS)
-    large = training_gb(RELEASE_HYPERPARAMETERS, 5000000)
-    # Resident dataset term dominates the scaling.
-    assert small < release < large
-    assert large > 10.0                # a 5M-row dataset needs fewer workers
+    five_million = training_gb(RELEASE_HYPERPARAMETERS, 5000000)
+    assert abs(five_million - release) < 1.0           # ~flat with dataset size
 
-    # Bigger minibatch raises the (smaller) activation term.
+    # Only an extreme row count materially raises the resident int8 term.
+    assert training_gb(RELEASE_HYPERPARAMETERS, 50000000) > release + 1.0
+
+    # Batch size scales the (per-batch) activation term.
     assert (training_gb(RELEASE_HYPERPARAMETERS, RELEASE_TRAINING_ROWS,
-                        minibatch_size=8192)
-            > release)
-
-    # A wider peptide encoding (more positions / features) raises the resident
-    # per-row cost.
-    wider = dict(RELEASE_HYPERPARAMETERS,
-                 peptide_encoding={"max_length": 30,
-                                   "vector_encoding_name": "BLOSUM62"})
-    assert training_gb(wider, RELEASE_TRAINING_ROWS) > release
+                        minibatch_size=32768) > release)
 
     # Missing hyperparameters / rows -> None.
     assert training_gb(None, RELEASE_TRAINING_ROWS) is None
     assert training_gb(RELEASE_HYPERPARAMETERS, 0) is None
+
+
+def test_training_legacy_vector_path_scales_with_dataset():
+    # If the torch index-encoding is disabled, peptides are float32 vectors
+    # device-resident, so the footprint DOES scale strongly with dataset size.
+    legacy = dict(RELEASE_HYPERPARAMETERS,
+                  peptide_amino_acid_encoding_torch=False)
+    release = training_gb(legacy, RELEASE_TRAINING_ROWS)
+    large = training_gb(legacy, 5000000)
+    assert large > release + 5.0
+    # ...and is larger than the index-encoded estimate for the same dataset.
+    assert release > training_gb(RELEASE_HYPERPARAMETERS, RELEASE_TRAINING_ROWS)
 
 
 # --------------------------------------------------------------------------
