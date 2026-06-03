@@ -268,18 +268,6 @@ class AlleleKeyResolver(object):
         return self.reverse_alias_map().get(normalized, normalized)
 
 
-def canonicalize_allele_to_keys(
-        raw_name, valid_keys, alias_map, raise_on_error=True):
-    """Resolve a single ``raw_name`` to a key in ``valid_keys``, no-alias-first.
-
-    Thin wrapper over :class:`AlleleKeyResolver` for callers that already hold a
-    prebuilt ``alias_map`` (e.g. the affinity predictor's ``allele_to_canonical``
-    built at load time). See that class for the resolution priority.
-    """
-    return AlleleKeyResolver(valid_keys, alias_map).resolve(
-        raw_name, raise_on_error=raise_on_error)
-
-
 def canonicalize_allele_series(alleles, valid_keys, log_label="alleles"):
     """Map allele names to canonical keys (no-alias-first), strictly.
 

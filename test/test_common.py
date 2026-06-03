@@ -4,8 +4,7 @@ import logging
 
 from mhcflurry.common import (
     filter_canonicalizable_alleles,
-    build_allele_alias_map,
-    canonicalize_allele_to_keys,
+    AlleleKeyResolver,
     canonicalize_allele_series,
 )
 
@@ -32,26 +31,22 @@ def test_filter_canonicalizable_alleles_returns_names_verbatim():
         ["HLA-B*44:01"]
 
 
-def test_canonicalize_allele_to_keys_no_alias_first():
-    keys = {"HLA-B*44:01", "HLA-A*02:01"}
-    alias_map = build_allele_alias_map(keys)
+def test_allele_key_resolver_priority():
+    resolver = AlleleKeyResolver({"HLA-B*44:01", "HLA-A*02:01"})
     # An allele with its own key keeps that key (not remapped to B*44:02).
-    assert canonicalize_allele_to_keys(
-        "HLA-B*44:01", keys, alias_map) == "HLA-B*44:01"
+    assert resolver.resolve("HLA-B*44:01") == "HLA-B*44:01"
     # An alternative spelling normalizes to the key.
-    assert canonicalize_allele_to_keys(
-        "HLA-A0201", keys, alias_map) == "HLA-A*02:01"
+    assert resolver.resolve("HLA-A0201") == "HLA-A*02:01"
     # The modern alias of a retired key routes back to the key in the set.
-    assert canonicalize_allele_to_keys(
-        "HLA-B*44:02", keys, alias_map) == "HLA-B*44:01"
+    assert resolver.resolve("HLA-B*44:02") == "HLA-B*44:01"
 
 
-def test_canonicalize_allele_to_keys_raises_on_junk():
+def test_allele_key_resolver_raises_on_junk():
     import pytest
     with pytest.raises(ValueError):
-        canonicalize_allele_to_keys("NONSENSE", set(), {}, raise_on_error=True)
-    assert canonicalize_allele_to_keys(
-        "NONSENSE", set(), {}, raise_on_error=False) is None
+        AlleleKeyResolver(set()).resolve("NONSENSE", raise_on_error=True)
+    assert AlleleKeyResolver(set()).resolve(
+        "NONSENSE", raise_on_error=False) is None
 
 
 def test_canonicalize_allele_series_resolves_aliases_and_drops_junk(caplog):

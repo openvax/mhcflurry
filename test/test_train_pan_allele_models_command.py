@@ -327,13 +327,12 @@ def test_training_retains_noncanonical_allele_names():
     (e.g. ``HLA-A0201``) is canonicalized to its pseudosequence key
     (``HLA-A*02:01``) and retained, rather than being silently dropped by the
     old exact-string ``isin`` filter."""
-    from mhcflurry.common import (
-        build_allele_alias_map, canonicalize_allele_to_keys)
+    from mhcflurry.common import AlleleKeyResolver
 
     allele_sequences_path = get_path(
         "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME)
     keys = set(pandas.read_csv(allele_sequences_path, index_col=0).index)
-    alias_map = build_allele_alias_map(keys)
+    resolver = AlleleKeyResolver(keys)
 
     data_df = pandas.read_csv(
         get_path("data_curated", "curated_training_data.affinity.csv.bz2"))
@@ -347,7 +346,7 @@ def test_training_retains_noncanonical_allele_names():
         candidate = str(allele).replace("*", "").replace(":", "")
         if candidate == allele:
             continue
-        if canonicalize_allele_to_keys(candidate, keys, alias_map) == allele:
+        if resolver.resolve(candidate) == allele:
             target, noncanon = allele, candidate
             break
     if target is None:

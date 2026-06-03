@@ -13,7 +13,7 @@ import pytest
 from mhcflurry.common import (
     normalize_allele_name,
     build_allele_alias_map,
-    canonicalize_allele_to_keys,
+    AlleleKeyResolver,
     canonicalize_allele_series,
 )
 from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
@@ -72,24 +72,25 @@ def test_canonicalize_allele_series_resolves_a_real_retired_alias():
         pytest.skip("no aliased alleles in this allele_sequences table")
 
     alias_name, original_key = next(iter(alias_map.items()))
-    resolved = canonicalize_allele_to_keys(alias_name, key_set, alias_map)
+    resolved = AlleleKeyResolver(key_set, alias_map).resolve(alias_name)
     assert resolved == original_key
     assert resolved in key_set
 
 
-def test_predictor_canonicalize_delegates_to_shared_helper():
-    # Single source of truth: canonicalize_allele_name must delegate to
-    # canonicalize_allele_to_keys using the predictor's own maps, so the two
-    # never diverge.
+def test_predictor_canonicalize_matches_resolver():
+    # Single source of truth: the predictor canonicalizes via an AlleleKeyResolver
+    # over its own maps, so canonicalize_allele_name matches a resolver built the
+    # same way.
     keys = _allele_sequence_keys()
     subset = {k: "X" for k in keys[:200]}
     predictor = Class1AffinityPredictor(allele_to_sequence=subset)
+    resolver = AlleleKeyResolver(
+        predictor.allele_to_sequence, predictor.allele_to_canonical)
     for name in ["HLA-A*02:01", "HLA-A0201"] + list(keys[:3]):
         if normalize_allele_name(name, raise_on_error=False) is None:
             continue
-        expected = canonicalize_allele_to_keys(
-            name, predictor.allele_to_sequence, predictor.allele_to_canonical)
-        assert predictor.canonicalize_allele_name(name) == expected
+        assert predictor.canonicalize_allele_name(name) == resolver.resolve(
+            name, raise_on_error=True)
 
 
 def test_canonicalize_allele_series_builds_reverse_map_lazily(monkeypatch):
