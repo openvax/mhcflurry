@@ -133,6 +133,13 @@ class EncodableSequences(object):
         Encode variable-length sequences to a fixed-size matrix. Amino acids
         are encoded as specified by the vector_encoding_name argument.
 
+        DEPRECATED (scheduled for removal): the dense ``(N, L, V)`` peptide/
+        sequence vector path has been retired — models always index-encode
+        peptides ((N, L) int8) and embed on device. This method has no
+        production caller; it is retained only for benchmark/encoding-cache
+        tests and will be removed once those migrate to the categorical path.
+        Use ``variable_length_to_fixed_length_categorical`` instead.
+
         See `sequences_to_fixed_length_index_encoded_array` for details.
 
         See also: variable_length_to_fixed_length_categorical.

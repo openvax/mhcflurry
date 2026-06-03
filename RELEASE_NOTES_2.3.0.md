@@ -275,6 +275,18 @@ required and is used for device-resident training and optional
 - **Saved 2.2.x model bundles still work unchanged** in 2.3.0 for
   prediction; no migration needed for downstream users running
   inference on existing bundles.
+- **Deprecated: the dense-vector amino-acid encoding path.** Peptides and
+  processing-model sequences are now always index-encoded (`(N, L)` int8) and
+  embedded on device. The `peptide_amino_acid_encoding_torch=False` /
+  `amino_acid_encoding_torch=False` hyperparameters (and the
+  `peptide_amino_acid_encoding_gpu` alias) no longer select a dense `(N, L, V)`
+  path — they are accepted but coerced to index encoding with a one-time
+  deprecation warning, so existing configs still load and predict identically.
+  `EncodableSequences.variable_length_to_fixed_length_vector_encoding` and the
+  network's defensive dense-input branch are retained only for tests and are
+  marked for removal (grep `DEPRECATED (scheduled for removal)`). The shared
+  vector-encoding table machinery stays — it backs the index embedding and the
+  allele encoder.
 - The pan-allele release training pipeline is the
   primary thing that's changed. Allele-specific and processing
   training paths inherit shared backend selection and worker sizing,

@@ -1142,6 +1142,14 @@ class Class1NeuralNetworkModel(nn.Module):
             peptide_input_vector_encoding_name = "BLOSUM62"
         self.peptide_input_vector_encoding_name = peptide_input_vector_encoding_name
         self.peptide_input_is_indices = peptide_input_vector_encoding_name is not None
+        # DEPRECATED (scheduled for removal): ``peptide_input_is_indices`` is now
+        # always True in production — the encoding path emits (N, L) int8 and the
+        # legacy dense-vector peptide path is gone. The ``False`` branch (a 3D
+        # fp32 peptide input, handled in ``forward``/``predict``) is retained
+        # only as defensive handling used by topology/init unit tests; it has no
+        # production caller and should be collapsed to index-only when those
+        # tests migrate.
+        #
         # Device-side fixed amino-acid encoding: when enabled, peptide input
         # is (N, L) int indices and ``forward`` widens to (N, L, V) fp32 via
         # a frozen embedding table. The table is a non-persistent buffer: it
