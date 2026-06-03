@@ -220,9 +220,10 @@ def build_allele_alias_map(valid_keys):
 
 
 class AlleleKeyResolver(object):
-    """Resolves allele names to a fixed set of keys, no-alias-first.
+    """Resolves allele names to a fixed set of canonical keys, no-alias-first.
 
-    Resolution order for a name (each step checked against ``valid_keys``):
+    A name is resolved by this priority (each step checked against
+    ``valid_keys``):
 
       1. its own no-alias normalization, if that is already a key — so an
          allele with its own pseudosequence isn't remapped onto an alias target
@@ -231,9 +232,16 @@ class AlleleKeyResolver(object):
       2. its alias-applied normalization, if *that* is a key;
       3. the key it is a retired alias of, via the reverse alias map.
 
-    Otherwise ``resolve`` returns the normalized-but-unknown name (best effort,
-    for callers that handle unsupported alleles downstream) or None when the
-    name can't be normalized at all.
+    Two resolution modes, deliberately distinct:
+
+      * :meth:`resolve_to_key` — strict. Returns the resolved key, or None for
+        any name that maps to no key (whether unsupported or unparseable). Use
+        this when an unmatched name should be dropped (e.g. training ingestion).
+      * :meth:`resolve` — best effort. Like ``resolve_to_key`` for names that do
+        match a key, but a name that *normalizes* yet matches no key is returned
+        as its normalized form (not None), so callers can surface it as an
+        unsupported allele downstream. Returns None only when the name can't be
+        normalized at all (and ``raise_on_error=False``).
 
     The reverse alias map (``build_allele_alias_map``, an O(len(valid_keys))
     scan) is built once and cached on first use — so already-canonical inputs,
@@ -241,7 +249,8 @@ class AlleleKeyResolver(object):
     predictor's load-time ``allele_to_canonical``) to skip the scan entirely.
 
     ``valid_keys`` should support O(1) ``in`` (a dict or set); an empty/falsy
-    value skips step 1 (e.g. allele-specific predictors with no pseudosequences).
+    value skips steps 1-2 (e.g. allele-specific predictors with no
+    pseudosequences), so every name falls through to the reverse-map step.
     """
 
     def __init__(self, valid_keys, alias_map=None):
@@ -249,11 +258,13 @@ class AlleleKeyResolver(object):
         self._alias_map = alias_map  # built lazily by reverse_alias_map()
 
     def reverse_alias_map(self):
+        """The alias -> key map, built once on first use and cached."""
         if self._alias_map is None:
             self._alias_map = build_allele_alias_map(self.valid_keys)
         return self._alias_map
 
     def resolve(self, raw_name, raise_on_error=False):
+        """Best-effort resolution. See the class docstring for the contract."""
         if self.valid_keys:
             no_alias = normalize_allele_name(
                 raw_name, raise_on_error=False, use_allele_aliases=False)
@@ -266,6 +277,17 @@ class AlleleKeyResolver(object):
         if self.valid_keys and normalized in self.valid_keys:
             return normalized
         return self.reverse_alias_map().get(normalized, normalized)
+
+    def resolve_to_key(self, raw_name):
+        """Strict resolution: a key in ``valid_keys``, or None.
+
+        Drops the best-effort fallback of :meth:`resolve` — an unsupported or
+        unparseable name both return None.
+        """
+        resolved = self.resolve(raw_name, raise_on_error=False)
+        if self.valid_keys and resolved in self.valid_keys:
+            return resolved
+        return None
 
 
 def canonicalize_allele_series(alleles, valid_keys, log_label="alleles"):
@@ -285,11 +307,9 @@ def canonicalize_allele_series(alleles, valid_keys, log_label="alleles"):
 
     def _resolve(name):
         if name not in resolved:
-            key = resolver.resolve(name, raise_on_error=False)
-            # Strict membership: the resolver's best-effort fallback (a
-            # normalized-but-unknown name) and unparseable None both drop out.
-            resolved[name] = key if key in resolver.valid_keys else None
-            if resolved[name] is None:
+            key = resolver.resolve_to_key(name)  # key, or None to drop
+            resolved[name] = key
+            if key is None:
                 dropped.append(name)
         return resolved[name]
 

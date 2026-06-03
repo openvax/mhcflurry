@@ -49,6 +49,28 @@ def test_allele_key_resolver_raises_on_junk():
         "NONSENSE", raise_on_error=False) is None
 
 
+def test_allele_key_resolver_best_effort_vs_strict():
+    resolver = AlleleKeyResolver({"HLA-A*02:01"})
+    # Supported allele: both modes return the key.
+    assert resolver.resolve("HLA-A0201") == "HLA-A*02:01"
+    assert resolver.resolve_to_key("HLA-A0201") == "HLA-A*02:01"
+    # A valid allele that is NOT a key: best-effort returns the normalized name
+    # (so the caller can flag it as unsupported); strict returns None (drop it).
+    assert resolver.resolve("HLA-B*07:02") == "HLA-B*07:02"
+    assert resolver.resolve_to_key("HLA-B*07:02") is None
+    # Unparseable: both return None (strict never raises).
+    assert resolver.resolve("NONSENSE") is None
+    assert resolver.resolve_to_key("NONSENSE") is None
+
+
+def test_allele_key_resolver_empty_keys_skip_membership_steps():
+    # With no keys, steps 1-2 are skipped; best-effort returns the normalized
+    # name and strict returns None (nothing can match an empty key set).
+    resolver = AlleleKeyResolver(set())
+    assert resolver.resolve("HLA-A*02:01") == "HLA-A*02:01"
+    assert resolver.resolve_to_key("HLA-A*02:01") is None
+
+
 def test_canonicalize_allele_series_resolves_aliases_and_drops_junk(caplog):
     keys = ["HLA-B*44:01", "HLA-A*02:01"]
     with caplog.at_level(logging.WARNING):

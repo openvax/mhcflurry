@@ -93,6 +93,30 @@ def test_predictor_canonicalize_matches_resolver():
             name, raise_on_error=True)
 
 
+def test_predictor_reuses_cached_resolver():
+    # The per-row calls in predict_to_dataframe must reuse one resolver, not
+    # reconstruct it each time.
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={"HLA-A*02:01": "AAAA"})
+    predictor.canonicalize_allele_name("HLA-A*02:01")
+    first = predictor._cache["allele_key_resolver"]
+    predictor.canonicalize_allele_name("HLA-A*02:01")
+    assert predictor._cache["allele_key_resolver"] is first
+
+
+def test_predictor_clear_cache_invalidates_cached_resolver():
+    # clear_cache() must drop the cached resolver (it lives in self._cache), so
+    # a resolver built before the allele maps change can't go stale.
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={"HLA-A*02:01": "AAAA"})
+    predictor.canonicalize_allele_name("HLA-A*02:01")
+    assert "allele_key_resolver" in predictor._cache
+    predictor.clear_cache()
+    assert "allele_key_resolver" not in predictor._cache
+    # Still resolves afterward (a fresh resolver is built on demand).
+    assert predictor.canonicalize_allele_name("HLA-A*02:01") == "HLA-A*02:01"
+
+
 def test_canonicalize_allele_series_builds_reverse_map_lazily(monkeypatch):
     # The ~O(keys) reverse alias map must be built only when a name actually
     # needs it (a current-name request for a retired key), never for data that
