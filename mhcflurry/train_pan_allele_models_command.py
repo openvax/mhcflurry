@@ -48,6 +48,9 @@ from .workload_planning import (
     WORKLOAD_AFFINITY_TRAINING,
     path_size_bytes,
 )
+from .device_footprint import (
+    estimate_affinity_training_device_worker_gb,
+)
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -464,6 +467,27 @@ def run(argv=sys.argv[1:]):
         return main(args)
 
 
+def _estimate_training_per_worker_gb(args):
+    """Measurement-driven per-worker VRAM (GB) for this training run, or None.
+
+    Reads the hyperparameters YAML and counts the training rows (cheaply, one
+    column) to size the device-resident dataset tensor. Takes the max over the
+    configured architectures so the worker count fits the heaviest one. Any
+    failure returns None -> the planner uses the static profile default.
+    """
+    try:
+        hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
+        num_rows = len(pandas.read_csv(args.data, usecols=[0]))
+    except Exception:
+        return None
+    estimates = [
+        estimate_affinity_training_device_worker_gb(hyperparameters, num_rows)
+        for hyperparameters in (hyperparameters_lst or [])
+    ]
+    estimates = [gb for gb in estimates if gb is not None]
+    return max(estimates) if estimates else None
+
+
 def main(args):
     print("Arguments:")
     print(args)
@@ -473,6 +497,7 @@ def main(args):
     resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+        per_worker_gb=_estimate_training_per_worker_gb(args),
         workload_name=WORKLOAD_AFFINITY_TRAINING,
         workload_hints={"data_bytes": path_size_bytes(args.data)},
     )
