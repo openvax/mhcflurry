@@ -169,7 +169,7 @@ def test_fit_from_scores_trains_expected_variants():
     }
 
 
-def test_save_accepts_write_metadata_alias(tmp_path):
+def test_save_write_metadata_false_skips_metadata(tmp_path):
     predictor = Class1PresentationPredictor(
         metadata_dataframes={"extra": pandas.DataFrame({"x": [1]})})
 

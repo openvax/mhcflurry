@@ -175,7 +175,7 @@ def main(args):
         write_weights = False,
         write_percent_ranks = False,
         write_info = False,
-        write_metdata = False)
+        write_metadata = False)
     print("Done writing: ", args.out_models_dir)
 
     print("Optimizing affinity predictor.")
@@ -231,7 +231,7 @@ def main(args):
         write_weights = True,
         write_percent_ranks = True,
         write_info = True,
-        write_metdata = True)
+        write_metadata = True)
     write_generate_sh(args.out_models_dir)
     print("Wrote", args.out_models_dir)
 

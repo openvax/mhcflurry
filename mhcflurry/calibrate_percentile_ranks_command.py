@@ -109,7 +109,7 @@ parser.add_argument(
     type=int,
     metavar="N",
     default=25,
-    help="Used when calibrrating a presentation predictor. Number of genotypes"
+    help="Used when calibrating a presentation predictor. Number of genotypes"
     "to sample")
 parser.add_argument(
     "--alleles-per-genotype",
@@ -497,7 +497,7 @@ def run_class1_presentation_predictor(args, peptides):
         write_weights=False,
         write_percent_ranks=True,
         write_info=False,
-        write_metdata=False)
+        write_metadata=False)
     write_generate_sh(args.models_dir)
     print("Wrote predictor to: %s" % args.models_dir)
 

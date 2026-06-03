@@ -230,7 +230,7 @@ def run(argv=sys.argv[1:]):
             else derive_seed(master_seed, "held_out_fraction"))
         df = subselect_df_held_out(
             df,
-            recriprocal_held_out_fraction=args.held_out_fraction_reciprocal,
+            reciprocal_held_out_fraction=args.held_out_fraction_reciprocal,
             seed=held_out_seed % (2 ** 32))
 
     print("Training data: %s" % (str(df.shape)))
@@ -521,12 +521,12 @@ def train_model(
     return predictor
 
 
-def subselect_df_held_out(df, recriprocal_held_out_fraction=10, seed=0):
+def subselect_df_held_out(df, reciprocal_held_out_fraction=10, seed=0):
     df = df.copy()
     df["allele_peptide"] = df.allele + "_" + df.peptide
 
     kf = StratifiedKFold(
-        n_splits=recriprocal_held_out_fraction,
+        n_splits=reciprocal_held_out_fraction,
         shuffle=True,
         random_state=seed)
 
