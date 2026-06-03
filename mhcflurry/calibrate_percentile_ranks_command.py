@@ -55,6 +55,77 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # copy-on-write pages instead of receiving a pickled copy.
 GLOBAL_DATA = {}
 
+# Per-worker VRAM estimate constants for affinity calibration. The dominant
+# consumer of the GPU-batched fast path is the cached peptide-stage tensor —
+# peptide-side activations precomputed for the whole peptide universe and reused
+# across allele batches — sized ~ num_networks × stage_dim × num_peptides × 4.
+_CALIBRATION_STAGE_DTYPE_BYTES = 4
+_CALIBRATION_DEFAULT_STAGE_DIM = 1024  # when the encoding can't be derived
+_CALIBRATION_OVERHEAD_GB = 3.0         # model weights + activation headroom
+_CALIBRATION_MIN_DEVICE_WORKER_GB = 4.0  # don't over-pack from a tiny estimate
+_GIB = 1024.0 ** 3
+
+
+def _peptide_vector_encoding_width(name):
+    """Per-amino-acid feature width of a vector encoding, or None if unknown."""
+    if not name:
+        return None
+    try:
+        from .amino_acid import ENCODING_DATA_FRAMES
+        return int(ENCODING_DATA_FRAMES[name].shape[1])
+    except Exception:
+        return None
+
+
+def estimate_calibration_device_worker_gb(models_dir, prediction_rows):
+    """Estimate per-worker affinity-calibration VRAM (GB) from the model + job.
+
+    Reads only ``manifest.csv`` (no weights) to count networks and derive the
+    peptide-stage width, then sizes the cached-stage tensor for this run's
+    actual peptide universe (``prediction_rows``). Returns the estimate, or
+    ``None`` if the model can't be read — in which case the planner falls back
+    to the static workload-profile default. Measurement-driven so the worker
+    count adapts to small/large peptide universes and ensemble sizes instead of
+    a fixed assumption.
+    """
+    import json
+    from os.path import join, exists
+
+    manifest_path = join(models_dir, "manifest.csv")
+    if not prediction_rows or not exists(manifest_path):
+        return None
+    try:
+        manifest = pandas.read_csv(manifest_path)
+    except Exception:
+        return None
+    num_networks = max(len(manifest), 1)
+
+    stage_dim = _CALIBRATION_DEFAULT_STAGE_DIM
+    try:
+        hyperparameters = json.loads(
+            manifest.iloc[0]["config_json"]).get("hyperparameters", {})
+        dense = hyperparameters.get("peptide_dense_layer_sizes") or []
+        if dense:
+            stage_dim = int(dense[-1])
+        else:
+            encoding = hyperparameters.get("peptide_encoding", {})
+            max_length = int(encoding.get("max_length", 0))
+            width = _peptide_vector_encoding_width(
+                encoding.get("vector_encoding_name"))
+            if max_length and width:
+                stage_dim = max_length * width
+    except Exception:
+        pass
+
+    cache_gb = (
+        num_networks * stage_dim * int(prediction_rows)
+        * _CALIBRATION_STAGE_DTYPE_BYTES / _GIB
+    )
+    return max(
+        _CALIBRATION_MIN_DEVICE_WORKER_GB,
+        _CALIBRATION_OVERHEAD_GB + cache_gb)
+
+
 parser = argparse.ArgumentParser(usage=__doc__)
 parser.add_argument(
     "--predictor-kind",
@@ -244,9 +315,20 @@ def run(argv=sys.argv[1:]):
     prediction_rows = int(args.num_peptides_per_length) * max(num_lengths, 1)
     if args.predictor_kind == "class1_presentation":
         prediction_rows *= max(int(args.num_genotypes), 1)
+    # Measurement-driven per-worker VRAM for affinity calibration: size the
+    # cached peptide-stage tensor from the actual model + peptide universe
+    # rather than the static profile default. (The presentation fast path's
+    # footprint is different, so it keeps the profile default.) None falls back
+    # to the profile default inside the planner.
+    calibration_per_worker_gb = (
+        estimate_calibration_device_worker_gb(args.models_dir, prediction_rows)
+        if args.predictor_kind == "class1_affinity"
+        else None
+    )
     resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+        per_worker_gb=calibration_per_worker_gb,
         workload_name=(
             WORKLOAD_PRESENTATION_CALIBRATION
             if args.predictor_kind == "class1_presentation"
