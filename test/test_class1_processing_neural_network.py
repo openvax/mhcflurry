@@ -251,59 +251,6 @@ def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
     )
 
 
-def test_processing_torch_amino_acid_encoding_matches_vector_path():
-    """Processing models should expand amino-acid indices inside torch."""
-    common_hyperparameters = dict(
-        peptide_max_length=12,
-        n_flank_length=2,
-        c_flank_length=2,
-        flanking_averages=True,
-        convolutional_filters=4,
-        convolutional_kernel_size=3,
-        dropout_rate=0.0,
-        post_convolutional_dense_layer_sizes=[3],
-    )
-    legacy = Class1ProcessingNeuralNetwork(
-        amino_acid_encoding_torch=False,
-        **common_hyperparameters)
-    indexed = Class1ProcessingNeuralNetwork(
-        amino_acid_encoding_torch=True,
-        **common_hyperparameters)
-    legacy._network = legacy.make_network(
-        **legacy.network_hyperparameter_defaults.subselect(legacy.hyperparameters)
-    )
-    indexed._network = indexed.make_network(
-        **indexed.network_hyperparameter_defaults.subselect(indexed.hyperparameters)
-    )
-    indexed.network().set_weights_list(
-        legacy.network().get_weights_list(),
-        auto_convert_keras=False,
-    )
-
-    encoding = FlankingEncoding(
-        peptides=["SIINFEKL", "QCVSQCVS", "PEPTIDE"],
-        n_flanks=["AA", "QWERTY", ""],
-        c_flanks=["GG", "MNV", ""],
-    )
-    legacy_x = legacy.network_input(encoding)
-    indexed_x = indexed.network_input(encoding)
-
-    assert legacy_x["sequence"].shape == indexed_x["sequence"].shape + (21,)
-    assert indexed_x["sequence"].dtype == numpy.int8
-    numpy.testing.assert_allclose(
-        legacy.network()(dict(
-            sequence=torch.from_numpy(legacy_x["sequence"]).float(),
-            peptide_length=torch.from_numpy(
-                legacy_x["peptide_length"].copy()),
-        )).detach().numpy(),
-        indexed.network()(dict(
-            sequence=torch.from_numpy(indexed_x["sequence"]),
-            peptide_length=torch.from_numpy(
-                indexed_x["peptide_length"].copy()),
-        )).detach().numpy(),
-        rtol=1e-6,
-        atol=1e-6,
-    )
 
 
 def test_processing_peak_estimate_scales_with_conv_shape():

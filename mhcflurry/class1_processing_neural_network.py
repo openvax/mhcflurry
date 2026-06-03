@@ -6,6 +6,7 @@ import time
 import collections
 import gc
 import json
+import logging
 import numpy
 import torch
 import torch.nn as nn
@@ -497,6 +498,19 @@ class Class1ProcessingModel(nn.Module):
         return reordered
 
 
+_warned_legacy_sequence_vector_encoding = []
+
+
+def _warn_legacy_sequence_vector_encoding(value):
+    """Warn once that the legacy dense-vector sequence path is gone."""
+    if not _warned_legacy_sequence_vector_encoding:
+        _warned_legacy_sequence_vector_encoding.append(True)
+        logging.warning(
+            "amino_acid_encoding_torch=%r is deprecated and ignored: "
+            "processing-model sequences are always index-encoded and embedded "
+            "on device. The legacy dense-vector path has been removed.", value)
+
+
 class Class1ProcessingNeuralNetwork(object):
     """
     A neural network for antigen processing prediction
@@ -563,6 +577,13 @@ class Class1ProcessingNeuralNetwork(object):
         self.hyperparameters = self.hyperparameter_defaults.with_defaults(
             hyperparameters
         )
+        # The legacy dense-vector sequence encoding path is gone: sequences are
+        # always index-encoded and embedded on device. Coerce a falsy value to
+        # True (with a one-time deprecation warning) so existing configs load.
+        if not self.hyperparameters.get("amino_acid_encoding_torch"):
+            _warn_legacy_sequence_vector_encoding(
+                self.hyperparameters.get("amino_acid_encoding_torch"))
+            self.hyperparameters["amino_acid_encoding_torch"] = True
         self._network = None
         self.network_json = None
         self.network_weights = None

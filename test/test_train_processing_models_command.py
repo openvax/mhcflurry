@@ -16,7 +16,6 @@ import pandas
 
 from mhcflurry.class1_processing_predictor import Class1ProcessingPredictor
 from mhcflurry.common import random_peptides
-import mhcflurry.train_processing_models_command as train_processing_models_command
 from mhcflurry.train_processing_models_command import estimate_processing_worker_gb
 
 from mhcflurry.testing_utils import cleanup, startup
@@ -188,48 +187,6 @@ def test_processing_worker_estimate_uses_data_and_architecture(tmp_path):
     assert estimate >= 4.0
 
 
-def test_processing_worker_estimate_counts_torch_indices_not_one_hot(
-        tmp_path, monkeypatch):
-    class FakeRows:
-        def __len__(self):
-            return 10_000_000
-
-    monkeypatch.setattr(
-        train_processing_models_command.pandas,
-        "read_csv",
-        lambda *args, **kwargs: FakeRows())
-
-    data = tmp_path / "training.csv"
-    data.write_text("peptide\nSIINFEKL\n")
-    hyperparameters = tmp_path / "hyperparameters.yaml"
-
-    common = {
-        "minibatch_size": 512,
-        "n_flank_length": 15,
-        "c_flank_length": 15,
-        "convolutional_filters": 512,
-    }
-
-    hyperparameters.write_text(json.dumps([
-        dict(common, amino_acid_encoding_torch=True),
-    ]))
-    categorical_estimate = estimate_processing_worker_gb(SimpleNamespace(
-        data=str(data),
-        hyperparameters=str(hyperparameters),
-    ))
-
-    hyperparameters.write_text(json.dumps([
-        dict(common, amino_acid_encoding_torch=False),
-    ]))
-    one_hot_estimate = estimate_processing_worker_gb(SimpleNamespace(
-        data=str(data),
-        hyperparameters=str(hyperparameters),
-    ))
-
-    assert categorical_estimate is not None
-    assert one_hot_estimate is not None
-    assert categorical_estimate < 8.0
-    assert one_hot_estimate > categorical_estimate * 8
 
 
 def Xtest_run_parallel():
