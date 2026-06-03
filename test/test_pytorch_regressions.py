@@ -263,8 +263,8 @@ def test_validation_split_is_fixed_when_lr_zero():
 
 
 def test_dropout_probability_is_keep_prob():
-    nn = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
-    peptide_shape = nn.peptides_to_network_input([]).shape[1:]
+    # Pre-encoded (L, V) peptide shape directly (encoding path is index-only).
+    peptide_shape = (15, 21)
     model = Class1NeuralNetworkModel(
         peptide_encoding_shape=peptide_shape,
         dropout_probability=0.8,
@@ -275,8 +275,8 @@ def test_dropout_probability_is_keep_prob():
 
 
 def test_batch_norm_uses_keras_defaults():
-    nn = Class1NeuralNetwork(peptide_amino_acid_encoding_torch=False)
-    peptide_shape = nn.peptides_to_network_input([]).shape[1:]
+    # Pre-encoded (L, V) peptide shape directly (encoding path is index-only).
+    peptide_shape = (15, 21)
     model = Class1NeuralNetworkModel(
         peptide_encoding_shape=peptide_shape,
         batch_normalization=True,

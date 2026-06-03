@@ -548,36 +548,53 @@ _DEVICE_PEPTIDE_ENCODING_FALSE_VALUES = {
     "legacy",
 }
 
+_warned_legacy_peptide_vector_encoding = []
+
+
+def _warn_legacy_peptide_vector_encoding(value):
+    """Warn once that the legacy dense-vector peptide path is gone."""
+    if not _warned_legacy_peptide_vector_encoding:
+        _warned_legacy_peptide_vector_encoding.append(True)
+        logging.warning(
+            "peptide_amino_acid_encoding_torch=%r is deprecated and ignored: "
+            "peptides are always index-encoded ((N, L) int8) and embedded on "
+            "device via a frozen table. The legacy dense-vector peptide "
+            "encoding path has been removed.", value)
+
 
 def _peptide_torch_encoding_name(hyperparameters):
-    """Return the fixed amino-acid encoding to materialize in torch.
+    """Return the fixed amino-acid encoding for the peptide embedding table.
 
-    ``peptide_amino_acid_encoding_torch`` controls whether peptide amino-acid
-    indices are widened to fixed vectors in torch. The implementation is
-    device-agnostic: CUDA, MPS, and CPU all use the same frozen
-    ``torch.nn.functional.embedding`` table once enabled. The table comes
-    from ``amino_acid.get_vector_encoding_df`` and is registered as a
-    non-persistent buffer, so it moves with ``.to(device)`` but never trains
-    or bloats the custom NPZ weight list.
+    Peptides are always index-encoded ((N, L) int8) and embedded via a frozen
+    ``torch.nn.functional.embedding`` table (device-agnostic: CUDA/MPS/CPU). The
+    table comes from ``amino_acid.get_vector_encoding_df`` and is registered as
+    a non-persistent buffer, so it moves with ``.to(device)`` but never trains
+    or bloats the NPZ weight list.
+
+    The legacy ``peptide_amino_acid_encoding_torch=False`` dense-vector path has
+    been removed; a falsy value is accepted but ignored (with a one-time
+    deprecation warning) so older configs still load. A non-default value names
+    the encoding directly; an unknown name still raises.
     """
     mode = hyperparameters.get("peptide_amino_acid_encoding_torch", True)
     if isinstance(mode, str):
         mode_normalized = mode.strip().lower()
         if mode_normalized in _DEVICE_PEPTIDE_ENCODING_FALSE_VALUES:
-            return None
-        try:
-            amino_acid.get_vector_encoding_df(mode)
-            return mode
-        except KeyError:
-            pass
-        if mode_normalized not in _DEVICE_PEPTIDE_ENCODING_TRUE_VALUES:
-            raise ValueError(
-                "Unsupported peptide_amino_acid_encoding_torch value %r. "
-                "Expected bool, a true/false string, or one of %s."
-                % (mode, sorted(amino_acid.ENCODING_DATA_FRAMES))
-            )
+            _warn_legacy_peptide_vector_encoding(mode)
+        else:
+            try:
+                amino_acid.get_vector_encoding_df(mode)
+                return mode
+            except KeyError:
+                pass
+            if mode_normalized not in _DEVICE_PEPTIDE_ENCODING_TRUE_VALUES:
+                raise ValueError(
+                    "Unsupported peptide_amino_acid_encoding_torch value %r. "
+                    "Expected bool, a true/false string, or one of %s."
+                    % (mode, sorted(amino_acid.ENCODING_DATA_FRAMES))
+                )
     elif not mode:
-        return None
+        _warn_legacy_peptide_vector_encoding(mode)
 
     peptide_encoding = hyperparameters.get("peptide_encoding", {})
     encoding_name = peptide_encoding.get("vector_encoding_name", "BLOSUM62")
@@ -585,16 +602,16 @@ def _peptide_torch_encoding_name(hyperparameters):
         amino_acid.get_vector_encoding_df(encoding_name)
     except KeyError:
         raise ValueError(
-            "peptide_amino_acid_encoding_torch requires a fixed peptide "
-            "vector encoding with a torch lookup table; got %r. Available: %s"
+            "Peptide encoding requires a fixed vector encoding with a torch "
+            "lookup table; got %r. Available: %s"
             % (encoding_name, sorted(amino_acid.ENCODING_DATA_FRAMES))
         ) from None
     return encoding_name
 
 
 def _peptide_uses_torch_encoding(hyperparameters):
-    """Return True when peptide vectors are produced by torch embedding."""
-    return _peptide_torch_encoding_name(hyperparameters) is not None
+    """Deprecated: peptides are always index-encoded now (always True)."""
+    return True
 
 
 def _peptide_torch_encoding_table(encoding_name):
@@ -632,26 +649,20 @@ def peptide_sequences_to_network_input(
         peptide_amino_acid_encoding_torch=True):
     """Encode peptide strings to the representation consumed by a network.
 
-    This is the central peptide-only string-to-array conversion. When torch
-    amino-acid encoding is enabled it returns compact ``(N, L)`` int8
-    amino-acid indices; the fixed-vector lookup then happens through the
-    network's frozen torch embedding table. When disabled it returns the
-    legacy ``(N, L, V)`` numpy vector encoding for compatibility.
+    This is the central peptide-only string-to-array conversion. Peptides are
+    always returned as compact ``(N, L)`` int8 amino-acid indices; the
+    fixed-vector lookup then happens through the network's frozen torch
+    embedding table. (``peptide_amino_acid_encoding_torch`` is accepted for
+    config compatibility but the legacy dense-vector path is gone.)
     """
+    if not peptide_amino_acid_encoding_torch:
+        _warn_legacy_peptide_vector_encoding(peptide_amino_acid_encoding_torch)
     encoder = EncodableSequences.create(peptides)
-    hyperparameters = {
-        "peptide_encoding": peptide_encoding,
-        "peptide_amino_acid_encoding_torch": peptide_amino_acid_encoding_torch,
-    }
-    if _peptide_uses_torch_encoding(hyperparameters):
-        return (
-            encoder.variable_length_to_fixed_length_categorical(
-                **_categorical_kwargs_for_peptide_encoding(peptide_encoding)
-            )
-            .astype("int8", copy=False)
+    return (
+        encoder.variable_length_to_fixed_length_categorical(
+            **_categorical_kwargs_for_peptide_encoding(peptide_encoding)
         )
-    return encoder.variable_length_to_fixed_length_vector_encoding(
-        **peptide_encoding
+        .astype("int8", copy=False)
     )
 
 

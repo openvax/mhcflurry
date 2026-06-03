@@ -198,45 +198,6 @@ def test_pretrain_network_input_iterator_compact_torch_indices(tmp_path):
     assert y.shape == (4,)
 
 
-@pytest.mark.parametrize("torch_encoding_mode", ["false", "0", "numpy"])
-def test_pretrain_network_input_iterator_torch_false_aliases_use_vectors(
-        tmp_path, torch_encoding_mode):
-    df = pandas.DataFrame(
-        {
-            "HLA-A*01:01": [100.0, 200.0, 300.0],
-            "HLA-A*02:01": [150.0, 250.0, 350.0],
-        },
-        index=["SIINFEKL", "LLFGYPVYV", "KLGGALQAK"],
-    )
-    filename = tmp_path / "pretrain.csv"
-    df.to_csv(filename)
-
-    master_allele_encoding = AlleleEncoding(
-        ["HLA-A*01:01", "HLA-A*02:01"],
-        allele_to_sequence={
-            "HLA-A*01:01": "A" * 34,
-            "HLA-A*02:01": "C" * 34,
-        },
-    )
-
-    iterator = pretrain_network_input_iterator(
-        str(filename),
-        master_allele_encoding,
-        peptide_encoding={
-            "alignment_method": "left_pad_centered_right_pad",
-            "max_length": 15,
-            "vector_encoding_name": "BLOSUM62",
-        },
-        peptides_per_chunk=2,
-        compact_peptide_repeats=True,
-        peptide_amino_acid_encoding_torch=torch_encoding_mode,
-    )
-    x_dict, y = next(iterator)
-
-    assert x_dict["peptide"].shape == (2, 45, 21)
-    assert x_dict["allele"].shape == (4,)
-    assert x_dict["peptide_repeat_count"] == 2
-    assert y.shape == (4,)
 
 
 def run_and_check(n_jobs=0, delete=True, additional_args=[]):

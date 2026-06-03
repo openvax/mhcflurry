@@ -248,124 +248,8 @@ def test_split_forward_matches_full_forward():
     )
 
 
-@pytest.mark.parametrize(
-    "encoding_name",
-    [
-        "BLOSUM62",
-        "one-hot",
-        "physchem",
-        "PMBEC",
-        "contact",
-        "BLOSUM62+physchem",
-        "PMBEC+contact",
-        "PMBEC:minmax+contact:minmax",
-    ],
-)
-def test_peptide_amino_acid_encoding_torch_forward_parity(encoding_name):
-    """Torch-side fixed peptide encoding must match CPU-side encoding.
-
-    With weights fixed and identical between a legacy (BLOSUM-encoded
-    input) model and an index-encoded model, both forward passes must
-    produce bit-identical outputs — the torch embedding lookup is
-    mathematically the same op as the CPU-side fixed-vector table lookup.
-    """
-    import torch
-    from mhcflurry.amino_acid import get_vector_encoding_df
-
-    base_hparams = dict(
-        activation="tanh",
-        layer_sizes=[8],
-        peptide_encoding={
-            "vector_encoding_name": encoding_name,
-            "alignment_method": "pad_middle",
-            "left_edge": 4,
-            "right_edge": 4,
-            "max_length": 15,
-        },
-        validation_split=0.0,
-        early_stopping=False,
-        locally_connected_layers=[
-            {"filters": 4, "activation": "tanh", "kernel_size": 3}
-        ],
-        dense_layer_l1_regularization=0.0,
-        dropout_probability=0.0,
-    )
-
-    peptides = random_peptides(16, length=9)
-
-    # Legacy path (flag off) — peptides encoded as (N, L, V) numpy vectors.
-    legacy = Class1NeuralNetwork(
-        peptide_amino_acid_encoding_torch=False,
-        **base_hparams
-    )
-    legacy._network = legacy.make_network(
-        allele_representations=None,
-        **legacy.network_hyperparameter_defaults.subselect(legacy.hyperparameters),
-    )
-    legacy_input = legacy.peptides_to_network_input(peptides)
-    assert legacy_input.ndim == 3
-    assert legacy_input.shape[-1] == get_vector_encoding_df(encoding_name).shape[1]
-
-    # Torch path (default) — peptides encoded as (N, L) int indices.
-    onpath = Class1NeuralNetwork(**base_hparams)
-    onpath._network = onpath.make_network(
-        allele_representations=None,
-        **onpath.network_hyperparameter_defaults.subselect(onpath.hyperparameters),
-    )
-    assert onpath._network.peptide_input_vector_encoding_name == encoding_name
-    onpath_input = onpath.peptides_to_network_input(peptides)
-    assert onpath_input.ndim == 2
-    assert numpy.issubdtype(onpath_input.dtype, numpy.integer)
-    assert "peptide_embedding_table" not in onpath._network.state_dict()
-    assert len(onpath._network.get_weights_list()) == len(
-        legacy._network.get_weights_list()
-    )
-
-    # Copy legacy weights into onpath so the only difference is the
-    # embedding expansion — forward outputs must match bit-identically.
-    onpath._network.load_state_dict(legacy._network.state_dict(), strict=False)
-
-    with torch.no_grad():
-        legacy_out = legacy._network({
-            "peptide": torch.from_numpy(legacy_input.astype(numpy.float32))
-        })
-        onpath_out = onpath._network({
-            "peptide": torch.from_numpy(onpath_input)
-        })
-
-    testing.assert_allclose(
-        legacy_out.numpy(), onpath_out.numpy(), rtol=0, atol=1e-6,
-        err_msg="Torch-side fixed peptide encoding must match the "
-                "legacy CPU-side vector-encoded forward bit-identically",
-    )
 
 
-def test_peptide_torch_encoding_preserves_index_encoding_options():
-    """Index path must preserve trim / unsupported-amino-acid semantics."""
-    from mhcflurry.amino_acid import get_vector_encoding_df
-
-    base_encoding = {
-        "vector_encoding_name": "BLOSUM62",
-        "alignment_method": "right_pad",
-        "max_length": 5,
-        "trim": True,
-        "allow_unsupported_amino_acids": True,
-    }
-    peptides = ["ACDZFGH"]
-    legacy = Class1NeuralNetwork(
-        peptide_encoding=base_encoding,
-        peptide_amino_acid_encoding_torch=False,
-    )
-    onpath = Class1NeuralNetwork(
-        peptide_encoding=base_encoding,
-    )
-
-    legacy_input = legacy.peptides_to_network_input(peptides)
-    onpath_indices = onpath.peptides_to_network_input(peptides)
-    table = get_vector_encoding_df("BLOSUM62").to_numpy()
-    expanded = table[onpath_indices]
-
-    testing.assert_allclose(legacy_input, expanded)
 
 
 def test_peptide_amino_acid_encoding_torch_default_and_legacy_alias():
@@ -389,52 +273,24 @@ def test_peptide_amino_acid_encoding_torch_default_and_legacy_alias():
         1, 15,
     )
 
-    explicit_numpy = Class1NeuralNetwork(
+    # The legacy dense-vector path is gone: a falsy value (and the old
+    # ``_gpu`` alias) is accepted but coerced to index encoding, not (N, L, V).
+    legacy_false = Class1NeuralNetwork(
         peptide_encoding=encoding,
         peptide_amino_acid_encoding_torch=False,
     )
-    assert not explicit_numpy.uses_peptide_torch_encoding()
-    assert explicit_numpy.peptides_to_network_input(["SIINFEKL"]).shape == (
-        1, 15, 21,
-    )
+    assert legacy_false.uses_peptide_torch_encoding()
+    assert legacy_false.peptides_to_network_input(["SIINFEKL"]).shape == (1, 15)
 
     legacy_alias = Class1NeuralNetwork(
         peptide_encoding=encoding,
         peptide_amino_acid_encoding_gpu=False,
     )
-    assert not legacy_alias.uses_peptide_torch_encoding()
+    assert legacy_alias.uses_peptide_torch_encoding()
     assert "peptide_amino_acid_encoding_gpu" not in legacy_alias.hyperparameters
-    assert legacy_alias.hyperparameters["peptide_amino_acid_encoding_torch"] is False
+    assert legacy_alias.peptides_to_network_input(
+        ["SIINFEKL"]).shape == (1, 15)
 
-
-def test_vector_encoded_random_negatives_use_shape_compatible_pool():
-    peptides = random_peptides(12, length=9)
-    affinities = numpy.random.uniform(10, 50000, len(peptides))
-    predictor = Class1NeuralNetwork(
-        peptide_amino_acid_encoding_torch=False,
-        activation="tanh",
-        layer_sizes=[4],
-        locally_connected_layers=[],
-        peptide_dense_layer_sizes=[],
-        allele_dense_layer_sizes=[],
-        dropout_probability=0.0,
-        batch_normalization=False,
-        dense_layer_l1_regularization=0.0,
-        dense_layer_l2_regularization=0.0,
-        max_epochs=1,
-        early_stopping=False,
-        validation_split=0.0,
-        minibatch_size=4,
-        random_negative_rate=1.0,
-        random_negative_constant=0,
-        random_negative_pool_epochs=1,
-    )
-
-    predictor.fit(peptides, affinities, verbose=0)
-
-    fit_info = predictor.fit_info[-1]
-    assert fit_info["random_negative_pool_residency"] == "host"
-    assert fit_info["fit_tensor_residency"] == "device"
 
 
 def test_unsupported_device_random_negative_alignment_falls_back_to_host():

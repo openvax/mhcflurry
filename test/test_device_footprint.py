@@ -102,18 +102,6 @@ def test_training_is_base_dominated_for_index_encoded_peptides():
     assert training_gb(RELEASE_HYPERPARAMETERS, 0) is None
 
 
-def test_training_legacy_vector_path_scales_with_dataset():
-    # If the torch index-encoding is disabled, peptides are float32 vectors
-    # device-resident, so the footprint DOES scale strongly with dataset size.
-    legacy = dict(RELEASE_HYPERPARAMETERS,
-                  peptide_amino_acid_encoding_torch=False)
-    release = training_gb(legacy, RELEASE_TRAINING_ROWS)
-    large = training_gb(legacy, 5000000)
-    assert large > release + 5.0
-    # ...and is larger than the index-encoded estimate for the same dataset.
-    assert release > training_gb(RELEASE_HYPERPARAMETERS, RELEASE_TRAINING_ROWS)
-
-
 # --------------------------------------------------------------------------
 # Unified dispatcher
 # --------------------------------------------------------------------------

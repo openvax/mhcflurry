@@ -68,8 +68,7 @@ _TRAINING_RANDOM_NEGATIVE_FACTOR = 2.0
 # Forward activations + gradients + backward working set, as a multiple of the
 # single-forward activation bytes.
 _TRAINING_ACTIVATION_BACKWARD_FACTOR = 3.0
-_PEPTIDE_INDEX_BYTES = 1  # int8 per position when index-encoded
-_PEPTIDE_ENCODING_FALSE_VALUES = {"false", "no", "off", "0", "none", ""}
+_PEPTIDE_INDEX_BYTES = 1  # int8 per position (peptides are always index-encoded)
 _TRAINING_DEFAULT_MINIBATCH = 128
 _TRAINING_DEFAULT_MERGE_WIDTH = 1024      # when layer widths can't be derived
 # Applied to the whole estimate; keeps margin over the measured peak.
@@ -125,23 +124,10 @@ def _peptide_stage_dim(hyperparameters):
     return None
 
 
-def _peptides_are_index_encoded(hyperparameters):
-    """True when peptides live device-resident as compact int8 indices.
-
-    Mirrors ``_peptide_torch_encoding_name``: the
-    ``peptide_amino_acid_encoding_torch`` knob defaults to True, and any value
-    that isn't an explicit false disables nothing — peptides are stored as
-    ``(N, L)`` int8 and embedded per-batch.
-    """
-    mode = hyperparameters.get("peptide_amino_acid_encoding_torch", True)
-    if isinstance(mode, str):
-        return mode.strip().lower() not in _PEPTIDE_ENCODING_FALSE_VALUES
-    return bool(mode)
-
-
 def _peptide_embedded_row_bytes(hyperparameters):
     """Bytes for one peptide's embedded ``(L, V) float32`` representation (the
-    per-batch activation, regardless of how it is stored resident), or None."""
+    per-batch activation; peptides are stored resident as int8 indices and
+    embedded on the fly), or None."""
     encoding = hyperparameters.get("peptide_encoding", {})
     max_length = int(encoding.get("max_length", 0) or 0)
     width = _peptide_vector_encoding_width(encoding.get("vector_encoding_name"))
@@ -151,21 +137,15 @@ def _peptide_embedded_row_bytes(hyperparameters):
 
 
 def _peptide_resident_row_bytes(hyperparameters):
-    """Bytes for one peptide's *device-resident* encoding, or None.
+    """Bytes for one peptide's device-resident encoding, or None.
 
-    Index-encoded (the default): ``L`` int8 bytes. Legacy fixed-vector path:
-    ``L x V x 4`` float32 bytes.
+    Peptides are always index-encoded: ``L`` int8 bytes (one per position).
     """
     encoding = hyperparameters.get("peptide_encoding", {})
     max_length = int(encoding.get("max_length", 0) or 0)
     if not max_length:
         return None
-    if _peptides_are_index_encoded(hyperparameters):
-        return max_length * _PEPTIDE_INDEX_BYTES
-    width = _peptide_vector_encoding_width(encoding.get("vector_encoding_name"))
-    if width:
-        return max_length * width * _FLOAT32_BYTES
-    return None
+    return max_length * _PEPTIDE_INDEX_BYTES
 
 
 def _merge_width(hyperparameters):
