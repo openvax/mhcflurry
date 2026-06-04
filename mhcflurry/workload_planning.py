@@ -500,6 +500,15 @@ def _is_auto(value):
 def _clip_auto_num_jobs_to_host_memory(
         num_jobs, max_workers_per_gpu, num_gpus, was_auto_mwpg,
         memory, memory_plan, warnings, dataloader_num_workers=0):
+    """Clamp an auto-resolved ``num_jobs`` to what host RAM can support.
+
+    Returns ``(num_jobs, max_workers_per_gpu, host_cap)``. ``host_cap`` is
+    ``None`` when no clamp was applied (the input fit within memory); when a
+    clamp happens it is the host-memory worker cap, which equals the returned
+    ``num_jobs``. Callers use a non-None ``host_cap`` to report capacity as the
+    clamped worker count rather than re-deriving it from the (ceil-rounded)
+    ``max_workers_per_gpu``.
+    """
     cap = host_memory_num_jobs_cap(
         memory,
         memory_plan["host_worker_gb"],
@@ -669,19 +678,23 @@ def plan_local_parallelism(
     if num_jobs_was_auto:
         num_jobs = capacity
         if cap_auto_num_jobs and num_jobs > 0:
-            num_jobs, max_workers_per_gpu, _ = _clip_auto_num_jobs_to_host_memory(
-                num_jobs,
-                max_workers_per_gpu,
-                gpus,
-                mwpg_was_auto,
-                memory,
-                memory_plan,
-                warnings,
+            num_jobs, max_workers_per_gpu, host_cap = (
+                _clip_auto_num_jobs_to_host_memory(
+                    num_jobs,
+                    max_workers_per_gpu,
+                    gpus,
+                    mwpg_was_auto,
+                    memory,
+                    memory_plan,
+                    warnings,
+                )
             )
-            capacity = (
-                int(auto_num_jobs(gpus, max_workers_per_gpu))
-                if backend in ("auto", "gpu") else 0
-            )
+            if host_cap is not None and backend in ("auto", "gpu"):
+                # Host memory is now the binding constraint, so report the
+                # clamped worker count as capacity. Recomputing
+                # gpus * ceil(num_jobs / gpus) here would over-report (e.g.
+                # num_jobs=5 on 2 GPUs -> mwpg=3 -> capacity=6 > num_jobs).
+                capacity = int(num_jobs)
     else:
         num_jobs = int(num_jobs_raw)
         cli_overrides.append("num_jobs")
@@ -734,20 +747,24 @@ def plan_local_parallelism(
                 cap_auto_num_jobs
                 and num_jobs_was_auto
                 and int(num_jobs) > host_memory_cap):
-            num_jobs, max_workers_per_gpu, _ = _clip_auto_num_jobs_to_host_memory(
-                num_jobs,
-                max_workers_per_gpu,
-                gpus,
-                mwpg_was_auto,
-                memory,
-                memory_plan,
-                warnings,
-                dataloader_num_workers=dataloader_num_workers,
+            num_jobs, max_workers_per_gpu, host_cap = (
+                _clip_auto_num_jobs_to_host_memory(
+                    num_jobs,
+                    max_workers_per_gpu,
+                    gpus,
+                    mwpg_was_auto,
+                    memory,
+                    memory_plan,
+                    warnings,
+                    dataloader_num_workers=dataloader_num_workers,
+                )
             )
-            capacity = (
-                int(auto_num_jobs(gpus, max_workers_per_gpu))
-                if backend in ("auto", "gpu") else 0
-            )
+            if host_cap is not None and backend in ("auto", "gpu"):
+                # Host memory is now the binding constraint, so report the
+                # clamped worker count as capacity. Recomputing
+                # gpus * ceil(num_jobs / gpus) here would over-report (e.g.
+                # num_jobs=5 on 2 GPUs -> mwpg=3 -> capacity=6 > num_jobs).
+                capacity = int(num_jobs)
             effective_fit_workers = max(1, int(num_jobs))
             if int(num_jobs) <= 0 and gpus > 0:
                 effective_fit_workers = 1

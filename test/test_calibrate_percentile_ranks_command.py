@@ -8,10 +8,12 @@ import tempfile
 import subprocess
 import pytest
 import sys
+from types import SimpleNamespace
 
 import numpy
 
 from mhcflurry import Class1AffinityPredictor
+from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
 from mhcflurry.downloads import get_path
 from mhcflurry.percent_rank_transform import PercentRankTransform
 from .pytest_helpers import mhcflurry_cli
@@ -181,30 +183,64 @@ def test_list_percent_rank_status_stdout_starts_with_csv_header(
     assert "random seed" not in stdout
 
 
-def test_filter_canonicalizable_alleles_used_through_shared_selector():
-    """Both predictor kinds use the same canonicalizable-allele selector.
+class FakeAffinityPredictorForAlleleSelection(object):
+    supported_alleles = ["HLA-A*02:01", "HLA-B*07:02"]
 
-    Without coverage on both, a presentation-predictor calibration with a
-    pseudogene allele in its coverage map would crash partway through the
-    same way the affinity path used to. The predictor-specific entry points
-    intentionally delegate allele selection to ``requested_calibration_alleles``
-    so the filter is not duplicated.
-    """
-    import inspect
-    from mhcflurry import calibrate_percentile_ranks_command as mod
+    def __init__(self):
+        self.canonicalized = []
 
-    affinity_src = inspect.getsource(mod.run_class1_affinity_predictor)
-    presentation_src = inspect.getsource(mod.run_class1_presentation_predictor)
-    selector_src = inspect.getsource(mod.requested_calibration_alleles)
-    assert "requested_calibration_alleles" in affinity_src, (
-        "affinity calibration path must call the shared allele selector"
+    def canonicalize_allele_name(self, allele):
+        self.canonicalized.append(allele)
+        return "canonical-%s" % allele
+
+
+def test_requested_calibration_alleles_uses_presentation_affinity_predictor():
+    from mhcflurry.calibrate_percentile_ranks_command import (
+        requested_calibration_alleles,
     )
-    assert "requested_calibration_alleles" in presentation_src, (
-        "presentation calibration path must call the shared allele selector"
+
+    affinity_predictor = FakeAffinityPredictorForAlleleSelection()
+    predictor = Class1PresentationPredictor(
+        affinity_predictor=affinity_predictor)
+    args = SimpleNamespace(
+        allele=["HLA-A*02:01", "HLA-B*07:02"],
+        alleles_file=None,
     )
-    assert "filter_canonicalizable_alleles" in selector_src, (
-        "shared allele selector must filter predictor-supported alleles"
+
+    assert not hasattr(predictor, "canonicalize_allele_name")
+    assert requested_calibration_alleles(args, predictor) == [
+        "canonical-HLA-A*02:01",
+        "canonical-HLA-B*07:02",
+    ]
+    assert affinity_predictor.canonicalized == [
+        "HLA-A*02:01",
+        "HLA-B*07:02",
+    ]
+
+
+def test_requested_calibration_alleles_file_uses_presentation_affinity_predictor(
+        tmp_path):
+    from mhcflurry.calibrate_percentile_ranks_command import (
+        requested_calibration_alleles,
     )
+
+    alleles_file = tmp_path / "alleles.csv"
+    alleles_file.write_text(
+        "allele\nHLA-A*02:01\nCaja-B5*01:01ps\nHLA-B*07:02\n")
+
+    affinity_predictor = FakeAffinityPredictorForAlleleSelection()
+    predictor = Class1PresentationPredictor(
+        affinity_predictor=affinity_predictor)
+    args = SimpleNamespace(allele=None, alleles_file=str(alleles_file))
+
+    assert requested_calibration_alleles(args, predictor) == [
+        "canonical-HLA-A*02:01",
+        "canonical-HLA-B*07:02",
+    ]
+    assert affinity_predictor.canonicalized == [
+        "HLA-A*02:01",
+        "HLA-B*07:02",
+    ]
 
 
 def test_filter_canonicalizable_alleles_memoizes_repeats():

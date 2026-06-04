@@ -9,6 +9,8 @@ integration suites, not here.
 import argparse
 import json
 import os
+import sys
+import types
 
 import pandas
 import pytest
@@ -137,6 +139,38 @@ def test_subsubcommand_help_shows_full_prog(capsys):
         cli_main.main(["pseudosequences", "filename", "--help"])
     captured = capsys.readouterr().out
     assert "usage: mhcflurry pseudosequences filename" in captured, captured
+
+
+def test_artifact_subcommand_preserves_recorded_argv(monkeypatch, tmp_path):
+    """Artifact commands dispatched through ``mhcflurry`` must record a
+    split executable + subcommand in GENERATE.sh, not a single argv[0]
+    containing a space."""
+    from mhcflurry.common import write_generate_sh
+
+    out_dir = tmp_path / "models"
+    module = types.ModuleType("test_cli_fake_artifact_command")
+
+    def run(argv):
+        assert argv == ["--out-dir", str(out_dir)]
+        os.makedirs(str(out_dir))
+        write_generate_sh(str(out_dir), mhcflurry_version="9.9.9-test")
+        return 0
+
+    module.run = run
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    monkeypatch.setitem(
+        cli_main._SUBCOMMANDS,
+        "fake-artifact",
+        (module.__name__, "run", "Fake artifact-producing command."),
+    )
+    monkeypatch.setattr(
+        sys, "argv", ["mhcflurry", "fake-artifact", "--out-dir", str(out_dir)])
+
+    assert cli_main.main(sys.argv[1:]) == 0
+
+    contents = (out_dir / "GENERATE.sh").read_text()
+    assert "'mhcflurry fake-artifact'" not in contents
+    assert "mhcflurry \\\n    fake-artifact" in contents
 
 
 def test_rewrite_parser_prog_restores_on_exit(capsys):

@@ -82,11 +82,35 @@ class RandomNegativePeptides(object):
         peptide_lengths = peptides.str.len()
 
         if self.hyperparameters['random_negative_match_distribution']:
-            self.aa_distribution = amino_acid_distribution(
+            distribution = amino_acid_distribution(
                 peptides.values,
                 smoothing=self.hyperparameters[
                     'random_negative_distribution_smoothing'
                 ])
+            # Random negatives are decoys over the common amino acids. Drop X
+            # (and anything else mapping to the X/unknown index) and
+            # renormalize so the host sampler (random_peptides over this
+            # distribution) and the device sampler
+            # (aa_distribution_to_index_weights, which already excludes X)
+            # agree. Without this, training peptides containing X would let
+            # the host path emit X in negatives while the device path never
+            # would.
+            keep = [
+                letter for letter in distribution.index
+                if amino_acid.AMINO_ACID_INDEX.get(letter) != amino_acid.X_INDEX
+            ]
+            distribution = distribution.loc[keep]
+            total = distribution.sum()
+            if total <= 0:
+                # Only reachable if every residue in every training peptide is
+                # X (or otherwise maps to the unknown index) — there are no
+                # common amino acids left to sample random negatives from.
+                raise ValueError(
+                    "Cannot match random-negative amino acid distribution: "
+                    "the training peptides contain no common amino acids "
+                    "(every residue mapped to X after dropping the unknown "
+                    "index).")
+            self.aa_distribution = distribution / total
             logging.info(
                 "Using amino acid distribution for random negative:\n%s" % (
                     str(self.aa_distribution.to_dict())))
@@ -554,10 +578,16 @@ def _place_indices_with_alignment(
     """
     L = int(length)
     if alignment == "left_pad_centered_right_pad":
-        if L < 1 or L > int(max_length):
+        # Mirror the reference encoder, which arbitrarily sets a minimum
+        # length of 5 for this alignment (see
+        # EncodableSequences.sequences_to_fixed_length_index_encoded_array).
+        # Keeping the same floor means the device path rejects exactly the
+        # lengths the host path would, rather than silently accepting 1..4.
+        min_length = 5
+        if L < min_length or L > int(max_length):
             raise ValueError(
-                "left_pad_centered_right_pad requires 1 <= length <= "
-                "max_length=%d; got %d" % (max_length, L)
+                "left_pad_centered_right_pad requires %d <= length <= "
+                "max_length=%d; got %d" % (min_length, max_length, L)
             )
         out_rows[:, :L] = block
         out_rows[:, -L:] = block

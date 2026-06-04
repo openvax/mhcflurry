@@ -1554,6 +1554,20 @@ def worker_pool_with_gpu_assignments_from_args(
         workload_hints=workload_hints,
     )
 
+    # --gpus only takes effect when there are worker processes to assign it to.
+    # A serial run (num_jobs == 0) ignores it. Warn when the user *explicitly*
+    # asked for GPUs but ends up serial, so "--gpus 4 --num-jobs 0" doesn't
+    # silently drop the GPU request. (The auto path legitimately resolves gpus
+    # alongside num_jobs == 0 on CPU-only boxes, so don't warn there.)
+    if (args.num_jobs == 0
+            and args.gpus
+            and not getattr(args, "gpus_was_auto", False)):
+        print(
+            "Warning: --gpus %d is ignored because num_jobs resolved to 0 "
+            "(serial run). Pass --num-jobs > 0 to fan out across the "
+            "requested GPUs." % args.gpus,
+            file=sys.stderr)
+
     return worker_pool_with_gpu_assignments(
         num_jobs=args.num_jobs,
         num_gpus=args.gpus,

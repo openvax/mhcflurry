@@ -43,6 +43,13 @@ _PRESENTATION_PREDICT_TARGET_ROWS = int(
 _PRESENTATION_LOGISTIC_REGRESSION_KWARGS = {
     # The presentation combiner has a tiny dense feature matrix; Newton-CG is
     # deterministic and avoids sklearn's SciPy L-BFGS-B wrapper warnings.
+    #
+    # NOTE: this solver was deliberately changed from lbfgs (used through
+    # 2.2.x) to newton-cg. Because the two optimizers converge to slightly
+    # different optima, presentation models *newly trained* with this code will
+    # have slightly different fitted weights than 2.2.x. This is intentional —
+    # do not "fix" it by reverting to lbfgs. (Pre-trained shipped models load
+    # their saved weights and are unaffected.)
     "solver": "newton-cg",
     "max_iter": 1000,
 }
@@ -857,6 +864,79 @@ class Class1PresentationPredictor(object):
             del df["affinity_score"]
         return df
 
+    def resolve_comparison_quantity(self, alleles, comparison_quantity=None):
+        """
+        Resolve the column used to rank scan predictions.
+
+        This is the single source of truth for the ``comparison_quantity``
+        defaulting and validation used by :meth:`predict_sequences`. It is
+        also called by the predict-scan CLI's parallel path so that chunked
+        execution ranks on exactly the same column the serial path would pick
+        (which depends on the predictor's *capabilities*, not on which columns
+        happen to be present in a given result).
+
+        Parameters
+        ----------
+        alleles
+            The ``alleles`` argument as passed to :meth:`predict_sequences`
+            (string, list, or dict). Only its length / emptiness is used here.
+        comparison_quantity : string or None
+            If None, a default is chosen: ``presentation_score`` when alleles
+            are given and presentation is supported, else ``affinity`` when
+            alleles are given, else ``processing_score``.
+
+        Returns
+        -------
+        string
+            The resolved (and validated) comparison quantity.
+        """
+        if comparison_quantity is None:
+            if len(alleles) > 0:
+                if self.supports_presentation_prediction:
+                    comparison_quantity = "presentation_score"
+                else:
+                    comparison_quantity = "affinity"
+            else:
+                comparison_quantity = "processing_score"
+
+        if comparison_quantity == "presentation_score":
+            if not self.supports_presentation_prediction:
+                raise ValueError(
+                    "Presentation prediction not supported by this predictor")
+        elif comparison_quantity == "processing_score":
+            if not self.supports_processing_prediction:
+                raise ValueError(
+                    "Processing prediction not supported by this predictor")
+        elif comparison_quantity in ("affinity", "affinity_percentile"):
+            if not self.supports_affinity_prediction:
+                raise ValueError(
+                    "Affinity prediction not supported by this predictor")
+        else:
+            raise ValueError(
+                "Unknown comparison quantity: %s" % comparison_quantity)
+
+        return comparison_quantity
+
+    @staticmethod
+    def sort_predictions(result_df, comparison_quantity):
+        """
+        Globally sort scan predictions by ``comparison_quantity``.
+
+        Score columns (those ending in ``"score"``) sort descending (stronger
+        binders first); ``affinity`` / ``affinity_percentile`` sort ascending
+        (stronger = lower nM). ``peptide`` is a deterministic secondary key and
+        the sort is stable, so the row order is independent of the input row
+        order. This is what lets the predict-scan CLI's parallel (chunked) path
+        reproduce the serial path's ranking exactly, including tie ordering.
+
+        Returns a new DataFrame; the index is not reset.
+        """
+        comparison_is_score = comparison_quantity.endswith("score")
+        return result_df.sort_values(
+            [comparison_quantity, "peptide"],
+            ascending=[not comparison_is_score, True],
+            kind="stable")
+
     def predict_sequences(
             self,
             sequences,
@@ -958,30 +1038,8 @@ class Class1PresentationPredictor(object):
             raise ValueError(
                 "Affinity prediction not supported by this predictor")
 
-        if comparison_quantity is None:
-            if len(alleles) > 0:
-                if self.supports_presentation_prediction:
-                    comparison_quantity = "presentation_score"
-                else:
-                    comparison_quantity = "affinity"
-            else:
-                comparison_quantity = "processing_score"
-
-        if comparison_quantity == "presentation_score":
-            if not self.supports_presentation_prediction:
-                raise ValueError(
-                    "Presentation prediction not supported by this predictor")
-        elif comparison_quantity == "processing_score":
-            if not self.supports_processing_prediction:
-                raise ValueError(
-                    "Processing prediction not supported by this predictor")
-        elif comparison_quantity in ("affinity", "affinity_percentile"):
-            if not self.supports_affinity_prediction:
-                raise ValueError(
-                    "Affinity prediction not supported by this predictor")
-        else:
-            raise ValueError(
-                "Unknown comparison quantity: %s" % comparison_quantity)
+        comparison_quantity = self.resolve_comparison_quantity(
+            alleles, comparison_quantity)
 
         processing_predictor = self.processing_predictor_with_flanks
         if not use_flanks or processing_predictor is None:
@@ -1094,9 +1152,7 @@ class Class1PresentationPredictor(object):
 
         comparison_is_score = comparison_quantity.endswith("score")
 
-        result_df = result_df.sort_values(
-            comparison_quantity,
-            ascending=not comparison_is_score)
+        result_df = self.sort_predictions(result_df, comparison_quantity)
 
         if result == "best":
             result_df = result_df.drop_duplicates(

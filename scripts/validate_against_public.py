@@ -187,6 +187,8 @@ def per_sample_random(df: pd.DataFrame, score_col: str, lower_is_better: bool,
         for _ in range(n_samples):
             subset = rng.sample(alleles, k=min(k, len(alleles)))
             sdf = pdf[pdf["allele"].isin(subset)].sort_values(score_col, ascending=ascending)
+            if sdf.empty:
+                continue
             top = sdf.iloc[0]
             rows.append({
                 "peptide": p,
@@ -217,6 +219,10 @@ def run_comparison(df_ours, df_public, score_col, lower_is_better, block_label):
     rand_ours = per_sample_random(df_ours, score_col, lower_is_better)
     rand_public = per_sample_random(df_public, score_col, lower_is_better)
     merged = rand_ours.merge(rand_public, on=["peptide", "subset"], suffixes=("_ours", "_public"))
+    if len(merged) == 0:
+        print(f"[{block_label}] best-allele agreement on random 4-subsets: "
+              f"no overlapping (peptide,subset) pairs to compare (skipped)")
+        return merged
     agree = (merged["best_allele_ours"] == merged["best_allele_public"]).sum()
     print(f"[{block_label}] best-allele agreement on random 4-subsets: "
           f"{agree}/{len(merged)} ({agree/len(merged)*100:.0f}%)")

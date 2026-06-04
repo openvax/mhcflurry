@@ -14,7 +14,15 @@ import numpy
 import pandas
 
 
-from .class1_neural_network import Class1NeuralNetwork
+from .class1_neural_network import (
+    Class1NeuralNetwork,
+    cartesian_network_output,
+    cartesian_output_log_ic50_sum,
+)
+from .motif_summary import (
+    prepare_motif_summary_state_gpu,
+    motif_summary_chunk_gpu,
+)
 from .common import (
     derive_seed,
     random_peptides,
@@ -1990,8 +1998,17 @@ class Class1AffinityPredictor(object):
             peptide_stage_dim=None,
             num_sub_networks=None,
             cuda_overhead_bytes=2 * (1 << 30),
-            safety_multiplier=1.3):
+            safety_multiplier=1.3,
+            fixed_peptide_batch=None,
+            fixed_allele_batch=None):
         """Split the auto-sized batch budget between peptide and allele axes.
+
+        ``fixed_peptide_batch`` / ``fixed_allele_batch`` pin one axis to a
+        user-supplied value (mixed pin/auto mode). The pinned axis is held
+        constant and only the other axis is sized against the VRAM budget, so
+        the auto axis shrinks to keep ``allele_batch × peptide_batch`` within
+        the per-worker budget instead of being sized as if the pinned axis were
+        also auto (which would underestimate peak VRAM).
 
         Models the per-worker VRAM peak as:
 
@@ -2195,6 +2212,8 @@ class Class1AffinityPredictor(object):
             n_peptides=n_peptides,
             n_alleles=n_alleles,
             min_peptide_batch=max(_AUTO_BATCH_MIN_ROWS, 2_000),
+            fixed_peptide_batch=fixed_peptide_batch,
+            fixed_allele_batch=fixed_allele_batch,
         )
 
     @staticmethod
@@ -2246,7 +2265,9 @@ class Class1AffinityPredictor(object):
             n_peptides,
             n_alleles,
             min_peptide_batch,
-            max_allele_batch=256):
+            max_allele_batch=256,
+            fixed_peptide_batch=None,
+            fixed_allele_batch=None):
         """Choose ``(peptide_batch, allele_batch)`` under a row budget.
 
         Minimize the number of cartesian forward chunks rather than filling
@@ -2254,12 +2275,31 @@ class Class1AffinityPredictor(object):
         (tens of alleles × tens of thousands of peptides), where many
         equivalent row budgets can differ by 20-40% in Python-level loop
         count and kernel launches.
+
+        ``fixed_peptide_batch`` / ``fixed_allele_batch`` pin one axis (mixed
+        pin/auto mode). The pinned axis is held at the user value and the other
+        axis is sized as ``total_rows // pinned`` so the product stays within
+        the budget; the pinned axis is *not* capped by ``max_allele_batch``
+        (the user asked for it explicitly).
         """
         total_rows = max(int(total_rows), 1)
         n_peptides = max(int(n_peptides), 1)
         n_alleles = max(int(n_alleles), 1)
         min_peptide_batch = max(int(min_peptide_batch), 1)
         max_allele_batch = max(int(max_allele_batch), 1)
+
+        # Mixed pin/auto: hold the pinned axis fixed and size the other axis
+        # against the same row budget so peak VRAM isn't underestimated.
+        if fixed_allele_batch is not None and fixed_peptide_batch is None:
+            allele_batch = min(max(int(fixed_allele_batch), 1), n_alleles)
+            peptide_batch = max(total_rows // allele_batch, 1)
+            peptide_batch = min(n_peptides, peptide_batch)
+            return int(peptide_batch), int(allele_batch)
+        if fixed_peptide_batch is not None and fixed_allele_batch is None:
+            peptide_batch = min(max(int(fixed_peptide_batch), 1), n_peptides)
+            allele_batch = max(total_rows // peptide_batch, 1)
+            allele_batch = min(n_alleles, max_allele_batch, allele_batch)
+            return int(peptide_batch), int(allele_batch)
 
         max_a = min(n_alleles, max_allele_batch, max(total_rows, 1))
         best = None
@@ -2347,338 +2387,6 @@ class Class1AffinityPredictor(object):
                 "(%s); falling back to encoding-shape heuristic", exc,
             )
             return None
-
-    @staticmethod
-    def _cartesian_network_output(
-            model, peptide_stage, allele_idx, exact_forward=False):
-        if not exact_forward:
-            return model.forward_cartesian_from_peptide_stage(
-                peptide_stage,
-                allele_idx,
-            )
-
-        peptide_width = peptide_stage.shape[-1]
-        num_peptides = peptide_stage.shape[0]
-        num_alleles = allele_idx.shape[0]
-        expanded_stage = peptide_stage.unsqueeze(0).expand(
-            num_alleles,
-            num_peptides,
-            peptide_width,
-        ).reshape(num_alleles * num_peptides, peptide_width)
-        expanded_alleles = allele_idx.unsqueeze(1).expand(
-            num_alleles,
-            num_peptides,
-        ).reshape(-1)
-        return model.forward_from_peptide_stage(
-            expanded_stage,
-            expanded_alleles,
-        ).reshape(num_alleles, num_peptides, -1)
-
-    @staticmethod
-    def _cartesian_output_log_ic50_sum(
-            network_output, model, log50000, accum_dtype):
-        """Convert cartesian network outputs to summed log(IC50).
-
-        Normal models may expose multiple output channels; prediction defaults
-        to channel 0, so fast calibration must do the same. Optimized pan-model
-        ensembles are different: ``MergedClass1NeuralNetwork`` with
-        ``merge_method='concatenate'`` returns one channel per merged submodel.
-        Those channels are ensemble members and must all contribute to the
-        geometric mean.
-
-        Returns
-        -------
-        (torch.Tensor, int)
-            ``(a_size, chunk_n)`` summed log(IC50) contribution and the number
-            of ensemble members represented by the sum.
-        """
-        if network_output.ndim == 2:
-            network_output = network_output.unsqueeze(-1)
-        if network_output.ndim != 3 or int(network_output.shape[-1]) < 1:
-            raise ValueError(
-                "cartesian network output must have shape "
-                "(alleles, peptides, outputs); got %s" % (
-                    tuple(network_output.shape),
-                )
-            )
-
-        is_merged_concatenate = (
-            getattr(model, "merge_method", None) == "concatenate"
-            and getattr(model, "networks", None) is not None
-        )
-        if is_merged_concatenate:
-            selected = network_output
-        else:
-            selected = network_output[..., :1]
-
-        log_ic50 = (1.0 - selected).to(accum_dtype) * log50000
-        return log_ic50.sum(dim=-1), int(selected.shape[-1])
-
-    @staticmethod
-    def _prepare_motif_summary_state_gpu(encoded_peptides, device):
-        """One-time setup for GPU motif_summary; lifts the per-allele
-        ``drop_duplicates`` + length-bucket + AA-encoding work out of
-        the calibrate chunk loop so each chunk is pure tensor math.
-
-        Returns a dict of device-resident tensors:
-            unique_idx_t : (n_unique,) long — first-occurrence indices
-                into the full peptide list. Selecting columns with this
-                from the chunk's ``ic50_device`` reproduces the legacy
-                ``drop_duplicates('peptide')`` semantics (first row wins).
-            length_groups : dict[L] -> (n_at_L,) long indices into the
-                unique-peptide axis for peptides of length L.
-            aa_codes_per_length : dict[L] -> (n_at_L, L) long tensor of
-                amino-acid index codes (matches ``AMINO_ACID_INDEX``,
-                so X = 20 if it ever appears).
-            unique_lengths_t : (n_unique,) long — peptide length per
-                unique peptide; powers the per-allele length distribution.
-            n_unique : int.
-        """
-        import torch
-        from .amino_acid import AMINO_ACID_INDEX
-
-        seqs = list(encoded_peptides.sequences)
-        seen = set()
-        unique_idx = []
-        for i, s in enumerate(seqs):
-            if s not in seen:
-                seen.add(s)
-                unique_idx.append(i)
-        unique_idx = numpy.asarray(unique_idx, dtype=numpy.int64)
-        unique_seqs = [seqs[i] for i in unique_idx]
-        lengths = numpy.fromiter(
-            (len(p) for p in unique_seqs),
-            dtype=numpy.int64,
-            count=len(unique_seqs),
-        )
-
-        unique_lengths_t = torch.from_numpy(lengths).to(device)
-        unique_idx_t = torch.from_numpy(unique_idx).to(device)
-
-        # ASCII -> AA-index lookup so the per-residue encoding is one
-        # vectorized numpy gather instead of 8M Python ops over 800k
-        # peptides. Unknown bytes map to X and the X bucket is dropped
-        # from the final 20-column matrix, matching
-        # positional_frequency_matrix's treatment of non-common letters.
-        ascii_lut = numpy.full(
-            256, AMINO_ACID_INDEX["X"], dtype=numpy.int64,
-        )
-        for letter, idx in AMINO_ACID_INDEX.items():
-            if len(letter) == 1:
-                ascii_lut[ord(letter)] = idx
-
-        length_groups = {}
-        aa_codes_per_length = {}
-        for L_np in numpy.unique(lengths):
-            L = int(L_np)
-            sel = numpy.where(lengths == L)[0].astype(numpy.int64)
-            n_at_L = int(sel.shape[0])
-            joined = "".join(unique_seqs[i] for i in sel).encode("ascii")
-            byte_arr = numpy.frombuffer(
-                joined, dtype=numpy.uint8,
-            ).reshape(n_at_L, L)
-            codes = ascii_lut[byte_arr]  # (n_at_L, L) int64
-            length_groups[L] = torch.from_numpy(sel).to(device)
-            aa_codes_per_length[L] = torch.from_numpy(
-                numpy.ascontiguousarray(codes),
-            ).to(device)
-
-        return {
-            "unique_idx_t": unique_idx_t,
-            "length_groups": length_groups,
-            "aa_codes_per_length": aa_codes_per_length,
-            "unique_lengths_t": unique_lengths_t,
-            "n_unique": int(unique_idx.shape[0]),
-        }
-
-    @staticmethod
-    def _topk_first_tie_indices(values, k):
-        """Return k smallest column indices per row with pandas tie semantics.
-
-        ``torch.topk`` is fast but does not promise which entries it
-        returns when the kth value is tied. Pandas ``Series.nsmallest``
-        defaults to ``keep='first'``; after ``drop_duplicates('peptide')``,
-        "first" means lower position on the unique-peptide axis. Keep
-        the fast ``topk`` path for normal continuous predictions and
-        repair only rows whose cutoff falls inside an exact tie block.
-        """
-        import torch
-
-        n = int(values.shape[1])
-        if k >= n:
-            return torch.arange(
-                n, dtype=torch.long, device=values.device,
-            ).expand(int(values.shape[0]), n)
-
-        top = torch.topk(values, k, dim=1, largest=False, sorted=False)
-        top_idx = top.indices
-
-        boundary = top.values.max(dim=1).values.unsqueeze(1)
-        lt_counts = (values < boundary).sum(dim=1)
-        eq_counts = (values == boundary).sum(dim=1)
-        tie_needed = k - lt_counts
-        tied_cutoff_rows = eq_counts > tie_needed
-        if not bool(tied_cutoff_rows.any().item()):
-            return top_idx
-
-        top_idx = top_idx.clone()
-        row_ids = torch.nonzero(
-            tied_cutoff_rows, as_tuple=False,
-        ).flatten()
-        row_values = values.index_select(0, row_ids)
-        row_boundary = boundary.index_select(0, row_ids)
-        row_lt = row_values < row_boundary
-        row_eq = row_values == row_boundary
-        row_tie_needed = tie_needed.index_select(0, row_ids).unsqueeze(1)
-        eq_rank = row_eq.to(torch.int64).cumsum(dim=1)
-        selected = row_lt | (row_eq & (eq_rank <= row_tie_needed))
-        stable_idx = selected.nonzero(as_tuple=False)[:, 1].reshape(
-            int(row_ids.numel()), k,
-        )
-        top_idx[row_ids] = stable_idx
-        return top_idx
-
-    @staticmethod
-    def _motif_summary_chunk_gpu(
-            ic50_device,
-            state,
-            summary_top_peptide_fractions,
-            batch_alleles):
-        """GPU motif_summary for one allele chunk.
-
-        Replaces the per-allele
-        ``DataFrame(...).drop_duplicates().groupby('length').nsmallest(...)``
-        block in the fast path with vectorized tensor ops:
-
-        * ``torch.topk(largest=False)`` selects top-k tightest binders
-          per (allele, length), with a small tie repair to match pandas
-          ``nsmallest(keep='first')`` at exact cutoff ties.
-        * AA frequency matrices are computed by gathering precomputed
-          per-length AA-code tensors and ``scatter_add`` into a one-hot
-          counts buffer of shape ``(a_size, L, 21)``; pandas only
-          assembles the final per-row schema.
-        * Length distributions are ``topk`` over the full
-          unique-peptide axis followed by a per-row ``scatter_add``
-          (a row-wise ``bincount``).
-
-        All math runs on the calibration device; per-batch ``.cpu()``
-        transfers happen once per (cutoff_fraction, length) at chunk-end
-        instead of inside the per-allele Python loop, and pandas only
-        stamps the persistent per-row schema on the consolidated
-        per-block tensors. Returns ``(freq_matrix_dfs, length_dist_dfs)``
-        — lists of ``pandas.DataFrame`` matching the legacy slow path's
-        per-row schema, ready to ``pandas.concat`` once all chunks are
-        done.
-        """
-        import torch
-        from .amino_acid import AMINO_ACIDS
-
-        a_size = len(batch_alleles)
-        device = ic50_device.device
-        count_dtype = torch.float32 if device.type == "mps" else torch.float64
-        n_unique = state["n_unique"]
-        # AMINO_ACIDS = COMMON_AMINO_ACIDS_WITH_UNKNOWN keys, alphabetical
-        # then X — first 20 entries are the BLOSUM62-ordered non-X rows
-        # the legacy ``positional_frequency_matrix`` returns.
-        aa_columns = AMINO_ACIDS[:20]
-
-        ic50_unique = ic50_device.index_select(1, state["unique_idx_t"])
-
-        # Stage 1 (Torch on device): build all freq + length-dist tensors.
-        # Each entry is (cutoff_fraction, k, L, freq_t (a_size, L, 20)).
-        freq_tensors = []
-        # Each entry is (cutoff_fraction, k_total, length_fractions_t (a_size, max_len_p1)).
-        length_fraction_tensors = []
-
-        for cutoff_fraction in summary_top_peptide_fractions:
-            for L, idx_in_unique in state["length_groups"].items():
-                n_at_L = int(idx_in_unique.numel())
-                k = min(max(int(n_at_L * cutoff_fraction), 1), n_at_L)
-                ic50_L = ic50_unique.index_select(1, idx_in_unique)
-                top_idx = Class1AffinityPredictor._topk_first_tie_indices(
-                    ic50_L, k,
-                )  # (a_size, k)
-                codes = state["aa_codes_per_length"][L]  # (n_at_L, L) long
-                selected_codes = codes[top_idx]  # (a_size, k, L) long
-                # Permute to (a_size, L, k) so scatter_add packs counts
-                # along the last (AA) axis. We allocate 21 AA slots to
-                # absorb X (index 20) and discard the X column at the
-                # end — this matches the legacy semantics where
-                # ``positional_frequency_matrix``'s row index excludes X
-                # while the divisor stays at ``k`` (so positions with
-                # any X residues sum to <1 across the 20 columns).
-                scatter_dst = selected_codes.permute(0, 2, 1)
-                counts = torch.zeros(
-                    a_size, L, 21, dtype=count_dtype, device=device,
-                )
-                counts.scatter_add_(
-                    2, scatter_dst,
-                    torch.ones_like(scatter_dst, dtype=count_dtype),
-                )
-                freq_t = counts[:, :, :20] / float(k)  # device tensor
-                freq_tensors.append(
-                    (float(cutoff_fraction), int(k), int(L), freq_t),
-                )
-
-            k_total = min(max(int(n_unique * cutoff_fraction), 1), n_unique)
-            top_full_idx = Class1AffinityPredictor._topk_first_tie_indices(
-                ic50_unique, k_total,
-            )  # (a_size, k_total)
-            lengths_per_topk = state["unique_lengths_t"][top_full_idx]
-            max_len_p1 = int(state["unique_lengths_t"].max().item()) + 1
-            length_counts = torch.zeros(
-                a_size, max_len_p1, dtype=count_dtype, device=device,
-            )
-            length_counts.scatter_add_(
-                1, lengths_per_topk,
-                torch.ones_like(lengths_per_topk, dtype=count_dtype),
-            )
-            length_fractions_t = length_counts / float(k_total)
-            length_fraction_tensors.append(
-                (float(cutoff_fraction), int(k_total), length_fractions_t),
-            )
-
-        # Stage 2 (single device→host transfer per logical block): build
-        # one wide-format pandas DataFrame per (cutoff_fraction, L) in
-        # one shot — the per-allele Python loop is replaced by a flat
-        # reshape + numpy.repeat for the allele/position axes.
-        batch_alleles_arr = numpy.asarray(batch_alleles)
-
-        freq_matrices = []
-        for cutoff_fraction, k, L, freq_t in freq_tensors:
-            freq_arr = freq_t.cpu().numpy()  # (a_size, L, 20)
-            wide = freq_arr.reshape(a_size * L, 20)
-            df = pandas.DataFrame(wide, columns=aa_columns)
-            df.insert(0, "allele", numpy.repeat(batch_alleles_arr, L))
-            df.insert(1, "length", L)
-            df.insert(2, "cutoff_fraction", cutoff_fraction)
-            df.insert(3, "cutoff_count", k)
-            df.insert(
-                4, "position", numpy.tile(numpy.arange(1, L + 1), a_size),
-            )
-            freq_matrices.append(df)
-
-        length_dists = []
-        for cutoff_fraction, k_total, length_fractions_t in length_fraction_tensors:
-            length_fractions = length_fractions_t.cpu().numpy()
-            a_idx, l_idx = numpy.where(length_fractions > 0)
-            if a_idx.size == 0:
-                continue
-            ld = pandas.DataFrame({
-                "allele": batch_alleles_arr[a_idx],
-                "cutoff_fraction": cutoff_fraction,
-                "cutoff_count": k_total,
-                "length": l_idx.astype(numpy.int64),
-                "fraction": length_fractions[a_idx, l_idx],
-            })[[
-                "allele", "cutoff_fraction", "cutoff_count",
-                "length", "fraction",
-            ]].sort_values(
-                ["allele", "cutoff_fraction", "length"]
-            ).reset_index(drop=True)
-            length_dists.append(ld)
-
-        return freq_matrices, length_dists
 
     def _calibration_fast_cache(self):
         """Return (creating if needed) the per-instance fast-calibrate cache.
@@ -2884,6 +2592,15 @@ class Class1AffinityPredictor(object):
             num_sub_networks_probed = (
                 len(sub_networks) if sub_networks is not None else 1
             )
+            # Mixed pin/auto: when the user pinned one axis, pass it through so
+            # the auto axis is sized against the *actual* pinned value rather
+            # than an assumed auto one (which would underestimate peak VRAM).
+            pinned_peptide = (
+                None if peptide_batch_size in (None, "auto")
+                else int(peptide_batch_size))
+            pinned_allele = (
+                None if allele_batch_size in (None, "auto")
+                else int(allele_batch_size))
             auto_peptide, auto_allele = self._auto_size_calibration_batches(
                 probe_net, device, n_peptides, len(alleles),
                 num_workers_per_gpu=num_workers_per_gpu,
@@ -2894,6 +2611,8 @@ class Class1AffinityPredictor(object):
                 num_cached_networks=0 if cache_hit else len(networks),
                 peptide_stage_dim=probed_stage_dim,
                 num_sub_networks=num_sub_networks_probed,
+                fixed_peptide_batch=pinned_peptide,
+                fixed_allele_batch=pinned_allele,
             )
             if peptide_batch_size in (None, "auto"):
                 peptide_batch_size = auto_peptide
@@ -3014,7 +2733,7 @@ class Class1AffinityPredictor(object):
             if cache.motif_signature == motif_signature:
                 motif_state = cache.motif_state
             else:
-                motif_state = self._prepare_motif_summary_state_gpu(
+                motif_state = prepare_motif_summary_state_gpu(
                     encoded_peptides, device,
                 )
                 cache.motif_state = motif_state
@@ -3052,7 +2771,7 @@ class Class1AffinityPredictor(object):
                     for start in range(0, n_peptides, peptide_batch_size):
                         end = min(start + peptide_batch_size, n_peptides)
                         p_chunk = peptide_stage[start:end]  # (chunk_n, d)
-                        network_output = self._cartesian_network_output(
+                        network_output = cartesian_network_output(
                             model,
                             p_chunk,
                             batch_idx,
@@ -3061,7 +2780,7 @@ class Class1AffinityPredictor(object):
                         (
                             log_ic50_chunk,
                             chunk_member_count,
-                        ) = self._cartesian_output_log_ic50_sum(
+                        ) = cartesian_output_log_ic50_sum(
                             network_output, model, log50000, accum_dtype,
                         )
                         if model_member_count is None:
@@ -3099,7 +2818,7 @@ class Class1AffinityPredictor(object):
                 # per-allele DataFrame.drop_duplicates().groupby().nsmallest()
                 # block that dominated calibrate wall time after the
                 # PercentRankTransform.fit GPU port.
-                chunk_freq, chunk_ld = self._motif_summary_chunk_gpu(
+                chunk_freq, chunk_ld = motif_summary_chunk_gpu(
                     ic50_device,
                     motif_state,
                     summary_top_peptide_fractions,

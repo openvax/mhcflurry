@@ -27,6 +27,7 @@ import glob
 import json
 import os
 import time
+import warnings
 from functools import partial
 from typing import Optional
 
@@ -594,9 +595,16 @@ def _parallel_affinity_predict(args, predictor_dir, peptides, alleles):
             chunksize=1,
         )
         chunks = [result for result in results]
-    finally:
         worker_pool.close()
         worker_pool.join()
+        worker_pool = None
+    finally:
+        # On failure mid-iteration, terminate() rather than close()/join()
+        # (which can hang on a wedged worker) and leave non-daemon workers
+        # behind. Mirrors the predict / predict-scan teardown.
+        if worker_pool is not None:
+            worker_pool.terminate()
+            worker_pool.join()
     # chunk_num is unique per work item, so sorted() never compares ndarrays.
     return numpy.concatenate([values for (_, values) in sorted(chunks)])
 
@@ -646,6 +654,16 @@ def _run_affinity(side_a, side_b, args):
 
     a_alleles = _read_supported_alleles(side_a["paths"]["affinity"])
     b_alleles = _read_supported_alleles(side_b["paths"]["affinity"])
+    if not a_alleles or not b_alleles:
+        _stamp(
+            "WARNING: supported-allele set empty for %s%s%s; skipping "
+            "allele-intersection filter -- the two models may be scored on "
+            "different allele supports" % (
+                "side A" if not a_alleles else "",
+                " and " if not a_alleles and not b_alleles else "",
+                "side B" if not b_alleles else "",
+            )
+        )
     both = a_alleles & b_alleles if (a_alleles and b_alleles) else None
     if both is not None:
         before = len(test)
@@ -867,9 +885,16 @@ def _parallel_presentation_predict(args, predictor_dir, df, mode, label):
             chunksize=1,
         )
         chunks = [result for result in results]
-    finally:
         worker_pool.close()
         worker_pool.join()
+        worker_pool = None
+    finally:
+        # On failure mid-iteration, terminate() rather than close()/join()
+        # (which can hang on a wedged worker) and leave non-daemon workers
+        # behind. Mirrors the predict / predict-scan teardown.
+        if worker_pool is not None:
+            worker_pool.terminate()
+            worker_pool.join()
     return pandas.concat(
         [frame for (_, frame) in sorted(chunks, key=lambda t: t[0])],
         ignore_index=True,
@@ -970,8 +995,12 @@ def _presentation_per_length(scored, score_kind):
             row["a_micro_%s" % metric] = m_a[metric]
             row["b_micro_%s" % metric] = m_b[metric]
             row["micro_%s_diff" % metric] = m_a[metric] - m_b[metric]
-            macro_a = float(numpy.nanmean(sub_sample["a_%s" % metric]))
-            macro_b = float(numpy.nanmean(sub_sample["b_%s" % metric]))
+            with warnings.catch_warnings():
+                # All-NaN slices emit a RuntimeWarning; nan is the intended
+                # result here (matches the silent pandas .mean() macro above).
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                macro_a = float(numpy.nanmean(sub_sample["a_%s" % metric]))
+                macro_b = float(numpy.nanmean(sub_sample["b_%s" % metric]))
             row["a_macro_%s" % metric] = macro_a
             row["b_macro_%s" % metric] = macro_b
             row["macro_%s_diff" % metric] = macro_a - macro_b

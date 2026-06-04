@@ -5,6 +5,7 @@ import warnings
 import numpy
 import torch
 
+from mhcflurry import amino_acid
 from mhcflurry.class1_affinity_training_data import AffinityDeviceTrainingData
 
 
@@ -41,7 +42,10 @@ def test_affinity_device_training_data_combined_buffer_layout():
         data.combined_peptide[num_rn:].numpy(), x_peptide
     )
     numpy.testing.assert_array_equal(data.x_peptide.numpy(), x_peptide)
-    assert (data.combined_peptide[:num_rn] == 0).all()
+    # The random-negative slice is pre-filled with the X (pad) index, not
+    # zero, so a forward pass before the first refill sees padding rather than
+    # real amino-acid index 0. It is overwritten by refill before training.
+    assert (data.combined_peptide[:num_rn] == amino_acid.X_INDEX).all()
 
     data.refill_random_negative_peptides(
         torch.full((num_rn, encoded_length), 17, dtype=torch.int8)

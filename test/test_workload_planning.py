@@ -509,6 +509,28 @@ def test_plan_8x_a100_resolved(monkeypatch):
     assert plan.capacity == 16
 
 
+def test_plan_host_memory_clamp_keeps_capacity_consistent(monkeypatch):
+    """When host RAM clamps auto num_jobs to a count that doesn't divide
+    evenly across GPUs, the reported capacity must equal the clamped
+    num_jobs — not gpus * ceil(num_jobs / gpus), which would over-report.
+
+    GPU capacity here is 2 * 4 = 8, but ~22 GB available RAM (×0.70 / 3 GB
+    per worker) caps to 5 workers on 2 GPUs (mwpg -> ceil(5/2)=3). Before the
+    fix, capacity was recomputed as 2*3=6 > num_jobs=5."""
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "32.0")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "22.0")
+    plan = wp.plan_local_parallelism(
+        _args(),
+        workload_name=wp.WORKLOAD_AFFINITY_INFERENCE,
+        **_planner_fakes(num_gpus=2, mwpg_value=4),
+    )
+    assert plan.num_jobs == 5
+    assert plan.max_workers_per_gpu == 3
+    assert plan.capacity == plan.num_jobs == 5
+    assert plan.capacity <= plan.gpus * plan.max_workers_per_gpu
+    assert any("capped" in w for w in plan.warnings)
+
+
 def test_plan_explicit_num_jobs_records_override(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "256.0")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "200.0")

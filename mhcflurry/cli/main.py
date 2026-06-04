@@ -20,6 +20,7 @@ Two flavors of subcommand:
 from __future__ import annotations
 
 import argparse
+import inspect
 import importlib
 import sys
 
@@ -121,8 +122,14 @@ def _check_help_groups():
     grouped = {name for _, names in _HELP_GROUPS for name in names}
     missing = set(_SUBCOMMANDS) - grouped
     extra = grouped - set(_SUBCOMMANDS)
-    assert not missing, "subcommands missing from _HELP_GROUPS: %s" % missing
-    assert not extra, "_HELP_GROUPS lists unknown subcommands: %s" % extra
+    # Raise explicitly rather than ``assert`` so the guard survives ``python -O``
+    # (which strips assertions): drift must never ship silently.
+    if missing:
+        raise RuntimeError(
+            "subcommands missing from _HELP_GROUPS: %s" % missing)
+    if extra:
+        raise RuntimeError(
+            "_HELP_GROUPS lists unknown subcommands: %s" % extra)
 
 
 _check_help_groups()
@@ -223,6 +230,15 @@ def _restore_parser_progs(saved):
         parser.prog = original_prog
 
 
+def _entry_accepts_prog(entry_func):
+    """Return whether ``entry_func`` accepts a ``prog=`` display override."""
+    try:
+        signature = inspect.signature(entry_func)
+    except (TypeError, ValueError):
+        return False
+    return "prog" in signature.parameters
+
+
 def main(argv=None):
     """Dispatch entry point for the ``mhcflurry`` console script."""
     if argv is None:
@@ -245,21 +261,19 @@ def main(argv=None):
     if subcommand in _SUBCOMMANDS:
         module_path, entry, _ = _SUBCOMMANDS[subcommand]
         module = importlib.import_module(module_path)
-        # Subcommands' parsers default ``prog`` to ``sys.argv[0]`` (the
-        # console script name). When dispatched under the parent, fix
-        # the displayed name so ``--help`` shows ``mhcflurry
-        # <subcommand>`` (and ``mhcflurry <subcommand> <subsub>`` for
-        # commands like ``downloads`` and ``pseudosequences`` that have
-        # their own subparsers) instead of just ``mhcflurry``.
+        # Subcommands' parsers normally default ``prog`` to ``sys.argv[0]``
+        # (the console script name). When dispatched under the parent, keep
+        # display ``prog`` separate from ``sys.argv`` so artifact-producing
+        # commands can still record a reproducible command in GENERATE.sh.
         prog = "mhcflurry %s" % subcommand
-        saved_argv0 = sys.argv[0]
-        sys.argv[0] = prog
         saved_progs = _rewrite_parser_prog(
             getattr(module, "parser", None), prog)
+        entry_func = getattr(module, entry)
         try:
-            return getattr(module, entry)(remaining)
+            if _entry_accepts_prog(entry_func):
+                return entry_func(remaining, prog=prog)
+            return entry_func(remaining)
         finally:
-            sys.argv[0] = saved_argv0
             _restore_parser_progs(saved_progs)
     # Unknown subcommand — let argparse emit the standard error + usage.
     build_parser().parse_args(argv)

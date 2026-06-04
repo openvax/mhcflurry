@@ -356,30 +356,42 @@ def run(argv=sys.argv[1:]):
             work_items,
             chunksize=1)
 
-        unsaved_predictors = []
-        last_save_time = time.time()
-        for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
-            unsaved_predictors.append(new_predictor)
+        try:
+            unsaved_predictors = []
+            last_save_time = time.time()
+            for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
+                unsaved_predictors.append(new_predictor)
 
-            if time.time() > last_save_time + args.save_interval:
-                # Save current predictor.
-                save_start = time.time()
-                new_model_names = predictor.merge_in_place(unsaved_predictors)
-                predictor.save(
-                    args.out_models_dir,
-                    model_names_to_write=new_model_names,
-                    write_metadata=False)
-                print(
-                    "Saved predictor (%d models total) including %d new models "
-                    "in %0.2f sec to %s" % (
-                        len(predictor.neural_networks),
-                        len(new_model_names),
-                        time.time() - save_start,
-                        args.out_models_dir))
-                unsaved_predictors = []
-                last_save_time = time.time()
+                if time.time() > last_save_time + args.save_interval:
+                    # Save current predictor.
+                    save_start = time.time()
+                    new_model_names = predictor.merge_in_place(unsaved_predictors)
+                    predictor.save(
+                        args.out_models_dir,
+                        model_names_to_write=new_model_names,
+                        write_metadata=False)
+                    print(
+                        "Saved predictor (%d models total) including %d new models "
+                        "in %0.2f sec to %s" % (
+                            len(predictor.neural_networks),
+                            len(new_model_names),
+                            time.time() - save_start,
+                            args.out_models_dir))
+                    unsaved_predictors = []
+                    last_save_time = time.time()
 
-        predictor.merge_in_place(unsaved_predictors)
+            predictor.merge_in_place(unsaved_predictors)
+
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+        finally:
+            # On failure mid-iteration, terminate() rather than
+            # close()/join() (which can hang on a wedged worker) and
+            # leave non-daemon workers behind.
+            if worker_pool is not None:
+                worker_pool.terminate()
+                worker_pool.join()
 
     else:
         assert worker_pool is None

@@ -82,8 +82,8 @@ def _peptide_vector_encoding_width(name):
     if not name:
         return None
     try:
-        from .amino_acid import ENCODING_DATA_FRAMES
-        return int(ENCODING_DATA_FRAMES[name].shape[1])
+        from .amino_acid import get_vector_encoding_df
+        return int(get_vector_encoding_df(name).shape[1])
     except Exception:
         return None
 

@@ -15,6 +15,8 @@ from typing import Optional
 import numpy
 import torch
 
+from . import amino_acid
+
 
 @dataclass
 class AffinityDeviceTrainingData:
@@ -160,7 +162,9 @@ class AffinityDeviceTrainingData:
             rn_peptide_view = combined_peptide[:num_rn]
             x_peptide_view = combined_peptide[num_rn:]
             x_peptide_view.copy_(x_peptide_dev)
-            rn_peptide_view.zero_()
+            # Fill the random-negative slice with the X/pad index (not 0) to
+            # match encode_random_negatives_on_device, which fills with X_INDEX.
+            rn_peptide_view.fill_(int(amino_acid.X_INDEX))
 
         rn_allele_dev = _to_device(random_negative_x_allele)
         combined_allele = None

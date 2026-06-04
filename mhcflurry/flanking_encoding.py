@@ -208,16 +208,18 @@ class FlankingEncoding(object):
             if not peptide_lengths.flags.writeable:
                 peptide_lengths = peptide_lengths.copy()
 
-            non_blocking = device.type == "cuda"
+            # These transfers are blocking: the source tensors come from
+            # torch.from_numpy(...) and are not pinned, so non_blocking=True
+            # would be a silent no-op. This is a one-time, cached transfer per
+            # cache key (not a per-batch hot path), so pinning the host buffer
+            # to enable an async copy isn't worth the extra staging copy.
             self.tensor_cache[cache_key] = EncodingResult(
-                array=torch.from_numpy(sequence_array).to(
-                    device, non_blocking=non_blocking),
-                peptide_lengths=torch.from_numpy(peptide_lengths).to(
-                    device, non_blocking=non_blocking),
+                array=torch.from_numpy(sequence_array).to(device),
+                peptide_lengths=torch.from_numpy(peptide_lengths).to(device),
                 unsupported_mask=(
                     torch.from_numpy(numpy.asarray(
                         encoded.unsupported_mask, dtype=bool,
-                    )).to(device, non_blocking=non_blocking)
+                    )).to(device)
                     if encoded.unsupported_mask is not None
                     else None
                 ))

@@ -37,6 +37,7 @@ mhcflurry-predict-scan \
 '''
 import sys
 import argparse
+import collections
 
 import pandas
 
@@ -205,6 +206,15 @@ def _load_predictor_for_command(models_dir):
     return _PREDICTOR_CACHE[models_dir]
 
 
+# One parallel chunk's predictions plus the comparison quantity the predictor
+# resolved for it. ``comparison_quantity`` is identical across chunks (it
+# depends only on the predictor's capabilities and the alleles, not on the
+# chunk's sequences); it is carried per-chunk so the parent can apply the same
+# global sort the serial path would without re-loading the predictor.
+ChunkResult = collections.namedtuple(
+    "ChunkResult", ["chunk_num", "predictions", "comparison_quantity"])
+
+
 def _predict_sequences_chunk_worker(work_item):
     predictor = _load_predictor_for_command(work_item["models_dir"])
     result_df = predictor.predict_sequences(
@@ -218,7 +228,11 @@ def _predict_sequences_chunk_worker(work_item):
         throw=work_item["throw"],
         affinity_model_kwargs=work_item["affinity_model_kwargs"],
         processing_batch_size=work_item["processing_batch_size"])
-    return work_item["chunk_num"], result_df
+    return ChunkResult(
+        chunk_num=work_item["chunk_num"],
+        predictions=result_df,
+        comparison_quantity=predictor.resolve_comparison_quantity(
+            work_item["alleles"]))
 
 
 def parse_peptide_lengths(value):
@@ -434,33 +448,22 @@ def run(argv=sys.argv[1:]):
                 if worker_pool is not None:
                     worker_pool.terminate()
                     worker_pool.join()
+            # Restore input sequence order by chunk_num before the global
+            # re-sort.
+            chunks.sort(key=lambda chunk: chunk.chunk_num)
             result_df = pandas.concat(
-                [chunk for (_, chunk) in sorted(chunks)],
+                [chunk.predictions for chunk in chunks],
                 ignore_index=True)
-            # Match the global sort that serial predict_sequences(result="all")
-            # applies in class1_presentation_predictor.predict_sequences().
-            # Each chunk is sorted within its sequence subset; after concat we
-            # need a stable global sort so parallel output ranking == serial.
-            # ``peptide`` is the secondary key so tied scores resolve in the
-            # same order regardless of how chunks were partitioned.
-            if "presentation_score" in result_df.columns:
-                result_df = result_df.sort_values(
-                    ["presentation_score", "peptide"],
-                    ascending=[False, True],
-                    kind="stable",
-                ).reset_index(drop=True)
-            elif "processing_score" in result_df.columns:
-                result_df = result_df.sort_values(
-                    ["processing_score", "peptide"],
-                    ascending=[False, True],
-                    kind="stable",
-                ).reset_index(drop=True)
-            elif "affinity" in result_df.columns:
-                result_df = result_df.sort_values(
-                    ["affinity", "peptide"],
-                    ascending=[True, True],
-                    kind="stable",
-                ).reset_index(drop=True)
+            # Apply the same global sort serial predict_sequences(result="all")
+            # uses (Class1PresentationPredictor.sort_predictions). Each chunk is
+            # sorted only within its sequence subset, so after concat we re-sort
+            # globally. All chunks resolved the same comparison quantity, so we
+            # take it from any of them — keeping parallel output ranking
+            # identical to serial, including the deterministic peptide
+            # tie-break.
+            comparison_quantity = chunks[0].comparison_quantity
+            result_df = Class1PresentationPredictor.sort_predictions(
+                result_df, comparison_quantity).reset_index(drop=True)
 
     # Apply thresholds, skipping ones whose column is missing (e.g.
     # processing-only run with no alleles, or --no-affinity-percentile

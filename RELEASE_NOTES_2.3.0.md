@@ -13,7 +13,7 @@ GPU-starvation gap that the host-side batching path was working
 around. The post-training pipeline (select → calibrate → eval → plot)
 is unified into a single resumable script, and calibration runs on
 device end-to-end (`PercentRankTransform.fit_batch_torch`,
-`_motif_summary_chunk_gpu`) for an additional per-worker speedup on
+`motif_summary.motif_summary_chunk_gpu`) for an additional per-worker speedup on
 top of the legacy `--gpu-batched` allele batching. Recipe tightening
 (``min_delta=1e-7``, ``max_epochs=500``) kills the patience-reset
 noise tail. Auto-resolvers pick workers/dataloader/compile settings
@@ -134,6 +134,15 @@ diversity. The neural-network `fit()` / `fit_streaming_batches()` and
 `Class1AffinityPredictor.fit_allele_specific_predictors()` APIs gained a
 matching `seed=` keyword (defaults to `None` = the prior stochastic behavior
 for direct API callers).
+
+### `--held-out-fraction-seed` default is now `None` (allele-specific)
+
+In `mhcflurry-class1-train-allele-specific-models`, the
+`--held-out-fraction-seed` default changed from `0` to `None`. With no flag,
+the held-out split is now derived from `--random-seed` (so the whole run
+reproduces from one value) instead of the implicit `seed=0` split 2.2.0 used.
+The no-flag held-out partition therefore differs from 2.2.0; pass
+`--held-out-fraction-seed 0` to recover the previous split exactly.
 
 ### Calibrate silently filters unsupported alleles
 
@@ -260,6 +269,15 @@ required and is used for device-resident training and optional
        running it does advance the global RNG before training proper
        starts. Pin a per-arch seed if you need bit-equivalence across
        runs.
+    3. Device-resident random-negative sampling
+       (`encode_random_negatives_on_device`) draws negative peptides as
+       amino-acid indices via `torch.multinomial` rather than the host
+       numpy `random_peptides` stream. Because this is a different RNG
+       stream than 2.2.x used, even at an identical `--random-seed` the
+       actual random-negative *peptides* differ (not just their row
+       layout) — an additional contributor, beyond the framework switch
+       and the `random_negative_pool_epochs` slicing above, to why 2.3.0
+       models differ from 2.2.x.
 - **Training ingestion now canonicalizes allele names**, so retraining on
   data that contained aliased / retired / alternative spellings can change
   which rows are included and therefore the resulting weights. Previously the
@@ -275,6 +293,11 @@ required and is used for device-resident training and optional
 - **Saved 2.2.x model bundles still work unchanged** in 2.3.0 for
   prediction; no migration needed for downstream users running
   inference on existing bundles.
+- **`Class1PresentationPredictor.save()` keyword `write_metdata` renamed to
+  `write_metadata`** (the prior spelling was a typo). The misspelled form would
+  have raised `TypeError` for in-tree callers, so this is a no-op for code that
+  used the correct spelling; any external caller passing `write_metdata=` must
+  update to `write_metadata=`.
 - **Deprecated: the dense-vector amino-acid encoding path.** Peptides and
   processing-model sequences are now always index-encoded (`(N, L)` int8) and
   embedded on device. The `peptide_amino_acid_encoding_torch=False` /

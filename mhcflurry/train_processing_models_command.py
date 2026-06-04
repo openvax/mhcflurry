@@ -492,22 +492,35 @@ def train_models(args):
             work_items,
             chunksize=1)
 
-    if results_generator:
-        for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
-            save_start = time.time()
-            (model,) = new_predictor.models
-            pprint.pprint(model.fit_info[-1]['training_info'])
-            (new_model_name,) = predictor.add_models(new_predictor.models)
-            predictor.save(
-                args.out_models_dir,
-                model_names_to_write=[new_model_name],
-                write_metadata=False)
-            print(
-                "Saved predictor (%d models total) with 1 new models"
-                "in %0.2f sec to %s" % (
-                    len(predictor.models),
-                    time.time() - save_start,
-                    args.out_models_dir))
+    try:
+        if results_generator:
+            for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
+                save_start = time.time()
+                (model,) = new_predictor.models
+                pprint.pprint(model.fit_info[-1]['training_info'])
+                (new_model_name,) = predictor.add_models(new_predictor.models)
+                predictor.save(
+                    args.out_models_dir,
+                    model_names_to_write=[new_model_name],
+                    write_metadata=False)
+                print(
+                    "Saved predictor (%d models total) with 1 new models"
+                    "in %0.2f sec to %s" % (
+                        len(predictor.models),
+                        time.time() - save_start,
+                        args.out_models_dir))
+
+        if worker_pool:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+    finally:
+        # On failure mid-iteration, terminate() rather than
+        # close()/join() (which can hang on a wedged worker) and
+        # leave non-daemon workers behind.
+        if worker_pool is not None:
+            worker_pool.terminate()
+            worker_pool.join()
 
     predictor.save(args.out_models_dir)
     write_generate_sh(args.out_models_dir)
@@ -518,10 +531,6 @@ def train_models(args):
     print("Trained affinity predictor with %d networks in %0.2f min." % (
         len(predictor.models), training_time / 60.0))
     print("*" * 30)
-
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
 
     print("Predictor written to: %s" % args.out_models_dir)
 

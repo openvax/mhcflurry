@@ -850,15 +850,31 @@ def _early_stop_reached(
     patience,
     min_epochs=0,
     early_stopping=True,
+    strict=True,
 ):
-    """Shared early-stopping decision using zero-based epoch indices."""
+    """Shared early-stopping decision using zero-based epoch indices.
+
+    With ``strict=True`` (the affinity ``fit()`` path) training stops the
+    first epoch *strictly after* ``max(min_val_loss_epoch + patience,
+    min_epochs - 1)`` — i.e. ``patience`` no-improvement epochs followed by
+    one more before stopping. This matches the pre-2.3.0 ``fit()`` condition
+    ``epoch > min_val_loss_iteration + patience``.
+
+    With ``strict=False`` (the streaming pretrain path) training stops *at*
+    that threshold, reproducing the pre-2.3.0 streaming condition
+    ``epoch >= min_val_loss_iteration + patience`` (which used one-based
+    epochs). Keeping the streaming path inclusive means pretrained base
+    weights reproduce historical runs rather than training one extra epoch.
+    """
     if not early_stopping or min_val_loss_epoch is None:
         return False
     threshold = max(
         int(min_val_loss_epoch) + int(patience),
         int(min_epochs) - 1,
     )
-    return int(epoch_index) > threshold
+    if strict:
+        return int(epoch_index) > threshold
+    return int(epoch_index) >= threshold
 
 
 def _should_validate_epoch(
@@ -871,8 +887,14 @@ def _should_validate_epoch(
     min_val_loss_epoch,
     patience,
     min_epochs=0,
+    strict=True,
 ):
-    """Shared validation cadence for fit() and fit_streaming_batches()."""
+    """Shared validation cadence for fit() and fit_streaming_batches().
+
+    ``strict`` is forwarded to :func:`_early_stop_reached` so the "validate on
+    the epoch we're about to stop" rule uses the same inclusive/exclusive
+    threshold as the caller's break condition.
+    """
     if not validation_enabled:
         return False
     is_last_epoch = int(epoch_index) == int(max_epochs) - 1
@@ -882,6 +904,7 @@ def _should_validate_epoch(
         patience=patience,
         min_epochs=min_epochs,
         early_stopping=early_stopping,
+        strict=strict,
     )
     return (
         int(epoch_index) % int(validation_interval) == 0
@@ -3658,6 +3681,9 @@ class Class1NeuralNetwork(object):
                 min_val_loss_epoch=min_val_loss_iteration,
                 patience=patience,
                 min_epochs=min_epochs,
+                # Streaming pretrain stops inclusively (epoch >= threshold) to
+                # match pre-2.3.0 weights — see _early_stop_reached.
+                strict=False,
             )
             validation_time = 0.0
             val_batch_size = None
@@ -3771,6 +3797,10 @@ class Class1NeuralNetwork(object):
                 patience=patience,
                 min_epochs=min_epochs,
                 early_stopping=True,
+                # Inclusive stop (epoch >= threshold) reproduces the pre-2.3.0
+                # streaming condition `epoch >= min_val_loss_iteration +
+                # patience`; the strict `>` default would train one extra epoch.
+                strict=False,
             ):
                 if progress_print_interval is not None:
                     print(progress_preamble, "STOPPING", progress_message)
@@ -4681,7 +4711,7 @@ class Class1NeuralNetwork(object):
             allele_encoding=None,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE,
             output_index=0,
-            num_workers_per_gpu=1):
+            num_workers_per_gpu=None):
         """
         Predict affinities.
 
@@ -4694,16 +4724,21 @@ class Class1NeuralNetwork(object):
             memory at call time — see ``compute_prediction_batch_size``.
             Pass an explicit int to pin the size.
         output_index : int or None
-        num_workers_per_gpu : int
+        num_workers_per_gpu : int, optional
             When multiple training/calibration workers are co-resident on
             the same CUDA device, pass the worker count so the auto-
             sizer partitions the VRAM budget. Ignored for explicit int
-            batch_size.
+            batch_size. When not passed, falls back to
+            ``_env_workers_per_gpu(1)`` (the ``MHCFLURRY_MAX_WORKERS_PER_GPU``
+            env var the worker pool sets), mirroring ``fit()``.
 
         Returns
         -------
         numpy.array of nM affinity predictions
         """
+        if num_workers_per_gpu is None:
+            num_workers_per_gpu = _env_workers_per_gpu(1)
+
         assert self.prediction_cache is not None
         use_cache = allele_encoding is None and isinstance(peptides, EncodableSequences)
         if use_cache and peptides in self.prediction_cache:
@@ -5102,3 +5137,81 @@ class MergedClass1NeuralNetwork(nn.Module):
             )
             network.set_weights_list(weights[idx:idx + n_weights], auto_convert_keras=auto_convert_keras)
             idx += n_weights
+
+
+def cartesian_network_output(
+        model, peptide_stage, allele_idx, exact_forward=False):
+    """Run a pan-allele network over the (allele × peptide) cartesian product.
+
+    ``model`` is any network exposing ``forward_cartesian_from_peptide_stage``
+    and ``forward_from_peptide_stage`` (a :class:`Class1NeuralNetworkModel` or a
+    :class:`MergedClass1NeuralNetwork`). The fast path delegates to the
+    network's factored ``forward_cartesian_from_peptide_stage``; ``exact_forward``
+    instead materializes the full ``(num_alleles * num_peptides)`` batch and runs
+    the plain ``forward_from_peptide_stage`` — the unfactored reference used to
+    check the compact path's numerics.
+
+    Returns a ``(num_alleles, num_peptides, num_outputs)`` tensor.
+    """
+    if not exact_forward:
+        return model.forward_cartesian_from_peptide_stage(
+            peptide_stage,
+            allele_idx,
+        )
+
+    peptide_width = peptide_stage.shape[-1]
+    num_peptides = peptide_stage.shape[0]
+    num_alleles = allele_idx.shape[0]
+    expanded_stage = peptide_stage.unsqueeze(0).expand(
+        num_alleles,
+        num_peptides,
+        peptide_width,
+    ).reshape(num_alleles * num_peptides, peptide_width)
+    expanded_alleles = allele_idx.unsqueeze(1).expand(
+        num_alleles,
+        num_peptides,
+    ).reshape(-1)
+    return model.forward_from_peptide_stage(
+        expanded_stage,
+        expanded_alleles,
+    ).reshape(num_alleles, num_peptides, -1)
+
+
+def cartesian_output_log_ic50_sum(
+        network_output, model, log50000, accum_dtype):
+    """Convert cartesian network outputs to summed log(IC50).
+
+    Normal models may expose multiple output channels; prediction defaults
+    to channel 0, so fast calibration must do the same. Optimized pan-model
+    ensembles are different: ``MergedClass1NeuralNetwork`` with
+    ``merge_method='concatenate'`` returns one channel per merged submodel.
+    Those channels are ensemble members and must all contribute to the
+    geometric mean.
+
+    Returns
+    -------
+    (torch.Tensor, int)
+        ``(a_size, chunk_n)`` summed log(IC50) contribution and the number
+        of ensemble members represented by the sum.
+    """
+    if network_output.ndim == 2:
+        network_output = network_output.unsqueeze(-1)
+    if network_output.ndim != 3 or int(network_output.shape[-1]) < 1:
+        raise ValueError(
+            "cartesian network output must have shape "
+            "(alleles, peptides, outputs); got %s" % (
+                tuple(network_output.shape),
+            )
+        )
+
+    is_merged_concatenate = (
+        getattr(model, "merge_method", None) == "concatenate"
+        and getattr(model, "networks", None) is not None
+    )
+    if is_merged_concatenate:
+        selected = network_output
+    else:
+        selected = network_output[..., :1]
+
+    log_ic50 = (1.0 - selected).to(accum_dtype) * log50000
+    return log_ic50.sum(dim=-1), int(selected.shape[-1])

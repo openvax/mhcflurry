@@ -234,15 +234,16 @@ def test_parallel_path_does_not_load_predictor_before_pool(monkeypatch):
         def imap_unordered(self, fn, work_items, chunksize=1):
             del fn, chunksize
             return [
-                (
-                    item["chunk_num"],
-                    pandas.DataFrame({
+                predict_scan_command.ChunkResult(
+                    chunk_num=item["chunk_num"],
+                    predictions=pandas.DataFrame({
                         "sequence_name": ["sequence_0"],
                         "pos": [0],
                         "peptide": ["ASDFGHKL"],
                         "sample_name": ["genotype_00"],
                         "presentation_score": [0.5],
                     }),
+                    comparison_quantity="presentation_score",
                 )
                 for item in work_items
             ]
@@ -304,9 +305,9 @@ def test_parallel_affinity_only_output_globally_sorted(monkeypatch):
         def imap_unordered(self, fn, work_items, chunksize=1):
             del fn, work_items, chunksize
             return [
-                (
-                    1,
-                    pandas.DataFrame({
+                predict_scan_command.ChunkResult(
+                    chunk_num=1,
+                    predictions=pandas.DataFrame({
                         "sequence_name": ["sequence_1"],
                         "pos": [0],
                         "peptide": ["BEST"],
@@ -314,10 +315,11 @@ def test_parallel_affinity_only_output_globally_sorted(monkeypatch):
                         "best_allele": ["HLA-A*02:01"],
                         "affinity": [10.0],
                     }),
+                    comparison_quantity="affinity",
                 ),
-                (
-                    0,
-                    pandas.DataFrame({
+                predict_scan_command.ChunkResult(
+                    chunk_num=0,
+                    predictions=pandas.DataFrame({
                         "sequence_name": ["sequence_0"],
                         "pos": [0],
                         "peptide": ["WORST"],
@@ -325,6 +327,7 @@ def test_parallel_affinity_only_output_globally_sorted(monkeypatch):
                         "best_allele": ["HLA-A*02:01"],
                         "affinity": [500.0],
                     }),
+                    comparison_quantity="affinity",
                 ),
             ]
 

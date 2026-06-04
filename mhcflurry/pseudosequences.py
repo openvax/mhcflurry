@@ -213,9 +213,9 @@ def _run_list(_args):
         ))
 
 
-def main(argv=None):
+def main(argv=None, prog=None):
     """Command-line access for shell generation scripts."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(prog=prog, description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     filename_parser = subparsers.add_parser(

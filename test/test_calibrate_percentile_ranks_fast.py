@@ -16,6 +16,11 @@ import pytest
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry import common
 from mhcflurry.common import positional_frequency_matrix, random_peptides
+from mhcflurry.class1_neural_network import cartesian_output_log_ic50_sum
+from mhcflurry.motif_summary import (
+    prepare_motif_summary_state_gpu,
+    motif_summary_chunk_gpu,
+)
 from mhcflurry.downloads import get_path
 from mhcflurry.encodable_sequences import EncodableSequences
 from mhcflurry.regression_target import to_ic50
@@ -131,11 +136,11 @@ def test_motif_summary_gpu_helper_matches_legacy_edge_cases():
     ])
     cutoff_fractions = (0.4, 1.0)
 
-    state = Class1AffinityPredictor._prepare_motif_summary_state_gpu(
+    state = prepare_motif_summary_state_gpu(
         EncodableSequences.create(peptides),
         torch.device("cpu"),
     )
-    fast_freq, fast_ld = Class1AffinityPredictor._motif_summary_chunk_gpu(
+    fast_freq, fast_ld = motif_summary_chunk_gpu(
         torch.from_numpy(predictions),
         state,
         cutoff_fractions,
@@ -193,7 +198,7 @@ def test_fast_calibration_output_aggregation_handles_merged_concatenate():
     log50000 = float(numpy.log(50000.0))
 
     contribution, count = (
-        Class1AffinityPredictor._cartesian_output_log_ic50_sum(
+        cartesian_output_log_ic50_sum(
             output,
             MergedConcatenate(),
             log50000,
@@ -217,7 +222,7 @@ def test_fast_calibration_output_aggregation_uses_first_normal_output():
     log50000 = float(numpy.log(50000.0))
 
     contribution, count = (
-        Class1AffinityPredictor._cartesian_output_log_ic50_sum(
+        cartesian_output_log_ic50_sum(
             output,
             NormalModel(),
             log50000,

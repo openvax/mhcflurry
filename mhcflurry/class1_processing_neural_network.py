@@ -498,17 +498,28 @@ class Class1ProcessingModel(nn.Module):
         return reordered
 
 
-_warned_legacy_sequence_vector_encoding = []
+_warned_legacy_sequence_vector_encoding = set()
 
 
 def _warn_legacy_sequence_vector_encoding(value):
-    """Warn once that the legacy dense-vector sequence path is gone."""
-    if not _warned_legacy_sequence_vector_encoding:
-        _warned_legacy_sequence_vector_encoding.append(True)
-        logging.warning(
-            "amino_acid_encoding_torch=%r is deprecated and ignored: "
-            "processing-model sequences are always index-encoded and embedded "
-            "on device. The legacy dense-vector path has been removed.", value)
+    """Warn once per distinct deprecated value that the dense-vector path is gone.
+
+    Dedup is keyed on ``value`` rather than a single process-wide flag so that a
+    second, *different* legacy config still surfaces a warning (the previous
+    once-per-process behavior silently swallowed every config after the first).
+    """
+    try:
+        key = value
+        if key in _warned_legacy_sequence_vector_encoding:
+            return
+        _warned_legacy_sequence_vector_encoding.add(key)
+    except TypeError:
+        # Unhashable value: fall back to warning every time rather than crash.
+        pass
+    logging.warning(
+        "amino_acid_encoding_torch=%r is deprecated and ignored: "
+        "processing-model sequences are always index-encoded and embedded "
+        "on device. The legacy dense-vector path has been removed.", value)
 
 
 class Class1ProcessingNeuralNetwork(object):

@@ -90,7 +90,10 @@ def indices_to_peptide(indices):
     string.
 
     Inverse of :func:`peptide_to_indices` for canonical alphabet
-    members. Out-of-range indices raise :class:`IndexError`.
+    members. Indices at or above the alphabet size raise
+    :class:`IndexError`; negative indices wrap (Python list indexing
+    semantics) — no per-element bounds check is added because this is a
+    tight per-position loop on a hot re-materialization path.
 
     Parameters
     ----------

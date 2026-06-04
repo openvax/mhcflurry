@@ -25,7 +25,7 @@
 #                                2.0.0–2.2.x pan-allele recipe — the
 #                                old documented value of 64 was wrong).
 #   MHCFLURRY_SCALE_LR  if "1", multiply learning_rate by sqrt(mb/BASE_MB) for
-#                       mb>64 (square-root LR scaling, Goyal et al. 2017
+#                       mb>BASE_MB (square-root LR scaling, Goyal et al. 2017
 #                       Appendix B). Default "0" leaves LR untouched, so
 #                       the sweep isolates the effect of minibatch size at
 #                       fixed LR -- run twice (once with, once without)
@@ -92,7 +92,7 @@ fi
 
 for MB in $MINIBATCH_SIZES; do
     SIZE_OUT="$SWEEP_OUT/mb_$MB"
-    if [ -f "$SIZE_OUT/eval_comparison/summary.json" ]; then
+    if [ -f "$SIZE_OUT/eval_comparison/affinity/summary.json" ]; then
         echo "=== minibatch=$MB already complete, skipping ==="
         continue
     fi
@@ -128,7 +128,8 @@ with open(src) as f:
     specs = yaml.safe_load(f)
 for spec in specs:
     spec["minibatch_size"] = mb
-    if scale_lr and mb > base_mb and "learning_rate" in spec:
+    if (scale_lr and mb > base_mb
+            and spec.get("learning_rate") is not None):
         spec["learning_rate"] = (
             float(spec["learning_rate"]) * math.sqrt(mb / base_mb))
 print(yaml.safe_dump(specs))
@@ -246,7 +247,7 @@ PY
     # params_M are derived from models.combined: row count of manifest.csv
     # gives ensemble size, and summing parameter counts across each
     # weights_<name>.npz gives total trainable params (in millions).
-    python3 - "$SIZE_OUT/eval_comparison/summary.json" "$MB" "$train_sec" \
+    python3 - "$SIZE_OUT/eval_comparison/affinity/summary.json" "$MB" "$train_sec" \
         "$select_sec" "$cal_sec" "$eval_sec" "$total_sec" "$SUMMARY" \
         "$SIZE_OUT/models.combined" <<'PY'
 import json, os, sys
@@ -272,14 +273,14 @@ row = [
     mb, n_models, f"{params_M:.3f}",
     train_s, sel_s, cal_s, eval_s, tot_s,
     s["n_alleles_reported"], s["n_hits"], s["n_rows"],
-    mac["roc_auc"]["new"], mac["roc_auc"]["public"],
-    mac["pr_auc"]["new"],  mac["pr_auc"]["public"],
-    mac["ppv_at_n"]["new"],mac["ppv_at_n"]["public"],
-    mic["new"]["roc_auc"], mic["public"]["roc_auc"],
-    mic["new"]["pr_auc"],  mic["public"]["pr_auc"],
-    mic["new"]["ppv_at_n"],mic["public"]["ppv_at_n"],
-    ac["new_better_roc_auc"], ac["new_better_pr_auc"], ac["new_better_ppv_at_n"],
-    ac["public_better_roc_auc"], ac["public_better_pr_auc"], ac["public_better_ppv_at_n"],
+    mac["roc_auc"]["a"], mac["roc_auc"]["b"],
+    mac["pr_auc"]["a"],  mac["pr_auc"]["b"],
+    mac["ppv_at_n"]["a"],mac["ppv_at_n"]["b"],
+    mic["a"]["roc_auc"], mic["b"]["roc_auc"],
+    mic["a"]["pr_auc"],  mic["b"]["pr_auc"],
+    mic["a"]["ppv_at_n"],mic["b"]["ppv_at_n"],
+    ac["a_better_roc_auc"], ac["a_better_pr_auc"], ac["a_better_ppv_at_n"],
+    ac["b_better_roc_auc"], ac["b_better_pr_auc"], ac["b_better_ppv_at_n"],
 ]
 with open(csv_path, "a") as f:
     f.write(",".join(str(x) for x in row) + "\n")

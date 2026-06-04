@@ -4,6 +4,8 @@ import numpy
 import pandas
 import math
 
+import pytest
+
 from mhcflurry.common import random_peptides
 from mhcflurry.random_negative_peptides import (
     RandomNegativePeptides,
@@ -380,6 +382,92 @@ def test_alignment_left_pad_centered_right_pad_matches_host():
             max_length=max_length,
         )
         numpy.testing.assert_array_equal(device.numpy(), host)
+
+
+def test_alignment_left_pad_centered_right_pad_rejects_short_lengths():
+    """Device path must reject lengths < 5 for left_pad_centered_right_pad,
+    matching the reference encoder's arbitrary min_length=5, so host and
+    device agree on which lengths are supported instead of the device
+    silently encoding lengths 1..4."""
+    import torch
+    from mhcflurry.random_negative_peptides import _place_indices_with_alignment
+    from mhcflurry import amino_acid
+
+    max_length = 15
+    encoded_length = 3 * max_length
+    for length in [1, 2, 3, 4]:
+        out = torch.full(
+            (2, encoded_length), int(amino_acid.X_INDEX), dtype=torch.int8)
+        block = torch.zeros((2, length), dtype=torch.int8)
+        with pytest.raises(ValueError, match="left_pad_centered_right_pad"):
+            _place_indices_with_alignment(
+                out, block, length=length,
+                alignment="left_pad_centered_right_pad",
+                max_length=max_length,
+            )
+
+
+def test_random_negative_match_distribution_excludes_x():
+    """The aa_distribution used for random negatives must exclude X (and any
+    letter mapping to the X/unknown index) and renormalize, so the host
+    sampler (random_peptides) and the device sampler
+    (aa_distribution_to_index_weights, which already drops X) agree. Without
+    this, training peptides containing X would let the host path emit X in
+    negatives while the device path never would."""
+    planner = RandomNegativePeptides(
+        random_negative_method="by_allele",
+        random_negative_binder_threshold=500,
+        random_negative_rate=1.0,
+        random_negative_constant=2,
+        random_negative_match_distribution=True)
+
+    data_rows = [
+        ("HLA-A*02:01", "SIINFEKLX", 1000, "="),
+        ("HLA-A*02:01", "XIINFEKL", 1000, "="),
+        ("HLA-A*02:01", "SIINFEKL", 100, "="),
+    ]
+    for peptide in random_peptides(50, length=9):
+        data_rows.append(("HLA-A*02:01", peptide, 100, "="))
+    data = pandas.DataFrame(
+        data_rows, columns=["allele", "peptide", "affinity", "inequality"])
+
+    planner.plan(
+        peptides=data.peptide.values,
+        affinities=data.affinity.values,
+        alleles=data.allele.values,
+        inequalities=data.inequality.values)
+
+    assert planner.aa_distribution is not None
+    assert "X" not in planner.aa_distribution.index
+    numpy.testing.assert_allclose(planner.aa_distribution.sum(), 1.0)
+    # End to end: generated negatives never contain X.
+    assert not any("X" in peptide for peptide in planner.get_peptides())
+
+
+def test_random_negative_match_distribution_all_x_raises():
+    """If every residue maps to X there are no common amino acids left to
+    sample from after the X-drop; plan() should raise a clear error rather
+    than divide by zero when normalizing the (empty) distribution."""
+    planner = RandomNegativePeptides(
+        random_negative_method="by_allele",
+        random_negative_binder_threshold=500,
+        random_negative_rate=1.0,
+        random_negative_constant=2,
+        random_negative_match_distribution=True)
+
+    data = pandas.DataFrame(
+        [
+            ("HLA-A*02:01", "XXXXXXXX", 1000, "="),
+            ("HLA-A*02:01", "XXXXXXXXX", 1000, "="),
+        ],
+        columns=["allele", "peptide", "affinity", "inequality"])
+
+    with pytest.raises(ValueError, match="no common amino acids"):
+        planner.plan(
+            peptides=data.peptide.values,
+            affinities=data.affinity.values,
+            alleles=data.allele.values,
+            inequalities=data.inequality.values)
 
 
 def test_alignment_pad_middle_matches_host():
