@@ -77,7 +77,12 @@ class FlankingEncoding(object):
             allow_unsupported_amino_acids=True,
             throw=True):
         """
-        Encode variable-length sequences to a fixed-size matrix.
+        Encode variable-length sequences to a fixed-size dense matrix.
+
+        DEPRECATED (scheduled for removal): the processing model always
+        index-encodes sequences ((N, L) int8) and embeds on device. This dense
+        ``(N, L, V)`` encoder has no remaining caller — use
+        ``categorical_encode`` (or ``categorical_encode_tensors``) instead.
 
         Parameters
         ----------
