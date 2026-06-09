@@ -7,37 +7,29 @@
 prediction package with competitive accuracy and a fast and
 [documented](http://openvax.github.io/mhcflurry/) implementation.
 
-> [!IMPORTANT]
-> **Version 2.3.0** keeps the same external API as 2.2.0 and ships substantial
-> performance and tooling improvements for users training their own models or
-> running large prediction workloads:
-> - **Device-resident affinity training**: `Class1NeuralNetwork.fit()` keeps
->   peptides, alleles, targets, and the random-negative pool on the active
->   torch device for the lifetime of one fit, eliminating per-batch
->   host↔device copies.
-> - **Multi-GPU prediction by default**: `mhcflurry-predict`,
->   `mhcflurry-predict-scan`, `mhcflurry-calibrate-percentile-ranks`, and the
->   sweep eval script auto-discover visible GPUs and fan out across them.
-> - **Orchestrator auto-tuning**: `mhcflurry-class1-train-pan-allele-models`
->   resolves `--num-jobs`, `--max-workers-per-gpu`, `--dataloader-num-workers`,
->   and `random_negative_pool_epochs` from the box's hardware so the same
->   recipe runs on a workstation, single-GPU node, or 8×A100 host.
->   `--dataloader-num-workers` applies to streaming pretraining; affinity
->   fine-tuning batches from device-resident tensors.
-> - **`torch.compile` + TF32 + matmul-precision** are first-class CLI flags
->   on the train commands; the in-process Inductor cache is warmed by a single
->   worker before the production pool launches.
->
-> If you are upgrading from 2.1.x or 2.2.x, simply
-> `pip install --upgrade mhcflurry`. The published pre-trained models are
-> unchanged and will be loaded automatically. Internal refactors (per-fit
-> device-resident training tensors, torch-side peptide encodings) do not
-> affect the public Python or CLI surface.
->
-> Earlier release: **Version 2.2.0** was the first release to use PyTorch as
-> its neural network backend, replacing TensorFlow/Keras. It introduced the
-> Python 3.10+ and `pandas >= 2.0` requirements and added Apple Silicon (MPS)
-> support.
+## 2.3.0 release candidate
+
+2.3.0 is currently a **release candidate** (`2.3.0rc1`), not yet a final
+release. It keeps the same API and pre-trained models as 2.2.x. Install it by
+pinning the version:
+
+    pip install mhcflurry==2.3.0rc1
+
+For now, `pip install --upgrade mhcflurry` still installs the latest stable
+release (2.2.x), because pip skips pre-releases unless you pin the version or
+pass `--pre`. Once 2.3.0 is released, `pip install --upgrade mhcflurry` will
+upgrade to it as usual.
+
+2.3.0 adds speed and tooling for people who train their own models or run large
+prediction jobs:
+
+- Training keeps data on the GPU for the whole fit, avoiding per-batch host/device copies.
+- `mhcflurry-predict`, `mhcflurry-predict-scan`, and `mhcflurry-calibrate-percentile-ranks` use all visible GPUs by default.
+- `mhcflurry-class1-train-pan-allele-models` auto-tunes job and worker counts from the hardware, so the same command runs on a laptop, a single GPU, or an 8×A100 host.
+- `torch.compile`, TF32, and matmul precision are available as flags on the training commands.
+
+Version 2.2.0 switched the neural-network backend from TensorFlow/Keras to
+PyTorch and added Apple Silicon (MPS) support.
 
 MHCflurry implements class I peptide/MHC binding affinity prediction.
 The current version provides pan-MHC I predictors supporting any MHC
