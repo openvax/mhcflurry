@@ -44,7 +44,12 @@ _GIB = 1024.0 ** 3
 _FLOAT32_BYTES = 4
 
 # ---- Affinity calibration (cached peptide-stage tensor) --------------------
-_CALIBRATION_DEFAULT_STAGE_DIM = 1024     # when the encoding can't be derived
+# Fallback peptide-stage width used only when manifest.csv is unreadable so
+# the true width can't be derived. Deliberately pessimistic: 1024 is ~2.5x the
+# observed real stage_dim (~400 implied by the ~12 GB anchor below), and
+# over-estimating VRAM is safe -- it only lowers max_workers_per_gpu, never
+# oversubscribes the card.
+_CALIBRATION_DEFAULT_STAGE_DIM = 1024
 _CALIBRATION_OVERHEAD_GB = 3.0            # model weights + activation headroom
 _CALIBRATION_MIN_DEVICE_WORKER_GB = 4.0   # don't over-pack from a tiny estimate
 

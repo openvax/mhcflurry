@@ -436,17 +436,21 @@ def run(argv=sys.argv[1:]):
             # Parallel path: do NOT load the predictor in this process.
             # Each worker loads it after CUDA_VISIBLE_DEVICES is set,
             # so per-worker GPU pinning takes effect.
-            ranges = chunk_ranges_for_local_parallelism(len(df), args.num_jobs)
-            work_items = [
-                {
-                    "chunk_num": chunk_num,
-                    "models_dir": models_dir,
-                    "dataframe": df.iloc[start:end].copy(),
-                    "options": prediction_options,
-                }
-                for (chunk_num, start, end) in ranges
-            ]
             try:
+                # Build the work items inside the try so a failure here (e.g.
+                # an OOM while copying chunk dataframes) still tears the pool
+                # down via the finally rather than leaking non-daemon workers.
+                ranges = chunk_ranges_for_local_parallelism(
+                    len(df), args.num_jobs)
+                work_items = [
+                    {
+                        "chunk_num": chunk_num,
+                        "models_dir": models_dir,
+                        "dataframe": df.iloc[start:end].copy(),
+                        "options": prediction_options,
+                    }
+                    for (chunk_num, start, end) in ranges
+                ]
                 results = worker_pool.imap_unordered(
                     _predict_dataframe_chunk_worker, work_items, chunksize=1)
                 chunks = [result for result in results]

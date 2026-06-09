@@ -356,7 +356,10 @@ def _resolve_components(include_arg, side_a, side_b):
 
 
 def _ppv_at_n(y_true, y_score, n):
-    order = numpy.argsort(-y_score)
+    # Stable sort so tied scores break deterministically (by original index),
+    # making PPV@N reproducible run-to-run. Applied symmetrically to sides A
+    # and B, so it does not bias the comparison.
+    order = numpy.argsort(-y_score, kind="stable")
     top = order[:n]
     return float(y_true[top].sum()) / float(n) if n > 0 else numpy.nan
 
@@ -960,6 +963,13 @@ def _score_values(df, prefix, score_kind):
 
 
 def _presentation_per_sample(scored, score_kind):
+    # NOTE: unlike _affinity_per_allele (which skips groups with <30 rows or
+    # zero hits before entering the macro), this per-sample macro applies no
+    # min-N / class-balance floor -- every (sample_id, hla) group is included,
+    # and only fully-degenerate groups (all-hit or all-decoy) drop out via the
+    # NaN that the downstream nanmean skips. This asymmetry is intentional (the
+    # two macros were never defined to share a threshold), but it does mean the
+    # presentation macro can be pulled around by small, noisy samples.
     rows = []
     for (sample_id, hla), group in scored.groupby(
             ["sample_id", "hla"], dropna=False):

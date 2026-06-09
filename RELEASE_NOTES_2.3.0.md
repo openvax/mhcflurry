@@ -135,6 +135,37 @@ diversity. The neural-network `fit()` / `fit_streaming_batches()` and
 matching `seed=` keyword (defaults to `None` = the prior stochastic behavior
 for direct API callers).
 
+**Reproducibility caveats.** "Bit-for-bit" is exact on CPU and for the default
+(Linear/RMSprop) affinity/processing architecture. Two scope conditions are
+worth knowing:
+
+- **Fixed effective minibatch size.** `fit()` may shrink the minibatch to fit
+  available VRAM, and that shrink depends on free GPU memory and how many
+  workers share the card — so the *same* seed on a busier or smaller GPU can
+  produce a different model. A warning is logged whenever the shrink fires
+  under an explicit seed, and `fit_info["effective_minibatch_size"]` records
+  the value actually used. Pin the minibatch (or run on matching hardware) for
+  cross-machine bit-for-bit reproduction.
+- **CUDA kernel determinism.** Seeding covers the RNGs, but mhcflurry does not
+  force `torch.use_deterministic_algorithms(True)`, and opting into
+  `MHCFLURRY_MATMUL_PRECISION` enables `cudnn.benchmark` autotuning. The
+  default MLP triggers no cuDNN kernels so it stays deterministic;
+  convolutional `locally_connected_layers` variants are not guaranteed
+  bit-identical run-to-run on CUDA.
+
+`mhcflurry-class1-train-presentation-models` also accepts `--random-seed` for
+uniformity (and logs the resolved value), though it has no stochastic step
+today (the logistic-regression fit is deterministic and the parallel feature
+path is pure inference).
+
+Because the framework moved from TF/Keras to a Torch-resident loop, 2.3.0 does
+not reproduce *2.2.x* outputs at an equal seed even on CPU: the per-epoch
+training shuffle moved from NumPy to `torch.randperm`, and scan/presentation
+`result="best"` ties now break deterministically by peptide (a stable
+secondary sort key), so the specific tied peptide reported can differ from
+2.2.x. These changes are intentional; only exact-tie outputs and cross-version
+seed-equality are affected.
+
 ### `--held-out-fraction-seed` default is now `None` (allele-specific)
 
 In `mhcflurry-class1-train-allele-specific-models`, the

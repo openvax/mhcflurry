@@ -8,6 +8,7 @@ import pandas
 
 from mhcflurry.proteome_decoys import (
     infer_flanking_length,
+    iter_protein_peptide_records,
     load_reference_sequences,
     make_peptide_frame_for_accessions,
     sample_peptide_frame_for_accessions,
@@ -158,6 +159,39 @@ def test_infer_flanking_length_rejects_mixed_lengths():
         assert "Expected one flank length" in str(e)
     else:
         raise AssertionError("Expected mixed flank lengths to fail")
+
+
+def test_iter_protein_peptide_records_drops_cterminal_min_length_mer():
+    # Pins the DELIBERATE off-by-one parity with the historical
+    # write_proteome_peptides.py: range(0, len(seq) - min_length) has an
+    # exclusive upper bound, so the min_length-mer starting at
+    # len(seq) - min_length (the C-terminal min_length-mer) is NOT emitted.
+    # This test exists so that behavior can't drift silently.
+    seq = "ACDEFGHIKL"  # length 10
+    records = list(iter_protein_peptide_records(
+        "P1", seq, lengths=[8], flanking_length=2))
+    starts = [start for (_, _, _, _, start) in records]
+    peptides = [pep for (_, pep, _, _, _) in records]
+    # Starts 0 and 1 only; start 2 (== len - min_length) is dropped.
+    assert starts == [0, 1]
+    assert peptides == ["ACDEFGHI", "CDEFGHIK"]
+    assert "DEFGHIKL" not in peptides  # the dropped C-terminal 8-mer
+
+
+def test_iter_protein_peptide_records_multi_length_counts():
+    # With multiple lengths the only systematically dropped peptide is the
+    # C-terminal min_length-mer; longer k-mers are bounded by the
+    # end_pos > len(sequence) break, not the start range.
+    seq = "ACDEFGHIKLMNPQR"  # length 15, min_length 8 -> starts 0..6
+    records = list(iter_protein_peptide_records(
+        "P1", seq, lengths=[8, 9], flanking_length=3))
+    starts8 = [s for (_, pep, _, _, s) in records if len(pep) == 8]
+    starts9 = [s for (_, pep, _, _, s) in records if len(pep) == 9]
+    assert starts8 == list(range(0, 7))
+    assert starts9 == list(range(0, 7))
+    assert len(records) == 14
+    # The 8-mer at start 7 (== len - min_length) is the dropped one.
+    assert "IKLMNPQR" not in [pep for (_, pep, _, _, _) in records]
 
 
 def test_sample_peptide_frame_for_accessions_excludes_peptides():

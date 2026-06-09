@@ -17,7 +17,12 @@ from .class1_neural_network import _estimate_peak_bytes_per_row
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_presentation_predictor import Class1PresentationPredictor
-from .common import configure_logging, write_generate_sh
+from .common import (
+    add_random_seed_arg,
+    configure_logging,
+    configure_random_seed,
+    write_generate_sh,
+)
 from .local_parallelism import (
     add_local_parallelism_args,
     attach_constant_data_to_work_items_if_needed,
@@ -97,6 +102,7 @@ parser.add_argument(
         "Default: %(default)s"))
 
 add_local_parallelism_args(parser)
+add_random_seed_arg(parser)
 
 def run(argv=sys.argv[1:]):
     # On sigusr1 print stack trace
@@ -123,6 +129,14 @@ def main(args):
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
     configure_logging(verbose=args.verbosity > 1)
+
+    # Presentation training has no stochastic step today (fit_from_scores
+    # uses a deterministic solver with no subsampling, and the parallel
+    # feature path is pure inference), but every other training CLI exposes
+    # --random-seed and logs the resolved value. Seed here too for uniformity
+    # and so the resolved seed is recorded; if a stochastic step is ever
+    # added (e.g. a switch to a stochastic solver) it is already covered.
+    configure_random_seed(args.random_seed, name="train-presentation")
 
     df = pandas.read_csv(
         args.data,
@@ -431,13 +445,20 @@ def predict_features_parallel(args, predictor, df, experiment_to_alleles):
             for (model_name, values) in result["processing_scores"].items():
                 processing_scores_by_model[model_name][start:end] = values
 
+        worker_pool.close()
+        worker_pool.join()
+        worker_pool = None
+
         return {
             "affinity": affinity,
             "processing_scores_by_model": processing_scores_by_model,
         }
     finally:
+        # On failure mid-iteration, terminate() rather than close()/join()
+        # (which can hang on a wedged worker) and leave non-daemon workers
+        # behind. On the success path worker_pool is set to None above.
         if worker_pool is not None:
-            worker_pool.close()
+            worker_pool.terminate()
             worker_pool.join()
 
 

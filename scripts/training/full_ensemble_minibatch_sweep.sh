@@ -85,14 +85,31 @@ MHCFLURRY_SKIP_CALIBRATE="${MHCFLURRY_SKIP_CALIBRATE:-0}"
 
 mkdir -p "$SWEEP_OUT"
 SUMMARY="$SWEEP_OUT/sweep_summary.csv"
+SUMMARY_HEADER="minibatch,n_models,params_M,train_seconds,select_seconds,calibrate_seconds,eval_seconds,total_seconds,n_alleles_reported,n_hits,n_rows,roc_auc_macro_new,roc_auc_macro_public,pr_auc_macro_new,pr_auc_macro_public,ppv_at_n_macro_new,ppv_at_n_macro_public,roc_auc_micro_new,roc_auc_micro_public,pr_auc_micro_new,pr_auc_micro_public,ppv_at_n_micro_new,ppv_at_n_micro_public,new_better_roc_auc,new_better_pr_auc,new_better_ppv_at_n,public_better_roc_auc,public_better_pr_auc,public_better_ppv_at_n"
 
-if [ ! -f "$SUMMARY" ]; then
-    echo "minibatch,n_models,params_M,train_seconds,select_seconds,calibrate_seconds,eval_seconds,total_seconds,n_alleles_reported,n_hits,n_rows,roc_auc_macro_new,roc_auc_macro_public,pr_auc_macro_new,pr_auc_macro_public,ppv_at_n_macro_new,ppv_at_n_macro_public,roc_auc_micro_new,roc_auc_micro_public,pr_auc_micro_new,pr_auc_micro_public,ppv_at_n_micro_new,ppv_at_n_micro_public,new_better_roc_auc,new_better_pr_auc,new_better_ppv_at_n,public_better_roc_auc,public_better_pr_auc,public_better_ppv_at_n" > "$SUMMARY"
-fi
+# Rebuild sweep_summary.csv from the durable per-cell row.csv files (header +
+# each cell's row in MINIBATCH_SIZES order). Written atomically via a temp
+# file so a crash never leaves a half-written summary, and regenerated from
+# the per-cell rows every time, so a completed cell's row can never be lost.
+rebuild_summary() {
+    local mb
+    {
+        echo "$SUMMARY_HEADER"
+        for mb in $MINIBATCH_SIZES; do
+            [ -f "$SWEEP_OUT/mb_$mb/row.csv" ] && cat "$SWEEP_OUT/mb_$mb/row.csv"
+        done
+    } > "$SUMMARY.tmp"
+    mv "$SUMMARY.tmp" "$SUMMARY"
+}
 
 for MB in $MINIBATCH_SIZES; do
     SIZE_OUT="$SWEEP_OUT/mb_$MB"
-    if [ -f "$SIZE_OUT/eval_comparison/affinity/summary.json" ]; then
+    # Per-cell completion is marked by row.csv, written (atomically) only
+    # after metrics are extracted -- NOT by summary.json, which compare-models
+    # writes partway through eval. A cell that died after eval but before its
+    # row was recorded therefore re-enters, skips every expensive phase via
+    # its .<phase>.done sentinel, and just regenerates the row.
+    if [ -f "$SIZE_OUT/row.csv" ]; then
         echo "=== minibatch=$MB already complete, skipping ==="
         continue
     fi
@@ -243,12 +260,14 @@ PY
 
     total_sec=$(( train_sec + select_sec + cal_sec + eval_sec ))
 
-    # Pull metrics out of summary.json into the sweep CSV. n_models +
-    # params_M are derived from models.combined: row count of manifest.csv
-    # gives ensemble size, and summing parameter counts across each
-    # weights_<name>.npz gives total trainable params (in millions).
+    # Pull metrics out of summary.json into the cell's own row.csv (written
+    # atomically; the sweep_summary.csv is rebuilt from these rows below).
+    # n_models + params_M are derived from models.combined: row count of
+    # manifest.csv gives ensemble size, and summing the element counts across
+    # each weights_<name>.npz gives the total number of saved parameters (in
+    # millions).
     python3 - "$SIZE_OUT/eval_comparison/affinity/summary.json" "$MB" "$train_sec" \
-        "$select_sec" "$cal_sec" "$eval_sec" "$total_sec" "$SUMMARY" \
+        "$select_sec" "$cal_sec" "$eval_sec" "$total_sec" "$SIZE_OUT/row.csv" \
         "$SIZE_OUT/models.combined" <<'PY'
 import json, os, sys
 import numpy
@@ -282,15 +301,25 @@ row = [
     ac["a_better_roc_auc"], ac["a_better_pr_auc"], ac["a_better_ppv_at_n"],
     ac["b_better_roc_auc"], ac["b_better_pr_auc"], ac["b_better_ppv_at_n"],
 ]
-with open(csv_path, "a") as f:
+# Write the single row atomically (temp file + os.replace) so a crash
+# mid-write can never leave a truncated line that a later run would treat as
+# a completed cell.
+tmp_path = csv_path + ".tmp"
+with open(tmp_path, "w") as f:
     f.write(",".join(str(x) for x in row) + "\n")
+os.replace(tmp_path, csv_path)
 print(f"=== minibatch={mb} done: n_models={n_models} params={params_M:.2f}M "
       f"train={train_s}s select={sel_s}s calibrate={cal_s}s "
       f"eval={eval_s}s total={tot_s}s ===")
 PY
 
+    rebuild_summary
     cd "$MHCFLURRY_OUT"
 done
+
+# Final rebuild so a run where every cell was already complete (and therefore
+# skipped above) still refreshes the summary from the per-cell rows.
+rebuild_summary
 
 echo "=== sweep complete ==="
 cat "$SUMMARY"

@@ -416,25 +416,28 @@ def run(argv=sys.argv[1:]):
                 affinity_model_kwargs=affinity_model_kwargs,
                 processing_batch_size="auto")
         else:
-            sequence_items = list(sequences.items())
-            ranges = chunk_ranges_for_local_parallelism(
-                len(sequence_items), args.num_jobs)
-            work_items = []
-            for (chunk_num, start, end) in ranges:
-                work_items.append({
-                    "chunk_num": chunk_num,
-                    "models_dir": models_dir,
-                    "sequences": dict(sequence_items[start:end]),
-                    "alleles": alleles,
-                    "peptide_lengths": peptide_lengths,
-                    "use_flanks": not args.no_flanking,
-                    "include_affinity_percentile": (
-                        not args.no_affinity_percentile),
-                    "throw": not args.no_throw,
-                    "affinity_model_kwargs": affinity_model_kwargs,
-                    "processing_batch_size": "auto",
-                })
             try:
+                # Build the work items inside the try so a failure here still
+                # tears the pool down via the finally rather than leaking
+                # non-daemon workers.
+                sequence_items = list(sequences.items())
+                ranges = chunk_ranges_for_local_parallelism(
+                    len(sequence_items), args.num_jobs)
+                work_items = []
+                for (chunk_num, start, end) in ranges:
+                    work_items.append({
+                        "chunk_num": chunk_num,
+                        "models_dir": models_dir,
+                        "sequences": dict(sequence_items[start:end]),
+                        "alleles": alleles,
+                        "peptide_lengths": peptide_lengths,
+                        "use_flanks": not args.no_flanking,
+                        "include_affinity_percentile": (
+                            not args.no_affinity_percentile),
+                        "throw": not args.no_throw,
+                        "affinity_model_kwargs": affinity_model_kwargs,
+                        "processing_batch_size": "auto",
+                    })
                 results = worker_pool.imap_unordered(
                     _predict_sequences_chunk_worker, work_items, chunksize=1)
                 chunks = [result for result in results]

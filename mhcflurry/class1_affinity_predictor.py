@@ -2339,7 +2339,22 @@ class Class1AffinityPredictor(object):
 
     @staticmethod
     def _calibration_stage_cache_signature(encoded_peptides, networks, device):
-        """Return the key for a reusable peptide-stage calibration cache."""
+        """Return the key for a reusable peptide-stage calibration cache.
+
+        Keyed on the peptide-set fingerprint, the network object identities
+        (``id``), and the device -- NOT on weight *content*. Adding, removing,
+        or replacing ensemble models changes the ``networks`` list (new
+        objects -> new ids) and so invalidates the cache, but mutating an
+        existing network's weights *in place* (e.g. a re-fit) does not. A
+        weight-content fingerprint is deliberately not used here:
+        ``borrow_cached_network`` serves architecturally-identical networks
+        from a single process-wide ``MODELS_CACHE`` module, so the underlying
+        torch parameter storage is shared across ensemble members and is not a
+        reliable per-network weight signal. Callers that mutate weights in
+        place between fast-calibrate calls on the same predictor instance must
+        therefore call ``clear_calibration_fast_cache()`` first (see
+        ``calibrate_percentile_ranks_fast``).
+        """
         return (
             _peptide_sequences_fingerprint(encoded_peptides.sequences),
             tuple(id(net) for net in networks),
@@ -2446,11 +2461,18 @@ class Class1AffinityPredictor(object):
            comfortably in an A100's 80 GB.
 
         Semantics-preserving w.r.t. ``calibrate_percentile_ranks``: same
-        peptides → same per-network IC50 predictions (bit-identical when
-        the network is deterministic) → same geometric-mean ensemble
-        aggregation → same ``PercentRankTransform.fit`` per allele.
+        peptides → same per-network IC50 predictions (numerically equivalent,
+        ≤1e-12, when the network is deterministic — batched vs per-allele
+        matmul scheduling can differ in the last ULPs) → same geometric-mean
+        ensemble aggregation → same ``PercentRankTransform.fit`` per allele.
         Only the schedule of Python dispatch and GPU kernel launches
         changes.
+
+        Caching note: this method memoizes the peptide-stage activations on
+        the predictor instance across calls (see ``_calibration_fast_cache``).
+        That cache is keyed on network identity, not weight content, so do not
+        mutate the predictor's network weights in place between calls on the
+        same instance without first calling ``clear_calibration_fast_cache()``.
 
         Only handles pan-allele models. Mass-spec-only models and
         ``class1_presentation_predictor`` should keep using the slower
@@ -2567,6 +2589,15 @@ class Class1AffinityPredictor(object):
         # wrong PercentRankTransforms with no error). It intentionally
         # omits ``peptide_batch_size``: that size only controls how the
         # cache tensor is filled, not its contents or shape.
+        #
+        # Cache validity also assumes the predictor's network weights are not
+        # mutated in place between calls on the same instance: the key tracks
+        # network *identity*, not weight content (see
+        # ``_calibration_stage_cache_signature`` for why a content fingerprint
+        # is unreliable here), so a caller that re-fits a network in place must
+        # call ``clear_calibration_fast_cache()`` to avoid reusing stale
+        # stages. Adding/removing/replacing whole models is already safe (new
+        # network objects -> new ids -> cache miss).
         cache = self._calibration_fast_cache()
         cache_signature = self._calibration_stage_cache_signature(
             encoded_peptides, networks, device,

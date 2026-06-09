@@ -88,16 +88,20 @@ class RandomNegativePeptides(object):
                     'random_negative_distribution_smoothing'
                 ])
             # Random negatives are decoys over the common amino acids. Drop X
-            # (and anything else mapping to the X/unknown index) and
+            # and any residue absent from the canonical amino-acid index
+            # (e.g. B/Z/U) -- treat both as the X/unknown index -- then
             # renormalize so the host sampler (random_peptides over this
-            # distribution) and the device sampler
-            # (aa_distribution_to_index_weights, which already excludes X)
-            # agree. Without this, training peptides containing X would let
-            # the host path emit X in negatives while the device path never
-            # would.
+            # distribution) and the device sampler agree. The device sampler
+            # (aa_distribution_to_index_weights) indexes AMINO_ACID_INDEX and
+            # would KeyError on an unsupported letter, so it must never reach
+            # here. Defaulting get() to X_INDEX is load-bearing: a bare
+            # get(letter) returns None for an unsupported residue, and
+            # None != X_INDEX keeps it, which would let the host path emit it
+            # while the device path raises before the first epoch.
             keep = [
                 letter for letter in distribution.index
-                if amino_acid.AMINO_ACID_INDEX.get(letter) != amino_acid.X_INDEX
+                if amino_acid.AMINO_ACID_INDEX.get(letter, amino_acid.X_INDEX)
+                != amino_acid.X_INDEX
             ]
             distribution = distribution.loc[keep]
             total = distribution.sum()
@@ -627,6 +631,11 @@ def encoded_length_for_alignment(alignment, max_length):
 
     Mirrors the shape contract of
     :func:`EncodableSequences.sequences_to_fixed_length_index_encoded_array`.
+    Covers every alignment method for shape bookkeeping / host-path parity;
+    note the device random-negative encoder only supports the subset in
+    ``_SUPPORTED_DEVICE_ALIGNMENTS`` (left_pad_centered_right_pad / pad_middle),
+    so the ``left_pad_right_pad`` / ``right_pad`` / ``left_pad`` branches here
+    are reachable only on the host path, not on device.
     """
     if alignment == "left_pad_centered_right_pad":
         return 3 * int(max_length)

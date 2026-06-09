@@ -204,6 +204,13 @@ parser.add_argument(
          "auto-sized budget. Reducing keeps peak VRAM down on smaller "
          "GPUs but adds kernel-launch overhead.")
 
+# Calibrate deliberately uses the broader training-flavored parallelism set
+# (add_local_parallelism_args) rather than the prediction subset
+# (add_prediction_parallelism_args used by predict / predict-scan): it needs
+# the training-only knobs (e.g. --max-tasks-per-worker, --worker-log-dir,
+# cluster parallelism). The shared flags (--num-jobs/--gpus/--max-workers-per-
+# gpu) are identical across all three, so do not "simplify" this to the
+# prediction helper.
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
 add_random_seed_arg(parser)
@@ -490,16 +497,22 @@ def run_class1_presentation_predictor(args, peptides):
         )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
-        attach_constant_data_to_work_items_if_needed(
-            work_items, GLOBAL_DATA, worker_pool
-        )
-        results = worker_pool.imap_unordered(
-            partial(call_wrapped_kwargs,
-                    do_class1_presentation_percent_rank_scores),
-            work_items,
-            chunksize=1)
+        results = None
 
     try:
+        if worker_pool is not None:
+            # Attach constant data and launch the work inside the try so a
+            # failure here (e.g. copying large constant data to workers) still
+            # tears the pool down via the finally rather than leaking
+            # non-daemon workers.
+            attach_constant_data_to_work_items_if_needed(
+                work_items, GLOBAL_DATA, worker_pool
+            )
+            results = worker_pool.imap_unordered(
+                partial(call_wrapped_kwargs,
+                        do_class1_presentation_percent_rank_scores),
+                work_items,
+                chunksize=1)
         score_chunks = [
             scores for scores in tqdm.tqdm(results, total=len(work_items))
         ]
@@ -686,15 +699,21 @@ def run_class1_affinity_predictor(args, peptides):
         print("Worker pool", worker_pool)
         assert worker_pool is not None
 
-        attach_constant_data_to_work_items_if_needed(
-            work_items, GLOBAL_DATA, worker_pool
-        )
-        results = worker_pool.imap_unordered(
-            partial(call_wrapped_kwargs, do_class1_affinity_calibrate_percentile_ranks),
-            work_items,
-            chunksize=1)
+        results = None
 
     try:
+        if worker_pool is not None:
+            # Attach constant data and launch the work inside the try so a
+            # failure here (e.g. copying large constant data to workers) still
+            # tears the pool down via the finally rather than leaking
+            # non-daemon workers.
+            attach_constant_data_to_work_items_if_needed(
+                work_items, GLOBAL_DATA, worker_pool
+            )
+            results = worker_pool.imap_unordered(
+                partial(call_wrapped_kwargs, do_class1_affinity_calibrate_percentile_ranks),
+                work_items,
+                chunksize=1)
         summary_results_lists = collections.defaultdict(list)
         for work_item in tqdm.tqdm(results, total=len(work_items)):
             for (transforms, summary_results) in work_item:

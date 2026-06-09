@@ -71,7 +71,14 @@ def iter_protein_peptide_records(
 
     The start-position range intentionally matches the historical
     ``write_proteome_peptides.py`` behavior so release data generation remains
-    comparable.
+    comparable. Concretely, ``range(0, len(sequence) - min_length)`` has an
+    exclusive upper bound, so the last start position is
+    ``len(sequence) - min_length - 1`` and the single ``min_length``-mer that
+    would start at ``len(sequence) - min_length`` (the C-terminal
+    ``min_length``-mer) is NOT emitted. This off-by-one is deliberate
+    bug-for-bug parity, not an oversight: changing it would alter the decoy
+    set used to generate released models. ``test_iter_protein_peptide_records_*``
+    pins the resulting counts so the behavior can't drift silently.
     """
     valid_amino_acids = set(valid_amino_acids or COMMON_AMINO_ACIDS)
     lengths = sorted(lengths)

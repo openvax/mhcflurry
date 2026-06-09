@@ -3961,6 +3961,19 @@ class Class1NeuralNetwork(object):
             left as the worker configured them (entropy-seeded), so
             training stays stochastic and decorrelated across workers, as
             it always has been.
+
+            Reproducibility caveats: a fixed ``seed`` reproduces a run
+            bit-for-bit only at a *fixed effective minibatch size*. fit()
+            may shrink the minibatch to fit available VRAM (see
+            ``check_training_batch_fits`` below), and that shrink depends on
+            free GPU memory and how many workers share the card — so the
+            same seed on a busier or smaller GPU can diverge. A warning is
+            logged whenever the shrink fires under a non-None seed. On CUDA,
+            determinism additionally assumes the default (Linear/RMSprop)
+            architecture: opting into ``MHCFLURRY_MATMUL_PRECISION`` enables
+            ``cudnn.benchmark`` autotuning, and convolutional
+            ``locally_connected_layers`` variants are not guaranteed
+            bit-identical run-to-run. CPU runs are fully deterministic.
         """
         device = self.get_device()
         _configure_matmul_precision(device)
@@ -4151,6 +4164,14 @@ class Class1NeuralNetwork(object):
         if _shrunk:
             fit_info["minibatch_size_shrunk_from"] = _requested_minibatch
             fit_info["minibatch_size_shrunk_to"] = _effective_minibatch
+            if seed is not None:
+                logging.warning(
+                    "fit(seed=%s) shrank minibatch_size %d -> %d to fit "
+                    "available VRAM. Reproducibility holds only at a fixed "
+                    "effective minibatch size, so this run may not reproduce "
+                    "bit-for-bit on a GPU with different free memory or a "
+                    "different number of workers per card.",
+                    seed, _requested_minibatch, _effective_minibatch)
         fit_info["effective_minibatch_size"] = _effective_minibatch
 
         optimizer = self._create_optimizer(network)

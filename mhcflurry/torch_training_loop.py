@@ -54,6 +54,16 @@ def _configure_matmul_precision(device):
     Opt in via ``MHCFLURRY_MATMUL_PRECISION={highest,high,medium}``.
     ``highest`` keeps full fp32 precision while still enabling
     ``cudnn.benchmark``.
+
+    Determinism note: ``cudnn.benchmark`` autotunes per shape and can
+    select different algorithms run-to-run, so enabling this opt-in
+    weakens the seeded-fit bit-for-bit guarantee for any workload that
+    actually triggers cuDNN kernels (e.g. convolutional
+    ``locally_connected_layers`` variants). The default Linear/RMSprop MLP
+    triggers no cuDNN kernels, so it stays deterministic either way; CPU
+    runs are unaffected. We deliberately do not call
+    ``torch.use_deterministic_algorithms(True)`` here because some ops lack
+    deterministic CUDA kernels and would raise.
     """
     if device.type != "cuda":
         return

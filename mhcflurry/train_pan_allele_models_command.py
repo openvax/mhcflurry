@@ -778,16 +778,21 @@ def train_models(args):
         print("Processing %d work items in parallel." % len(work_items))
         assert not serial_run
 
-        attach_constant_data_to_work_items_if_needed(
-            work_items, GLOBAL_DATA, worker_pool
-        )
-
-        results_generator = worker_pool.imap_unordered(
-            partial(call_wrapped_kwargs, train_model),
-            work_items,
-            chunksize=1)
+        results_generator = None
 
     try:
+        if worker_pool is not None:
+            # Attach constant data and launch the work inside the try so a
+            # failure here (e.g. copying large constant data to workers) still
+            # tears the pool down via the finally rather than leaking
+            # non-daemon workers.
+            attach_constant_data_to_work_items_if_needed(
+                work_items, GLOBAL_DATA, worker_pool
+            )
+            results_generator = worker_pool.imap_unordered(
+                partial(call_wrapped_kwargs, train_model),
+                work_items,
+                chunksize=1)
         if results_generator:
             for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
                 save_start = time.time()

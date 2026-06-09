@@ -58,11 +58,13 @@ class PercentRankTransform(object):
         -------
         List of ``PercentRankTransform`` of length n_distributions.
 
-        Numerically equivalent to the per-row ``numpy.histogram`` path:
-        same bin assignment (right-open intervals, last bin inclusive),
-        same CDF normalization (% out of in-range count), bit-identical
-        ``cdf`` array layout (length n_bins+3, sentinels at [0]=[1]=0,
-        [-1]=100, cumsum in [2:-1]).
+        Numerically equivalent to the per-row ``numpy.histogram`` path
+        (matching to ≤1e-12, not bit-for-bit -- division/cumsum ordering on
+        CUDA drifts in the last ULPs, far below bin resolution): same bin
+        assignment (right-open intervals, last bin inclusive), same CDF
+        normalization (% out of in-range count), and an identical ``cdf``
+        array layout (length n_bins+3, sentinels at [0]=[1]=0, [-1]=100,
+        cumsum in [2:-1]).
         """
         import torch
         assert values_2d.dim() == 2, values_2d.shape

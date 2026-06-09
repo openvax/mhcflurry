@@ -74,7 +74,16 @@ def derive_seed(master_seed, *parts):
     rooted in the run's single master seed. ``master_seed`` may be None
     (e.g. a legacy run with no recorded seed); the result is still stable.
     """
-    identity = "|".join(str(p) for p in ((master_seed,) + parts))
+    pieces = [str(p) for p in ((master_seed,) + parts)]
+    # The "|" join is unambiguous only because no coordinate contains "|"
+    # (parts are integers / allele names today). Guard it so a future caller
+    # passing a "|"-containing identity fails loudly rather than silently
+    # colliding with a differently-split set of parts -- e.g. ("a|b",) vs
+    # ("a", "b"). Kept as a guard rather than a new length-prefixed encoding
+    # so every existing derived seed is unchanged.
+    assert not any("|" in piece for piece in pieces), (
+        "derive_seed parts must not contain '|': %r" % (parts,))
+    identity = "|".join(pieces)
     return int(hashlib.sha1(identity.encode()).hexdigest()[:16], 16)
 
 

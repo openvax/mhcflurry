@@ -14,7 +14,7 @@ import torch.nn.functional as F
 
 from . import amino_acid
 from .hyperparameters import HyperparameterDefaults
-from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
+from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE, _torch_from_numpy
 from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
 from .torch_training_loop import (
@@ -802,11 +802,14 @@ class Class1ProcessingNeuralNetwork(object):
         # slicing by `batch_idx` on-device removes the per-step
         # numpy.from_numpy + astype + .to(device) trio that this loop
         # used to do every minibatch.
-        seq_dev = torch.from_numpy(x_dict["sequence"]).to(device)
-        length_dev = torch.from_numpy(x_dict["peptide_length"]).to(device)
-        targets_dev = torch.from_numpy(targets.astype(numpy.float32)).to(device)
+        # Route through _torch_from_numpy (copies non-writeable arrays) for
+        # parity with the affinity path; encode_indices returns fresh arrays
+        # today, but this guards against a future read-only cache entry.
+        seq_dev = _torch_from_numpy(x_dict["sequence"]).to(device)
+        length_dev = _torch_from_numpy(x_dict["peptide_length"]).to(device)
+        targets_dev = _torch_from_numpy(targets.astype(numpy.float32)).to(device)
         weights_dev = (
-            torch.from_numpy(sample_weights.astype(numpy.float32)).to(device)
+            _torch_from_numpy(sample_weights.astype(numpy.float32)).to(device)
             if sample_weights is not None
             else None
         )

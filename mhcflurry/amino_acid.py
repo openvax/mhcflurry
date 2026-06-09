@@ -430,12 +430,24 @@ def available_vector_encodings():
     these names and the ``:minmax`` suffix, for example
     ``"BLOSUM62+PMBEC:minmax"``.
 
+    Several encodings are registered under more than one name (aliases:
+    e.g. ``"PMBEC"``/``"pmbec"``, ``"contact"``/``"simons1999-contact"``/
+    ``"SIMK990103"``). Each underlying encoding is listed once -- by its
+    first-registered (canonical) name -- so the advertised list has no
+    duplicates; every alias still resolves via ``get_vector_encoding_df``.
+
     Returns
     -------
     list of string
 
     """
-    return list(ENCODING_DATA_FRAMES)
+    seen_ids = set()
+    unique_names = []
+    for name, df in ENCODING_DATA_FRAMES.items():
+        if id(df) not in seen_ids:
+            seen_ids.add(id(df))
+            unique_names.append(name)
+    return unique_names
 
 
 def vector_encoding_length(name):
