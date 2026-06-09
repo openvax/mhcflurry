@@ -20,10 +20,22 @@ from sklearn.metrics import roc_auc_score
 import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .common import normalize_allele_name
+from .common import (
+    add_random_seed_arg,
+    configure_logging,
+    configure_random_seed,
+    derive_seed,
+    filter_canonicalizable_alleles,
+    normalize_allele_name,
+    random_peptides,
+    write_generate_sh,
+)
 from .encodable_sequences import EncodableSequences
-from .common import configure_logging, random_peptides
-from .local_parallelism import worker_pool_with_gpu_assignments_from_args, add_local_parallelism_args
+from .local_parallelism import (
+    add_local_parallelism_args,
+    worker_pool_with_gpu_assignments_from_args,
+)
+from .workload_planning import WORKLOAD_AFFINITY_SELECTION, path_size_bytes
 from .regression_target import from_ic50
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
@@ -32,8 +44,8 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # To avoid pickling large matrices to send to child processes when running in
 # parallel, we use this global variable as a place to store data. Data that is
 # stored here before creating the thread pool will be inherited to the child
-# processes upon fork() call, allowing us to share large data with the workers
-# via shared memory.
+# processes upon fork() call, allowing local workers to read the same
+# copy-on-write pages instead of receiving a pickled copy.
 GLOBAL_DATA = {}
 
 
@@ -180,11 +192,10 @@ parser.add_argument(
     default=0)
 
 add_local_parallelism_args(parser)
+add_random_seed_arg(parser)
 
 
 def run(argv=sys.argv[1:]):
-    global GLOBAL_DATA
-
     # On sigusr1 print stack trace
     print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
     signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
@@ -195,13 +206,25 @@ def run(argv=sys.argv[1:]):
 
     configure_logging(verbose=args.verbosity > 1)
 
+    # Seed all randomness up front (the allele shuffle below runs in this
+    # process). Per-allele scrambling in model_select runs in workers, so we
+    # also stash the master seed in GLOBAL_DATA and reseed per allele there.
+    master_seed = configure_random_seed(
+        args.random_seed, name="select-allele-specific")
+
     input_predictor = Class1AffinityPredictor.load(args.models_dir)
     print("Loaded: %s" % input_predictor)
 
     if args.allele:
+        # User-supplied alleles must canonicalize; mismatch is a config error.
         alleles = [normalize_allele_name(a) for a in args.allele]
     else:
-        alleles = input_predictor.supported_alleles
+        # Pre-filter pseudogene / null / questionable supported_alleles so a
+        # single bad row doesn't crash the parallel selection mid-fold.
+        alleles = filter_canonicalizable_alleles(
+            input_predictor.supported_alleles,
+            log_label="supported_alleles",
+        )
 
     metadata_dfs = {}
     if args.data:
@@ -344,6 +367,7 @@ def run(argv=sys.argv[1:]):
     GLOBAL_DATA["unselected_accuracy_scorer"] = unselected_accuracy_scorer
     GLOBAL_DATA["allele_to_selector"] = allele_to_selector
     GLOBAL_DATA["allele_to_model_selection_kwargs"] = allele_to_model_selection_kwargs
+    GLOBAL_DATA["seed"] = master_seed
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -352,7 +376,18 @@ def run(argv=sys.argv[1:]):
 
     result_predictor = Class1AffinityPredictor(metadata_dataframes=metadata_dfs)
 
-    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+    worker_pool = worker_pool_with_gpu_assignments_from_args(
+        args,
+        workload_name=WORKLOAD_AFFINITY_SELECTION,
+        workload_hints={
+            "data_bytes": sum(
+                value or 0 for value in (
+                    path_size_bytes(args.data),
+                    path_size_bytes(args.exclude_data),
+                )
+            ) or None,
+        },
+    )
 
     start = time.time()
 
@@ -397,6 +432,7 @@ def run(argv=sys.argv[1:]):
 
     print("Done model selecting for %d alleles." % len(alleles))
     result_predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
 
     model_selection_time = time.time() - start
 
@@ -424,6 +460,11 @@ class ScrambledPredictor(object):
 
 
 def model_select(allele, constant_data=GLOBAL_DATA):
+    # Runs in a worker, which reseeds its RNGs from entropy on startup. Reseed
+    # from the run's master seed mixed with the allele so the scrambling
+    # ``.sample(frac=1.0)`` in the accuracy scorer is reproducible per allele.
+    numpy.random.seed(derive_seed(constant_data.get("seed"), allele) % (2 ** 32))
+
     unselected_accuracy_scorer = constant_data["unselected_accuracy_scorer"]
     selector = constant_data["allele_to_selector"][allele]
     model_selection_kwargs = constant_data[

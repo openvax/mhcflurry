@@ -16,6 +16,8 @@ def setup_module():
     cleanup()
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_multi_output(setup_module):
     hyperparameters = dict(
         loss="custom:mse_with_inequalities_and_multiple_outputs",

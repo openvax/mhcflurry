@@ -59,7 +59,7 @@ do
         cp $SCRIPT_DIR/make_benchmark.py .
         time python make_benchmark.py \
             --hits "$(mhcflurry-downloads path models_class1_processing)/hits_with_tpm.csv.bz2" \
-            --proteome-peptides "$(mhcflurry-downloads path models_class1_processing)/proteome_peptides.csv.bz2" \
+            --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
             --decoys-per-hit 110 \
             --exclude-train-data "$EXCLUDE_TRAIN_DATA" \
             --only-format MONOALLELIC \
@@ -85,7 +85,7 @@ do
         cp $SCRIPT_DIR/make_benchmark.py .
         time python make_benchmark.py \
             --hits "$(mhcflurry-downloads path models_class1_processing)/hits_with_tpm.csv.bz2" \
-            --proteome-peptides "$(mhcflurry-downloads path models_class1_processing)/proteome_peptides.csv.bz2" \
+            --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
             --decoys-per-hit 110 \
             --exclude-train-data "$EXCLUDE_TRAIN_DATA" \
             --only-format MULTIALLELIC \

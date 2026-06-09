@@ -8,6 +8,7 @@ selected models across all folds.
 """
 import argparse
 import os
+import re
 import signal
 import sys
 import time
@@ -23,10 +24,20 @@ import tqdm  # progress bar
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .encodable_sequences import EncodableSequences
 from .allele_encoding import AlleleEncoding
-from .common import configure_logging
+from .common import (
+    configure_logging,
+    filter_canonicalizable_alleles,
+    write_generate_sh,
+)
 from .local_parallelism import (
+    attach_constant_data_to_work_items_if_needed,
+    resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)
+from .workload_planning import (
+    WORKLOAD_AFFINITY_SELECTION,
+    path_size_bytes,
+)
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -38,8 +49,8 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # To avoid pickling large matrices to send to child processes when running in
 # parallel, we use this global variable as a place to store data. Data that is
 # stored here before creating the thread pool will be inherited to the child
-# processes upon fork() call, allowing us to share large data with the workers
-# via shared memory.
+# processes upon fork() call, allowing local workers to read the same
+# copy-on-write pages instead of receiving a pickled copy.
 GLOBAL_DATA = {}
 
 
@@ -132,8 +143,6 @@ def mse(
 
 
 def run(argv=sys.argv[1:]):
-    global GLOBAL_DATA
-
     # On sigusr1 print stack trace
     print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
     signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
@@ -143,6 +152,12 @@ def run(argv=sys.argv[1:]):
     args.out_models_dir = os.path.abspath(args.out_models_dir)
 
     configure_logging(verbose=args.verbosity > 1)
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not args.cluster_parallelism,
+        workload_name=WORKLOAD_AFFINITY_SELECTION,
+        workload_hints={"data_bytes": path_size_bytes(args.data)},
+    )
 
     df = pandas.read_csv(args.data)
     print("Loaded data: %s" % (str(df.shape)))
@@ -151,16 +166,50 @@ def run(argv=sys.argv[1:]):
         args.models_dir, optimization_level=0)
     print("Loaded: %s" % input_predictor)
 
-    alleles = input_predictor.supported_alleles
+    # Filter pseudogene / null / questionable alleles up front so a single
+    # bad row in ``input_predictor.supported_alleles`` doesn't crash the
+    # parallel selection pass mid-fold. Same helper that calibrate uses.
+    alleles = filter_canonicalizable_alleles(
+        input_predictor.supported_alleles,
+        log_label="supported_alleles",
+    )
     (min_peptide_length, max_peptide_length) = (
         input_predictor.supported_peptide_lengths)
 
     metadata_dfs = {}
 
-    fold_cols = [c for c in df if c.startswith("fold_")]
+    # Match only ``fold_<int>`` exactly so a stray ``fold_0_x`` column
+    # (e.g. from a pandas merge with default ``_x``/``_y`` suffixes) is
+    # surfaced as a clean error instead of crashing later in
+    # ``int(col.split("_")[-1])``. The merge that produced the suffix
+    # collision is fixed upstream in train_pan_allele_models_command;
+    # this is the defense-in-depth so the parser never lies.
+    fold_cols = [c for c in df if re.match(r"^fold_\d+$", c)]
     num_folds = len(fold_cols)
     if num_folds <= 1:
-        raise ValueError("Too few folds: ", num_folds)
+        raise ValueError(
+            "Too few clean ``fold_<int>`` columns: %d (saw: %s)" % (
+                num_folds, [c for c in df if c.startswith("fold_")]))
+
+    def make_train_peptide_hash(sub_df):
+        train_peptide_hash = hashlib.sha1()
+        for peptide in sorted(sub_df.peptide.values):
+            train_peptide_hash.update(peptide.encode())
+        return train_peptide_hash.hexdigest()
+
+    # Compute the per-fold training-peptide hash on the raw saved data
+    # *before* applying the peptide-length / canonicalizable-allele
+    # filters below. The saved ``train_data.csv.bz2`` was written by
+    # ``train_pan_allele_models_command`` from the same df it trained
+    # on, and the train-time hash is over that unfiltered fold subset.
+    # Hashing the filtered df here would silently drop any rows whose
+    # allele fails ``normalize_allele_name`` (pseudogenes / null
+    # annotations are real entries in the public allele_sequences.csv)
+    # and produce a false-positive mismatch against the train-time hash.
+    fold_hashes = {
+        int(col.split("_")[-1]): make_train_peptide_hash(df.loc[df[col] == 1])
+        for col in fold_cols
+    }
 
     df = df.loc[
         (df.peptide.str.len() >= min_peptide_length) &
@@ -181,17 +230,10 @@ def run(argv=sys.argv[1:]):
     df["mass_spec"] = df.measurement_source.str.contains(
         args.mass_spec_regex)
 
-    def make_train_peptide_hash(sub_df):
-        train_peptide_hash = hashlib.sha1()
-        for peptide in sorted(sub_df.peptide.values):
-            train_peptide_hash.update(peptide.encode())
-        return train_peptide_hash.hexdigest()
-
-    folds_to_predictors = dict(
-        (int(col.split("_")[-1]), (
-            [],
-            make_train_peptide_hash(df.loc[df[col] == 1])))
-        for col in fold_cols)
+    folds_to_predictors = {
+        fold_num: ([], fold_hashes[fold_num])
+        for fold_num in fold_hashes
+    }
     print(folds_to_predictors)
     for model in input_predictor.class1_pan_allele_models:
         training_info = model.fit_info[-1]['training_info']
@@ -226,6 +268,7 @@ def run(argv=sys.argv[1:]):
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
     worker_pool = None
     start = time.time()
+    print(f"TIMING_MARKER selection_start {start:.3f}")
     if serial_run:
         # Serial run
         print("Running in serial.")
@@ -247,9 +290,9 @@ def run(argv=sys.argv[1:]):
         print("Processing %d work items in parallel." % len(work_items))
         assert not serial_run
 
-        for item in work_items:
-            item['constant_data'] = GLOBAL_DATA
-
+        attach_constant_data_to_work_items_if_needed(
+            work_items, GLOBAL_DATA, worker_pool
+        )
         # Parallel run
         results = worker_pool.imap_unordered(
             do_model_select_task,
@@ -280,8 +323,10 @@ def run(argv=sys.argv[1:]):
         summary_df.reset_index(drop=True))
 
     result_predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
 
     model_selection_time = time.time() - start
+    print(f"TIMING_MARKER selection_done {time.time():.3f}")
 
     if worker_pool:
         worker_pool.close()

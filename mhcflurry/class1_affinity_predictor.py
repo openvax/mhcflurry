@@ -2,9 +2,10 @@ import collections
 import hashlib
 import json
 import logging
+import shlex
 import time
 import warnings
-from os.path import join, exists, abspath
+from os.path import join, exists, abspath, dirname
 from os import mkdir, environ
 from socket import gethostname
 from getpass import getuser
@@ -13,11 +14,21 @@ import numpy
 import pandas
 
 
-from .class1_neural_network import Class1NeuralNetwork
+from .class1_neural_network import (
+    Class1NeuralNetwork,
+    cartesian_network_output,
+    cartesian_output_log_ic50_sum,
+)
+from .motif_summary import (
+    prepare_motif_summary_state_gpu,
+    motif_summary_chunk_gpu,
+)
 from .common import (
+    derive_seed,
     random_peptides,
     positional_frequency_matrix,
-    normalize_allele_name
+    normalize_allele_name,
+    AlleleKeyResolver,
 )
 from .downloads import get_default_class1_models_dir
 from .encodable_sequences import EncodableSequences
@@ -27,6 +38,11 @@ from .version import __version__
 from .ensemble_centrality import CENTRALITY_MEASURES
 from .allele_encoding import AlleleEncoding
 from .common import save_weights, load_weights
+from .pseudosequences import (
+    LEGACY_ALLELE_SEQUENCES_FILENAME,
+    pseudosequence_filename_candidates,
+    pseudosequence_filename_for_mapping,
+)
 
 
 # Default function for combining predictions across models in an ensemble.
@@ -35,6 +51,50 @@ DEFAULT_CENTRALITY_MEASURE = "mean"
 
 # Any value > 0 will result in attempting to optimize models after loading.
 OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 1))
+
+def _peptide_sequences_fingerprint(sequences):
+    """Order-and-content-sensitive SHA-256 of a peptide list.
+
+    Length-prefixes each peptide so e.g. ``["AB", "C"]`` and ``["A", "BC"]``
+    cannot collide by concatenation. Used as the cache key for the fast
+    calibration peptide-stage cache; collisions there silently reuse the
+    wrong tensors and produce wrong PercentRankTransforms.
+    """
+    h = hashlib.sha256()
+    for peptide in sequences:
+        b = str(peptide).encode("utf8")
+        h.update(len(b).to_bytes(8, "little"))
+        h.update(b)
+    return h.hexdigest()
+
+
+class _CalibrationFastCache(object):
+    """Per-predictor-instance state for ``calibrate_percentile_ranks_fast``.
+
+    Holds the device-resident peptide-stage tensors and the motif-summary
+    helper state that survive across calibrate tasks within one worker.
+    Centralizing both fields here makes the cache lifecycle visible —
+    it used to live behind dynamic ``setattr`` of private names.
+    """
+
+    __slots__ = (
+        "stage_signature",
+        "cached_stages",
+        "motif_signature",
+        "motif_state",
+    )
+
+    def __init__(self):
+        self.stage_signature = None
+        self.cached_stages = None
+        self.motif_signature = None
+        self.motif_state = None
+
+    def clear(self):
+        self.stage_signature = None
+        self.cached_stages = None
+        self.motif_signature = None
+        self.motif_state = None
 
 
 class Class1AffinityPredictor(object):
@@ -56,7 +116,8 @@ class Class1AffinityPredictor(object):
             allele_to_percent_rank_transform=None,
             metadata_dataframes=None,
             provenance_string=None,
-            optimization_info=None):
+            optimization_info=None,
+            models_dir=None):
         """
         Parameters
         ----------
@@ -67,8 +128,7 @@ class Class1AffinityPredictor(object):
             Ensemble of pan-allele models.
 
         allele_to_sequence : dict of string -> string
-            MHC allele name to fixed-length amino acid sequence (sometimes
-            referred to as the pseudosequence). Required only if
+            MHC allele name to fixed-length pseudosequence. Required only if
             class1_pan_allele_models is specified.
 
         manifest_df : `pandas.DataFrame`, optional
@@ -91,6 +151,9 @@ class Class1AffinityPredictor(object):
             Dict describing any optimizations already performed on the model.
             The only currently supported optimization is to merge ensembles
             together into one PyTorch model.
+
+        models_dir : string, optional
+            Directory this predictor was loaded from. Used for diagnostics.
         """
 
         if allele_to_allele_specific_models is None:
@@ -122,6 +185,7 @@ class Class1AffinityPredictor(object):
         assert isinstance(self.class1_pan_allele_models, list)
 
         self.provenance_string = provenance_string
+        self.models_dir = models_dir
         self.allele_to_canonical = {}  # populated by load()
 
     @property
@@ -173,6 +237,7 @@ class Class1AffinityPredictor(object):
         """
         self._cache.clear()
         self.provenance_string = None
+        self.models_dir = None
 
     @property
     def neural_networks(self):
@@ -291,6 +356,11 @@ class Class1AffinityPredictor(object):
         (which aliases map to C*01:02) resolve to their own pseudosequence
         when one exists.
 
+        Raises on names that cannot be normalized (loud failure for explicit
+        prediction/calibration inputs). The no-alias-first logic lives in
+        ``AlleleKeyResolver``; training ingestion shares it via
+        ``canonicalize_allele_series``.
+
         Parameters
         ----------
         raw_name : str
@@ -299,16 +369,15 @@ class Class1AffinityPredictor(object):
         -------
         str
         """
-        # Try without aliases first — this matches pseudosequence keys
-        # directly and avoids mhcgnomes alias remapping or Q/N annotations.
-        if self.allele_to_sequence:
-            no_alias = normalize_allele_name(
-                raw_name, raise_on_error=False, use_allele_aliases=False)
-            if no_alias is not None and no_alias in self.allele_to_sequence:
-                return no_alias
-        # Fall back to aliases and map through canonical lookup.
-        normalized = normalize_allele_name(raw_name)
-        return self.allele_to_canonical.get(normalized, normalized)
+        # Cache one resolver (built from the already-built load-time maps) so
+        # the per-row calls in predict_to_dataframe don't reconstruct it each
+        # time. Lives in ``self._cache`` so ``clear_cache`` drops it whenever
+        # the allele maps change, exactly as ``supported_alleles`` is handled.
+        if "allele_key_resolver" not in self._cache:
+            self._cache["allele_key_resolver"] = AlleleKeyResolver(
+                self.allele_to_sequence, self.allele_to_canonical)
+        return self._cache["allele_key_resolver"].resolve(
+            raw_name, raise_on_error=True)
 
     @property
     def supported_alleles(self):
@@ -376,8 +445,8 @@ class Class1AffinityPredictor(object):
         The serialization format consists of a file called "manifest.csv" with
         the configurations of each Class1NeuralNetwork, along with per-network
         files giving the model weights. If there are pan-allele predictors in
-        the ensemble, the allele sequences are also stored in the
-        directory. There is also a small file "index.txt" with basic metadata:
+        the ensemble, the pseudosequences are also stored in the
+        directory. There is also a small file "info.txt" with basic metadata:
         when the models were trained, by whom, on what host.
 
         Parameters
@@ -387,73 +456,104 @@ class Class1AffinityPredictor(object):
 
         model_names_to_write : list of string, optional
             Only write the weights for the specified models. Useful for
-            incremental updates during training.
+            incremental updates during training. Passing an explicit empty
+            list writes no model artifacts; this is used by calibration-only
+            updates that should replace ``percent_ranks.csv`` without touching
+            the manifest, weights, model provenance, allele sequences, or
+            optimization metadata. Explicit ``metadata_dataframes`` are still
+            written when ``write_metadata`` is true.
 
         write_metadata : boolean, optional
             Whether to write optional metadata
         """
-        self.check_consistency()
-
         if model_names_to_write is None:
             # Write all models
-            model_names_to_write = self.manifest_df.model_name.values
+            model_names_to_write = list(self.manifest_df.model_name.values)
+            write_model_artifacts = True
+        else:
+            model_names_to_write = list(model_names_to_write)
+            write_model_artifacts = len(model_names_to_write) > 0
+
+        if write_model_artifacts:
+            self.check_consistency()
 
         if not exists(models_dir):
             mkdir(models_dir)
 
-        sub_manifest_df = self.manifest_df.loc[
-            self.manifest_df.model_name.isin(model_names_to_write)
-        ].copy()
+        if write_model_artifacts:
+            sub_manifest_df = self.manifest_df.loc[
+                self.manifest_df.model_name.isin(model_names_to_write)
+            ].copy()
 
-        # Network JSON configs may have changed since the models were added,
-        # for example due to changes to the allele representation layer.
-        # So we update the JSON configs here also.
-        updated_network_config_jsons = []
-        for (_, row) in sub_manifest_df.iterrows():
-            updated_network_config_jsons.append(
-                json.dumps(row.model.get_config()))
-            weights_path = self.weights_path(models_dir, row.model_name)
-            save_weights(row.model.get_weights(), weights_path)
-            logging.info("Wrote: %s", weights_path)
-        sub_manifest_df["config_json"] = updated_network_config_jsons
-        self.manifest_df.loc[
-            sub_manifest_df.index,
-            "config_json"
-        ] = updated_network_config_jsons
+            # Network JSON configs may have changed since the models were added,
+            # for example due to changes to the allele representation layer.
+            # So we update the JSON configs here also.
+            updated_network_config_jsons = []
+            for (_, row) in sub_manifest_df.iterrows():
+                updated_network_config_jsons.append(
+                    json.dumps(row.model.get_config()))
+                weights_path = self.weights_path(models_dir, row.model_name)
+                save_weights(row.model.get_weights(), weights_path)
+                logging.info("Wrote: %s", weights_path)
+            sub_manifest_df["config_json"] = updated_network_config_jsons
+            self.manifest_df.loc[
+                sub_manifest_df.index,
+                "config_json"
+            ] = updated_network_config_jsons
 
-        write_manifest_df = self.manifest_df[[
-            c for c in self.manifest_df.columns if c != "model"
-        ]]
-        manifest_path = join(models_dir, "manifest.csv")
-        write_manifest_df.to_csv(manifest_path, index=False)
-        logging.info("Wrote: %s", manifest_path)
+            write_manifest_df = self.manifest_df[[
+                c for c in self.manifest_df.columns if c != "model"
+            ]]
+            manifest_path = join(models_dir, "manifest.csv")
+            write_manifest_df.to_csv(manifest_path, index=False)
+            logging.info("Wrote: %s", manifest_path)
 
-        if write_metadata:
-            # Write "info.txt"
-            info_path = join(models_dir, "info.txt")
-            rows = [
-                ("trained on", time.asctime()),
-                ("package   ", "mhcflurry %s" % __version__),
-                ("hostname  ", gethostname()),
-                ("user      ", getuser()),
-            ]
-            pandas.DataFrame(rows).to_csv(
-                info_path, sep="\t", header=False, index=False)
+            if write_metadata:
+                # Write "info.txt"
+                info_path = join(models_dir, "info.txt")
+                rows = [
+                    ("trained on", time.asctime()),
+                    ("package   ", "mhcflurry %s" % __version__),
+                    ("hostname  ", gethostname()),
+                    ("user      ", getuser()),
+                ]
+                pandas.DataFrame(rows).to_csv(
+                    info_path, sep="\t", header=False, index=False)
 
-            if self.metadata_dataframes:
-                for (name, df) in self.metadata_dataframes.items():
-                    metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
-                    df.to_csv(metadata_df_path, index=False, compression="bz2")
+            # Save pseudosequences. New artifacts get an explicit
+            # pseudosequences.<source>.<length>aa.csv filename while still
+            # writing allele_sequences.csv for older MHCflurry releases and
+            # external tooling.
+            if self.allele_to_sequence is not None:
+                allele_to_sequence_df = pandas.DataFrame(
+                    list(self.allele_to_sequence.items()),
+                    columns=['allele', 'sequence']
+                )
+                legacy_path = join(models_dir, LEGACY_ALLELE_SEQUENCES_FILENAME)
+                allele_to_sequence_df.to_csv(legacy_path, index=False)
+                logging.info("Wrote: %s", legacy_path)
 
-        # Save allele sequences
-        if self.allele_to_sequence is not None:
-            allele_to_sequence_df = pandas.DataFrame(
-                list(self.allele_to_sequence.items()),
-                columns=['allele', 'sequence']
-            )
-            allele_to_sequence_df.to_csv(
-                join(models_dir, "allele_sequences.csv"), index=False)
-            logging.info("Wrote: %s", join(models_dir, "allele_sequences.csv"))
+                pseudosequences_filename = (
+                    pseudosequence_filename_for_mapping(
+                        self.allele_to_sequence))
+                if pseudosequences_filename is not None:
+                    pseudosequences_path = join(
+                        models_dir, pseudosequences_filename)
+                    pseudosequences_df = pandas.DataFrame(
+                        list(self.allele_to_sequence.items()),
+                        columns=['allele', 'pseudosequence'])
+                    pseudosequences_df.to_csv(
+                        pseudosequences_path, index=False)
+                    logging.info("Wrote: %s", pseudosequences_path)
+                else:
+                    logging.info(
+                        "Pseudosequences have mixed or unknown lengths; "
+                        "skipping explicit pseudosequences.*.*aa.csv alias.")
+
+        if write_metadata and self.metadata_dataframes:
+            for (name, df) in self.metadata_dataframes.items():
+                metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
+                df.to_csv(metadata_df_path, index=False, compression="bz2")
 
         if self.allele_to_percent_rank_transform:
             percent_ranks_df = None
@@ -476,7 +576,7 @@ class Class1AffinityPredictor(object):
                 index_label="bin")
             logging.info("Wrote: %s", percent_ranks_path)
 
-        if self.optimization_info:
+        if write_model_artifacts and self.optimization_info:
             # If the model being saved was optimized, we need to save that
             # information since it can affect how predictions are performed
             # (e.g. stitched-together ensembles output concatenated results,
@@ -484,6 +584,7 @@ class Class1AffinityPredictor(object):
             optimization_info_path = join(models_dir, "optimization_info.json")
             with open(optimization_info_path, "w") as fd:
                 json.dump(self.optimization_info, fd, indent=4)
+        self.models_dir = abspath(models_dir)
 
     @staticmethod
     def load(models_dir=None, max_models=None, optimization_level=None):
@@ -530,9 +631,14 @@ class Class1AffinityPredictor(object):
         # ----- Load pseudosequences first so we can canonicalize -----
         allele_to_sequence = None
         allele_to_canonical = {}
-        if exists(join(models_dir, "allele_sequences.csv")):
+        allele_sequences_filename = None
+        candidates = pseudosequence_filename_candidates(models_dir)
+        if candidates:
+            allele_sequences_filename = candidates[0]
+
+        if allele_sequences_filename is not None:
             allele_to_sequence = pandas.read_csv(
-                join(models_dir, "allele_sequences.csv"),
+                join(models_dir, allele_sequences_filename),
                 index_col=0).iloc[:, 0].to_dict()
 
             # Re-normalize allele names. We first try without IMGT allele
@@ -572,7 +678,7 @@ class Class1AffinityPredictor(object):
                 renormalized[normalized] = value
             allele_to_sequence = renormalized
             if skipped_non_class1:
-                logging.info(
+                logging.debug(
                     "Skipped %d non-class-I entries from pseudosequence "
                     "file (class II / TAP / pseudogene with incomplete "
                     "pseudosequences): %s",
@@ -606,7 +712,8 @@ class Class1AffinityPredictor(object):
 
             model = Class1NeuralNetwork.from_config(
                 config,
-                weights_loader=partial(load_weights, abspath(weights_filename)))
+                weights_loader=partial(load_weights, abspath(weights_filename)),
+                weight_paths=abspath(weights_filename))
             if row.allele == "pan-class1":
                 class1_pan_allele_models.append(model)
             else:
@@ -668,6 +775,7 @@ class Class1AffinityPredictor(object):
             allele_to_percent_rank_transform=allele_to_percent_rank_transform,
             provenance_string=provenance_string,
             optimization_info=optimization_info,
+            models_dir=abspath(models_dir),
         )
         if allele_to_sequence is not None:
             result.allele_to_canonical = allele_to_canonical
@@ -802,7 +910,8 @@ class Class1AffinityPredictor(object):
             models_dir_for_save=None,
             verbose=0,
             progress_preamble="",
-            progress_print_interval=5.0):
+            progress_print_interval=5.0,
+            seed=None):
         """
         Fit one or more allele specific predictors for a single allele using one
         or more neural network architectures.
@@ -844,6 +953,13 @@ class Class1AffinityPredictor(object):
 
         progress_print_interval : float
             How often (in seconds) to print progress. Set to None to disable.
+
+        seed : int, optional
+            Base seed for this allele's fits. When given, each (model_num,
+            architecture_num) pair gets a distinct sub-seed derived from it,
+            so ensemble members are decorrelated but the whole call is
+            reproducible. When None, each `Class1NeuralNetwork.fit` is left
+            entropy-seeded as before.
 
         Returns
         -------
@@ -893,6 +1009,17 @@ class Class1AffinityPredictor(object):
                     architecture_hyperparameters_list):
                 model = Class1NeuralNetwork(**architecture_hyperparameters)
                 for round_num in range(n_rounds):
+                    # Distinct sub-seed per (ensemble member, architecture,
+                    # round) so members don't initialize identically and each
+                    # round sees a different shuffle / random-negative draw,
+                    # while the whole call stays reproducible from the
+                    # caller's base seed. fit() re-seeds the global RNG at its
+                    # start, so the round_num must be part of the mix —
+                    # otherwise every round would replay round 0's randomness.
+                    fit_seed = (
+                        None if seed is None
+                        else derive_seed(
+                            seed, model_num, architecture_num, round_num))
                     (round_peptides, round_affinities, round_inequalities) = (
                         peptides_affinities_inequalities_per_round[round_num]
                     )
@@ -901,6 +1028,7 @@ class Class1AffinityPredictor(object):
                         round_affinities,
                         inequalities=round_inequalities,
                         verbose=verbose,
+                        seed=fit_seed,
                         progress_preamble=progress_preamble_template.format(
                             n_peptides=len(round_peptides),
                             round=round_num,
@@ -1073,32 +1201,55 @@ class Class1AffinityPredictor(object):
         """
         if allele is not None:
             normalized_allele = self.canonicalize_allele_name(allele)
-            try:
-                transform = self.allele_to_percent_rank_transform[normalized_allele]
+            calibrated_allele = self.percent_rank_calibrated_allele(
+                normalized_allele
+            )
+            if calibrated_allele is not None:
+                transform = self.allele_to_percent_rank_transform[calibrated_allele]
                 return transform.transform(affinities)
-            except KeyError:
-                if self.allele_to_sequence:
-                    # See if we have information for an equivalent allele
-                    sequence = self.allele_to_sequence[normalized_allele]
-                    other_alleles = [
-                        other_allele for (other_allele, other_sequence)
-                        in self.allele_to_sequence.items()
-                        if other_sequence == sequence
-                    ]
-                    for other_allele in other_alleles:
-                        if other_allele in self.allele_to_percent_rank_transform:
-                            transform = self.allele_to_percent_rank_transform[
-                                other_allele]
-                            return transform.transform(affinities)
 
-                msg = "Allele %s has no percentile rank information" % (
-                    allele + (
-                        "" if allele == normalized_allele
-                        else " (normalized to %s)" % normalized_allele))
-                if throw:
-                    raise ValueError(msg)
-                warnings.warn(msg)
-                return numpy.ones(len(affinities)) * numpy.nan  # Return NaNs
+            allele_repr = allele + (
+                "" if allele == normalized_allele
+                else " (normalized to %s)" % normalized_allele)
+            affinity_known = (
+                self.allele_to_sequence is not None
+                and normalized_allele in self.allele_to_sequence
+            )
+            hint_lines = [
+                "Missing percentile-rank calibration for %s." % allele_repr,
+            ]
+            if affinity_known:
+                hint_lines.append(
+                    "Affinity predictions are available; percentile ranks are not."
+                )
+            else:
+                hint_lines.append(
+                    "The predictor also lacks an allele sequence for %s; "
+                    "affinity prediction is unavailable." % normalized_allele
+                )
+            calibrate_command = ["mhcflurry-calibrate-percentile-ranks"]
+            models_dir = self.models_dir_for_diagnostics()
+            if models_dir:
+                calibrate_command.extend(["--models-dir", models_dir])
+            calibrate_command.extend(["--allele", normalized_allele, "..."])
+            calibrate_command = " ".join(
+                shlex.quote(part) for part in calibrate_command
+            )
+            if models_dir:
+                command_message = "Calibrate with: `%s`." % calibrate_command
+            else:
+                command_message = (
+                    "Calibrate with: `%s` against this models directory."
+                    % calibrate_command
+                )
+            hint_lines.append(
+                command_message
+            )
+            msg = " ".join(hint_lines)
+            if throw:
+                raise ValueError(msg)
+            warnings.warn(msg)
+            return numpy.ones(len(affinities)) * numpy.nan  # Return NaNs
 
         if alleles is None:
             raise ValueError("Specify allele or alleles")
@@ -1110,6 +1261,60 @@ class Class1AffinityPredictor(object):
             df.loc[sub_df.index, "result"] = self.percentile_ranks(
                 sub_df.affinity, allele=allele, throw=throw)
         return df.result.values
+
+    def model_source_description(self):
+        """Return a compact human-readable description of this predictor."""
+        pieces = []
+        models_dir = self.models_dir_for_diagnostics()
+        if models_dir:
+            pieces.append("models_dir=%s" % models_dir)
+        if self.provenance_string:
+            pieces.append(self.provenance_string)
+        pieces.append("%d model(s)" % len(self.neural_networks))
+        pieces.append(
+            "%d percent-rank calibration(s)" % (
+                len(self.allele_to_percent_rank_transform)))
+        return "; ".join(pieces)
+
+    def models_dir_for_diagnostics(self):
+        """Return explicit or inferred models dir for user-facing messages."""
+        if self.models_dir:
+            return self.models_dir
+
+        source_dirs = set()
+        for model in self.neural_networks:
+            for path in getattr(model, "network_weight_paths", ()):
+                source_dir = dirname(path)
+                if source_dir:
+                    source_dirs.add(abspath(source_dir))
+        if len(source_dirs) == 1:
+            return next(iter(source_dirs))
+        return None
+
+    def percent_rank_calibrated_allele(self, allele):
+        """Return the allele key whose percentile-rank transform applies.
+
+        Percent-rank calibration is allele-specific, but pan predictors can
+        reuse calibration from another allele with the same pseudosequence.
+        This helper centralizes that equivalence check for prediction and CLI
+        status/filtering code.
+        """
+        normalized_allele = self.canonicalize_allele_name(allele)
+        if normalized_allele in self.allele_to_percent_rank_transform:
+            return normalized_allele
+
+        if (
+                self.allele_to_sequence is None
+                or normalized_allele not in self.allele_to_sequence):
+            return None
+
+        sequence = self.allele_to_sequence[normalized_allele]
+        for other_allele in sorted(self.allele_to_sequence):
+            if (
+                    self.allele_to_sequence[other_allele] == sequence
+                    and other_allele in self.allele_to_percent_rank_transform):
+                return other_allele
+        return None
 
     def predict(
             self,
@@ -1144,7 +1349,6 @@ class Class1AffinityPredictor(object):
             ensemble. Options include: mean, median, robust_mean.
         model_kwargs : dict
             Additional keyword arguments to pass to Class1NeuralNetwork.predict
-
         Returns
         -------
         numpy.array of predictions
@@ -1157,9 +1361,183 @@ class Class1AffinityPredictor(object):
             include_percentile_ranks=False,
             include_confidence_intervals=False,
             centrality_measure=centrality_measure,
-            model_kwargs=model_kwargs
+            model_kwargs=model_kwargs,
         )
         return df.prediction.values
+
+    def predict_cartesian_pan_allele(
+            self,
+            peptides,
+            alleles,
+            throw=True,
+            centrality_measure=DEFAULT_CENTRALITY_MEASURE,
+            model_kwargs=None):
+        """
+        Predict a peptide x allele matrix using the optimized pan-allele path.
+
+        Returns ``None`` when the predictor is not a single optimized merged
+        pan-allele model. Callers can then fall back to ``predict``. This path
+        keeps peptide encodings unique, computes the peptide stage once per
+        peptide batch, and combines it with allele embeddings on-device.
+        """
+        if model_kwargs is None:
+            model_kwargs = {}
+        else:
+            model_kwargs = dict(model_kwargs)
+
+        if (
+                not self.optimization_info.get("pan_models_merged", False)
+                or len(self.class1_pan_allele_models) != 1
+                or self.allele_to_allele_specific_models):
+            return None
+
+        import torch
+        from .class1_neural_network import (
+            DEFAULT_PREDICT_BATCH_SIZE,
+            resolve_prediction_batch_size,
+        )
+        from .torch_training_loop import (
+            _configure_matmul_precision,
+            _maybe_compile_network,
+        )
+
+        peptides = EncodableSequences.create(peptides)
+        if len(peptides) == 0 or len(alleles) == 0:
+            return numpy.empty((len(peptides), len(alleles)), dtype="float64")
+
+        (min_peptide_length, max_peptide_length) = (
+            self.supported_peptide_lengths)
+        peptide_df = pandas.DataFrame({"peptide": peptides.sequences})
+        sequence_length = peptide_df.peptide.str.len()
+        supported_peptide = (
+            (sequence_length >= min_peptide_length) &
+            (sequence_length <= max_peptide_length)
+        )
+        if (~supported_peptide).any():
+            msg = (
+                "%d peptides have lengths outside of supported range [%d, %d]: "
+                "%s" % (
+                    (~supported_peptide).sum(),
+                    min_peptide_length,
+                    max_peptide_length,
+                    str(peptide_df.loc[~supported_peptide].peptide.unique())))
+            logging.warning(msg)
+            if throw:
+                raise ValueError(msg)
+
+        peptide_has_valid_amino_acids = (
+            (~supported_peptide) |
+            peptide_df.peptide.str.upper().str.match("^[ACDEFGHIKLMNPQRSTVWY]+$")
+        )
+        supported_peptide = supported_peptide & peptide_has_valid_amino_acids
+        if (~peptide_has_valid_amino_acids).any():
+            msg = (
+                "%d peptides have nonstandard amino acids: "
+                "%s" % (
+                    (~peptide_has_valid_amino_acids).sum(),
+                    str(peptide_df.loc[
+                        ~peptide_has_valid_amino_acids
+                    ].peptide.unique())))
+            logging.warning(msg)
+            if throw:
+                raise ValueError(msg)
+
+        normalized_alleles = [
+            self.canonicalize_allele_name(allele)
+            for allele in alleles
+        ]
+        unsupported_alleles = [
+            allele for allele in normalized_alleles
+            if allele not in self.allele_to_sequence
+        ]
+        if unsupported_alleles:
+            msg = "No sequences for allele(s): %s." % " ".join(
+                unsupported_alleles)
+            logging.warning(msg)
+            if throw:
+                raise ValueError(msg)
+            return None
+
+        model_obj = self.class1_pan_allele_models[0]
+        master = self.master_allele_encoding
+        allele_encoding = AlleleEncoding(
+            normalized_alleles,
+            borrow_from=master,
+        ).compact()
+        (
+            allele_encoding_input,
+            allele_representations,
+        ) = model_obj.allele_encoding_to_network_input(allele_encoding)
+        model_obj.set_allele_representations(allele_representations)
+
+        device = model_obj.get_device()
+        _configure_matmul_precision(device)
+        network = model_obj.network(borrow=True)
+        network.to(device)
+        network = _maybe_compile_network(network, device)
+        network.eval()
+
+        n_peptides = len(peptides)
+        n_alleles = len(normalized_alleles)
+        result = numpy.full((n_peptides, n_alleles), numpy.nan, dtype="float64")
+        supported_indices = numpy.flatnonzero(supported_peptide.to_numpy())
+        if len(supported_indices) == 0:
+            return result
+        peptides_to_predict = EncodableSequences.create(
+            peptides.sequences[supported_indices])
+        peptide_input = model_obj.peptides_to_network_input(peptides_to_predict)
+        batch_size = resolve_prediction_batch_size(
+            model_kwargs.get("batch_size", DEFAULT_PREDICT_BATCH_SIZE),
+            device,
+            model=network,
+            num_workers_per_gpu=model_kwargs.get("num_workers_per_gpu", 1),
+        )
+        batch_size = int(batch_size)
+
+        allele_encoding_input = numpy.asarray(allele_encoding_input)
+        if not allele_encoding_input.flags.writeable:
+            allele_encoding_input = allele_encoding_input.copy()
+        allele_idx = torch.from_numpy(allele_encoding_input).to(device)
+        peptide_is_indices = model_obj.uses_peptide_torch_encoding()
+
+        if callable(centrality_measure):
+            centrality_function = centrality_measure
+        else:
+            centrality_function = CENTRALITY_MEASURES[centrality_measure]
+
+        def peptide_tensor(batch_array):
+            batch_array = numpy.asarray(batch_array)
+            if not batch_array.flags.writeable:
+                batch_array = batch_array.copy()
+            keep_int = (
+                peptide_is_indices
+                and batch_array.ndim == 2
+                and numpy.issubdtype(batch_array.dtype, numpy.integer)
+            )
+            if not keep_int:
+                batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
+            return torch.from_numpy(batch_array).to(device)
+
+        with torch.no_grad():
+            for start in range(0, len(peptides_to_predict), batch_size):
+                end = min(start + batch_size, len(peptides_to_predict))
+                peptide_batch = peptide_tensor(peptide_input[start:end])
+                peptide_stage = network.forward_peptide_stage(peptide_batch)
+                output = network.forward_cartesian_from_peptide_stage(
+                    peptide_stage,
+                    allele_idx,
+                )
+                affinities = to_ic50(output.detach().cpu().numpy())
+                if affinities.ndim == 3 and affinities.shape[2] > 1:
+                    log_values = numpy.log(
+                        affinities.reshape((-1, affinities.shape[2]))
+                    )
+                    centers = numpy.exp(centrality_function(log_values))
+                    affinities = centers.reshape(n_alleles, end - start)
+                else:
+                    affinities = affinities.reshape(n_alleles, end - start)
+                result[supported_indices[start:end]] = affinities.T
+        return result
 
     def predict_to_dataframe(
             self,
@@ -1611,6 +1989,891 @@ class Class1AffinityPredictor(object):
             }
         return {}
 
+    @staticmethod
+    def _auto_size_calibration_batches(
+            model, device, n_peptides, n_alleles,
+            num_workers_per_gpu=1,
+            free_memory_fraction=0.85,
+            num_cached_networks=1,
+            peptide_stage_dim=None,
+            num_sub_networks=None,
+            cuda_overhead_bytes=2 * (1 << 30),
+            safety_multiplier=1.3,
+            fixed_peptide_batch=None,
+            fixed_allele_batch=None):
+        """Split the auto-sized batch budget between peptide and allele axes.
+
+        ``fixed_peptide_batch`` / ``fixed_allele_batch`` pin one axis to a
+        user-supplied value (mixed pin/auto mode). The pinned axis is held
+        constant and only the other axis is sized against the VRAM budget, so
+        the auto axis shrinks to keep ``allele_batch × peptide_batch`` within
+        the per-worker budget instead of being sized as if the pinned axis were
+        also auto (which would underestimate peak VRAM).
+
+        Models the per-worker VRAM peak as:
+
+            peak = cuda_overhead
+                 + cache_bytes                # peptide-stage cache,
+                                              # ``num_cached_networks ×
+                                              # n_peptides × stage_dim × 4``
+                 + cartesian_intermediate     # transient forward
+                                              # ``a_size × p_batch ×
+                                              # peak_bytes_per_row``
+                 + small_state                # log-IC50 acc, ic50_unique,
+                                              # motif state (~1 GB)
+            with explicit free-memory headroom plus a safety factor on
+            CUDA/runtime scratch allocations to absorb fragmentation that
+            ``mem_get_info`` can't see.
+
+        ``peak_bytes_per_row`` is calibrated for the cartesian fast path.
+        For a merged ensemble it uses one sub-network's hidden activation
+        peak plus the small retained per-sub-network outputs, matching
+        ``MergedClass1NeuralNetwork.forward_cartesian_from_peptide_stage``
+        which runs each sub-network to completion before starting the next.
+        The cartesian-intermediate term scales with ``a_size × p_batch``,
+        which is exactly the rate the budget carves out — preserving the existing
+        ``total_rows = forward_budget // peak_bytes`` math.
+
+        Returns the chosen ``(peptide_batch, allele_batch)``.
+        """
+        from .class1_neural_network import (
+            compute_prediction_batch_size,
+            _free_device_memory_bytes,
+            _AUTO_BATCH_MAX_ROWS,
+            _AUTO_BATCH_MIN_ROWS,
+        )
+        import torch
+
+        def env_float(name, default):
+            try:
+                return float(environ.get(name, default))
+            except (TypeError, ValueError):
+                logging.warning(
+                    "Ignoring invalid %s=%r; using %s",
+                    name, environ.get(name), default,
+                )
+                return float(default)
+
+        if n_peptides == 0 or n_alleles == 0:
+            return max(n_peptides, 1), max(n_alleles, 1)
+        free_memory_fraction = env_float(
+            "MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION",
+            free_memory_fraction,
+        )
+        reserve_fraction = env_float(
+            "MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", 0.10)
+        reserve_min_bytes = int(
+            env_float("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", 2.0)
+            * (1 << 30)
+        )
+        fixed_safety_multiplier = env_float(
+            "MHCFLURRY_CALIBRATE_AUTO_FIXED_SAFETY_MULTIPLIER",
+            safety_multiplier,
+        )
+        if device.type != "cuda":
+            total_rows = compute_prediction_batch_size(
+                device,
+                model=model,
+                num_workers_per_gpu=num_workers_per_gpu,
+                free_memory_fraction=free_memory_fraction,
+            )
+        else:
+            workers = max(int(num_workers_per_gpu), 1)
+            free = _free_device_memory_bytes(device)
+            total_memory = free
+            try:
+                props = torch.cuda.get_device_properties(device)
+                total_memory = int(props.total_memory)
+            except Exception:
+                # Tests and nonstandard CUDA wrappers may not expose device
+                # properties. Fall back to free memory; the explicit reserve
+                # still keeps the budget bounded.
+                pass
+            peak_bytes = (
+                Class1AffinityPredictor
+                ._estimate_calibration_peak_bytes_per_row(model)
+            )
+            reserve_bytes = max(
+                reserve_min_bytes,
+                int(total_memory * reserve_fraction),
+            )
+            fraction_budget = int(
+                free * float(free_memory_fraction) / workers)
+            reserved_headroom_budget = int(
+                max(free - reserve_bytes, 0) / workers)
+            per_worker_budget = min(fraction_budget, reserved_headroom_budget)
+            stage_dim = peptide_stage_dim
+            sub_networks = getattr(model, "networks", None)
+            if num_sub_networks is None:
+                num_sub_networks = (
+                    len(sub_networks) if sub_networks is not None else 1
+                )
+            if stage_dim is None:
+                # MergedClass1NeuralNetwork: peptide-stage cache is the
+                # concatenation of all sub-networks' stages → sum the
+                # per-sub-network stage dims. The peptide_encoding_shape
+                # heuristic is a *floor* (raw encoded peptide) — actual
+                # stage_dim grows when peptide_dense_layer_sizes or LC
+                # layers are configured. Caller should pass
+                # ``peptide_stage_dim`` from a real probe to avoid
+                # under-counting.
+                if (
+                    sub_networks is not None
+                    and not hasattr(model, "peptide_encoding_shape")
+                ):
+                    try:
+                        sub_dims = []
+                        for net in sub_networks:
+                            sub_enc = getattr(net, "peptide_encoding_shape", None)
+                            if sub_enc is not None:
+                                sub_dims.append(int(sub_enc[0]) * int(sub_enc[1]))
+                            else:
+                                sub_dims.append(1024)
+                        stage_dim = int(sum(sub_dims))
+                    except Exception:
+                        stage_dim = None
+                if stage_dim is None:
+                    try:
+                        enc_shape = getattr(model, "peptide_encoding_shape", None)
+                        if enc_shape is not None:
+                            stage_dim = int(enc_shape[0]) * int(enc_shape[1])
+                    except Exception:
+                        stage_dim = None
+                if stage_dim is None:
+                    stage_dim = peak_bytes // 32 if peak_bytes else 1024
+            cache_bytes = (
+                int(num_cached_networks)
+                * int(n_peptides)
+                * int(stage_dim)
+                * 4
+            )
+            # Small-state pad: log-IC50 accumulator, ic50_unique view,
+            # motif-summary state, PercentRankTransform.fit_batch_torch
+            # buffers, allele_idx tensor, etc. Scales with a_size and
+            # n_peptides; a 1 GB constant covers the production ranges
+            # without further accounting. Cheap insurance vs OOM.
+            small_state_bytes = 1 * (1 << 30)
+            # The peptide-stage cache estimate is shape-derived and
+            # persistent, so multiplying it by a fragmentation safety factor
+            # unnecessarily strands several GB on A100-40GB. Keep explicit
+            # global headroom, and safety-pad only CUDA/runtime scratch and
+            # small state whose allocation behavior is less predictable.
+            scratch_state_bytes = int(cuda_overhead_bytes) + small_state_bytes
+            guarded_fixed_overhead = (
+                cache_bytes
+                + int(scratch_state_bytes * fixed_safety_multiplier)
+            )
+            forward_budget = (
+                per_worker_budget - guarded_fixed_overhead
+            )
+            logging.info(
+                "calibrate auto-sizer: free=%.2f GB, workers=%d, "
+                "total=%.2f GB, reserve=%.2f GB, "
+                "fraction_budget=%.2f GB, per_worker_budget=%.2f GB, "
+                "stage_dim=%d "
+                "(sub_networks=%d, num_cached=%d), cache=%.2f GB, "
+                "cuda_overhead=%.2f GB, small_state=%.2f GB, "
+                "scratch_safety=%.2fx, guarded_fixed=%.2f GB "
+                "-> forward_budget=%.2f GB, "
+                "peak_bytes_per_row=%d (≈%.2f KB)",
+                free / 1e9, workers, total_memory / 1e9,
+                reserve_bytes / 1e9, fraction_budget / 1e9,
+                per_worker_budget / 1e9, stage_dim,
+                num_sub_networks, num_cached_networks,
+                cache_bytes / 1e9, cuda_overhead_bytes / 1e9,
+                small_state_bytes / 1e9, fixed_safety_multiplier,
+                guarded_fixed_overhead / 1e9,
+                forward_budget / 1e9, peak_bytes, peak_bytes / 1024,
+            )
+            if forward_budget < peak_bytes * _AUTO_BATCH_MIN_ROWS:
+                logging.warning(
+                    "calibrate auto-sizer: fixed overhead "
+                    "(cache %.2f GB + scratch/state %.2f GB × safety %.2fx) "
+                    "exceeds per-worker budget %.2f GB "
+                    "(%.2f GB free, %.2f GB reserved, %d workers). "
+                    "Falling back to minimum batch; reduce "
+                    "--max-workers-per-gpu or lower the peptide universe "
+                    "size.",
+                    cache_bytes / 1e9,
+                    scratch_state_bytes / 1e9,
+                    fixed_safety_multiplier,
+                    per_worker_budget / 1e9,
+                    free / 1e9,
+                    reserve_bytes / 1e9,
+                    workers,
+                )
+                forward_budget = peak_bytes * _AUTO_BATCH_MIN_ROWS
+            total_rows = max(
+                _AUTO_BATCH_MIN_ROWS,
+                min(forward_budget // peak_bytes, _AUTO_BATCH_MAX_ROWS),
+            )
+        return Class1AffinityPredictor._choose_calibration_batch_shape(
+            total_rows,
+            n_peptides=n_peptides,
+            n_alleles=n_alleles,
+            min_peptide_batch=max(_AUTO_BATCH_MIN_ROWS, 2_000),
+            fixed_peptide_batch=fixed_peptide_batch,
+            fixed_allele_batch=fixed_allele_batch,
+        )
+
+    @staticmethod
+    def _estimate_calibration_peak_bytes_per_row(model):
+        """Estimate cartesian calibration forward peak bytes per row.
+
+        The generic prediction estimator is deliberately conservative for
+        arbitrary merged forwards. Calibration has a more specific execution
+        shape: ``MergedClass1NeuralNetwork.forward_cartesian_from_peptide_stage``
+        evaluates sub-networks serially and retains only their final outputs
+        before combining them. Hidden-layer peak memory is therefore the max
+        sub-network peak, not the sum of every sub-network peak.
+        """
+        from .class1_neural_network import _estimate_peak_bytes_per_row
+
+        if model is None:
+            return _estimate_peak_bytes_per_row(model)
+
+        sub_networks = getattr(model, "networks", None)
+        if sub_networks is None or hasattr(model, "peptide_encoding_shape"):
+            return _estimate_peak_bytes_per_row(model)
+
+        try:
+            sub_peaks = [
+                _estimate_peak_bytes_per_row(net)
+                for net in sub_networks
+            ]
+            if not sub_peaks:
+                return _estimate_peak_bytes_per_row(model)
+            output_channels = 0
+            for net in sub_networks:
+                output_layer = getattr(net, "output_layer", None)
+                output_channels += int(getattr(output_layer, "out_features", 1))
+            # Retained outputs are small compared with hidden activations but
+            # include them, padded for stack/cat/log-IC50 temporary tensors.
+            retained_output_bytes = max(output_channels, 1) * 8 * 4
+            return int(max(sub_peaks) + retained_output_bytes)
+        except (AttributeError, TypeError, ValueError) as exc:
+            logging.warning(
+                "Could not estimate calibration peak for merged ensemble; "
+                "falling back to generic estimator: %s",
+                exc,
+            )
+            return _estimate_peak_bytes_per_row(model)
+
+    @staticmethod
+    def _choose_calibration_batch_shape(
+            total_rows,
+            n_peptides,
+            n_alleles,
+            min_peptide_batch,
+            max_allele_batch=256,
+            fixed_peptide_batch=None,
+            fixed_allele_batch=None):
+        """Choose ``(peptide_batch, allele_batch)`` under a row budget.
+
+        Minimize the number of cartesian forward chunks rather than filling
+        one axis greedily. This matters for the production shape
+        (tens of alleles × tens of thousands of peptides), where many
+        equivalent row budgets can differ by 20-40% in Python-level loop
+        count and kernel launches.
+
+        ``fixed_peptide_batch`` / ``fixed_allele_batch`` pin one axis (mixed
+        pin/auto mode). The pinned axis is held at the user value and the other
+        axis is sized as ``total_rows // pinned`` so the product stays within
+        the budget; the pinned axis is *not* capped by ``max_allele_batch``
+        (the user asked for it explicitly).
+        """
+        total_rows = max(int(total_rows), 1)
+        n_peptides = max(int(n_peptides), 1)
+        n_alleles = max(int(n_alleles), 1)
+        min_peptide_batch = max(int(min_peptide_batch), 1)
+        max_allele_batch = max(int(max_allele_batch), 1)
+
+        # Mixed pin/auto: hold the pinned axis fixed and size the other axis
+        # against the same row budget so peak VRAM isn't underestimated.
+        if fixed_allele_batch is not None and fixed_peptide_batch is None:
+            allele_batch = min(max(int(fixed_allele_batch), 1), n_alleles)
+            peptide_batch = max(total_rows // allele_batch, 1)
+            peptide_batch = min(n_peptides, peptide_batch)
+            return int(peptide_batch), int(allele_batch)
+        if fixed_peptide_batch is not None and fixed_allele_batch is None:
+            peptide_batch = min(max(int(fixed_peptide_batch), 1), n_peptides)
+            allele_batch = max(total_rows // peptide_batch, 1)
+            allele_batch = min(n_alleles, max_allele_batch, allele_batch)
+            return int(peptide_batch), int(allele_batch)
+
+        max_a = min(n_alleles, max_allele_batch, max(total_rows, 1))
+        best = None
+        for allele_batch in range(1, max_a + 1):
+            peptide_batch = total_rows // allele_batch
+            if peptide_batch < min_peptide_batch:
+                continue
+            peptide_batch = min(n_peptides, max(min_peptide_batch, peptide_batch))
+            chunk_count = (
+                int(numpy.ceil(n_alleles / float(allele_batch)))
+                * int(numpy.ceil(n_peptides / float(peptide_batch)))
+            )
+            used_rows = allele_batch * peptide_batch
+            candidate = (
+                chunk_count,
+                -used_rows,
+                -allele_batch,
+                -peptide_batch,
+                peptide_batch,
+                allele_batch,
+            )
+            if best is None or candidate < best:
+                best = candidate
+
+        if best is None:
+            allele_batch = min(n_alleles, max_a)
+            peptide_batch = min(n_peptides, max(min_peptide_batch, total_rows))
+            while allele_batch * peptide_batch > total_rows and allele_batch > 1:
+                allele_batch -= 1
+            while (
+                    allele_batch * peptide_batch > total_rows
+                    and peptide_batch > min_peptide_batch):
+                peptide_batch = max(min_peptide_batch, peptide_batch // 2)
+            return int(peptide_batch), int(allele_batch)
+
+        return int(best[4]), int(best[5])
+
+    @staticmethod
+    def _calibration_stage_cache_signature(encoded_peptides, networks, device):
+        """Return the key for a reusable peptide-stage calibration cache.
+
+        Keyed on the peptide-set fingerprint, the network object identities
+        (``id``), and the device -- NOT on weight *content*. Adding, removing,
+        or replacing ensemble models changes the ``networks`` list (new
+        objects -> new ids) and so invalidates the cache, but mutating an
+        existing network's weights *in place* (e.g. a re-fit) does not. A
+        weight-content fingerprint is deliberately not used here:
+        ``borrow_cached_network`` serves architecturally-identical networks
+        from a single process-wide ``MODELS_CACHE`` module, so the underlying
+        torch parameter storage is shared across ensemble members and is not a
+        reliable per-network weight signal. Callers that mutate weights in
+        place between fast-calibrate calls on the same predictor instance must
+        therefore call ``clear_calibration_fast_cache()`` first (see
+        ``calibrate_percentile_ranks_fast``).
+        """
+        return (
+            _peptide_sequences_fingerprint(encoded_peptides.sequences),
+            tuple(id(net) for net in networks),
+            str(device),
+        )
+
+    @staticmethod
+    def _probe_peptide_stage_dim(net_obj, encoded_peptides, device):
+        """Run a 1-row forward through ``forward_peptide_stage`` to
+        record the actual feature dimension of the peptide-stage
+        output. The auto-sizer's cache estimate depends on this and
+        the encoding-shape heuristic under-counts when the model
+        configures ``peptide_dense_layer_sizes`` or LC layers.
+
+        Returns ``None`` on probe failure so callers can fall back
+        to the heuristic.
+        """
+        import torch
+        from .encodable_sequences import EncodableSequences
+        try:
+            seqs = list(encoded_peptides.sequences)
+            if not seqs:
+                return None
+            probe_seqs = EncodableSequences.create([seqs[0]])
+            probe_input = net_obj.peptides_to_network_input(probe_seqs)
+            probe_is_int = net_obj.uses_peptide_torch_encoding()
+            if (
+                probe_is_int
+                and probe_input.ndim == 2
+                and numpy.issubdtype(probe_input.dtype, numpy.integer)
+            ):
+                probe_tensor = torch.from_numpy(probe_input).to(device)
+            else:
+                probe_tensor = torch.from_numpy(
+                    numpy.asarray(probe_input, dtype=numpy.float32)
+                ).to(device)
+            model = net_obj.network(borrow=True)
+            model.eval()
+            with torch.no_grad():
+                stage = model.forward_peptide_stage(probe_tensor)
+            return int(stage.shape[-1])
+        except Exception as exc:
+            logging.warning(
+                "calibrate auto-sizer: peptide_stage_dim probe failed "
+                "(%s); falling back to encoding-shape heuristic", exc,
+            )
+            return None
+
+    def _calibration_fast_cache(self):
+        """Return (creating if needed) the per-instance fast-calibrate cache.
+
+        See ``_CalibrationFastCache``. Lazy so that predictors loaded for
+        prediction never pay the allocation cost.
+        """
+        cache = getattr(self, "_calibration_fast_cache_state", None)
+        if cache is None:
+            cache = _CalibrationFastCache()
+            self._calibration_fast_cache_state = cache
+        return cache
+
+    def clear_calibration_fast_cache(self):
+        """Drop any cached fast-calibrate state on this predictor.
+
+        Long-lived workers that finish calibrate but stay alive for
+        prediction can reclaim the (potentially many GB) of device-
+        resident peptide-stage tensors via this hook.
+        """
+        cache = getattr(self, "_calibration_fast_cache_state", None)
+        if cache is not None:
+            cache.clear()
+            del self._calibration_fast_cache_state
+
+    def calibrate_percentile_ranks_fast(
+            self,
+            peptides,
+            alleles,
+            bins=None,
+            motif_summary=False,
+            summary_top_peptide_fractions=(0.001,),
+            allele_batch_size="auto",
+            peptide_batch_size="auto",
+            num_workers_per_gpu=1,
+            device=None,
+            verbose=False):
+        """GPU-hoisted calibration for many alleles sharing a peptide set.
+
+        Drop-in replacement for the bulk of ``calibrate_percentile_ranks``
+        when calibration is dominated by per-allele Python dispatch (the
+        pan-allele full-universe calibration workload, which sweeps
+        ~20k alleles across the same peptide set). Two structural changes:
+
+        1. **Precompute peptide-stage activations once per network.** The
+           network's locally-connected + peptide-dense + early-batchnorm
+           layers are identity across alleles; we forward the calibration
+           peptides through that stage exactly once per network and
+           cache the output tensor on device.
+        2. **Batch ``allele_batch_size`` alleles per forward.** A single
+           ``forward_from_peptide_stage`` call replaces
+           ``allele_batch_size`` separate ``model.predict`` calls —
+           amortizing all the small kernel-launch + Python-dispatch
+           overhead that was dominating wall-clock time on the pan-allele
+           full-universe calibration. Effective batch size per forward:
+           ``allele_batch_size * peptide_batch_size``, sized so it fits
+           comfortably in an A100's 80 GB.
+
+        Semantics-preserving w.r.t. ``calibrate_percentile_ranks``: same
+        peptides → same per-network IC50 predictions (numerically equivalent,
+        ≤1e-12, when the network is deterministic — batched vs per-allele
+        matmul scheduling can differ in the last ULPs) → same geometric-mean
+        ensemble aggregation → same ``PercentRankTransform.fit`` per allele.
+        Only the schedule of Python dispatch and GPU kernel launches
+        changes.
+
+        Caching note: this method memoizes the peptide-stage activations on
+        the predictor instance across calls (see ``_calibration_fast_cache``).
+        That cache is keyed on network identity, not weight content, so do not
+        mutate the predictor's network weights in place between calls on the
+        same instance without first calling ``clear_calibration_fast_cache()``.
+
+        Only handles pan-allele models. Mass-spec-only models and
+        ``class1_presentation_predictor`` should keep using the slower
+        per-allele path.
+
+        Parameters
+        ----------
+        peptides : sequence of string or EncodableSequences
+        alleles : sequence of string — already-normalized allele names
+            (canonicalization is the caller's responsibility for speed).
+        bins : sequence of bin edges in IC50 space (default: 999 log-spaced
+            IC50 bins, matching ``calibrate_percentile_ranks``). Scalar
+            integer ``numpy.histogram`` bin counts are rejected in this fast
+            path because they imply data-dependent edges per allele, while
+            the batched GPU histogram uses one explicit edge vector for the
+            whole allele chunk.
+        motif_summary : bool — populate frequency matrices + length
+            distributions, same format as ``calibrate_percentile_ranks``.
+        summary_top_peptide_fractions : iterable of float — only used
+            when ``motif_summary=True``.
+        allele_batch_size : int — how many alleles share a single forward
+            through the merge + main dense. 64 is a reasonable default
+            on an A100-80GB with the release pan-allele arch + the 800k
+            peptide calibration set (peak VRAM ~ allele_batch_size *
+            peptide_batch_size * 4 bytes per hidden unit).
+        peptide_batch_size : int — peptide chunk size on device.
+        device : str or torch.device — defaults to CUDA if available.
+        verbose : bool — per-batch timing to stdout.
+
+        Returns
+        -------
+        dict (same schema as ``calibrate_percentile_ranks``). Also
+        populates ``self.allele_to_percent_rank_transform[allele]`` for
+        every allele in ``alleles``.
+        """
+        import torch
+
+        from .encodable_sequences import EncodableSequences
+        from .allele_encoding import AlleleEncoding
+        from .regression_target import to_ic50
+        from .percent_rank_transform import PercentRankTransform
+
+        if not self.class1_pan_allele_models:
+            raise ValueError(
+                "calibrate_percentile_ranks_fast is pan-allele-only; "
+                "this predictor has no pan-allele models."
+            )
+
+        if bins is None:
+            bins = to_ic50(numpy.linspace(1, 0, 1000))
+        bin_edges_array = numpy.asarray(bins)
+        if bin_edges_array.ndim == 0:
+            raise ValueError(
+                "calibrate_percentile_ranks_fast requires explicit IC50 bin "
+                "edges. Scalar integer bins use numpy.histogram's "
+                "data-dependent per-allele edges in the legacy path and "
+                "cannot be represented by one batched GPU edge vector. Use "
+                "bins=to_ic50(numpy.linspace(1, 0, n_bins + 1)) for fixed "
+                "log-space IC50 edges."
+            )
+        if bin_edges_array.ndim != 1 or bin_edges_array.shape[0] < 2:
+            raise ValueError(
+                "calibrate_percentile_ranks_fast requires a one-dimensional "
+                "sequence of at least two IC50 bin edges."
+            )
+
+        if device is None:
+            from .common import get_pytorch_device
+            device = get_pytorch_device()
+        else:
+            device = torch.device(device)
+
+        encoded_peptides = EncodableSequences.create(peptides)
+        n_peptides = len(encoded_peptides.sequences)
+        if n_peptides == 0:
+            raise ValueError("No peptides supplied for calibration")
+        alleles = list(alleles)
+        if not alleles:
+            raise ValueError("No alleles supplied for calibration")
+
+        master = self.master_allele_encoding
+        unknown = [a for a in alleles if a not in master.allele_to_index]
+        if unknown:
+            raise KeyError(
+                "calibrate_percentile_ranks_fast: %d allele(s) not in the "
+                "predictor's master encoding (first 5: %s)" % (
+                    len(unknown), unknown[:5],
+                )
+            )
+        allele_idx_np = numpy.array(
+            [master.allele_to_index[a] for a in alleles], dtype=numpy.int64,
+        )
+
+        # Per-network prep: ensure allele representations are wired up,
+        # move the eager (uncompiled) model to device, cache the
+        # peptide-stage output.
+        networks = self.class1_pan_allele_models
+
+        # Cross-task cached_stages reuse: when calibrate is sharded into
+        # many tasks, each task is a separate ``calibrate_percentile_ranks_fast``
+        # call inside the same worker process and re-builds
+        # ``cached_stages`` from scratch even though the peptide universe
+        # and the predictor are identical. Cache the built tensors on
+        # ``self._calibration_fast_cache`` and skip the rebuild whenever
+        # the signature matches. ``forward_peptide_stage`` runs once per
+        # peptide-batch per network, so for the production workload
+        # (~400k peptides × many allele chunks/worker) each saved rebuild
+        # is a couple-second-per-task win that compounds.
+        #
+        # The signature uses a SHA-256 fingerprint of the full peptide
+        # list rather than (count, first, last) — the latter would
+        # silently reuse a stale cache for two distinct peptide sets that
+        # share count/first/last (rare but real, and the failure mode is
+        # wrong PercentRankTransforms with no error). It intentionally
+        # omits ``peptide_batch_size``: that size only controls how the
+        # cache tensor is filled, not its contents or shape.
+        #
+        # Cache validity also assumes the predictor's network weights are not
+        # mutated in place between calls on the same instance: the key tracks
+        # network *identity*, not weight content (see
+        # ``_calibration_stage_cache_signature`` for why a content fingerprint
+        # is unreliable here), so a caller that re-fits a network in place must
+        # call ``clear_calibration_fast_cache()`` to avoid reusing stale
+        # stages. Adding/removing/replacing whole models is already safe (new
+        # network objects -> new ids -> cache miss).
+        cache = self._calibration_fast_cache()
+        cache_signature = self._calibration_stage_cache_signature(
+            encoded_peptides, networks, device,
+        )
+        cache_hit = (
+            cache.stage_signature == cache_signature
+            and cache.cached_stages is not None
+        )
+
+        if allele_batch_size in (None, "auto") or peptide_batch_size in (None, "auto"):
+            # Resolve once, using the first network as the architecture
+            # probe — all ensembles we serve have homogeneous layer
+            # sizing, so one probe is sufficient.
+            probe_net_obj = networks[0]
+            probe_net = probe_net_obj.network(borrow=True)
+            probe_net.to(device)
+            # Probe the *actual* peptide_stage output dim so the cache
+            # estimate doesn't fall back to the encoding-shape floor.
+            probed_stage_dim = self._probe_peptide_stage_dim(
+                probe_net_obj, encoded_peptides, device,
+            )
+            sub_networks = getattr(probe_net, "networks", None)
+            num_sub_networks_probed = (
+                len(sub_networks) if sub_networks is not None else 1
+            )
+            # Mixed pin/auto: when the user pinned one axis, pass it through so
+            # the auto axis is sized against the *actual* pinned value rather
+            # than an assumed auto one (which would underestimate peak VRAM).
+            pinned_peptide = (
+                None if peptide_batch_size in (None, "auto")
+                else int(peptide_batch_size))
+            pinned_allele = (
+                None if allele_batch_size in (None, "auto")
+                else int(allele_batch_size))
+            auto_peptide, auto_allele = self._auto_size_calibration_batches(
+                probe_net, device, n_peptides, len(alleles),
+                num_workers_per_gpu=num_workers_per_gpu,
+                # If the peptide-stage cache is already resident in this
+                # worker, current CUDA free memory has already been reduced
+                # by that cache. Counting it again here makes later shards
+                # collapse to tiny fallback batches.
+                num_cached_networks=0 if cache_hit else len(networks),
+                peptide_stage_dim=probed_stage_dim,
+                num_sub_networks=num_sub_networks_probed,
+                fixed_peptide_batch=pinned_peptide,
+                fixed_allele_batch=pinned_allele,
+            )
+            if peptide_batch_size in (None, "auto"):
+                peptide_batch_size = auto_peptide
+            if allele_batch_size in (None, "auto"):
+                allele_batch_size = auto_allele
+            if verbose:
+                print(
+                    "calibrate_percentile_ranks_fast auto-sized: "
+                    f"peptide_batch={peptide_batch_size}, "
+                    f"allele_batch={allele_batch_size} "
+                    f"(workers_per_gpu={num_workers_per_gpu}, "
+                    f"cached_networks={len(networks)}, "
+                    f"sub_networks={num_sub_networks_probed}, "
+                    f"probed_stage_dim={probed_stage_dim})"
+                )
+        peptide_batch_size = int(peptide_batch_size)
+        allele_batch_size = int(allele_batch_size)
+
+        if cache_hit:
+            cached_stages = cache.cached_stages
+        else:
+            # Drop stale cache before building the new one — releases
+            # the previous peptide-stage tensor's VRAM before we
+            # allocate the next, which matters when the per-call
+            # peptide universe size changes (e.g. a smoke test
+            # followed by the production calibrate in the same worker).
+            cache.stage_signature = None
+            cache.cached_stages = None
+            cache.motif_signature = None
+            cache.motif_state = None
+            cached_stages = []
+            for net_obj in networks:
+                (_, allele_reps) = net_obj.allele_encoding_to_network_input(
+                    AlleleEncoding(alleles=[], borrow_from=master),
+                )
+                net_obj.set_allele_representations(allele_reps)
+                model = net_obj.network(borrow=True)
+                model.to(device)
+                model.eval()
+                peptide_input = net_obj.peptides_to_network_input(encoded_peptides)
+                peptide_is_indices = net_obj.uses_peptide_torch_encoding()
+                # Pre-size the cache tensor by probing one row's stage_dim
+                # then write each chunk in-place. The previous build path
+                # used append+torch.cat, which transiently held *both* the
+                # per-chunk parts and the new contiguous tensor at once —
+                # a 2× VRAM peak (~13 GB extra on the production 400k
+                # peptide × 8-subnet ensemble) that pushed --max-workers-
+                # per-gpu auto into OOM territory. Pre-sized fill keeps
+                # the peak at 1× the cache.
+                with torch.no_grad():
+                    probe_chunk = peptide_input[:1]
+                    probe_keep_int = (
+                        peptide_is_indices
+                        and probe_chunk.ndim == 2
+                        and numpy.issubdtype(probe_chunk.dtype, numpy.integer)
+                    )
+                    if probe_keep_int:
+                        probe_tensor = torch.from_numpy(probe_chunk).to(device)
+                    else:
+                        probe_tensor = torch.from_numpy(
+                            numpy.asarray(probe_chunk, dtype=numpy.float32),
+                        ).to(device)
+                    probe_stage = model.forward_peptide_stage(probe_tensor)
+                    stage_dim_cached = int(probe_stage.shape[-1])
+                    stage_dtype = probe_stage.dtype
+                cached_tensor = torch.empty(
+                    n_peptides, stage_dim_cached,
+                    dtype=stage_dtype, device=device,
+                )
+                with torch.no_grad():
+                    for start in range(0, n_peptides, peptide_batch_size):
+                        end = min(start + peptide_batch_size, n_peptides)
+                        chunk = peptide_input[start:end]
+                        keep_int = (
+                            peptide_is_indices
+                            and chunk.ndim == 2
+                            and numpy.issubdtype(chunk.dtype, numpy.integer)
+                        )
+                        if keep_int:
+                            tensor = torch.from_numpy(chunk).to(device)
+                        else:
+                            tensor = torch.from_numpy(
+                                numpy.asarray(chunk, dtype=numpy.float32),
+                            ).to(device)
+                        cached_tensor[start:end] = model.forward_peptide_stage(
+                            tensor,
+                        )
+                cached_stages.append((net_obj, model, cached_tensor))
+            cache.cached_stages = cached_stages
+            cache.stage_signature = cache_signature
+            del peptide_input
+
+        log50000 = float(numpy.log(50000.0))
+        n_alleles = len(alleles)
+        frequency_matrices = [] if motif_summary else None
+        length_distributions = [] if motif_summary else None
+        # CPU parity tests compare against the legacy per-allele forward.
+        # Preserve that matmul order on CPU; GPU keeps the lower-memory
+        # factored cartesian path used by the production calibration run.
+        exact_cartesian_forward = device.type == "cpu"
+        # Bin edges for the on-device batched histogram fit. Materialize
+        # once outside the per-chunk loop — same edges across alleles.
+        calibration_float_dtype = (
+            torch.float32 if device.type == "mps" else torch.float64
+        )
+        bins_tensor = torch.as_tensor(
+            bin_edges_array, dtype=calibration_float_dtype, device=device,
+        )
+
+        # Hoist the per-allele dedup + length-bucket + AA-encoding work
+        # out of the chunk loop. The peptide universe is identical across
+        # alleles so this only needs to run once per calibrate call —
+        # and across the many tasks per worker that share the same
+        # peptide universe, we reuse the device-resident state via the
+        # same signature key as ``cached_stages`` above.
+        if motif_summary:
+            motif_signature = (cache_signature, "motif")
+            if cache.motif_signature == motif_signature:
+                motif_state = cache.motif_state
+            else:
+                motif_state = prepare_motif_summary_state_gpu(
+                    encoded_peptides, device,
+                )
+                cache.motif_state = motif_state
+                cache.motif_signature = motif_signature
+        else:
+            motif_state = None
+
+        for abatch_start in range(0, n_alleles, allele_batch_size):
+            abatch_end = min(abatch_start + allele_batch_size, n_alleles)
+            a_size = abatch_end - abatch_start
+            batch_alleles = alleles[abatch_start:abatch_end]
+            batch_idx = torch.from_numpy(
+                allele_idx_np[abatch_start:abatch_end],
+            ).to(device)
+
+            # log-space accumulator across ensemble members:
+            # (a_size, n_peptides).
+            # Same aggregation scheme as the existing ensemble code:
+            # arithmetic mean of per-network log(IC50) = geometric mean
+            # of per-network IC50. Use fp64 where supported so the
+            # aggregation matches the legacy path bit-for-bit; fall
+            # back to fp32 on MPS (which has no fp64) — drift there is
+            # ~1e-6 in log-IC50, well below histogram-bin resolution.
+            accum_dtype = (
+                torch.float32 if device.type == "mps" else torch.float64
+            )
+            log_ic50_sum = torch.zeros(
+                a_size, n_peptides, dtype=accum_dtype, device=device,
+            )
+            ensemble_member_count = 0
+
+            for (_, model, peptide_stage) in cached_stages:
+                model_member_count = None
+                with torch.no_grad():
+                    for start in range(0, n_peptides, peptide_batch_size):
+                        end = min(start + peptide_batch_size, n_peptides)
+                        p_chunk = peptide_stage[start:end]  # (chunk_n, d)
+                        network_output = cartesian_network_output(
+                            model,
+                            p_chunk,
+                            batch_idx,
+                            exact_forward=exact_cartesian_forward,
+                        )
+                        (
+                            log_ic50_chunk,
+                            chunk_member_count,
+                        ) = cartesian_output_log_ic50_sum(
+                            network_output, model, log50000, accum_dtype,
+                        )
+                        if model_member_count is None:
+                            model_member_count = chunk_member_count
+                        elif model_member_count != chunk_member_count:
+                            raise ValueError(
+                                "cartesian network output member count changed "
+                                "within one calibration batch"
+                            )
+                        log_ic50_sum[:, start:end] += log_ic50_chunk
+
+                if model_member_count is None:
+                    raise ValueError("No peptide batches were evaluated")
+                ensemble_member_count += model_member_count
+
+            if ensemble_member_count < 1:
+                raise ValueError("No ensemble members were evaluated")
+            log_mean = log_ic50_sum / float(ensemble_member_count)
+            ic50_device = torch.exp(log_mean)  # (a_size, n_peptides) on device
+            # Batched torch fit replaces the per-allele numpy.histogram
+            # loop that dominated calibrate wall time. One bucketize +
+            # one scatter_add covers all 30 alleles in the chunk; the
+            # final per-allele cdf is materialized as numpy only at
+            # storage time so the persistent format is unchanged.
+            transforms = PercentRankTransform.fit_batch_torch(
+                ic50_device, bins_tensor,
+            )
+            for local_i, allele in enumerate(batch_alleles):
+                self.allele_to_percent_rank_transform[allele] = transforms[local_i]
+            if motif_summary:
+                # All motif-summary work now runs on device — topk +
+                # scatter_add for AA frequency matrices, topk + scatter_add
+                # bincount for length distributions. Pandas only assembles
+                # final per-row schema at chunk-end. This replaces the
+                # per-allele DataFrame.drop_duplicates().groupby().nsmallest()
+                # block that dominated calibrate wall time after the
+                # PercentRankTransform.fit GPU port.
+                chunk_freq, chunk_ld = motif_summary_chunk_gpu(
+                    ic50_device,
+                    motif_state,
+                    summary_top_peptide_fractions,
+                    batch_alleles,
+                )
+                frequency_matrices.extend(chunk_freq)
+                length_distributions.extend(chunk_ld)
+            if verbose:
+                print(
+                    "calibrate_percentile_ranks_fast: "
+                    f"{abatch_end}/{n_alleles} alleles done"
+                )
+
+        if motif_summary:
+            return {
+                "frequency_matrices": pandas.concat(
+                    frequency_matrices, ignore_index=True,
+                ),
+                "length_distributions": pandas.concat(
+                    length_distributions, ignore_index=True,
+                ),
+            }
+        return {}
+
     def model_select(
             self,
             score_function,
@@ -1650,6 +2913,11 @@ class Class1AffinityPredictor(object):
 
         dfs = []
         allele_to_allele_specific_models = {}
+
+        def model_is_selectable(model):
+            max_epochs = model.hyperparameters.get("max_epochs", 1)
+            return max_epochs is None or int(max_epochs) > 0
+
         for allele in alleles:
             df = pandas.DataFrame({
                 'model': self.allele_to_allele_specific_models[allele]
@@ -1657,16 +2925,19 @@ class Class1AffinityPredictor(object):
             df["model_num"] = df.index
             df["allele"] = allele
             df["selected"] = False
+            df["selectable"] = df.model.map(model_is_selectable)
 
             round_num = 1
 
-            while not df.selected.all() and sum(df.selected) < max_models:
+            while (
+                    not df.loc[df.selectable, "selected"].all()
+                    and sum(df.selected) < max_models):
                 score_col = "score_%2d" % round_num
                 prev_score_col = "score_%2d" % (round_num - 1)
 
                 existing_selected = list(df[df.selected].model)
                 df[score_col] = [
-                    numpy.nan if row.selected else
+                    numpy.nan if row.selected or not row.selectable else
                     score_function(
                         Class1AffinityPredictor(
                             allele_to_allele_specific_models={
@@ -1676,6 +2947,9 @@ class Class1AffinityPredictor(object):
                     )
                     for (_, row) in df.iterrows()
                 ]
+
+                if not numpy.isfinite(df[score_col]).any():
+                    break
 
                 if round_num > min_models and (
                         df[score_col].max() < df[prev_score_col].max()):

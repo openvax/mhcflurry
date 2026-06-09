@@ -37,12 +37,24 @@ mhcflurry-predict-scan \
 '''
 import sys
 import argparse
+import collections
 
 import pandas
 
 from .downloads import get_default_class1_presentation_models_dir
 from .class1_presentation_predictor import Class1PresentationPredictor
 from .fasta import read_fasta_to_dataframe
+from .local_parallelism import (
+    add_prediction_parallelism_args,
+    chunk_ranges_for_local_parallelism,
+    num_workers_per_gpu_from_args,
+    worker_pool_with_gpu_assignments_from_args,
+)
+from .workload_planning import (
+    WORKLOAD_PRESENTATION_INFERENCE,
+    WORKLOAD_PROCESSING_INFERENCE,
+    path_size_bytes,
+)
 from .version import __version__
 
 
@@ -181,6 +193,47 @@ model_args.add_argument(
     default=False,
     help="Do not use flanking sequence information in predictions")
 
+add_prediction_parallelism_args(parser)
+
+
+_PREDICTOR_CACHE = {}
+
+
+def _load_predictor_for_command(models_dir):
+    if models_dir not in _PREDICTOR_CACHE:
+        _PREDICTOR_CACHE[models_dir] = Class1PresentationPredictor.load(
+            models_dir)
+    return _PREDICTOR_CACHE[models_dir]
+
+
+# One parallel chunk's predictions plus the comparison quantity the predictor
+# resolved for it. ``comparison_quantity`` is identical across chunks (it
+# depends only on the predictor's capabilities and the alleles, not on the
+# chunk's sequences); it is carried per-chunk so the parent can apply the same
+# global sort the serial path would without re-loading the predictor.
+ChunkResult = collections.namedtuple(
+    "ChunkResult", ["chunk_num", "predictions", "comparison_quantity"])
+
+
+def _predict_sequences_chunk_worker(work_item):
+    predictor = _load_predictor_for_command(work_item["models_dir"])
+    result_df = predictor.predict_sequences(
+        sequences=work_item["sequences"],
+        alleles=work_item["alleles"],
+        result="all",
+        peptide_lengths=work_item["peptide_lengths"],
+        use_flanks=work_item["use_flanks"],
+        include_affinity_percentile=work_item[
+            "include_affinity_percentile"],
+        throw=work_item["throw"],
+        affinity_model_kwargs=work_item["affinity_model_kwargs"],
+        processing_batch_size=work_item["processing_batch_size"])
+    return ChunkResult(
+        chunk_num=work_item["chunk_num"],
+        predictions=result_df,
+        comparison_quantity=predictor.resolve_comparison_quantity(
+            work_item["alleles"]))
+
 
 def parse_peptide_lengths(value):
     try:
@@ -219,8 +272,12 @@ def run(argv=sys.argv[1:]):
         args.threshold_affinity_percentile,
     ]
     if not args.results_all and all(x is None for x in threshold_args):
-        print("Filtering by affinity-percentile < %s" % default_thresholds["affinity_percentile"])
-        print("to show all predictions, pass --results-all")
+        print(
+            "Filtering by affinity-percentile < %s" % default_thresholds["affinity_percentile"],
+            file=sys.stderr)
+        print(
+            "to show all predictions, pass --results-all",
+            file=sys.stderr)
         args.threshold_affinity_percentile = default_thresholds["affinity_percentile"]
 
     models_dir = args.models
@@ -230,13 +287,13 @@ def run(argv=sys.argv[1:]):
         # message instructing them to download the models if needed.
         models_dir = get_default_class1_presentation_models_dir(test_exists=True)
 
-    predictor = Class1PresentationPredictor.load(models_dir)
-
     if args.list_supported_alleles:
+        predictor = _load_predictor_for_command(models_dir)
         print("\n".join(predictor.supported_alleles))
         return
 
     if args.list_supported_peptide_lengths:
+        predictor = _load_predictor_for_command(models_dir)
         min_len, max_len = predictor.supported_peptide_lengths
         print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
         return
@@ -261,12 +318,16 @@ def run(argv=sys.argv[1:]):
                     "Couldn't guess input format from file extension: %s\n"
                     "Pass the --input-format argument to specify if it is a "
                     "CSV or fasta file" % args.input)
-            print("Guessed input file format:", input_format)
+            print(
+                "Guessed input file format:", input_format,
+                file=sys.stderr)
 
         if input_format == "csv":
             df = pandas.read_csv(args.input)
-            print("Read input CSV with %d rows, columns are: %s" % (
-                len(df), ", ".join(df.columns)))
+            print(
+                "Read input CSV with %d rows, columns are: %s" % (
+                    len(df), ", ".join(df.columns)),
+                file=sys.stderr)
             for col in [args.sequence_column,]:
                 if col not in df.columns:
                     raise ValueError(
@@ -275,8 +336,10 @@ def run(argv=sys.argv[1:]):
 
         elif input_format == "fasta":
             df = read_fasta_to_dataframe(args.input)
-            print("Read input fasta with %d sequences" % len(df))
-            print(df)
+            print(
+                "Read input fasta with %d sequences" % len(df),
+                file=sys.stderr)
+            print(df, file=sys.stderr)
         else:
             raise ValueError("Unsupported input format", input_format)
     else:
@@ -298,34 +361,133 @@ def run(argv=sys.argv[1:]):
         genotypes.index = genotypes.index.map(lambda i: "genotype_%02d" % i)
         alleles = genotypes.to_dict()
     else:
-        print("No alleles specified. Will perform processing prediction only.")
+        print(
+            "No alleles specified. Will perform processing prediction only.",
+            file=sys.stderr)
         alleles = {}
 
-    result_df = predictor.predict_sequences(
-        sequences=df[args.sequence_column].to_dict(),
-        alleles=alleles,
-        result="all",
-        peptide_lengths=peptide_lengths,
-        use_flanks=not args.no_flanking,
-        include_affinity_percentile=not args.no_affinity_percentile,
-        throw=not args.no_throw)
+    sequences = df[args.sequence_column].to_dict()
+    if not sequences:
+        # Empty input: return a DataFrame with the same schema the
+        # predictor would have produced for non-empty input, so
+        # threshold filters and downstream readers don't see a
+        # schema-less object. The column list is derived from the
+        # predictor (single source of truth) — see test_empty_and_populated_schemas_match.
+        predictor = _load_predictor_for_command(models_dir)
+        result_df = pandas.DataFrame(
+            columns=predictor.predict_sequences_columns(
+                alleles=alleles,
+                use_flanks=not args.no_flanking,
+                include_affinity_percentile=not args.no_affinity_percentile,
+            ))
+    else:
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            workload_name=(
+                WORKLOAD_PRESENTATION_INFERENCE
+                if alleles
+                else WORKLOAD_PROCESSING_INFERENCE
+            ),
+            workload_hints={
+                "data_bytes": path_size_bytes(args.input),
+                "num_rows": len(df),
+            },
+            # Predict-scan workers run PyTorch inference. On Linux, the default
+            # fork context can inherit a parent process where PyTorch has
+            # already been initialized by earlier command invocations/tests,
+            # which makes later model .to(...) calls unsafe in workers.
+            start_method="spawn",
+        )
+        affinity_model_kwargs = {}
+        if hasattr(args, "max_workers_per_gpu"):
+            affinity_model_kwargs["num_workers_per_gpu"] = (
+                num_workers_per_gpu_from_args(args)
+            )
+        if worker_pool is None:
+            predictor = _load_predictor_for_command(models_dir)
+            result_df = predictor.predict_sequences(
+                sequences=sequences,
+                alleles=alleles,
+                result="all",
+                peptide_lengths=peptide_lengths,
+                use_flanks=not args.no_flanking,
+                include_affinity_percentile=not args.no_affinity_percentile,
+                throw=not args.no_throw,
+                affinity_model_kwargs=affinity_model_kwargs,
+                processing_batch_size="auto")
+        else:
+            try:
+                # Build the work items inside the try so a failure here still
+                # tears the pool down via the finally rather than leaking
+                # non-daemon workers.
+                sequence_items = list(sequences.items())
+                ranges = chunk_ranges_for_local_parallelism(
+                    len(sequence_items), args.num_jobs)
+                work_items = []
+                for (chunk_num, start, end) in ranges:
+                    work_items.append({
+                        "chunk_num": chunk_num,
+                        "models_dir": models_dir,
+                        "sequences": dict(sequence_items[start:end]),
+                        "alleles": alleles,
+                        "peptide_lengths": peptide_lengths,
+                        "use_flanks": not args.no_flanking,
+                        "include_affinity_percentile": (
+                            not args.no_affinity_percentile),
+                        "throw": not args.no_throw,
+                        "affinity_model_kwargs": affinity_model_kwargs,
+                        "processing_batch_size": "auto",
+                    })
+                results = worker_pool.imap_unordered(
+                    _predict_sequences_chunk_worker, work_items, chunksize=1)
+                chunks = [result for result in results]
+                worker_pool.close()
+                worker_pool.join()
+                worker_pool = None
+            finally:
+                # On failure mid-iteration, terminate() rather than
+                # close()/join() (which can hang on a wedged worker) and
+                # leave non-daemon workers behind.
+                if worker_pool is not None:
+                    worker_pool.terminate()
+                    worker_pool.join()
+            # Restore input sequence order by chunk_num before the global
+            # re-sort.
+            chunks.sort(key=lambda chunk: chunk.chunk_num)
+            result_df = pandas.concat(
+                [chunk.predictions for chunk in chunks],
+                ignore_index=True)
+            # Apply the same global sort serial predict_sequences(result="all")
+            # uses (Class1PresentationPredictor.sort_predictions). Each chunk is
+            # sorted only within its sequence subset, so after concat we re-sort
+            # globally. All chunks resolved the same comparison quantity, so we
+            # take it from any of them — keeping parallel output ranking
+            # identical to serial, including the deterministic peptide
+            # tie-break.
+            comparison_quantity = chunks[0].comparison_quantity
+            result_df = Class1PresentationPredictor.sort_predictions(
+                result_df, comparison_quantity).reset_index(drop=True)
 
-    # Apply thresholds
-    if args.threshold_presentation_score is not None:
-        result_df = result_df.loc[result_df.presentation_score >= args.threshold_presentation_score]
-
-    if args.threshold_processing_score is not None:
-        result_df = result_df.loc[result_df.processing_score >= args.threshold_processing_score]
-
-    if args.threshold_affinity is not None:
-        result_df = result_df.loc[result_df.affinity <= args.threshold_affinity]
-
-    if args.threshold_affinity_percentile is not None:
-        result_df = result_df.loc[result_df.affinity_percentile <= args.threshold_affinity_percentile]
+    # Apply thresholds, skipping ones whose column is missing (e.g.
+    # processing-only run with no alleles, or --no-affinity-percentile
+    # leaves affinity_percentile out).
+    threshold_filters = [
+        ("presentation_score", args.threshold_presentation_score, "ge"),
+        ("processing_score", args.threshold_processing_score, "ge"),
+        ("affinity", args.threshold_affinity, "le"),
+        ("affinity_percentile", args.threshold_affinity_percentile, "le"),
+    ]
+    for col, thresh, op in threshold_filters:
+        if thresh is None or col not in result_df.columns:
+            continue
+        if op == "ge":
+            result_df = result_df.loc[result_df[col] >= thresh]
+        else:
+            result_df = result_df.loc[result_df[col] <= thresh]
 
     # Write results
     if args.out:
         result_df.to_csv(args.out, index=False, sep=args.output_delimiter)
-        print("Wrote: %s" % args.out)
+        print("Wrote: %s" % args.out, file=sys.stderr)
     else:
         result_df.to_csv(sys.stdout, index=False, sep=args.output_delimiter)

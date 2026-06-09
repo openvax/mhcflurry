@@ -1,5 +1,9 @@
 import collections
+import datetime
+import hashlib
 import logging
+import random
+import shlex
 import sys
 import os
 import json
@@ -11,6 +15,76 @@ from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene
 
 
 from . import amino_acid
+
+
+# Default master seed for every CLI command that involves randomness. Fixed
+# (not entropy) so runs are reproducible out of the box; pass --random-seed N
+# to get a different, still-reproducible run.
+DEFAULT_RANDOM_SEED = 42
+
+
+def add_random_seed_arg(parser):
+    """Add the standard ``--random-seed`` argument to a CLI parser.
+
+    Every mhcflurry command that involves randomness exposes this flag so a
+    single value reproduces the whole run. Pair with :func:`configure_random_seed`
+    at the start of the command's ``run``/``main``.
+    """
+    parser.add_argument(
+        "--random-seed",
+        type=int,
+        metavar="N",
+        default=DEFAULT_RANDOM_SEED,
+        help="Master random seed controlling all randomness in this command "
+        "(numpy, Python `random`, and torch): data shuffles, fold/held-out "
+        "sampling, weight initialization, and random peptide/negative "
+        "sampling. Defaults to %(default)s, so runs are reproducible out of "
+        "the box; pass a different integer for a different (still "
+        "reproducible) run.")
+
+
+def configure_random_seed(seed=None, name="mhcflurry"):
+    """Resolve, apply, and log a master random seed.
+
+    Seeds numpy's, Python's, and torch's *global* RNGs so every randomness
+    source in this process derives from one value. When ``seed`` is None a
+    value is drawn from system entropy. Returns the resolved seed so callers
+    can derive worker-local sub-seeds via :func:`derive_seed`.
+    """
+    resolved = (
+        int(seed) if seed is not None
+        else int.from_bytes(os.urandom(4), "little"))
+    numpy.random.seed(resolved % (2 ** 32))
+    random.seed(resolved)
+    try:
+        import torch
+        torch.manual_seed(resolved & ((1 << 63) - 1))
+    except ImportError:
+        pass
+    print("%s random seed: %d%s" % (
+        name, resolved, "" if seed is not None else " (drawn from entropy)"))
+    return resolved
+
+
+def derive_seed(master_seed, *parts):
+    """Derive a stable sub-seed from a master seed and identity ``parts``.
+
+    Gives independent units of work (e.g. one training fit, keyed by
+    architecture/fold/replicate) decorrelated but reproducible seeds, all
+    rooted in the run's single master seed. ``master_seed`` may be None
+    (e.g. a legacy run with no recorded seed); the result is still stable.
+    """
+    pieces = [str(p) for p in ((master_seed,) + parts)]
+    # The "|" join is unambiguous only because no coordinate contains "|"
+    # (parts are integers / allele names today). Guard it so a future caller
+    # passing a "|"-containing identity fails loudly rather than silently
+    # colliding with a differently-split set of parts -- e.g. ("a|b",) vs
+    # ("a", "b"). Kept as a guard rather than a new length-prefixed encoding
+    # so every existing derived seed is unchanged.
+    assert not any("|" in piece for piece in pieces), (
+        "derive_seed parts must not contain '|': %r" % (parts,))
+    identity = "|".join(pieces)
+    return int(hashlib.sha1(identity.encode()).hexdigest()[:16], 16)
 
 
 def normalize_allele_name(
@@ -40,9 +114,10 @@ def normalize_allele_name(
         If True, use mhcgnomes allele alias table (IMGT historical name
         reassignments). Some old allele names (e.g. B*44:01, Cw*0201) were
         retired by IMGT when the original sequences were found to contain
-        errors. Defaults to False to preserve current IMGT nomenclature;
-        the pseudosequence loading code explicitly handles aliases with
-        fallback logic.
+        errors. Defaults to True, so retired/aliased names resolve to their
+        current canonical form. Callers that must preserve current IMGT
+        nomenclature (e.g. pseudosequence-key matching, which is no-alias-first
+        with explicit fallback) pass use_allele_aliases=False.
 
     Returns
     -------
@@ -80,6 +155,181 @@ def normalize_allele_name(
         else:
             return default_value
     return result.restrict_allele_fields(2).to_string()
+
+
+def filter_canonicalizable_alleles(alleles, log_label="alleles"):
+    """Drop alleles that ``normalize_allele_name`` refuses to canonicalize.
+
+    Returns the surviving names **unchanged** (raw input strings), having only
+    removed the un-canonicalizable ones. ``predictor.supported_alleles`` (and
+    any user-supplied ``--alleles-file``) can contain pseudogenes / null
+    alleles / questionable annotations — those are real entries in the public
+    ``allele_sequences.csv`` (which aims to be exhaustive), but
+    ``predict_to_dataframe`` raises on them mid-iteration. Filter once up front
+    so iteration doesn't crash partway through, and log the dropped sample so
+    the missing rows in the resulting output table are explainable.
+
+    Survivors are returned verbatim rather than canonicalized: callers that
+    need names to match a predictor's pseudosequence keys must map them through
+    ``predictor.canonicalize_allele_name`` (which prefers the no-alias form,
+    matching how ``allele_to_sequence`` keys are built). A generic
+    alias-applying normalization here would silently remap retired alleles
+    (e.g. ``HLA-B*44:01`` -> ``HLA-B*44:02``) away from their own key.
+
+    A local memo keeps the per-allele ``normalize_allele_name`` cost bounded.
+    mhcgnomes also caches its own parses, so even the full ~20K-allele predictor
+    set is a one-time ~1-2 sec single-threaded pre-pass (measured), not the
+    minutes a naive uncached parse would cost.
+    """
+    seen = {}
+
+    def _ok(allele):
+        if allele not in seen:
+            try:
+                normalize_allele_name(allele)
+                seen[allele] = True
+            except (ValueError, TypeError):
+                seen[allele] = False
+        return seen[allele]
+
+    filtered = []
+    dropped = []
+    for a in alleles:
+        (filtered if _ok(a) else dropped).append(a)
+    if dropped:
+        sample = ", ".join(dropped[:5]) + (
+            ", ..." if len(dropped) > 5 else ""
+        )
+        logging.warning(
+            "Skipping %d %s that fail canonicalization "
+            "(pseudogene/null/questionable): %s",
+            len(dropped),
+            log_label,
+            sample,
+        )
+    return filtered
+
+
+def build_allele_alias_map(valid_keys):
+    """Map mhcgnomes-aliased names back to the canonical keys in ``valid_keys``.
+
+    For each key, compute its alias-applied normalization; if that differs from
+    the key and isn't itself a key, record ``alias -> key``. Mirrors the map the
+    affinity predictor builds at load time (``allele_to_canonical``), but for an
+    arbitrary key set — e.g. an allele-sequences table at training time.
+    """
+    valid = set(valid_keys)
+    alias_map = {}
+    for key in valid:
+        aliased = normalize_allele_name(
+            key, raise_on_error=False, use_allele_aliases=True)
+        if aliased is not None and aliased != key and aliased not in valid:
+            alias_map[aliased] = key
+    return alias_map
+
+
+class AlleleKeyResolver(object):
+    """Resolves allele names to a fixed set of canonical keys, no-alias-first.
+
+    A name is resolved by this priority (each step checked against
+    ``valid_keys``):
+
+      1. its own no-alias normalization, if that is already a key — so an
+         allele with its own pseudosequence isn't remapped onto an alias target
+         (e.g. retired ``HLA-B*44:01`` keeps its own entry rather than
+         collapsing to ``HLA-B*44:02``);
+      2. its alias-applied normalization, if *that* is a key;
+      3. the key it is a retired alias of, via the reverse alias map.
+
+    Two resolution modes, deliberately distinct:
+
+      * :meth:`resolve_to_key` — strict. Returns the resolved key, or None for
+        any name that maps to no key (whether unsupported or unparseable). Use
+        this when an unmatched name should be dropped (e.g. training ingestion).
+      * :meth:`resolve` — best effort. Like ``resolve_to_key`` for names that do
+        match a key, but a name that *normalizes* yet matches no key is returned
+        as its normalized form (not None), so callers can surface it as an
+        unsupported allele downstream. Returns None only when the name can't be
+        normalized at all (and ``raise_on_error=False``).
+
+    The reverse alias map (``build_allele_alias_map``, an O(len(valid_keys))
+    scan) is built once and cached on first use — so already-canonical inputs,
+    which resolve at step 1 or 2, never pay for it. Pass it prebuilt (e.g. a
+    predictor's load-time ``allele_to_canonical``) to skip the scan entirely.
+
+    ``valid_keys`` should support O(1) ``in`` (a dict or set); an empty/falsy
+    value skips steps 1-2 (e.g. allele-specific predictors with no
+    pseudosequences), so every name falls through to the reverse-map step.
+    """
+
+    def __init__(self, valid_keys, alias_map=None):
+        self.valid_keys = valid_keys
+        self._alias_map = alias_map  # built lazily by reverse_alias_map()
+
+    def reverse_alias_map(self):
+        """The alias -> key map, built once on first use and cached."""
+        if self._alias_map is None:
+            self._alias_map = build_allele_alias_map(self.valid_keys)
+        return self._alias_map
+
+    def resolve(self, raw_name, raise_on_error=False):
+        """Best-effort resolution. See the class docstring for the contract."""
+        if self.valid_keys:
+            no_alias = normalize_allele_name(
+                raw_name, raise_on_error=False, use_allele_aliases=False)
+            if no_alias is not None and no_alias in self.valid_keys:
+                return no_alias
+        normalized = normalize_allele_name(
+            raw_name, raise_on_error=raise_on_error)
+        if normalized is None:
+            return None
+        if self.valid_keys and normalized in self.valid_keys:
+            return normalized
+        return self.reverse_alias_map().get(normalized, normalized)
+
+    def resolve_to_key(self, raw_name):
+        """Strict resolution: a key in ``valid_keys``, or None.
+
+        Drops the best-effort fallback of :meth:`resolve` — an unsupported or
+        unparseable name both return None.
+        """
+        resolved = self.resolve(raw_name, raise_on_error=False)
+        if self.valid_keys and resolved in self.valid_keys:
+            return resolved
+        return None
+
+
+def canonicalize_allele_series(alleles, valid_keys, log_label="alleles"):
+    """Map allele names to canonical keys (no-alias-first), strictly.
+
+    Returns a list parallel to ``alleles`` with each name resolved to a key in
+    ``valid_keys``, or None when it resolves to no key (so the row can be
+    dropped). Memoizes per unique input, so it is cheap over a long training
+    column with few distinct alleles, and the reverse alias map is built lazily
+    (only if some name is a current-name request for a retired key) — so
+    already-canonical data never pays the ~O(len(valid_keys)) scan. Logs a
+    sample of names that did not resolve. Use this for training ingestion.
+    """
+    resolver = AlleleKeyResolver(set(valid_keys))  # alias map built lazily
+    resolved = {}
+    dropped = []
+
+    def _resolve(name):
+        if name not in resolved:
+            key = resolver.resolve_to_key(name)  # key, or None to drop
+            resolved[name] = key
+            if key is None:
+                dropped.append(name)
+        return resolved[name]
+
+    out = [_resolve(a) for a in alleles]
+    if dropped:
+        sample = ", ".join(map(str, dropped[:5])) + (
+            ", ..." if len(dropped) > 5 else "")
+        logging.warning(
+            "Dropping %d %s that resolve to no supported allele key: %s",
+            len(dropped), log_label, sample)
+    return out
 
 
 _pytorch_backend = "auto"
@@ -131,14 +381,12 @@ def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
     backend : str, optional
         Device backend: "auto", "gpu", "mps", or "cpu".
         "auto" selects the best available device (GPU > MPS > CPU).
-    gpu_device_nums : list of int, optional
-        CUDA devices to expose via CUDA_VISIBLE_DEVICES. An empty list hides
-        CUDA entirely for the current process.
+    gpu_device_nums : list of str or int, optional
+        CUDA device identifiers to expose via CUDA_VISIBLE_DEVICES. An empty
+        list hides CUDA entirely for the current process.
     num_threads : int, optional
         Number of threads for PyTorch operations
     """
-    import torch
-
     global _pytorch_backend
 
     if backend is not None:
@@ -148,6 +396,7 @@ def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
         os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, gpu_device_nums))
 
     if num_threads:
+        import torch
         torch.set_num_threads(num_threads)
 
 
@@ -161,8 +410,8 @@ def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
         Legacy backend value retained for API compatibility. TensorFlow-era
         names such as "tensorflow-cpu" are translated to the equivalent
         PyTorch backend and emit a deprecation warning.
-    gpu_device_nums : list of int, optional
-        GPU devices to potentially use.
+    gpu_device_nums : list of str or int, optional
+        GPU device identifiers to potentially use.
     num_threads : int, optional
         Number of threads for backend operations.
     """
@@ -267,7 +516,7 @@ def amino_acid_distribution(peptides, smoothing=0.0):
     return normalized
 
 
-def random_peptides(num, length=9, distribution=None):
+def random_peptides(num, length=9, distribution=None, rng=None):
     """
     Generate random peptides (kmers).
 
@@ -284,6 +533,12 @@ def random_peptides(num, length=9, distribution=None):
         probabilities. If not specified a uniform
         distribution is used.
 
+    rng : numpy.random.Generator, optional
+        If provided, peptides are sampled from this generator instead of the
+        global ``numpy.random`` state. Used by callers that need deterministic
+        peptide generation, such as pre-generated random-negative pools. When
+        None the global state is used, preserving legacy call-site semantics.
+
     Returns
     ----------
     list of string
@@ -295,12 +550,17 @@ def random_peptides(num, length=9, distribution=None):
         distribution = pandas.Series(1, index=sorted(amino_acid.COMMON_AMINO_ACIDS))
         distribution /= distribution.sum()
 
-    return [
-        "".join(peptide_sequence)
-        for peptide_sequence in numpy.random.choice(
+    if rng is None:
+        sampled = numpy.random.choice(
             distribution.index, p=distribution.values, size=(int(num), int(length))
         )
-    ]
+    else:
+        sampled = rng.choice(
+            distribution.index.to_numpy(),
+            p=distribution.values,
+            size=(int(num), int(length)),
+        )
+    return ["".join(peptide_sequence) for peptide_sequence in sampled]
 
 
 def positional_frequency_matrix(peptides):
@@ -393,3 +653,111 @@ class NumpyJSONEncoder(json.JSONEncoder):
         if isinstance(obj, numpy.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+_GENERATE_SH_TEMPLATE = """\
+#!/usr/bin/env bash
+# Auto-generated by mhcflurry {version} on {timestamp}.
+#
+# Run this script with no arguments to produce a tar.gz snapshot of
+# the artifact directory it lives in:
+#
+#     bash GENERATE.sh
+#
+# Pass `regenerate` as the first argument to re-run the originating
+# mhcflurry command (which recreates the directory) and then snapshot:
+#
+#     bash GENERATE.sh regenerate
+#
+# The originating command is recorded in ORIGINAL_COMMAND below; paths
+# inside it may need adjustment if you run from a different machine.
+set -euo pipefail
+HERE="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+NAME="$(basename "$HERE")"
+PARENT="$(dirname "$HERE")"
+
+ORIGINAL_CWD={cwd}
+ORIGINAL_COMMAND=(
+    {cmd}
+)
+
+if [ "${{1:-}}" = "regenerate" ]; then
+    # Safety checks before destroying the artifact dir:
+    #   * $HERE must resolve to a directory we own,
+    #   * not be the filesystem root or $HOME,
+    #   * and contain the GENERATE.sh we are running -- the canonical
+    #     marker that this dir was produced by mhcflurry. Without these
+    #     checks, a user re-running GENERATE.sh from inside an already-
+    #     replaced mountpoint, or with $HERE corrupted by a path edit,
+    #     could rm -rf an unrelated tree.
+    if [ -z "$HERE" ] || [ "$HERE" = "/" ] || [ "$HERE" = "$HOME" ]; then
+        echo "regenerate: refusing to rm -rf suspicious path: $HERE" >&2
+        exit 1
+    fi
+    if [ ! -d "$HERE" ] || [ ! -O "$HERE" ]; then
+        echo "regenerate: $HERE is not a directory we own" >&2
+        exit 1
+    fi
+    if [ ! -f "$HERE/GENERATE.sh" ]; then
+        echo "regenerate: GENERATE.sh missing in $HERE -- refusing" >&2
+        exit 1
+    fi
+    cd "$ORIGINAL_CWD"
+    rm -rf "$HERE"
+    "${{ORIGINAL_COMMAND[@]}}"
+fi
+
+TARBALL="$PARENT/$NAME.tar.gz"
+echo "Snapshotting $HERE -> $TARBALL ..."
+tar czf "$TARBALL" -C "$PARENT" "$NAME"
+echo "Snapshot complete: $TARBALL"
+"""
+
+
+def write_generate_sh(out_dir, argv=None, mhcflurry_version=None):
+    """
+    Write a GENERATE.sh in ``out_dir`` recording how to reproduce the
+    artifact directory and snapshot it as a tar.gz.
+
+    Called by every artifact-producing CLI (train/select/calibrate)
+    so each output directory ships a one-liner snapshot script.
+
+    Parameters
+    ----------
+    out_dir : str
+        Directory to write GENERATE.sh into. Created by the caller.
+    argv : list of str, optional
+        Command-line invocation to record. Defaults to ``sys.argv``.
+    mhcflurry_version : str, optional
+        Version string for the audit comment. Defaults to current.
+
+    Returns
+    -------
+    str
+        Absolute path to the GENERATE.sh that was written.
+    """
+    if argv is None:
+        argv = list(sys.argv)
+    if mhcflurry_version is None:
+        try:
+            from mhcflurry.version import __version__ as mhcflurry_version
+        except Exception:
+            mhcflurry_version = "unknown"
+
+    timestamp = datetime.datetime.now().isoformat(timespec="seconds")
+    cmd_lines = " \\\n    ".join(shlex.quote(a) for a in argv)
+    cwd = shlex.quote(os.getcwd())
+
+    contents = _GENERATE_SH_TEMPLATE.format(
+        version=mhcflurry_version,
+        timestamp=timestamp,
+        cwd=cwd,
+        cmd=cmd_lines,
+    )
+    out_dir = os.path.abspath(out_dir)
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "GENERATE.sh")
+    with open(path, "w") as f:
+        f.write(contents)
+    os.chmod(path, 0o755)
+    return path

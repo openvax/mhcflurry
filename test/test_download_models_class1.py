@@ -7,6 +7,8 @@ from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 
 from mhcflurry.testing_utils import cleanup, startup
 
+pytestmark = [pytest.mark.slow, pytest.mark.downloads]
+
 numpy.random.seed(0)
 
 SERIALIZATION_RTOL = 1e-6

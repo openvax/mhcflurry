@@ -75,3 +75,14 @@ target/
 
 # OS X extra files
 .DS_Store
+.venv/
+
+# Runner outputs
+artifacts/
+jobs/
+out/
+brev_runs/
+sweep_results/
+
+# Claude Code local state
+.claude/

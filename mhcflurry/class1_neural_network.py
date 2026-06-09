@@ -6,6 +6,7 @@ import gc
 import time
 import collections
 import json
+import multiprocessing
 import weakref
 import itertools
 import os
@@ -16,6 +17,7 @@ import pandas
 import torch
 import torch.nn as nn
 
+from . import amino_acid
 from .hyperparameters import HyperparameterDefaults
 from .encodable_sequences import EncodableSequences, EncodingError
 from .allele_encoding import AlleleEncoding
@@ -24,21 +26,1110 @@ from .common import get_pytorch_device
 from .pytorch_layers import LocallyConnected1D, get_activation
 from .pytorch_losses import get_pytorch_loss
 from .data_dependent_weights_initialization import lsuv_init
-from .random_negative_peptides import RandomNegativePeptides
+from .random_negative_peptides import (
+    RandomNegativePeptides,
+    RandomNegativesPool,
+    supports_device_random_negative_encoding,
+)
+from .class1_affinity_training_data import AffinityDeviceTrainingData
+from .torch_training_loop import (
+    _configure_matmul_precision,
+    _effective_validation_batch_size,
+    _maybe_compile_loss,
+    _maybe_compile_network,
+    _uncompiled_network,
+    _validation_forward_network,
+)
 
 
-DEFAULT_PREDICT_BATCH_SIZE = 4096
+DEFAULT_PREDICT_BATCH_SIZE = "auto"
+_AUTO_BATCH_MAX_ROWS = 1_000_000  # cap past which kernel-launch savings flatten
+_AUTO_BATCH_MIN_ROWS = 1024       # floor: avoid pathologically tiny batches
+_AUTO_BATCH_CPU_FALLBACK = 32_768 # CPU: large batches thrash L3 — stay modest
+_AUTO_BATCH_FREE_FRACTION = 0.5   # half of free VRAM is the working-set budget
+_MPS_PSUTIL_WARNED = False        # one-shot warning if psutil is missing on MPS
 if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
     DEFAULT_PREDICT_BATCH_SIZE = int(os.environ["MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"])
     logging.info(
-        "Configured default predict batch size: %d" % DEFAULT_PREDICT_BATCH_SIZE
+        "Configured default predict batch size: %s" % DEFAULT_PREDICT_BATCH_SIZE
     )
+
+
+def _estimate_peak_bytes_per_row(model):
+    """Worst-case peak activation bytes per sample during a forward.
+
+    Walks the model's configured layers and returns the maximum hidden-
+    layer width (in fp32 bytes) × 2 (one input + one output of the
+    current layer stay live under torch's eval-time no_grad reuse). A
+    4× multiplier covers framework overhead, cuDNN scratch buffers,
+    and Python-side tensor bookkeeping. Used by ``compute_prediction_batch_size``.
+    """
+    if model is None:
+        return 32 * 1024  # conservative 32 KB/row fallback
+    # Class1ProcessingModel is convolutional over the full
+    # flank+peptide sequence. Its peak activation is not represented by
+    # the affinity model's peptide_dense_layers/dense_layers attributes,
+    # so compute it from the Conv1d sequence width. This keeps prediction
+    # autosizing sensitive to future flank length / filter count changes
+    # instead of falling back to the generic 1024-width estimate.
+    try:
+        conv1 = model.conv1
+        seq_len = (
+            int(model.n_flank_length)
+            + int(model.peptide_max_length)
+            + int(model.c_flank_length)
+        )
+        widths = [
+            seq_len * int(conv1.in_channels),
+            seq_len * int(conv1.out_channels),
+        ]
+        for convs_name in ("n_flank_post_convs", "c_flank_post_convs"):
+            for layer in getattr(model, convs_name, []):
+                widths.append(seq_len * int(layer.out_channels))
+        if getattr(model, "flanking_averages", False):
+            widths.append(seq_len * int(conv1.out_channels))
+        peak = max(widths)
+        return int(peak * 4 * 2 * 4)  # fp32 × 2 buffers × 4x safety
+    except (AttributeError, TypeError, ValueError):
+        pass
+    # MergedClass1NeuralNetwork wraps N sub-networks and runs each one's
+    # forward independently in a list comprehension, then combines the
+    # outputs. All N sub-networks' peak intermediates are alive
+    # simultaneously, so the per-row peak is the SUM of per-sub-network
+    # peaks, not the max. Without this, the merged ensemble's auto-sized
+    # batch overshoots VRAM by Nx (~8x for the production 8-network
+    # release ensemble) and OOMs in calibrate's cartesian forward.
+    sub_networks = getattr(model, "networks", None)
+    if sub_networks is not None and not hasattr(model, "peptide_encoding_shape"):
+        try:
+            return int(sum(
+                _estimate_peak_bytes_per_row(net) for net in sub_networks
+            ))
+        except (AttributeError, TypeError) as exc:
+            logging.warning(
+                "Could not estimate peak per-row bytes for merged ensemble; "
+                "falling back to per-network walk: %s",
+                exc,
+            )
+    widths = []
+    try:
+        lc_out_len = int(model.peptide_encoding_shape[0])
+        lc_out_ch = int(model.peptide_encoding_shape[1])
+        for lc_layer in model.lc_layers:
+            lc_out_ch = getattr(lc_layer, "out_channels", lc_out_ch)
+            try:
+                lc_out_len = int(lc_layer.output_length)
+            except AttributeError:
+                pass
+        widths.append(lc_out_len * lc_out_ch)
+        for layer in model.peptide_dense_layers:
+            widths.append(int(layer.out_features))
+    except AttributeError:
+        widths.append(1024)
+    try:
+        allele_out = None
+        if getattr(model, "allele_embedding", None) is not None:
+            allele_out = int(model.allele_embedding.weight.shape[1])
+        for layer in getattr(model, "allele_dense_layers", []):
+            allele_out = layer.out_features
+        if allele_out is not None:
+            widths.append(allele_out)
+    except AttributeError:
+        pass
+    try:
+        for layer in model.dense_layers:
+            widths.append(int(layer.out_features))
+    except AttributeError:
+        widths.append(1024)
+    peak = max(widths) if widths else 1024
+    return int(peak * 4 * 2 * 4)  # fp32 × 2 buffers × 4x safety
+
+
+def _free_device_memory_bytes(device):
+    """Best-effort free-memory query. Returns a conservative value when
+    the device doesn't expose a direct free-memory API.
+
+    CUDA: ``torch.cuda.mem_get_info`` (exposed free + reserved tracking).
+    MPS: Apple's ``recommended_max_memory`` on unified memory,
+        minus whatever the MPS driver has already handed us. Cap by
+        ``psutil`` available RAM when present so other apps aren't
+        evicted. Falls back to 4 GB if neither API is reachable.
+    CPU / unknown: 2 GB conservative budget (the helper short-circuits
+        for CPU anyway, but keep a sensible value in case callers pass
+        a foreign device).
+    """
+    import torch
+    if device.type == "cuda":
+        try:
+            free, _ = torch.cuda.mem_get_info(device)
+            return int(free)
+        except Exception:
+            props = torch.cuda.get_device_properties(device)
+            reserved = torch.cuda.memory_reserved(device)
+            return max(int(props.total_memory) - int(reserved), 0)
+    if device.type == "mps":
+        # Apple Silicon: unified memory, so "free VRAM" is better
+        # estimated from the MPS driver's recommended ceiling minus
+        # whatever it's already allocated. Ceiling is typically
+        # ~75-80% of total system RAM on M-series chips.
+        try:
+            ceiling = int(torch.mps.recommended_max_memory())
+        except Exception:
+            ceiling = 4 * (1 << 30)
+        allocated = 0
+        try:
+            allocated = int(torch.mps.driver_allocated_memory())
+        except Exception:
+            pass
+        free = max(ceiling - allocated, 0)
+        # Don't evict other apps: also cap by the OS-reported free
+        # RAM when psutil is available. This gets us a realistic
+        # "what's safe to claim right now" rather than the MPS
+        # driver's peak permission.
+        try:
+            import psutil
+            free = min(free, int(psutil.virtual_memory().available))
+        except ImportError:
+            try:
+                from .workload_planning import system_memory_info_gb
+                available_gb = system_memory_info_gb().get("available_gb")
+                if available_gb is not None:
+                    free = min(free, int(available_gb * (1 << 30)))
+            except Exception:
+                # psutil isn't a hard dep. Log once per process so the
+                # skip is visible rather than silent — without this cap
+                # the MPS driver's "recommended max" can exceed what's
+                # actually safe to claim alongside other apps.
+                global _MPS_PSUTIL_WARNED
+                if not _MPS_PSUTIL_WARNED:
+                    logging.warning(
+                        "psutil not available and OS memory fallback failed; "
+                        "MPS free-memory estimate will use "
+                        "torch.mps.recommended_max_memory alone, which may "
+                        "overshoot actual available RAM."
+                    )
+                    _MPS_PSUTIL_WARNED = True
+        except Exception:
+            # Any other psutil failure (broken install, etc.) — skip
+            # the cap but don't fail the whole batch-size query.
+            pass
+        return free if free > 0 else 4 * (1 << 30)
+    return 2 * (1 << 30)
+
+
+def compute_prediction_batch_size(
+        device,
+        model=None,
+        num_workers_per_gpu=1,
+        free_memory_fraction=_AUTO_BATCH_FREE_FRACTION,
+        max_rows=_AUTO_BATCH_MAX_ROWS,
+        min_rows=_AUTO_BATCH_MIN_ROWS,
+        cpu_fallback=_AUTO_BATCH_CPU_FALLBACK):
+    """Auto-size a prediction batch for ``device`` and ``model``.
+
+    Divides free VRAM by the per-row peak activation estimate for the
+    model, scales by 1/``num_workers_per_gpu`` so co-resident workers
+    don't step on each other's budget, caps at ``max_rows`` (past which
+    kernel-launch savings flatten out), floors at ``min_rows``.
+
+    CPU: returns ``cpu_fallback`` — large batches on CPU thrash L3
+    cache and rarely help for the small networks mhcflurry trains.
+    """
+    if device.type == "cpu":
+        return cpu_fallback
+    peak_bytes = _estimate_peak_bytes_per_row(model)
+    free = _free_device_memory_bytes(device)
+    workers = max(int(num_workers_per_gpu), 1)
+    budget = int(free * float(free_memory_fraction) / workers)
+    budget = max(budget, peak_bytes * min_rows)
+    rows = budget // peak_bytes
+    return int(max(min_rows, min(rows, max_rows)))
+
+
+def _env_workers_per_gpu(default=1):
+    """Read the ``MHCFLURRY_MAX_WORKERS_PER_GPU`` env var.
+
+    The local_parallelism pool sets this in each training worker so
+    auto-sized batching + training-memory checks can partition VRAM
+    across co-resident workers without the caller wiring it explicitly.
+    """
+    value = os.environ.get("MHCFLURRY_MAX_WORKERS_PER_GPU")
+    if value:
+        try:
+            return max(int(value), 1)
+        except ValueError:
+            pass
+    return default
+
+
+def resolve_prediction_batch_size(
+        value, device, model=None, num_workers_per_gpu=1):
+    """Resolve an explicit int or ``"auto"`` to a concrete batch size.
+
+    Accepts ``None`` as a synonym for ``"auto"``. Propagates an
+    explicit int through unchanged so callers can always pin the size
+    when they know better than the heuristic.
+    """
+    if value in (None, "auto"):
+        return compute_prediction_batch_size(
+            device,
+            model=model,
+            num_workers_per_gpu=num_workers_per_gpu,
+        )
+    return int(value)
+
+
+# Training-time memory multiplier: inference keeps only activations of
+# the current layer alive (input + output), training keeps the whole
+# forward-pass activation stack for backward plus gradients plus
+# optimizer state. RMSProp/Adam each store 1-2× weights in moving
+# averages on top. 4× the inference peak is a conservative floor that
+# leaves headroom for cuDNN workspace + Python-side torch overhead.
+_TRAINING_PEAK_MULTIPLIER = 4
+
+
+def check_training_batch_fits(
+        requested_batch_size,
+        device,
+        model,
+        num_workers_per_gpu=1,
+        free_memory_fraction=0.5,
+        min_batch=64,
+        logger=None):
+    """Verify that ``requested_batch_size`` will fit on ``device``.
+
+    Training peak memory = activations kept alive across the forward
+    pass (for backward), plus gradients, plus optimizer state. That's
+    roughly ``4 × _estimate_peak_bytes_per_row`` (inference peak).
+
+    Returns ``(effective_batch_size, shrunk: bool)``. When the
+    requested batch is too large for the available VRAM — partitioned
+    across co-resident workers — the batch is shrunk to the largest
+    power-of-two that fits (floored at ``min_batch``) and a loud
+    warning is emitted via ``logger`` / stderr explaining that the
+    training dynamics (BN running stats, gradient noise scale) now
+    differ from what the caller configured.
+
+    CPU short-circuits — no OOM risk there that a size-based heuristic
+    can catch. Returns ``(requested_batch_size, False)`` in that case.
+    """
+    import sys
+    if device.type == "cpu" or requested_batch_size <= min_batch:
+        return int(requested_batch_size), False
+    peak_bytes = _estimate_peak_bytes_per_row(model) * _TRAINING_PEAK_MULTIPLIER
+    free = _free_device_memory_bytes(device)
+    workers = max(int(num_workers_per_gpu), 1)
+    budget = int(free * float(free_memory_fraction) / workers)
+    max_rows = max(budget // peak_bytes, min_batch)
+    requested_batch_size = int(requested_batch_size)
+    if requested_batch_size <= max_rows:
+        return requested_batch_size, False
+    shrunk = 1
+    while shrunk * 2 <= max_rows:
+        shrunk *= 2
+    shrunk = max(shrunk, min_batch)
+    message = (
+        "!!! TRAINING BATCH WILL NOT FIT !!!  "
+        "Requested minibatch_size=%d on %s with %d worker(s)/GPU. "
+        "Estimated need ~%.1f GB of %.1f GB free VRAM (per-worker budget "
+        "~%.1f GB). Shrinking to %d.  "
+        "This CHANGES TRAINING DYNAMICS: batch-norm running stats, "
+        "gradient noise scale, and effective learning-rate schedule "
+        "all depend on batch size. Re-check convergence before "
+        "trusting the trained model. To pin an explicit size and "
+        "silence this guard, set a minibatch_size the caller knows "
+        "fits." % (
+            requested_batch_size, device, workers,
+            requested_batch_size * peak_bytes / 1e9,
+            free / 1e9,
+            budget / 1e9,
+            shrunk,
+        )
+    )
+    if logger is not None:
+        logger.warning(message)
+    else:
+        logging.warning(message)
+    # Also scream to stderr so it's loud in the job log regardless of
+    # which logger config the caller uses.
+    print("\n" + message + "\n", file=sys.stderr, flush=True)
+    return int(shrunk), True
 
 
 KERAS_BATCH_NORM_EPSILON = 1e-3
 # Keras uses moving = moving * 0.99 + batch * 0.01. PyTorch's momentum is the
 # new-batch coefficient, so the equivalent value is 0.01.
 KERAS_BATCH_NORM_MOMENTUM = 0.01
+
+
+def _identity_collate(sample):
+    """Return a pre-batched sample unchanged."""
+    return sample
+
+
+def _materialize_repeated_peptide_batch(batch):
+    """Return ``batch`` with compact repeated-peptide input expanded.
+
+    Pretrain batches can carry each unique peptide encoding once plus a
+    ``peptide_repeat_count`` telling the training forward path to form the
+    peptide × allele batch on device. LSUV/data-dependent initialization still
+    expects ordinary row-aligned numpy arrays, so materialize that rare
+    one-batch path here.
+    """
+    repeat_count = batch.get("peptide_repeat_count")
+    if repeat_count is None:
+        return batch
+    result = dict(batch)
+    result["peptide"] = numpy.repeat(
+        result["peptide"],
+        int(repeat_count),
+        axis=0,
+    )
+    del result["peptide_repeat_count"]
+    return result
+
+
+class _StreamingBatchIterableDataset(torch.utils.data.IterableDataset):
+    """IterableDataset backing ``fit_streaming_batches``.
+
+    Supports two input formats:
+    - Legacy raw tuples: ``(alleles, peptides, affinities)``
+    - Pre-encoded tuples: ``(x_dict, y)``
+
+    The pre-encoded path is what allows worker-side prefetch in
+    pretraining: the dataset can be pickled into spawned workers without
+    serializing the full ``Class1NeuralNetwork`` instance.
+
+    Picklability contract
+    ---------------------
+    When ``num_workers>0``, PyTorch's DataLoader pickles the dataset via
+    ``ForkingPickler`` to ship it to each spawned worker. Two classes of
+    attributes would break that:
+
+    - Live generator objects (from ``generator=iter(...)``). Generators
+      are intrinsically unpicklable.
+    - Bound methods of ``Class1NeuralNetwork`` (``peptides_to_network_input``,
+      ``allele_encoding_to_network_input``). Pickling a bound method
+      pickles ``self``, i.e. the entire network.
+
+    We sidestep both by dropping those references whenever they're
+    redundant: the factory path never reads ``self.generator`` (always
+    fresh-instantiates per worker), and the pre-encoded path never reads
+    the ``*_to_input`` callbacks. The live-generator / raw-tuple path is
+    single-process by construction — the downgrade lives in
+    ``fit_streaming_batches`` — so zeroing these out doesn't remove any
+    functionality.
+    """
+
+    def __init__(
+        self,
+        *,
+        generator,
+        generator_factory=None,
+        source_batches_are_encoded=False,
+        allele_encoding_to_input=None,
+        peptides_to_network_input=None,
+    ):
+        # Factory takes precedence: every call to ``_iter_source`` will
+        # invoke the factory and ignore ``self.generator``, so don't
+        # retain the live (unpicklable) generator object.
+        self.generator = None if generator_factory is not None else generator
+        self.generator_factory = generator_factory
+        self.source_batches_are_encoded = source_batches_are_encoded
+        # Pre-encoded batches never consume these callbacks. Drop them
+        # to keep ``ForkingPickler`` from dragging the whole
+        # ``Class1NeuralNetwork`` instance into every spawned worker.
+        if source_batches_are_encoded:
+            self.allele_encoding_to_input = None
+            self.peptides_to_network_input = None
+        else:
+            self.allele_encoding_to_input = allele_encoding_to_input
+            self.peptides_to_network_input = peptides_to_network_input
+
+    def _iter_source(self):
+        worker_info = torch.utils.data.get_worker_info()
+        if self.generator_factory is not None:
+            worker_id = worker_info.id if worker_info is not None else 0
+            num_workers = (
+                worker_info.num_workers if worker_info is not None else 1
+            )
+            return self.generator_factory(
+                worker_id=worker_id,
+                num_workers=num_workers,
+            )
+        if worker_info is not None:
+            raise ValueError(
+                "fit_streaming_batches with DataLoader workers requires a "
+                "picklable generator_factory."
+            )
+        return self.generator
+
+    def _normalize_item(self, item):
+        if self.source_batches_are_encoded:
+            x_dict, y = item
+        else:
+            if self.peptides_to_network_input is None:
+                raise ValueError(
+                    "peptides_to_network_input is required for raw "
+                    "fit_streaming_batches batches."
+                )
+            alleles, peptides, affinities = item
+            allele_input = None
+            if self.allele_encoding_to_input is not None:
+                allele_input, _ = self.allele_encoding_to_input(alleles)
+            x_dict = {
+                "peptide": self.peptides_to_network_input(peptides),
+            }
+            if allele_input is not None:
+                x_dict["allele"] = allele_input
+            y = from_ic50(affinities)
+
+        result = dict(x_dict)
+        if not isinstance(y, numpy.ndarray):
+            y = numpy.asarray(y)
+        if y.dtype != numpy.float32:
+            y = y.astype(numpy.float32)
+        result["y"] = y
+        return result
+
+    def __iter__(self):
+        for item in self._iter_source():
+            yield self._normalize_item(item)
+
+
+def _batch_value_to_device(value, device, *, non_blocking, cast_float):
+    """Move a batch value (numpy array or tensor) to ``device``.
+
+    When ``cast_float=True`` and the source is float64, cast to float32 on
+    the CPU *before* transfer. MPS refuses to host float64 tensors, and
+    transferring fp64 just to narrow it on-device wastes bandwidth anyway.
+    int8 / float32 inputs skip the CPU-side cast so the pattern of shipping
+    compact int encodings and widening on the torch device stays intact.
+
+    When ``cast_float=False`` the value is shipped through in its source
+    dtype — used by the device-side fixed peptide encoding path where
+    peptide tensors are (N, L) int indices that get widened to (N, L, V)
+    fp32 via embedding lookup inside the network's forward pass.
+    """
+    if isinstance(value, numpy.ndarray):
+        value = _torch_from_numpy(value)
+    if cast_float and value.dtype == torch.float64:
+        value = value.float()
+    value = value.to(device, non_blocking=non_blocking)
+    if cast_float:
+        value = value.float()
+    return value
+
+
+def _torch_from_numpy(value):
+    if not value.flags.writeable:
+        value = value.copy()
+    return torch.from_numpy(value)
+
+
+_DEVICE_PEPTIDE_ENCODING_TRUE_VALUES = {
+    "1",
+    "true",
+    "yes",
+    "on",
+    "auto",
+    "cpu",
+    "device",
+    "torch",
+    "gpu",
+    "mps",
+}
+_DEVICE_PEPTIDE_ENCODING_FALSE_VALUES = {
+    "0",
+    "false",
+    "no",
+    "off",
+    "numpy",
+    "legacy",
+}
+
+_warned_legacy_peptide_vector_encoding = []
+
+
+def _warn_legacy_peptide_vector_encoding(value):
+    """Warn once that the legacy dense-vector peptide path is gone."""
+    if not _warned_legacy_peptide_vector_encoding:
+        _warned_legacy_peptide_vector_encoding.append(True)
+        logging.warning(
+            "peptide_amino_acid_encoding_torch=%r is deprecated and ignored: "
+            "peptides are always index-encoded ((N, L) int8) and embedded on "
+            "device via a frozen table. The legacy dense-vector peptide "
+            "encoding path has been removed.", value)
+
+
+def _peptide_torch_encoding_name(hyperparameters):
+    """Return the fixed amino-acid encoding for the peptide embedding table.
+
+    Peptides are always index-encoded ((N, L) int8) and embedded via a frozen
+    ``torch.nn.functional.embedding`` table (device-agnostic: CUDA/MPS/CPU). The
+    table comes from ``amino_acid.get_vector_encoding_df`` and is registered as
+    a non-persistent buffer, so it moves with ``.to(device)`` but never trains
+    or bloats the NPZ weight list.
+
+    The legacy ``peptide_amino_acid_encoding_torch=False`` dense-vector path has
+    been removed; a falsy value is accepted but ignored (with a one-time
+    deprecation warning) so older configs still load. A non-default value names
+    the encoding directly; an unknown name still raises.
+    """
+    mode = hyperparameters.get("peptide_amino_acid_encoding_torch", True)
+    if isinstance(mode, str):
+        mode_normalized = mode.strip().lower()
+        if mode_normalized in _DEVICE_PEPTIDE_ENCODING_FALSE_VALUES:
+            _warn_legacy_peptide_vector_encoding(mode)
+        else:
+            try:
+                amino_acid.get_vector_encoding_df(mode)
+                return mode
+            except KeyError:
+                pass
+            if mode_normalized not in _DEVICE_PEPTIDE_ENCODING_TRUE_VALUES:
+                raise ValueError(
+                    "Unsupported peptide_amino_acid_encoding_torch value %r. "
+                    "Expected bool, a true/false string, or one of %s."
+                    % (mode, sorted(amino_acid.ENCODING_DATA_FRAMES))
+                )
+    elif not mode:
+        _warn_legacy_peptide_vector_encoding(mode)
+
+    peptide_encoding = hyperparameters.get("peptide_encoding", {})
+    encoding_name = peptide_encoding.get("vector_encoding_name", "BLOSUM62")
+    try:
+        amino_acid.get_vector_encoding_df(encoding_name)
+    except KeyError:
+        raise ValueError(
+            "Peptide encoding requires a fixed vector encoding with a torch "
+            "lookup table; got %r. Available: %s"
+            % (encoding_name, sorted(amino_acid.ENCODING_DATA_FRAMES))
+        ) from None
+    return encoding_name
+
+
+def _peptide_uses_torch_encoding(hyperparameters):
+    """Deprecated: peptides are always index-encoded now (always True)."""
+    return True
+
+
+def _peptide_torch_encoding_table(encoding_name):
+    """Return a float32 lookup table indexed by ``AMINO_ACID_INDEX``."""
+    return amino_acid.vector_encoding_index_table(encoding_name)
+
+
+def _peptide_torch_encoding_shape(index_shape, encoding_name):
+    """Expand an ``(L,)`` categorical peptide shape to ``(L, V)``."""
+    return (
+        index_shape[0],
+        amino_acid.vector_encoding_length(encoding_name),
+    )
+
+
+def _categorical_kwargs_for_peptide_encoding(peptide_encoding):
+    """Extract kwargs shared by vector and categorical peptide encoders."""
+    return {
+        key: value
+        for key, value in peptide_encoding.items()
+        if key in (
+            "alignment_method",
+            "left_edge",
+            "right_edge",
+            "max_length",
+            "trim",
+            "allow_unsupported_amino_acids",
+        )
+    }
+
+
+def peptide_sequences_to_network_input(
+        peptides,
+        peptide_encoding,
+        peptide_amino_acid_encoding_torch=True):
+    """Encode peptide strings to the representation consumed by a network.
+
+    This is the central peptide-only string-to-array conversion. Peptides are
+    always returned as compact ``(N, L)`` int8 amino-acid indices; the
+    fixed-vector lookup then happens through the network's frozen torch
+    embedding table. (``peptide_amino_acid_encoding_torch`` is accepted for
+    config compatibility but the legacy dense-vector path is gone.)
+    """
+    if not peptide_amino_acid_encoding_torch:
+        _warn_legacy_peptide_vector_encoding(peptide_amino_acid_encoding_torch)
+    encoder = EncodableSequences.create(peptides)
+    return (
+        encoder.variable_length_to_fixed_length_categorical(
+            **_categorical_kwargs_for_peptide_encoding(peptide_encoding)
+        )
+        .astype("int8", copy=False)
+    )
+
+
+def _timing_enabled():
+    """Return True when fine-grained training timing is enabled."""
+    return os.environ.get("MHCFLURRY_ENABLE_TIMING", "0") == "1"
+
+
+def _timing_synchronize(device):
+    """Synchronize asynchronous device work for accurate wall timing."""
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    elif device.type == "mps" and hasattr(torch, "mps"):
+        torch.mps.synchronize()
+
+
+def _timing_start(device, enabled):
+    if enabled:
+        _timing_synchronize(device)
+    return time.perf_counter()
+
+
+def _timing_stop(start, device, enabled):
+    if enabled:
+        _timing_synchronize(device)
+    return time.perf_counter() - start
+
+
+def _move_fit_batch_to_device(batch, device, *, non_blocking):
+    """Move a training batch dict to ``device``.
+
+    When ``batch["peptide"]`` is a 2D integer array the torch-side fixed
+    peptide encoding path is active — keep it as int so the network's
+    embedding lookup can consume it. A 3D integer array is a compact
+    vector-encoded cache payload; still widen that to fp32 on device.
+    Float arrays flow through as before.
+    """
+    peptide_source = batch["peptide"]
+    peptide_repeat_count = batch.get("peptide_repeat_count")
+    if isinstance(peptide_source, numpy.ndarray):
+        _peptide_is_indices = (
+            peptide_source.ndim == 2
+            and numpy.issubdtype(peptide_source.dtype, numpy.integer)
+        )
+    else:
+        _peptide_is_indices = (
+            hasattr(peptide_source, "dim")
+            and peptide_source.dim() == 2
+            and peptide_source.dtype in (
+                torch.int8, torch.int16, torch.int32, torch.int64, torch.uint8
+            )
+        )
+    peptide_batch = _batch_value_to_device(
+        peptide_source,
+        device,
+        non_blocking=non_blocking,
+        cast_float=not _peptide_is_indices,
+    )
+    y_batch = _batch_value_to_device(
+        batch["y"],
+        device,
+        non_blocking=non_blocking,
+        cast_float=False,
+    )
+    inputs = {"peptide": peptide_batch}
+    if peptide_repeat_count is not None:
+        inputs["peptide_repeat_count"] = int(peptide_repeat_count)
+    if "allele" in batch:
+        inputs["allele"] = _batch_value_to_device(
+            batch["allele"],
+            device,
+            non_blocking=non_blocking,
+            cast_float=True,
+        )
+    weights_batch = None
+    if "weight" in batch:
+        weights_batch = _batch_value_to_device(
+            batch["weight"],
+            device,
+            non_blocking=non_blocking,
+            cast_float=True,
+        )
+    return (inputs, y_batch, weights_batch)
+
+
+def _run_training_batch(
+    *,
+    network,
+    optimizer,
+    loss_obj,
+    regularization_parameters,
+    l1_reg,
+    l2_reg,
+    inputs,
+    y_batch,
+    weights_batch=None,
+):
+    """Run one optimizer step and return the detached loss tensor."""
+    optimizer.zero_grad()
+    predictions = network(inputs)
+    loss = loss_obj(predictions, y_batch, sample_weights=weights_batch)
+    regularization_penalty = Class1NeuralNetwork._regularization_penalty(
+        regularization_parameters,
+        l1=l1_reg,
+        l2=l2_reg,
+    )
+    if regularization_penalty is not None:
+        loss = loss + regularization_penalty
+    loss.backward()
+    optimizer.step()
+    return loss.detach()
+
+
+def _run_prepared_training_batches(
+    prepared_batches,
+    *,
+    optimizer,
+    loss_obj,
+    regularization_parameters,
+    l1_reg,
+    l2_reg,
+    timing_enabled,
+    device,
+):
+    """Run optimizer steps for a prepared batch stream.
+
+    Batch sources are responsible for efficient data plumbing. The in-memory
+    affinity path yields device-resident tensors selected by GPU indices; the
+    streaming pretrain path yields DataLoader chunks after its H2D copy. This
+    helper owns the learning step so fit() and fit_streaming_batches() share the
+    same optimizer/loss/timing behavior without forcing one data layout onto the
+    other.
+    """
+    losses = []
+    train_time = 0.0
+    train_rows = 0
+    first_batch_time = None
+    for prepared in prepared_batches:
+        batch_start = _timing_start(device, timing_enabled)
+        loss = _run_training_batch(
+            network=prepared["network"],
+            optimizer=optimizer,
+            loss_obj=loss_obj,
+            regularization_parameters=regularization_parameters,
+            l1_reg=l1_reg,
+            l2_reg=l2_reg,
+            inputs=prepared["inputs"],
+            y_batch=prepared["y_batch"],
+            weights_batch=prepared.get("weights_batch"),
+        )
+        batch_time = _timing_stop(batch_start, device, timing_enabled)
+        train_time += batch_time
+        if first_batch_time is None:
+            first_batch_time = batch_time
+        train_rows += int(prepared["row_count"])
+        losses.append(loss)
+    return {
+        "losses": losses,
+        "train_time": train_time,
+        "train_rows": train_rows,
+        "first_batch_time": first_batch_time,
+    }
+
+
+def _sync_mean_loss(losses, *, device, timing_enabled):
+    """Return mean detached loss with one device sync plus sync timing."""
+    loss_sync_start = _timing_start(device, timing_enabled)
+    train_loss = (
+        torch.stack(losses).mean().item()
+        if losses else float("nan")
+    )
+    loss_sync_time = _timing_stop(loss_sync_start, device, timing_enabled)
+    return train_loss, loss_sync_time
+
+
+def _validation_interval_from_hyperparameters(hyperparameters):
+    """Return normalized validation interval for both training paths."""
+    return max(1, int(hyperparameters.get("validation_interval", 1) or 1))
+
+
+def _early_stop_reached(
+    *,
+    epoch_index,
+    min_val_loss_epoch,
+    patience,
+    min_epochs=0,
+    early_stopping=True,
+    strict=True,
+):
+    """Shared early-stopping decision using zero-based epoch indices.
+
+    With ``strict=True`` (the affinity ``fit()`` path) training stops the
+    first epoch *strictly after* ``max(min_val_loss_epoch + patience,
+    min_epochs - 1)`` — i.e. ``patience`` no-improvement epochs followed by
+    one more before stopping. This matches the pre-2.3.0 ``fit()`` condition
+    ``epoch > min_val_loss_iteration + patience``.
+
+    With ``strict=False`` (the streaming pretrain path) training stops *at*
+    that threshold, reproducing the pre-2.3.0 streaming condition
+    ``epoch >= min_val_loss_iteration + patience`` (which used one-based
+    epochs). Keeping the streaming path inclusive means pretrained base
+    weights reproduce historical runs rather than training one extra epoch.
+    """
+    if not early_stopping or min_val_loss_epoch is None:
+        return False
+    threshold = max(
+        int(min_val_loss_epoch) + int(patience),
+        int(min_epochs) - 1,
+    )
+    if strict:
+        return int(epoch_index) > threshold
+    return int(epoch_index) >= threshold
+
+
+def _should_validate_epoch(
+    *,
+    validation_enabled,
+    epoch_index,
+    max_epochs,
+    validation_interval,
+    early_stopping,
+    min_val_loss_epoch,
+    patience,
+    min_epochs=0,
+    strict=True,
+):
+    """Shared validation cadence for fit() and fit_streaming_batches().
+
+    ``strict`` is forwarded to :func:`_early_stop_reached` so the "validate on
+    the epoch we're about to stop" rule uses the same inclusive/exclusive
+    threshold as the caller's break condition.
+    """
+    if not validation_enabled:
+        return False
+    is_last_epoch = int(epoch_index) == int(max_epochs) - 1
+    patience_would_trigger = _early_stop_reached(
+        epoch_index=epoch_index,
+        min_val_loss_epoch=min_val_loss_epoch,
+        patience=patience,
+        min_epochs=min_epochs,
+        early_stopping=early_stopping,
+        strict=strict,
+    )
+    return (
+        int(epoch_index) % int(validation_interval) == 0
+        or is_last_epoch
+        or patience_would_trigger
+    )
+
+
+def _carry_forward_validation_loss(fit_info):
+    """Keep val_loss aligned with epochs when validation is skipped."""
+    return fit_info["val_loss"][-1] if fit_info["val_loss"] else float("nan")
+
+
+def _update_min_validation_loss(
+    *,
+    val_loss,
+    epoch_index,
+    min_val_loss,
+    min_val_loss_epoch,
+    min_delta,
+):
+    """Update min validation state after a measured validation epoch."""
+    if min_val_loss is None or val_loss < min_val_loss - min_delta:
+        return val_loss, epoch_index
+    return min_val_loss, min_val_loss_epoch
+
+
+def _effective_num_workers(num_workers):
+    """Downgrade ``num_workers`` to 0 when running inside a daemon process.
+
+    Safety net for DataLoader's ``num_workers>0`` path, which requires
+    spawning child processes — forbidden from daemon parents. mhcflurry's
+    training orchestrator switched to ``NonDaemonPool`` (see
+    ``local_parallelism.py``) so in production Pool workers are now
+    non-daemonic and this downgrade does NOT fire. It remains as
+    defense-in-depth for:
+
+      - External callers that wrap ``Class1NeuralNetwork.fit`` in a
+        daemonic process of their own (e.g. ``ProcessPoolExecutor`` is
+        non-daemon by default but ``multiprocessing.Pool`` without the
+        NonDaemonPool subclass is daemonic).
+      - Test suites that explicitly construct daemon subprocesses (our
+        own ``test_dataloader_num_workers_downgrades_in_daemon_context``
+        exercises this path).
+
+    Emits a ``DeprecationWarning`` — it's worth knowing if this fires,
+    since it means the caller is running in a daemon context and
+    DataLoader prefetch is silently disabled. Use ``warnings.filterwarnings``
+    to silence if intentional.
+    """
+    if num_workers > 0 and multiprocessing.current_process().daemon:
+        import warnings
+        warnings.warn(
+            f"dataloader_num_workers={num_workers} requested from a daemon "
+            f"process; downgrading to 0 because daemon processes cannot "
+            f"spawn children. If this is mhcflurry's Pool worker, switch "
+            f"to NonDaemonPool (mhcflurry/local_parallelism.py); if it's "
+            f"your own caller, use a non-daemonic executor or accept the "
+            f"downgrade (set dataloader_num_workers=0 explicitly to silence).",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return 0
+    return num_workers
+
+
+def _make_streaming_batch_dataloader(
+    dataset,
+    num_workers,
+):
+    """Construct a DataLoader for ``fit_streaming_batches``.
+
+    The dataset already yields complete batches, so automatic batching is
+    disabled (``batch_size=None``) and we keep the payload as numpy
+    arrays via ``_identity_collate``. That avoids worker-side tensor
+    materialization and keeps the worker path picklable for spawned
+    subprocesses.
+    """
+    effective_workers = _effective_num_workers(num_workers)
+    kwargs = dict(
+        dataset=dataset,
+        batch_size=None,
+        num_workers=effective_workers,
+        collate_fn=_identity_collate,
+    )
+    if effective_workers > 0:
+        kwargs["multiprocessing_context"] = "spawn"
+        kwargs["prefetch_factor"] = 2
+    return torch.utils.data.DataLoader(**kwargs)
+
+
+_VALIDATION_INEQUALITY_FALLBACK_WARNED = False
+
+
+def _warn_validation_inequality_fallback_once(loss_name):
+    """Log once per process when val_loss drops to the single-shot inequality path.
+
+    The fallback exists to preserve 2.1.x semantics: ``MSEWithInequalities`` and
+    its multi-output variant exclude encoded ``2.0`` targets from the
+    denominator, and batchwise averaging would change that count. Users should
+    know that validation is then unbatched so they can size ``batch_size``
+    knowing the cost.
+    """
+    global _VALIDATION_INEQUALITY_FALLBACK_WARNED
+    if _VALIDATION_INEQUALITY_FALLBACK_WARNED:
+        return
+    _VALIDATION_INEQUALITY_FALLBACK_WARNED = True
+    logging.warning(
+        "validation loss running single-shot (no batching) because "
+        "%s has inequality targets that would change the legacy denominator "
+        "if split across batches. This log fires once per process.",
+        loss_name,
+    )
+
+
+def _batched_validation_loss(
+    *,
+    network,
+    eager_network,
+    val_peptide,
+    val_allele,
+    val_y,
+    val_weights,
+    loss_obj,
+    batch_size,
+):
+    """Compute validation loss with a fixed-size fast path and eager tail path.
+
+    Every ``network(inputs)`` call inside this helper sees the same
+    shape (``batch_size``), so GPU validation stays memory-bounded and
+    optional compiled-validation paths can specialize once and reuse.
+    That matters for H100 and A100 training where single-shot forward
+    passes over the full validation set (up to ~185K rows for pan-allele
+    training) were eating 15+ GB of VRAM per worker.
+
+    Semantics: iterate ``val_peptide`` in ``batch_size``-row chunks and
+    return the exact mean validation loss across all rows. Full-size
+    batches run through ``network`` (typically compiled); any short tail
+    batch runs through ``eager_network`` to avoid recompiling on an odd
+    shape.
+
+    Weighted validation and cross-example losses fall back to the
+    original single-shot computation to preserve exact semantics:
+    averaging per-batch weighted means is not the same as taking the
+    weighted mean over the whole validation set, and losses like
+    ``MultiallelicMassSpecLoss`` couple samples within a batch.
+
+    Returns a Python float (already detached from autograd).
+    """
+    n_val = val_peptide.shape[0]
+    if n_val == 0:
+        return float("nan")
+
+    # Short-circuit cheap predicates first so we only sync the device for the
+    # inequality-denominator check when none of the basic conditions apply.
+    needs_basic_fallback = (
+        n_val < batch_size
+        or val_weights is not None
+        or not getattr(loss_obj, "supports_independent_samples", True)
+    )
+    inequality_fallback = (
+        not needs_basic_fallback
+        and _validation_loss_has_legacy_inequality_denominator(loss_obj, val_y)
+    )
+    if needs_basic_fallback or inequality_fallback:
+        # Fallback for tiny val sets (typical in unit tests) and for
+        # weighted / cross-example / inequality losses whose reductions are
+        # not decomposable batchwise without changing the legacy denominator.
+        if inequality_fallback:
+            _warn_validation_inequality_fallback_once(type(loss_obj).__name__)
+        inputs = {"peptide": val_peptide}
+        if val_allele is not None:
+            inputs["allele"] = val_allele
+        preds = eager_network(inputs)
+        batch_loss = loss_obj(preds, val_y, sample_weights=val_weights)
+        return batch_loss.item()
+
+    n_full = (n_val // batch_size) * batch_size
+    loss_accum = 0.0
+    weight_accum = 0.0
+    for start in range(0, n_full, batch_size):
+        end = start + batch_size
+        inputs = {"peptide": val_peptide[start:end]}
+        if val_allele is not None:
+            inputs["allele"] = val_allele[start:end]
+        preds = network(inputs)
+        weights_slice = (
+            val_weights[start:end] if val_weights is not None else None
+        )
+        batch_loss = loss_obj(
+            preds, val_y[start:end], sample_weights=weights_slice
+        )
+        loss_accum += batch_loss.item() * batch_size
+        weight_accum += batch_size
+    if n_full < n_val:
+        inputs = {"peptide": val_peptide[n_full:n_val]}
+        if val_allele is not None:
+            inputs["allele"] = val_allele[n_full:n_val]
+        tail_loss = loss_obj(
+            eager_network(inputs),
+            val_y[n_full:n_val],
+            sample_weights=None,
+        )
+        tail_size = n_val - n_full
+        loss_accum += tail_loss.item() * tail_size
+        weight_accum += tail_size
+    return loss_accum / weight_accum
+
+
+def _validation_loss_has_legacy_inequality_denominator(loss_obj, val_y):
+    """Return True when batch-size weighting would change inequality loss.
+
+    ``MSEWithInequalities`` and its multi-output variant keep 2.1.x behavior:
+    encoded ``2.0`` targets are excluded from the denominator. If such rows
+    are split unevenly across validation batches, averaging batch means by raw
+    batch size changes ``val_loss``. Use the old single-shot path only for that
+    case; all other independent-sample inequality rows remain batchable.
+    """
+    if not getattr(loss_obj, "supports_inequalities", False):
+        return False
+    y_t = val_y.reshape(-1)
+    if getattr(loss_obj, "supports_multiple_outputs", False):
+        output_indices = (y_t / 10.0).long()
+        y_t = y_t - output_indices.to(y_t.dtype) * 10.0
+    return bool(torch.any(y_t == 2.0).item())
 
 
 class Class1NeuralNetworkModel(nn.Module):
@@ -64,10 +1155,37 @@ class Class1NeuralNetworkModel(nn.Module):
             dense_layer_l2_regularization=0.0,
             topology="feedforward",
             num_outputs=1,
-            init="glorot_uniform"):
+            init="glorot_uniform",
+            peptide_input_is_indices=False,
+            peptide_input_vector_encoding_name=None):
         super(Class1NeuralNetworkModel, self).__init__()
 
         self.peptide_encoding_shape = peptide_encoding_shape
+        if peptide_input_vector_encoding_name is None and peptide_input_is_indices:
+            peptide_input_vector_encoding_name = "BLOSUM62"
+        self.peptide_input_vector_encoding_name = peptide_input_vector_encoding_name
+        self.peptide_input_is_indices = peptide_input_vector_encoding_name is not None
+        # DEPRECATED (scheduled for removal): ``peptide_input_is_indices`` is now
+        # always True in production — the encoding path emits (N, L) int8 and the
+        # legacy dense-vector peptide path is gone. The ``False`` branch (a 3D
+        # fp32 peptide input, handled in ``forward``/``predict``) is retained
+        # only as defensive handling used by topology/init unit tests; it has no
+        # production caller and should be collapsed to index-only when those
+        # tests migrate.
+        #
+        # Device-side fixed amino-acid encoding: when enabled, peptide input
+        # is (N, L) int indices and ``forward`` widens to (N, L, V) fp32 via
+        # a frozen embedding table. The table is a non-persistent buffer: it
+        # moves with ``.to(device)`` but is fully determined by hyperparameters
+        # and should not be serialized in custom NPZ weight lists.
+        if self.peptide_input_is_indices:
+            self.register_buffer(
+                "peptide_embedding_table",
+                torch.from_numpy(
+                    _peptide_torch_encoding_table(peptide_input_vector_encoding_name)
+                ),
+                persistent=False,
+            )
         self.has_allele = allele_representations is not None
         self.peptide_allele_merge_method = peptide_allele_merge_method
         self.peptide_allele_merge_activation = peptide_allele_merge_activation
@@ -244,6 +1362,374 @@ class Class1NeuralNetworkModel(nn.Module):
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
 
+    def _forward_peptide_stage_before_early_batch_norm(self, peptide):
+        if (
+            self.peptide_input_is_indices
+            and peptide.dim() == 2
+        ):
+            peptide = torch.nn.functional.embedding(
+                peptide.long(), self.peptide_embedding_table
+            )
+        x = peptide
+        for lc_layer in self.lc_layers:
+            x = lc_layer(x)
+        x = x.reshape(x.size(0), -1)
+        for layer in self.peptide_dense_layers:
+            x = layer(x)
+            if self.activation is not None:
+                x = self.activation(x)
+        return x
+
+    def forward_peptide_stage(self, peptide):
+        """Run only the peptide-side of the network.
+
+        Ends at the point where the allele information enters — just
+        before the merge step. Used by the calibration fast path to
+        compute the peptide-dependent activations once and reuse them
+        across thousands of alleles.
+
+        Parameters
+        ----------
+        peptide : torch.Tensor
+            (N, L, V) fp32 fixed-vector encoded, or (N, L) int indices when
+            ``peptide_input_is_indices`` is True.
+
+        Returns
+        -------
+        torch.Tensor of shape (N, peptide_representation_dim) — the
+        input the ``forward_from_peptide_stage`` fast path expects.
+        """
+        x = self._forward_peptide_stage_before_early_batch_norm(peptide)
+        if self.batch_norm_early is not None:
+            x = self.batch_norm_early(x)
+        return x
+
+    def _forward_allele_stage(self, allele_idx):
+        allele_idx = allele_idx.long()
+        if allele_idx.dim() > 1:
+            allele_idx = allele_idx.squeeze(-1)
+        allele_embed = self.allele_embedding(allele_idx)
+        for layer in self.allele_dense_layers:
+            allele_embed = layer(allele_embed)
+            if self.activation is not None:
+                allele_embed = self.activation(allele_embed)
+        return allele_embed.reshape(allele_embed.size(0), -1)
+
+    def forward_from_peptide_stage(self, peptide_stage, allele_idx):
+        """Run the allele-merge + main dense path from cached peptide reps.
+
+        ``peptide_stage`` must be the output of
+        ``forward_peptide_stage``. ``allele_idx`` has shape matching
+        ``peptide_stage``'s batch dim — typical calibration usage
+        tiles one allele across many peptides or the cross-product
+        of (peptide_chunk, allele_chunk).
+
+        This path skips all peptide-side ops, which for pan-allele
+        calibration lets a single precomputed activation be reused
+        across tens of thousands of allele forwards.
+        """
+        if not self.has_allele:
+            raise RuntimeError(
+                "forward_from_peptide_stage called on a has_allele=False "
+                "model — just call forward() directly"
+            )
+        x = peptide_stage
+        allele_embed = self._forward_allele_stage(allele_idx)
+        if self.peptide_allele_merge_method == "concatenate":
+            x = torch.cat([x, allele_embed], dim=-1)
+        elif self.peptide_allele_merge_method == "multiply":
+            x = x * allele_embed
+        if self.merge_activation is not None:
+            x = self.merge_activation(x)
+        prev_outputs = []
+        merged_input = x
+        for i, layer in enumerate(self.dense_layers):
+            if self.topology == "with-skip-connections" and i > 0:
+                if i == 1:
+                    x = torch.cat([merged_input, prev_outputs[-1]], dim=-1)
+                else:
+                    x = torch.cat([prev_outputs[-2], prev_outputs[-1]], dim=-1)
+            x = layer(x)
+            if self.activation is not None:
+                x = self.activation(x)
+            if self.batch_norms[i] is not None:
+                x = self.batch_norms[i](x)
+            if self.dropouts[i] is not None:
+                x = self.dropouts[i](x)
+            prev_outputs.append(x)
+        output = self.output_layer(x)
+        if self.output_activation is not None:
+            output = self.output_activation(output)
+        return output
+
+    def _first_linear_from_cartesian_stages(self, peptide_stage, allele_stage, layer):
+        if self.peptide_allele_merge_method == "concatenate":
+            peptide_width = peptide_stage.shape[-1]
+            peptide_weight = layer.weight[:, :peptide_width]
+            allele_weight = layer.weight[:, peptide_width:]
+            x = (
+                peptide_stage.matmul(peptide_weight.t()).unsqueeze(1)
+                + allele_stage.matmul(allele_weight.t()).unsqueeze(0)
+            )
+        elif self.peptide_allele_merge_method == "multiply":
+            x = torch.einsum(
+                "pd,ad,hd->pah",
+                peptide_stage,
+                allele_stage,
+                layer.weight,
+            )
+        else:
+            raise ValueError(
+                f"Unknown merge method: {self.peptide_allele_merge_method}"
+            )
+        return x + layer.bias
+
+    def _forward_compact_cartesian(self, peptide, allele_idx, repeat_count):
+        """Forward a compact peptide × allele batch without raw peptide repeat."""
+        if not self.has_allele:
+            raise RuntimeError(
+                "compact peptide-repeat batches require a pan-allele model"
+            )
+        if repeat_count <= 0:
+            raise ValueError("peptide_repeat_count must be positive")
+
+        allele_idx = allele_idx.long()
+        if allele_idx.dim() > 1:
+            allele_idx = allele_idx.squeeze(-1)
+        peptide_count = peptide.shape[0]
+        allele_count = allele_idx.shape[0]
+        if (
+            isinstance(peptide_count, int)
+            and isinstance(allele_count, int)
+            and allele_count != peptide_count * repeat_count
+        ):
+            raise ValueError(
+                "compact peptide-repeat batch has %d peptides, repeat_count=%d, "
+                "and %d allele rows"
+                % (peptide_count, repeat_count, allele_count)
+            )
+
+        peptide_stage = self._forward_peptide_stage_before_early_batch_norm(peptide)
+        if self.batch_norm_early is not None:
+            # BatchNorm's running variance depends on the batch size. Repeat
+            # before early BN so compact training is numerically equivalent to
+            # the historical fully repeated peptide batch.
+            peptide_stage = peptide_stage.repeat_interleave(repeat_count, dim=0)
+            peptide_stage = self.batch_norm_early(peptide_stage)
+            peptide_stage = peptide_stage.reshape(
+                peptide_count, repeat_count, peptide_stage.shape[-1]
+            )[:, 0, :]
+
+        allele_stage = self._forward_allele_stage(allele_idx[:repeat_count])
+        can_factorize_first_layer = (
+            self.merge_activation is None
+            and self.topology != "with-skip-connections"
+        )
+        if not can_factorize_first_layer:
+            peptide_stage = peptide_stage.repeat_interleave(repeat_count, dim=0)
+            return self.forward_from_peptide_stage(peptide_stage, allele_idx)
+
+        if self.dense_layers:
+            first_layer = self.dense_layers[0]
+        else:
+            first_layer = self.output_layer
+        x = self._first_linear_from_cartesian_stages(
+            peptide_stage,
+            allele_stage,
+            first_layer,
+        )
+        x = x.reshape(peptide_count * repeat_count, x.shape[-1])
+
+        if self.dense_layers:
+            if self.activation is not None:
+                x = self.activation(x)
+            if self.batch_norms[0] is not None:
+                x = self.batch_norms[0](x)
+            if self.dropouts[0] is not None:
+                x = self.dropouts[0](x)
+
+            # ``enumerate(seq, start=N)`` triggers a torch._dynamo graph
+            # break on PyTorch <=2.4 (``call_enumerate`` rejects the
+            # ``start`` kwarg in builtin.py:775) — every traced forward
+            # then falls back to eager for the layer-stack loop, losing
+            # the compile speedup. Iterate by index instead so the loop
+            # body stays inside the compiled graph.
+            #
+            # When upgrading torch past 2.4 confirm the dynamo bug is
+            # fixed and revert to enumerate(seq, start=1).
+            for offset, layer in enumerate(self.dense_layers[1:]):
+                i = offset + 1
+                x = layer(x)
+                if self.activation is not None:
+                    x = self.activation(x)
+                if self.batch_norms[i] is not None:
+                    x = self.batch_norms[i](x)
+                if self.dropouts[i] is not None:
+                    x = self.dropouts[i](x)
+            output = self.output_layer(x)
+        else:
+            output = x
+
+        if self.output_activation is not None:
+            output = self.output_activation(output)
+        return output
+
+    def forward_cartesian_from_peptide_stage(self, peptide_stage, allele_idx):
+        """Forward every peptide-stage row against every allele index.
+
+        Returns predictions in allele-major order with shape
+        ``(num_alleles, num_peptides, num_outputs)``. When the model's
+        merge + first linear layer can be factored, this avoids materializing
+        the larger ``num_alleles * num_peptides * peptide_stage_dim`` repeated
+        peptide-stage tensor used by ``forward_from_peptide_stage``.
+
+        Skip-connections (``topology == "with-skip-connections"``) are
+        also factorized: layer 1's input ``cat[merged_input, layer0_out]``
+        is computed without materializing the (a*p, peptide_width +
+        allele_width) merged_input expansion — instead layer 1's weight
+        is split column-wise into peptide / allele / prev pieces and
+        the contributions are summed in their factored shapes
+        (``(p, h1)`` + ``(a, h1)`` + ``(a, p, h1)``). Layers ≥ 2's
+        input ``cat[prev[-2], prev[-1]]`` is similarly factorized via
+        column-wise weight splits, avoiding the explicit concat.
+        """
+        if not self.has_allele:
+            raise RuntimeError(
+                "forward_cartesian_from_peptide_stage called on a "
+                "has_allele=False model"
+            )
+        allele_idx = allele_idx.long()
+        if allele_idx.dim() > 1:
+            allele_idx = allele_idx.squeeze(-1)
+        num_peptides = peptide_stage.shape[0]
+        num_alleles = allele_idx.shape[0]
+
+        is_skip = self.topology == "with-skip-connections"
+        # ``_first_linear_from_cartesian_stages`` handles both
+        # ``concatenate`` and ``multiply`` merge methods via separate
+        # codepaths, so the standard (non-skip) factorized path is fine
+        # for either. Skip-connections factorization at layer 1 below
+        # only handles the concatenate case (multiply + skip is rare
+        # and would need an einsum at every skip layer); fall back to
+        # the non-factorized path for that combo.
+        can_factorize_first_layer = (
+            self.merge_activation is None
+            and (not is_skip or self.peptide_allele_merge_method == "concatenate")
+        )
+        if not can_factorize_first_layer:
+            peptide_width = peptide_stage.shape[-1]
+            expanded = peptide_stage.unsqueeze(0).expand(
+                num_alleles, num_peptides, peptide_width
+            ).reshape(num_alleles * num_peptides, peptide_width)
+            expanded_alleles = allele_idx.unsqueeze(1).expand(
+                num_alleles, num_peptides
+            ).reshape(-1)
+            return self.forward_from_peptide_stage(
+                expanded,
+                expanded_alleles,
+            ).reshape(num_alleles, num_peptides, -1)
+
+        allele_stage = self._forward_allele_stage(allele_idx)
+        if self.dense_layers:
+            first_layer = self.dense_layers[0]
+        else:
+            first_layer = self.output_layer
+        x = self._first_linear_from_cartesian_stages(
+            peptide_stage,
+            allele_stage,
+            first_layer,
+        )
+        x = x.transpose(0, 1).reshape(num_alleles * num_peptides, x.shape[-1])
+
+        if self.dense_layers:
+            if self.activation is not None:
+                x = self.activation(x)
+            if self.batch_norms[0] is not None:
+                x = self.batch_norms[0](x)
+            if self.dropouts[0] is not None:
+                x = self.dropouts[0](x)
+
+            if is_skip:
+                # Skip-connections factorized path. layer 1's input is
+                # cat[merged_input, prev[0]] = cat[peptide_expanded,
+                # allele_expanded, prev[0]]; rather than materialize
+                # the (a*p, peptide_width + allele_width + h0) tensor,
+                # split the layer's weight column-wise and sum the
+                # three contributions in their natural factored shapes.
+                # Layers ≥ 2 take cat[prev[-2], prev[-1]]; both are
+                # already in flat-cartesian form so we just split the
+                # weight column-wise to skip the concat materialization.
+                peptide_width = peptide_stage.shape[-1]
+                allele_width = allele_stage.shape[-1]
+                prev_outputs = [x]
+                for offset, layer in enumerate(self.dense_layers[1:]):
+                    i = offset + 1
+                    if i == 1:
+                        W = layer.weight
+                        W_p = W[:, :peptide_width]
+                        W_a = W[:, peptide_width:peptide_width + allele_width]
+                        W_prev = W[:, peptide_width + allele_width:]
+                        peptide_part = peptide_stage.matmul(W_p.t())  # (p, h1)
+                        allele_part = allele_stage.matmul(W_a.t())   # (a, h1)
+                        prev_reshaped = prev_outputs[0].reshape(
+                            num_alleles, num_peptides, -1,
+                        )
+                        prev_part = prev_reshaped.matmul(W_prev.t())  # (a, p, h1)
+                        new_x = (
+                            peptide_part.unsqueeze(0)
+                            + allele_part.unsqueeze(1)
+                            + prev_part
+                            + layer.bias
+                        )
+                        new_x = new_x.reshape(
+                            num_alleles * num_peptides, -1,
+                        )
+                    else:
+                        # Layers ≥ 2: cat[prev[-2], prev[-1]] @ W.T + bias
+                        # = prev[-2] @ W_left.T + prev[-1] @ W_right.T + bias
+                        h_left = prev_outputs[-2].shape[-1]
+                        W = layer.weight
+                        W_left = W[:, :h_left]
+                        W_right = W[:, h_left:]
+                        new_x = (
+                            prev_outputs[-2].matmul(W_left.t())
+                            + prev_outputs[-1].matmul(W_right.t())
+                            + layer.bias
+                        )
+                    if self.activation is not None:
+                        new_x = self.activation(new_x)
+                    if self.batch_norms[i] is not None:
+                        new_x = self.batch_norms[i](new_x)
+                    if self.dropouts[i] is not None:
+                        new_x = self.dropouts[i](new_x)
+                    prev_outputs.append(new_x)
+                x = prev_outputs[-1]
+            else:
+                # Standard feedforward (no skip): existing tight loop.
+                # ``enumerate(seq, start=N)`` triggers a torch._dynamo
+                # graph break on PyTorch <=2.4 (``call_enumerate`` rejects
+                # the ``start`` kwarg in builtin.py:775) — every traced
+                # forward then falls back to eager for the layer-stack
+                # loop, losing the compile speedup. Iterate by index
+                # instead so the loop body stays inside the compiled
+                # graph.
+                for offset, layer in enumerate(self.dense_layers[1:]):
+                    i = offset + 1
+                    x = layer(x)
+                    if self.activation is not None:
+                        x = self.activation(x)
+                    if self.batch_norms[i] is not None:
+                        x = self.batch_norms[i](x)
+                    if self.dropouts[i] is not None:
+                        x = self.dropouts[i](x)
+            output = self.output_layer(x)
+        else:
+            output = x
+
+        if self.output_activation is not None:
+            output = self.output_activation(output)
+        return output.reshape(num_alleles, num_peptides, -1)
+
     def forward(self, inputs):
         """
         Forward pass.
@@ -258,7 +1744,35 @@ class Class1NeuralNetworkModel(nn.Module):
         torch.Tensor
             Predictions of shape (batch, num_outputs)
         """
+        if self.has_allele != ('allele' in inputs):
+            raise ValueError(
+                "Class1NeuralNetworkModel input mismatch: "
+                f"network has_allele={self.has_allele} but "
+                f"received allele key={('allele' in inputs)}"
+            )
+
         peptide = inputs['peptide']
+        peptide_repeat_count = inputs.get("peptide_repeat_count")
+        if peptide_repeat_count is not None:
+            if "allele" not in inputs:
+                raise ValueError(
+                    "compact peptide-repeat batch requires an allele input"
+                )
+            return self._forward_compact_cartesian(
+                peptide,
+                inputs["allele"],
+                int(peptide_repeat_count),
+            )
+
+        # Device-side fixed amino-acid encoding: (N, L) int indices →
+        # (N, L, V) fp32. Skipped when the input is already the 3D
+        # vector-encoded tensor. ``torch.nn.functional.embedding`` is a
+        # pure gather, so the op cost is comparable to the int8→fp32
+        # widening cast it replaces while saving V× H2D/cache bytes.
+        if self.peptide_input_is_indices and peptide.dim() == 2:
+            peptide = torch.nn.functional.embedding(
+                peptide.long(), self.peptide_embedding_table
+            )
 
         # Locally connected layers
         x = peptide
@@ -279,7 +1793,7 @@ class Class1NeuralNetworkModel(nn.Module):
             x = self.batch_norm_early(x)
 
         # Allele processing and merge
-        if self.has_allele and 'allele' in inputs:
+        if self.has_allele:
             allele_idx = inputs['allele'].long()
             # Handle case where input might be (batch,) or (batch, 1)
             if allele_idx.dim() > 1:
@@ -350,10 +1864,25 @@ class Class1NeuralNetworkModel(nn.Module):
         weights = []
         for name, param in self.named_parameters():
             weights.append(param.detach().cpu().numpy())
-        # Also include buffers (running mean/var for batch norm)
-        for name, buffer in self.named_buffers():
+        # Also include persistent buffers (running mean/var for batch norm).
+        # Deterministic fixed-encoding tables are registered as
+        # persistent=False and reconstructed from hyperparameters.
+        for name, buffer in self._named_persistent_buffers():
             weights.append(buffer.detach().cpu().numpy())
         return weights
+
+    def _named_persistent_buffers(self):
+        """Yield named buffers that belong in mhcflurry's NPZ weights."""
+        modules = dict(self.named_modules())
+        for name, buffer in self.named_buffers():
+            module = self
+            buffer_name = name
+            if "." in name:
+                module_path, buffer_name = name.rsplit(".", 1)
+                module = modules[module_path]
+            if buffer_name in module._non_persistent_buffers_set:
+                continue
+            yield name, buffer
 
     def set_weights_list(self, weights, auto_convert_keras=True):
         """
@@ -616,7 +2145,7 @@ class Class1NeuralNetworkModel(nn.Module):
             idx += 1 + extra_keras_skip
         if not auto_convert_keras:
             named_modules_dict = dict(self.named_modules())
-            for name, buffer in self.named_buffers():
+            for name, buffer in self._named_persistent_buffers():
                 tensor = torch.from_numpy(weights[idx]).to(
                     device=buffer.device,
                     dtype=buffer.dtype,
@@ -665,6 +2194,7 @@ class Class1NeuralNetworkModel(nn.Module):
         config = {
             'class': 'Class1NeuralNetworkModel',
             'peptide_encoding_shape': list(self.peptide_encoding_shape),
+            'peptide_input_vector_encoding_name': self.peptide_input_vector_encoding_name,
             'has_allele': self.has_allele,
             'peptide_allele_merge_method': self.peptide_allele_merge_method,
             'peptide_allele_merge_activation': self.peptide_allele_merge_activation,
@@ -719,6 +2249,11 @@ class Class1NeuralNetwork(object):
         ],
         topology="feedforward",
         num_outputs=1,
+        # Feed the network (N, L) int amino-acid indices and widen to the
+        # configured fixed vector encoding through a frozen torch embedding
+        # table on the active device, instead of shipping the (N, L, V)
+        # vector tensor from numpy. Disable only for legacy byte-level tests.
+        peptide_amino_acid_encoding_torch=True,
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -738,11 +2273,33 @@ class Class1NeuralNetwork(object):
         max_epochs=500,
         validation_split=0.1,
         early_stopping=True,
-        minibatch_size=128,
+        minibatch_size=512,
         data_dependent_initialization_method=None,
         random_negative_affinity_min=20000.0,
         random_negative_affinity_max=50000.0,
         random_negative_output_indices=None,
+        # Number of consecutive epochs backed by one generated pool of
+        # random-negative peptides. 1 (default) samples fresh negatives every
+        # epoch. Values >1 amortize peptide generation/encoding by drawing
+        # distinct per-epoch slices from a larger pool, with a new pool at each
+        # ``epoch // random_negative_pool_epochs`` boundary. Larger values save
+        # more CPU work; smaller values preserve more sampling diversity.
+        random_negative_pool_epochs=1,
+        # Streaming pretraining can use DataLoader workers to prefetch encoded
+        # batches. Standard affinity fit() is device-resident and ignores this
+        # knob. Kept in the schema so old configs that set it don't error.
+        dataloader_num_workers=0,
+        # Random-negative pool backing for fit(). None uses the optimized
+        # device-resident pool; "host" preserves the legacy
+        # planner.get_peptides() path for compatibility/debugging.
+        fit_tensor_residency=None,
+        # Batch size used for the validation forward pass. ``None`` uses a
+        # device-aware heuristic: ``max(4 * minibatch_size, 4096)`` on CUDA
+        # and ``4 * minibatch_size`` elsewhere. Separate from minibatch_size
+        # because eval has no backward / optimizer state so VRAM headroom is
+        # much higher; the larger CUDA default cuts validation-loop overhead
+        # substantially on the small pan-allele networks.
+        validation_batch_size=None,
     ).extend(RandomNegativePeptides.hyperparameter_defaults)
     """
     Hyperparameters for neural network training.
@@ -751,6 +2308,13 @@ class Class1NeuralNetwork(object):
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
         patience=20,
         min_delta=0.0,
+        # Run the validation pass every N epochs in fit() / streaming pretrain.
+        # Default 1 preserves pre-existing behavior (validate every epoch).
+        # Setting to >1 trades resolution-of-early-stop-decision for
+        # epoch-level throughput; the fit() loop forces a final validation
+        # pass before reporting min_val_loss / breaking on patience so the
+        # saved model still reflects an up-to-date val_loss measurement.
+        validation_interval=1,
     )
     """
     Hyperparameters for early stopping.
@@ -774,12 +2338,23 @@ class Class1NeuralNetwork(object):
     Combined set of all supported hyperparameters and their default values.
     """
 
-    # Hyperparameter renames.
+    # Hyperparameter renames. Map old_name → new_name (string to rename)
+    # or old_name → None (to silently drop). Loading an old config with
+    # any of these keys triggers the mapping in ``__init__`` before
+    # ``HyperparameterDefaults.check_valid_keys`` runs — so old keys
+    # don't cause a ValueError.
+    #
+    # Note: ``min_delta`` used to be in this table mapping to None,
+    # because when it was added (pre-PyTorch) it was flagged "currently
+    # unused". It has since been re-introduced as a live early-stopping
+    # hyperparameter, so dropping it silently would have caused old
+    # configs with explicit non-default ``min_delta`` to lose that
+    # value. Fixed by removing from this table — now it passes through
+    # to the valid-keys check and gets preserved.
     hyperparameter_renames = {
         "use_embedding": None,
         "pseudosequence_use_embedding": None,
         "monitor": None,
-        "min_delta": None,
         "verbose": None,
         "mode": None,
         "take_best_epoch": None,
@@ -788,8 +2363,12 @@ class Class1NeuralNetwork(object):
         "embedding_input_dim": None,
         "embedding_output_dim": None,
         "embedding_init_method": None,
+        "peptide_amino_acid_encoding_gpu": "peptide_amino_acid_encoding_torch",
         "left_edge": None,
         "right_edge": None,
+        # 2.3.0 cleanup: the per-fit DataLoader backing layer is gone.
+        # Old configs may still set this knob; silently drop it.
+        "fit_dataloader_backing": None,
     }
 
     @classmethod
@@ -810,6 +2389,13 @@ class Class1NeuralNetwork(object):
             if from_name in hyperparameters:
                 value = hyperparameters.pop(from_name)
                 if to_name:
+                    if (to_name in hyperparameters
+                            and hyperparameters[to_name] != value):
+                        raise ValueError(
+                            "Conflicting values for renamed hyperparameter "
+                            "%s=%r and %s=%r"
+                            % (from_name, value, to_name, hyperparameters[to_name])
+                        )
                     hyperparameters[to_name] = value
         return hyperparameters
 
@@ -822,6 +2408,7 @@ class Class1NeuralNetwork(object):
         self.network_json = None
         self.network_weights = None
         self.network_weights_loader = None
+        self.network_weight_paths = ()
 
         self.fit_info = []
         self.prediction_cache = weakref.WeakKeyDictionary()
@@ -856,15 +2443,25 @@ class Class1NeuralNetwork(object):
         Class1NeuralNetworkModel
         """
         assert network_weights is not None
-        key = klass.model_cache_key(network_json)
         config = json.loads(network_json)
         # Detect if weights are from Keras or PyTorch format
         # Keras JSON has 'class_name': 'Model' or 'Functional'; PyTorch has 'hyperparameters'
         is_keras_format = config.get('class_name') in ('Model', 'Functional')
+        key = (
+            klass.model_cache_key(network_json),
+            klass._infer_allele_representation_dim_from_weights(
+                network_weights,
+                config.get("hyperparameters", {}),
+                network_config=config,
+            ),
+        )
 
         if key not in klass.MODELS_CACHE:
             # Cache miss - create new model
-            network = klass._create_model_from_config(config)
+            network = klass._create_model_from_config(
+                config,
+                network_weights=network_weights,
+            )
             existing_weights = None
         else:
             # Cache hit
@@ -1002,7 +2599,164 @@ class Class1NeuralNetwork(object):
         return hyperparameters, keras_metadata
 
     @classmethod
-    def _create_model_from_config(cls, config, instance_hyperparameters=None):
+    def _infer_allele_representation_dim_from_weights(
+            cls, network_weights, hyperparameters, network_config=None):
+        """Infer flattened allele representation width from serialized weights.
+
+        Strategy:
+          1. Compute the position of the first allele-stage weight from
+             the architecture config. In ``named_parameters()`` order the
+             layout is::
+
+                locally_connected → peptide_dense → batch_norm_early?
+                  → allele_dense → allele_embedding → dense_layers
+                  → output
+
+             so ``weights[peptide_offset]`` is the first allele_dense
+             weight (when allele_dense layers exist) or the
+             allele_embedding weight (otherwise). Either way its
+             ``shape[1]`` equals the flattened allele representation
+             width.
+
+          2. Cross-check using a structural invariant: when allele_dense
+             layers exist, both the allele_dense first-layer weight and
+             the allele_embedding weight have ``shape[1]`` equal to
+             ``allele_rep_width``. That value appears at two distinct
+             positions in the weight list. Peptide-stage Linear weights
+             chain through different shape[1] values, so no peptide
+             weight will produce a duplicate match.
+
+          3. Return ``None`` if neither check is conclusive. The caller
+             falls back to ``default_sequence_length`` (39).
+        """
+        if not network_weights or not hyperparameters.get('allele_amino_acid_encoding'):
+            return None
+        from .amino_acid import get_vector_encoding_df
+        try:
+            encoding_dim = len(get_vector_encoding_df(
+                hyperparameters['allele_amino_acid_encoding']).columns)
+        except KeyError:
+            return None
+
+        if network_config and network_config.get("merged_networks"):
+            architecture = network_config["merged_networks"][0]
+        elif network_config:
+            architecture = network_config.get("hyperparameters", network_config)
+        else:
+            architecture = hyperparameters
+
+        def valid_dim(dim):
+            if dim % encoding_dim != 0:
+                return False
+            sequence_length = dim // encoding_dim
+            return 20 <= sequence_length <= 60
+
+        def candidate_dim(weight):
+            if isinstance(weight, numpy.ndarray) and len(weight.shape) == 2:
+                dim = weight.shape[1]
+                if valid_dim(dim):
+                    return dim
+            return None
+
+        allele_dense_sizes = architecture.get(
+            'allele_dense_layer_sizes',
+            hyperparameters.get('allele_dense_layer_sizes', []),
+        )
+
+        peptide_offset = 0
+        peptide_offset += 2 * len(architecture.get(
+            'locally_connected_layers',
+            hyperparameters.get('locally_connected_layers', []),
+        ))
+        peptide_offset += 2 * len(architecture.get(
+            'peptide_dense_layer_sizes',
+            hyperparameters.get('peptide_dense_layer_sizes', []),
+        ))
+        if architecture.get(
+                'batch_normalization',
+                hyperparameters.get('batch_normalization', False)):
+            peptide_offset += 2
+
+        n = len(network_weights)
+
+        # Position-based primary lookup.
+        primary_dim = (
+            candidate_dim(network_weights[peptide_offset])
+            if peptide_offset < n else None)
+
+        # Cross-check: when allele_dense layers exist, the same shape[1]
+        # must appear at the embedding position (peptide_offset +
+        # 2*n_allele_dense_layers). If they disagree, the offset is
+        # wrong and we fall back to a duplicate-shape scan.
+        if primary_dim is not None and allele_dense_sizes:
+            embedding_idx = (
+                peptide_offset + 2 * len(allele_dense_sizes))
+            if embedding_idx < n:
+                embedding_dim = candidate_dim(network_weights[embedding_idx])
+                if embedding_dim == primary_dim:
+                    return primary_dim
+                # Disagreement: don't trust either value here, scan below.
+            else:
+                # Can't confirm via embedding slot; trust the primary.
+                return primary_dim
+        elif primary_dim is not None:
+            # No allele_dense — only one matching slot exists.
+            return primary_dim
+
+        # Fallback: duplicate-shape[1] scan. Only the allele block
+        # (allele_dense weight + allele_embedding weight) produces two
+        # 2D weights with the same shape[1] in this architecture.
+        if allele_dense_sizes:
+            seen = {}
+            for i in range(n):
+                dim = candidate_dim(network_weights[i])
+                if dim is None:
+                    continue
+                if dim in seen:
+                    logging.warning(
+                        "Allele width inferred via duplicate-shape fallback "
+                        "(positions %d and %d -> width %d). Position-based "
+                        "lookup failed: the saved layer count may not match "
+                        "the architecture used to write these weights.",
+                        seen[dim],
+                        i,
+                        dim,
+                    )
+                    return dim
+                seen[dim] = i
+        return None
+
+    @classmethod
+    def _placeholder_allele_representations(
+            cls, hyperparameters, network_weights=None, network_config=None,
+            default_sequence_length=39):
+        """Create a shape-compatible placeholder for pan-allele models.
+
+        Public artifacts have used several pseudosequence widths over time
+        (including 2.1.x-era weights). Prefer the width encoded in the saved
+        weights; fall back to the current 39-residue sequence only when no
+        weights are available to guide reconstruction.
+        """
+        if not hyperparameters.get('allele_amino_acid_encoding'):
+            return None
+        from .amino_acid import get_vector_encoding_df
+        encoding_name = hyperparameters['allele_amino_acid_encoding']
+        try:
+            encoding_df = get_vector_encoding_df(encoding_name)
+        except KeyError:
+            return None
+        embedding_dim = cls._infer_allele_representation_dim_from_weights(
+            network_weights,
+            hyperparameters,
+            network_config=network_config,
+        )
+        if embedding_dim is None:
+            embedding_dim = default_sequence_length * len(encoding_df.columns)
+        return numpy.zeros((1, embedding_dim), dtype=numpy.float32)
+
+    @classmethod
+    def _create_model_from_config(
+            cls, config, instance_hyperparameters=None, network_weights=None):
         """Create a model from a configuration dictionary.
 
         Parameters
@@ -1017,7 +2771,11 @@ class Class1NeuralNetwork(object):
 
         # Check if this is a merged network config
         if config.get('merged_networks'):
-            return cls._create_merged_model_from_config(config, instance_hyperparameters)
+            return cls._create_merged_model_from_config(
+                config,
+                instance_hyperparameters,
+                network_weights=network_weights,
+            )
 
         # Check if this is a legacy Keras JSON config
         if config.get('class_name') in ('Model', 'Functional'):
@@ -1039,9 +2797,22 @@ class Class1NeuralNetwork(object):
                     merged[key] = hyperparameters[key]
             hyperparameters = merged
 
+        hyperparameters = cls.hyperparameter_defaults.with_defaults(
+            cls.apply_hyperparameter_renames(dict(hyperparameters))
+        )
+
         # Create a temporary instance to get encoding shape
         temp = cls(**hyperparameters)
         peptide_encoding_shape = temp.peptides_to_network_input([]).shape[1:]
+        peptide_torch_encoding_name = _peptide_torch_encoding_name(hyperparameters)
+        # Device-side fixed encoding: peptides_to_network_input returns
+        # (N, L) int indices, but dense layers are still sized against
+        # the post-embedding (L, V) shape.
+        if peptide_torch_encoding_name and len(peptide_encoding_shape) == 1:
+            peptide_encoding_shape = _peptide_torch_encoding_shape(
+                peptide_encoding_shape,
+                peptide_torch_encoding_name,
+            )
 
         # Get allele representations if present
         allele_representations = config.get('allele_representations')
@@ -1064,15 +2835,11 @@ class Class1NeuralNetwork(object):
         has_allele = config.get('has_allele', True)  # Default True for backward compat
         if (allele_representations is None and keras_metadata is None
                 and has_allele and hyperparameters.get('allele_amino_acid_encoding')):
-            # Compute embedding dimension from encoding
-            from .amino_acid import ENCODING_DATA_FRAMES
-            encoding_name = hyperparameters['allele_amino_acid_encoding']
-            encoding_df = ENCODING_DATA_FRAMES.get(encoding_name)
-            if encoding_df is not None:
-                # Standard allele pseudosequence length is 37 amino acids
-                allele_seq_length = 37
-                embedding_dim = allele_seq_length * len(encoding_df.columns)
-                allele_representations = numpy.zeros((1, embedding_dim), dtype=numpy.float32)
+            allele_representations = cls._placeholder_allele_representations(
+                hyperparameters,
+                network_weights=network_weights,
+                network_config=config,
+            )
 
         model = Class1NeuralNetworkModel(
             peptide_encoding_shape=peptide_encoding_shape,
@@ -1092,6 +2859,7 @@ class Class1NeuralNetwork(object):
             topology=hyperparameters.get('topology', 'feedforward'),
             num_outputs=hyperparameters.get('num_outputs', 1),
             init=hyperparameters.get('init', 'glorot_uniform'),
+            peptide_input_vector_encoding_name=peptide_torch_encoding_name,
         )
 
         # Store keras metadata and config for weight loading
@@ -1102,7 +2870,8 @@ class Class1NeuralNetwork(object):
         return model
 
     @classmethod
-    def _create_merged_model_from_config(cls, config, instance_hyperparameters=None):
+    def _create_merged_model_from_config(
+            cls, config, instance_hyperparameters=None, network_weights=None):
         """Create a merged model from a configuration dictionary.
 
         Parameters
@@ -1120,19 +2889,26 @@ class Class1NeuralNetwork(object):
         if instance_hyperparameters:
             base_hyperparameters = dict(instance_hyperparameters)
             base_hyperparameters.update(config.get('hyperparameters', {}))
+        base_hyperparameters = cls.hyperparameter_defaults.with_defaults(
+            cls.apply_hyperparameter_renames(dict(base_hyperparameters))
+        )
         temp = cls(**base_hyperparameters)
         peptide_encoding_shape = temp.peptides_to_network_input([]).shape[1:]
+        peptide_torch_encoding_name = _peptide_torch_encoding_name(
+            base_hyperparameters
+        )
+        if peptide_torch_encoding_name and len(peptide_encoding_shape) == 1:
+            peptide_encoding_shape = _peptide_torch_encoding_shape(
+                peptide_encoding_shape,
+                peptide_torch_encoding_name,
+            )
 
         # Create placeholder allele representations for pan-allele models
-        allele_representations = None
-        if base_hyperparameters.get('allele_amino_acid_encoding'):
-            from .amino_acid import ENCODING_DATA_FRAMES
-            encoding_name = base_hyperparameters['allele_amino_acid_encoding']
-            encoding_df = ENCODING_DATA_FRAMES.get(encoding_name)
-            if encoding_df is not None:
-                allele_seq_length = 37
-                embedding_dim = allele_seq_length * len(encoding_df.columns)
-                allele_representations = numpy.zeros((1, embedding_dim), dtype=numpy.float32)
+        allele_representations = cls._placeholder_allele_representations(
+            base_hyperparameters,
+            network_weights=network_weights,
+            network_config=config,
+        )
 
         # Create sub-networks
         sub_networks = []
@@ -1155,6 +2931,7 @@ class Class1NeuralNetwork(object):
                 topology=sub_config.get('topology', 'feedforward'),
                 num_outputs=sub_config.get('num_outputs', 1),
                 init=base_hyperparameters.get('init', 'glorot_uniform'),
+                peptide_input_vector_encoding_name=peptide_torch_encoding_name,
             )
             sub_networks.append(model)
 
@@ -1216,7 +2993,9 @@ class Class1NeuralNetwork(object):
                 is_keras_format = config.get('class_name') in ('Model', 'Functional')
                 # Pass this instance's hyperparameters to preserve peptide_encoding etc.
                 self._network = self._create_model_from_config(
-                    config, instance_hyperparameters=self.hyperparameters)
+                    config,
+                    instance_hyperparameters=self.hyperparameters,
+                    network_weights=self.network_weights)
                 if self.network_weights is not None:
                     self._network.set_weights_list(
                         self.network_weights,
@@ -1300,11 +3079,12 @@ class Class1NeuralNetwork(object):
         result["_network"] = None
         result["network_weights"] = None
         result["network_weights_loader"] = None
+        result.pop("network_weight_paths", None)
         result["prediction_cache"] = None
         return result
 
     @classmethod
-    def from_config(cls, config, weights=None, weights_loader=None):
+    def from_config(cls, config, weights=None, weights_loader=None, weight_paths=None):
         """
         deserialize from a dict returned by get_config().
 
@@ -1319,6 +3099,9 @@ class Class1NeuralNetwork(object):
             Network weights to restore
         weights_loader : callable, optional
             Function to call (no arguments) to load weights when needed
+        weight_paths : string or list of strings, optional
+            Filename(s) the weights were loaded from. This is diagnostic
+            provenance only and is not serialized by get_config().
 
         Returns
         -------
@@ -1341,8 +3124,32 @@ class Class1NeuralNetwork(object):
 
         instance.network_weights = weights
         instance.network_weights_loader = weights_loader
+        instance.network_weight_paths = (
+            cls._normalize_network_weight_paths(weight_paths)
+            or cls._network_weight_paths_from_loader(weights_loader)
+        )
         instance.prediction_cache = weakref.WeakKeyDictionary()
         return instance
+
+    @staticmethod
+    def _normalize_network_weight_paths(weight_paths):
+        """Return weight path(s) as a tuple of strings."""
+        if weight_paths is None:
+            return ()
+        if isinstance(weight_paths, (str, os.PathLike)):
+            return (os.fspath(weight_paths),)
+        return tuple(os.fspath(path) for path in weight_paths if path)
+
+    @classmethod
+    def _network_weight_paths_from_loader(cls, weights_loader):
+        """Infer weight path(s) from the standard lazy load_weights partial."""
+        if weights_loader is None:
+            return ()
+        func = getattr(weights_loader, "func", None)
+        args = getattr(weights_loader, "args", ())
+        if getattr(func, "__name__", None) == "load_weights" and args:
+            return cls._normalize_network_weight_paths(args[0])
+        return ()
 
     def load_weights(self):
         """
@@ -1424,10 +3231,20 @@ class Class1NeuralNetwork(object):
         self.__dict__.update(state)
         self.prediction_cache = weakref.WeakKeyDictionary()
 
+    def uses_peptide_torch_encoding(self):
+        """Whether fixed peptide vectors are looked up in torch forward."""
+        return _peptide_uses_torch_encoding(self.hyperparameters)
+
     def peptides_to_network_input(self, peptides):
         """
         Encode peptides to the fixed-length encoding expected by the neural
         network (which depends on the architecture).
+
+        When ``peptide_amino_acid_encoding_torch`` is enabled, the returned
+        array is (N, L) int8 amino-acid indices and the network widens it to
+        the configured fixed vector encoding on the active torch device.
+        Otherwise the returned array is the traditional (N, L, V) numpy
+        vector encoding.
 
         Parameters
         ----------
@@ -1438,8 +3255,12 @@ class Class1NeuralNetwork(object):
         numpy.array
         """
         encoder = EncodableSequences.create(peptides)
-        encoded = encoder.variable_length_to_fixed_length_vector_encoding(
-            **self.hyperparameters["peptide_encoding"]
+        encoded = peptide_sequences_to_network_input(
+            encoder,
+            peptide_encoding=self.hyperparameters["peptide_encoding"],
+            peptide_amino_acid_encoding_torch=(
+                self.hyperparameters.get("peptide_amino_acid_encoding_torch")
+            ),
         )
         assert len(encoded) == len(peptides)
         return encoded
@@ -1476,6 +3297,8 @@ class Class1NeuralNetwork(object):
         Indices and allele representations.
 
         """
+        if allele_encoding is None:
+            return (None, None)
         return (
             allele_encoding.indices.values,
             allele_encoding.allele_representations(
@@ -1540,7 +3363,7 @@ class Class1NeuralNetwork(object):
         """Get the PyTorch device to use."""
         return get_pytorch_device()
 
-    def fit_generator(
+    def fit_streaming_batches(
             self,
             generator,
             validation_peptide_encoding,
@@ -1556,14 +3379,50 @@ class Class1NeuralNetwork(object):
             verbose=1,
             progress_callback=None,
             progress_preamble="",
-            progress_print_interval=5.0):
-        """
-        Fit using a generator. Does not support many of the features of fit(),
-        such as random negative peptides.
+            progress_print_interval=5.0,
+            generator_factory=None,
+            generator_batches_are_encoded=False,
+            seed=None):
+        """Pretrain from a stream of already batched examples.
+
+        This is the streaming pretraining path used by pan-allele training. It
+        intentionally has a narrower contract than :meth:`fit`:
+
+        * training examples arrive as complete batches from ``generator``;
+        * validation data is supplied explicitly rather than split from the
+          training rows;
+        * random negatives, sample weights, and the affinity ``fit()`` row
+          layout are not part of this API.
+
+        The method still shares the same low-level optimizer step, loss object,
+        regularization, and batched validation helpers as :meth:`fit`.
+
+        ``generator`` may yield either pre-encoded ``(x_dict, y)`` tuples
+        (the path the shipped pan-allele pretrain pipeline uses) or legacy
+        raw ``(allele_encoding, peptides, affinities)`` tuples. The legacy
+        form is still tested for back-compat but is not exercised by any
+        production pipeline. ``generator_factory`` enables DataLoader
+        worker prefetch: each worker calls it with ``worker_id`` and
+        ``num_workers`` to read a disjoint shard.
+
+        ``seed`` (int, optional) seeds numpy's and torch's global RNGs up
+        front, so weight initialization and any shuffling in this pretrain
+        pass derive from it; None leaves the worker's entropy seeding in
+        place. Mirrors :meth:`fit`'s ``seed`` so one value can drive both
+        phases of a pan-allele fit.
         """
         device = self.get_device()
+        _configure_matmul_precision(device)
+
+        # Single-seed control, mirroring fit(): seed up front so weight init
+        # and shuffling in this pass are reproducible. See fit() for detail.
+        if seed is not None:
+            numpy.random.seed(int(seed) % (2 ** 32))
+            torch.manual_seed(int(seed) & ((1 << 63) - 1))
 
         fit_info = collections.defaultdict(list)
+        timing_enabled = _timing_enabled()
+        fit_info["timing_enabled"] = timing_enabled
 
         loss_obj = get_pytorch_loss(self.hyperparameters["loss"])
 
@@ -1597,8 +3456,9 @@ class Class1NeuralNetwork(object):
         # Prepare validation data
         validation_x_dict = {
             "peptide": self.peptides_to_network_input(validation_peptide_encoding),
-            "allele": validation_allele_input,
         }
+        if validation_allele_input is not None:
+            validation_x_dict["allele"] = validation_allele_input
         encode_y_kwargs = {}
         if validation_inequalities is not None:
             encode_y_kwargs["inequalities"] = validation_inequalities
@@ -1607,25 +3467,94 @@ class Class1NeuralNetwork(object):
 
         output = loss_obj.encode_y(from_ic50(validation_affinities), **encode_y_kwargs)
 
-        mutable_generator_state = {
-            "yielded_values": 0
-        }
+        # Validation tensors are constant across streaming-pretrain epochs, but
+        # original code re-ran ``torch.from_numpy(...).float().to(device)``
+        # on every epoch — three H2D copies × many epochs. For large
+        # validation sets that's tens of ms/epoch of pure wasted bandwidth.
+        # Hoist the copy to happen once before the epoch loop.
+        #
+        # 2D int -> index-encoded; keep dtype intact so the embedding lookup
+        # inside forward() sees int indices. Vector-encoded inputs are numeric
+        # feature tensors and should reach the network as fp32.
+        _val_peptide_np = validation_x_dict["peptide"]
+        if (
+            _val_peptide_np.ndim == 2
+            and numpy.issubdtype(_val_peptide_np.dtype, numpy.integer)
+        ):
+            val_peptide_device = _torch_from_numpy(_val_peptide_np).to(device)
+        else:
+            val_peptide_device = _torch_from_numpy(
+                _val_peptide_np).to(device).float()
+        val_allele_device = None
+        if "allele" in validation_x_dict:
+            val_allele_device = _torch_from_numpy(
+                validation_x_dict["allele"]
+            ).to(device).float()
+        val_y_device = _torch_from_numpy(
+            output.astype(numpy.float32)).to(device)
 
-        def wrapped_generator():
-            for alleles, peptides, affinities in generator:
-                (allele_encoding_input, _) = self.allele_encoding_to_network_input(
-                    alleles
-                )
-                x_dict = {
-                    "peptide": self.peptides_to_network_input(peptides),
-                    "allele": allele_encoding_input,
-                }
-                y = from_ic50(affinities)
-                yield (x_dict, y)
-                mutable_generator_state["yielded_values"] += len(affinities)
+        # Streaming-pretrain batches stay as numpy arrays until the parent
+        # training loop moves them to the device. That keeps worker-side
+        # prefetch compatible across platforms and still overlaps CSV /
+        # encoding work with GPU compute when a picklable encoded-batch
+        # generator_factory is supplied (the pretrain path).
+        mutable_generator_state = {"yielded_values": 0}
+        dataloader_num_workers = self.hyperparameters.get(
+            "dataloader_num_workers", 0
+        )
+        # The streaming-pretrain DataLoader intentionally transports numpy arrays
+        # unchanged (``batch_size=None`` + ``_identity_collate``). Those arrays
+        # are not pinned, and setting non_blocking=True for pageable
+        # numpy-backed tensors lets CUDA retain source pages until later stream
+        # synchronization. Keep H2D copies synchronous so each pretrain chunk's
+        # CPU buffer can be released/reused immediately.
+        non_blocking_h2d = False
+        fit_info["dataloader_num_workers"] = dataloader_num_workers
+        fit_info["validation_rows"] = len(validation_affinities)
+        # Worker-prefetch requires both (a) a picklable ``generator_factory``
+        # so each spawned worker can build its own shard, and (b)
+        # ``generator_batches_are_encoded=True`` so the dataset never
+        # holds bound methods of this ``Class1NeuralNetwork``. Either
+        # missing piece forces a single-process path.
+        if dataloader_num_workers > 0 and (
+            generator_factory is None or not generator_batches_are_encoded
+        ):
+            logging.warning(
+                "fit_streaming_batches requested dataloader_num_workers=%s but "
+                "worker-prefetch needs generator_factory + "
+                "generator_batches_are_encoded=True (got factory=%s, "
+                "encoded=%s); downgrading to 0.",
+                dataloader_num_workers,
+                "present" if generator_factory is not None else "missing",
+                generator_batches_are_encoded,
+            )
+            dataloader_num_workers = 0
+        dataset = _StreamingBatchIterableDataset(
+            generator=generator,
+            generator_factory=generator_factory,
+            source_batches_are_encoded=generator_batches_are_encoded,
+            allele_encoding_to_input=self.allele_encoding_to_network_input,
+            peptides_to_network_input=self.peptides_to_network_input,
+        )
 
         start = time.time()
-        iterator = wrapped_generator()
+        fit_info["iterator_setup_time"] = 0.0
+        fit_info["iterator_restarts"] = 0
+
+        def make_iterator():
+            iterator_setup_start = time.perf_counter()
+            iterator_result = iter(
+                _make_streaming_batch_dataloader(
+                    dataset=dataset,
+                    num_workers=dataloader_num_workers,
+                )
+            )
+            fit_info["iterator_setup_time"] += (
+                time.perf_counter() - iterator_setup_start
+            )
+            return iterator_result
+
+        iterator = make_iterator()
 
         # Data dependent init
         data_dependent_init = self.hyperparameters[
@@ -1633,95 +3562,223 @@ class Class1NeuralNetwork(object):
         ]
         if data_dependent_init and not self.fit_info:
             first_chunk = next(iterator)
+            init_chunk = _materialize_repeated_peptide_batch(first_chunk)
+            first_inputs = {"peptide": init_chunk["peptide"]}
+            if "allele" in init_chunk:
+                first_inputs["allele"] = init_chunk["allele"]
             self.data_dependent_weights_initialization(
                 network,
-                first_chunk[0],
+                first_inputs,
                 method=data_dependent_init,
                 verbose=verbose,
             )
             iterator = itertools.chain([first_chunk], iterator)
 
+        # Compile AFTER LSUV init — LSUV registers + removes forward hooks
+        # during its activation-norm measurement pass, and every hook-count
+        # change invalidates dynamo's frame guard (``len(L['self']
+        # .dense_layers[0]._forward_hooks) != 1``). Compiling before LSUV
+        # burns through the 8-entry cache_size_limit in seconds and falls
+        # back to eager. Compiling after gives dynamo a single stable
+        # hook state to specialize on.
+        network = _maybe_compile_network(network, device)
+        eager_network = _uncompiled_network(network)
+        # Compile the loss alongside the network — see _maybe_compile_loss
+        # docstring. MSEWithInequalities eager-dispatches ~10 kernels
+        # per step; fusing them matters more as batch size grows (less
+        # compute to amortize launch overhead against).
+        loss_obj = _maybe_compile_loss(loss_obj, device)
+
         min_val_loss_iteration = None
         min_val_loss = None
         last_progress_print = 0
-        epoch = 1
+        first_batch_time = None
 
-        while True:
+        # The first batch establishes the compiled fast-path shape.
+        # Non-conforming later batches (most commonly a short final
+        # pretrain chunk) run eagerly to preserve exact semantics without
+        # triggering a second compile.
+        expected_chunk_shape = None
+
+        validation_interval = _validation_interval_from_hyperparameters(
+            self.hyperparameters)
+
+        for epoch_index in range(int(epochs)):
+            epoch_num = epoch_index + 1
             epoch_start_time = time.time()
+            epoch_wall_start = time.perf_counter()
             network.train()
 
-            epoch_losses = []
-            for step in range(steps_per_epoch):
-                try:
-                    x_dict, y = next(iterator)
-                except StopIteration:
-                    break
+            epoch_fetch_time = 0.0
+            epoch_h2d_time = 0.0
 
-                # Convert to tensors
-                peptide_tensor = torch.from_numpy(x_dict["peptide"]).float().to(device)
-                allele_tensor = torch.from_numpy(x_dict["allele"]).float().to(device)
-                y_tensor = torch.from_numpy(y.astype(numpy.float32)).to(device)
+            def prepared_streaming_batches():
+                nonlocal iterator
+                nonlocal expected_chunk_shape
+                nonlocal epoch_fetch_time
+                nonlocal epoch_h2d_time
+                for _step in range(steps_per_epoch):
+                    fetch_start = time.perf_counter()
+                    try:
+                        batch = next(iterator)
+                    except StopIteration:
+                        if generator_factory is None:
+                            break
+                        fit_info["iterator_restarts"] += 1
+                        iterator = make_iterator()
+                        try:
+                            batch = next(iterator)
+                        except StopIteration:
+                            break
+                    epoch_fetch_time += time.perf_counter() - fetch_start
 
-                optimizer.zero_grad()
-                inputs = {"peptide": peptide_tensor, "allele": allele_tensor}
-                predictions = network(inputs)
-                loss = loss_obj(predictions, y_tensor)
-                regularization_penalty = self._regularization_penalty(
-                    regularization_parameters,
-                    l1=l1_reg,
-                    l2=l2_reg,
+                    if expected_chunk_shape is None:
+                        expected_chunk_shape = batch["peptide"].shape
+                    # Measure H2D separately from training compute. When timing
+                    # is disabled, _timing_start/stop are cheap wall-clock reads;
+                    # when enabled, they synchronize around the copy.
+                    h2d_start = _timing_start(device, timing_enabled)
+                    inputs, y_tensor, weights_batch = _move_fit_batch_to_device(
+                        batch,
+                        device,
+                        non_blocking=non_blocking_h2d,
+                    )
+                    epoch_h2d_time += _timing_stop(
+                        h2d_start, device, timing_enabled
+                    )
+                    mutable_generator_state["yielded_values"] += len(batch["y"])
+                    yield {
+                        "network": (
+                            network
+                            if batch["peptide"].shape == expected_chunk_shape
+                            else eager_network
+                        ),
+                        "inputs": inputs,
+                        "y_batch": y_tensor,
+                        "weights_batch": weights_batch,
+                        "row_count": len(batch["y"]),
+                    }
+
+            train_epoch_result = _run_prepared_training_batches(
+                prepared_streaming_batches(),
+                optimizer=optimizer,
+                loss_obj=loss_obj,
+                regularization_parameters=regularization_parameters,
+                l1_reg=l1_reg,
+                l2_reg=l2_reg,
+                timing_enabled=timing_enabled,
+                device=device,
+            )
+            if first_batch_time is None:
+                first_batch_time = train_epoch_result["first_batch_time"]
+
+            should_validate_this_epoch = _should_validate_epoch(
+                validation_enabled=True,
+                epoch_index=epoch_index,
+                max_epochs=epochs,
+                validation_interval=validation_interval,
+                early_stopping=True,
+                min_val_loss_epoch=min_val_loss_iteration,
+                patience=patience,
+                min_epochs=min_epochs,
+                # Streaming pretrain stops inclusively (epoch >= threshold) to
+                # match pre-2.3.0 weights — see _early_stop_reached.
+                strict=False,
+            )
+            validation_time = 0.0
+            val_batch_size = None
+            val_loss = _carry_forward_validation_loss(fit_info)
+            if should_validate_this_epoch:
+                # Compute validation loss in fixed-size batches — reuse the
+                # device tensors hoisted before the epoch loop (val data is
+                # static). Single-shot forward pass over the entire pretrain
+                # validation set (typically 50K+ rows) was dominating VRAM.
+                # By default validation uses the eager network to avoid a
+                # second torch.compile specialization for grad-disabled eval.
+                network.eval()
+                with torch.inference_mode():
+                    validation_start = _timing_start(device, timing_enabled)
+                    val_batch_size = _effective_validation_batch_size(
+                        device,
+                        self.hyperparameters["validation_batch_size"],
+                        self.hyperparameters["minibatch_size"],
+                    )
+                    fit_info["effective_validation_batch_size"] = val_batch_size
+                    val_loss = _batched_validation_loss(
+                        network=_validation_forward_network(network, eager_network),
+                        eager_network=eager_network,
+                        val_peptide=val_peptide_device,
+                        val_allele=val_allele_device,
+                        val_y=val_y_device,
+                        val_weights=None,
+                        loss_obj=loss_obj,
+                        batch_size=val_batch_size,
+                    )
+                    regularization_penalty = self._regularization_penalty(
+                        regularization_parameters,
+                        l1=l1_reg,
+                        l2=l2_reg,
+                    )
+                    if regularization_penalty is not None:
+                        val_loss = val_loss + regularization_penalty.item()
+                    validation_time = _timing_stop(
+                        validation_start, device, timing_enabled
+                    )
+                fit_info["val_loss"].append(val_loss)
+                (
+                    min_val_loss,
+                    min_val_loss_iteration,
+                ) = _update_min_validation_loss(
+                    val_loss=val_loss,
+                    epoch_index=epoch_index,
+                    min_val_loss=min_val_loss,
+                    min_val_loss_epoch=min_val_loss_iteration,
+                    min_delta=min_delta,
                 )
-                if regularization_penalty is not None:
-                    loss = loss + regularization_penalty
-                loss.backward()
-                optimizer.step()
-                epoch_losses.append(loss.item())
-
-            # Compute validation loss
-            network.eval()
-            with torch.no_grad():
-                val_peptide = torch.from_numpy(validation_x_dict["peptide"]).float().to(device)
-                val_allele = torch.from_numpy(validation_x_dict["allele"]).float().to(device)
-                val_y = torch.from_numpy(output.astype(numpy.float32)).to(device)
-
-                val_inputs = {"peptide": val_peptide, "allele": val_allele}
-                val_predictions = network(val_inputs)
-                val_loss = loss_obj(val_predictions, val_y)
-                regularization_penalty = self._regularization_penalty(
-                    regularization_parameters,
-                    l1=l1_reg,
-                    l2=l2_reg,
-                )
-                if regularization_penalty is not None:
-                    val_loss = val_loss + regularization_penalty
-                val_loss = val_loss.item()
+            else:
+                fit_info["val_loss"].append(val_loss)
 
             epoch_time = time.time() - epoch_start_time
-            train_loss = numpy.mean(epoch_losses) if epoch_losses else float('nan')
-            fit_info["loss"].append(train_loss)
-            fit_info["val_loss"].append(val_loss)
-
-            if min_val_loss is None or val_loss < min_val_loss - min_delta:
-                min_val_loss = val_loss
-                min_val_loss_iteration = epoch
-
-            patience_epoch_threshold = min(
-                epochs, max(min_val_loss_iteration + patience, min_epochs)
+            train_loss, epoch_loss_sync_time = _sync_mean_loss(
+                train_epoch_result["losses"],
+                device=device,
+                timing_enabled=timing_enabled,
             )
+            fit_info["loss"].append(train_loss)
+            if timing_enabled:
+                fit_info["epoch_fetch_time"].append(epoch_fetch_time)
+                fit_info["epoch_h2d_time"].append(epoch_h2d_time)
+                fit_info["epoch_train_time"].append(
+                    train_epoch_result["train_time"])
+                fit_info["epoch_loss_sync_time"].append(epoch_loss_sync_time)
+                fit_info["epoch_validation_time"].append(validation_time)
+                fit_info["epoch_num_train_batches"].append(
+                    len(train_epoch_result["losses"]))
+                fit_info["epoch_num_train_rows"].append(
+                    train_epoch_result["train_rows"])
+                fit_info["epoch_num_validation_batches"].append(
+                    int(numpy.ceil(len(validation_affinities) / val_batch_size))
+                    if val_batch_size else 0
+                )
+                fit_info["epoch_total_time"].append(
+                    time.perf_counter() - epoch_wall_start
+                )
 
             progress_message = (
                 "epoch %3d/%3d [%0.2f sec.]: loss=%g val_loss=%g. Min val "
-                "loss %g at epoch %s. Cum. points: %d. Stop at epoch %d."
+                "loss %g at epoch %s. Cum. points: %d."
                 % (
-                    epoch,
+                    epoch_num,
                     epochs,
                     epoch_time,
                     train_loss,
                     val_loss,
-                    min_val_loss,
-                    min_val_loss_iteration,
+                    min_val_loss if min_val_loss is not None else numpy.nan,
+                    (
+                        min_val_loss_iteration + 1
+                        if min_val_loss_iteration is not None else None
+                    ),
                     mutable_generator_state["yielded_values"],
-                    patience_epoch_threshold,
                 )
             ).strip()
 
@@ -1734,15 +3791,111 @@ class Class1NeuralNetwork(object):
             if progress_callback:
                 progress_callback()
 
-            if epoch >= patience_epoch_threshold:
+            if _early_stop_reached(
+                epoch_index=epoch_index,
+                min_val_loss_epoch=min_val_loss_iteration,
+                patience=patience,
+                min_epochs=min_epochs,
+                early_stopping=True,
+                # Inclusive stop (epoch >= threshold) reproduces the pre-2.3.0
+                # streaming condition `epoch >= min_val_loss_iteration +
+                # patience`; the strict `>` default would train one extra epoch.
+                strict=False,
+            ):
                 if progress_print_interval is not None:
                     print(progress_preamble, "STOPPING", progress_message)
                 break
-            epoch += 1
 
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = mutable_generator_state["yielded_values"]
+        if first_batch_time is not None:
+            fit_info["first_batch_time"] = first_batch_time
         self.fit_info.append(dict(fit_info))
+
+    def fit_generator(
+            self,
+            generator,
+            validation_peptide_encoding,
+            validation_affinities,
+            validation_allele_encoding=None,
+            validation_inequalities=None,
+            validation_output_indices=None,
+            steps_per_epoch=10,
+            epochs=1000,
+            min_epochs=0,
+            patience=10,
+            min_delta=0.0,
+            verbose=1,
+            progress_callback=None,
+            progress_preamble="",
+            progress_print_interval=5.0,
+            generator_factory=None,
+            generator_batches_are_encoded=False):
+        """Backward-compatible alias for :meth:`fit_streaming_batches`.
+
+        The name is historical from the old Keras API. New internal code should
+        call ``fit_streaming_batches`` because this path is specifically the
+        pan-allele pretraining stream, not a general replacement for
+        :meth:`fit`.
+        """
+        return self.fit_streaming_batches(
+            generator=generator,
+            validation_peptide_encoding=validation_peptide_encoding,
+            validation_affinities=validation_affinities,
+            validation_allele_encoding=validation_allele_encoding,
+            validation_inequalities=validation_inequalities,
+            validation_output_indices=validation_output_indices,
+            steps_per_epoch=steps_per_epoch,
+            epochs=epochs,
+            min_epochs=min_epochs,
+            patience=patience,
+            min_delta=min_delta,
+            verbose=verbose,
+            progress_callback=progress_callback,
+            progress_preamble=progress_preamble,
+            progress_print_interval=progress_print_interval,
+            generator_factory=generator_factory,
+            generator_batches_are_encoded=generator_batches_are_encoded,
+        )
+
+    def _random_negatives_pool_for_fit(
+            self,
+            *,
+            random_negatives_planner,
+            random_negative_pool_epochs,
+            pool_seed,
+            device,
+            requested_fit_tensor_residency):
+        """Construct a shape-compatible random-negative pool for fit()."""
+        use_device_pool = (
+            requested_fit_tensor_residency != "host"
+            and self.uses_peptide_torch_encoding()
+            and supports_device_random_negative_encoding(
+                self.hyperparameters["peptide_encoding"]
+            )
+        )
+        if use_device_pool:
+            return (
+                RandomNegativesPool(
+                    planner=random_negatives_planner,
+                    peptide_encoder=self.peptides_to_network_input,
+                    pool_epochs=random_negative_pool_epochs,
+                    seed=pool_seed,
+                    device=device,
+                    peptide_encoding=self.hyperparameters["peptide_encoding"],
+                ),
+                "device",
+            )
+
+        return (
+            RandomNegativesPool(
+                planner=random_negatives_planner,
+                peptide_encoder=self.peptides_to_network_input,
+                pool_epochs=random_negative_pool_epochs,
+                seed=pool_seed,
+            ),
+            "host",
+        )
 
     def _create_optimizer(self, network):
         """Create an optimizer for the network."""
@@ -1777,7 +3930,8 @@ class Class1NeuralNetwork(object):
             verbose=1,
             progress_callback=None,
             progress_preamble="",
-            progress_print_interval=5.0):
+            progress_print_interval=5.0,
+            seed=None):
         """
         Fit the neural network.
 
@@ -1797,12 +3951,50 @@ class Class1NeuralNetwork(object):
         progress_callback : function
         progress_preamble : string
         progress_print_interval : float
+        seed : int, optional
+            Master seed for this fit. When given, it seeds numpy's and
+            torch's global RNGs at the start of the call, so every
+            stochastic step downstream flows from this one value:
+            data-dependent weight initialization, the initial
+            example shuffle, the per-epoch training-batch shuffle, and
+            random-negative sampling. When None (the default) the RNGs are
+            left as the worker configured them (entropy-seeded), so
+            training stays stochastic and decorrelated across workers, as
+            it always has been.
+
+            Reproducibility caveats: a fixed ``seed`` reproduces a run
+            bit-for-bit only at a *fixed effective minibatch size*. fit()
+            may shrink the minibatch to fit available VRAM (see
+            ``check_training_batch_fits`` below), and that shrink depends on
+            free GPU memory and how many workers share the card — so the
+            same seed on a busier or smaller GPU can diverge. A warning is
+            logged whenever the shrink fires under a non-None seed. On CUDA,
+            determinism additionally assumes the default (Linear/RMSprop)
+            architecture: opting into ``MHCFLURRY_MATMUL_PRECISION`` enables
+            ``cudnn.benchmark`` autotuning, and convolutional
+            ``locally_connected_layers`` variants are not guaranteed
+            bit-identical run-to-run. CPU runs are fully deterministic.
         """
         device = self.get_device()
+        _configure_matmul_precision(device)
+
+        # One seed controls every stochastic step in this fit. Seed numpy's
+        # and torch's global RNGs up front so weight init, the example
+        # shuffle, the per-epoch batch shuffle, and random-negative
+        # sampling all derive from it. Left untouched when seed is None
+        # (entropy-seeded by the worker), keeping training stochastic.
+        if seed is not None:
+            numpy.random.seed(int(seed) % (2 ** 32))
+            torch.manual_seed(int(seed) & ((1 << 63) - 1))
 
         encodable_peptides = EncodableSequences.create(peptides)
         peptide_encoding = self.peptides_to_network_input(encodable_peptides)
         fit_info = collections.defaultdict(list)
+        timing_enabled = _timing_enabled()
+        fit_info["timing_enabled"] = timing_enabled
+        fit_info["dataloader_num_workers"] = self.hyperparameters.get(
+            "dataloader_num_workers", 0
+        )
 
         random_negatives_planner = RandomNegativePeptides(
             **RandomNegativePeptides.hyperparameter_defaults.subselect(
@@ -1822,6 +4014,62 @@ class Class1NeuralNetwork(object):
                 random_negatives_planner.get_alleles(), borrow_from=allele_encoding
             )
         num_random_negatives = random_negatives_planner.get_total_count()
+
+        # Pre-generate random-negative peptides + encodings once per pool cycle
+        # rather than once per epoch. At pool_epochs=1 the pool regenerates
+        # every epoch, matching the default "fresh negatives each epoch"
+        # semantics.
+        random_negative_pool_epochs = int(
+            self.hyperparameters.get("random_negative_pool_epochs", 1) or 1
+        )
+        if random_negative_pool_epochs < 1:
+            random_negative_pool_epochs = 1
+        # When negatives are pooled across cycles the pool needs an explicit
+        # seed (it pre-generates once and slices), so feed it the master
+        # seed. At pool_epochs == 1 the pool regenerates every epoch from
+        # numpy's global RNG, which the master seed above already pins — so
+        # leave pool_seed None and let the global stream drive it.
+        pool_seed = (
+            seed
+            if random_negative_pool_epochs > 1
+            else None
+        )
+        requested_fit_tensor_residency = self.hyperparameters.get(
+            "fit_tensor_residency"
+        )
+        # Random negatives stay worker-local. For torch-index peptide
+        # inputs, the pool samples and aligns int8 AA indices directly on
+        # the active torch device. Host-vector models use the same encoder
+        # as their real peptides so the training input shape remains identical.
+        (
+            random_negatives_pool,
+            random_negative_pool_residency,
+        ) = self._random_negatives_pool_for_fit(
+            random_negatives_planner=random_negatives_planner,
+            random_negative_pool_epochs=random_negative_pool_epochs,
+            pool_seed=pool_seed,
+            device=device,
+            requested_fit_tensor_residency=requested_fit_tensor_residency,
+        )
+        fit_info["random_negative_pool_residency"] = (
+            random_negative_pool_residency
+        )
+        fit_info["random_negative_pool_epochs"] = random_negative_pool_epochs
+
+        # Allele encoding for random negatives is planned once (the allele
+        # list is a deterministic function of the planner's plan_df). Hoist
+        # it out of the epoch loop; it is a deterministic function of the plan.
+        random_negative_x_allele_base = None
+        if (
+            num_random_negatives > 0
+            and random_negatives_allele_encoding is not None
+        ):
+            (
+                random_negative_x_allele_base,
+                _,
+            ) = self.allele_encoding_to_network_input(
+                random_negatives_allele_encoding
+            )
 
         y_values = from_ic50(numpy.asarray(affinities))
         assert numpy.isnan(y_values).sum() == 0, y_values
@@ -1857,7 +4105,6 @@ class Class1NeuralNetwork(object):
         if shuffle_permutation is None:
             shuffle_permutation = numpy.random.permutation(len(y_values))
         y_values = y_values[shuffle_permutation]
-        peptide_encoding = peptide_encoding[shuffle_permutation]
         adjusted_inequalities = adjusted_inequalities[shuffle_permutation]
         for key in x_dict_without_random_negatives:
             x_dict_without_random_negatives[key] = x_dict_without_random_negatives[key][
@@ -1899,6 +4146,33 @@ class Class1NeuralNetwork(object):
 
         if allele_representations is not None:
             self.set_allele_representations(allele_representations)
+
+        # Guard against silent training-time OOMs. When many workers
+        # share one GPU (pan-allele default max_workers_per_gpu=2 on
+        # A100-80GB), the naive minibatch_size from the hyperparameters
+        # YAML may not fit per-worker. Shrink loudly for the duration
+        # of this fit() call only — DO NOT mutate self.hyperparameters,
+        # so the saved model config preserves the user's original
+        # intent. fit_info carries the actual value used at run time.
+        _requested_minibatch = int(self.hyperparameters["minibatch_size"])
+        _effective_minibatch, _shrunk = check_training_batch_fits(
+            _requested_minibatch,
+            device,
+            network,
+            num_workers_per_gpu=_env_workers_per_gpu(1),
+        )
+        if _shrunk:
+            fit_info["minibatch_size_shrunk_from"] = _requested_minibatch
+            fit_info["minibatch_size_shrunk_to"] = _effective_minibatch
+            if seed is not None:
+                logging.warning(
+                    "fit(seed=%s) shrank minibatch_size %d -> %d to fit "
+                    "available VRAM. Reproducibility holds only at a fixed "
+                    "effective minibatch size, so this run may not reproduce "
+                    "bit-for-bit on a GPU with different free memory or a "
+                    "different number of workers per card.",
+                    seed, _requested_minibatch, _effective_minibatch)
+        fit_info["effective_minibatch_size"] = _effective_minibatch
 
         optimizer = self._create_optimizer(network)
         if self.hyperparameters["learning_rate"] is not None:
@@ -1973,6 +4247,7 @@ class Class1NeuralNetwork(object):
 
         start = time.time()
         last_progress_print = None
+        first_batch_time = None
 
         # Validation split (fixed across epochs; only training data is reshuffled)
         val_split = self.hyperparameters["validation_split"]
@@ -1986,116 +4261,316 @@ class Class1NeuralNetwork(object):
         else:
             train_indices_base = indices
             val_indices = None
+        fit_info["train_rows"] = int(n_train)
+        fit_info["validation_rows"] = int(n_val)
+        fit_info["num_random_negatives"] = int(num_random_negatives)
 
         regularization_parameters = tuple(self._regularized_parameters(network))
         l1_reg = self.hyperparameters["dense_layer_l1_regularization"]
         l2_reg = self.hyperparameters["dense_layer_l2_regularization"]
 
-        for epoch in range(self.hyperparameters["max_epochs"]):
-            random_negative_peptides = EncodableSequences.create(
-                random_negatives_planner.get_peptides()
-            )
-            random_negative_peptides_encoding = self.peptides_to_network_input(
-                random_negative_peptides
+        # The validation set indexes into the concatenated
+        # [random_negs | training] array via val_indices. The training portion
+        # is static across epochs; the random-negative portion changes.
+        # When val_indices points entirely into the training portion (the
+        # common case — with default val_split=0.1 and random_negative_rate=1,
+        # val set is the tail 10% of the ~2x-size concatenated array, all in
+        # training portion), x_peptide[val_indices] and x_allele[val_indices]
+        # are stable across epochs. Materialize them on device once to save
+        # ~60 MB+ H2D per epoch.
+        #
+        # When overlap IS possible (unusual hyperparameter combos), skip the
+        # cache and fall back to per-epoch copy (preserved behavior).
+        # Check EVERY val index, not just the first — val_indices can be
+        # unsorted (scikit-learn's train_test_split sometimes produces
+        # shuffled indices). A leading value ≥ num_random_negatives does
+        # not guarantee all subsequent values are in the training portion;
+        # the weight/peptide slicing below would then index into the
+        # random-negative portion, which mutates per epoch → stale tensors.
+        _val_cache_safe = (
+            val_indices is not None
+            and len(val_indices) > 0
+            and bool(numpy.all(val_indices >= num_random_negatives))
+        )
+        fit_info["validation_cache_reused"] = _val_cache_safe
+        _val_device_tensors = None
+        if _val_cache_safe:
+            val_training_indices = val_indices - num_random_negatives
+            # 2D int is index-encoded (keep dtype); 3D int is an already
+            # materialized vector-encoded payload (widen to fp32).
+            _val_peptide_np = x_dict_without_random_negatives["peptide"][
+                val_training_indices
+            ]
+            if (
+                _val_peptide_np.ndim == 2
+                and numpy.issubdtype(_val_peptide_np.dtype, numpy.integer)
+            ):
+                _val_peptide_device = _torch_from_numpy(_val_peptide_np).to(device)
+            else:
+                _val_peptide_device = _torch_from_numpy(
+                    _val_peptide_np).float().to(device)
+            _val_y_device = _torch_from_numpy(
+                y_encoded[val_indices].astype(numpy.float32)
+            ).to(device)
+            _val_allele_device = None
+            if "allele" in x_dict_without_random_negatives:
+                _val_allele_device = _torch_from_numpy(
+                    x_dict_without_random_negatives["allele"][val_training_indices]
+                ).float().to(device)
+            _val_weights_device = None
+            if sample_weights_with_negatives is not None:
+                _val_weights_device = _torch_from_numpy(
+                    sample_weights_with_negatives[val_indices]
+                ).float().to(device)
+            _val_device_tensors = (
+                _val_peptide_device,
+                _val_y_device,
+                _val_allele_device,
+                _val_weights_device,
             )
 
-            # Build x_dict with random negatives
-            if len(random_negative_peptides) > 0:
-                x_peptide = numpy.concatenate([
-                    random_negative_peptides_encoding,
-                    x_dict_without_random_negatives["peptide"],
-                ])
-                if "allele" in x_dict_without_random_negatives:
-                    x_allele = numpy.concatenate([
-                        self.allele_encoding_to_network_input(
-                            random_negatives_allele_encoding
-                        )[0],
-                        x_dict_without_random_negatives["allele"],
-                    ])
-                else:
-                    x_allele = None
+        # AffinityDeviceTrainingData owns the device row space for this
+        # fit: [random negatives | real examples]. The training loop only
+        # asks it for indexed batches and refills the random-negative slice
+        # once per epoch.
+        random_neg_template = None
+        if num_random_negatives > 0:
+            _, random_neg_template = random_negatives_pool.get_epoch_inputs(0)
+        affinity_training_data = AffinityDeviceTrainingData.from_arrays(
+            x_peptide=x_dict_without_random_negatives["peptide"],
+            x_allele=x_dict_without_random_negatives.get("allele"),
+            y_encoded=y_encoded,
+            sample_weights=sample_weights_with_negatives,
+            random_negative_x_peptide_template=random_neg_template,
+            random_negative_x_allele=random_negative_x_allele_base,
+            device=device,
+        )
+        fit_info["fit_tensor_residency"] = "device"
+        logging.info("fit tensor residency: device (device=%s)", device.type)
+
+        for epoch in range(self.hyperparameters["max_epochs"]):
+            epoch_wall_start = time.perf_counter()
+            # Coarse + fine timing buckets — kept for back-compat with
+            # downstream telemetry consumers; the host-path-specific
+            # buckets (dataset construction, dataloader setup) stay
+            # at zero in the device-only world.
+            input_build_time = 0.0
+            rn_pool_get_time = 0.0
+            rn_refill_time = 0.0
+            dataset_construction_time = 0.0
+            initialization_time = 0.0
+            shuffle_dataset_time = 0.0
+            dataloader_setup_time = 0.0
+            train_loop_wall_time = 0.0
+            train_loop_time = 0.0
+            epoch_h2d_time = 0.0
+            epoch_loss_sync_time = 0.0
+            validation_materialize_time = 0.0
+            validation_compute_time = 0.0
+            callback_time = 0.0
+            gc_time = 0.0
+
+            # Per-epoch random-negatives slice. With ``pool_epochs=1``
+            # this regenerates every epoch (legacy behavior); with
+            # ``pool_epochs=N`` the encoding pass runs once per N
+            # epochs and this is an O(1) view.
+            rn_get_start = time.perf_counter()
+            if epoch == 0 and random_neg_template is not None:
+                random_negative_peptides_encoding = random_neg_template
+                random_neg_template = None
             else:
-                x_peptide = x_dict_without_random_negatives["peptide"]
-                x_allele = x_dict_without_random_negatives.get("allele")
+                _, random_negative_peptides_encoding = (
+                    random_negatives_pool.get_epoch_inputs(epoch)
+                )
+            rn_pool_get_time += time.perf_counter() - rn_get_start
+
+            rn_refill_start = time.perf_counter()
+            affinity_training_data.refill_random_negative_peptides(
+                random_negative_peptides_encoding
+            )
+            rn_refill_time += time.perf_counter() - rn_refill_start
+            input_build_time = rn_pool_get_time + rn_refill_time
 
             if needs_initialization:
-                x_init = {"peptide": x_peptide}
-                if x_allele is not None:
-                    x_init["allele"] = x_allele
+                init_start = _timing_start(device, timing_enabled)
+                init_batch = affinity_training_data.batch_dict_for_indices(
+                    indices, device=device
+                )
                 self.data_dependent_weights_initialization(
                     network,
-                    x_init,
+                    init_batch,
                     method=self.hyperparameters["data_dependent_initialization_method"],
                     verbose=verbose,
                 )
+                initialization_time += _timing_stop(
+                    init_start, device, timing_enabled
+                )
                 needs_initialization = False
 
-            # Train/val split (keep validation fixed)
-            train_indices = train_indices_base.copy()
-            numpy.random.shuffle(train_indices)
+            # Compile AFTER LSUV hook churn finishes (see fit_streaming_batches
+            # comment above). Idempotent — _maybe_compile_network returns
+            # the OptimizedModule unchanged if ``network`` is already
+            # compiled, so it's safe to call every epoch. First epoch's
+            # first batch pays the codegen cost; rest runs compiled.
+            network = _maybe_compile_network(network, device)
+            eager_network = _uncompiled_network(network)
+            # Same rationale as fit_streaming_batches' loss-compile call.
+            loss_obj = _maybe_compile_loss(loss_obj, device)
+
+            # Train indices live on device — train_indices_base is
+            # contiguous [0, n_train), so a shuffled view is just
+            # torch.randperm(n_train) on device with no host array
+            # or H2D copy.
+            dataset_start = time.perf_counter()
+            train_indices_dev_full = torch.randperm(
+                train_indices_base.shape[0], device=device,
+            )
+            shuffle_dataset_time += time.perf_counter() - dataset_start
 
             # Training
             network.train()
             epoch_start = time.time()
+            train_loop_wall_start = time.perf_counter()
 
-            # Create batches
-            batch_size = self.hyperparameters["minibatch_size"]
-            train_losses = []
+            batch_size = _effective_minibatch
+            n_train_epoch = int(train_indices_dev_full.shape[0])
+            full_batch_count = (n_train_epoch // batch_size) * batch_size
 
-            for batch_start in range(0, n_train, batch_size):
-                batch_idx = train_indices[batch_start:batch_start + batch_size]
+            def prepared_device_batches():
+                # --- Device-resident inner loop ---
+                # No DataLoader, no per-batch H2D. Indices live on device;
+                # batches are built by index_select into the combined
+                # buffer that holds [RN | real] rows.
+                if full_batch_count > 0:
+                    train_indices_dev = train_indices_dev_full[:full_batch_count]
+                    num_full_batches = full_batch_count // batch_size
+                    for step in range(num_full_batches):
+                        batch_indices = train_indices_dev[
+                            step * batch_size : (step + 1) * batch_size
+                        ]
+                        inputs, y_batch, weights_batch = (
+                            affinity_training_data.batch_for_indices(batch_indices)
+                        )
+                        yield {
+                            "network": network,
+                            "inputs": inputs,
+                            "y_batch": y_batch,
+                            "weights_batch": weights_batch,
+                            "row_count": int(y_batch.shape[0]),
+                        }
+                tail_count = n_train_epoch - full_batch_count
+                if tail_count > 0:
+                    tail_indices_dev = train_indices_dev_full[full_batch_count:]
+                    inputs, y_batch, weights_batch = (
+                        affinity_training_data.batch_for_indices(tail_indices_dev)
+                    )
+                    yield {
+                        "network": eager_network,
+                        "inputs": inputs,
+                        "y_batch": y_batch,
+                        "weights_batch": weights_batch,
+                        "row_count": int(y_batch.shape[0]),
+                    }
 
-                peptide_batch = torch.from_numpy(x_peptide[batch_idx]).float().to(device)
-                y_batch = torch.from_numpy(y_encoded[batch_idx].astype(numpy.float32)).to(device)
-
-                inputs = {"peptide": peptide_batch}
-                if x_allele is not None:
-                    allele_batch = torch.from_numpy(x_allele[batch_idx]).float().to(device)
-                    inputs["allele"] = allele_batch
-
-                optimizer.zero_grad()
-                predictions = network(inputs)
-                weights_batch = None
-                if sample_weights_with_negatives is not None:
-                    weights_batch = torch.from_numpy(
-                        sample_weights_with_negatives[batch_idx]
-                    ).float().to(device)
-                loss = loss_obj(predictions, y_batch, sample_weights=weights_batch)
-                regularization_penalty = self._regularization_penalty(
-                    regularization_parameters,
-                    l1=l1_reg,
-                    l2=l2_reg,
-                )
-                if regularization_penalty is not None:
-                    loss = loss + regularization_penalty
-                loss.backward()
-                optimizer.step()
-                train_losses.append(loss.item())
+            train_epoch_result = _run_prepared_training_batches(
+                prepared_device_batches(),
+                optimizer=optimizer,
+                loss_obj=loss_obj,
+                regularization_parameters=regularization_parameters,
+                l1_reg=l1_reg,
+                l2_reg=l2_reg,
+                timing_enabled=timing_enabled,
+                device=device,
+            )
+            train_loop_time += train_epoch_result["train_time"]
+            if first_batch_time is None:
+                first_batch_time = train_epoch_result["first_batch_time"]
 
             epoch_time = time.time() - epoch_start
-            train_loss = numpy.mean(train_losses)
+            train_loop_wall_time = time.perf_counter() - train_loop_wall_start
+            train_loss, epoch_loss_sync_time = _sync_mean_loss(
+                train_epoch_result["losses"],
+                device=device,
+                timing_enabled=timing_enabled,
+            )
             fit_info["loss"].append(train_loss)
 
-            # Validation
-            if val_split > 0:
+            # Validation — batched so every GPU invocation is fixed-size
+            # and peak VRAM stays bounded regardless of n_val. By default
+            # validation uses the eager network to avoid a second
+            # torch.compile specialization for grad-disabled eval.
+            #
+            # Three conditions trigger a measurement; otherwise the val
+            # pass is skipped and the previous measurement is carried
+            # forward so fit_info["val_loss"] stays one-per-epoch:
+            #   1. on a ``validation_interval`` cadence (the routine case);
+            #   2. on the final epoch of the loop (so the saved model
+            #      always reflects an up-to-date val_loss);
+            #   3. when patience would trigger this epoch (so the saved
+            #      val_loss reflects the actual stop state, not a stale
+            #      carried-forward value).
+            validation_interval = _validation_interval_from_hyperparameters(
+                self.hyperparameters)
+            val_batch_size = None
+            should_validate_this_epoch = _should_validate_epoch(
+                validation_enabled=val_split > 0,
+                epoch_index=epoch,
+                max_epochs=self.hyperparameters["max_epochs"],
+                validation_interval=validation_interval,
+                early_stopping=self.hyperparameters.get("early_stopping", False),
+                min_val_loss_epoch=min_val_loss_iteration,
+                patience=self.hyperparameters["patience"],
+            )
+            if val_split > 0 and not should_validate_this_epoch:
+                prev_val_loss = _carry_forward_validation_loss(fit_info)
+                fit_info["val_loss"].append(prev_val_loss)
+                val_loss = prev_val_loss
+            if should_validate_this_epoch:
                 network.eval()
-                with torch.no_grad():
-                    val_peptide = torch.from_numpy(x_peptide[val_indices]).float().to(device)
-                    val_y = torch.from_numpy(y_encoded[val_indices].astype(numpy.float32)).to(device)
-                    val_inputs = {"peptide": val_peptide}
-                    if x_allele is not None:
-                        val_allele = torch.from_numpy(x_allele[val_indices]).float().to(device)
-                        val_inputs["allele"] = val_allele
-                    val_predictions = network(val_inputs)
-                    val_weights = None
-                    if sample_weights_with_negatives is not None:
-                        val_weights = torch.from_numpy(
-                            sample_weights_with_negatives[val_indices]
-                        ).float().to(device)
-                    val_loss = loss_obj(
-                        val_predictions,
-                        val_y,
-                        sample_weights=val_weights,
+                with torch.inference_mode():
+                    if _val_device_tensors is not None:
+                        # Fast path: reuse tensors materialized once before the
+                        # epoch loop. Saves ~60 MB+ H2D copy per epoch. Bit-
+                        # identical because val_indices points entirely into
+                        # the static training portion of x_peptide/x_allele.
+                        (
+                            val_peptide,
+                            val_y,
+                            val_allele,
+                            val_weights,
+                        ) = _val_device_tensors
+                    else:
+                        # Rare case: val_indices overlaps the per-epoch
+                        # random-negative slice. Build the batch directly
+                        # from the device-resident combined buffer.
+                        materialize_start = time.perf_counter()
+                        val_indices_dev = torch.as_tensor(
+                            val_indices, dtype=torch.long, device=device,
+                        )
+                        val_inputs, val_y, val_weights = (
+                            affinity_training_data.batch_for_indices(val_indices_dev)
+                        )
+                        val_peptide = val_inputs["peptide"]
+                        val_allele = val_inputs.get("allele")
+                        validation_materialize_time += (
+                            time.perf_counter() - materialize_start
+                        )
+                    val_batch_size = _effective_validation_batch_size(
+                        device,
+                        self.hyperparameters["validation_batch_size"],
+                        batch_size,
+                    )
+                    fit_info["effective_validation_batch_size"] = val_batch_size
+                    validation_start = _timing_start(device, timing_enabled)
+                    val_loss = _batched_validation_loss(
+                        network=_validation_forward_network(network, eager_network),
+                        eager_network=eager_network,
+                        val_peptide=val_peptide,
+                        val_allele=val_allele,
+                        val_y=val_y,
+                        val_weights=val_weights,
+                        loss_obj=loss_obj,
+                        batch_size=val_batch_size,
                     )
                     regularization_penalty = self._regularization_penalty(
                         regularization_parameters,
@@ -2103,8 +4578,10 @@ class Class1NeuralNetwork(object):
                         l2=l2_reg,
                     )
                     if regularization_penalty is not None:
-                        val_loss = val_loss + regularization_penalty
-                    val_loss = val_loss.item()
+                        val_loss = val_loss + regularization_penalty.item()
+                    validation_compute_time += _timing_stop(
+                        validation_start, device, timing_enabled
+                    )
                 fit_info["val_loss"].append(val_loss)
 
             # Progress printing
@@ -2130,17 +4607,32 @@ class Class1NeuralNetwork(object):
                 )
                 last_progress_print = time.time()
 
-            # Early stopping
+            # Early stopping. ``min_val_loss`` / ``min_val_loss_iteration``
+            # only update on epochs where validation actually ran — on
+            # skipped epochs ``val_loss`` is the carried-forward previous
+            # measurement and would never beat the current min anyway, so
+            # restricting the update is for clarity (the patience counter
+            # is anchored to the epoch the measurement was taken, not a
+            # later epoch that copied the same value).
             if val_split > 0:
-                if min_val_loss is None or (
-                    val_loss < min_val_loss - self.hyperparameters["min_delta"]
-                ):
-                    min_val_loss = val_loss
-                    min_val_loss_iteration = epoch
+                if should_validate_this_epoch:
+                    min_val_loss, min_val_loss_iteration = (
+                        _update_min_validation_loss(
+                            val_loss=val_loss,
+                            epoch_index=epoch,
+                            min_val_loss=min_val_loss,
+                            min_val_loss_epoch=min_val_loss_iteration,
+                            min_delta=self.hyperparameters["min_delta"],
+                        )
+                    )
 
                 if self.hyperparameters["early_stopping"]:
-                    threshold = min_val_loss_iteration + self.hyperparameters["patience"]
-                    if epoch > threshold:
+                    if _early_stop_reached(
+                        epoch_index=epoch,
+                        min_val_loss_epoch=min_val_loss_iteration,
+                        patience=self.hyperparameters["patience"],
+                        early_stopping=True,
+                    ):
                         if progress_print_interval is not None:
                             print(
                                 (
@@ -2160,12 +4652,78 @@ class Class1NeuralNetwork(object):
                         break
 
             if progress_callback:
+                callback_start = time.perf_counter()
                 progress_callback()
+                callback_time += time.perf_counter() - callback_start
 
+            gc_start = time.perf_counter()
             gc.collect()
+            gc_time += time.perf_counter() - gc_start
+            if timing_enabled:
+                # Coarse + fine-grained input-build buckets. The split was
+                # added to find the unaccounted 35 s/epoch gap on the
+                # 2026-04-28 release_full run (epoch_total_time ~45 s,
+                # sum of pre-split components ~10 s).
+                fit_info["epoch_input_build_time"].append(input_build_time)
+                fit_info["epoch_rn_pool_get_time"].append(rn_pool_get_time)
+                fit_info["epoch_random_negative_refill_time"].append(
+                    rn_refill_time
+                )
+                fit_info["epoch_dataset_construction_time"].append(
+                    dataset_construction_time
+                )
+                fit_info["epoch_initialization_time"].append(
+                    initialization_time
+                )
+                fit_info["epoch_shuffle_dataset_time"].append(
+                    shuffle_dataset_time
+                )
+                fit_info["epoch_dataloader_setup_time"].append(
+                    dataloader_setup_time
+                )
+                fit_info["epoch_h2d_time"].append(epoch_h2d_time)
+                fit_info["epoch_train_time"].append(train_loop_time)
+                fit_info["epoch_train_loop_wall_time"].append(
+                    train_loop_wall_time
+                )
+                # The dataloader-iter overhead is the wall time of the
+                # `for batch in loader:` loop minus the per-batch GPU
+                # compute and H2D copies that are timed separately. It
+                # captures DataLoader worker IPC, prefetcher waits,
+                # Python iterator overhead, and any compile-recompile
+                # storms — i.e. exactly the gap that was unaccounted
+                # for in the pre-split breakdown.
+                fit_info["epoch_dataloader_iter_overhead_time"].append(
+                    max(0.0, train_loop_wall_time - epoch_h2d_time - train_loop_time)
+                )
+                fit_info["epoch_loss_sync_time"].append(epoch_loss_sync_time)
+                fit_info["epoch_validation_materialize_time"].append(
+                    validation_materialize_time
+                )
+                fit_info["epoch_validation_time"].append(
+                    validation_compute_time
+                )
+                fit_info["epoch_num_train_batches"].append(
+                    len(train_epoch_result["losses"]))
+                fit_info["epoch_num_train_rows"].append(
+                    train_epoch_result["train_rows"])
+                fit_info["epoch_tail_train_rows"].append(
+                    n_train_epoch - full_batch_count
+                )
+                fit_info["epoch_num_validation_batches"].append(
+                    int(numpy.ceil(n_val / val_batch_size))
+                    if val_batch_size else 0
+                )
+                fit_info["epoch_callback_time"].append(callback_time)
+                fit_info["epoch_gc_time"].append(gc_time)
+                fit_info["epoch_total_time"].append(
+                    time.perf_counter() - epoch_wall_start
+                )
 
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = len(peptides)
+        if first_batch_time is not None:
+            fit_info["first_batch_time"] = first_batch_time
         self.fit_info.append(dict(fit_info))
 
     def predict(
@@ -2173,7 +4731,8 @@ class Class1NeuralNetwork(object):
             peptides,
             allele_encoding=None,
             batch_size=DEFAULT_PREDICT_BATCH_SIZE,
-            output_index=0):
+            output_index=0,
+            num_workers_per_gpu=None):
         """
         Predict affinities.
 
@@ -2181,19 +4740,33 @@ class Class1NeuralNetwork(object):
         ----------
         peptides : EncodableSequences or list of string
         allele_encoding : AlleleEncoding, optional
-        batch_size : int
+        batch_size : int or ``"auto"``
+            ``"auto"`` (the default) sizes batches to the available GPU
+            memory at call time — see ``compute_prediction_batch_size``.
+            Pass an explicit int to pin the size.
         output_index : int or None
+        num_workers_per_gpu : int, optional
+            When multiple training/calibration workers are co-resident on
+            the same CUDA device, pass the worker count so the auto-
+            sizer partitions the VRAM budget. Ignored for explicit int
+            batch_size. When not passed, falls back to
+            ``_env_workers_per_gpu(1)`` (the ``MHCFLURRY_MAX_WORKERS_PER_GPU``
+            env var the worker pool sets), mirroring ``fit()``.
 
         Returns
         -------
         numpy.array of nM affinity predictions
         """
+        if num_workers_per_gpu is None:
+            num_workers_per_gpu = _env_workers_per_gpu(1)
+
         assert self.prediction_cache is not None
         use_cache = allele_encoding is None and isinstance(peptides, EncodableSequences)
         if use_cache and peptides in self.prediction_cache:
             return self.prediction_cache[peptides].copy()
 
         device = self.get_device()
+        _configure_matmul_precision(device)
 
         x_dict = {"peptide": self.peptides_to_network_input(peptides)}
 
@@ -2209,16 +4782,38 @@ class Class1NeuralNetwork(object):
             network = self.network(borrow=True)
 
         network.to(device)
+        network = _maybe_compile_network(network, device)
         network.eval()
+
+        # Resolve ``"auto"`` once the network is on device so the
+        # heuristic has final visibility into VRAM + architecture.
+        batch_size = resolve_prediction_batch_size(
+            batch_size,
+            device,
+            model=network,
+            num_workers_per_gpu=num_workers_per_gpu,
+        )
 
         # Batch prediction
         n_samples = len(x_dict["peptide"])
         all_predictions = []
 
+        peptide_is_indices = _peptide_uses_torch_encoding(self.hyperparameters)
+
         def prediction_tensor(batch_array):
-            batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
+            batch_array = numpy.asarray(batch_array)
             if not batch_array.flags.writeable:
                 batch_array = batch_array.copy()
+            # Keep integer dtype only on the index-encoded peptide path.
+            # Allele inputs and 3D int8 vector-encoded payloads still widen
+            # to fp32 as before — the flag only governs the peptide tensor.
+            keep_int = (
+                peptide_is_indices
+                and batch_array.ndim == 2
+                and numpy.issubdtype(batch_array.dtype, numpy.integer)
+            )
+            if not keep_int:
+                batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
             return torch.from_numpy(batch_array).to(device)
 
         with torch.no_grad():
@@ -2288,6 +4883,11 @@ class Class1NeuralNetwork(object):
             merge_method=merge_method
         )
         result.update_network_description()
+        result.network_weight_paths = tuple(
+            path
+            for model in models
+            for path in getattr(model, "network_weight_paths", ())
+        )
 
         return result
 
@@ -2310,11 +4910,32 @@ class Class1NeuralNetwork(object):
             locally_connected_layers,
             topology,
             num_outputs=1,
-            allele_representations=None):
+            allele_representations=None,
+            peptide_amino_acid_encoding_torch=True,
+            peptide_amino_acid_encoding_gpu=None):
         """
         Helper function to make a PyTorch network for class 1 affinity prediction.
         """
-        peptide_encoding_shape = self.peptides_to_network_input([]).shape[1:]
+        if peptide_amino_acid_encoding_gpu is not None:
+            peptide_amino_acid_encoding_torch = peptide_amino_acid_encoding_gpu
+        hyperparameters = dict(self.hyperparameters)
+        hyperparameters["peptide_encoding"] = peptide_encoding
+        hyperparameters["peptide_amino_acid_encoding_torch"] = (
+            peptide_amino_acid_encoding_torch
+        )
+        peptide_torch_encoding_name = _peptide_torch_encoding_name(hyperparameters)
+        peptide_encoding_shape = peptide_sequences_to_network_input(
+            [],
+            peptide_encoding=peptide_encoding,
+            peptide_amino_acid_encoding_torch=peptide_amino_acid_encoding_torch,
+        ).shape[1:]
+        # Index-encoded peptides probe as 1D (L,), but dense layers still
+        # size against the post-embedding (L, V) shape.
+        if peptide_torch_encoding_name and len(peptide_encoding_shape) == 1:
+            peptide_encoding_shape = _peptide_torch_encoding_shape(
+                peptide_encoding_shape,
+                peptide_torch_encoding_name,
+            )
 
         return Class1NeuralNetworkModel(
             peptide_encoding_shape=peptide_encoding_shape,
@@ -2334,6 +4955,7 @@ class Class1NeuralNetwork(object):
             topology=topology,
             num_outputs=num_outputs,
             init=init,
+            peptide_input_vector_encoding_name=peptide_torch_encoding_name,
         )
 
     def clear_allele_representations(self):
@@ -2364,6 +4986,25 @@ class Class1NeuralNetwork(object):
         """
         network = self.network()
         if network is None:
+            return
+
+        if allele_representations is None:
+            has_allele_embedding = False
+            if isinstance(network, MergedClass1NeuralNetwork):
+                has_allele_embedding = any(
+                    sub_network.allele_embedding is not None
+                    for sub_network in network.networks
+                )
+            else:
+                has_allele_embedding = (
+                    hasattr(network, 'allele_embedding') and
+                    network.allele_embedding is not None
+                )
+            if has_allele_embedding:
+                raise ValueError(
+                    "set_allele_representations(None) called on a pan-allele "
+                    "network"
+                )
             return
 
         reshaped = allele_representations.reshape(
@@ -2427,19 +5068,78 @@ class MergedClass1NeuralNetwork(nn.Module):
         super(MergedClass1NeuralNetwork, self).__init__()
         self.networks = nn.ModuleList(networks)
         self.merge_method = merge_method
+        # Per-sub-network peptide_stage feature dims, populated lazily on
+        # the first call to ``forward_peptide_stage``. Used by
+        # ``forward_from_peptide_stage`` / ``forward_cartesian_from_peptide_stage``
+        # to split a concatenated peptide-stage tensor back into per-network
+        # slices. Lazy because the dim depends on each sub-network's
+        # peptide_dense_layer configuration; computing it without running
+        # an actual peptide forward is fragile.
+        self._sub_stage_dims = None
+
+    def _combine_subnet_outputs(self, outputs):
+        """Apply ``self.merge_method`` to a list of per-subnet output tensors."""
+        if self.merge_method == "average":
+            return torch.stack(outputs, dim=-1).mean(dim=-1)
+        if self.merge_method == "sum":
+            return torch.stack(outputs, dim=-1).sum(dim=-1)
+        if self.merge_method == "concatenate":
+            return torch.cat(outputs, dim=-1)
+        raise ValueError(f"Unknown merge method: {self.merge_method}")
+
+    def _split_peptide_stage(self, peptide_stage):
+        """Split a concatenated peptide-stage tensor into per-subnet chunks.
+
+        ``forward_peptide_stage`` concatenates per-subnet stages along the
+        feature axis; this is the inverse operation, used inside the
+        ``forward_*_from_peptide_stage`` helpers below.
+        """
+        if self._sub_stage_dims is None:
+            raise RuntimeError(
+                "forward_peptide_stage must be called before "
+                "forward_from_peptide_stage / forward_cartesian_from_peptide_stage "
+                "on MergedClass1NeuralNetwork (the per-subnet feature dims "
+                "are recorded lazily on the first peptide forward)."
+            )
+        chunks = []
+        offset = 0
+        for d in self._sub_stage_dims:
+            chunks.append(peptide_stage[..., offset:offset + d])
+            offset += d
+        return chunks
 
     def forward(self, inputs):
         outputs = [network(inputs) for network in self.networks]
-        stacked = torch.stack(outputs, dim=-1)
+        return self._combine_subnet_outputs(outputs)
 
-        if self.merge_method == "average":
-            return stacked.mean(dim=-1)
-        elif self.merge_method == "sum":
-            return stacked.sum(dim=-1)
-        elif self.merge_method == "concatenate":
-            return torch.cat(outputs, dim=-1)
-        else:
-            raise ValueError(f"Unknown merge method: {self.merge_method}")
+    def forward_peptide_stage(self, peptide):
+        """Run each sub-network's peptide-side stage and concatenate.
+
+        Returned tensor has shape ``(batch, sum_i(peptide_dim_i))``;
+        ``forward_from_peptide_stage`` and ``forward_cartesian_from_peptide_stage``
+        split it back along the feature axis using the recorded per-subnet
+        dims and merge the per-subnet outputs via ``self.merge_method``.
+        """
+        stages = [net.forward_peptide_stage(peptide) for net in self.networks]
+        if self._sub_stage_dims is None:
+            self._sub_stage_dims = tuple(int(s.shape[-1]) for s in stages)
+        return torch.cat(stages, dim=-1)
+
+    def forward_from_peptide_stage(self, peptide_stage, allele_idx):
+        chunks = self._split_peptide_stage(peptide_stage)
+        outputs = [
+            net.forward_from_peptide_stage(chunk, allele_idx)
+            for net, chunk in zip(self.networks, chunks)
+        ]
+        return self._combine_subnet_outputs(outputs)
+
+    def forward_cartesian_from_peptide_stage(self, peptide_stage, allele_idx):
+        chunks = self._split_peptide_stage(peptide_stage)
+        outputs = [
+            net.forward_cartesian_from_peptide_stage(chunk, allele_idx)
+            for net, chunk in zip(self.networks, chunks)
+        ]
+        return self._combine_subnet_outputs(outputs)
 
     def get_weights_list(self):
         """Get all weights as a flat list."""
@@ -2452,6 +5152,87 @@ class MergedClass1NeuralNetwork(nn.Module):
         """Set weights from a flat list."""
         idx = 0
         for network in self.networks:
-            n_weights = len(list(network.parameters())) + len(list(network.buffers()))
+            n_weights = (
+                len(list(network.parameters()))
+                + len(list(network._named_persistent_buffers()))
+            )
             network.set_weights_list(weights[idx:idx + n_weights], auto_convert_keras=auto_convert_keras)
             idx += n_weights
+
+
+def cartesian_network_output(
+        model, peptide_stage, allele_idx, exact_forward=False):
+    """Run a pan-allele network over the (allele × peptide) cartesian product.
+
+    ``model`` is any network exposing ``forward_cartesian_from_peptide_stage``
+    and ``forward_from_peptide_stage`` (a :class:`Class1NeuralNetworkModel` or a
+    :class:`MergedClass1NeuralNetwork`). The fast path delegates to the
+    network's factored ``forward_cartesian_from_peptide_stage``; ``exact_forward``
+    instead materializes the full ``(num_alleles * num_peptides)`` batch and runs
+    the plain ``forward_from_peptide_stage`` — the unfactored reference used to
+    check the compact path's numerics.
+
+    Returns a ``(num_alleles, num_peptides, num_outputs)`` tensor.
+    """
+    if not exact_forward:
+        return model.forward_cartesian_from_peptide_stage(
+            peptide_stage,
+            allele_idx,
+        )
+
+    peptide_width = peptide_stage.shape[-1]
+    num_peptides = peptide_stage.shape[0]
+    num_alleles = allele_idx.shape[0]
+    expanded_stage = peptide_stage.unsqueeze(0).expand(
+        num_alleles,
+        num_peptides,
+        peptide_width,
+    ).reshape(num_alleles * num_peptides, peptide_width)
+    expanded_alleles = allele_idx.unsqueeze(1).expand(
+        num_alleles,
+        num_peptides,
+    ).reshape(-1)
+    return model.forward_from_peptide_stage(
+        expanded_stage,
+        expanded_alleles,
+    ).reshape(num_alleles, num_peptides, -1)
+
+
+def cartesian_output_log_ic50_sum(
+        network_output, model, log50000, accum_dtype):
+    """Convert cartesian network outputs to summed log(IC50).
+
+    Normal models may expose multiple output channels; prediction defaults
+    to channel 0, so fast calibration must do the same. Optimized pan-model
+    ensembles are different: ``MergedClass1NeuralNetwork`` with
+    ``merge_method='concatenate'`` returns one channel per merged submodel.
+    Those channels are ensemble members and must all contribute to the
+    geometric mean.
+
+    Returns
+    -------
+    (torch.Tensor, int)
+        ``(a_size, chunk_n)`` summed log(IC50) contribution and the number
+        of ensemble members represented by the sum.
+    """
+    if network_output.ndim == 2:
+        network_output = network_output.unsqueeze(-1)
+    if network_output.ndim != 3 or int(network_output.shape[-1]) < 1:
+        raise ValueError(
+            "cartesian network output must have shape "
+            "(alleles, peptides, outputs); got %s" % (
+                tuple(network_output.shape),
+            )
+        )
+
+    is_merged_concatenate = (
+        getattr(model, "merge_method", None) == "concatenate"
+        and getattr(model, "networks", None) is not None
+    )
+    if is_merged_concatenate:
+        selected = network_output
+    else:
+        selected = network_output[..., :1]
+
+    log_ic50 = (1.0 - selected).to(accum_dtype) * log50000
+    return log_ic50.sum(dim=-1), int(selected.shape[-1])

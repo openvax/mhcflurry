@@ -219,6 +219,7 @@ class MultiallelicMassSpecLoss(nn.Module):
     """
     supports_inequalities = True
     supports_multiple_outputs = False
+    supports_independent_samples = False
 
     def __init__(self, delta=0.2, multiplier=1.0):
         super(MultiallelicMassSpecLoss, self).__init__()

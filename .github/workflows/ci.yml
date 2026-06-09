@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      MHCFLURRY_DATA_DIR: ${{ github.workspace }}/.mhcflurry-data
     defaults:
       run:
         shell: bash -el {0}
@@ -19,24 +21,52 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            docs/requirements.txt
+            setup.py
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc
+
+      - name: Cache Conda packages
+        uses: actions/cache@v4
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: ~/conda_pkgs_dir
+          key: conda-${{ runner.os }}-${{ matrix.python-version }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('test-environment.yml') }}
+          restore-keys: |
+            conda-${{ runner.os }}-${{ matrix.python-version }}-${{ env.CACHE_NUMBER }}-
+
       - name: Build Conda environment
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v4
         with:
           activate-environment: test-environment
           environment-file: test-environment.yml
           python-version: ${{ matrix.python-version }}
-          auto-activate-base: false
+          auto-activate: false
+          use-only-tar-bz2: true
+
+      - name: Lint shell scripts
+        run: |
+          # Catch syntax regressions in the training-pipeline shell
+          # wrappers cheaply. ``bash -n`` parses without executing.
+          set -e
+          mapfile -t shell_scripts < <(find scripts -type f -name "*.sh")
+          for script in "${shell_scripts[@]}"; do
+              echo "bash -n $script"
+              bash -n "$script"
+          done
 
       - name: Install python dependencies
         run: |
@@ -51,6 +81,14 @@ jobs:
       #    flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
       #    # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
       #    # flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Cache MHCflurry downloads
+        uses: actions/cache@v4
+        with:
+          path: .mhcflurry-data
+          key: mhcflurry-data-${{ runner.os }}-${{ hashFiles('mhcflurry/downloads.yml') }}
+          restore-keys: |
+            mhcflurry-data-${{ runner.os }}-
 
       - name: Download data and models
         run: |

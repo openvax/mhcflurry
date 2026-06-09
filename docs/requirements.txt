@@ -2,6 +2,7 @@ sphinx
 sphinxcontrib-programoutput
 sphinxcontrib-autoprogram
 sphinx-rtd-theme
+myst-parser
 numpydoc
 pypandoc
 pydot

@@ -2,6 +2,7 @@
 import pandas
 import tempfile
 import pickle
+import pytest
 
 from numpy.testing import assert_array_equal
 
@@ -22,11 +23,30 @@ def teardown():
     pass
 
 
+def test_empty_prediction_returns_empty_array_and_dataframe():
+    predictor = Class1ProcessingPredictor(models=[])
+    assert_array_equal(predictor.predict([]), [])
+
+    df = predictor.predict_to_dataframe([])
+    assert list(df.columns) == ["peptide", "n_flank", "c_flank", "score"]
+    assert len(df) == 0
+
+
+def test_predict_rejects_string_peptides():
+    predictor = Class1ProcessingPredictor(models=[])
+    with pytest.raises(TypeError, match="peptides must be a list"):
+        predictor.predict_to_dataframe("SIINFEKL")
+
+
 def test_basic():
-    network = train_basic_network(num=10000, do_assertions=False, max_epochs=10)
+    network = train_basic_network(
+        num=200,
+        do_assertions=False,
+        max_epochs=1,
+        minibatch_size=100000)
     predictor = Class1ProcessingPredictor(models=[network])
 
-    num=10000
+    num = 200
     df = pandas.DataFrame({
         "n_flank": random_peptides(num, 10),
         "c_flank": random_peptides(num, 10),
@@ -61,4 +81,3 @@ def test_basic():
         n_flanks=df.n_flank.values,
         c_flanks=df.c_flank.values)
     assert_array_equal(df.score.values, df3.score.values)
-

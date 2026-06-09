@@ -231,6 +231,8 @@ class Class1ProcessingPredictor(object):
         Processing predictions are in the "score" column. Also includes
         peptides and flanking sequences.
         """
+        if isinstance(peptides, str):
+            raise TypeError("peptides must be a list or array, not a string")
 
         if n_flanks is None:
             n_flanks = [""] * len(peptides)
@@ -260,22 +262,49 @@ class Class1ProcessingPredictor(object):
         pandas.DataFrame
         """
 
-        score_array = []
+        if len(sequences.dataframe) == 0:
+            return pandas.DataFrame({
+                "peptide": pandas.Series(dtype=object),
+                "n_flank": pandas.Series(dtype=object),
+                "c_flank": pandas.Series(dtype=object),
+                "score": pandas.Series(dtype=float),
+            })
 
-        for (i, network) in enumerate(self.models):
-            predictions = network.predict_encoded(
-                sequences, throw=throw, batch_size=batch_size)
-            score_array.append(predictions)
-
-        score_array = numpy.array(score_array)
+        score = self.predict_encoded_tensor(
+            sequences=sequences, throw=throw, batch_size=batch_size)
+        score_array = score.detach().cpu().numpy().astype("float64", copy=False)
 
         result_df = pandas.DataFrame({
             "peptide": sequences.dataframe.peptide,
             "n_flank": sequences.dataframe.n_flank,
             "c_flank": sequences.dataframe.c_flank,
-            "score": numpy.mean(score_array, axis=0),
+            "score": score_array,
         })
         return result_df
+
+    def predict_encoded_tensor(
+            self, sequences, throw=True, batch_size=DEFAULT_PREDICT_BATCH_SIZE):
+        """
+        Predict antigen processing and return a torch tensor.
+
+        Ensemble members consume the tensor cache on ``sequences`` when
+        available, so encoded inputs only need to move to each target device
+        once per encoding/device combination.
+        """
+        if not self.models:
+            import torch
+
+            return torch.full((len(sequences.dataframe),), numpy.nan)
+
+        score = None
+        for network in self.models:
+            predictions = network.predict_encoded_tensor(
+                sequences, throw=throw, batch_size=batch_size)
+            if score is None:
+                score = predictions
+            else:
+                score = score + predictions.to(score.device)
+        return score / float(len(self.models))
 
     def check_consistency(self):
         """

@@ -8,15 +8,36 @@ prediction package with competitive accuracy and a fast and
 [documented](http://openvax.github.io/mhcflurry/) implementation.
 
 > [!IMPORTANT]
-> **Version 2.2.0** is the first release to use [PyTorch](https://pytorch.org/) as its neural network backend, replacing TensorFlow/Keras used in previous versions. It loads the same published weights and produces equivalent predictions, so existing workflows should continue to work with no changes.
+> **Version 2.3.0** keeps the same external API as 2.2.0 and ships substantial
+> performance and tooling improvements for users training their own models or
+> running large prediction workloads:
+> - **Device-resident affinity training**: `Class1NeuralNetwork.fit()` keeps
+>   peptides, alleles, targets, and the random-negative pool on the active
+>   torch device for the lifetime of one fit, eliminating per-batch
+>   host↔device copies.
+> - **Multi-GPU prediction by default**: `mhcflurry-predict`,
+>   `mhcflurry-predict-scan`, `mhcflurry-calibrate-percentile-ranks`, and the
+>   sweep eval script auto-discover visible GPUs and fan out across them.
+> - **Orchestrator auto-tuning**: `mhcflurry-class1-train-pan-allele-models`
+>   resolves `--num-jobs`, `--max-workers-per-gpu`, `--dataloader-num-workers`,
+>   and `random_negative_pool_epochs` from the box's hardware so the same
+>   recipe runs on a workstation, single-GPU node, or 8×A100 host.
+>   `--dataloader-num-workers` applies to streaming pretraining; affinity
+>   fine-tuning batches from device-resident tensors.
+> - **`torch.compile` + TF32 + matmul-precision** are first-class CLI flags
+>   on the train commands; the in-process Inductor cache is warmed by a single
+>   worker before the production pool launches.
 >
-> Key changes in 2.2.0:
-> - **Backend**: TensorFlow/Keras replaced by PyTorch (>= 2.0)
-> - **Python**: Requires Python 3.10+ (previously 3.9+)
-> - **Dependencies**: `pandas >= 2.0` is now required; `tensorflow` and `keras` are no longer needed
-> - **Hardware**: Automatic GPU detection; Apple Silicon (MPS) is now supported
+> If you are upgrading from 2.1.x or 2.2.x, simply
+> `pip install --upgrade mhcflurry`. The published pre-trained models are
+> unchanged and will be loaded automatically. Internal refactors (per-fit
+> device-resident training tensors, torch-side peptide encodings) do not
+> affect the public Python or CLI surface.
 >
-> If you are upgrading from 2.1.x, simply `pip install --upgrade mhcflurry`. The published pre-trained models are unchanged and will be loaded and converted automatically.
+> Earlier release: **Version 2.2.0** was the first release to use PyTorch as
+> its neural network backend, replacing TensorFlow/Keras. It introduced the
+> Python 3.10+ and `pandas >= 2.0` requirements and added Apple Silicon (MPS)
+> support.
 
 MHCflurry implements class I peptide/MHC binding affinity prediction.
 The current version provides pan-MHC I predictors supporting any MHC
@@ -83,9 +104,62 @@ $ mhcflurry-predict-scan \
 Wrote: /tmp/predictions.csv
 ```
 
+### Unified `mhcflurry` parent command
+
+Starting in 2.3.0 there is also a single `mhcflurry` command that dispatches
+to every subcommand:
+
+```
+$ mhcflurry predict \
+        --alleles HLA-A0201 HLA-A0301 \
+        --peptides SIINFEKL SIINFEKD SIINFEKQ \
+        --out /tmp/predictions.csv
+
+$ mhcflurry compare-models \
+        --a results/new_run/ \
+        --b public \
+        --out results/comparison/
+
+$ mhcflurry plot-model-comparison --input results/comparison/
+```
+
+Every historical command is reachable as a subcommand
+(`mhcflurry-predict` ↔ `mhcflurry predict`, `mhcflurry-downloads` ↔
+`mhcflurry downloads`, `mhcflurry-class1-train-pan-allele-models` ↔
+`mhcflurry class1-train-pan-allele-models`, etc.). Both forms run the
+same underlying entry point; the legacy `mhcflurry-*` scripts remain
+installed as compat shims and are not changing. `mhcflurry --help`
+lists every available subcommand.
+
+The two new-in-2.3.0 model-comparison tools, `compare-models` and
+`plot-model-comparison`, only have the unified form.
 
 See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
 
+## Development and tests
+
+From a checkout, source `develop.sh` to create and activate the editable
+environment:
+
+```
+$ source develop.sh
+```
+
+For quick feedback, run lint plus a focused unit subset:
+
+```
+$ ./lint.sh
+$ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
+```
+
+`pytest test/` is the full test suite, not a fast unit-only loop. It includes
+small end-to-end training runs, command subprocess tests, public-model smoke
+tests that require cached MHCflurry download bundles, and speed/regression
+checks, so it can take many minutes. Use
+`pytest -q test -m "not slow and not downloads"` for the broad fast tier, and
+`pytest -q test --durations=25` when auditing slow tests. See the
+[testing documentation](http://openvax.github.io/mhcflurry/testing.html) for
+the current test tiers.
 
 ## Docker
 You can also try the latest (GitHub master) version of MHCflurry using the Docker

@@ -22,7 +22,7 @@ import sys
 import argparse
 import logging
 import os
-from pipes import quote
+from shlex import quote
 import errno
 import tarfile
 from shutil import copyfileobj
@@ -139,6 +139,21 @@ def yes_no(boolean):
     return "YES" if boolean else "NO"
 
 
+def suspicious_tar_member(member):
+    """Return whether a tar member should not be extracted."""
+    name = member.name.strip()
+    if not name or posixpath.isabs(name):
+        return True
+    if ".." in name.split("/"):
+        return True
+    # Keep a normalized guard for unusual path spellings that still resolve
+    # above the extraction directory.
+    normalized = posixpath.normpath(name)
+    if normalized == ".." or normalized.startswith("../"):
+        return True
+    return member.issym() or member.islnk()
+
+
 # For progress bar on download. See https://pypi.python.org/pypi/tqdm
 class TqdmUpTo(tqdm):
     """Provides `update_to(n)` which uses `tqdm.update(delta_n)`."""
@@ -244,11 +259,12 @@ def fetch_subcommand(args):
 
             temp.close()
             tar = tarfile.open(temp.name, 'r:bz2')
-            names = tar.getnames()
+            members = tar.getmembers()
+            names = [member.name for member in members]
             logging.debug("Extracting: %s" % names)
             bad_names = [
-                n for n in names
-                if n.strip().startswith("/") or n.strip().startswith("..")
+                member.name for member in members
+                if suspicious_tar_member(member)
             ]
             if bad_names:
                 raise RuntimeError(
@@ -256,7 +272,7 @@ def fetch_subcommand(args):
             result_dir = get_path(item, test_exists=False)
             os.mkdir(result_dir)
 
-            for member in tqdm(tar.getmembers(), desc='Extracting'):
+            for member in tqdm(members, desc='Extracting'):
                 tar.extractall(path=result_dir, members=[member])
             tar.close()
 

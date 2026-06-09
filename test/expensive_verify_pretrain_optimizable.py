@@ -3,6 +3,7 @@
 from mhcflurry import train_pan_allele_models_command
 from mhcflurry.downloads import get_path
 from mhcflurry.allele_encoding import AlleleEncoding
+from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 
 import pandas
 import numpy
@@ -19,7 +20,7 @@ TRAIN_DF = FULL_TRAIN_DF.loc[
     (FULL_TRAIN_DF.peptide.str.len() <= 15)
 ]
 ALLELE_SEQUENCES = pandas.read_csv(
-    get_path("allele_sequences", "allele_sequences.csv"),
+    get_path("allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
     index_col=0).sequence
 ALLELE_SEQUENCES = ALLELE_SEQUENCES.loc[
     ALLELE_SEQUENCES.index.isin(TRAIN_DF.allele)

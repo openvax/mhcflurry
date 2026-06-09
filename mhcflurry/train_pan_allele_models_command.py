@@ -13,6 +13,7 @@ import pprint
 import hashlib
 import pickle
 import uuid
+import resource
 from functools import partial
 
 import numpy
@@ -21,17 +22,41 @@ import yaml
 import tqdm  # progress bar
 
 from .class1_affinity_predictor import Class1AffinityPredictor
-from .class1_neural_network import Class1NeuralNetwork
-from .common import configure_logging, normalize_allele_name
+from .class1_neural_network import (
+    Class1NeuralNetwork,
+    peptide_sequences_to_network_input,
+)
+from .common import (
+    add_random_seed_arg,
+    canonicalize_allele_series,
+    configure_random_seed,
+    configure_logging,
+    derive_seed,
+    normalize_allele_name,
+    write_generate_sh,
+)
 from .local_parallelism import (
     add_local_parallelism_args,
+    apply_resolved_training_hyperparameters_to_work_items,
+    attach_constant_data_to_work_items_if_needed,
+    call_wrapped_kwargs,
+    resolve_local_parallelism_args,
+    run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
-    call_wrapped_kwargs)
+)
+from .workload_planning import (
+    WORKLOAD_AFFINITY_TRAINING,
+    path_size_bytes,
+)
+from .device_footprint import (
+    estimate_affinity_training_device_worker_gb,
+)
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
 from .allele_encoding import AlleleEncoding
 from .encodable_sequences import EncodableSequences
+from .regression_target import from_ic50
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -39,13 +64,62 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # To avoid pickling large matrices to send to child processes when running in
 # parallel, we use this global variable as a place to store data. Data that is
 # stored here before creating the thread pool will be inherited to the child
-# processes upon fork() call, allowing us to share large data with the workers
-# via shared memory.
+# processes upon fork() call, allowing local workers to read the same
+# copy-on-write pages instead of receiving a pickled copy.
 GLOBAL_DATA = {}
 
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
 # process. Model loading and inference should happen in worker processes.
+
+
+def _pop_train_param(train_params, names, default, verbose=0):
+    """Pop one training parameter, honoring backward-compatible aliases."""
+    present = [name for name in names if name in train_params]
+    if len(present) > 1:
+        values = {name: train_params[name] for name in present}
+        raise ValueError(
+            "Conflicting train_data aliases specified for %s: %s"
+            % (names[0], values)
+        )
+    if present:
+        name = present[0]
+        result = train_params.pop(name)
+        if verbose:
+            suffix = "" if name == names[0] else f" [alias for {names[0]}]"
+            print("Train param", name, "=", result, suffix)
+        return result
+    if verbose:
+        print("Train param", names[0], "=", default, "[default]")
+    return default
+
+
+def _log_process_telemetry(marker):
+    """Emit lightweight per-process RSS / FD telemetry."""
+    try:
+        rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        rss_mb = (
+            rss / (1024 * 1024)
+            if sys.platform == "darwin"
+            else rss / 1024
+        )
+        rss_field = f"{rss_mb:.1f}"
+    except Exception:
+        rss_field = "na"
+
+    fd_field = "na"
+    for path in ("/proc/self/fd", "/dev/fd"):
+        if os.path.isdir(path):
+            try:
+                fd_field = str(len(os.listdir(path)))
+            except OSError:
+                pass
+            break
+
+    print(
+        f"PROCESS_TELEMETRY pid={os.getpid()} marker={marker} "
+        f"rss_mb={rss_field} num_fds={fd_field}"
+    )
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -94,6 +168,7 @@ parser.add_argument(
     metavar="N",
     default=1,
     help="Number of replicates per (architecture, fold) pair to train.")
+add_random_seed_arg(parser)
 parser.add_argument(
     "--max-epochs",
     type=int,
@@ -126,12 +201,11 @@ parser.add_argument(
     default=False,
     help="Do not actually train models. The initialized run can be continued "
     "later with --continue-incomplete.")
-
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
 
 
-def assign_folds(df, num_folds, held_out_fraction, held_out_max):
+def assign_folds(df, num_folds, held_out_fraction, held_out_max, seed=None):
     """
     Split training data into multple test/train pairs, which we refer to as
     folds. Note that a given data point may be assigned to multiple test or
@@ -154,6 +228,11 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
     held_out_max
         For a given allele, do not hold out more than held_out_max number of
         data points in any fold.
+    seed : int, optional
+        Master seed. When given, numpy's global RNG (which the per-allele
+        ``.sample()`` calls below draw from) is seeded up front, so fold
+        membership is reproducible. When None, fold assignment is left
+        entropy-random as before.
 
     Returns
     -------
@@ -161,18 +240,40 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
         index is same as df.index, columns are "fold_0", ... "fold_N" giving
         whether the data point is in the training data for the fold
     """
+    if seed is not None:
+        numpy.random.seed(int(seed) % (2 ** 32))
+
     result_df = pandas.DataFrame(index=df.index)
+
+    # Per-allele invariants (medians, low/high peptides, held-out count) are
+    # fold-independent. Precompute once outside the fold loop; the fold loop
+    # then only does the RNG-dependent sampling. ``groupby("allele")`` defaults
+    # to sort=True, so iteration order is deterministic — must be materialized
+    # so the same order is reused across folds and sample() advances pandas'
+    # global RNG in the same sequence as the pre-refactor implementation.
+    allele_groups = list(df.groupby("allele"))
+    allele_precomputed = {}
+    for (allele, sub_df) in allele_groups:
+        medians = sub_df.groupby("peptide").measurement_value.median()
+        median_of_medians = medians.median()
+        allele_precomputed[allele] = {
+            "medians": medians,
+            "low_peptides": medians[medians < median_of_medians].index.values,
+            "high_peptides": medians[medians >= median_of_medians].index.values,
+            "held_out_count": int(
+                min(len(medians) * held_out_fraction, held_out_max)),
+            "sub_df_index": sub_df.index,
+            "sub_df_peptide": sub_df.peptide,
+        }
 
     for fold in range(num_folds):
         result_df["fold_%d" % fold] = True
-        for (allele, sub_df) in df.groupby("allele"):
-            medians = sub_df.groupby("peptide").measurement_value.median()
-
-            low_peptides = medians[medians < medians.median()].index.values
-            high_peptides = medians[medians >= medians.median()].index.values
-
-            held_out_count = int(
-                min(len(medians) * held_out_fraction, held_out_max))
+        for (allele, _sub_df) in allele_groups:
+            cached = allele_precomputed[allele]
+            medians = cached["medians"]
+            low_peptides = cached["low_peptides"]
+            high_peptides = cached["high_peptides"]
+            held_out_count = cached["held_out_count"]
 
             held_out_peptides = set()
             if held_out_count == 0:
@@ -194,8 +295,9 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
                     n=held_out_high_count) if held_out_high_count else set()
                 held_out_peptides = set(held_out_low).union(set(held_out_high))
 
+            sub_df_peptide = cached["sub_df_peptide"]
             result_df.loc[
-                sub_df.index[sub_df.peptide.isin(held_out_peptides)],
+                cached["sub_df_index"][sub_df_peptide.isin(held_out_peptides)],
                 "fold_%d" % fold
             ] = False
 
@@ -210,7 +312,9 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max):
 def pretrain_data_iterator(
         filename,
         master_allele_encoding,
-        peptides_per_chunk=1024):
+        peptides_per_chunk=1024,
+        shard_rank=0,
+        num_shards=1):
     """
     Step through a CSV file giving predictions for a large number of peptides
     (rows) and alleles (columns).
@@ -220,44 +324,128 @@ def pretrain_data_iterator(
     filename : string
     master_allele_encoding : AlleleEncoding
     peptides_per_chunk : int
-
     Returns
     -------
     Generator of (AlleleEncoding, EncodableSequences, float affinities) tuples
 
     """
-    empty = pandas.read_csv(filename, index_col=0, nrows=0)
-    empty.columns = empty.columns.map(normalize_allele_name)
-    print("Pretrain alleles available: ", *empty.columns.values)
-    usable_alleles = [
-        c for c in empty.columns
-        if c in master_allele_encoding.allele_to_sequence
-    ]
-    print("Using %d / %d alleles" % (len(usable_alleles), len(empty.columns)))
-    print("Skipped alleles: ", [
-        c for c in empty.columns
-        if c not in master_allele_encoding.allele_to_sequence
-    ])
+    empty, usable_alleles, _ = _get_pretrain_allele_info(
+        filename,
+        master_allele_encoding,
+        verbose=True,
+    )
 
-    allele_encoding = AlleleEncoding(
-        numpy.tile(usable_alleles, peptides_per_chunk),
-        borrow_from=master_allele_encoding)
+    allele_encoding_cache = {}
 
     while True:
         synthetic_iter = pandas.read_csv(
             filename, index_col=0, chunksize=peptides_per_chunk)
         for (k, df) in enumerate(synthetic_iter):
-            if len(df) != peptides_per_chunk:
+            if num_shards > 1 and (k % num_shards) != shard_rank:
                 continue
 
             df.columns = empty.columns
             df = df[usable_alleles]
-            encodable_peptides = EncodableSequences(
-                numpy.repeat(
-                    df.index.values,
-                    len(usable_alleles)))
-
+            chunk_len = len(df)
+            if chunk_len == 0:
+                continue
+            if chunk_len not in allele_encoding_cache:
+                allele_encoding_cache[chunk_len] = AlleleEncoding(
+                    numpy.tile(usable_alleles, chunk_len),
+                    borrow_from=master_allele_encoding,
+                )
+            allele_encoding = allele_encoding_cache[chunk_len]
+            repeated_peptides = numpy.repeat(df.index.values, len(usable_alleles))
+            encodable_peptides = EncodableSequences(repeated_peptides)
             yield (allele_encoding, encodable_peptides, df.stack().values)
+
+
+_LOGGED_PRETRAIN_ALLELE_INFO = set()
+
+
+def _get_pretrain_allele_info(filename, master_allele_encoding, verbose):
+    """Return (normalized-empty-df, usable_alleles, skipped_alleles).
+
+    Verbose output is dedup'd per (filename, skipped_alleles) tuple at
+    module scope: this function gets called repeatedly by the per-fold
+    pretrain loaders and was emitting 10× redundant 'Pretrain alleles'
+    + 'Skipped alleles' blocks per training run that drowned the log.
+    """
+    empty = pandas.read_csv(filename, index_col=0, nrows=0)
+    empty.columns = empty.columns.map(normalize_allele_name)
+    usable_alleles = [
+        c for c in empty.columns
+        if c in master_allele_encoding.allele_to_sequence
+    ]
+    skipped_alleles = [
+        c for c in empty.columns
+        if c not in master_allele_encoding.allele_to_sequence
+    ]
+    if verbose:
+        log_key = (filename, tuple(skipped_alleles))
+        if log_key not in _LOGGED_PRETRAIN_ALLELE_INFO:
+            _LOGGED_PRETRAIN_ALLELE_INFO.add(log_key)
+            print("Pretrain alleles available: ", *empty.columns.values)
+            print("Using %d / %d alleles" % (
+                len(usable_alleles), len(empty.columns)
+            ))
+            print("Skipped alleles: ", skipped_alleles)
+    return empty, usable_alleles, skipped_alleles
+
+
+def pretrain_network_input_iterator(
+        filename,
+        master_allele_encoding,
+        peptide_encoding,
+        peptides_per_chunk=1024,
+        worker_id=0,
+        num_workers=1,
+        compact_peptide_repeats=False,
+        peptide_amino_acid_encoding_torch=True):
+    """Yield pretrain batches as network-input ``(x_dict, y)`` tuples."""
+    empty, usable_alleles, _ = _get_pretrain_allele_info(
+        filename,
+        master_allele_encoding,
+        verbose=(worker_id == 0),
+    )
+    allele_encoding_cache = {}
+    allele_indices_cache = {}
+
+    synthetic_iter = pandas.read_csv(
+        filename, index_col=0, chunksize=peptides_per_chunk)
+    for chunk_num, df in enumerate(synthetic_iter):
+        if num_workers > 1 and (chunk_num % num_workers) != worker_id:
+            continue
+        df.columns = empty.columns
+        df = df[usable_alleles]
+        chunk_len = len(df)
+        if chunk_len == 0:
+            continue
+        if chunk_len not in allele_encoding_cache:
+            allele_encoding_cache[chunk_len] = AlleleEncoding(
+                numpy.tile(usable_alleles, chunk_len),
+                borrow_from=master_allele_encoding,
+            )
+            allele_indices_cache[chunk_len] = (
+                allele_encoding_cache[chunk_len].indices.values.copy()
+            )
+
+        if compact_peptide_repeats:
+            peptide_values = df.index.values
+        else:
+            peptide_values = numpy.repeat(df.index.values, len(usable_alleles))
+        peptide_rows = peptide_sequences_to_network_input(
+            peptide_values,
+            peptide_encoding=peptide_encoding,
+            peptide_amino_acid_encoding_torch=peptide_amino_acid_encoding_torch,
+        )
+        x_dict = {
+            "peptide": peptide_rows,
+            "allele": allele_indices_cache[chunk_len],
+        }
+        if compact_peptide_repeats:
+            x_dict["peptide_repeat_count"] = len(usable_alleles)
+        yield (x_dict, from_ic50(df.stack().values))
 
 
 def run(argv=sys.argv[1:]):
@@ -279,12 +467,43 @@ def run(argv=sys.argv[1:]):
         return main(args)
 
 
+def _estimate_training_per_worker_gb(args):
+    """Measurement-driven per-worker VRAM (GB) for this training run, or None.
+
+    Reads the hyperparameters YAML and counts the training rows (cheaply, one
+    column) to size the device-resident dataset tensor. Takes the max over the
+    configured architectures so the worker count fits the heaviest one. Any
+    failure returns None -> the planner uses the static profile default.
+    """
+    try:
+        hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
+        # One-column read just to count rows; ``initialize_training`` re-reads
+        # the full file later. A deliberate, one-time decompression pass at
+        # planning time (negligible against a multi-hour training run).
+        num_rows = len(pandas.read_csv(args.data, usecols=[0]))
+    except Exception:
+        return None
+    estimates = [
+        estimate_affinity_training_device_worker_gb(hyperparameters, num_rows)
+        for hyperparameters in (hyperparameters_lst or [])
+    ]
+    estimates = [gb for gb in estimates if gb is not None]
+    return max(estimates) if estimates else None
+
+
 def main(args):
     print("Arguments:")
     print(args)
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
     configure_logging(verbose=args.verbosity > 1)
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+        per_worker_gb=_estimate_training_per_worker_gb(args),
+        workload_name=WORKLOAD_AFFINITY_TRAINING,
+        workload_hints={"data_bytes": path_size_bytes(args.data)},
+    )
 
     if not args.continue_incomplete:
         initialize_training(args)
@@ -304,6 +523,14 @@ def initialize_training(args):
         if getattr(args, arg) is None:
             parser.error("Missing required arg: %s" % arg)
 
+    # TIMING_MARKER lines let the sweep harness compute clean per-phase
+    # wall times:
+    #   start               — argparse + validation done; before any I/O
+    #   data_loaded         — train_data CSV parsed + filtered + folded
+    #   setup_done          — pool + all GLOBAL_DATA
+    #   training_done       — all work items finished
+    # Extract deltas by grepping stdout for ``TIMING_MARKER``.
+    print(f"TIMING_MARKER start {time.time():.3f}")
     print("Initializing training.")
     hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
     assert isinstance(hyperparameters_lst, list)
@@ -313,18 +540,40 @@ def initialize_training(args):
     allele_sequences = pandas.read_csv(
         args.allele_sequences, index_col=0).iloc[:,0]
 
-    df = pandas.read_csv(args.data)
+    # pyarrow parser is 3–10× faster than the default C engine for
+    # typical CSV. Still bzip2-bound on the I/O side but the parse phase
+    # becomes negligible. Falls back to C engine if pyarrow isn't
+    # installed (it's a pandas optional dep).
+    try:
+        df = pandas.read_csv(args.data, engine="pyarrow")
+    except (ImportError, ValueError):
+        df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
-    df = df.loc[
-        (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
-    ]
-    print("Subselected to 8-15mers: %s" % (str(df.shape)))
 
-    df = df.loc[~df.measurement_value.isnull()]
-    print("Dropped NaNs: %s" % (str(df.shape)))
+    # Canonicalize allele names to the pseudosequence key set (no-alias-first),
+    # so aliased / retired / alternative spellings resolve to their canonical
+    # key instead of being silently dropped or fragmented into separate
+    # embedding rows. Rows that resolve to no key become NaN and are filtered
+    # out below. (The minimal canonical set is whatever keys allele_sequences
+    # provides; every alias of a key routes back to it.)
+    df = df.assign(allele=canonicalize_allele_series(
+        df.allele.values, allele_sequences.index, log_label="training alleles"))
 
-    df = df.loc[df.allele.isin(allele_sequences.index)]
-    print("Subselected to alleles with sequences: %s" % (str(df.shape)))
+    # Collapse the filter chain into a single boolean mask. The original
+    # code chained 3 ``.loc[]`` calls which each materialize a full
+    # DataFrame copy. Single-mask form scans each column once and allocates
+    # one result buffer. ``allele.notnull()`` keeps only rows that resolved to
+    # a known pseudosequence key (canonicalize_allele_series guarantees a
+    # resolved value is in allele_sequences.index).
+    peptide_len = df.peptide.str.len()
+    mask = (
+        (peptide_len >= 8)
+        & (peptide_len <= 15)
+        & df.measurement_value.notnull()
+        & df.allele.notnull()
+    )
+    df = df.loc[mask]
+    print("Filtered to valid (len, non-null, known-allele): %s" % (str(df.shape)))
 
     print("Data inequalities:")
     print(df.measurement_inequality.value_counts())
@@ -332,8 +581,16 @@ def initialize_training(args):
     if args.ignore_inequalities and "measurement_inequality" in df.columns:
         print("Dropping measurement_inequality column")
         del df["measurement_inequality"]
-    # Allele names in data are assumed to be already normalized.
+    # Allele names were canonicalized to pseudosequence keys above.
     print("Training data: %s" % (str(df.shape)))
+
+    # Resolve the master seed once for the whole run and seed this process's
+    # global RNGs (so fold assignment below is reproducible). Per-fit weight
+    # init, shuffles, and random negatives in train_model derive from the
+    # same value via derive_seed. --random-seed defaults to 42 (reproducible
+    # out of the box); the resolved value is logged either way.
+    master_seed = configure_random_seed(
+        args.random_seed, name="train-pan-allele")
 
     (held_out_fraction, held_out_max) = (
         args.held_out_measurements_per_allele_fraction_and_max)
@@ -342,7 +599,9 @@ def initialize_training(args):
         df=df,
         num_folds=args.num_folds,
         held_out_fraction=held_out_fraction,
-        held_out_max=held_out_max)
+        held_out_max=held_out_max,
+        seed=master_seed)
+    print(f"TIMING_MARKER data_loaded {time.time():.3f}")
 
     allele_sequences_in_use = allele_sequences[
         allele_sequences.index.isin(df.allele)
@@ -367,11 +626,23 @@ def initialize_training(args):
         os.mkdir(args.out_models_dir)
         print("Done.")
 
+    # Strip any pre-existing fold_* columns from ``df`` before joining the
+    # freshly-computed ``folds_df``. Public 2.2.0 train_data.csv.bz2 ships
+    # with fold_0..3 already attached; without this, ``pandas.merge`` adds
+    # ``_x``/``_y`` suffixes to disambiguate, which then breaks
+    # ``select_pan_allele_models_command``'s ``int(col.split("_")[-1])``
+    # parser. Re-folding is the intended behavior — fold assignment is a
+    # function of (data, num_folds, held_out_*), so any prior fold cols
+    # are stale.
+    df_no_folds = df.drop(
+        columns=[c for c in df.columns if c.startswith("fold_")],
+        errors="ignore",
+    )
     predictor = Class1AffinityPredictor(
         allele_to_sequence=allele_encoding.allele_to_sequence,
         metadata_dataframes={
             'train_data': pandas.merge(
-                df,
+                df_no_folds,
                 folds_df,
                 left_index=True,
                 right_index=True)
@@ -410,6 +681,10 @@ def initialize_training(args):
     training_init_info["allele_encoding"] = allele_encoding
     training_init_info["full_allele_encoding"] = full_allele_encoding
     training_init_info["work_items"] = work_items
+    # Persist the master seed so the train_models phase (which may run in a
+    # separate invocation via --continue-incomplete) derives per-fit seeds
+    # from the same value used for fold assignment.
+    training_init_info["seed"] = master_seed
 
     # Save empty predictor (for metadata)
     predictor.save(args.out_models_dir)
@@ -419,11 +694,10 @@ def initialize_training(args):
         pickle.dump(training_init_info, fd, protocol=pickle.HIGHEST_PROTOCOL)
 
     print("Done initializing training.")
+    print(f"TIMING_MARKER setup_done {time.time():.3f}")
 
 
 def train_models(args):
-    global GLOBAL_DATA
-
     print("Beginning training.")
     predictor = Class1AffinityPredictor.load(
         args.out_models_dir, optimization_level=0)
@@ -434,6 +708,9 @@ def train_models(args):
     print("Loaded training init info.")
 
     all_work_items = GLOBAL_DATA["work_items"]
+
+    apply_resolved_training_hyperparameters_to_work_items(all_work_items, args)
+
     complete_work_item_names = [
         network.fit_info[-1]["training_info"]["work_item_name"] for network in
         predictor.neural_networks
@@ -448,8 +725,12 @@ def train_models(args):
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
 
     # The estimated time to completion is more accurate if we randomize
-    # the order of the work.
-    random.shuffle(work_items)
+    # the order of the work. Seed from the master seed so even the dispatch
+    # order is reproducible (per-fit results don't depend on order — each
+    # fit reseeds from its own work-item seed — but this keeps the whole
+    # run deterministic).
+    master_seed = GLOBAL_DATA.get("seed")
+    random.Random(master_seed).shuffle(work_items)
     for (work_item_num, item) in enumerate(work_items):
         item['work_item_num'] = work_item_num
         item['num_work_items'] = len(work_items)
@@ -483,6 +764,13 @@ def train_models(args):
             constant_data=GLOBAL_DATA,
             result_serialization_method="save_predictor")
     else:
+        run_single_worker_torch_compile_warmup(
+            args,
+            work_items,
+            train_model,
+            constant_data=GLOBAL_DATA,
+        )
+
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
         assert worker_pool is not None
@@ -490,28 +778,47 @@ def train_models(args):
         print("Processing %d work items in parallel." % len(work_items))
         assert not serial_run
 
-        for item in work_items:
-            item['constant_data'] = GLOBAL_DATA
+        results_generator = None
 
-        results_generator = worker_pool.imap_unordered(
-            partial(call_wrapped_kwargs, train_model),
-            work_items,
-            chunksize=1)
+    try:
+        if worker_pool is not None:
+            # Attach constant data and launch the work inside the try so a
+            # failure here (e.g. copying large constant data to workers) still
+            # tears the pool down via the finally rather than leaking
+            # non-daemon workers.
+            attach_constant_data_to_work_items_if_needed(
+                work_items, GLOBAL_DATA, worker_pool
+            )
+            results_generator = worker_pool.imap_unordered(
+                partial(call_wrapped_kwargs, train_model),
+                work_items,
+                chunksize=1)
+        if results_generator:
+            for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
+                save_start = time.time()
+                (new_model_name,) = predictor.merge_in_place([new_predictor])
+                predictor.save(
+                    args.out_models_dir,
+                    model_names_to_write=[new_model_name],
+                    write_metadata=False)
+                print(
+                    "Saved predictor (%d models total) with 1 new models"
+                    "in %0.2f sec to %s" % (
+                        len(predictor.neural_networks),
+                        time.time() - save_start,
+                        args.out_models_dir))
 
-    if results_generator:
-        for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
-            save_start = time.time()
-            (new_model_name,) = predictor.merge_in_place([new_predictor])
-            predictor.save(
-                args.out_models_dir,
-                model_names_to_write=[new_model_name],
-                write_metadata=False)
-            print(
-                "Saved predictor (%d models total) with 1 new models"
-                "in %0.2f sec to %s" % (
-                    len(predictor.neural_networks),
-                    time.time() - save_start,
-                    args.out_models_dir))
+        if worker_pool:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+    finally:
+        # On failure mid-iteration, terminate() rather than
+        # close()/join() (which can hang on a wedged worker) and
+        # leave non-daemon workers behind.
+        if worker_pool is not None:
+            worker_pool.terminate()
+            worker_pool.join()
 
     # We want the final predictor to support all alleles with sequences, not
     # just those we actually used for model training.
@@ -519,6 +826,7 @@ def train_models(args):
         GLOBAL_DATA['full_allele_encoding'].allele_to_sequence)
     predictor.clear_cache()
     predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
     print("Done.")
 
     print("*" * 30)
@@ -527,11 +835,74 @@ def train_models(args):
         len(predictor.neural_networks), training_time / 60.0))
     print("*" * 30)
 
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
-
     print("Predictor written to: %s" % args.out_models_dir)
+    print(f"TIMING_MARKER training_done {time.time():.3f}")
+
+
+def _build_train_peptides(peptide_values):
+    """Construct an EncodableSequences for the fold's training peptides."""
+    return EncodableSequences(peptide_values)
+
+
+def _run_compile_warmup(hyperparameters, fold_num, constant_data):
+    """One forward+backward through a freshly-built network for compile-cache priming.
+
+    Used by ``run_single_worker_torch_compile_warmup`` to populate the
+    torch.compile on-disk cache once per unique architecture before the
+    production worker pool launches. Trains for one epoch on
+    ``minibatch_size`` rows with pretrain/validation/early-stop disabled,
+    discards the resulting model, and returns. The compile cache write
+    is the only durable side effect.
+    """
+    df = constant_data["train_data"]
+    folds_df = constant_data["folds_df"]
+    allele_encoding = constant_data["allele_encoding"]
+
+    minibatch = max(int(hyperparameters.get("minibatch_size", 128) or 128), 1)
+    fold_mask = folds_df["fold_%d" % fold_num]
+    train_subset = df.loc[fold_mask].head(minibatch)
+    if len(train_subset) == 0:
+        train_subset = df.head(minibatch)
+
+    train_peptides = _build_train_peptides(train_subset.peptide.values)
+    train_alleles = AlleleEncoding(
+        train_subset.allele.values, borrow_from=allele_encoding)
+
+    # Subselect to keys this network actually accepts so warmup is
+    # robust to upstream configs carrying parameters from a different
+    # network or removed-but-still-present keys.
+    hp = Class1NeuralNetwork.hyperparameter_defaults.subselect(
+        dict(hyperparameters))
+    hp["max_epochs"] = 1
+    hp["validation_split"] = 0.0
+    hp["early_stopping"] = False
+    hp["data_dependent_initialization_method"] = None
+    train_data_overrides = dict(hp.get("train_data") or {})
+    train_data_overrides["pretrain"] = False
+    hp["train_data"] = train_data_overrides
+
+    print(
+        "compile_warmup_only: layer_sizes=%s topology=%s minibatch=%d "
+        "rows=%d" % (
+            hp.get("layer_sizes"),
+            hp.get("topology"),
+            minibatch,
+            len(train_subset),
+        )
+    )
+    started = time.time()
+    model = Class1NeuralNetwork(**hp)
+    model.fit(
+        peptides=train_peptides,
+        affinities=train_subset.measurement_value.values,
+        allele_encoding=train_alleles,
+        inequalities=(
+            train_subset.measurement_inequality.values
+            if "measurement_inequality" in train_subset.columns else None
+        ),
+        verbose=0,
+    )
+    print("compile_warmup_only: completed in %.1f sec" % (time.time() - started))
 
 
 def train_model(
@@ -550,7 +921,12 @@ def train_model(
         progress_print_interval,
         predictor,
         save_to,
+        compile_warmup_only=False,
         constant_data=GLOBAL_DATA):
+
+    if compile_warmup_only:
+        _run_compile_warmup(hyperparameters, fold_num, constant_data)
+        return None
 
     df = constant_data["train_data"]
     folds_df = constant_data["folds_df"]
@@ -562,11 +938,14 @@ def train_model(
 
     numpy.testing.assert_equal(len(df), len(folds_df))
 
-    train_data = df.loc[
-        folds_df["fold_%d" % fold_num]
-    ].sample(frac=1.0)
+    # Don't shuffle here: fit() owns ordering via its seeded
+    # ``shuffle_permutation`` (host, for the train/val split) and an
+    # on-device ``torch.randperm`` each epoch. A host-side ``.sample()``
+    # would just add an unseeded numpy-global shuffle ahead of fit's
+    # seeding, breaking single-seed reproducibility.
+    train_data = df.loc[folds_df["fold_%d" % fold_num]]
 
-    train_peptides = EncodableSequences(train_data.peptide.values)
+    train_peptides = _build_train_peptides(train_data.peptide.values)
     train_alleles = AlleleEncoding(
         train_data.allele.values, borrow_from=allele_encoding)
 
@@ -587,18 +966,41 @@ def train_model(
     print("%s [pid %d]. Hyperparameters:" % (progress_preamble, os.getpid()))
     pprint.pprint(hyperparameters)
 
+    # GPU memory telemetry at task boundaries. With max-tasks-per-worker>1,
+    # a single worker process handles
+    # many arch×fold tasks sequentially. Logging allocated/reserved VRAM
+    # plus the max-allocated high-water-mark at task start and end gives
+    # us a trajectory to detect leaks: if the high-water mark or the
+    # start-of-task "residual" allocation creeps upward across tasks
+    # within a worker, there's a leak somewhere (PyTorch allocator fails
+    # to release, cached tensors pinned, etc). Flat across 140 tasks is
+    # the "no leak" signal.
+    def _log_gpu_memory(marker):
+        import torch
+        if not torch.cuda.is_available():
+            return
+        alloc_gb = torch.cuda.memory_allocated() / 1e9
+        reserved_gb = torch.cuda.memory_reserved() / 1e9
+        max_alloc_gb = torch.cuda.max_memory_allocated() / 1e9
+        print(
+            f"GPU_MEMORY_TELEMETRY pid={os.getpid()} "
+            f"task={work_item_num + 1}/{num_work_items} marker={marker} "
+            f"allocated_gb={alloc_gb:.3f} reserved_gb={reserved_gb:.3f} "
+            f"max_allocated_gb={max_alloc_gb:.3f}"
+        )
+
+    _log_gpu_memory("START")
+    _log_process_telemetry("START")
+
     train_params = dict(hyperparameters.get("train_data", {}))
 
     def get_train_param(param, default):
-        if param in train_params:
-            result = train_params.pop(param)
-            if verbose:
-                print("Train param", param, "=", result)
-        else:
-            result = default
-            if verbose:
-                print("Train param", param, "=", result, "[default]")
-        return result
+        return _pop_train_param(
+            train_params,
+            names=(param,),
+            default=default,
+            verbose=verbose,
+        )
 
 
     def progress_callback():
@@ -607,6 +1009,15 @@ def train_model(
             mem = torch.cuda.memory_allocated() / 10**9
             print("Current used GPU memory: ", mem, "gb")
 
+    # One stable per-work-item seed controls every stochastic step of this
+    # fit — pretrain weight init + batch order, then the finetune shuffles
+    # and random negatives. Derived from the run's master seed plus this
+    # fit's identity coordinates, so the whole run is reproducible from
+    # --seed regardless of dispatch order across workers.
+    work_item_seed = derive_seed(
+        constant_data.get("seed"),
+        architecture_num, fold_num, replicate_num)
+
     if get_train_param("pretrain", False):
         pretrain_patience = get_train_param("pretrain_patience", 10)
         pretrain_min_delta = get_train_param("pretrain_min_delta", 0.0)
@@ -614,8 +1025,15 @@ def train_model(
             "pretrain_steps_per_epoch", 10)
         pretrain_max_epochs = get_train_param("pretrain_max_epochs", 1000)
         pretrain_min_epochs = get_train_param("pretrain_min_epochs", 0)
-        pretrain_peptides_per_step = get_train_param(
-            "pretrain_peptides_per_step", 1024)
+        pretrain_peptides_per_step = _pop_train_param(
+            train_params,
+            names=(
+                "pretrain_peptides_per_step",
+                "pretrain_peptides_per_epoch",
+            ),
+            default=1024,
+            verbose=verbose,
+        )
         max_val_loss = get_train_param("pretrain_max_val_loss", None)
 
         if verbose:
@@ -631,13 +1049,22 @@ def train_model(
 
             model = Class1NeuralNetwork(**hyperparameters)
             assert model.network() is None
-            generator = pretrain_data_iterator(
-                pretrain_data_filename,
-                allele_encoding,
-                peptides_per_chunk=pretrain_peptides_per_step)
+            make_pretrain_generator = partial(
+                pretrain_network_input_iterator,
+                filename=pretrain_data_filename,
+                master_allele_encoding=allele_encoding,
+                peptide_encoding=hyperparameters["peptide_encoding"],
+                peptides_per_chunk=pretrain_peptides_per_step,
+                compact_peptide_repeats=True,
+                peptide_amino_acid_encoding_torch=(
+                    model.uses_peptide_torch_encoding()
+                ),
+            )
 
-            model.fit_generator(
-                generator,
+            model.fit_streaming_batches(
+                generator=make_pretrain_generator(),
+                generator_factory=make_pretrain_generator,
+                generator_batches_are_encoded=True,
                 validation_peptide_encoding=train_peptides,
                 validation_affinities=train_data.measurement_value.values,
                 validation_allele_encoding=train_alleles,
@@ -651,9 +1078,16 @@ def train_model(
                 progress_callback=progress_callback,
                 progress_preamble=progress_preamble + "PRETRAIN",
                 progress_print_interval=progress_print_interval,
+                # Per-attempt offset so a rejected init (val loss too high)
+                # is followed by a *different* init on retry, while the
+                # attempt sequence stays reproducible from the work-item seed.
+                seed=work_item_seed + attempt,
             )
             model.fit_info[-1].setdefault(
-                "training_info", {})["pretrain_attempt"] = attempt
+                "training_info", {}).update({
+                    "pretrain_attempt": attempt,
+                    "phase": "pretrain",
+                })
             if not max_val_loss:
                 break
             final_val_loss = model.fit_info[-1]["val_loss"][-1]
@@ -681,6 +1115,7 @@ def train_model(
         progress_preamble=progress_preamble,
         progress_callback=progress_callback,
         progress_print_interval=progress_print_interval,
+        seed=work_item_seed,
         verbose=verbose)
 
     # Save model-specific training info
@@ -689,6 +1124,7 @@ def train_model(
         train_peptide_hash.update(peptide.encode())
 
     model.fit_info[-1].setdefault("training_info", {}).update({
+        "phase": "finetune",
         "fold_num": fold_num,
         "num_folds": num_folds,
         "replicate_num": replicate_num,
@@ -710,6 +1146,18 @@ def train_model(
     model.clear_allele_representations()
     model.update_network_description()  # save weights and config
     model._network = None  # release network to free memory
+
+    # Release any cached allocator blocks we can, then log residual state.
+    # empty_cache() doesn't free live tensors — just returns unused
+    # cached blocks to the driver. If the END telemetry shows growing
+    # "allocated_gb" across tasks despite this call, a reference is
+    # being retained somewhere.
+    import torch
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    _log_gpu_memory("END")
+    _log_process_telemetry("END")
+
     return predictor
 
 

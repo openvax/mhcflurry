@@ -13,7 +13,7 @@ import os
 import logging
 import re
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 
 readme_dir = os.path.dirname(__file__)
@@ -36,6 +36,7 @@ if __name__ == "__main__":
     required_packages = [
         "pandas>=2.0",
         "appdirs",
+        "ahocorasick-rs",
         "scikit-learn",
         "mhcgnomes>=3.0.1",
         "numpy>=1.22.4",
@@ -54,7 +55,9 @@ if __name__ == "__main__":
         license="Apache-2.0",
         entry_points={
             "console_scripts": [
+                "mhcflurry = mhcflurry.cli.main:main",
                 "mhcflurry-downloads = mhcflurry.downloads_command:run",
+                "mhcflurry-pseudosequences = mhcflurry.pseudosequences:main",
                 "mhcflurry-predict = mhcflurry.predict_command:run",
                 "mhcflurry-predict-scan = mhcflurry.predict_scan_command:run",
                 "mhcflurry-class1-train-allele-specific-models = "
@@ -95,7 +98,5 @@ if __name__ == "__main__":
         install_requires=required_packages,
         long_description=readme,
         long_description_content_type="text/markdown",
-        packages=[
-            "mhcflurry",
-        ],
+        packages=find_packages(include=["mhcflurry", "mhcflurry.*"]),
     )

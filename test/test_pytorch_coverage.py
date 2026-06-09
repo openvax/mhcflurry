@@ -283,12 +283,10 @@ class TestEnsembleCentralityEdgeCases:
 
 class TestWeightInitialization:
     def _make_model(self, init):
-        from mhcflurry.class1_neural_network import (
-            Class1NeuralNetwork,
-            Class1NeuralNetworkModel,
-        )
-        nn_obj = Class1NeuralNetwork()
-        peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
+        from mhcflurry.class1_neural_network import Class1NeuralNetworkModel
+        # Topology/init coverage builds the model from a pre-encoded (L, V)
+        # peptide shape directly (the peptide encoding path is index-only now).
+        peptide_shape = (15, 21)
         return Class1NeuralNetworkModel(
             peptide_encoding_shape=peptide_shape,
             layer_sizes=[16],
@@ -324,12 +322,12 @@ class TestWeightInitialization:
 class TestMergedClass1NeuralNetwork:
     def _make_merged(self, merge_method, n_networks=2):
         from mhcflurry.class1_neural_network import (
-            Class1NeuralNetwork,
             Class1NeuralNetworkModel,
             MergedClass1NeuralNetwork,
         )
-        nn_obj = Class1NeuralNetwork()
-        peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
+        # Topology/init coverage builds the model from a pre-encoded (L, V)
+        # peptide shape directly (the peptide encoding path is index-only now).
+        peptide_shape = (15, 21)
         torch.manual_seed(0)
         networks = []
         for _ in range(n_networks):
@@ -389,12 +387,10 @@ class TestMergedClass1NeuralNetwork:
 
 class TestSkipConnectionsTopology:
     def test_forward_pass(self):
-        from mhcflurry.class1_neural_network import (
-            Class1NeuralNetwork,
-            Class1NeuralNetworkModel,
-        )
-        nn_obj = Class1NeuralNetwork()
-        peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
+        from mhcflurry.class1_neural_network import Class1NeuralNetworkModel
+        # Topology/init coverage builds the model from a pre-encoded (L, V)
+        # peptide shape directly (the peptide encoding path is index-only now).
+        peptide_shape = (15, 21)
         torch.manual_seed(7)
         model = Class1NeuralNetworkModel(
             peptide_encoding_shape=peptide_shape,
@@ -406,12 +402,10 @@ class TestSkipConnectionsTopology:
         assert out.shape == (2, 1)
 
     def test_different_from_feedforward(self):
-        from mhcflurry.class1_neural_network import (
-            Class1NeuralNetwork,
-            Class1NeuralNetworkModel,
-        )
-        nn_obj = Class1NeuralNetwork()
-        peptide_shape = nn_obj.peptides_to_network_input([]).shape[1:]
+        from mhcflurry.class1_neural_network import Class1NeuralNetworkModel
+        # Topology/init coverage builds the model from a pre-encoded (L, V)
+        # peptide shape directly (the peptide encoding path is index-only now).
+        peptide_shape = (15, 21)
 
         torch.manual_seed(99)
         skip_model = Class1NeuralNetworkModel(
@@ -495,6 +489,22 @@ class TestConfigurePyTorch:
         from mhcflurry import common
         with pytest.raises(ValueError, match="Invalid backend"):
             common.configure_pytorch(backend="gpuu")
+
+    def test_gpu_visibility_does_not_import_torch(self, monkeypatch):
+        import builtins
+        from mhcflurry import common
+
+        monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+        original_import = builtins.__import__
+
+        def guarded_import(name, *args, **kwargs):
+            if name == "torch" or name.startswith("torch."):
+                raise AssertionError("configure_pytorch imported torch")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", guarded_import)
+        common.configure_pytorch(gpu_device_nums=[2])
+        assert common.os.environ["CUDA_VISIBLE_DEVICES"] == "2"
 
     def test_default_backend_alias_maps_to_auto(self):
         from mhcflurry import common

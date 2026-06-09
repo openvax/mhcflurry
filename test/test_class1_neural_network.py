@@ -81,6 +81,8 @@ def test_class1_neural_network_a0205_training_accuracy():
     assert predictor.network().to_json() == predictor2.network().to_json()
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_inequalities():
     """Test that inequality constraints are properly handled."""
     # Memorize the dataset.
@@ -163,6 +165,8 @@ def test_inequalities():
     print(df.groupby("value")[["prediction1", "prediction2"]].mean())
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_basic_training():
     """Test basic network training with synthetic data."""
     hyperparameters = dict(
@@ -191,6 +195,204 @@ def test_basic_training():
     assert predictions.max() < 100000
 
 
+def test_split_forward_matches_full_forward():
+    """forward_peptide_stage + forward_from_peptide_stage = forward (bit-identical).
+
+    The calibration fast path precomputes peptide-side activations once
+    and reuses them across many alleles. For it to be a valid speedup
+    (not a silent behavior change) the split must compose to the same
+    numerical output as the monolithic ``forward``.
+    """
+    import torch
+
+    base_hparams = dict(
+        activation="tanh",
+        layer_sizes=[16, 8],
+        validation_split=0.0,
+        early_stopping=False,
+        locally_connected_layers=[
+            {"filters": 4, "activation": "tanh", "kernel_size": 3}
+        ],
+        peptide_allele_merge_method="concatenate",
+        dense_layer_l1_regularization=0.0,
+        dropout_probability=0.0,
+    )
+    predictor = Class1NeuralNetwork(**base_hparams)
+    # Fake allele_representations so has_allele=True
+    alle_reps = numpy.random.rand(3, 37, 21).astype(numpy.float32)
+    predictor._network = predictor.make_network(
+        allele_representations=alle_reps,
+        **predictor.network_hyperparameter_defaults.subselect(
+            predictor.hyperparameters),
+    )
+    predictor._network.eval()
+
+    peptides = random_peptides(12, length=9)
+    peptide_encoded = predictor.peptides_to_network_input(peptides)
+    peptide_tensor = torch.from_numpy(peptide_encoded.astype(numpy.float32))
+    allele_idx = torch.tensor([0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2], dtype=torch.long)
+
+    with torch.no_grad():
+        full_out = predictor._network({
+            "peptide": peptide_tensor,
+            "allele": allele_idx,
+        })
+        stage = predictor._network.forward_peptide_stage(peptide_tensor)
+        split_out = predictor._network.forward_from_peptide_stage(
+            stage, allele_idx,
+        )
+
+    testing.assert_allclose(
+        full_out.numpy(), split_out.numpy(), rtol=0, atol=1e-6,
+        err_msg="split-forward must match monolithic forward bit-identically",
+    )
+
+
+
+
+
+
+def test_peptide_amino_acid_encoding_torch_default_and_legacy_alias():
+    encoding = {
+        "vector_encoding_name": "BLOSUM62",
+        "alignment_method": "pad_middle",
+        "left_edge": 4,
+        "right_edge": 4,
+        "max_length": 15,
+    }
+    default = Class1NeuralNetwork(peptide_encoding=encoding)
+    assert default.uses_peptide_torch_encoding()
+    assert default.peptides_to_network_input(["SIINFEKL"]).shape == (1, 15)
+
+    explicit_cpu_torch = Class1NeuralNetwork(
+        peptide_encoding=encoding,
+        peptide_amino_acid_encoding_torch="cpu",
+    )
+    assert explicit_cpu_torch.uses_peptide_torch_encoding()
+    assert explicit_cpu_torch.peptides_to_network_input(["SIINFEKL"]).shape == (
+        1, 15,
+    )
+
+    # The legacy dense-vector path is gone: a falsy value (and the old
+    # ``_gpu`` alias) is accepted but coerced to index encoding, not (N, L, V).
+    legacy_false = Class1NeuralNetwork(
+        peptide_encoding=encoding,
+        peptide_amino_acid_encoding_torch=False,
+    )
+    assert legacy_false.uses_peptide_torch_encoding()
+    assert legacy_false.peptides_to_network_input(["SIINFEKL"]).shape == (1, 15)
+
+    legacy_alias = Class1NeuralNetwork(
+        peptide_encoding=encoding,
+        peptide_amino_acid_encoding_gpu=False,
+    )
+    assert legacy_alias.uses_peptide_torch_encoding()
+    assert "peptide_amino_acid_encoding_gpu" not in legacy_alias.hyperparameters
+    assert legacy_alias.peptides_to_network_input(
+        ["SIINFEKL"]).shape == (1, 15)
+
+
+@pytest.mark.parametrize(
+    "encoding_name",
+    [
+        "BLOSUM62",
+        "one-hot",
+        "physchem",
+        "PMBEC",
+        "contact",
+        "BLOSUM62+physchem",
+        "PMBEC+contact",
+        "PMBEC:minmax+contact:minmax",
+    ],
+)
+def test_index_embedding_matches_dense_vector_forward(encoding_name):
+    """The production index-embedding peptide path is bit-identical to the
+    (retained, test-only) dense ``(N, L, V)`` vector path.
+
+    This pins the fidelity of the index-encoding migration end-to-end — the
+    guarantee that loading and predicting saved models is numerically unchanged
+    — using the retained ``variable_length_to_fixed_length_vector_encoding`` and
+    the model's dense-input branch. (Replaces the old vector-vs-index forward
+    parity test, which built the two models through the now-coerced high-level
+    encoding flag.)
+    """
+    import torch
+
+    from mhcflurry.class1_neural_network import Class1NeuralNetworkModel
+    from mhcflurry.encodable_sequences import EncodableSequences
+    from mhcflurry.amino_acid import vector_encoding_length
+
+    align = dict(
+        alignment_method="pad_middle", left_edge=4, right_edge=4, max_length=15)
+    width = vector_encoding_length(encoding_name)
+    arch = dict(
+        peptide_encoding_shape=(15, width), layer_sizes=[8],
+        activation="tanh", dropout_probability=0.0)
+
+    index_model = Class1NeuralNetworkModel(
+        peptide_input_is_indices=True,
+        peptide_input_vector_encoding_name=encoding_name, **arch).eval()
+    vector_model = Class1NeuralNetworkModel(
+        peptide_input_is_indices=False, **arch).eval()
+    # Identical downstream weights; only the peptide encoding (index-embed vs
+    # dense vector) differs.
+    vector_model.load_state_dict(index_model.state_dict(), strict=False)
+
+    peptides = random_peptides(16, length=9)
+    encoder = EncodableSequences.create(peptides)
+    index_input = encoder.variable_length_to_fixed_length_categorical(
+        **align).astype("int8")
+    vector_input = encoder.variable_length_to_fixed_length_vector_encoding(
+        vector_encoding_name=encoding_name, **align).astype("float32")
+
+    with torch.no_grad():
+        index_out = index_model(
+            {"peptide": torch.from_numpy(index_input)}).numpy()
+        vector_out = vector_model(
+            {"peptide": torch.from_numpy(vector_input)}).numpy()
+
+    testing.assert_allclose(
+        index_out, vector_out, rtol=0, atol=1e-6,
+        err_msg="index-embedding peptide forward must equal the dense "
+                "vector-encoded forward for %s" % encoding_name)
+
+
+def test_unsupported_device_random_negative_alignment_falls_back_to_host():
+    peptides = random_peptides(12, length=9)
+    affinities = numpy.random.uniform(10, 50000, len(peptides))
+    predictor = Class1NeuralNetwork(
+        peptide_encoding={
+            "vector_encoding_name": "BLOSUM62",
+            "alignment_method": "left_pad_right_pad",
+            "max_length": 15,
+        },
+        activation="tanh",
+        layer_sizes=[4],
+        locally_connected_layers=[],
+        peptide_dense_layer_sizes=[],
+        allele_dense_layer_sizes=[],
+        dropout_probability=0.0,
+        batch_normalization=False,
+        dense_layer_l1_regularization=0.0,
+        dense_layer_l2_regularization=0.0,
+        max_epochs=1,
+        early_stopping=False,
+        validation_split=0.0,
+        minibatch_size=4,
+        random_negative_rate=1.0,
+        random_negative_constant=0,
+        random_negative_pool_epochs=1,
+    )
+
+    predictor.fit(peptides, affinities, verbose=0)
+
+    fit_info = predictor.fit_info[-1]
+    assert fit_info["random_negative_pool_residency"] == "host"
+    assert fit_info["fit_tensor_residency"] == "device"
+
+
+@pytest.mark.slow
+@pytest.mark.integration
 def test_serialization():
     """Test that network weights can be serialized and deserialized."""
     hyperparameters = dict(
@@ -225,6 +427,8 @@ def test_serialization():
     numpy.testing.assert_allclose(preds_before, preds_after, rtol=1e-5)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_different_peptide_lengths():
     """Test that the network handles different peptide lengths correctly."""
     hyperparameters = dict(
@@ -250,6 +454,8 @@ def test_different_peptide_lengths():
     assert len(predictions) == len(peptides)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_early_stopping():
     """Test that early stopping works correctly."""
     hyperparameters = dict(
@@ -273,6 +479,8 @@ def test_early_stopping():
     assert len(predictions) == len(peptides)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_batch_normalization():
     """Test training with batch normalization."""
     hyperparameters = dict(
@@ -293,6 +501,8 @@ def test_batch_normalization():
     assert len(predictions) == len(peptides)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_dropout():
     """Test training with dropout."""
     hyperparameters = dict(
@@ -313,6 +523,8 @@ def test_dropout():
     assert len(predictions) == len(peptides)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_multiple_outputs():
     """Test network with multiple outputs."""
     hyperparameters = dict(

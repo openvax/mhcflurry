@@ -11,10 +11,7 @@ import pandas
 import pytest
 from sklearn.metrics import roc_auc_score
 
-from mhcflurry import Class1AffinityPredictor
-from mhcflurry.downloads import get_path
-
-from mhcflurry.testing_utils import cleanup, startup
+pytestmark = [pytest.mark.slow, pytest.mark.downloads]
 
 def data_path(name):
     '''
@@ -27,31 +24,9 @@ def data_path(name):
 DF = pandas.read_csv(data_path("hpv_predictions.csv"))
 
 
-def setup_module():
-    global PREDICTORS
-    startup()
-    PREDICTORS = {
-        'allele-specific': Class1AffinityPredictor.load(
-            get_path("models_class1", "models")),
-        'pan-allele': Class1AffinityPredictor.load(
-            get_path("models_class1_pan", "models.combined"))
-    }
-
-
-def teardown_module():
-    global PREDICTORS
-    PREDICTORS = None
-    cleanup()
-
-
-@pytest.fixture(scope="module")
-def predictors():
-    return PREDICTORS
-
-
-def test_on_hpv(predictors, df=DF):
+def test_on_hpv(released_affinity_predictors, df=DF):
     scores_df = []
-    for (name, predictor) in predictors.items():
+    for (name, predictor) in released_affinity_predictors.items():
         print("Running", name)
         df[name] = predictor.predict(df.peptide, alleles=df.allele)
 

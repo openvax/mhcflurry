@@ -3,6 +3,7 @@ from os import mkdir
 from socket import gethostname
 from getpass import getuser
 
+import os
 import time
 import collections
 import logging
@@ -11,17 +12,15 @@ import numpy
 import pandas
 import sklearn
 import sklearn.linear_model
-
-
-try:
-    import tqdm
-except ImportError:
-    tdqm = None
+import tqdm
 
 from .version import __version__
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_processing_predictor import Class1ProcessingPredictor
-from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
+from .class1_neural_network import (
+    DEFAULT_PREDICT_BATCH_SIZE,
+    _env_workers_per_gpu,
+)
 from .encodable_sequences import EncodableSequences
 from .regression_target import from_ic50
 from .downloads import get_default_class1_presentation_models_dir
@@ -31,6 +30,29 @@ from .percent_rank_transform import PercentRankTransform
 MAX_ALLELES_PER_SAMPLE = 6
 PREDICT_BATCH_SIZE = DEFAULT_PREDICT_BATCH_SIZE
 PREDICT_CHUNK_SIZE = 100000  # currently used only for cleavage prediction
+
+# Target rows for one cartesian (peptides × alleles) predict() call inside
+# the presentation predictor. The predictor chunks the allele axis so that
+# each call materializes at most this many rows before the model sees them
+# — bounding peak memory regardless of how many alleles a caller supplies.
+# 1M peptide×allele rows is ~4 MB per int8 column, comfortable on A100.
+_PRESENTATION_PREDICT_TARGET_ROWS = int(
+    os.environ.get("MHCFLURRY_PRESENTATION_PREDICT_TARGET_ROWS", "1000000")
+)
+
+_PRESENTATION_LOGISTIC_REGRESSION_KWARGS = {
+    # The presentation combiner has a tiny dense feature matrix; Newton-CG is
+    # deterministic and avoids sklearn's SciPy L-BFGS-B wrapper warnings.
+    #
+    # NOTE: this solver was deliberately changed from lbfgs (used through
+    # 2.2.x) to newton-cg. Because the two optimizers converge to slightly
+    # different optima, presentation models *newly trained* with this code will
+    # have slightly different fitted weights than 2.2.x. This is intentional —
+    # do not "fix" it by reverting to lbfgs. (Pre-trained shipped models load
+    # their saved weights and are unaffected.)
+    "solver": "newton-cg",
+    "max_iter": 1000,
+}
 
 
 class Class1PresentationPredictor(object):
@@ -102,6 +124,62 @@ class Class1PresentationPredictor(object):
             self.supports_processing_prediction and
             self.weights_dataframe is not None)
 
+    def predict_sequences_columns(
+            self, alleles, use_flanks=True, include_affinity_percentile=True):
+        """
+        Column names that ``predict_sequences(..., result="all")`` will emit.
+
+        Used so the empty-input fast-path in ``mhcflurry-predict-scan`` can
+        seed a DataFrame with the same schema the populated path produces.
+        Mirrors the column set assembled in ``predict()`` plus the
+        ``sequence_name`` / ``pos`` columns inserted in ``predict_sequences``.
+        """
+        cols = ["sequence_name", "pos", "peptide"]
+        has_alleles = bool(alleles)
+        emits_processing = self.supports_processing_prediction
+        if emits_processing and use_flanks:
+            cols += ["n_flank", "c_flank"]
+        cols.append("sample_name")
+        if has_alleles:
+            cols += ["affinity", "best_allele"]
+            if include_affinity_percentile:
+                cols.append("affinity_percentile")
+        if emits_processing:
+            cols.append("processing_score")
+        if (has_alleles and emits_processing
+                and self.supports_presentation_prediction):
+            cols += ["presentation_score", "presentation_percentile"]
+        return cols
+
+    def predict_columns(
+            self,
+            affinity_only=False,
+            use_flanking=True,
+            include_affinity_percentile=False):
+        """
+        Column names that ``predict()`` / ``predict_affinity()`` emit when
+        called with non-empty inputs.
+
+        Used by ``mhcflurry-predict`` to give empty inputs the same output
+        schema as populated ones. Mirrors the columns assembled by
+        ``predict_affinity`` and the additional columns layered on by
+        ``predict``.
+        """
+        cols = ["peptide", "peptide_num", "sample_name"]
+        cols += ["affinity", "best_allele"]
+        if include_affinity_percentile:
+            cols.append("affinity_percentile")
+        if affinity_only:
+            return cols
+        emits_processing = self.supports_processing_prediction
+        if emits_processing:
+            if use_flanking:
+                cols += ["n_flank", "c_flank"]
+            cols.append("processing_score")
+            if self.supports_presentation_prediction:
+                cols += ["presentation_score", "presentation_percentile"]
+        return cols
+
     def predict_affinity(
             self,
             peptides,
@@ -109,7 +187,8 @@ class Class1PresentationPredictor(object):
             sample_names=None,
             include_affinity_percentile=True,
             verbose=1,
-            throw=True):
+            throw=True,
+            model_kwargs=None):
         """
         Predict binding affinities across samples (each corresponding to up to
         six MHC  I alleles).
@@ -171,52 +250,136 @@ class Class1PresentationPredictor(object):
         throw : verbose
             Whether to throw exception (vs. just log a warning) on invalid
             peptides, etc.
+        model_kwargs : dict, optional
+            Keyword arguments forwarded to ``Class1AffinityPredictor.predict``.
 
         Returns
         -------
         pandas.DataFrame : predictions
         """
+        if model_kwargs is None:
+            model_kwargs = {}
+        else:
+            model_kwargs = dict(model_kwargs)
+        affinity_model_kwargs = {
+            "batch_size": PREDICT_BATCH_SIZE,
+            "num_workers_per_gpu": _env_workers_per_gpu(1),
+        }
+        affinity_model_kwargs.update(model_kwargs)
+        predict_cartesian = getattr(
+            self.affinity_predictor,
+            "predict_cartesian_pan_allele",
+            None,
+        )
+
         df = pandas.DataFrame({
             "peptide": numpy.asarray(peptides),
         })
         df["peptide_num"] = df.index
         if sample_names is None:
             peptides = EncodableSequences.create(peptides)
-            all_alleles = set()
-            for lst in alleles.values():
-                all_alleles.update(lst)
-
-            iterator = sorted(all_alleles)
+            all_alleles = sorted({a for lst in alleles.values() for a in lst})
 
             if verbose > 0:
                 print("Predicting affinities.")
-                if tqdm is not None:
-                    iterator = tqdm.tqdm(iterator, total=len(all_alleles))
 
-            predictions_df = pandas.DataFrame(index=df.index)
-            for allele in iterator:
-                predictions_df[allele] = self.affinity_predictor.predict(
-                    peptides=peptides,
-                    allele=allele,
-                    model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
-                    throw=throw)
+            # Per-allele × per-peptide chunked predict. Track each
+            # sample's best allele as chunks return, so peak host memory
+            # stays bounded by one cartesian chunk instead of materializing
+            # the full ``(n_peps, n_unique_alleles)`` matrix.
+            n_peps = len(peptides)
+            n_all = len(all_alleles)
+            allele_chunk = max(1, _PRESENTATION_PREDICT_TARGET_ROWS // max(n_peps, 1))
+            best_value_by_sample = {}
+            best_allele_by_sample = {}
+            best_rank_by_sample = {}
+            allele_to_sample_ranks = collections.defaultdict(list)
+            for sample_name, sample_alleles in alleles.items():
+                best_value_by_sample[sample_name] = numpy.full(
+                    n_peps, numpy.inf, dtype=numpy.float64,
+                )
+                best_allele_by_sample[sample_name] = numpy.full(
+                    n_peps, None, dtype=object,
+                )
+                best_rank_by_sample[sample_name] = numpy.full(
+                    n_peps, numpy.iinfo(numpy.int64).max, dtype=numpy.int64,
+                )
+                seen_sample_alleles = set()
+                for rank, allele in enumerate(sample_alleles):
+                    if allele in seen_sample_alleles:
+                        continue
+                    seen_sample_alleles.add(allele)
+                    allele_to_sample_ranks[allele].append((sample_name, rank))
+
+            if n_peps > 0:
+                chunk_iter = range(0, n_all, allele_chunk)
+                if verbose > 0 and n_all > allele_chunk:
+                    chunk_iter = tqdm.tqdm(
+                        chunk_iter,
+                        total=(n_all + allele_chunk - 1) // allele_chunk,
+                    )
+                for chunk_start in chunk_iter:
+                    chunk_end = min(chunk_start + allele_chunk, n_all)
+                    chunk_alleles = all_alleles[chunk_start:chunk_end]
+                    chunk_n = chunk_end - chunk_start
+                    chunk_matrix = (
+                        predict_cartesian(
+                            peptides=peptides,
+                            alleles=chunk_alleles,
+                            model_kwargs=affinity_model_kwargs,
+                            throw=throw,
+                        )
+                        if predict_cartesian is not None
+                        else None
+                    )
+                    if chunk_matrix is None:
+                        peptides_repeated = EncodableSequences.create(
+                            numpy.tile(peptides.sequences, chunk_n)
+                        )
+                        alleles_repeated = numpy.repeat(
+                            numpy.asarray(chunk_alleles), n_peps,
+                        )
+                        flat_predictions = numpy.asarray(
+                            self.affinity_predictor.predict(
+                                peptides=peptides_repeated,
+                                alleles=alleles_repeated,
+                                model_kwargs=affinity_model_kwargs,
+                                throw=throw,
+                            ),
+                            dtype=numpy.float64,
+                        )
+                        chunk_matrix = flat_predictions.reshape(chunk_n, n_peps).T
+                    for j, allele in enumerate(chunk_alleles):
+                        sample_ranks = allele_to_sample_ranks.get(allele, ())
+                        if not sample_ranks:
+                            continue
+                        col = chunk_matrix[:, j]
+                        valid = ~numpy.isnan(col)
+                        if not valid.any():
+                            continue
+                        for sample_name, rank in sample_ranks:
+                            best_value = best_value_by_sample[sample_name]
+                            best_rank = best_rank_by_sample[sample_name]
+                            better = valid & (
+                                (col < best_value) |
+                                ((col == best_value) & (rank < best_rank))
+                            )
+                            if better.any():
+                                best_value[better] = col[better]
+                                best_allele_by_sample[sample_name][better] = allele
+                                best_rank[better] = rank
 
             dfs = []
-            for (sample_name, sample_alleles) in alleles.items():
+            for sample_name in alleles:
                 new_df = df.copy()
                 new_df["sample_name"] = sample_name
-                new_df["affinity"] = predictions_df[
-                    sample_alleles
-                ].min(axis=1).values
-                if len(df) == 0:
-                    new_df["best_allele"] = []
-                else:
-                    sample_predictions = predictions_df[sample_alleles]
-                    best_allele = pandas.Series(index=sample_predictions.index, dtype=object)
-                    valid = sample_predictions.notna().any(axis=1)
-                    if valid.any():
-                        best_allele.loc[valid] = sample_predictions.loc[valid].idxmin(axis=1)
-                    new_df["best_allele"] = best_allele.values
+                affinity = numpy.where(
+                    numpy.isfinite(best_value_by_sample[sample_name]),
+                    best_value_by_sample[sample_name],
+                    numpy.nan,
+                )
+                new_df["affinity"] = affinity
+                new_df["best_allele"] = best_allele_by_sample[sample_name]
                 dfs.append(new_df)
 
             result_df = pandas.concat(dfs, ignore_index=True)
@@ -226,29 +389,67 @@ class Class1PresentationPredictor(object):
             iterator = df.groupby("sample_name")
             if verbose > 0:
                 print("Predicting affinities.")
-                if tqdm is not None:
-                    iterator = tqdm.tqdm(
-                        iterator, total=df.sample_name.nunique())
+                iterator = tqdm.tqdm(
+                    iterator, total=df.sample_name.nunique())
 
             for (sample, sub_df) in iterator:
-                predictions_df = pandas.DataFrame(index=sub_df.index)
                 sample_peptides = EncodableSequences.create(sub_df.peptide.values)
-                for allele in alleles[sample]:
-                    predictions_df[allele] = self.affinity_predictor.predict(
-                        peptides=sample_peptides,
-                        allele=allele,
-                        model_kwargs={'batch_size': PREDICT_BATCH_SIZE},
-                        throw=throw)
-                df.loc[
-                    sub_df.index, "affinity"
-                ] = predictions_df.min(axis=1).values
-                best_allele = pandas.Series(index=predictions_df.index, dtype=object)
-                valid = predictions_df.notna().any(axis=1)
-                if valid.any():
-                    best_allele.loc[valid] = predictions_df.loc[valid].idxmin(axis=1)
-                df.loc[
-                    sub_df.index, "best_allele"
-                ] = best_allele.values
+                sample_alleles = list(alleles[sample])
+                n_peps = len(sample_peptides)
+                n_all = len(sample_alleles)
+                # Per-sample best-affinity / best-allele tracking with
+                # chunked cartesian predicts. Strict ``<`` on update so
+                # the earliest allele in ``sample_alleles`` wins ties
+                # (matches the legacy ``pandas.idxmin`` behavior, which
+                # returns the first column at exact ties).
+                best_value = numpy.full(n_peps, numpy.inf, dtype=numpy.float64)
+                best_allele_arr = numpy.full(n_peps, None, dtype=object)
+                allele_chunk = max(
+                    1, _PRESENTATION_PREDICT_TARGET_ROWS // max(n_peps, 1),
+                )
+                for chunk_start in range(0, n_all, allele_chunk):
+                    chunk_end = min(chunk_start + allele_chunk, n_all)
+                    chunk_alleles = sample_alleles[chunk_start:chunk_end]
+                    chunk_n = chunk_end - chunk_start
+                    chunk_matrix = (
+                        predict_cartesian(
+                            peptides=sample_peptides,
+                            alleles=chunk_alleles,
+                            model_kwargs=affinity_model_kwargs,
+                            throw=throw,
+                        )
+                        if predict_cartesian is not None
+                        else None
+                    )
+                    if chunk_matrix is None:
+                        peptides_repeated = EncodableSequences.create(
+                            numpy.tile(sample_peptides.sequences, chunk_n)
+                        )
+                        alleles_repeated = numpy.repeat(
+                            numpy.asarray(chunk_alleles), n_peps,
+                        )
+                        flat_predictions = numpy.asarray(
+                            self.affinity_predictor.predict(
+                                peptides=peptides_repeated,
+                                alleles=alleles_repeated,
+                                model_kwargs=affinity_model_kwargs,
+                                throw=throw,
+                            ),
+                            dtype=numpy.float64,
+                        )
+                        chunk_matrix = flat_predictions.reshape(chunk_n, n_peps).T
+                    for j, allele in enumerate(chunk_alleles):
+                        col = chunk_matrix[:, j]
+                        valid = ~numpy.isnan(col)
+                        better = valid & (col < best_value)
+                        if better.any():
+                            best_value[better] = col[better]
+                            best_allele_arr[better] = allele
+                affinity_out = numpy.where(
+                    numpy.isfinite(best_value), best_value, numpy.nan,
+                )
+                df.loc[sub_df.index, "affinity"] = affinity_out
+                df.loc[sub_df.index, "best_allele"] = best_allele_arr
 
             result_df = df
 
@@ -262,7 +463,13 @@ class Class1PresentationPredictor(object):
         return result_df
 
     def predict_processing(
-            self, peptides, n_flanks=None, c_flanks=None, throw=True, verbose=1):
+            self,
+            peptides,
+            n_flanks=None,
+            c_flanks=None,
+            throw=True,
+            verbose=1,
+            batch_size=PREDICT_BATCH_SIZE):
         """
         Predict antigen processing scores for individual peptides, optionally
         including flanking sequences for better cleavage prediction.
@@ -275,6 +482,7 @@ class Class1PresentationPredictor(object):
         throw : boolean
             Whether to raise exception on unsupported peptides
         verbose  : int
+        batch_size : int or "auto"
 
         Returns
         -------
@@ -306,8 +514,7 @@ class Class1PresentationPredictor(object):
         iterator = zip(peptide_chunks, n_flank_chunks, c_flank_chunks)
         if verbose > 0:
             print("Predicting processing.")
-            if tqdm is not None:
-                iterator = tqdm.tqdm(iterator, total=len(peptide_chunks))
+            iterator = tqdm.tqdm(iterator, total=len(peptide_chunks))
 
         result_chunks = []
         for (peptide_chunk, n_flank_chunk, c_flank_chunk) in iterator:
@@ -316,7 +523,7 @@ class Class1PresentationPredictor(object):
                 n_flanks=n_flank_chunk,
                 c_flanks=c_flank_chunk,
                 throw=throw,
-                batch_size=PREDICT_BATCH_SIZE)
+                batch_size=batch_size)
             result_chunks.append(result_chunk)
         return numpy.concatenate(result_chunks)
 
@@ -349,9 +556,8 @@ class Class1PresentationPredictor(object):
             peptides=peptides,
             alleles=alleles,
             sample_names=sample_names,
+            include_affinity_percentile=False,
             verbose=verbose)
-        df["affinity_score"] = from_ic50(df.affinity)
-        df["target"] = numpy.asarray(targets)
 
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
@@ -366,24 +572,78 @@ class Class1PresentationPredictor(object):
         if not with_flanks_list:
             raise RuntimeError("Can't fit any models")
 
-        if self.weights_dataframe is None:
-            self.weights_dataframe = pandas.DataFrame()
-
+        processing_scores_by_model = {}
         for with_flanks in with_flanks_list:
             model_name = 'with_flanks' if with_flanks else "without_flanks"
             if verbose > 0:
-                print("Training variant", model_name)
+                print("Predicting processing for variant", model_name)
 
-            df["processing_score"] = self.predict_processing(
+            processing_scores_by_model[model_name] = self.predict_processing(
                 peptides=df.peptide.values,
                 n_flanks=n_flanks if with_flanks else None,
                 c_flanks=c_flanks if with_flanks else None,
                 verbose=verbose)
 
+        self.fit_from_scores(
+            targets=targets,
+            affinities=df.affinity.values,
+            processing_scores_by_model=processing_scores_by_model,
+            verbose=verbose)
+
+    def fit_from_scores(
+            self,
+            targets,
+            affinities,
+            processing_scores_by_model,
+            verbose=1):
+        """
+        Fit presentation logistic-regression weights from precomputed scores.
+
+        Parameters
+        ----------
+        targets : list of int/float
+            1 indicates hit, 0 indicates decoy.
+        affinities : list of float
+            Best binding affinity predictions aligned to ``targets``.
+        processing_scores_by_model : dict
+            Mapping from model name (``"with_flanks"`` or
+            ``"without_flanks"``) to processing predictions aligned to
+            ``targets``.
+        verbose : int
+        """
+        if not processing_scores_by_model:
+            raise RuntimeError("Can't fit any models")
+
+        df = pandas.DataFrame({
+            "affinity_score": from_ic50(affinities),
+            "target": numpy.asarray(targets),
+        })
+
+        if self.weights_dataframe is None:
+            self.weights_dataframe = pandas.DataFrame()
+
+        for (model_name, processing_scores) in processing_scores_by_model.items():
+            if verbose > 0:
+                print("Training variant", model_name)
+
+            df["processing_score"] = numpy.asarray(processing_scores)
+
             model = self.get_model()
             if verbose > 0:
                 print("Fitting LR model.")
-                print(df)
+                print(
+                    "LR input rows=%d columns=%s target_mean=%.6f "
+                    "affinity_score_range=(%.6f, %.6f) "
+                    "processing_score_range=(%.6f, %.6f)" % (
+                        len(df),
+                        list(df.columns),
+                        float(df.target.mean()),
+                        float(df.affinity_score.min()),
+                        float(df.affinity_score.max()),
+                        float(df.processing_score.min()),
+                        float(df.processing_score.max()),
+                    )
+                )
 
             model.fit(
                 X=df[self.model_inputs].values,
@@ -411,7 +671,8 @@ class Class1PresentationPredictor(object):
         sklearn.linear_model.LogisticRegression
         """
         if name is None or name not in self._models_cache:
-            model = sklearn.linear_model.LogisticRegression(solver="lbfgs")
+            model = sklearn.linear_model.LogisticRegression(
+                **_PRESENTATION_LOGISTIC_REGRESSION_KWARGS)
             if name is not None:
                 row = self.weights_dataframe.loc[name]
                 model.intercept_ = row.intercept
@@ -431,7 +692,9 @@ class Class1PresentationPredictor(object):
             c_flanks=None,
             include_affinity_percentile=False,
             verbose=1,
-            throw=True):
+            throw=True,
+            affinity_model_kwargs=None,
+            processing_batch_size=PREDICT_BATCH_SIZE):
         """
         Predict presentation scores across a set of peptides.
 
@@ -495,6 +758,10 @@ class Class1PresentationPredictor(object):
         throw : verbose
             Whether to throw exception (vs. just log a warning) on invalid
             peptides, etc.
+        affinity_model_kwargs : dict, optional
+            Keyword arguments forwarded to ``Class1AffinityPredictor.predict``.
+        processing_batch_size : int or "auto"
+            Batch size for antigen processing neural network prediction.
 
         Returns
         -------
@@ -538,7 +805,8 @@ class Class1PresentationPredictor(object):
                 n_flanks=n_flanks,
                 c_flanks=c_flanks,
                 throw=throw,
-                verbose=verbose)
+                verbose=verbose,
+                batch_size=processing_batch_size)
         else:
             processing_scores = None
 
@@ -549,7 +817,8 @@ class Class1PresentationPredictor(object):
                 sample_names=sample_names,  # might be None
                 include_affinity_percentile=include_affinity_percentile,
                 verbose=verbose,
-                throw=throw)
+                throw=throw,
+                model_kwargs=affinity_model_kwargs)
 
             df["affinity_score"] = from_ic50(df.affinity)
         else:
@@ -595,6 +864,79 @@ class Class1PresentationPredictor(object):
             del df["affinity_score"]
         return df
 
+    def resolve_comparison_quantity(self, alleles, comparison_quantity=None):
+        """
+        Resolve the column used to rank scan predictions.
+
+        This is the single source of truth for the ``comparison_quantity``
+        defaulting and validation used by :meth:`predict_sequences`. It is
+        also called by the predict-scan CLI's parallel path so that chunked
+        execution ranks on exactly the same column the serial path would pick
+        (which depends on the predictor's *capabilities*, not on which columns
+        happen to be present in a given result).
+
+        Parameters
+        ----------
+        alleles
+            The ``alleles`` argument as passed to :meth:`predict_sequences`
+            (string, list, or dict). Only its length / emptiness is used here.
+        comparison_quantity : string or None
+            If None, a default is chosen: ``presentation_score`` when alleles
+            are given and presentation is supported, else ``affinity`` when
+            alleles are given, else ``processing_score``.
+
+        Returns
+        -------
+        string
+            The resolved (and validated) comparison quantity.
+        """
+        if comparison_quantity is None:
+            if len(alleles) > 0:
+                if self.supports_presentation_prediction:
+                    comparison_quantity = "presentation_score"
+                else:
+                    comparison_quantity = "affinity"
+            else:
+                comparison_quantity = "processing_score"
+
+        if comparison_quantity == "presentation_score":
+            if not self.supports_presentation_prediction:
+                raise ValueError(
+                    "Presentation prediction not supported by this predictor")
+        elif comparison_quantity == "processing_score":
+            if not self.supports_processing_prediction:
+                raise ValueError(
+                    "Processing prediction not supported by this predictor")
+        elif comparison_quantity in ("affinity", "affinity_percentile"):
+            if not self.supports_affinity_prediction:
+                raise ValueError(
+                    "Affinity prediction not supported by this predictor")
+        else:
+            raise ValueError(
+                "Unknown comparison quantity: %s" % comparison_quantity)
+
+        return comparison_quantity
+
+    @staticmethod
+    def sort_predictions(result_df, comparison_quantity):
+        """
+        Globally sort scan predictions by ``comparison_quantity``.
+
+        Score columns (those ending in ``"score"``) sort descending (stronger
+        binders first); ``affinity`` / ``affinity_percentile`` sort ascending
+        (stronger = lower nM). ``peptide`` is a deterministic secondary key and
+        the sort is stable, so the row order is independent of the input row
+        order. This is what lets the predict-scan CLI's parallel (chunked) path
+        reproduce the serial path's ranking exactly, including tie ordering.
+
+        Returns a new DataFrame; the index is not reset.
+        """
+        comparison_is_score = comparison_quantity.endswith("score")
+        return result_df.sort_values(
+            [comparison_quantity, "peptide"],
+            ascending=[not comparison_is_score, True],
+            kind="stable")
+
     def predict_sequences(
             self,
             sequences,
@@ -606,7 +948,9 @@ class Class1PresentationPredictor(object):
             use_flanks=True,
             include_affinity_percentile=True,
             verbose=1,
-            throw=True):
+            throw=True,
+            affinity_model_kwargs=None,
+            processing_batch_size=PREDICT_BATCH_SIZE):
         """
         Predict presentation across protein sequences.
 
@@ -676,6 +1020,10 @@ class Class1PresentationPredictor(object):
             Set to 0 for quiet mode.
         throw : boolean
             Whether to throw exceptions (vs. log warnings) on invalid inputs.
+        affinity_model_kwargs : dict, optional
+            Keyword arguments forwarded to ``Class1AffinityPredictor.predict``.
+        processing_batch_size : int or "auto"
+            Batch size for antigen processing neural network prediction.
 
         Returns
         -------
@@ -690,30 +1038,8 @@ class Class1PresentationPredictor(object):
             raise ValueError(
                 "Affinity prediction not supported by this predictor")
 
-        if comparison_quantity is None:
-            if len(alleles) > 0:
-                if self.supports_presentation_prediction:
-                    comparison_quantity = "presentation_score"
-                else:
-                    comparison_quantity = "affinity"
-            else:
-                comparison_quantity = "processing_score"
-
-        if comparison_quantity == "presentation_score":
-            if not self.supports_presentation_prediction:
-                raise ValueError(
-                    "Presentation prediction not supported by this predictor")
-        elif comparison_quantity == "processing_score":
-            if not self.supports_processing_prediction:
-                raise ValueError(
-                    "Processing prediction not supported by this predictor")
-        elif comparison_quantity in ("affinity", "affinity_percentile"):
-            if not self.supports_affinity_prediction:
-                raise ValueError(
-                    "Affinity prediction not supported by this predictor")
-        else:
-            raise ValueError(
-                "Unknown comparison quantity: %s" % comparison_quantity)
+        comparison_quantity = self.resolve_comparison_quantity(
+            alleles, comparison_quantity)
 
         processing_predictor = self.processing_predictor_with_flanks
         if not use_flanks or processing_predictor is None:
@@ -810,7 +1136,9 @@ class Class1PresentationPredictor(object):
             sample_names=sample_names,
             include_affinity_percentile=include_affinity_percentile,
             verbose=verbose,
-            throw=throw)
+            throw=throw,
+            affinity_model_kwargs=affinity_model_kwargs,
+            processing_batch_size=processing_batch_size)
 
         result_df.insert(
             0,
@@ -824,9 +1152,7 @@ class Class1PresentationPredictor(object):
 
         comparison_is_score = comparison_quantity.endswith("score")
 
-        result_df = result_df.sort_values(
-            comparison_quantity,
-            ascending=not comparison_is_score)
+        result_df = self.sort_predictions(result_df, comparison_quantity)
 
         if result == "best":
             result_df = result_df.drop_duplicates(
@@ -861,7 +1187,7 @@ class Class1PresentationPredictor(object):
             write_weights=True,
             write_percent_ranks=True,
             write_info=True,
-            write_metdata=True):
+            write_metadata=True):
         """
         Save the predictor to a directory on disk. If the directory does
         not exist it will be created.
@@ -874,7 +1200,6 @@ class Class1PresentationPredictor(object):
         models_dir : string
             Path to directory. It will be created if it doesn't exist.
         """
-
         if write_weights and self.weights_dataframe is None:
             raise RuntimeError("Can't save before fitting")
 
@@ -924,7 +1249,7 @@ class Class1PresentationPredictor(object):
             pandas.DataFrame(rows).to_csv(
                 info_path, sep="\t", header=False, index=False)
 
-        if write_metdata:
+        if write_metadata:
             if self.metadata_dataframes:
                 for (name, df) in self.metadata_dataframes.items():
                     metadata_df_path = join(models_dir, "%s.csv.bz2" % name)

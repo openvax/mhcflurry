@@ -17,6 +17,9 @@ from mhcflurry.common import random_peptides
 from mhcflurry.testing_utils import startup, cleanup
 
 
+pytestmark = pytest.mark.slow
+
+
 @pytest.fixture(autouse=True)
 def setup_teardown():
     startup()

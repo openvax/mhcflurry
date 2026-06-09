@@ -110,7 +110,7 @@ def run():
     print(eval_df.ensemble_key.value_counts())
 
     def predictor_for_ensemble_key(key_string):
-        indicators = [eval(s) for s in key_string.split("_")]
+        indicators = [s == "True" for s in key_string.split("_")]
         ensemble = []
         for fold, indicator in enumerate(indicators):
             if indicator:

@@ -1,0 +1,86 @@
+# Introduction and setup
+
+MHCflurry is an open source package for peptide/MHC I binding affinity prediction. It
+aims to provide competitive accuracy with a fast and documented implementation.
+
+You can download pre-trained MHCflurry models fit to mass spec-identified MHC I
+ligands and peptide/MHC affinity measurements deposited in IEDB (plus a few other
+sources) or train a MHCflurry predictor on your own data.
+
+Starting in version 1.6.0, the default MHCflurry binding affinity predictors
+are "pan-allele" models that support most sequenced MHC I alleles across humans
+and a few other species (about 14,000 alleles in total). This version also
+introduces two experimental predictors, an "antigen processing" predictor
+that attempts to model MHC allele-independent effects such as proteosomal
+cleavage and a "presentation" predictor that integrates processing predictions
+with binding affinity predictions to give a composite "presentation score." Both
+models are trained on mass spec-identified MHC ligands.
+
+MHCflurry supports Python 3.10+. It uses the [PyTorch](https://pytorch.org/)
+neural network library. GPUs and Apple Silicon (MPS) may optionally be used for
+a speed improvement and are auto-detected.
+
+If you find MHCflurry useful in your research, please cite:
+
+> T. J. O'Donnell, et al. "MHCflurry 2.0: Improved pan-allele prediction of MHC
+> I-presented peptides by incorporating antigen processing,"
+> *Cell Systems*, 2020. <https://doi.org/10.1016/j.cels.2020.06.010>
+>
+> T. J. O'Donnell, et al., "MHCflurry: Open-Source Class I MHC Binding Affinity
+> Prediction," *Cell Systems*, 2018. <https://doi.org/10.1016/j.cels.2018.05.014>
+
+If you have questions or encounter problems, please file an issue at the
+MHCflurry github repo: <https://github.com/openvax/mhcflurry>
+
+
+## Installation (pip)
+
+Install the package:
+
+```shell
+$ pip install mhcflurry
+```
+
+Then download our datasets and trained models:
+
+```shell
+$ mhcflurry-downloads fetch
+```
+
+From a checkout, source `develop.sh` to create and activate the editable
+environment:
+
+```shell
+$ source develop.sh
+```
+
+For quick feedback, run lint plus a focused unit subset:
+
+```shell
+$ ./lint.sh
+$ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
+```
+
+The full command, `pytest test/`, includes integration-style training,
+command, and public-model smoke tests that require cached MHCflurry download
+bundles. It can take many minutes. See {doc}`testing` for the test tiers,
+marker expressions such as `pytest -q test -m "not slow and not downloads"`,
+and profiling commands.
+
+
+## Using conda
+
+You can alternatively get up and running with a [conda](https://conda.io/docs/)
+environment as follows.
+
+```shell
+$ conda create -q -n mhcflurry-env python=3.10
+$ source activate mhcflurry-env
+```
+
+Then continue as above:
+
+```shell
+$ pip install mhcflurry
+$ mhcflurry-downloads fetch
+```

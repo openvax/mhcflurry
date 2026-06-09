@@ -12,14 +12,13 @@ import argparse
 import pickle
 import subprocess
 import shutil
+from shlex import quote
 
-from .local_parallelism import call_wrapped_kwargs
+from .local_parallelism import (
+    call_wrapped_kwargs,
+    configure_cluster_worker_torch_compile_threads,
+)
 from .class1_affinity_predictor import Class1AffinityPredictor
-
-try:
-    from shlex import quote
-except ImportError:
-    from pipes import quote
 
 
 def add_cluster_parallelism_args(parser):
@@ -409,6 +408,7 @@ def worker_entry_point(argv=sys.argv[1:]):
         kwargs['constant_data'] = constant_payload['constant_data']
 
     try:
+        configure_cluster_worker_torch_compile_threads()
         result = call_wrapped_kwargs(constant_payload['function'], kwargs)
         if args.result_serialization_method == 'save_predictor':
             result.save(args.result_out)

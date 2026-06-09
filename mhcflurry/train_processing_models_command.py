@@ -22,11 +22,28 @@ import tqdm  # progress bar
 
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
-from .common import configure_logging
+from .class1_neural_network import (
+    _TRAINING_PEAK_MULTIPLIER,
+    _estimate_peak_bytes_per_row,
+)
+from .common import (
+    add_random_seed_arg,
+    configure_random_seed,
+    configure_logging,
+    derive_seed,
+    write_generate_sh,
+)
 from .local_parallelism import (
     add_local_parallelism_args,
+    attach_constant_data_to_work_items_if_needed,
+    resolve_local_parallelism_args,
+    run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
+from .workload_planning import (
+    WORKLOAD_PROCESSING_TRAINING,
+    path_size_bytes,
+)
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -36,9 +53,12 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # To avoid pickling large matrices to send to child processes when running in
 # parallel, we use this global variable as a place to store data. Data that is
 # stored here before creating the thread pool will be inherited to the child
-# processes upon fork() call, allowing us to share large data with the workers
-# via shared memory.
+# processes upon fork() call, allowing local workers to read the same
+# copy-on-write pages instead of receiving a pickled copy.
 GLOBAL_DATA = {}
+
+_PROCESSING_WORKER_RUNTIME_FLOOR_GB = 2.0
+_PROCESSING_WORKER_SAFETY_FACTOR = 1.3
 
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
@@ -77,6 +97,7 @@ parser.add_argument(
     metavar="N",
     default=1,
     help="Number of replicates per (architecture, fold) pair to train.")
+add_random_seed_arg(parser)
 parser.add_argument(
     "--max-epochs",
     type=int,
@@ -110,7 +131,7 @@ add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
 
 
-def assign_folds(df, num_folds, held_out_samples):
+def assign_folds(df, num_folds, held_out_samples, seed=None):
     """
     Split training data into mulitple test/train pairs, which we refer to as
     folds. Note that a given data point may be assigned to multiple test or
@@ -127,6 +148,11 @@ def assign_folds(df, num_folds, held_out_samples):
         training data
     num_folds : int
     held_out_samples : int
+    seed : int, optional
+        Master seed. When given, numpy's global RNG (which the per-fold
+        ``.sample()`` call below draws from) is seeded up front, so
+        held-out-sample membership is reproducible. When None, fold
+        assignment is left entropy-random as before.
 
     Returns
     -------
@@ -134,6 +160,9 @@ def assign_folds(df, num_folds, held_out_samples):
         index is same as df.index, columns are "fold_0", ... "fold_N" giving
         whether the data point is in the training data for the fold
     """
+    if seed is not None:
+        numpy.random.seed(int(seed) % (2 ** 32))
+
     result_df = pandas.DataFrame(index=df.index)
     sample_names = pandas.Series(df.sample_id.unique())
 
@@ -175,12 +204,110 @@ def main(args):
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
     configure_logging(verbose=args.verbosity > 1)
+    processing_worker_gb = estimate_processing_worker_gb(args)
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
+        workload_name=WORKLOAD_PROCESSING_TRAINING,
+        workload_hints={
+            "data_bytes": path_size_bytes(args.data),
+            "per_worker_gb": processing_worker_gb,
+        },
+    )
 
     if not args.continue_incomplete:
         initialize_training(args)
 
     if not args.only_initialize:
         train_models(args)
+
+
+def estimate_processing_worker_gb(args):
+    """Estimate steady per-worker VRAM for processing training.
+
+    Processing is not shaped like affinity training: workers keep encoded
+    flank tensors resident on-device, then run Conv1d models whose peak
+    activation width scales with flank length and convolutional filters.
+    This estimate sizes worker concurrency from the actual data row count
+    and largest architecture in the hyperparameter sweep. Prediction-time
+    AUC scoring is separately auto-batched per call.
+    """
+    data_path = getattr(args, "data", None)
+    hyperparameters_path = getattr(args, "hyperparameters", None)
+    if not data_path or not hyperparameters_path:
+        return None
+    try:
+        row_count = len(pandas.read_csv(data_path, usecols=["peptide"]))
+        hyperparameters_lst = yaml.unsafe_load(open(hyperparameters_path))
+        if not isinstance(hyperparameters_lst, list):
+            return None
+
+        max_sequence_bytes_per_row = 0
+        max_forward_bytes_per_row = 0
+        max_minibatch_size = 0
+        for hyperparameters in hyperparameters_lst:
+            model = Class1ProcessingNeuralNetwork(**hyperparameters)
+            network = model.make_network(
+                **model.network_hyperparameter_defaults.subselect(
+                    model.hyperparameters
+                )
+            )
+            seq_len = (
+                int(network.n_flank_length)
+                + int(network.peptide_max_length)
+                + int(network.c_flank_length)
+            )
+            # Encoded sequence + peptide_length + target + index tensors.
+            # Sequences are always index-encoded (int8), one byte per position.
+            sequence_bytes_per_row = seq_len * 1 + 8 + 4 + 8
+            max_sequence_bytes_per_row = max(
+                max_sequence_bytes_per_row,
+                sequence_bytes_per_row,
+            )
+            max_forward_bytes_per_row = max(
+                max_forward_bytes_per_row,
+                _estimate_peak_bytes_per_row(network),
+            )
+            max_minibatch_size = max(
+                max_minibatch_size,
+                int(model.hyperparameters["minibatch_size"]),
+            )
+
+        if not max_forward_bytes_per_row or not max_minibatch_size:
+            return None
+
+        dataset_bytes = row_count * max_sequence_bytes_per_row
+        training_batch_bytes = (
+            max_minibatch_size
+            * max_forward_bytes_per_row
+            * _TRAINING_PEAK_MULTIPLIER
+        )
+        runtime_bytes = int(_PROCESSING_WORKER_RUNTIME_FLOOR_GB * (1 << 30))
+        estimate_gb = (
+            (dataset_bytes + training_batch_bytes + runtime_bytes)
+            * _PROCESSING_WORKER_SAFETY_FACTOR
+            / float(1 << 30)
+        )
+        estimate_gb = max(estimate_gb, 4.0)
+        print(
+            "Estimated processing worker VRAM: %.2f GB "
+            "(rows=%d, sequence=%.2f GB, train_batch=%.2f GB, "
+            "runtime_floor=%.2f GB, safety=%.1fx)" % (
+                estimate_gb,
+                row_count,
+                dataset_bytes / float(1 << 30),
+                training_batch_bytes / float(1 << 30),
+                _PROCESSING_WORKER_RUNTIME_FLOOR_GB,
+                _PROCESSING_WORKER_SAFETY_FACTOR,
+            )
+        )
+        return estimate_gb
+    except Exception as exc:
+        print(
+            "Could not estimate processing worker VRAM; falling back to "
+            "default local parallelism estimate: %s" % (exc,)
+        )
+        return None
 
 
 def initialize_training(args):
@@ -213,10 +340,20 @@ def initialize_training(args):
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))
+
+    # Resolve the master seed once for the whole run and seed this process's
+    # global RNGs (so fold assignment below is reproducible). Per-fit weight
+    # init and the train-data shuffle in train_model derive from the same
+    # value via derive_seed. --random-seed defaults to 42 (reproducible out
+    # of the box); the resolved value is logged either way.
+    master_seed = configure_random_seed(
+        args.random_seed, name="train-processing")
+
     folds_df = assign_folds(
         df=df,
         num_folds=args.num_folds,
-        held_out_samples=args.held_out_samples)
+        held_out_samples=args.held_out_samples,
+        seed=master_seed)
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -256,6 +393,10 @@ def initialize_training(args):
     training_init_info["train_data"] = df
     training_init_info["folds_df"] = folds_df
     training_init_info["work_items"] = work_items
+    # Persist the master seed so the train_models phase (which may run in a
+    # separate invocation via --continue-incomplete) derives per-fit seeds
+    # from the same value used for fold assignment.
+    training_init_info["seed"] = master_seed
 
     # Save empty predictor (for metadata)
     predictor.save(args.out_models_dir)
@@ -268,8 +409,6 @@ def initialize_training(args):
 
 
 def train_models(args):
-    global GLOBAL_DATA
-
     print("Beginning training.")
     predictor = Class1ProcessingPredictor.load(args.out_models_dir)
     print("Loaded predictor with %d networks" % len(predictor.models))
@@ -293,8 +432,12 @@ def train_models(args):
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
 
     # The estimated time to completion is more accurate if we randomize
-    # the order of the work.
-    random.shuffle(work_items)
+    # the order of the work. Seed from the master seed so even the dispatch
+    # order is reproducible (per-fit results don't depend on order — each
+    # fit reseeds from its own work-item seed — but this keeps the whole
+    # run deterministic).
+    master_seed = GLOBAL_DATA.get("seed")
+    random.Random(master_seed).shuffle(work_items)
     for (work_item_num, item) in enumerate(work_items):
         item['work_item_num'] = work_item_num
         item['num_work_items'] = len(work_items)
@@ -327,6 +470,13 @@ def train_models(args):
             constant_data=GLOBAL_DATA,
             result_serialization_method="pickle")
     else:
+        run_single_worker_torch_compile_warmup(
+            args,
+            work_items,
+            train_model,
+            constant_data=GLOBAL_DATA,
+        )
+
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
         print("Worker pool", worker_pool)
         assert worker_pool is not None
@@ -334,32 +484,52 @@ def train_models(args):
         print("Processing %d work items in parallel." % len(work_items))
         assert not serial_run
 
-        for item in work_items:
-            item['constant_data'] = GLOBAL_DATA
+        results_generator = None
 
-        results_generator = worker_pool.imap_unordered(
-            partial(call_wrapped_kwargs, train_model),
-            work_items,
-            chunksize=1)
+    try:
+        if worker_pool is not None:
+            # Attach constant data and launch the work inside the try so a
+            # failure here (e.g. copying large constant data to workers) still
+            # tears the pool down via the finally rather than leaking
+            # non-daemon workers.
+            attach_constant_data_to_work_items_if_needed(
+                work_items, GLOBAL_DATA, worker_pool
+            )
+            results_generator = worker_pool.imap_unordered(
+                partial(call_wrapped_kwargs, train_model),
+                work_items,
+                chunksize=1)
+        if results_generator:
+            for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
+                save_start = time.time()
+                (model,) = new_predictor.models
+                pprint.pprint(model.fit_info[-1]['training_info'])
+                (new_model_name,) = predictor.add_models(new_predictor.models)
+                predictor.save(
+                    args.out_models_dir,
+                    model_names_to_write=[new_model_name],
+                    write_metadata=False)
+                print(
+                    "Saved predictor (%d models total) with 1 new models"
+                    "in %0.2f sec to %s" % (
+                        len(predictor.models),
+                        time.time() - save_start,
+                        args.out_models_dir))
 
-    if results_generator:
-        for new_predictor in tqdm.tqdm(results_generator, total=len(work_items)):
-            save_start = time.time()
-            (model,) = new_predictor.models
-            pprint.pprint(model.fit_info[-1]['training_info'])
-            (new_model_name,) = predictor.add_models(new_predictor.models)
-            predictor.save(
-                args.out_models_dir,
-                model_names_to_write=[new_model_name],
-                write_metadata=False)
-            print(
-                "Saved predictor (%d models total) with 1 new models"
-                "in %0.2f sec to %s" % (
-                    len(predictor.models),
-                    time.time() - save_start,
-                    args.out_models_dir))
+        if worker_pool:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+    finally:
+        # On failure mid-iteration, terminate() rather than
+        # close()/join() (which can hang on a wedged worker) and
+        # leave non-daemon workers behind.
+        if worker_pool is not None:
+            worker_pool.terminate()
+            worker_pool.join()
 
     predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
     print("Done saving.")
 
     print("*" * 30)
@@ -368,11 +538,58 @@ def train_models(args):
         len(predictor.models), training_time / 60.0))
     print("*" * 30)
 
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
-
     print("Predictor written to: %s" % args.out_models_dir)
+
+
+def _run_compile_warmup(hyperparameters, fold_num, constant_data):
+    """One forward+backward through a freshly-built processing network.
+
+    Companion to ``mhcflurry.train_pan_allele_models_command._run_compile_warmup``.
+    Used by ``run_single_worker_torch_compile_warmup`` to populate the
+    torch.compile on-disk cache once per unique architecture before the
+    production worker pool launches. Discards the resulting model.
+    """
+    from mhcflurry.flanking_encoding import FlankingEncoding
+
+    df = constant_data["train_data"]
+    folds_df = constant_data["folds_df"]
+    minibatch = max(int(hyperparameters.get("minibatch_size", 128) or 128), 1)
+    fold_mask = folds_df["fold_%d" % fold_num]
+    train_subset = df.loc[fold_mask].head(minibatch)
+    if len(train_subset) == 0:
+        train_subset = df.head(minibatch)
+
+    # Subselect to keys this network actually accepts so warmup is
+    # robust to upstream configs carrying parameters that belong to a
+    # different network (e.g. affinity-only data_dependent_initialization_method
+    # used to leak in here and crash the strict-keys check).
+    hp = Class1ProcessingNeuralNetwork.hyperparameter_defaults.subselect(
+        dict(hyperparameters))
+    hp["max_epochs"] = 1
+    hp["validation_split"] = 0.0
+    hp["early_stopping"] = False
+
+    print(
+        "compile_warmup_only (processing): convolutional_filters=%s "
+        "post_dense=%s minibatch=%d rows=%d" % (
+            hp.get("convolutional_filters"),
+            hp.get("post_convolutional_dense_layer_sizes"),
+            minibatch,
+            len(train_subset),
+        )
+    )
+    started = time.time()
+    model = Class1ProcessingNeuralNetwork(**hp)
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=train_subset.peptide.values,
+            n_flanks=train_subset.n_flank.values,
+            c_flanks=train_subset.c_flank.values),
+        targets=train_subset.hit.values,
+        verbose=0,
+    )
+    print("compile_warmup_only (processing): completed in %.1f sec" % (
+        time.time() - started))
 
 
 def train_model(
@@ -390,10 +607,15 @@ def train_model(
         progress_print_interval,
         predictor,
         save_to,
+        compile_warmup_only=False,
         constant_data=GLOBAL_DATA):
 
     from sklearn.metrics import roc_auc_score
     from mhcflurry.flanking_encoding import FlankingEncoding
+
+    if compile_warmup_only:
+        _run_compile_warmup(hyperparameters, fold_num, constant_data)
+        return None
 
     df = constant_data["train_data"]
     folds_df = constant_data["folds_df"]
@@ -403,9 +625,12 @@ def train_model(
 
     numpy.testing.assert_equal(len(df), len(folds_df))
 
-    train_data = df.loc[
-        folds_df["fold_%d" % fold_num]
-    ].sample(frac=1.0).copy()
+    # Don't shuffle here: fit() owns ordering via its seeded
+    # ``shuffle_permutation`` (a ``numpy.random.permutation`` drawn from the
+    # global RNG that fit() seeds from the work-item seed). A host-side
+    # ``.sample()`` would just add an unseeded numpy-global shuffle ahead of
+    # fit's seeding, breaking single-seed reproducibility.
+    train_data = df.loc[folds_df["fold_%d" % fold_num]].copy()
 
     test_data = df.loc[~folds_df["fold_%d" % fold_num]].copy()
 
@@ -429,6 +654,15 @@ def train_model(
     print("%s [pid %d]. Hyperparameters:" % (progress_preamble, os.getpid()))
     pprint.pprint(hyperparameters)
 
+    # One stable per-work-item seed controls every stochastic step of this
+    # fit — weight init plus the train/val shuffles. Derived from the run's
+    # master seed plus this fit's identity coordinates, so the whole run is
+    # reproducible from --random-seed regardless of dispatch order across
+    # workers.
+    work_item_seed = derive_seed(
+        constant_data.get("seed"),
+        architecture_num, fold_num, replicate_num)
+
     model = Class1ProcessingNeuralNetwork(**hyperparameters)
     model.fit(
         sequences=FlankingEncoding(
@@ -438,6 +672,7 @@ def train_model(
         targets=train_data.hit.values,
         progress_preamble=progress_preamble,
         progress_print_interval=progress_print_interval,
+        seed=work_item_seed,
         verbose=verbose)
 
     # Save model-specific training info

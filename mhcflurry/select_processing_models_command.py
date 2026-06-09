@@ -8,6 +8,7 @@ selected models across all folds. AUC is used as the metric.
 """
 import argparse
 import os
+import re
 import signal
 import sys
 import time
@@ -23,10 +24,15 @@ import tqdm  # progress bar
 
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .flanking_encoding import FlankingEncoding
-from .common import configure_logging
+from .common import configure_logging, write_generate_sh
 from .local_parallelism import (
+    resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)
+from .workload_planning import (
+    WORKLOAD_PROCESSING_SELECTION,
+    path_size_bytes,
+)
 from .cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -37,8 +43,8 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # To avoid pickling large matrices to send to child processes when running in
 # parallel, we use this global variable as a place to store data. Data that is
 # stored here before creating the thread pool will be inherited to the child
-# processes upon fork() call, allowing us to share large data with the workers
-# via shared memory.
+# processes upon fork() call, allowing local workers to read the same
+# copy-on-write pages instead of receiving a pickled copy.
 GLOBAL_DATA = {}
 
 
@@ -85,8 +91,6 @@ add_cluster_parallelism_args(parser)
 
 
 def run(argv=sys.argv[1:]):
-    global GLOBAL_DATA
-
     # On sigusr1 print stack trace
     print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
     signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
@@ -96,6 +100,12 @@ def run(argv=sys.argv[1:]):
     args.out_models_dir = os.path.abspath(args.out_models_dir)
 
     configure_logging(verbose=args.verbosity > 1)
+    resolve_local_parallelism_args(
+        args,
+        cap_auto_num_jobs=not args.cluster_parallelism,
+        workload_name=WORKLOAD_PROCESSING_SELECTION,
+        workload_hints={"data_bytes": path_size_bytes(args.data)},
+    )
 
     df = pandas.read_csv(args.data)
     print("Loaded data: %s" % (str(df.shape)))
@@ -105,10 +115,12 @@ def run(argv=sys.argv[1:]):
 
     metadata_dfs = {}
 
-    fold_cols = [c for c in df if c.startswith("fold_")]
+    fold_cols = [c for c in df if re.match(r"^fold_\d+$", c)]
     num_folds = len(fold_cols)
     if num_folds <= 1:
-        raise ValueError("Too few folds: ", num_folds)
+        raise ValueError(
+            "Too few clean ``fold_<int>`` columns: %d (saw: %s)" % (
+                num_folds, [c for c in df if c.startswith("fold_")]))
 
     print("Num folds: ", num_folds, "fraction included:")
     print(df[fold_cols].mean())
@@ -214,6 +226,7 @@ def run(argv=sys.argv[1:]):
         summary_df.reset_index(drop=True))
 
     result_predictor.save(args.out_models_dir)
+    write_generate_sh(args.out_models_dir)
 
     model_selection_time = time.time() - start
 
@@ -258,23 +271,29 @@ def model_select(
         n_flanks=df.n_flank.values,
         c_flanks=df.c_flank.values)
 
-    predictions_df = df.copy()
+    targets = df.hit.values
+    prediction_matrix = numpy.empty((len(df), len(models)), dtype=numpy.float32)
     for (i, model) in enumerate(models):
-        predictions_df[i] = model.predict_encoded(sequences)
+        prediction_matrix[:, i] = model.predict_encoded(sequences)
 
     selected = []
-    selected_score = 0
-    remaining_models = set(numpy.arange(len(models)))
+    selected_sum = None
+    selected_score = -numpy.inf
+    remaining_models = set(range(len(models)))
     individual_model_scores = {}
     selected_in_round = {}
     ensemble_score_when_selected = {}
     while remaining_models and len(selected) < max_models:
         best_model = None
-        best_model_score = 0
+        best_model_score = -numpy.inf
         for i in remaining_models:
-            possible_ensemble = list(selected) + [i]
-            predictions = predictions_df[possible_ensemble].mean(axis=1)
-            auc_score = roc_auc_score(df.hit.values, predictions.values)
+            if selected_sum is None:
+                predictions = prediction_matrix[:, i]
+            else:
+                predictions = (
+                    selected_sum + prediction_matrix[:, i]
+                ) / float(len(selected) + 1)
+            auc_score = roc_auc_score(targets, predictions)
             if auc_score > best_model_score:
                 best_model = i
                 best_model_score = auc_score
@@ -285,6 +304,10 @@ def model_select(
             selected_score = best_model_score
             remaining_models.remove(best_model)
             selected.append(best_model)
+            if selected_sum is None:
+                selected_sum = prediction_matrix[:, best_model].copy()
+            else:
+                selected_sum += prediction_matrix[:, best_model]
             selected_in_round[best_model] = len(selected)
             ensemble_score_when_selected[best_model] = selected_score
         else:

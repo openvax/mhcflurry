@@ -6,7 +6,6 @@ import sys
 import argparse
 import os
 
-
 import pandas
 import tqdm
 
@@ -30,6 +29,18 @@ parser.add_argument(
     help="File to write")
 
 
+def annotate_tpm(hit_df, expression_df):
+    """Return per-hit TPM sums for each row's expression dataset."""
+    tpm = pandas.Series(0.0, index=hit_df.index)
+    for expression_dataset, sub_df in hit_df.groupby(
+            "expression_dataset", sort=False):
+        expression_by_gene = expression_df[expression_dataset]
+        genes = sub_df.protein_ensembl.str.split().explode()
+        gene_tpm = genes.map(expression_by_gene).fillna(0.0)
+        tpm.loc[sub_df.index] = gene_tpm.groupby(level=0).sum()
+    return tpm
+
+
 def run():
     args = parser.parse_args(sys.argv[1:])
     args.out = os.path.abspath(args.out)
@@ -43,12 +54,7 @@ def run():
 
     # Add a column to hit_df giving expression value for that sample and that gene
     print("Annotating expression.")
-    hit_df["tpm"] = [
-        expression_df.reindex(
-            row.protein_ensembl.split())[row.expression_dataset].sum()
-        for _, row in tqdm.tqdm(
-            hit_df.iterrows(), total=len(hit_df), ascii=True, maxinterval=10000)
-    ]
+    hit_df["tpm"] = annotate_tpm(hit_df, expression_df)
 
     # Discard hits except those that have max expression for each hit_id
     print("Selecting max-expression transcripts for each hit.")

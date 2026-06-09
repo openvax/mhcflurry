@@ -12,12 +12,12 @@ import os
 
 import numpy as np
 import pytest
-import torch
 
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import configure_pytorch, load_weights
 from mhcflurry.testing_utils import startup, cleanup
+from . import available_torch_accelerators
 
 
 MODEL_NAMES = [
@@ -82,18 +82,26 @@ def test_predictions_match_expected(model_name):
 
 
 @pytest.mark.parametrize("model_name", MODEL_NAMES)
-def test_mps_matches_cpu(model_name):
-    if not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
-        pytest.skip("MPS is not available")
-
+@pytest.mark.parametrize(
+    "backend,device_type",
+    available_torch_accelerators(),
+    ids=lambda value: value,
+)
+def test_accelerator_matches_cpu(model_name, backend, device_type):
     config, weights, expected = _load_model_and_expected(model_name)
     predicted_cpu = np.asarray(
         _predict(config, weights, expected, backend="cpu"),
         dtype=np.float64,
     )
-    predicted_mps = np.asarray(
-        _predict(config, weights, expected, backend="mps"),
+    predicted_accelerator = np.asarray(
+        _predict(config, weights, expected, backend=backend),
         dtype=np.float64,
     )
 
-    np.testing.assert_allclose(predicted_mps, predicted_cpu, rtol=1e-5, atol=1e-2)
+    np.testing.assert_allclose(
+        predicted_accelerator,
+        predicted_cpu,
+        rtol=1e-5,
+        atol=1e-2,
+        err_msg=f"{device_type} predictions differ from CPU",
+    )

@@ -21,6 +21,9 @@ from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import cleanup, startup
 
 
+pytestmark = [pytest.mark.slow, pytest.mark.downloads]
+
+
 ALLELE_SPECIFIC_PREDICTOR = None
 PAN_ALLELE_PREDICTOR = None
 

@@ -4,6 +4,7 @@ import pytest
 import tempfile
 import shutil
 import logging
+import shlex
 import warnings
 import traceback
 import sys
@@ -11,19 +12,25 @@ import sys
 import numpy
 import pandas
 
-from mhcflurry import Class1AffinityPredictor
+from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 
 from numpy import testing
 
 from mhcflurry.downloads import get_path
+from mhcflurry.percent_rank_transform import PercentRankTransform
+from mhcflurry.pseudosequences import (
+    LEGACY_ALLELE_SEQUENCES_FILENAME,
+    LEGACY_CLASS1_PSEUDOSEQUENCES_FILENAME,
+    PSEUDOSEQUENCE_FILENAMES_BY_LENGTH,
+)
 from mhcflurry.testing_utils import cleanup, startup
 
 DOWNLOADED_PREDICTOR = None
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="module")
 def setup_teardown():
-    """Setup and teardown for each test."""
+    """Load the downloaded predictor once for this module."""
     global DOWNLOADED_PREDICTOR
     startup()
     try:
@@ -46,6 +53,222 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 warnings.showwarning = warn_with_traceback
 
 
+def test_save_calibration_only_preserves_model_artifacts(tmp_path):
+    manifest_path = tmp_path / "manifest.csv"
+    info_path = tmp_path / "info.txt"
+    allele_sequences_path = tmp_path / LEGACY_ALLELE_SEQUENCES_FILENAME
+    optimization_info_path = tmp_path / "optimization_info.json"
+    motif_summary_path = tmp_path / "motif_summary.csv.bz2"
+
+    manifest_text = (
+        "model_name,allele,config_json\n"
+        "PAN-CLASS1-0,pan-class1,\"{}\"\n"
+        "PAN-CLASS1-1,pan-class1,\"{}\"\n"
+    )
+    info_text = "trained on\toriginal release\n"
+    allele_sequences_text = "allele,sequence\nHLA-A*02:01,ORIGINAL\n"
+    manifest_path.write_text(manifest_text)
+    info_path.write_text(info_text)
+    allele_sequences_path.write_text(allele_sequences_text)
+
+    transform = PercentRankTransform()
+    transform.fit(numpy.array([10.0, 20.0, 30.0]), bins=3)
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={"HLA-A*02:01": "REWRITTEN"},
+        allele_to_percent_rank_transform={"HLA-A*02:01": transform},
+        metadata_dataframes={
+            "motif_summary": pandas.DataFrame({
+                "allele": ["HLA-A*02:01"],
+                "value": [1.0],
+            }),
+        },
+        optimization_info={
+            "pan_models_merged": True,
+            "num_pan_models_merged": 2,
+        },
+    )
+
+    predictor.save(str(tmp_path), model_names_to_write=[])
+
+    assert manifest_path.read_text() == manifest_text
+    assert info_path.read_text() == info_text
+    assert allele_sequences_path.read_text() == allele_sequences_text
+    assert not (tmp_path / PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[37]).exists()
+    assert not optimization_info_path.exists()
+
+    motif_summary = pandas.read_csv(motif_summary_path)
+    assert motif_summary.to_dict("list") == {
+        "allele": ["HLA-A*02:01"],
+        "value": [1.0],
+    }
+    percent_ranks = pandas.read_csv(tmp_path / "percent_ranks.csv")
+    assert "HLA-A*02:01" in percent_ranks.columns
+
+
+def test_load_accepts_legacy_class1_pseudosequences_file(tmp_path):
+    (tmp_path / "manifest.csv").write_text("model_name,allele,config_json\n")
+    (tmp_path / LEGACY_CLASS1_PSEUDOSEQUENCES_FILENAME).write_text(
+        "allele,pseudosequence\n"
+        "HLA-A*02:01,YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY\n"
+    )
+
+    predictor = Class1AffinityPredictor.load(
+        str(tmp_path),
+        optimization_level=0,
+    )
+
+    assert predictor.allele_to_sequence == {
+        "HLA-A*02:01": "YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY",
+    }
+
+
+@pytest.mark.parametrize("filename,sequence", [
+    (
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[34],
+        "YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY",
+    ),
+    (
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[37],
+        "YFAMYGEKVAHTHVDTLYGVRYDHYYTWAVLAYTWYA",
+    ),
+    (
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[39],
+        "YFGERAMPYGEKVAHTHVDTLYGVRYHYYTWAVLAYTWY",
+    ),
+])
+def test_load_accepts_named_pseudosequence_files(tmp_path, filename, sequence):
+    (tmp_path / "manifest.csv").write_text("model_name,allele,config_json\n")
+    (tmp_path / filename).write_text(
+        "allele,pseudosequence\n"
+        "HLA-A*02:01,%s\n" % sequence
+    )
+
+    predictor = Class1AffinityPredictor.load(
+        str(tmp_path),
+        optimization_level=0,
+    )
+
+    assert predictor.allele_to_sequence == {"HLA-A*02:01": sequence}
+
+
+@pytest.mark.parametrize("sequence,expected_filename", [
+    (
+        "YFAMYQENMAHTDANTLYIIYRDYTWVARVYRGY",
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[34],
+    ),
+    (
+        "YFAMYGEKVAHTHVDTLYGVRYDHYYTWAVLAYTWYA",
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[37],
+    ),
+    (
+        "YFGERAMPYGEKVAHTHVDTLYGVRYHYYTWAVLAYTWY",
+        PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[39],
+    ),
+])
+def test_save_writes_named_pseudosequence_alias(
+        tmp_path, sequence, expected_filename):
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={"HLA-A*02:01": sequence},
+    )
+
+    predictor.save(str(tmp_path))
+
+    legacy_df = pandas.read_csv(
+        tmp_path / LEGACY_ALLELE_SEQUENCES_FILENAME)
+    assert legacy_df.to_dict("list") == {
+        "allele": ["HLA-A*02:01"],
+        "sequence": [sequence],
+    }
+    named_df = pandas.read_csv(tmp_path / expected_filename)
+    assert named_df.to_dict("list") == {
+        "allele": ["HLA-A*02:01"],
+        "pseudosequence": [sequence],
+    }
+
+
+def test_percent_rank_calibrated_allele_direct_equivalent_missing():
+    transform = PercentRankTransform()
+    transform.fit(numpy.array([10.0, 20.0, 30.0]), bins=3)
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={
+            "HLA-A*02:01": "SEQUENCE1",
+            "HLA-A*02:02": "SEQUENCE1",
+            "HLA-B*07:02": "SEQUENCE2",
+        },
+        allele_to_percent_rank_transform={"HLA-A*02:01": transform},
+    )
+
+    assert (
+        predictor.percent_rank_calibrated_allele("HLA-A*02:01")
+        == "HLA-A*02:01"
+    )
+    assert (
+        predictor.percent_rank_calibrated_allele("HLA-A*02:02")
+        == "HLA-A*02:01"
+    )
+    assert predictor.percent_rank_calibrated_allele("HLA-B*07:02") is None
+    assert predictor.percent_rank_calibrated_allele("HLA-C*03:04") is None
+
+
+def test_missing_percent_rank_error_reports_calibration_command(tmp_path):
+    models_dir = str(tmp_path / "models with spaces")
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={"HLA-A*02:01": "SEQUENCE1"},
+        provenance_string="generated on test date",
+        models_dir=models_dir,
+    )
+
+    with pytest.raises(ValueError) as err:
+        predictor.percentile_ranks([50.0], allele="HLA-A*02:01")
+
+    message = str(err.value)
+    assert "Missing percentile-rank calibration for HLA-A*02:01" in message
+    assert (
+        "Affinity predictions are available; percentile ranks are not."
+        in message
+    )
+    assert "generated on test date" not in message
+    assert "0 model(s)" not in message
+    assert "0 percent-rank calibration(s)" not in message
+    assert "Calibrate with:" in message
+    assert (
+        "mhcflurry-calibrate-percentile-ranks --models-dir %s "
+        "--allele %s ..." % (
+            shlex.quote(models_dir),
+            shlex.quote("HLA-A*02:01"),
+        )
+    ) in message
+
+
+def test_missing_percent_rank_error_infers_models_dir_from_loaded_models(tmp_path):
+    models_dir = str(tmp_path / "loaded models")
+    network = Class1NeuralNetwork.from_config(
+        {"hyperparameters": {}},
+        weight_paths=str(tmp_path / "loaded models" / "weights_PAN-CLASS1-0.npz"),
+    )
+    assert "network_weight_paths" not in network.get_config()
+    predictor = Class1AffinityPredictor(
+        class1_pan_allele_models=[network],
+        allele_to_sequence={"HLA-A*02:01": "SEQUENCE1"},
+    )
+
+    assert predictor.models_dir is None
+    assert predictor.models_dir_for_diagnostics() == models_dir
+
+    with pytest.raises(ValueError) as err:
+        predictor.percentile_ranks([50.0], allele="HLA-A*02:01")
+
+    message = str(err.value)
+    assert "Calibrate with:" in message
+    assert (
+        "mhcflurry-calibrate-percentile-ranks --models-dir %s "
+        "--allele %s ..." % (
+            shlex.quote(models_dir),
+            shlex.quote("HLA-A*02:01"),
+        )
+    ) in message
+
+
 def predict_and_check(
     allele, peptide, predictor=DOWNLOADED_PREDICTOR, expected_range=(0, 500)
 ):
@@ -66,6 +289,8 @@ def predict_and_check(
         assert prediction <= expected_range[1], (predictor, prediction, debug())
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_a1_known_epitopes_in_newly_trained_model():
     allele = "HLA-A*01:01"
     df = pandas.read_csv(
@@ -133,6 +358,8 @@ def test_a1_known_epitopes_in_newly_trained_model():
     shutil.rmtree(models_dir)
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_class1_affinity_predictor_a0205_memorize_training_data():
     # Memorize the dataset.
     hyperparameters = dict(

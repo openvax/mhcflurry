@@ -21,7 +21,9 @@ base_hyperparameters = {
     'topology': 'feedfoward',
     'loss': 'custom:mse_with_inequalities',
     'max_epochs': 5000,
-    'minibatch_size': 128,
+    # See scripts/training/release_exact/generate_hyperparameters.py for
+    # the rationale on this bump.
+    'minibatch_size': 4096,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
     "patience": 20,
@@ -43,6 +45,16 @@ base_hyperparameters = {
     'random_negative_rate': 1.0,
     'random_negative_method': 'by_allele_equalize_nonbinders',
     'random_negative_binder_threshold': 500.0,
+    # Random-negative pool: ``pool_epochs=1`` keeps a single epoch of
+    # encoded negatives in heap at a time. Setting >1 amortizes the
+    # encoding cost across that many epochs but materializes the full
+    # ``pool_epochs × per_epoch_count`` peptide buffer per worker —
+    # on the 8xA100 release_exact run, ``100`` ballooned to ~199 GB/worker
+    # (tooling overhead + intermediate Series) and OOM'd a 944 GB box.
+    # Hold at 1 until a streaming-rebuild fix lands that doesn't
+    # materialize the full N-epoch buffer at once. The pool primitive is
+    # exercised at this default in unit tests.
+    'random_negative_pool_epochs': 1,
     'train_data': {
         'pretrain': True,
         'pretrain_peptides_per_epoch': 64,

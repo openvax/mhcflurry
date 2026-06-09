@@ -4,6 +4,7 @@ import pytest
 
 from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
+from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 
 
 from mhcflurry.testing_utils import cleanup, startup
@@ -16,7 +17,7 @@ def setup_module():
 
 ALLELE_TO_SEQUENCE = pandas.read_csv(
     get_path(
-        "allele_sequences", "allele_sequences.csv"),
+        "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
     index_col=0).sequence.to_dict()
 
 HYPERPARAMETERS = {
@@ -57,6 +58,8 @@ HYPERPARAMETERS = {
 }
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_changing_allele_representations():
     allele1 = "HLA-A*02:01"
     allele2 = "HLA-C*03:04"
@@ -97,8 +100,6 @@ def test_changing_allele_representations():
         alleles=[allele1, allele2, allele3])
     assert value1 < 100, value1
     assert value2 > 4000, value2
-
-
 
 
 

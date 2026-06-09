@@ -16,7 +16,6 @@
 import sys
 import os
 import re
-import textwrap
 import logging
 import subprocess
 
@@ -24,12 +23,10 @@ if os.environ.get("READTHEDOCS"):
     # For rtd builds, call "make generate" first.
     subprocess.check_call("make generate", shell=True)
 
-# Hack added by tim for bug in autoprogram extension under Python 2.
-from sphinx.util.pycompat import indent  # pylint: disable=import-error
-textwrap.indent = indent
-
-# Disable logging (added by tim)
-logging.disable(logging.ERROR)
+# Quiet matplotlib's verbose font-cache logging during doctests; leave
+# Sphinx's own progress + warning output alone so sphinx-build -W
+# diagnostics are actually visible.
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -51,10 +48,19 @@ extensions = [
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
+    'myst_parser',
     'numpydoc',
     'sphinxcontrib.programoutput',
     'sphinxcontrib.autoprogram',
     'sphinx.ext.githubpages',
+]
+
+# myst-parser settings. ``colon_fence`` lets us write ``:::{note}`` blocks
+# alongside ```` ```{note} ```` blocks; ``deflist`` keeps RST-style
+# definition lists working in Markdown.
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
 ]
 
 doctest_global_setup = '''
@@ -72,10 +78,12 @@ doctest_test_doctest_blocks = ''
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
-# The suffix(es) of source filenames.
-# You can specify multiple suffix as a list of string:
-# source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+# The suffix(es) of source filenames. Both .rst and .md are accepted;
+# myst-parser owns the .md path.
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.md': 'markdown',
+}
 
 # The encoding of source files.
 #source_encoding = 'utf-8-sig'
@@ -116,7 +124,7 @@ suppress_warnings = ['image.nonlocal_uri']
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:

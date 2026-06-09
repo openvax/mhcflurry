@@ -2,11 +2,8 @@
 """
 import sys
 import argparse
+import csv
 import os
-import time
-import collections
-import re
-from six.moves import StringIO
 
 import pandas
 import tqdm  # progress bar
@@ -88,42 +85,38 @@ def run():
     reference_df = reference_df.loc[proteins]
 
     lengths = sorted(args.lengths)
-    rows = []
     total = len(reference_df)
-    for (accession, info) in tqdm.tqdm(reference_df.iterrows(), total=total):
-        seq = info.seq
-        for start in range(0, len(seq) - min(args.lengths)):
-            for length in lengths:
-                end_pos = start + length
-                if end_pos > len(seq):
-                    break
-                n_flank = seq[
-                    max(start - flanking_length, 0) : start
-                ].rjust(flanking_length, 'X')
-                c_flank = seq[
-                    end_pos : (end_pos + flanking_length)
-                ].ljust(flanking_length, 'X')
-                peptide = seq[start : start + length]
-
-                rows.append((
-                    accession,
-                    peptide,
-                    n_flank,
-                    c_flank,
-                    start
-                ))
-
-    result_df = pandas.DataFrame(
-        rows,
-        columns=[
+    with open(args.out, "w", newline="") as out_fd:
+        writer = csv.writer(out_fd)
+        writer.writerow([
             "protein_accession",
             "peptide",
             "n_flank",
             "c_flank",
             "start_position",
         ])
+        for (accession, info) in tqdm.tqdm(reference_df.iterrows(), total=total):
+            seq = info.seq
+            for start in range(0, len(seq) - min(args.lengths)):
+                for length in lengths:
+                    end_pos = start + length
+                    if end_pos > len(seq):
+                        break
+                    n_flank = seq[
+                        max(start - flanking_length, 0) : start
+                    ].rjust(flanking_length, 'X')
+                    c_flank = seq[
+                        end_pos : (end_pos + flanking_length)
+                    ].ljust(flanking_length, 'X')
+                    peptide = seq[start : start + length]
 
-    result_df.to_csv(args.out, index=False)
+                    writer.writerow((
+                        accession,
+                        peptide,
+                        n_flank,
+                        c_flank,
+                        start
+                    ))
     print("Wrote: %s" % os.path.abspath(args.out))
 
     if args.debug_max_rows:

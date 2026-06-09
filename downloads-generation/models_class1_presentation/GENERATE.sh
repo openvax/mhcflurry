@@ -48,7 +48,7 @@ else
     cp $SCRIPT_DIR/make_train_data.py .
     time python make_train_data.py \
         --hits "$(mhcflurry-downloads path models_class1_processing)/hits_with_tpm.csv.bz2" \
-        --proteome-peptides "$(mhcflurry-downloads path models_class1_processing)/proteome_peptides.csv.bz2" \
+        --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
         --decoys-per-hit 2 \
         --exclude-pmid 31844290 31495665 31154438 \
         --only-format MULTIALLELIC \
