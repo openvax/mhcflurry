@@ -7,13 +7,23 @@
 prediction package with competitive accuracy and a fast and
 [documented](http://openvax.github.io/mhcflurry/) implementation.
 
+If you find MHCflurry useful in your research please cite:
+
+> T. O'Donnell, A. Rubinsteyn, U. Laserson. "MHCflurry 2.0: Improved pan-allele prediction of MHC I-presented peptides by incorporating antigen processing," *Cell Systems*, 2020. https://doi.org/10.1016/j.cels.2020.06.010
+
+> T. O'Donnell, A. Rubinsteyn, M. Bonsack, A. B. Riemer, U. Laserson, and J. Hammerbacher, "MHCflurry: Open-Source Class I MHC Binding Affinity Prediction," *Cell Systems*, 2018. https://doi.org/10.1016/j.cels.2018.05.014
+
+Please file an issue if you have questions or encounter problems.
+
+Have a bugfix or other contribution? We would love your help. See our [contributing guidelines](CONTRIBUTING.md).
+
 ## 2.3.0 release candidate
 
-2.3.0 is currently a **release candidate** (`2.3.0rc1`), not yet a final
+2.3.0 is currently a **release candidate** (`2.3.0rc3`), not yet a final
 release. It keeps the same API and pre-trained models as 2.2.x. Install it by
 pinning the version:
 
-    pip install mhcflurry==2.3.0rc1
+    pip install mhcflurry==2.3.0rc3
 
 For now, `pip install --upgrade mhcflurry` still installs the latest stable
 release (2.2.x), because pip skips pre-releases unless you pin the version or
@@ -26,35 +36,7 @@ prediction jobs:
 - Training keeps data on the GPU for the whole fit, avoiding per-batch host/device copies.
 - `mhcflurry-predict`, `mhcflurry-predict-scan`, and `mhcflurry-calibrate-percentile-ranks` use all visible GPUs by default.
 - `mhcflurry-class1-train-pan-allele-models` auto-tunes job and worker counts from the hardware, so the same command runs on a laptop, a single GPU, or an 8×A100 host.
-- `torch.compile`, TF32, and matmul precision are available as flags on the training commands.
-
-Version 2.2.0 switched the neural-network backend from TensorFlow/Keras to
-PyTorch and added Apple Silicon (MPS) support.
-
-MHCflurry implements class I peptide/MHC binding affinity prediction.
-The current version provides pan-MHC I predictors supporting any MHC
-allele of known sequence. MHCflurry runs on Python 3.10+ using the
-[PyTorch](https://pytorch.org/) neural network library.
-It exposes [command-line](http://openvax.github.io/mhcflurry/commandline_tutorial.html)
-and [Python library](http://openvax.github.io/mhcflurry/python_tutorial.html)
-interfaces.
-
-MHCflurry also includes two experimental predictors,
-an "antigen processing" predictor that attempts to model MHC allele-independent
-effects such as proteosomal cleavage and a "presentation" predictor that
-integrates processing predictions with binding affinity predictions to give a
-composite "presentation score." Both models are trained on mass spec-identified
-MHC ligands.
-
-If you find MHCflurry useful in your research please cite:
-
-> T. O'Donnell, A. Rubinsteyn, U. Laserson. "MHCflurry 2.0: Improved pan-allele prediction of MHC I-presented peptides by incorporating antigen processing," *Cell Systems*, 2020. https://doi.org/10.1016/j.cels.2020.06.010
-
-> T. O'Donnell, A. Rubinsteyn, M. Bonsack, A. B. Riemer, U. Laserson, and J. Hammerbacher, "MHCflurry: Open-Source Class I MHC Binding Affinity Prediction," *Cell Systems*, 2018. https://doi.org/10.1016/j.cels.2018.05.014
-
-Please file an issue if you have questions or encounter problems.
-
-Have a bugfix or other contribution? We would love your help. See our [contributing guidelines](CONTRIBUTING.md).
+- `torch.compile` and matmul precision (including TF32) are available as flags on the training commands.
 
 ## Try it now
 
@@ -90,7 +72,7 @@ Or scan protein sequences for potential epitopes:
 ```
 $ mhcflurry-predict-scan \
         --sequences MFVFLVLLPLVSSQCVNLTTRTQLPPAYTNSFTRGVYYPDKVFRSSVLHS \
-        --alleles HLA-A*02:01 \
+        --alleles 'HLA-A*02:01' \
         --out /tmp/predictions.csv
 
 Wrote: /tmp/predictions.csv
@@ -106,13 +88,6 @@ $ mhcflurry predict \
         --alleles HLA-A0201 HLA-A0301 \
         --peptides SIINFEKL SIINFEKD SIINFEKQ \
         --out /tmp/predictions.csv
-
-$ mhcflurry compare-models \
-        --a results/new_run/ \
-        --b public \
-        --out results/comparison/
-
-$ mhcflurry plot-model-comparison --input results/comparison/
 ```
 
 Every historical command is reachable as a subcommand
@@ -122,9 +97,6 @@ Every historical command is reachable as a subcommand
 same underlying entry point; the legacy `mhcflurry-*` scripts remain
 installed as compat shims and are not changing. `mhcflurry --help`
 lists every available subcommand.
-
-The two new-in-2.3.0 model-comparison tools, `compare-models` and
-`plot-model-comparison`, only have the unified form.
 
 See the [documentation](http://openvax.github.io/mhcflurry/) for more details.
 

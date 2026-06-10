@@ -243,11 +243,11 @@ MHCflurry behavior can be modified using these environment variables:
   if you are running out of memory using the pan-allele models.
 
 `MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE`
-: For large prediction tasks, it can be helpful to increase the prediction batch
-  size, which is set by this environment variable (default is 4096). This
-  affects both allele-specific and pan-allele predictors. It can have large
-  effects on performance. Alternatively, if you are running out of memory,
-  you can try decreasing the batch size.
+: Prediction batch size. By default this is `auto`, sized at runtime from
+  available GPU memory. Set this environment variable to a fixed integer to
+  pin it (affects both allele-specific and pan-allele predictors). Increasing
+  the batch size can speed up large prediction tasks; decrease it if you run
+  out of memory.
 
 ## Auto-resolved training/calibration knobs
 
@@ -290,12 +290,14 @@ post-mortem is visible in the log.
 
 ## Reproducibility (`--random-seed`, new in 2.3.0)
 
-Every command that involves randomness — `class1-train-pan-allele-models`,
+Every training and calibration command — `class1-train-pan-allele-models`,
 `class1-train-allele-specific-models`, `class1-train-processing-models`,
-`class1-select-allele-specific-models`, and `calibrate-percentile-ranks` —
-takes a single `--random-seed N` that controls **all** of that command's
-randomness (fold assignment, dispatch/data shuffles, weight init, random
-negatives, allele sampling, and the calibration peptide universe).
+`class1-train-presentation-models`, `class1-select-allele-specific-models`,
+and `calibrate-percentile-ranks` — takes a single `--random-seed N` that
+controls **all** of that command's randomness (fold assignment, dispatch/data
+shuffles, weight init, random negatives, allele sampling, and the calibration
+peptide universe). (`class1-train-presentation-models` accepts the flag for
+consistency but has no stochastic step today.)
 
 `--random-seed` defaults to **42**, so training and calibration reproduce
 bit-for-bit out of the box. Pass `--random-seed N` for a different but

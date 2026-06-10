@@ -34,7 +34,7 @@ models directory, then it will load that predictor instead.
 ## Predicting for individual peptides
 
 To generate predictions for individual peptides, we can use the
-{meth}`~mhcflurry.Class1AffinityPredictor.predict` method of the {class}`~mhcflurry.Class1PresentationPredictor`,
+{meth}`~mhcflurry.Class1PresentationPredictor.predict` method of the {class}`~mhcflurry.Class1PresentationPredictor`,
 loaded above. This method returns a {class}`pandas.DataFrame` with binding affinity, processing, and presentation
 predictions:
 
@@ -43,9 +43,9 @@ predictions:
 ...     peptides=["SIINFEKL", "NLVPMVATV"],
 ...     alleles=["HLA-A0201", "HLA-A0301"],
 ...     verbose=0)
-     peptide  peptide_num sample_name      affinity best_allele  processing_score  presentation_score
-0   SIINFEKL            0     sample1  12906.786173   HLA-A0201          0.101473            0.012503
-1  NLVPMVATV            1     sample1     15.038358   HLA-A0201          0.676289            0.975463
+     peptide  peptide_num sample_name      affinity best_allele  processing_score  presentation_score  presentation_percentile
+0   SIINFEKL            0     sample1  11927.173394   HLA-A0201          0.264710            0.020690                11.630326
+1  NLVPMVATV            1     sample1     16.570969   HLA-A0201          0.533008            0.970187                 0.018723
 ```
 
 Here, the list of alleles is taken to be an individual's MHC I genotype (i.e. up
@@ -70,11 +70,11 @@ keys are arbitrary sample names:
 ...        "sample2": ["A0101", "A0206", "B5701", "C0202"],
 ...     },
 ...     verbose=0)
-      peptide  peptide_num sample_name      affinity best_allele  processing_score  presentation_score
-0  KSEYMTSWFY            0     sample1  16737.745268       A0301          0.381632            0.026550
-1   NLVPMVATV            1     sample1     15.038358       A0201          0.676289            0.975463
-2  KSEYMTSWFY            0     sample2     62.540779       A0101          0.381632            0.796731
-3   NLVPMVATV            1     sample2     15.765500       A0206          0.676289            0.974439
+      peptide  peptide_num sample_name     affinity best_allele  processing_score  presentation_score  presentation_percentile
+0  KSEYMTSWFY            0     sample1  8292.186793       C0201          0.542474            0.074376                 3.639185
+1   NLVPMVATV            1     sample1    16.570969       A0201          0.533008            0.970187                 0.018723
+2  KSEYMTSWFY            0     sample2    88.898412       A0101          0.542474            0.868106                 0.171848
+3   NLVPMVATV            1     sample2    17.406640       A0206          0.533008            0.968773                 0.021413
 ```
 
 Here the strongest binder for each sample / peptide pair is returned.
@@ -96,11 +96,11 @@ arguments, which give the flanking sequences for the corresponding peptides:
 ...        "sample2": ["A0101", "A0206", "B5701", "C0202"],
 ...     },
 ...     verbose=0)
-      peptide   n_flank   c_flank  peptide_num sample_name      affinity best_allele  processing_score  presentation_score
-0  KSEYMTSWFY   NNNNNNN  CCCCCCCC            0     sample1  16737.745268       A0301          0.605816            0.056190
-1   NLVPMVATV  SSSSSSSS   YYYAAAA            1     sample1     15.038358       A0201          0.824994            0.986719
-2  KSEYMTSWFY   NNNNNNN  CCCCCCCC            0     sample2     62.540779       A0101          0.605816            0.897493
-3   NLVPMVATV  SSSSSSSS   YYYAAAA            1     sample2     15.765500       A0206          0.824994            0.986155
+      peptide   n_flank   c_flank  peptide_num sample_name     affinity best_allele  processing_score  presentation_score  presentation_percentile
+0  KSEYMTSWFY   NNNNNNN  CCCCCCCC            0     sample1  8292.186793       C0201          0.626173            0.097041                 2.991685
+1   NLVPMVATV  SSSSSSSS   YYYAAAA            1     sample1    16.570969       A0201          0.436871            0.956961                 0.036957
+2  KSEYMTSWFY   NNNNNNN  CCCCCCCC            0     sample2    88.898412       A0101          0.626173            0.898967                 0.122663
+3   NLVPMVATV  SSSSSSSS   YYYAAAA            1     sample2    17.406640       A0206          0.436871            0.954945                 0.041168
 ```
 
 ## Scanning protein sequences
@@ -124,17 +124,17 @@ across two sample genotypes and two short peptide sequences.
 ...    comparison_quantity="affinity",
 ...    filter_value=500,
 ...    verbose=0)
-  sequence_name  pos     peptide         n_flank     c_flank sample_name    affinity best_allele  affinity_percentile  processing_score  presentation_score
-0      protein1   13   LLLLVVSNL   MDSKGSSQKGSRL           L     sample1   38.206225       A0201             0.380125          0.017644            0.571060
-1      protein1   14   LLLVVSNLL  MDSKGSSQKGSRLL                 sample1   42.243472       A0201             0.420250          0.090984            0.619213
-2      protein1    5   SSQKGSRLL           MDSKG   LLLVVSNLL     sample2   66.749223       C0202             0.803375          0.383608            0.774468
-3      protein1    6   SQKGSRLLL          MDSKGS    LLVVSNLL     sample2  178.033467       C0202             1.820000          0.275019            0.482206
-4      protein1   13  LLLLVVSNLL   MDSKGSSQKGSRL                 sample1  202.208167       A0201             1.112500          0.058782            0.261320
-5      protein1   12  LLLLLVVSNL    MDSKGSSQKGSR           L     sample1  202.506582       A0201             1.112500          0.010025            0.225648
-6      protein2    0   SSLPTPEDK                    EQAQQTHH     sample1  335.529377       A0301             1.011750          0.010443            0.156798
-7      protein2    0   SSLPTPEDK                    EQAQQTHH     sample2  353.451759       C0202             2.674250          0.010443            0.150753
-8      protein1    8   KGSRLLLLL        MDSKGSSQ      VVSNLL     sample2  410.327286       C0202             2.887000          0.121374            0.194081
-9      protein1    5    SSQKGSRL           MDSKG  LLLLVVSNLL     sample2  477.285937       C0202             3.107375          0.111982            0.168572
+  sequence_name  pos     peptide n_flank c_flank sample_name    affinity best_allele  affinity_percentile  processing_score  presentation_score  presentation_percentile
+0      protein1   14   LLLVVSNLL   GSRLL             sample1   57.180447       A0201             0.398125          0.233159            0.754186                 0.351359
+1      protein1   13   LLLLVVSNL   KGSRL       L     sample1   57.338895       A0201             0.398125          0.030920            0.586465                 0.642908
+2      protein1    5   SSQKGSRLL   MDSKG   LLLVV     sample2  110.778519       C0202             0.781875          0.060995            0.455738                 0.920299
+3      protein1    6   SQKGSRLLL   DSKGS   LLVVS     sample2  254.479925       C0202             1.734875          0.101657            0.303070                 1.356196
+4      protein1   13  LLLLVVSNLL   KGSRL             sample1  260.390251       A0201             1.012500          0.158010            0.345066                 1.214701
+5      protein1   12  LLLLLVVSNL   QKGSR       L     sample1  308.149631       A0201             1.093750          0.015113            0.206176                 1.801603
+6      protein2    0   SSLPTPEDK           EQAQQ     sample2  410.354088       C0202             2.398000          0.003090            0.158057                 2.154946
+7      protein1    5    SSQKGSRL   MDSKG   LLLLV     sample2  444.320680       C0202             2.511750          0.026198            0.159450                 2.137962
+8      protein2    0   SSLPTPEDK           EQAQQ     sample1  459.295763       A0301             0.970625          0.003090            0.143999                 2.292011
+9      protein1    4   GSSQKGSRL    MDSK   LLLLV     sample2  469.052760       C0202             2.594750          0.013744            0.146487                 2.261060
 ```
 
 When using `predict_sequences`, the flanking sequences for each peptide are
@@ -156,9 +156,9 @@ Here's an example:
 >>> from mhcflurry import Class1AffinityPredictor
 >>> predictor = Class1AffinityPredictor.load()
 >>> predictor.predict_to_dataframe(allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
-    peptide     allele    prediction  prediction_low  prediction_high  prediction_percentile
-0  SIINFEKL  HLA-A0201  12906.786173     8829.460289     18029.923061               6.566375
-1  SIINFEQL  HLA-A0201  13025.300796     9050.056312     18338.004869               6.623625
+    peptide       allele    prediction  prediction_low  prediction_high  prediction_percentile
+0  SIINFEKL  HLA-A*02:01  11927.160672     6901.075753     18127.365636               6.296000
+1  SIINFEQL  HLA-A*02:01  12070.888207     7362.362111     18465.971144               6.354125
 ```
 
 The `prediction_low` and `prediction_high` fields give the 5-95 percentile
