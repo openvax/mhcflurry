@@ -19,16 +19,13 @@ Have a bugfix or other contribution? We would love your help. See our [contribut
 
 ## 2.3.0 release candidate
 
-2.3.0 is currently a **release candidate** (`2.3.0rc3`), not yet a final
-release. It keeps the same API and pre-trained models as 2.2.x. Install it by
-pinning the version:
-
-    pip install mhcflurry==2.3.0rc3
-
-For now, `pip install --upgrade mhcflurry` still installs the latest stable
-release (2.2.x), because pip skips pre-releases unless you pin the version or
-pass `--pre`. Once 2.3.0 is released, `pip install --upgrade mhcflurry` will
-upgrade to it as usual.
+> [!IMPORTANT]
+> 2.3.0 is currently a release candidate (`2.3.0rc3`), not yet a final release.
+> It keeps the same public API and pre-trained models as 2.2.x. Install it with
+> `pip install --pre mhcflurry`, or pin the version with
+> `pip install mhcflurry==2.3.0rc3`. A plain `pip install --upgrade mhcflurry`
+> stays on the latest stable release (2.2.x) until 2.3.0 is final, since pip
+> skips pre-releases.
 
 2.3.0 adds speed and tooling for people who train their own models or run large
 prediction jobs:

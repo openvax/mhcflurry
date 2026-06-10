@@ -27,6 +27,27 @@ except:
     readme = ""
 
 
+def readme_for_pypi(text):
+    # PyPI's Markdown renderer (cmark-gfm) does not support GitHub's
+    # "> [!IMPORTANT]" alert syntax and would display the literal "[!IMPORTANT]"
+    # token. Convert each alert marker line to a bold label so the PyPI
+    # long_description renders as a clean blockquote. GitHub keeps the colored
+    # callout because README.md on disk is unchanged.
+    import re
+    labels = {
+        "NOTE": "Note",
+        "TIP": "Tip",
+        "IMPORTANT": "Important",
+        "WARNING": "Warning",
+        "CAUTION": "Caution",
+    }
+    return re.sub(
+        r"(?m)^(\s*>\s*)\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*$",
+        lambda m: "%s**%s**" % (m.group(1), labels[m.group(2)]),
+        text,
+    )
+
+
 with open("mhcflurry/version.py", "r") as f:
     version = re.search(
         r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]', f.read(), re.MULTILINE
@@ -96,7 +117,7 @@ if __name__ == "__main__":
             "mhcflurry": ["downloads.yml"],
         },
         install_requires=required_packages,
-        long_description=readme,
+        long_description=readme_for_pypi(readme),
         long_description_content_type="text/markdown",
         packages=find_packages(include=["mhcflurry", "mhcflurry.*"]),
     )
