@@ -19,11 +19,11 @@ Have a bugfix or other contribution? We would love your help. See our [contribut
 
 ## 2.3.0 release candidate
 
-2.3.0 is currently a **release candidate** (`2.3.0rc2`), not yet a final
+2.3.0 is currently a **release candidate** (`2.3.0rc3`), not yet a final
 release. It keeps the same API and pre-trained models as 2.2.x. Install it by
 pinning the version:
 
-    pip install mhcflurry==2.3.0rc2
+    pip install mhcflurry==2.3.0rc3
 
 For now, `pip install --upgrade mhcflurry` still installs the latest stable
 release (2.2.x), because pip skips pre-releases unless you pin the version or
@@ -36,7 +36,7 @@ prediction jobs:
 - Training keeps data on the GPU for the whole fit, avoiding per-batch host/device copies.
 - `mhcflurry-predict`, `mhcflurry-predict-scan`, and `mhcflurry-calibrate-percentile-ranks` use all visible GPUs by default.
 - `mhcflurry-class1-train-pan-allele-models` auto-tunes job and worker counts from the hardware, so the same command runs on a laptop, a single GPU, or an 8×A100 host.
-- `torch.compile`, TF32, and matmul precision are available as flags on the training commands.
+- `torch.compile` and matmul precision (including TF32) are available as flags on the training commands.
 
 ## Try it now
 

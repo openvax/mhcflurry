@@ -34,7 +34,7 @@ models directory, then it will load that predictor instead.
 ## Predicting for individual peptides
 
 To generate predictions for individual peptides, we can use the
-{meth}`~mhcflurry.Class1AffinityPredictor.predict` method of the {class}`~mhcflurry.Class1PresentationPredictor`,
+{meth}`~mhcflurry.Class1PresentationPredictor.predict` method of the {class}`~mhcflurry.Class1PresentationPredictor`,
 loaded above. This method returns a {class}`pandas.DataFrame` with binding affinity, processing, and presentation
 predictions:
 
