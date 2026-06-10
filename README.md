@@ -72,7 +72,7 @@ Or scan protein sequences for potential epitopes:
 ```
 $ mhcflurry-predict-scan \
         --sequences MFVFLVLLPLVSSQCVNLTTRTQLPPAYTNSFTRGVYYPDKVFRSSVLHS \
-        --alleles HLA-A*02:01 \
+        --alleles 'HLA-A*02:01' \
         --out /tmp/predictions.csv
 
 Wrote: /tmp/predictions.csv
