@@ -1,4 +1,16 @@
-'''
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
 Scan protein sequences using the MHCflurry presentation predictor.
 
 By default, sub-sequences (peptides) with affinity percentile ranks less than
@@ -34,7 +46,7 @@ mhcflurry-predict-scan \
     --sequences MGYINVFAFPFTIYSLLLCRMNSRNYIAQVDVVNFNLT \
     --alleles HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02
 
-'''
+"""
 import sys
 import argparse
 import collections
