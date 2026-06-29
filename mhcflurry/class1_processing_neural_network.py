@@ -29,12 +29,12 @@ from .hyperparameters import HyperparameterDefaults
 from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE, _torch_from_numpy
 from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
-from .torch_training_loop import (
-    _configure_matmul_precision,
-    _maybe_compile_loss,
-    _maybe_compile_network,
-    _uncompiled_network,
-    _validation_forward_network,
+from .pytorch_training import (
+    configure_matmul_precision,
+    maybe_compile_loss,
+    maybe_compile_network,
+    uncompiled_network,
+    validation_forward_network,
 )
 
 
@@ -746,7 +746,7 @@ class Class1ProcessingNeuralNetwork(object):
             ``seed`` so one value can drive both trainers.
         """
         device = self.get_device()
-        _configure_matmul_precision(device)
+        configure_matmul_precision(device)
 
         # One seed controls every stochastic step in this fit. Seed numpy's
         # and torch's global RNGs up front so weight init, the example
@@ -790,8 +790,8 @@ class Class1ProcessingNeuralNetwork(object):
         # fit_streaming_batches()
         # paths so production opt-ins (MHCFLURRY_TORCH_COMPILE=1) light up
         # both trainers.
-        network = _maybe_compile_network(network, device)
-        eager_network = _uncompiled_network(network)
+        network = maybe_compile_network(network, device)
+        eager_network = uncompiled_network(network)
 
         # Setup optimizer
         optimizer = self._create_optimizer(network)
@@ -800,7 +800,7 @@ class Class1ProcessingNeuralNetwork(object):
         # compile gate as affinity losses so processing, affinity pretrain,
         # and affinity finetune use one torch performance policy. Presentation
         # training is a separate model family and does not enter this path.
-        loss_fn = _maybe_compile_loss(nn.BCELoss(reduction='none'), device)
+        loss_fn = maybe_compile_loss(nn.BCELoss(reduction='none'), device)
 
         # Validation split
         val_split = self.hyperparameters["validation_split"]
@@ -884,7 +884,7 @@ class Class1ProcessingNeuralNetwork(object):
 
             # Validation
             if val_split > 0:
-                validation_network = _validation_forward_network(
+                validation_network = validation_forward_network(
                     network, eager_network)
                 validation_network.eval()
                 with torch.no_grad():
@@ -1086,13 +1086,13 @@ class Class1ProcessingNeuralNetwork(object):
             device = self.get_device()
         else:
             device = torch.device(device)
-        _configure_matmul_precision(device)
+        configure_matmul_precision(device)
 
         x_dict = self.network_input_tensors(
             sequences=sequences, device=device, throw=throw)
         network = self.network()
         network.to(device)
-        network = _maybe_compile_network(network, device)
+        network = maybe_compile_network(network, device)
         network.eval()
 
         batch_size = resolve_prediction_batch_size(

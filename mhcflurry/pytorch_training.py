@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Shared PyTorch training-loop helpers used by multiple mhcflurry trainers.
+"""Shared PyTorch training helpers used by multiple mhcflurry trainers.
 
 These helpers are model-agnostic: they assume only that the caller has a
 ``torch.nn.Module`` network and a ``torch.device``. The pure-helper subset
@@ -34,7 +34,7 @@ from .local_parallelism import resolve_torchinductor_compile_threads_env
 _TRITON_AUTOGRAD_WARMED_DEVICES = set()
 
 
-def _configure_matmul_precision(device):
+def configure_matmul_precision(device):
     """Optionally enable TF32 + cuDNN benchmark on CUDA Ampere+.
 
     Both are runtime settings with no JIT/startup overhead, but TF32 changes
@@ -90,13 +90,13 @@ def _configure_matmul_precision(device):
         torch.backends.cudnn.benchmark = True
 
 
-def _maybe_compile_network(network, device):
+def maybe_compile_network(network, device):
     """Wrap ``network`` with ``torch.compile`` when the env asks for it.
 
     Gated on ``MHCFLURRY_TORCH_COMPILE=1`` and a CUDA device.
     ``torch.compile`` is heavy: JIT graph capture + kernel fusion + on-
     disk cache + recompile-on-shape-change. The TF32 knob is cheaper
-    and independent — see ``_configure_matmul_precision``.
+    and independent — see ``configure_matmul_precision``.
 
     ``MHCFLURRY_TORCH_COMPILE_MODE`` picks the ``mode=`` kwarg (default,
     reduce-overhead, max-autotune). Default is "default" — codegen time
@@ -141,11 +141,11 @@ def _maybe_compile_network(network, device):
     return torch.compile(network, mode=mode, dynamic=dynamic)
 
 
-def _maybe_compile_loss(loss_obj, device):
+def maybe_compile_loss(loss_obj, device):
     """Wrap a loss module with ``torch.compile`` when the env asks for it.
 
     Gated on ``MHCFLURRY_TORCH_COMPILE=1`` and a CUDA device — same
-    criteria as ``_maybe_compile_network``. ``MSEWithInequalities``
+    criteria as ``maybe_compile_network``. ``MSEWithInequalities``
     issues ~10 small elementwise kernels per step in eager mode
     (reshape → subtract → compare → cast → multiply → compare → cast →
     multiply → square → sum), each with its own launch overhead that
@@ -205,19 +205,19 @@ def _warm_cuda_autograd_for_triton(device):
     _TRITON_AUTOGRAD_WARMED_DEVICES.add(key)
 
 
-def _uncompiled_network(network):
+def uncompiled_network(network):
     """Return the eager module behind ``network``."""
     return network._orig_mod if hasattr(network, "_orig_mod") else network
 
 
-def _validation_forward_network(network, eager_network):
+def validation_forward_network(network, eager_network):
     """Choose the module used for validation forward passes during training."""
     if os.environ.get("MHCFLURRY_TORCH_COMPILE_VALIDATION", "0") == "1":
         return network
     return eager_network
 
 
-def _effective_validation_batch_size(
+def effective_validation_batch_size(
         device, configured_batch_size, minibatch_size):
     """Return the validation batch size to use for the current device.
 

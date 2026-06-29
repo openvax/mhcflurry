@@ -221,7 +221,7 @@ def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
         captured_regularization_parameters.append(tuple(parameters))
         return original_regularization_penalty(parameters, l1=l1, l2=l2)
 
-    monkeypatch.setattr(processing_module, "_maybe_compile_network", fake_compile)
+    monkeypatch.setattr(processing_module, "maybe_compile_network", fake_compile)
     monkeypatch.setattr(
         processing_module.Class1ProcessingNeuralNetwork,
         "_regularization_penalty",
