@@ -261,7 +261,7 @@ def compute_prediction_batch_size(
 def _env_workers_per_gpu(default=1):
     """Read the ``MHCFLURRY_MAX_WORKERS_PER_GPU`` env var.
 
-    The local_parallelism pool sets this in each training worker so
+    The local parallelism pool sets this in each training worker so
     auto-sized batching + training-memory checks can partition VRAM
     across co-resident workers without the caller wiring it explicitly.
     """
@@ -950,7 +950,7 @@ def _effective_num_workers(num_workers):
     Safety net for DataLoader's ``num_workers>0`` path, which requires
     spawning child processes — forbidden from daemon parents. mhcflurry's
     training orchestrator switched to ``NonDaemonPool`` (see
-    ``local_parallelism.py``) so in production Pool workers are now
+    ``mhcflurry.parallelism``) so in production Pool workers are now
     non-daemonic and this downgrade does NOT fire. It remains as
     defense-in-depth for:
 
@@ -973,7 +973,7 @@ def _effective_num_workers(num_workers):
             f"dataloader_num_workers={num_workers} requested from a daemon "
             f"process; downgrading to 0 because daemon processes cannot "
             f"spawn children. If this is mhcflurry's Pool worker, switch "
-            f"to NonDaemonPool (mhcflurry/local_parallelism.py); if it's "
+            f"to NonDaemonPool (mhcflurry/parallelism); if it's "
             f"your own caller, use a non-daemonic executor or accept the "
             f"downgrade (set dataloader_num_workers=0 explicitly to silence).",
             DeprecationWarning,

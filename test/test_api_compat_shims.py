@@ -20,6 +20,31 @@ from mhcflurry.data_dependent_weights_initialization import get_activations
 from mhcflurry.local_parallelism import worker_init
 
 
+def test_old_local_parallelism_import_matches_new_parallelism_package():
+    import mhcflurry.local_parallelism as old_module
+    import mhcflurry.parallelism as new_package
+    from mhcflurry.parallelism import (
+        cli_args,
+        planning,
+        torch_compile,
+        worker_pool,
+        worker_runtime,
+    )
+
+    assert old_module is new_package
+    assert old_module.worker_init is worker_runtime.worker_init
+    assert old_module.add_local_parallelism_args is cli_args.add_local_parallelism_args
+    assert old_module.resolve_local_parallelism_args is planning.resolve_local_parallelism_args
+    assert (
+        old_module.worker_pool_with_gpu_assignments
+        is worker_pool.worker_pool_with_gpu_assignments
+    )
+    assert (
+        old_module.resolve_torchinductor_compile_threads_env
+        is torch_compile.resolve_torchinductor_compile_threads_env
+    )
+
+
 def test_legacy_configure_tensorflow_entry_point():
     with pytest.warns(FutureWarning, match="configure_tensorflow"):
         configure_tensorflow(backend="tensorflow", gpu_device_nums=None, num_threads=1)
@@ -37,7 +62,7 @@ def test_worker_init_preserves_empty_gpu_assignment(monkeypatch):
         calls.append(kwargs)
 
     monkeypatch.setattr(
-        "mhcflurry.local_parallelism.configure_pytorch",
+        "mhcflurry.parallelism.worker_runtime.configure_pytorch",
         fake_configure_pytorch,
     )
 

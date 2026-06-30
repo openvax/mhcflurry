@@ -35,7 +35,7 @@ from ..common import (
     configure_random_seed,
     write_generate_sh,
 )
-from ..local_parallelism import (
+from ..parallelism import (
     add_local_parallelism_args,
     attach_constant_data_to_work_items_if_needed,
     call_wrapped_kwargs,

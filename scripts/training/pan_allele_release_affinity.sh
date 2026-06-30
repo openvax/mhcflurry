@@ -33,7 +33,7 @@ export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
 # Inductor defaults to a large compile helper pool per training process.
 # With 8-16 concurrent mhcflurry workers that multiplies into thousands of
 # short-lived subprocesses and can stall the box. Leave the env unset by
-# default: mhcflurry.local_parallelism resolves it from the final NUM_JOBS
+# default: mhcflurry.parallelism resolves it from the final NUM_JOBS
 # in the same place that resolves Pool/GPU concurrency. Callers can still
 # export TORCHINDUCTOR_COMPILE_THREADS before invoking this script to pin.
 # OMP/MKL/OPENBLAS set via set_cpu_threads helper below — auto-computes
@@ -244,7 +244,7 @@ elif [ "$MAX_WORKERS_PER_GPU_REQUESTED" = "auto" ]; then
     MAX_WORKERS_PER_GPU="$(
         NUM_JOBS="$_NUM_JOBS_FOR_AUTO" GPUS="$GPUS" python - <<'PY'
 import os
-from mhcflurry.local_parallelism import auto_max_workers_per_gpu
+from mhcflurry.parallelism import auto_max_workers_per_gpu
 print(auto_max_workers_per_gpu(
     num_jobs=int(os.environ["NUM_JOBS"]),
     num_gpus=int(os.environ["GPUS"]),

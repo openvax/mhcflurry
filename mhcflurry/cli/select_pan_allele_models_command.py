@@ -41,7 +41,7 @@ from ..common import (
     filter_canonicalizable_alleles,
     write_generate_sh,
 )
-from ..local_parallelism import (
+from ..parallelism import (
     attach_constant_data_to_work_items_if_needed,
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,

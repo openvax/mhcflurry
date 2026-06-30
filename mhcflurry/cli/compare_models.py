@@ -47,7 +47,7 @@ import numpy
 import pandas
 from sklearn.metrics import average_precision_score, roc_auc_score
 
-from ..local_parallelism import (
+from ..parallelism import (
     add_prediction_parallelism_args,
     call_wrapped_kwargs,
     chunk_ranges_for_local_parallelism,

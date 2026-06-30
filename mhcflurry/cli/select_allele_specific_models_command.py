@@ -43,7 +43,7 @@ from ..common import (
     write_generate_sh,
 )
 from ..encodable_sequences import EncodableSequences
-from ..local_parallelism import (
+from ..parallelism import (
     add_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
 )

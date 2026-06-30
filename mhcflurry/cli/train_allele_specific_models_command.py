@@ -38,7 +38,7 @@ from ..common import (
     derive_seed,
     write_generate_sh,
 )
-from ..local_parallelism import (
+from ..parallelism import (
     add_local_parallelism_args,
     apply_resolved_training_hyperparameters_to_work_items,
     attach_constant_data_to_work_items_if_needed,

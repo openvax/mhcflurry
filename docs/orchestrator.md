@@ -80,7 +80,7 @@ models fall back to the host encoder so their input shape remains unchanged.
 
 Two backends, one CLI surface:
 
-- **Local** (`local_parallelism.py`): `multiprocessing.Pool` of
+- **Local** (`mhcflurry.parallelism`): `multiprocessing.Pool` of
   non-daemon workers. Workers can spawn DataLoader children for the
   pretrain streaming path. `resolve_local_parallelism_args` is the
   single pre-fork normalization point: it resolves
@@ -114,7 +114,7 @@ paths remain intentionally smaller.
 
 Three knobs auto-derive from the box's hardware so the orchestrator
 keeps working when the recipe lands on a different tier. Every auto
-resolver lives in `mhcflurry.local_parallelism` and is exercised by
+resolver lives in `mhcflurry.parallelism` and is exercised by
 the unit-test matrix in `test/test_orchestrator_helpers.py`. The
 production recipes pass `auto` for each; pin a literal int only when
 intentionally re-benchmarking.
@@ -184,7 +184,7 @@ bounded by `minibatch_size`, not total dataset rows.
 ### `--num-jobs` (auto-derives from MWPG × GPUs)
 
 `--num-jobs` defaults to `auto`, which resolves to `gpus × max_workers_per_gpu`
-via `mhcflurry.local_parallelism.auto_num_jobs(num_gpus, max_workers_per_gpu)`
+via `mhcflurry.parallelism.auto_num_jobs(num_gpus, max_workers_per_gpu)`
 once `auto_max_workers_per_gpu` has resolved. Pass an integer to pin it.
 
 ### Cross-model coverage
@@ -378,10 +378,10 @@ asymmetries to know about:
   `mhcflurry/class1_affinity_training_data.py` (`AffinityDeviceTrainingData`)
 - Pseudogene/null filter: `mhcflurry/common.py`
   (`filter_canonicalizable_alleles`)
-- Worker pool sizing: `mhcflurry/local_parallelism.py`
+- Worker pool sizing: `mhcflurry/parallelism`
   (`auto_max_workers_per_gpu`, `resolve_max_workers_per_gpu`)
 - Compile-thread hoist:
-  `mhcflurry/local_parallelism.hoist_torchinductor_compile_threads`
+  `mhcflurry.parallelism.hoist_torchinductor_compile_threads`
 - Cluster fork point:
   `mhcflurry/cluster_parallelism.cluster_results`
 

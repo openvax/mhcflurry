@@ -25,7 +25,7 @@ import tqdm
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from mhcflurry.common import configure_logging
-from mhcflurry.local_parallelism import (
+from mhcflurry.parallelism import (
     add_local_parallelism_args,
     attach_constant_data_to_work_items_if_needed,
     resolve_local_parallelism_args,
