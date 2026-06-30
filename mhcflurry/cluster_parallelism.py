@@ -26,7 +26,7 @@ import subprocess
 import shutil
 from shlex import quote
 
-from .local_parallelism import (
+from .parallelism import (
     call_wrapped_kwargs,
     configure_cluster_worker_torch_compile_threads,
 )

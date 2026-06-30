@@ -41,7 +41,7 @@ from ..common import (
     write_generate_sh,
 )
 from ..encodable_sequences import EncodableSequences
-from ..local_parallelism import (
+from ..parallelism import (
     attach_constant_data_to_work_items_if_needed,
     add_local_parallelism_args,
     chunk_ranges_for_local_parallelism,
@@ -261,7 +261,7 @@ def run(argv=sys.argv[1:]):
     # footprint. Presentation calibration in particular keeps the full
     # presentation predictor stack resident while generating a large
     # peptide-by-genotype score universe.
-    from ..local_parallelism import resolve_local_parallelism_args
+    from ..parallelism import resolve_local_parallelism_args
     num_lengths = args.length_range[1] - args.length_range[0] + 1
     prediction_rows = int(args.num_peptides_per_length) * max(num_lengths, 1)
     if args.predictor_kind == "class1_presentation":

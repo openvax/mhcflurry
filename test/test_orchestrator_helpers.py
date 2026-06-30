@@ -14,7 +14,7 @@
 
 Covers:
 * ``mhcflurry.common.filter_canonicalizable_alleles``.
-* ``mhcflurry.local_parallelism.hoist_torchinductor_compile_threads``.
+* ``mhcflurry.parallelism.hoist_torchinductor_compile_threads``.
 * Confirmation that the select commands' source actually invokes the
   shared filter (cheap regression for the same class of bug as the
   calibrate pseudogene crash).
@@ -52,7 +52,7 @@ def test_filter_select_call_sites():
 
 def test_hoist_torchinductor_no_op_when_compile_disabled(monkeypatch):
     """If MHCFLURRY_TORCH_COMPILE!=1 the hoist must not touch the env."""
-    from mhcflurry.local_parallelism import (
+    from mhcflurry.parallelism import (
         hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
     )
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
@@ -64,7 +64,7 @@ def test_hoist_torchinductor_no_op_when_compile_disabled(monkeypatch):
 
 
 def test_hoist_torchinductor_respects_user_pin(monkeypatch):
-    from mhcflurry.local_parallelism import (
+    from mhcflurry.parallelism import (
         hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
     )
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
@@ -77,7 +77,7 @@ def test_hoist_torchinductor_respects_user_pin(monkeypatch):
 
 
 def test_hoist_torchinductor_sizes_against_num_jobs(monkeypatch):
-    from mhcflurry.local_parallelism import (
+    from mhcflurry.parallelism import (
         hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
     )
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
@@ -115,7 +115,7 @@ def test_hoist_torchinductor_sizes_against_num_jobs(monkeypatch):
 
 
 def test_hoist_torchinductor_recomputes_auto_owned_value(monkeypatch):
-    from mhcflurry.local_parallelism import (
+    from mhcflurry.parallelism import (
         hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
     )
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
@@ -128,7 +128,7 @@ def test_hoist_torchinductor_recomputes_auto_owned_value(monkeypatch):
 
 
 def test_hoist_torchinductor_accepts_auto_env(monkeypatch):
-    from mhcflurry.local_parallelism import (
+    from mhcflurry.parallelism import (
         hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
     )
 
@@ -143,7 +143,7 @@ def test_hoist_torchinductor_accepts_auto_env(monkeypatch):
 
 
 def test_resolve_torchinductor_env_accepts_auto_when_compile_disabled(monkeypatch):
-    from mhcflurry.local_parallelism import resolve_torchinductor_compile_threads_env
+    from mhcflurry.parallelism import resolve_torchinductor_compile_threads_env
 
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
     monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "auto")
@@ -158,7 +158,7 @@ def test_resolve_torchinductor_env_accepts_auto_when_compile_disabled(monkeypatc
 
 
 def test_resolve_torchinductor_env_rejects_invalid_user_pin(monkeypatch):
-    from mhcflurry.local_parallelism import resolve_torchinductor_compile_threads_env
+    from mhcflurry.parallelism import resolve_torchinductor_compile_threads_env
 
     monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "autoish")
     monkeypatch.delenv("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
@@ -168,7 +168,7 @@ def test_resolve_torchinductor_env_rejects_invalid_user_pin(monkeypatch):
 
 
 def test_hoist_torchinductor_warmup_uses_larger_single_worker_budget(monkeypatch):
-    from mhcflurry.local_parallelism import (
+    from mhcflurry.parallelism import (
         hoist_torchinductor_compile_threads as _hoist_torchinductor_compile_threads,
     )
 
@@ -181,7 +181,7 @@ def test_hoist_torchinductor_warmup_uses_larger_single_worker_budget(monkeypatch
 
 
 def test_cluster_worker_compile_threads_auto(monkeypatch):
-    from mhcflurry.local_parallelism import configure_cluster_worker_torch_compile_threads
+    from mhcflurry.parallelism import configure_cluster_worker_torch_compile_threads
 
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
     monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "auto")
@@ -195,7 +195,7 @@ def test_cluster_worker_compile_threads_auto(monkeypatch):
 
 
 def test_attach_constant_data_skips_fork_pool():
-    from mhcflurry.local_parallelism import attach_constant_data_to_work_items_if_needed
+    from mhcflurry.parallelism import attach_constant_data_to_work_items_if_needed
 
     class Ctx:
         def get_start_method(self):
@@ -216,7 +216,7 @@ def test_attach_constant_data_skips_fork_pool():
 
 
 def test_attach_constant_data_attaches_for_non_fork_pool():
-    from mhcflurry.local_parallelism import attach_constant_data_to_work_items_if_needed
+    from mhcflurry.parallelism import attach_constant_data_to_work_items_if_needed
 
     class Ctx:
         def get_start_method(self):
@@ -263,7 +263,7 @@ def test_auto_dataloader_num_workers_hardware_tiers():
     measured against. Regressions here will silently change runtime
     parallelism on the next run, so the table is fixed.
     """
-    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+    from mhcflurry.parallelism import auto_dataloader_num_workers
 
     cases = [
         # (label, vcpus, ram_gb, num_fit_workers, expected)
@@ -296,7 +296,7 @@ def test_auto_dataloader_num_workers_ram_constrained():
     Each DL child is ~500 MB RSS over the main fit-worker baseline (~2 GB).
     When ram_per_fit < 2 GB, no children should be spawned (in-process).
     """
-    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+    from mhcflurry.parallelism import auto_dataloader_num_workers
 
     cases = [
         # (label, vcpus, ram_gb, num_fit_workers, expected)
@@ -317,7 +317,7 @@ def test_auto_dataloader_num_workers_ram_constrained():
 
 def test_auto_dataloader_num_workers_no_ram_input_means_cpu_only_decision():
     """When ram_gb is None, only CPU/fit-worker math drives the choice."""
-    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+    from mhcflurry.parallelism import auto_dataloader_num_workers
 
     # 176v / 16fit → cpu_per_fit=11, cpu_cap=5, hard_cap=4 → 4 regardless of RAM.
     assert auto_dataloader_num_workers(num_fit_workers=16, vcpus=176) == 4
@@ -327,7 +327,7 @@ def test_auto_dataloader_num_workers_no_ram_input_means_cpu_only_decision():
 
 def test_auto_dataloader_num_workers_hard_cap_env_override(monkeypatch):
     """``MHCFLURRY_AUTO_DATALOADER_HARD_CAP`` shifts the ceiling."""
-    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+    from mhcflurry.parallelism import auto_dataloader_num_workers
 
     # Default cap = 4; with 176v/16fit we'd get 4.
     monkeypatch.setenv("MHCFLURRY_AUTO_DATALOADER_HARD_CAP", "2")
@@ -350,7 +350,7 @@ def test_auto_random_negative_pool_epochs_hardware_tiers():
     pool epochs scale inversely with ``num_workers / ram_gb``. The hard
     cap of 10 prevents marginal-return values from running away.
     """
-    from mhcflurry.local_parallelism import auto_random_negative_pool_epochs
+    from mhcflurry.parallelism import auto_random_negative_pool_epochs
 
     cases = [
         # (label, ram_gb, num_workers, expected)
@@ -384,7 +384,7 @@ def test_auto_random_negative_pool_epochs_hardware_tiers():
 
 def test_auto_random_negative_pool_epochs_serial_or_no_ram_returns_one():
     """Serial run or unknown-RAM box → conservative pool_epochs=1."""
-    from mhcflurry.local_parallelism import auto_random_negative_pool_epochs
+    from mhcflurry.parallelism import auto_random_negative_pool_epochs
 
     # No fit-workers: serial run, no need to amortize.
     assert auto_random_negative_pool_epochs(
@@ -405,7 +405,7 @@ def test_auto_random_negative_pool_epochs_serial_or_no_ram_returns_one():
 
 def test_auto_random_negative_pool_epochs_env_overrides(monkeypatch):
     """Env knobs let operators tighten or loosen the heuristic."""
-    from mhcflurry.local_parallelism import auto_random_negative_pool_epochs
+    from mhcflurry.parallelism import auto_random_negative_pool_epochs
 
     # Verda baseline: 6.
     assert auto_random_negative_pool_epochs(
@@ -437,7 +437,7 @@ def test_auto_random_negative_pool_epochs_env_overrides(monkeypatch):
 
 def test_auto_dataloader_num_workers_handles_none_and_zero_fit_workers():
     """Serial / no-fit-worker case should return 0 (in-process)."""
-    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+    from mhcflurry.parallelism import auto_dataloader_num_workers
 
     assert auto_dataloader_num_workers(num_fit_workers=None) == 0
     assert auto_dataloader_num_workers(num_fit_workers=0) == 0
@@ -446,7 +446,7 @@ def test_auto_dataloader_num_workers_handles_none_and_zero_fit_workers():
 
 def test_resolve_dataloader_num_workers_passthrough_int():
     """Pinned int is a passthrough; only "auto" or None invokes the heuristic."""
-    from mhcflurry.local_parallelism import resolve_dataloader_num_workers
+    from mhcflurry.parallelism import resolve_dataloader_num_workers
 
     assert resolve_dataloader_num_workers(0, num_fit_workers=16) == 0
     assert resolve_dataloader_num_workers(2, num_fit_workers=16) == 2
@@ -454,7 +454,7 @@ def test_resolve_dataloader_num_workers_passthrough_int():
 
 
 def test_resolve_dataloader_num_workers_auto_calls_heuristic():
-    from mhcflurry.local_parallelism import resolve_dataloader_num_workers
+    from mhcflurry.parallelism import resolve_dataloader_num_workers
 
     # Verda-like config; "auto" → 4.
     got = resolve_dataloader_num_workers(
@@ -469,7 +469,7 @@ def test_resolve_dataloader_num_workers_auto_calls_heuristic():
 
 
 def test_resolve_dataloader_num_workers_rejects_negative():
-    from mhcflurry.local_parallelism import resolve_dataloader_num_workers
+    from mhcflurry.parallelism import resolve_dataloader_num_workers
 
     with pytest.raises(ValueError, match=">= 0"):
         resolve_dataloader_num_workers(-1, num_fit_workers=16)
@@ -478,7 +478,7 @@ def test_resolve_dataloader_num_workers_rejects_negative():
 
 
 def test_auto_num_jobs_basic():
-    from mhcflurry.local_parallelism import auto_num_jobs
+    from mhcflurry.parallelism import auto_num_jobs
 
     assert auto_num_jobs(num_gpus=8, max_workers_per_gpu=2) == 16
     assert auto_num_jobs(num_gpus=1, max_workers_per_gpu=2) == 2
@@ -488,7 +488,7 @@ def test_auto_num_jobs_basic():
 
 def test_auto_num_jobs_rejects_unresolved_auto():
     """Caller must resolve max_workers_per_gpu first."""
-    from mhcflurry.local_parallelism import auto_num_jobs
+    from mhcflurry.parallelism import auto_num_jobs
 
     with pytest.raises(ValueError, match="must be resolved"):
         auto_num_jobs(num_gpus=8, max_workers_per_gpu="auto")
@@ -496,7 +496,7 @@ def test_auto_num_jobs_rejects_unresolved_auto():
 
 def test_apply_dataloader_num_workers_to_work_items_overrides_existing():
     """Applies the resolved value uniformly; counts overrides for the log."""
-    from mhcflurry.local_parallelism import apply_dataloader_num_workers_to_work_items
+    from mhcflurry.parallelism import apply_dataloader_num_workers_to_work_items
 
     work_items = [
         {"hyperparameters": {"dataloader_num_workers": 1, "minibatch_size": 4096}},
@@ -519,7 +519,7 @@ def test_apply_dataloader_num_workers_to_work_items_overrides_existing():
 
 def test_apply_dataloader_num_workers_skips_items_without_hyperparameters():
     """Defensive: items lacking the 'hyperparameters' key are left alone."""
-    from mhcflurry.local_parallelism import apply_dataloader_num_workers_to_work_items
+    from mhcflurry.parallelism import apply_dataloader_num_workers_to_work_items
 
     work_items = [{"work_item_name": "no-hp"}, {"hyperparameters": {}}]
     apply_dataloader_num_workers_to_work_items(
@@ -530,7 +530,7 @@ def test_apply_dataloader_num_workers_skips_items_without_hyperparameters():
 
 
 def test_apply_resolved_training_hyperparameters_to_work_items():
-    from mhcflurry.local_parallelism import (
+    from mhcflurry.parallelism import (
         apply_resolved_training_hyperparameters_to_work_items,
     )
 
@@ -575,7 +575,7 @@ def test_data_size_growth_does_not_change_dataloader_count():
     should pick the same value whether train_rows is 700K (today) or 7M
     (10x growth).
     """
-    from mhcflurry.local_parallelism import auto_dataloader_num_workers
+    from mhcflurry.parallelism import auto_dataloader_num_workers
 
     big_box = dict(num_fit_workers=16, vcpus=176, ram_gb=400)
     chosen = auto_dataloader_num_workers(**big_box)

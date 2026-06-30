@@ -58,10 +58,11 @@ resolve_dataloader_num_workers() {
 
     NUM_FIT_WORKERS="$num_fit_workers" python -c '
 import os
-from mhcflurry.local_parallelism import auto_dataloader_num_workers, _system_ram_gb
+from mhcflurry.parallelism import auto_dataloader_num_workers
+from mhcflurry.workload_planning import system_memory_info_gb
 print(auto_dataloader_num_workers(
     num_fit_workers=int(os.environ["NUM_FIT_WORKERS"]),
-    ram_gb=_system_ram_gb(),
+    ram_gb=system_memory_info_gb()["total_gb"],
 ))
 '
 }

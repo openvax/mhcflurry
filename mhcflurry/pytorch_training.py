@@ -29,7 +29,7 @@ import os
 
 import torch
 
-from .local_parallelism import resolve_torchinductor_compile_threads_env
+from .parallelism import resolve_torchinductor_compile_threads_env
 
 _TRITON_AUTOGRAD_WARMED_DEVICES = set()
 

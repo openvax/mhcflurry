@@ -44,7 +44,7 @@ elif [ "$MAX_WORKERS_PER_GPU" = "auto" ]; then
     MAX_WORKERS_PER_GPU="$(
         GPUS="$GPUS" python - <<'PY'
 import os
-from mhcflurry.local_parallelism import auto_max_workers_per_gpu
+from mhcflurry.parallelism import auto_max_workers_per_gpu
 print(auto_max_workers_per_gpu(
     num_jobs=0, num_gpus=int(os.environ["GPUS"]), backend="auto"))
 PY

@@ -79,7 +79,7 @@ MHCFLURRY_SCALE_LR_BASE_MB="${MHCFLURRY_SCALE_LR_BASE_MB:-128}"
 # overhead. Run calibrate manually for the winning cell at the end.
 MHCFLURRY_SKIP_CALIBRATE="${MHCFLURRY_SKIP_CALIBRATE:-0}"
 # --num-jobs and --max-workers-per-gpu are passed as ``auto`` so that
-# the resolver in mhcflurry/local_parallelism.py picks values that match
+# the resolver in mhcflurry/parallelism picks values that match
 # the box (free VRAM, GPU count, per-worker memory) instead of being
 # pinned to fixed sweep-time defaults that drift away from reality.
 

@@ -56,7 +56,7 @@ import pandas
 from ..downloads import get_default_class1_presentation_models_dir
 from ..class1_presentation_predictor import Class1PresentationPredictor
 from ..fasta import read_fasta_to_dataframe
-from ..local_parallelism import (
+from ..parallelism import (
     add_prediction_parallelism_args,
     chunk_ranges_for_local_parallelism,
     num_workers_per_gpu_from_args,
