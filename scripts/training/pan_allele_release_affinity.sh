@@ -290,7 +290,7 @@ PARALLELISM_ARGS=(
     # Orchestrator-owned tuning knobs. CLI-resolved values are propagated
     # to env (MHCFLURRY_TORCH_COMPILE / MHCFLURRY_MATMUL_PRECISION /
     # MHCFLURRY_ENABLE_TIMING) inside resolve_local_parallelism_args, so
-    # the existing _maybe_compile_network / _configure_matmul_precision /
+    # the existing maybe_compile_network / configure_matmul_precision /
     # _timing_enabled call sites continue to read env unchanged. Defaults
     # to 'auto' for --torch-compile so an env preset (e.g.
     # MHCFLURRY_TORCH_COMPILE=1 set by the runplz container) still wins

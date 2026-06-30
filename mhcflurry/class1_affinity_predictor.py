@@ -1408,9 +1408,9 @@ class Class1AffinityPredictor(object):
             DEFAULT_PREDICT_BATCH_SIZE,
             resolve_prediction_batch_size,
         )
-        from .torch_training_loop import (
-            _configure_matmul_precision,
-            _maybe_compile_network,
+        from .pytorch_training import (
+            configure_matmul_precision,
+            maybe_compile_network,
         )
 
         peptides = EncodableSequences.create(peptides)
@@ -1483,10 +1483,10 @@ class Class1AffinityPredictor(object):
         model_obj.set_allele_representations(allele_representations)
 
         device = model_obj.get_device()
-        _configure_matmul_precision(device)
+        configure_matmul_precision(device)
         network = model_obj.network(borrow=True)
         network.to(device)
-        network = _maybe_compile_network(network, device)
+        network = maybe_compile_network(network, device)
         network.eval()
 
         n_peptides = len(peptides)

@@ -844,10 +844,16 @@ class Class1PresentationPredictor(object):
         if processing_scores is not None:
             df["processing_score"] = df.peptide_num.map(
                 pandas.Series(processing_scores))
-            if c_flanks is not None:
-                df.insert(1, "c_flank", df.peptide_num.map(pandas.Series(c_flanks)))
             if n_flanks is not None:
-                df.insert(1, "n_flank", df.peptide_num.map(pandas.Series(n_flanks)))
+                flank_df = pandas.DataFrame({
+                    "n_flank": df.peptide_num.map(pandas.Series(n_flanks)),
+                    "c_flank": df.peptide_num.map(pandas.Series(c_flanks)),
+                })
+                leading_columns = [df.columns[0]]
+                df = pandas.concat(
+                    [df[leading_columns], flank_df, df.drop(columns=leading_columns)],
+                    axis=1,
+                )
 
         predict_presentation = (
                 "affinity_score" in df.columns and
@@ -1152,15 +1158,18 @@ class Class1PresentationPredictor(object):
             affinity_model_kwargs=affinity_model_kwargs,
             processing_batch_size=processing_batch_size)
 
-        result_df.insert(
-            0,
-            "sequence_name",
-            result_df.peptide_num.map(pandas.Series(sequence_names)))
-        result_df.insert(
-            1,
-            "pos",
-            result_df.peptide_num.map(pandas.Series(position_in_sequence)))
-        del result_df["peptide_num"]
+        sequence_metadata = pandas.DataFrame({
+            "sequence_name": result_df.peptide_num.map(
+                pandas.Series(sequence_names)
+            ),
+            "pos": result_df.peptide_num.map(
+                pandas.Series(position_in_sequence)
+            ),
+        })
+        result_df = pandas.concat(
+            [sequence_metadata, result_df.drop(columns=["peptide_num"])],
+            axis=1,
+        )
 
         comparison_is_score = comparison_quantity.endswith("score")
 

@@ -29,10 +29,7 @@ from mhcflurry.class1_neural_network import (
     Class1NeuralNetworkModel,
     MergedClass1NeuralNetwork,
     _batched_validation_loss,
-    _effective_validation_batch_size,
-    _validation_forward_network,
 )
-from mhcflurry.torch_training_loop import _maybe_compile_loss
 from mhcflurry.class1_processing_neural_network import (
     Class1ProcessingModel,
     Class1ProcessingNeuralNetwork,
@@ -43,6 +40,11 @@ from mhcflurry.pytorch_losses import (
     MSEWithInequalities,
     MultiallelicMassSpecLoss,
     get_pytorch_loss,
+)
+from mhcflurry.pytorch_training import (
+    effective_validation_batch_size,
+    maybe_compile_loss,
+    validation_forward_network,
 )
 from mhcflurry.testing_utils import startup, cleanup
 
@@ -94,11 +96,13 @@ def _plain_or_shared_tensor(value):
 
 
 def test_maybe_compile_loss_defaults_on_with_network_compile_cuda(monkeypatch):
-    from mhcflurry import torch_training_loop as ttl
+    from mhcflurry import pytorch_training as training
 
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE_LOSS", raising=False)
-    monkeypatch.setattr(ttl, "_warm_cuda_autograd_for_triton", lambda device: None)
+    monkeypatch.setattr(
+        training, "_warm_cuda_autograd_for_triton", lambda device: None
+    )
     calls = []
 
     def fake_compile(obj, mode=None, dynamic=None):
@@ -108,7 +112,7 @@ def test_maybe_compile_loss_defaults_on_with_network_compile_cuda(monkeypatch):
     monkeypatch.setattr(torch, "compile", fake_compile)
     loss = MSEWithInequalities()
 
-    result = _maybe_compile_loss(loss, torch.device("cuda"))
+    result = maybe_compile_loss(loss, torch.device("cuda"))
 
     assert result == "compiled-loss"
     assert calls == [(loss, "default", True)]
@@ -121,7 +125,7 @@ def test_maybe_compile_loss_can_be_disabled(monkeypatch):
     monkeypatch.setattr(torch, "compile", lambda *a, **k: calls.append((a, k)))
     loss = MSEWithInequalities()
 
-    result = _maybe_compile_loss(loss, torch.device("cuda"))
+    result = maybe_compile_loss(loss, torch.device("cuda"))
 
     assert result is loss
     assert calls == []
@@ -134,7 +138,7 @@ def test_maybe_compile_loss_requires_network_compile(monkeypatch):
     monkeypatch.setattr(torch, "compile", lambda *a, **k: calls.append((a, k)))
     loss = MSEWithInequalities()
 
-    result = _maybe_compile_loss(loss, torch.device("cuda"))
+    result = maybe_compile_loss(loss, torch.device("cuda"))
 
     assert result is loss
     assert calls == []
@@ -185,10 +189,10 @@ def test_fit_validation_interval_default_runs_every_epoch():
 
 
 def test_effective_validation_batch_size_uses_larger_cuda_default():
-    assert _effective_validation_batch_size(torch.device("cuda"), None, 512) == 4096
-    assert _effective_validation_batch_size(torch.device("cuda"), None, 2048) == 8192
-    assert _effective_validation_batch_size(torch.device("cpu"), None, 512) == 2048
-    assert _effective_validation_batch_size(torch.device("cuda"), 123, 512) == 123
+    assert effective_validation_batch_size(torch.device("cuda"), None, 512) == 4096
+    assert effective_validation_batch_size(torch.device("cuda"), None, 2048) == 8192
+    assert effective_validation_batch_size(torch.device("cpu"), None, 512) == 2048
+    assert effective_validation_batch_size(torch.device("cuda"), 123, 512) == 123
 
 
 @pytest.mark.slow
@@ -1231,10 +1235,10 @@ def test_validation_forward_network_uses_eager_by_default(monkeypatch):
     eager = object()
 
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE_VALIDATION", raising=False)
-    assert _validation_forward_network(compiled, eager) is eager
+    assert validation_forward_network(compiled, eager) is eager
 
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE_VALIDATION", "1")
-    assert _validation_forward_network(compiled, eager) is compiled
+    assert validation_forward_network(compiled, eager) is compiled
 
 
 def test_optimizer_defaults_match_keras():

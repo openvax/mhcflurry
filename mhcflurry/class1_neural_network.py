@@ -44,13 +44,13 @@ from .random_negative_peptides import (
     supports_device_random_negative_encoding,
 )
 from .class1_affinity_training_data import AffinityDeviceTrainingData
-from .torch_training_loop import (
-    _configure_matmul_precision,
-    _effective_validation_batch_size,
-    _maybe_compile_loss,
-    _maybe_compile_network,
-    _uncompiled_network,
-    _validation_forward_network,
+from .pytorch_training import (
+    configure_matmul_precision,
+    effective_validation_batch_size,
+    maybe_compile_loss,
+    maybe_compile_network,
+    uncompiled_network,
+    validation_forward_network,
 )
 
 
@@ -3424,7 +3424,7 @@ class Class1NeuralNetwork(object):
         phases of a pan-allele fit.
         """
         device = self.get_device()
-        _configure_matmul_precision(device)
+        configure_matmul_precision(device)
 
         # Single-seed control, mirroring fit(): seed up front so weight init
         # and shuffling in this pass are reproducible. See fit() for detail.
@@ -3593,13 +3593,13 @@ class Class1NeuralNetwork(object):
         # burns through the 8-entry cache_size_limit in seconds and falls
         # back to eager. Compiling after gives dynamo a single stable
         # hook state to specialize on.
-        network = _maybe_compile_network(network, device)
-        eager_network = _uncompiled_network(network)
-        # Compile the loss alongside the network — see _maybe_compile_loss
+        network = maybe_compile_network(network, device)
+        eager_network = uncompiled_network(network)
+        # Compile the loss alongside the network; see maybe_compile_loss
         # docstring. MSEWithInequalities eager-dispatches ~10 kernels
         # per step; fusing them matters more as batch size grows (less
         # compute to amortize launch overhead against).
-        loss_obj = _maybe_compile_loss(loss_obj, device)
+        loss_obj = maybe_compile_loss(loss_obj, device)
 
         min_val_loss_iteration = None
         min_val_loss = None
@@ -3710,14 +3710,14 @@ class Class1NeuralNetwork(object):
                 network.eval()
                 with torch.inference_mode():
                     validation_start = _timing_start(device, timing_enabled)
-                    val_batch_size = _effective_validation_batch_size(
+                    val_batch_size = effective_validation_batch_size(
                         device,
                         self.hyperparameters["validation_batch_size"],
                         self.hyperparameters["minibatch_size"],
                     )
                     fit_info["effective_validation_batch_size"] = val_batch_size
                     val_loss = _batched_validation_loss(
-                        network=_validation_forward_network(network, eager_network),
+                        network=validation_forward_network(network, eager_network),
                         eager_network=eager_network,
                         val_peptide=val_peptide_device,
                         val_allele=val_allele_device,
@@ -3988,7 +3988,7 @@ class Class1NeuralNetwork(object):
             bit-identical run-to-run. CPU runs are fully deterministic.
         """
         device = self.get_device()
-        _configure_matmul_precision(device)
+        configure_matmul_precision(device)
 
         # One seed controls every stochastic step in this fit. Seed numpy's
         # and torch's global RNGs up front so weight init, the example
@@ -4420,14 +4420,14 @@ class Class1NeuralNetwork(object):
                 needs_initialization = False
 
             # Compile AFTER LSUV hook churn finishes (see fit_streaming_batches
-            # comment above). Idempotent — _maybe_compile_network returns
+            # comment above). Idempotent: maybe_compile_network returns
             # the OptimizedModule unchanged if ``network`` is already
             # compiled, so it's safe to call every epoch. First epoch's
             # first batch pays the codegen cost; rest runs compiled.
-            network = _maybe_compile_network(network, device)
-            eager_network = _uncompiled_network(network)
+            network = maybe_compile_network(network, device)
+            eager_network = uncompiled_network(network)
             # Same rationale as fit_streaming_batches' loss-compile call.
-            loss_obj = _maybe_compile_loss(loss_obj, device)
+            loss_obj = maybe_compile_loss(loss_obj, device)
 
             # Train indices live on device — train_indices_base is
             # contiguous [0, n_train), so a shuffled view is just
@@ -4567,7 +4567,7 @@ class Class1NeuralNetwork(object):
                         validation_materialize_time += (
                             time.perf_counter() - materialize_start
                         )
-                    val_batch_size = _effective_validation_batch_size(
+                    val_batch_size = effective_validation_batch_size(
                         device,
                         self.hyperparameters["validation_batch_size"],
                         batch_size,
@@ -4575,7 +4575,7 @@ class Class1NeuralNetwork(object):
                     fit_info["effective_validation_batch_size"] = val_batch_size
                     validation_start = _timing_start(device, timing_enabled)
                     val_loss = _batched_validation_loss(
-                        network=_validation_forward_network(network, eager_network),
+                        network=validation_forward_network(network, eager_network),
                         eager_network=eager_network,
                         val_peptide=val_peptide,
                         val_allele=val_allele,
@@ -4778,7 +4778,7 @@ class Class1NeuralNetwork(object):
             return self.prediction_cache[peptides].copy()
 
         device = self.get_device()
-        _configure_matmul_precision(device)
+        configure_matmul_precision(device)
 
         x_dict = {"peptide": self.peptides_to_network_input(peptides)}
 
@@ -4794,7 +4794,7 @@ class Class1NeuralNetwork(object):
             network = self.network(borrow=True)
 
         network.to(device)
-        network = _maybe_compile_network(network, device)
+        network = maybe_compile_network(network, device)
         network.eval()
 
         # Resolve ``"auto"`` once the network is on device so the

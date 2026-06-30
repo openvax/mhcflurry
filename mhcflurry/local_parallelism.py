@@ -863,8 +863,8 @@ def resolve_local_parallelism_args(
     args.workload_plan = plan
 
     # Promote orchestrator-owned tuning knobs from CLI to env so the
-    # existing call sites (torch_training_loop._maybe_compile_network,
-    # _configure_matmul_precision, class1_neural_network._timing_enabled,
+    # existing call sites (pytorch_training.maybe_compile_network,
+    # configure_matmul_precision, class1_neural_network._timing_enabled,
     # hoist_torchinductor_compile_threads) read a single source of truth.
     # Auto -> leave env untouched (preserves backward-compat for env-only
     # deploys); explicit CLI value -> overrides env. Workers inherit
@@ -1421,7 +1421,7 @@ def add_local_parallelism_args(parser):
         default="auto",
         help="Enable torch.compile for training loss modules. 'auto' "
              "(default) reads MHCFLURRY_TORCH_COMPILE_LOSS env; when unset, "
-             "loss compilation defaults on inside _maybe_compile_loss. CUDA "
+             "loss compilation defaults on inside maybe_compile_loss. CUDA "
              "workers run a one-op autograd warmup before compiling losses to "
              "avoid the PyTorch 2.4 / Triton invalid-device-context bug.")
     group.add_argument(

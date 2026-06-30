@@ -263,14 +263,20 @@ def motif_summary_chunk_gpu(
     freq_matrices = []
     for cutoff_fraction, k, L, freq_t in freq_tensors:
         freq_arr = freq_t.cpu().numpy()  # (a_size, L, 20)
-        wide = freq_arr.reshape(a_size * L, 20)
-        df = pandas.DataFrame(wide, columns=aa_columns)
-        df.insert(0, "allele", numpy.repeat(batch_alleles_arr, L))
-        df.insert(1, "length", L)
-        df.insert(2, "cutoff_fraction", cutoff_fraction)
-        df.insert(3, "cutoff_count", k)
-        df.insert(
-            4, "position", numpy.tile(numpy.arange(1, L + 1), a_size),
+        row_count = a_size * L
+        wide = freq_arr.reshape(row_count, 20)
+        row_metadata = pandas.DataFrame(
+            {
+                "allele": numpy.repeat(batch_alleles_arr, L),
+                "length": numpy.full(row_count, L, dtype=numpy.int64),
+                "cutoff_fraction": numpy.full(row_count, cutoff_fraction),
+                "cutoff_count": numpy.full(row_count, k, dtype=numpy.int64),
+                "position": numpy.tile(numpy.arange(1, L + 1), a_size),
+            }
+        )
+        df = pandas.concat(
+            [row_metadata, pandas.DataFrame(wide, columns=aa_columns)],
+            axis=1,
         )
         freq_matrices.append(df)
 

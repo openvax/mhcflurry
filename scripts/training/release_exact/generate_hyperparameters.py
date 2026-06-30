@@ -66,7 +66,7 @@ base_hyperparameters = {
     # Validation represents a per-epoch GPU-sync barrier that prevents
     # pipelining the next epoch's CPU prep with the current epoch's
     # training tail. With minibatch=16384 the effective val batch is
-    # 4×minibatch=65536 (see ``_effective_validation_batch_size``), so a
+    # 4×minibatch=65536 (see ``effective_validation_batch_size``), so a
     # 244K-row val set is ~4 batches per pass. Early-stop check still
     # fires reliably because patience=20 is far larger than
     # ``validation_interval=5``. A final validation pass is forced

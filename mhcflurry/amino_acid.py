@@ -17,59 +17,60 @@ vector representations, such as one-hot and BLOSUM62.
 
 import collections
 import warnings
-from copy import copy
 from io import StringIO
 
 import numpy
 import pandas
 
+COMMON_AMINO_ACIDS = collections.OrderedDict(
+    [
+        ("A", "Alanine"),
+        ("C", "Cysteine"),
+        ("D", "Aspartic Acid"),
+        ("E", "Glutamic Acid"),
+        ("F", "Phenylalanine"),
+        ("G", "Glycine"),
+        ("H", "Histidine"),
+        ("I", "Isoleucine"),
+        ("K", "Lysine"),
+        ("L", "Leucine"),
+        ("M", "Methionine"),
+        ("N", "Asparagine"),
+        ("P", "Proline"),
+        ("Q", "Glutamine"),
+        ("R", "Arginine"),
+        ("S", "Serine"),
+        ("T", "Threonine"),
+        ("V", "Valine"),
+        ("W", "Tryptophan"),
+        ("Y", "Tyrosine"),
+    ]
+)
 
-COMMON_AMINO_ACIDS = collections.OrderedDict(sorted({
-    "A": "Alanine",
-    "R": "Arginine",
-    "N": "Asparagine",
-    "D": "Aspartic Acid",
-    "C": "Cysteine",
-    "E": "Glutamic Acid",
-    "Q": "Glutamine",
-    "G": "Glycine",
-    "H": "Histidine",
-    "I": "Isoleucine",
-    "L": "Leucine",
-    "K": "Lysine",
-    "M": "Methionine",
-    "F": "Phenylalanine",
-    "P": "Proline",
-    "S": "Serine",
-    "T": "Threonine",
-    "W": "Tryptophan",
-    "Y": "Tyrosine",
-    "V": "Valine",
-}.items()))
-COMMON_AMINO_ACIDS_WITH_UNKNOWN = copy(COMMON_AMINO_ACIDS)
+COMMON_AMINO_ACIDS_WITH_UNKNOWN = COMMON_AMINO_ACIDS.copy()
 COMMON_AMINO_ACIDS_WITH_UNKNOWN["X"] = "Unknown"
 
-AMINO_ACID_INDEX = dict(
-    (letter, i) for (i, letter) in enumerate(COMMON_AMINO_ACIDS_WITH_UNKNOWN))
+AMINO_ACID_INDEX = {
+    letter: i for i, letter in enumerate(COMMON_AMINO_ACIDS_WITH_UNKNOWN)
+}
 
-for (letter, i) in list(AMINO_ACID_INDEX.items()):
-    AMINO_ACID_INDEX[letter.lower()] = i  # Support lower-case as well.
+for letter, index in list(AMINO_ACID_INDEX.items()):
+    AMINO_ACID_INDEX[letter.lower()] = index  # Support lower-case as well.
 
 AMINO_ACIDS = list(COMMON_AMINO_ACIDS_WITH_UNKNOWN.keys())
 
 # Single canonical letter<->index mapping for the whole codebase. Position
 # of a letter in ``AMINO_ACIDS`` equals ``AMINO_ACID_INDEX[letter]``; X is
 # at index 20. Anything that round-trips between peptide strings and
-# integer index arrays must go through these helpers — that is the
+# integer index arrays must go through these helpers; that is the
 # contract device-resident encoding paths rely on for re-materializing
 # peptides from index tensors.
-
+# Canonical index of the X (unknown) amino acid. This is equal to
+# len(COMMON_AMINO_ACIDS).
 X_INDEX = AMINO_ACID_INDEX["X"]
-"""Canonical index of the X (unknown) amino acid; equal to
-``len(COMMON_AMINO_ACIDS)``."""
 
+# Count of the 20 common amino acids (excludes X).
 NUM_COMMON_AMINO_ACIDS = len(COMMON_AMINO_ACIDS)
-"""Count of the 20 common amino acids (excludes X)."""
 
 
 def peptide_to_indices(peptide, dtype="int8"):
@@ -77,14 +78,14 @@ def peptide_to_indices(peptide, dtype="int8"):
     Convert a peptide string to a 1-D integer index array.
 
     Uppercases the input and uses :data:`AMINO_ACID_INDEX` for the
-    letter→index map so the result matches what
+    letter-to-index map so the result matches what
     :func:`index_encoding` produces for one row.
 
     Parameters
     ----------
     peptide : str
     dtype : numpy dtype, default ``"int8"``
-        Index payloads fit comfortably in int8 (alphabet size 21 ≪ 127).
+        Index payloads fit comfortably in int8 (alphabet size 21 << 127).
 
     Returns
     -------
@@ -104,7 +105,7 @@ def indices_to_peptide(indices):
     Inverse of :func:`peptide_to_indices` for canonical alphabet
     members. Indices at or above the alphabet size raise
     :class:`IndexError`; negative indices wrap (Python list indexing
-    semantics) — no per-element bounds check is added because this is a
+    semantics); no per-element bounds check is added because this is a
     tight per-position loop on a hot re-materialization path.
 
     Parameters
@@ -117,7 +118,10 @@ def indices_to_peptide(indices):
     """
     return "".join(AMINO_ACIDS[int(i)] for i in indices)
 
-BLOSUM62_MATRIX = pandas.read_csv(StringIO("""
+
+BLOSUM62_MATRIX = (
+    pandas.read_csv(
+        StringIO("""
    A  R  N  D  C  Q  E  G  H  I  L  K  M  F  P  S  T  W  Y  V  X
 A  4 -1 -2 -2  0 -1 -1  0 -2 -1 -1 -1 -1 -2 -1  1  0 -3 -2  0  0
 R -1  5  0 -2 -3  1  0 -2  0 -3 -2  2 -1 -3 -2 -1 -1 -3 -2 -3  0
@@ -140,7 +144,12 @@ W -3 -3 -4 -4 -2 -2 -3 -2 -2 -3 -2 -3 -1  1 -4 -3 -2 11  2 -3  0
 Y -2 -2 -2 -3 -2 -1 -2 -3  2 -1 -1 -2 -1  3 -3 -2 -2  2  7 -1  0
 V  0 -3 -3 -3 -1 -2 -2 -3 -3  3  1 -2  1 -1 -2 -2  0 -3 -1  4  0
 X  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  1
-"""), sep=r'\s+').loc[AMINO_ACIDS, AMINO_ACIDS].astype("int8")
+"""),
+        sep=r"\s+",
+    )
+    .loc[AMINO_ACIDS, AMINO_ACIDS]
+    .astype("int8")
+)
 assert (BLOSUM62_MATRIX == BLOSUM62_MATRIX.T).all().all()
 
 
@@ -160,7 +169,9 @@ def _matrix_with_unknown(df, dtype="float32"):
     return result.loc[AMINO_ACIDS, AMINO_ACIDS].astype(dtype)
 
 
-PMBEC_MATRIX = _matrix_with_unknown(pandas.read_csv(StringIO("""
+PMBEC_MATRIX = _matrix_with_unknown(
+    pandas.read_csv(
+        StringIO("""
    A C D E F G H I K L M N P Q R S T V W Y
 A 0.322860152036 0.0113750373506 -0.0156239175966 -0.00259952715456 -0.0508792185716 0.0382679273874 -0.0832539299638 -0.00196691041626 -0.0103729638696 -0.042393907322 -0.0651042403697 -0.0853704925231 0.0757409633086 -0.0483151514798 -0.0136431408498 0.038455041596 0.0520376087986 0.081101427454 -0.125564718844 -0.0747500389698
 C 0.0113750373506 0.100680270274 0.0102951033136 0.0147570340938 0.0345785831581 0.00933463557214 -0.00750101609651 0.00476007239717 -0.0459237939975 -0.0182998264075 -0.0155971113182 0.0021128481374 -0.00860770840682 -0.0309903425175 -0.0482562439545 -0.0217965163697 -0.0227322740574 -0.0154276574266 0.0412325888637 0.00600631739163
@@ -182,7 +193,11 @@ T 0.0520376087986 -0.0227322740574 0.00656101264316 -0.0054830504799 -0.07772923
 V 0.081101427454 -0.0154276574266 -0.0193560886308 -0.00806269508269 -0.015794520965 -0.0127217072682 -0.0870188771708 0.091300054417 -0.0400367780545 0.0449678806271 -0.0120310888206 -0.0436807942705 0.0225294243984 -0.032780800211 -0.0934989556047 -0.00816241136786 0.0493244941272 0.172778293246 -0.0289445753682 -0.0444846240282
 W -0.125564718844 0.0412325888637 0.00415097887978 -0.00791955104235 0.0625957490761 -0.0246539147339 0.0123622841944 0.00138488610169 -0.0598522551401 -0.00754567267671 0.0210041287765 0.0296409813073 -0.0525069717881 -0.0118972341632 -0.0557627605155 -0.0444334801409 -0.0264928932645 -0.0289445753682 0.194048086876 0.0791543436022
 Y -0.0747500389698 0.00600631739163 -0.0191575919464 -0.0231187170833 0.0858189617896 -0.0205094859119 0.0365879336865 -0.0230596885329 -0.00464804635586 -0.0137219703366 0.0126203200265 -0.00205806264345 -0.0890062760945 -0.0487465602402 0.00827128508526 -0.0561239385213 -0.0468623824337 -0.0444846240282 0.0791543436022 0.237788221516
-"""), sep=r"\s+", index_col=0))
+"""),
+        sep=r"\s+",
+        index_col=0,
+    )
+)
 assert numpy.allclose(PMBEC_MATRIX, PMBEC_MATRIX.T)
 
 
@@ -205,7 +220,9 @@ def _lower_triangular_matrix(values, amino_acids):
     return pandas.DataFrame(matrix, index=amino_acids, columns=amino_acids)
 
 
-CONTACT_MATRIX = _matrix_with_unknown(_lower_triangular_matrix("""
+CONTACT_MATRIX = _matrix_with_unknown(
+    _lower_triangular_matrix(
+        """
 -0.06711
 0.06154 -0.08474
 0.09263 -0.15773 -0.17967
@@ -226,7 +243,10 @@ CONTACT_MATRIX = _matrix_with_unknown(_lower_triangular_matrix("""
 0.08732 0.07735 0.00987 0.02263 -0.02572 -0.06867 -0.04921 0.10405 -0.11836 0.03430 -0.06007 0.14702 -0.06644 -0.11108 0.01048 0.01889 0.01650 -0.07522
 0.03904 0.02232 -0.01661 -0.05851 -0.01389 -0.04713 -0.08186 0.04000 -0.03306 0.02135 0.00677 0.06447 -0.00096 -0.02173 -0.05590 0.00139 0.00633 -0.09071 -0.03925
 -0.07279 0.17288 0.10802 0.14779 0.00772 0.11813 0.11895 0.02340 0.07075 -0.13605 -0.06701 0.12223 -0.01508 -0.04855 0.11169 0.03754 0.01024 0.01594 0.03319 -0.10756
-""", list("ARNDCQEGHILKMFPSTWYV")))
+""",
+        list("ARNDCQEGHILKMFPSTWYV"),
+    )
+)
 assert numpy.allclose(CONTACT_MATRIX, CONTACT_MATRIX.T)
 
 # Five Atchley physicochemical factors from Atchley et al. 2005
@@ -235,35 +255,43 @@ assert numpy.allclose(CONTACT_MATRIX, CONTACT_MATRIX.T)
 # molecular size, codon composition, and electrostatic charge. X is
 # represented as zeros, matching the "unknown/no signal" convention
 # used by the BLOSUM62 X row.
-ATCHLEY_FACTORS = pandas.DataFrame.from_dict({
-    "A": [-0.591, -1.302, -0.733, 1.570, -0.146],
-    "R": [1.538, -0.055, 1.502, 0.440, 2.897],
-    "N": [0.945, 0.828, 1.299, -0.169, 0.933],
-    "D": [1.050, 0.302, -3.656, -0.259, -3.242],
-    "C": [-1.343, 0.465, -0.862, -1.020, -0.255],
-    "E": [1.357, -1.453, 1.477, 0.113, -0.837],
-    "Q": [0.931, -0.179, -3.005, -0.503, -1.853],
-    "G": [-0.384, 1.652, 1.330, 1.045, 2.064],
-    "H": [0.336, -0.417, -1.673, -1.474, -0.078],
-    "I": [-1.239, -0.547, 2.131, 0.393, 0.816],
-    "L": [-1.019, -0.987, -1.505, 1.266, -0.912],
-    "K": [1.831, -0.561, 0.533, -0.277, 1.648],
-    "M": [-0.663, -1.524, 2.219, -1.005, 1.212],
-    "F": [-1.006, -0.590, 1.891, -0.397, 0.412],
-    "P": [0.189, 2.081, -1.628, 0.421, -1.392],
-    "S": [-0.228, 1.399, -4.760, 0.670, -2.647],
-    "T": [-0.032, 0.326, 2.213, 0.908, 1.313],
-    "W": [-0.595, 0.009, 0.672, -2.128, -0.184],
-    "Y": [0.260, 0.830, 3.097, -0.838, 1.512],
-    "V": [-1.337, -0.279, -0.544, 1.242, -1.262],
-    "X": [0.0, 0.0, 0.0, 0.0, 0.0],
-}, orient="index", columns=[
-    "atchley_polarity",
-    "atchley_secondary_structure",
-    "atchley_molecular_size",
-    "atchley_codon_composition",
-    "atchley_electrostatic_charge",
-]).loc[AMINO_ACIDS].astype("float32")
+ATCHLEY_FACTORS = (
+    pandas.DataFrame.from_dict(
+        {
+            "A": [-0.591, -1.302, -0.733, 1.570, -0.146],
+            "R": [1.538, -0.055, 1.502, 0.440, 2.897],
+            "N": [0.945, 0.828, 1.299, -0.169, 0.933],
+            "D": [1.050, 0.302, -3.656, -0.259, -3.242],
+            "C": [-1.343, 0.465, -0.862, -1.020, -0.255],
+            "E": [1.357, -1.453, 1.477, 0.113, -0.837],
+            "Q": [0.931, -0.179, -3.005, -0.503, -1.853],
+            "G": [-0.384, 1.652, 1.330, 1.045, 2.064],
+            "H": [0.336, -0.417, -1.673, -1.474, -0.078],
+            "I": [-1.239, -0.547, 2.131, 0.393, 0.816],
+            "L": [-1.019, -0.987, -1.505, 1.266, -0.912],
+            "K": [1.831, -0.561, 0.533, -0.277, 1.648],
+            "M": [-0.663, -1.524, 2.219, -1.005, 1.212],
+            "F": [-1.006, -0.590, 1.891, -0.397, 0.412],
+            "P": [0.189, 2.081, -1.628, 0.421, -1.392],
+            "S": [-0.228, 1.399, -4.760, 0.670, -2.647],
+            "T": [-0.032, 0.326, 2.213, 0.908, 1.313],
+            "W": [-0.595, 0.009, 0.672, -2.128, -0.184],
+            "Y": [0.260, 0.830, 3.097, -0.838, 1.512],
+            "V": [-1.337, -0.279, -0.544, 1.242, -1.262],
+            "X": [0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+        orient="index",
+        columns=[
+            "atchley_polarity",
+            "atchley_secondary_structure",
+            "atchley_molecular_size",
+            "atchley_codon_composition",
+            "atchley_electrostatic_charge",
+        ],
+    )
+    .loc[AMINO_ACIDS]
+    .astype("float32")
+)
 
 
 def _standardize_over_common_amino_acids(df):
@@ -284,47 +312,55 @@ def _standardize_over_common_amino_acids(df):
 # Kyte-Doolittle hydropathy plus Grantham composition, polarity, and volume.
 # The remaining columns are direct side-chain chemistry indicators. X is the
 # neutral/no-signal row, matching the convention used by BLOSUM62.
-_PHYSCHEM_CONTINUOUS_RAW = pandas.DataFrame.from_dict({
-    "A": [1.8, 0.00, 8.1, 31.0],
-    "R": [-4.5, 0.65, 10.5, 124.0],
-    "N": [-3.5, 1.33, 11.6, 56.0],
-    "D": [-3.5, 1.38, 13.0, 54.0],
-    "C": [2.5, 2.75, 5.5, 55.0],
-    "Q": [-3.5, 0.89, 10.5, 85.0],
-    "E": [-3.5, 0.92, 12.3, 83.0],
-    "G": [-0.4, 0.74, 9.0, 3.0],
-    "H": [-3.2, 0.58, 10.4, 96.0],
-    "I": [4.5, 0.00, 5.2, 111.0],
-    "L": [3.8, 0.00, 4.9, 111.0],
-    "K": [-3.9, 0.33, 11.3, 119.0],
-    "M": [1.9, 0.00, 5.7, 105.0],
-    "F": [2.8, 0.00, 5.2, 132.0],
-    "P": [-1.6, 0.39, 8.0, 32.5],
-    "S": [-0.8, 1.42, 9.2, 32.0],
-    "T": [-0.7, 0.71, 8.6, 61.0],
-    "W": [-0.9, 0.13, 5.4, 170.0],
-    "Y": [-1.3, 0.20, 6.2, 136.0],
-    "V": [4.2, 0.00, 5.9, 84.0],
-    "X": [0.0, 0.0, 0.0, 0.0],
-}, orient="index", columns=[
-    "z_kd_hydropathy",
-    "z_grantham_composition",
-    "z_grantham_polarity",
-    "z_grantham_volume",
-]).loc[AMINO_ACIDS]
+_PHYSCHEM_CONTINUOUS_RAW = pandas.DataFrame.from_dict(
+    {
+        "A": [1.8, 0.00, 8.1, 31.0],
+        "R": [-4.5, 0.65, 10.5, 124.0],
+        "N": [-3.5, 1.33, 11.6, 56.0],
+        "D": [-3.5, 1.38, 13.0, 54.0],
+        "C": [2.5, 2.75, 5.5, 55.0],
+        "Q": [-3.5, 0.89, 10.5, 85.0],
+        "E": [-3.5, 0.92, 12.3, 83.0],
+        "G": [-0.4, 0.74, 9.0, 3.0],
+        "H": [-3.2, 0.58, 10.4, 96.0],
+        "I": [4.5, 0.00, 5.2, 111.0],
+        "L": [3.8, 0.00, 4.9, 111.0],
+        "K": [-3.9, 0.33, 11.3, 119.0],
+        "M": [1.9, 0.00, 5.7, 105.0],
+        "F": [2.8, 0.00, 5.2, 132.0],
+        "P": [-1.6, 0.39, 8.0, 32.5],
+        "S": [-0.8, 1.42, 9.2, 32.0],
+        "T": [-0.7, 0.71, 8.6, 61.0],
+        "W": [-0.9, 0.13, 5.4, 170.0],
+        "Y": [-1.3, 0.20, 6.2, 136.0],
+        "V": [4.2, 0.00, 5.9, 84.0],
+        "X": [0.0, 0.0, 0.0, 0.0],
+    },
+    orient="index",
+    columns=[
+        "z_kd_hydropathy",
+        "z_grantham_composition",
+        "z_grantham_polarity",
+        "z_grantham_volume",
+    ],
+).loc[AMINO_ACIDS]
 
-_PHYSCHEM_BINARY = pandas.DataFrame(0.0, index=AMINO_ACIDS, columns=[
-    "side_chain_charge",
-    "aromatic",
-    "sulfur",
-    "hydroxyl",
-    "amide",
-    "acidic",
-    "basic",
-    "aliphatic",
-    "glycine",
-    "proline",
-])
+_PHYSCHEM_BINARY = pandas.DataFrame(
+    0.0,
+    index=AMINO_ACIDS,
+    columns=[
+        "side_chain_charge",
+        "aromatic",
+        "sulfur",
+        "hydroxyl",
+        "amide",
+        "acidic",
+        "basic",
+        "aliphatic",
+        "glycine",
+        "proline",
+    ],
+)
 _PHYSCHEM_BINARY.loc[["D", "E"], "side_chain_charge"] = -1.0
 _PHYSCHEM_BINARY.loc[["K", "R"], "side_chain_charge"] = 1.0
 _PHYSCHEM_BINARY.loc["H", "side_chain_charge"] = 0.1
@@ -338,19 +374,26 @@ _PHYSCHEM_BINARY.loc[["A", "I", "L", "M", "V"], "aliphatic"] = 1.0
 _PHYSCHEM_BINARY.loc["G", "glycine"] = 1.0
 _PHYSCHEM_BINARY.loc["P", "proline"] = 1.0
 
-PHYSICOCHEMICAL_PROPERTIES = pandas.concat([
-    _standardize_over_common_amino_acids(_PHYSCHEM_CONTINUOUS_RAW),
-    _PHYSCHEM_BINARY,
-], axis=1).astype("float32")
+PHYSICOCHEMICAL_PROPERTIES = pandas.concat(
+    [
+        _standardize_over_common_amino_acids(_PHYSCHEM_CONTINUOUS_RAW),
+        _PHYSCHEM_BINARY,
+    ],
+    axis=1,
+).astype("float32")
 assert numpy.isfinite(PHYSICOCHEMICAL_PROPERTIES.values).all()
 assert (PHYSICOCHEMICAL_PROPERTIES.loc["X"].values == 0.0).all()
 
 ENCODING_DATA_FRAMES = {
     "BLOSUM62": BLOSUM62_MATRIX,
-    "one-hot": pandas.DataFrame([
-        [1 if i == j else 0 for i in range(len(AMINO_ACIDS))]
-        for j in range(len(AMINO_ACIDS))
-    ], index=AMINO_ACIDS, columns=AMINO_ACIDS),
+    "one-hot": pandas.DataFrame(
+        [
+            [1 if i == j else 0 for i in range(len(AMINO_ACIDS))]
+            for j in range(len(AMINO_ACIDS))
+        ],
+        index=AMINO_ACIDS,
+        columns=AMINO_ACIDS,
+    ),
     "PMBEC": PMBEC_MATRIX,
     "pmbec": PMBEC_MATRIX,
     "contact": CONTACT_MATRIX,
@@ -408,9 +451,7 @@ def get_vector_encoding_df(name):
             if len(parts) < 2:
                 raise KeyError(name)
             frames = [
-                get_vector_encoding_df(part).loc[AMINO_ACIDS].add_prefix(
-                    "%s:" % part
-                )
+                get_vector_encoding_df(part).loc[AMINO_ACIDS].add_prefix("%s:" % part)
                 for part in parts
             ]
             composite = pandas.concat(
@@ -486,8 +527,9 @@ def vector_encoding_index_table(name):
     paths should both use this helper to keep amino-acid index semantics
     centralized.
     """
-    return get_vector_encoding_df(name).loc[AMINO_ACIDS].to_numpy().astype(
-        numpy.float32)
+    return (
+        get_vector_encoding_df(name).loc[AMINO_ACIDS].to_numpy().astype(numpy.float32)
+    )
 
 
 def index_encoding(sequences, letter_to_index_dict):
@@ -510,10 +552,12 @@ def index_encoding(sequences, letter_to_index_dict):
     """
     df = pandas.DataFrame(iter(s) for s in sequences)
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=FutureWarning,
-                                message=".*Downcasting.*")
-        warnings.filterwarnings("ignore", category=DeprecationWarning,
-                                message=".*no_silent_downcasting.*")
+        warnings.filterwarnings(
+            "ignore", category=FutureWarning, message=".*Downcasting.*"
+        )
+        warnings.filterwarnings(
+            "ignore", category=DeprecationWarning, message=".*no_silent_downcasting.*"
+        )
         result = df.replace(letter_to_index_dict).infer_objects()
     return result.values
 
@@ -537,9 +581,8 @@ def fixed_vectors_encoding(index_encoded_sequences, letter_to_vector_df):
     -------
     numpy.array of integers with shape (`n`, `k`, `m`)
     """
-    (num_sequences, sequence_length) = index_encoded_sequences.shape
-    target_shape = (
-        num_sequences, sequence_length, letter_to_vector_df.shape[1])
+    num_sequences, sequence_length = index_encoded_sequences.shape
+    target_shape = (num_sequences, sequence_length, letter_to_vector_df.shape[1])
     result = letter_to_vector_df.iloc[
         index_encoded_sequences.reshape((-1,))  # reshape() avoids copy
     ].values.reshape(target_shape)

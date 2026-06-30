@@ -10,4 +10,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = "2.3.0rc6"
+__version__ = "2.3.0rc7"
