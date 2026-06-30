@@ -25,7 +25,7 @@ import numpy
 import pandas
 import tqdm  # progress bar
 
-from ..class1_neural_network import _estimate_peak_bytes_per_row
+from ..pytorch_sizing import _estimate_peak_bytes_per_row
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor

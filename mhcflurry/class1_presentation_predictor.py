@@ -29,7 +29,7 @@ import tqdm
 from .version import __version__
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_processing_predictor import Class1ProcessingPredictor
-from .class1_neural_network import (
+from .pytorch_sizing import (
     DEFAULT_PREDICT_BATCH_SIZE,
     _env_workers_per_gpu,
 )

@@ -25,7 +25,7 @@ import numpy
 import pandas
 
 from .version import __version__
-from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE
+from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
 from .downloads import get_default_class1_processing_models_dir
 from .class1_processing_neural_network import Class1ProcessingNeuralNetwork

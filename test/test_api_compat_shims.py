@@ -45,6 +45,26 @@ def test_old_local_parallelism_import_matches_new_parallelism_package():
     )
 
 
+def test_class1_neural_network_public_helpers_remain_importable():
+    import mhcflurry.class1_encoding as encoding
+    import mhcflurry.class1_neural_network as old_module
+    import mhcflurry.pytorch_sizing as sizing
+
+    assert (
+        old_module.compute_prediction_batch_size
+        is sizing.compute_prediction_batch_size
+    )
+    assert (
+        old_module.resolve_prediction_batch_size
+        is sizing.resolve_prediction_batch_size
+    )
+    assert old_module.check_training_batch_fits is sizing.check_training_batch_fits
+    assert (
+        old_module.peptide_sequences_to_network_input
+        is encoding.peptide_sequences_to_network_input
+    )
+
+
 def test_legacy_configure_tensorflow_entry_point():
     with pytest.warns(FutureWarning, match="configure_tensorflow"):
         configure_tensorflow(backend="tensorflow", gpu_device_nums=None, num_threads=1)

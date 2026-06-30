@@ -772,7 +772,7 @@ def resolve_local_parallelism_args(
 
     # Promote orchestrator-owned tuning knobs from CLI to env so the
     # existing call sites (pytorch_training.maybe_compile_network,
-    # configure_matmul_precision, class1_neural_network._timing_enabled,
+    # configure_matmul_precision, class1_training._timing_enabled,
     # hoist_torchinductor_compile_threads) read a single source of truth.
     # Auto -> leave env untouched (preserves backward-compat for env-only
     # deploys); explicit CLI value -> overrides env. Workers inherit

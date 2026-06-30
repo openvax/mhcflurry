@@ -23,8 +23,8 @@ import pytest
 import torch
 
 from mhcflurry.allele_encoding import AlleleEncoding
-from mhcflurry.class1_neural_network import (
-    Class1NeuralNetwork,
+from mhcflurry.class1_neural_network import Class1NeuralNetwork
+from mhcflurry.class1_training import (
     _StreamingBatchIterableDataset,
 )
 from mhcflurry.common import configure_pytorch
