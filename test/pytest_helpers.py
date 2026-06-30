@@ -19,13 +19,13 @@ import sys
 
 
 _MHCFLURRY_COMMANDS = {
-    "mhcflurry-calibrate-percentile-ranks": "mhcflurry.calibrate_percentile_ranks_command",
-    "mhcflurry-class1-train-allele-specific-models": "mhcflurry.train_allele_specific_models_command",
-    "mhcflurry-class1-select-allele-specific-models": "mhcflurry.select_allele_specific_models_command",
-    "mhcflurry-class1-train-pan-allele-models": "mhcflurry.train_pan_allele_models_command",
-    "mhcflurry-class1-select-pan-allele-models": "mhcflurry.select_pan_allele_models_command",
-    "mhcflurry-class1-train-processing-models": "mhcflurry.train_processing_models_command",
-    "mhcflurry-class1-select-processing-models": "mhcflurry.select_processing_models_command",
+    "mhcflurry-calibrate-percentile-ranks": "mhcflurry.cli.calibrate_percentile_ranks_command",
+    "mhcflurry-class1-train-allele-specific-models": "mhcflurry.cli.train_allele_specific_models_command",
+    "mhcflurry-class1-select-allele-specific-models": "mhcflurry.cli.select_allele_specific_models_command",
+    "mhcflurry-class1-train-pan-allele-models": "mhcflurry.cli.train_pan_allele_models_command",
+    "mhcflurry-class1-select-pan-allele-models": "mhcflurry.cli.select_pan_allele_models_command",
+    "mhcflurry-class1-train-processing-models": "mhcflurry.cli.train_processing_models_command",
+    "mhcflurry-class1-select-processing-models": "mhcflurry.cli.select_processing_models_command",
 }
 
 

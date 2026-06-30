@@ -10,10 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""mhcflurry parent CLI.
+"""mhcflurry command-line modules.
 
-The ``mhcflurry`` console script (installed by ``setup.py``) dispatches
-to one of the registered subcommands. Legacy ``mhcflurry-*`` entry
-points stay installed as compat shims — see
-https://github.com/openvax/mhcflurry/issues/291 for the migration plan.
+The ``mhcflurry`` console script dispatches to one of the registered
+subcommands, and the historical ``mhcflurry-*`` console scripts point at
+the same implementations in this package. Top-level ``*_command.py``
+modules remain as import shims for compatibility.
 """

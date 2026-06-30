@@ -21,10 +21,10 @@ Two flavors of subcommand:
 
 * **New under the parent**: ``compare-models``, ``plot-model-comparison``.
   Each module exposes ``run_argv(argv)`` which does its own argparse.
-* **Legacy mhcflurry-* commands**: ``predict``, ``predict-scan``,
+* **Historical mhcflurry-* commands**: ``predict``, ``predict-scan``,
   ``downloads``, ``calibrate-percentile-ranks``, the ``class1-train-*`` /
   ``class1-select-*`` family, ``pseudosequences``. Each is wrapped by
-  invoking the legacy module's existing ``run(argv)`` (or ``main(argv)``
+  invoking the command module's existing ``run(argv)`` (or ``main(argv)``
   for ``pseudosequences``) on the post-subcommand argv. All
   ``mhcflurry-*`` console_scripts in ``setup.py`` remain installed as
   compat shims pointing at the same underlying entry functions.
@@ -50,37 +50,37 @@ _SUBCOMMANDS = {
         "mhcflurry.cli.plot_model_comparison", "run_argv",
         "Render plots from a compare-models output directory."),
     "predict": (
-        "mhcflurry.predict_command", "run",
+        "mhcflurry.cli.predict_command", "run",
         "Predict MHC binding affinities for peptide/allele pairs."),
     "predict-scan": (
-        "mhcflurry.predict_scan_command", "run",
+        "mhcflurry.cli.predict_scan_command", "run",
         "Scan protein sequences for MHC-binding peptides."),
     "downloads": (
-        "mhcflurry.downloads_command", "run",
+        "mhcflurry.cli.downloads_command", "run",
         "Fetch, inspect, resolve data + model downloads."),
     "calibrate-percentile-ranks": (
-        "mhcflurry.calibrate_percentile_ranks_command", "run",
+        "mhcflurry.cli.calibrate_percentile_ranks_command", "run",
         "Calibrate percentile ranks on an existing predictor."),
     "class1-train-allele-specific-models": (
-        "mhcflurry.train_allele_specific_models_command", "run",
+        "mhcflurry.cli.train_allele_specific_models_command", "run",
         "Train Class I allele-specific affinity models."),
     "class1-select-allele-specific-models": (
-        "mhcflurry.select_allele_specific_models_command", "run",
+        "mhcflurry.cli.select_allele_specific_models_command", "run",
         "Select Class I allele-specific models from a candidate pool."),
     "class1-train-pan-allele-models": (
-        "mhcflurry.train_pan_allele_models_command", "run",
+        "mhcflurry.cli.train_pan_allele_models_command", "run",
         "Train Class I pan-allele affinity models."),
     "class1-select-pan-allele-models": (
-        "mhcflurry.select_pan_allele_models_command", "run",
+        "mhcflurry.cli.select_pan_allele_models_command", "run",
         "Select Class I pan-allele models from a candidate pool."),
     "class1-train-processing-models": (
-        "mhcflurry.train_processing_models_command", "run",
+        "mhcflurry.cli.train_processing_models_command", "run",
         "Train Class I antigen-processing models."),
     "class1-select-processing-models": (
-        "mhcflurry.select_processing_models_command", "run",
+        "mhcflurry.cli.select_processing_models_command", "run",
         "Select Class I processing models from a candidate pool."),
     "class1-train-presentation-models": (
-        "mhcflurry.train_presentation_models_command", "run",
+        "mhcflurry.cli.train_presentation_models_command", "run",
         "Train the Class I presentation predictor (affinity + processing)."),
     "pseudosequences": (
         "mhcflurry.pseudosequences", "main",

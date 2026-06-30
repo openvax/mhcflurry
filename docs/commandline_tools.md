@@ -19,17 +19,17 @@ The two commands new in 2.3.0 — `mhcflurry compare-models` and
 ```{eval-rst}
 .. _ref-mhcflurry-predict:
 
-.. autoprogram:: mhcflurry.predict_command:parser
+.. autoprogram:: mhcflurry.cli.predict_command:parser
     :prog: mhcflurry predict
 
 .. _ref-mhcflurry-predict-scan:
 
-.. autoprogram:: mhcflurry.predict_scan_command:parser
+.. autoprogram:: mhcflurry.cli.predict_scan_command:parser
     :prog: mhcflurry predict-scan
 
 .. _ref-mhcflurry-downloads:
 
-.. autoprogram:: mhcflurry.downloads_command:parser
+.. autoprogram:: mhcflurry.cli.downloads_command:parser
     :prog: mhcflurry downloads
 ```
 
@@ -38,7 +38,7 @@ The two commands new in 2.3.0 — `mhcflurry compare-models` and
 ```{eval-rst}
 .. _ref-mhcflurry-calibrate-percentile-ranks:
 
-.. autoprogram:: mhcflurry.calibrate_percentile_ranks_command:parser
+.. autoprogram:: mhcflurry.cli.calibrate_percentile_ranks_command:parser
     :prog: mhcflurry calibrate-percentile-ranks
 ```
 
@@ -47,37 +47,37 @@ The two commands new in 2.3.0 — `mhcflurry compare-models` and
 ```{eval-rst}
 .. _ref-mhcflurry-class1-train-allele-specific-models:
 
-.. autoprogram:: mhcflurry.train_allele_specific_models_command:parser
+.. autoprogram:: mhcflurry.cli.train_allele_specific_models_command:parser
     :prog: mhcflurry class1-train-allele-specific-models
 
 .. _ref-mhcflurry-class1-select-allele-specific-models:
 
-.. autoprogram:: mhcflurry.select_allele_specific_models_command:parser
+.. autoprogram:: mhcflurry.cli.select_allele_specific_models_command:parser
     :prog: mhcflurry class1-select-allele-specific-models
 
 .. _ref-mhcflurry-class1-train-pan-allele-models:
 
-.. autoprogram:: mhcflurry.train_pan_allele_models_command:parser
+.. autoprogram:: mhcflurry.cli.train_pan_allele_models_command:parser
     :prog: mhcflurry class1-train-pan-allele-models
 
 .. _ref-mhcflurry-class1-select-pan-allele-models:
 
-.. autoprogram:: mhcflurry.select_pan_allele_models_command:parser
+.. autoprogram:: mhcflurry.cli.select_pan_allele_models_command:parser
     :prog: mhcflurry class1-select-pan-allele-models
 
 .. _ref-mhcflurry-class1-train-processing-models:
 
-.. autoprogram:: mhcflurry.train_processing_models_command:parser
+.. autoprogram:: mhcflurry.cli.train_processing_models_command:parser
     :prog: mhcflurry class1-train-processing-models
 
 .. _ref-mhcflurry-class1-select-processing-models:
 
-.. autoprogram:: mhcflurry.select_processing_models_command:parser
+.. autoprogram:: mhcflurry.cli.select_processing_models_command:parser
     :prog: mhcflurry class1-select-processing-models
 
 .. _ref-mhcflurry-class1-train-presentation-models:
 
-.. autoprogram:: mhcflurry.train_presentation_models_command:parser
+.. autoprogram:: mhcflurry.cli.train_presentation_models_command:parser
     :prog: mhcflurry class1-train-presentation-models
 ```
 

@@ -19,6 +19,7 @@ integration suites, not here.
 """
 
 import argparse
+import importlib
 import json
 import os
 import sys
@@ -94,12 +95,44 @@ def test_main_help_does_not_import_predict_command():
         [_sys.executable, "-c",
          "import sys; from mhcflurry.cli.main import build_parser; "
          "build_parser(); "
-         "print(int('mhcflurry.predict_command' in sys.modules))"],
+         "print('\\n'.join(name for name in ("
+         "'mhcflurry.predict_command', "
+         "'mhcflurry.cli.predict_command') if name in sys.modules))"],
         capture_output=True, text=True, check=True,
     )
-    assert result.stdout.strip() == "0", (
+    assert result.stdout.strip() == "", (
         "predict_command was imported by build_parser(); should be lazy: %s"
         % result.stdout
+    )
+
+
+def test_legacy_command_module_shims_reexport_cli_modules():
+    command_modules = [
+        "calibrate_percentile_ranks_command",
+        "downloads_command",
+        "predict_command",
+        "predict_scan_command",
+        "select_allele_specific_models_command",
+        "select_pan_allele_models_command",
+        "select_processing_models_command",
+        "train_allele_specific_models_command",
+        "train_pan_allele_models_command",
+        "train_processing_models_command",
+        "train_presentation_models_command",
+    ]
+    for module_name in command_modules:
+        legacy = importlib.import_module("mhcflurry.%s" % module_name)
+        canonical = importlib.import_module("mhcflurry.cli.%s" % module_name)
+        assert legacy is canonical
+        assert legacy.run is canonical.run
+        assert legacy.parser is canonical.parser
+
+    from mhcflurry import predict_command
+    from mhcflurry.cli import predict_command as cli_predict_command
+
+    assert (
+        predict_command._predict_dataframe_chunk
+        is cli_predict_command._predict_dataframe_chunk
     )
 
 

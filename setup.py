@@ -78,26 +78,26 @@ if __name__ == "__main__":
         entry_points={
             "console_scripts": [
                 "mhcflurry = mhcflurry.cli.main:main",
-                "mhcflurry-downloads = mhcflurry.downloads_command:run",
+                "mhcflurry-downloads = mhcflurry.cli.downloads_command:run",
                 "mhcflurry-pseudosequences = mhcflurry.pseudosequences:main",
-                "mhcflurry-predict = mhcflurry.predict_command:run",
-                "mhcflurry-predict-scan = mhcflurry.predict_scan_command:run",
+                "mhcflurry-predict = mhcflurry.cli.predict_command:run",
+                "mhcflurry-predict-scan = mhcflurry.cli.predict_scan_command:run",
                 "mhcflurry-class1-train-allele-specific-models = "
-                "mhcflurry.train_allele_specific_models_command:run",
+                "mhcflurry.cli.train_allele_specific_models_command:run",
                 "mhcflurry-class1-train-pan-allele-models = "
-                "mhcflurry.train_pan_allele_models_command:run",
+                "mhcflurry.cli.train_pan_allele_models_command:run",
                 "mhcflurry-class1-train-processing-models = "
-                "mhcflurry.train_processing_models_command:run",
+                "mhcflurry.cli.train_processing_models_command:run",
                 "mhcflurry-class1-select-allele-specific-models = "
-                "mhcflurry.select_allele_specific_models_command:run",
+                "mhcflurry.cli.select_allele_specific_models_command:run",
                 "mhcflurry-class1-select-pan-allele-models = "
-                "mhcflurry.select_pan_allele_models_command:run",
+                "mhcflurry.cli.select_pan_allele_models_command:run",
                 "mhcflurry-class1-select-processing-models = "
-                "mhcflurry.select_processing_models_command:run",
+                "mhcflurry.cli.select_processing_models_command:run",
                 "mhcflurry-calibrate-percentile-ranks = "
-                "mhcflurry.calibrate_percentile_ranks_command:run",
+                "mhcflurry.cli.calibrate_percentile_ranks_command:run",
                 "mhcflurry-class1-train-presentation-models = "
-                "mhcflurry.train_presentation_models_command:run",
+                "mhcflurry.cli.train_presentation_models_command:run",
                 "_mhcflurry-cluster-worker-entry-point = "
                 "mhcflurry.cluster_parallelism:worker_entry_point",
             ]
