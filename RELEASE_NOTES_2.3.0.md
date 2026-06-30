@@ -190,7 +190,7 @@ a specific predictor:
 
 ```python
 from mhcflurry import Class1AffinityPredictor
-from mhcflurry.calibrate_percentile_ranks_command import (
+from mhcflurry.cli.calibrate_percentile_ranks_command import (
     filter_canonicalizable_alleles,
 )
 predictor = Class1AffinityPredictor.load(models_dir)

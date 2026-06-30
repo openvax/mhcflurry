@@ -465,7 +465,7 @@ if [ "$SKIP_EVAL" = "1" ]; then
 else
     log_release_event phase_info "starting eval against public release"
     # ``mhcflurry-downloads fetch`` accepts multiple targets via nargs="*"
-    # (see mhcflurry/downloads_command.py:74). Both go to FETCH_LOG so
+    # (see mhcflurry/cli/downloads_command.py:74). Both go to FETCH_LOG so
     # the per-allele eval output stays unpolluted by extraction progress.
     run_logged_step "fetch_eval_data" "$FETCH_LOG" \
         mhcflurry-downloads fetch data_evaluation models_class1_pan
