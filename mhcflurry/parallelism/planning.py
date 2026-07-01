@@ -103,7 +103,7 @@ _AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB = 2.0
 # queue, two physical cores per child is a comfortable upper bound.
 _AUTO_DATALOADER_CORES_PER_CHILD = 2
 
-def _cuda_visible_devices_from_env():
+def cuda_visible_devices_from_env():
     """Return CUDA_VISIBLE_DEVICES entries, or ``None`` when unset."""
     value = os.environ.get("CUDA_VISIBLE_DEVICES")
     if value is None:
@@ -118,7 +118,7 @@ def _cuda_visible_devices_from_env():
         return []
     return devices
 
-def _free_vram_per_gpu_override_gb(num_gpus):
+def free_vram_per_gpu_override_gb(num_gpus):
     """Return env-pinned free VRAM in GB as a per-GPU list, or ``None``.
 
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB`` accepts either one
@@ -146,13 +146,13 @@ def _free_vram_per_gpu_override_gb(num_gpus):
     return vals[:max(int(num_gpus), 1)]
 
 
-def _free_vram_override_gb(num_gpus):
+def free_vram_override_gb(num_gpus):
     """Minimum env-pinned free VRAM in GB, or ``None``."""
-    vals = _free_vram_per_gpu_override_gb(num_gpus)
+    vals = free_vram_per_gpu_override_gb(num_gpus)
     return min(vals) if vals else None
 
 
-def _detect_num_cuda_devices_no_torch():
+def detect_num_cuda_devices_no_torch():
     """Return the number of visible CUDA devices without importing torch.
 
     ``CUDA_VISIBLE_DEVICES`` is authoritative when set by a scheduler or
@@ -160,7 +160,7 @@ def _detect_num_cuda_devices_no_torch():
     worker pool without initializing CUDA in the parent process. Returns 0
     when nvidia-smi is unavailable or no GPUs are visible.
     """
-    cuda_visible_devices = _cuda_visible_devices_from_env()
+    cuda_visible_devices = cuda_visible_devices_from_env()
     if cuda_visible_devices is not None:
         return len(cuda_visible_devices)
 
@@ -193,13 +193,13 @@ def _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus):
     Returns ``None`` if ``nvidia-smi`` is unavailable or returns nothing. The
     per-GPU list (not collapsed to a scalar) lets capacity diagnostics see
     heterogeneous / partially-occupied cards; the worker-count math separately
-    takes the ``min`` via ``_free_vram_from_nvidia_smi_gb``.
+    takes the ``min`` via ``free_vram_from_nvidia_smi_gb``.
 
     This is intentionally a subprocess call instead of ``torch.cuda`` so the
     orchestrator can size a fork-based worker pool without initializing CUDA in
     the parent process.
     """
-    cuda_visible_devices = _cuda_visible_devices_from_env()
+    cuda_visible_devices = cuda_visible_devices_from_env()
     if cuda_visible_devices is not None:
         cuda_visible_devices = cuda_visible_devices[:max(int(num_gpus), 1)]
         if not cuda_visible_devices:
@@ -239,7 +239,7 @@ def _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus):
     return vals[:max(int(num_gpus), 1)]
 
 
-def _free_vram_from_nvidia_smi_gb(num_gpus):
+def free_vram_from_nvidia_smi_gb(num_gpus):
     """Minimum free VRAM (GB) across visible GPUs, or ``None``."""
     vals = _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus)
     return min(vals) if vals else None
@@ -253,7 +253,7 @@ def detect_free_vram_per_gpu_gb(num_gpus):
     math, this preserves the per-GPU values so capacity warnings can flag
     small or uneven cards.
     """
-    override = _free_vram_per_gpu_override_gb(num_gpus)
+    override = free_vram_per_gpu_override_gb(num_gpus)
     if override is not None:
         return override
     return _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus)
@@ -312,11 +312,11 @@ def auto_max_workers_per_gpu(
 
     # Honor an explicit env override even when it resolves to 0.0 (falsy);
     # only fall through to nvidia-smi when no override was set at all.
-    free_vram_override = _free_vram_override_gb(num_gpus)
+    free_vram_override = free_vram_override_gb(num_gpus)
     free_vram_gb = (
         free_vram_override
         if free_vram_override is not None
-        else _free_vram_from_nvidia_smi_gb(num_gpus)
+        else free_vram_from_nvidia_smi_gb(num_gpus)
     )
 
     free_vram_gb_used = (
@@ -652,7 +652,7 @@ def auto_random_negative_pool_epochs(
     return min(by_memory, max(1, int(hard_cap)))
 
 
-def _resolved_int(value, name):
+def resolved_int(value, name):
     if isinstance(value, str) and value.strip().lower() == "auto":
         raise ValueError(
             "%s must be resolved to an int before use; got 'auto'" % name
@@ -670,7 +670,7 @@ def auto_num_jobs(num_gpus, max_workers_per_gpu):
     """
     if not num_gpus or int(num_gpus) <= 0:
         return 0
-    max_workers_per_gpu = _resolved_int(
+    max_workers_per_gpu = resolved_int(
         max_workers_per_gpu, "max_workers_per_gpu")
     return int(num_gpus) * max_workers_per_gpu
 
@@ -728,7 +728,7 @@ def num_workers_per_gpu_from_args(args):
             "resolve_local_parallelism_args before using it as "
             "num_workers_per_gpu."
         )
-    return _resolved_int(value, "max_workers_per_gpu")
+    return resolved_int(value, "max_workers_per_gpu")
 
 
 def resolve_local_parallelism_args(
@@ -748,7 +748,7 @@ def resolve_local_parallelism_args(
         per_worker_gb=per_worker_gb,
         cap_auto_num_jobs=cap_auto_num_jobs,
         normalize_backend=normalize_pytorch_backend,
-        detect_num_cuda_devices=_detect_num_cuda_devices_no_torch,
+        detect_num_cuda_devices=detect_num_cuda_devices_no_torch,
         auto_max_workers_per_gpu=auto_max_workers_per_gpu,
         auto_num_jobs=auto_num_jobs,
         resolve_dataloader_num_workers=resolve_dataloader_num_workers,

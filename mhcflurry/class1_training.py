@@ -173,7 +173,7 @@ def _batch_value_to_device(value, device, *, non_blocking, cast_float):
     fp32 via embedding lookup inside the network's forward pass.
     """
     if isinstance(value, numpy.ndarray):
-        value = _torch_from_numpy(value)
+        value = torch_from_numpy(value)
     if cast_float and value.dtype == torch.float64:
         value = value.float()
     value = value.to(device, non_blocking=non_blocking)
@@ -182,7 +182,7 @@ def _batch_value_to_device(value, device, *, non_blocking, cast_float):
     return value
 
 
-def _torch_from_numpy(value):
+def torch_from_numpy(value):
     if not value.flags.writeable:
         value = value.copy()
     return torch.from_numpy(value)

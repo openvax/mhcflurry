@@ -78,6 +78,19 @@ def configure_random_seed(seed=None, name="mhcflurry"):
     return resolved
 
 
+def install_sigusr1_stack_trace_handler():
+    """Install a SIGUSR1 handler that prints this process's stack trace."""
+    import signal
+    import traceback
+
+    signum = getattr(signal, "SIGUSR1", None)
+    if signum is None:
+        return False
+    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
+    signal.signal(signum, lambda _signum, _frame: traceback.print_stack())
+    return True
+
+
 def derive_seed(master_seed, *parts):
     """Derive a stable sub-seed from a master seed and identity ``parts``.
 
