@@ -1404,7 +1404,7 @@ class Class1AffinityPredictor(object):
             return None
 
         import torch
-        from .class1_neural_network import (
+        from .pytorch_sizing import (
             DEFAULT_PREDICT_BATCH_SIZE,
             resolve_prediction_batch_size,
         )
@@ -2048,7 +2048,7 @@ class Class1AffinityPredictor(object):
 
         Returns the chosen ``(peptide_batch, allele_batch)``.
         """
-        from .class1_neural_network import (
+        from .pytorch_sizing import (
             compute_prediction_batch_size,
             _free_device_memory_bytes,
             _AUTO_BATCH_MAX_ROWS,
@@ -2239,7 +2239,7 @@ class Class1AffinityPredictor(object):
         before combining them. Hidden-layer peak memory is therefore the max
         sub-network peak, not the sum of every sub-network peak.
         """
-        from .class1_neural_network import _estimate_peak_bytes_per_row
+        from .pytorch_sizing import _estimate_peak_bytes_per_row
 
         if model is None:
             return _estimate_peak_bytes_per_row(model)

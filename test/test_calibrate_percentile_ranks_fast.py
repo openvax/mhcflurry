@@ -433,7 +433,7 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
     a loud warning explaining the training-dynamics drift."""
     import logging
 
-    from mhcflurry.class1_neural_network import (
+    from mhcflurry.pytorch_sizing import (
         check_training_batch_fits,
         _TRAINING_PEAK_MULTIPLIER,
         _estimate_peak_bytes_per_row,
@@ -447,10 +447,10 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
             return "cuda:0"
 
     # Swap out _free_device_memory_bytes for the duration of this test.
-    from mhcflurry import class1_neural_network as cnn
-    saved = cnn._free_device_memory_bytes
+    from mhcflurry import pytorch_sizing
+    saved = pytorch_sizing._free_device_memory_bytes
     try:
-        cnn._free_device_memory_bytes = lambda device: 8 * (1 << 30)
+        pytorch_sizing._free_device_memory_bytes = lambda device: 8 * (1 << 30)
 
         class TinyModel:
             # Pretend peak row = 1 KB; 8 GB / 2 workers / 2 (0.5 fraction)
@@ -491,7 +491,7 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
         assert "TRAINING BATCH WILL NOT FIT" in joined
         assert "CHANGES TRAINING DYNAMICS" in joined
     finally:
-        cnn._free_device_memory_bytes = saved
+        pytorch_sizing._free_device_memory_bytes = saved
 
 
 @pytest.mark.parametrize(
@@ -511,16 +511,16 @@ def test_fit_end_to_end_shrinks_minibatch_when_vram_too_small(
     """
     import logging
 
-    from mhcflurry import class1_neural_network as cnn
+    from mhcflurry import pytorch_sizing
     from mhcflurry.class1_neural_network import Class1NeuralNetwork
     from mhcflurry.common import random_peptides
 
     # Override accelerator free-memory to be tiny so the shrink fires.
-    saved_free = cnn._free_device_memory_bytes
+    saved_free = pytorch_sizing._free_device_memory_bytes
     old_backend = common._pytorch_backend
     try:
         common.configure_pytorch(backend=backend)
-        cnn._free_device_memory_bytes = lambda device: (
+        pytorch_sizing._free_device_memory_bytes = lambda device: (
             128 * (1 << 20) if device.type == device_type else saved_free(device)
         )
 
@@ -571,7 +571,7 @@ def test_fit_end_to_end_shrinks_minibatch_when_vram_too_small(
             "config would no longer reflect the user's configured value"
         )
     finally:
-        cnn._free_device_memory_bytes = saved_free
+        pytorch_sizing._free_device_memory_bytes = saved_free
         common.configure_pytorch(backend=old_backend)
 
 
@@ -625,7 +625,7 @@ def test_processing_nn_auto_batch_matches_explicit_size():
 def test_compute_prediction_batch_size_scales_with_memory_and_workers():
     """``compute_prediction_batch_size`` respects free VRAM and the
     workers-per-GPU partition."""
-    from mhcflurry.class1_neural_network import (
+    from mhcflurry.pytorch_sizing import (
         compute_prediction_batch_size,
         _AUTO_BATCH_CPU_FALLBACK,
         _AUTO_BATCH_MAX_ROWS,
@@ -667,7 +667,7 @@ def test_calibrate_auto_size_uses_reserved_headroom_not_cache_safety(monkeypatch
     60% of free memory and multiplied the entire fixed cache by 1.3,
     forcing ``peptide_batch=2000, allele_batch=1`` despite ~28 GB free.
     """
-    from mhcflurry import class1_neural_network as cnn
+    from mhcflurry import pytorch_sizing
 
     class FakeCUDA:
         type = "cuda"
@@ -694,7 +694,7 @@ def test_calibrate_auto_size_uses_reserved_headroom_not_cache_safety(monkeypatch
     monkeypatch.delenv(
         "MHCFLURRY_CALIBRATE_AUTO_FIXED_SAFETY_MULTIPLIER", raising=False)
     monkeypatch.setattr(
-        cnn, "_free_device_memory_bytes",
+        pytorch_sizing, "_free_device_memory_bytes",
         lambda device: int(28.63 * (1 << 30)),
     )
 
@@ -725,7 +725,7 @@ def test_calibrate_auto_size_still_floors_when_cache_does_not_fit(
     """The looser headroom budget still keeps the minimum-batch fallback
     when the exact cache plus scratch genuinely exceeds available VRAM."""
     import logging
-    from mhcflurry import class1_neural_network as cnn
+    from mhcflurry import pytorch_sizing
 
     class FakeCUDA:
         type = "cuda"
@@ -745,7 +745,7 @@ def test_calibrate_auto_size_still_floors_when_cache_does_not_fit(
         networks = [SubNet() for _ in range(8)]
 
     monkeypatch.setattr(
-        cnn, "_free_device_memory_bytes",
+        pytorch_sizing, "_free_device_memory_bytes",
         lambda device: int(16 * (1 << 30)),
     )
 
@@ -771,7 +771,7 @@ def test_calibrate_auto_size_still_floors_when_cache_does_not_fit(
 def test_calibrate_auto_size_honors_lower_fraction_budget(monkeypatch):
     """When the free-memory fraction is lower than reserved headroom,
     calibration auto-sizing must use the lower budget."""
-    from mhcflurry import class1_neural_network as cnn
+    from mhcflurry import pytorch_sizing
 
     class FakeCUDA:
         type = "cuda"
@@ -791,7 +791,7 @@ def test_calibrate_auto_size_honors_lower_fraction_budget(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", "0.10")
     monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", "1.0")
     monkeypatch.setattr(
-        cnn, "_free_device_memory_bytes",
+        pytorch_sizing, "_free_device_memory_bytes",
         lambda device: int(40 * (1 << 30)),
     )
 
@@ -831,7 +831,7 @@ def test_calibrate_auto_size_honors_lower_fraction_budget(monkeypatch):
 def test_calibrate_auto_size_honors_lower_reserved_headroom(monkeypatch):
     """When reserved headroom is lower than the fraction budget,
     calibration auto-sizing must use the lower budget."""
-    from mhcflurry import class1_neural_network as cnn
+    from mhcflurry import pytorch_sizing
 
     class FakeCUDA:
         type = "cuda"
@@ -850,7 +850,7 @@ def test_calibrate_auto_size_honors_lower_reserved_headroom(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION", "0.95")
     monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", "20.0")
     monkeypatch.setattr(
-        cnn, "_free_device_memory_bytes",
+        pytorch_sizing, "_free_device_memory_bytes",
         lambda device: int(40 * (1 << 30)),
     )
 
@@ -897,7 +897,7 @@ def test_calibrate_auto_size_reused_cache_uses_current_free_memory(
     cartesian-forward memory instead of falling back to ``2000 x 1``.
     """
     import logging
-    from mhcflurry import class1_neural_network as cnn
+    from mhcflurry import pytorch_sizing
 
     class FakeCUDA:
         type = "cuda"
@@ -917,7 +917,7 @@ def test_calibrate_auto_size_reused_cache_uses_current_free_memory(
         networks = [SubNet() for _ in range(9)]
 
     monkeypatch.setattr(
-        cnn, "_free_device_memory_bytes",
+        pytorch_sizing, "_free_device_memory_bytes",
         lambda device: int(18.79 * (1 << 30)),
     )
 
@@ -1080,4 +1080,3 @@ def test_calibrate_fast_cache_signature_cleared_if_rebuild_fails():
 
     assert cache.stage_signature is None
     assert cache.cached_stages is None
-

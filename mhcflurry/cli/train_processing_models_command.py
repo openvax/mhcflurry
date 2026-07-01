@@ -34,7 +34,7 @@ import tqdm  # progress bar
 
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..class1_processing_neural_network import Class1ProcessingNeuralNetwork
-from ..class1_neural_network import (
+from ..pytorch_sizing import (
     _TRAINING_PEAK_MULTIPLIER,
     _estimate_peak_bytes_per_row,
 )

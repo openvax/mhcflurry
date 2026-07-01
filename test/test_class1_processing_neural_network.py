@@ -267,7 +267,7 @@ def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
 
 def test_processing_peak_estimate_scales_with_conv_shape():
     """Processing prediction autosizing should see Conv1d activation width."""
-    from mhcflurry.class1_neural_network import _estimate_peak_bytes_per_row
+    from mhcflurry.pytorch_sizing import _estimate_peak_bytes_per_row
 
     small = Class1ProcessingNeuralNetwork(
         peptide_max_length=15,
@@ -299,7 +299,7 @@ def test_processing_peak_estimate_scales_with_conv_shape():
 
 def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
     """Pool workers expose co-resident workers/GPU through the env."""
-    from mhcflurry import class1_neural_network as cnn
+    from mhcflurry import pytorch_sizing
 
     captured = {}
 
@@ -309,7 +309,7 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
         return 2
 
     monkeypatch.setenv("MHCFLURRY_MAX_WORKERS_PER_GPU", "4")
-    monkeypatch.setattr(cnn, "resolve_prediction_batch_size", fake_resolve)
+    monkeypatch.setattr(pytorch_sizing, "resolve_prediction_batch_size", fake_resolve)
 
     model = Class1ProcessingNeuralNetwork(
         peptide_max_length=12,

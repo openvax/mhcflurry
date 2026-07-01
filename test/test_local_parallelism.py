@@ -218,7 +218,10 @@ def _spawn_child_from_pool_worker(_):
     """
     child = multiprocessing.Process(target=_grandchild_entry)
     child.start()
-    child.join(timeout=10)
+    child.join(timeout=60)
+    if child.exitcode is None:
+        child.terminate()
+        child.join(timeout=10)
     return child.exitcode
 
 

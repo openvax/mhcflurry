@@ -159,7 +159,7 @@ def _batch_size_arg(value):
     """Accept either an int or the literal string 'auto' for --prediction-batch-size.
 
     ``auto`` (the default) delegates sizing to
-    ``mhcflurry.class1_neural_network.compute_prediction_batch_size``,
+    ``mhcflurry.pytorch_sizing.compute_prediction_batch_size``,
     which picks a per-GPU-memory batch, reserving the VRAM partition
     across co-resident workers.
     """
@@ -174,7 +174,7 @@ parser.add_argument(
     default="auto",
     help="Batch size for predictions. Pass an int to pin, or 'auto' "
          "(default) to size per GPU free memory / workers-per-GPU — see "
-         "mhcflurry.class1_neural_network.compute_prediction_batch_size.")
+         "mhcflurry.pytorch_sizing.compute_prediction_batch_size.")
 parser.add_argument(
     "--alleles-per-work-chunk",
     type=int,

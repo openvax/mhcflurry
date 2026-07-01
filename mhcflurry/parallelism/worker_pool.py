@@ -35,7 +35,7 @@ from .worker_runtime import worker_init, worker_init_entry_point
 # processes cannot fork their own children. Streaming pretraining can use
 # PyTorch DataLoader workers to prefetch batches, so mhcflurry's outer training
 # pool must use non-daemonic workers. The runtime fallback in
-# ``class1_neural_network._effective_num_workers`` still downgrades to
+# ``class1_training._effective_num_workers`` still downgrades to
 # ``num_workers=0`` if an external caller uses a daemon process, but production
 # training should keep prefetch available by using this pool.
 #

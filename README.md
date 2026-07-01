@@ -20,10 +20,10 @@ Have a bugfix or other contribution? We would love your help. See our [contribut
 ## 2.3.0 release candidate
 
 > [!IMPORTANT]
-> 2.3.0 is currently a release candidate (`2.3.0rc9`), not yet a final release.
+> 2.3.0 is currently a release candidate (`2.3.0rc10`), not yet a final release.
 > It keeps the same public API and pre-trained models as 2.2.x. Install it with
 > `pip install --pre mhcflurry`, or pin the version with
-> `pip install mhcflurry==2.3.0rc9`. A plain `pip install --upgrade mhcflurry`
+> `pip install mhcflurry==2.3.0rc10`. A plain `pip install --upgrade mhcflurry`
 > stays on the latest stable release (2.2.x) until 2.3.0 is final, since pip
 > skips pre-releases.
 

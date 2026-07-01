@@ -26,7 +26,8 @@ import torch.nn.functional as F
 
 from . import amino_acid
 from .hyperparameters import HyperparameterDefaults
-from .class1_neural_network import DEFAULT_PREDICT_BATCH_SIZE, _torch_from_numpy
+from .class1_training import _torch_from_numpy
+from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
 from .pytorch_training import (
@@ -1052,7 +1053,7 @@ class Class1ProcessingNeuralNetwork(object):
         batch_size : int or ``"auto"``
             Prediction batch size. ``"auto"`` (the default) auto-sizes
             per the current device — see
-            ``mhcflurry.class1_neural_network.compute_prediction_batch_size``.
+            ``mhcflurry.pytorch_sizing.compute_prediction_batch_size``.
 
         Returns
         -------
@@ -1077,7 +1078,7 @@ class Class1ProcessingNeuralNetwork(object):
         ``predict_encoded`` delegates here and converts the final result to
         numpy for the public API.
         """
-        from .class1_neural_network import (
+        from .pytorch_sizing import (
             _env_workers_per_gpu,
             resolve_prediction_batch_size,
         )

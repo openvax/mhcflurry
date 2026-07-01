@@ -28,6 +28,8 @@ from mhcflurry.class1_neural_network import (
     Class1NeuralNetwork,
     Class1NeuralNetworkModel,
     MergedClass1NeuralNetwork,
+)
+from mhcflurry.class1_training import (
     _batched_validation_loss,
 )
 from mhcflurry.class1_processing_neural_network import (
@@ -1185,7 +1187,7 @@ def test_batched_validation_loss_inequality_free_targets_use_batched_path():
     equivalent to single-shot, so the fast path should be allowed to
     run. This protects the optimization from collapsing to single-shot
     on every validation step."""
-    from mhcflurry.class1_neural_network import (
+    from mhcflurry.class1_training import (
         _validation_loss_has_legacy_inequality_denominator,
     )
 

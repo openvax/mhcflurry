@@ -21,7 +21,7 @@ in follow-up changes.
 
 Anything that touches affinity-specific machinery (random-negative
 resampling, multi-output / inequality losses, allele encoding,
-percentile-rank calibration) stays in ``class1_neural_network.py``.
+percentile-rank calibration) stays in the class I modules.
 """
 
 import logging

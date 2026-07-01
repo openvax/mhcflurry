@@ -34,10 +34,8 @@ import yaml
 import tqdm  # progress bar
 
 from ..class1_affinity_predictor import Class1AffinityPredictor
-from ..class1_neural_network import (
-    Class1NeuralNetwork,
-    peptide_sequences_to_network_input,
-)
+from ..class1_encoding import peptide_sequences_to_network_input
+from ..class1_neural_network import Class1NeuralNetwork
 from ..common import (
     add_random_seed_arg,
     canonicalize_allele_series,
