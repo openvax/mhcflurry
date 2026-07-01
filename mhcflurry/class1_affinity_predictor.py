@@ -1856,10 +1856,12 @@ class Class1AffinityPredictor(object):
             probe_net_obj = networks[0]
             probe_net = probe_net_obj.network(borrow=True)
             probe_net.to(device)
-            # Probe the *actual* peptide_stage output dim so the cache
-            # estimate doesn't fall back to the encoding-shape floor.
-            probed_stage_dim = calibration_sizing.probe_peptide_stage_dim(
-                probe_net_obj, encoded_peptides, device,
+            # Probe the actual peptide feature width so the cache estimate
+            # doesn't fall back to the encoding-shape floor.
+            probed_peptide_feature_dim = (
+                calibration_sizing.probe_peptide_feature_dim(
+                    probe_net_obj, encoded_peptides, device,
+                )
             )
             sub_networks = getattr(probe_net, "networks", None)
             num_sub_networks_probed = (
@@ -1882,7 +1884,7 @@ class Class1AffinityPredictor(object):
                 # by that cache. Counting it again here makes later shards
                 # collapse to tiny fallback batches.
                 num_cached_networks=0 if cache_hit else len(networks),
-                peptide_stage_dim=probed_stage_dim,
+                peptide_feature_dim=probed_peptide_feature_dim,
                 num_sub_networks=num_sub_networks_probed,
                 fixed_peptide_batch=pinned_peptide,
                 fixed_allele_batch=pinned_allele,
@@ -1899,7 +1901,8 @@ class Class1AffinityPredictor(object):
                     f"(workers_per_gpu={num_workers_per_gpu}, "
                     f"cached_networks={len(networks)}, "
                     f"sub_networks={num_sub_networks_probed}, "
-                    f"probed_stage_dim={probed_stage_dim})"
+                    f"probed_peptide_feature_dim="
+                    f"{probed_peptide_feature_dim})"
                 )
         peptide_batch_size = int(peptide_batch_size)
         allele_batch_size = int(allele_batch_size)
@@ -1927,14 +1930,11 @@ class Class1AffinityPredictor(object):
                 model.eval()
                 peptide_input = net_obj.peptides_to_network_input(encoded_peptides)
                 peptide_is_indices = net_obj.uses_peptide_torch_encoding()
-                # Pre-size the cache tensor by probing one row's stage_dim
-                # then write each chunk in-place. The previous build path
-                # used append+torch.cat, which transiently held *both* the
-                # per-chunk parts and the new contiguous tensor at once —
-                # a 2× VRAM peak (~13 GB extra on the production 400k
-                # peptide × 8-subnet ensemble) that pushed --max-workers-
-                # per-gpu auto into OOM territory. Pre-sized fill keeps
-                # the peak at 1× the cache.
+                # Pre-size the cache tensor by probing one row's peptide
+                # feature width, then write each chunk in-place. The previous
+                # append+torch.cat path transiently held both the per-chunk
+                # parts and the new contiguous tensor, a 2x VRAM peak that
+                # pushed --max-workers-per-gpu auto into OOM territory.
                 with torch.no_grad():
                     probe_chunk = peptide_input[:1]
                     probe_keep_int = (
@@ -1948,11 +1948,15 @@ class Class1AffinityPredictor(object):
                         probe_tensor = torch.from_numpy(
                             numpy.asarray(probe_chunk, dtype=numpy.float32),
                         ).to(device)
-                    probe_stage = model.forward_peptide_stage(probe_tensor)
-                    stage_dim_cached = int(probe_stage.shape[-1])
-                    stage_dtype = probe_stage.dtype
+                    probe_peptide_features = model.forward_peptide_stage(
+                        probe_tensor,
+                    )
+                    peptide_feature_dim_cached = int(
+                        probe_peptide_features.shape[-1],
+                    )
+                    stage_dtype = probe_peptide_features.dtype
                 cached_tensor = torch.empty(
-                    n_peptides, stage_dim_cached,
+                    n_peptides, peptide_feature_dim_cached,
                     dtype=stage_dtype, device=device,
                 )
                 with torch.no_grad():
@@ -2038,12 +2042,12 @@ class Class1AffinityPredictor(object):
             )
             ensemble_member_count = 0
 
-            for (_, model, peptide_stage) in cached_stages:
+            for (_, model, peptide_features) in cached_stages:
                 model_member_count = None
                 with torch.no_grad():
                     for start in range(0, n_peptides, peptide_batch_size):
                         end = min(start + peptide_batch_size, n_peptides)
-                        p_chunk = peptide_stage[start:end]  # (chunk_n, d)
+                        p_chunk = peptide_features[start:end]  # (chunk_n, d)
                         network_output = cartesian_network_output(
                             model,
                             p_chunk,

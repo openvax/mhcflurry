@@ -707,7 +707,7 @@ def test_calibrate_auto_size_uses_reserved_headroom_not_cache_safety(monkeypatch
             n_alleles=30,
             num_workers_per_gpu=1,
             num_cached_networks=8,
-            peptide_stage_dim=7560,
+            peptide_feature_dim=7560,
             num_sub_networks=8,
         )
     )
@@ -759,7 +759,7 @@ def test_calibrate_auto_size_still_floors_when_cache_does_not_fit(
                 n_alleles=30,
                 num_workers_per_gpu=1,
                 num_cached_networks=8,
-                peptide_stage_dim=7560,
+                peptide_feature_dim=7560,
                 num_sub_networks=8,
             )
         )
@@ -804,7 +804,7 @@ def test_calibrate_auto_size_honors_lower_fraction_budget(monkeypatch):
             n_alleles=100,
             num_workers_per_gpu=1,
             num_cached_networks=0,
-            peptide_stage_dim=1024,
+            peptide_feature_dim=1024,
             num_sub_networks=1,
         )
     )
@@ -818,7 +818,7 @@ def test_calibrate_auto_size_honors_lower_fraction_budget(monkeypatch):
             n_alleles=100,
             num_workers_per_gpu=1,
             num_cached_networks=0,
-            peptide_stage_dim=1024,
+            peptide_feature_dim=1024,
             num_sub_networks=1,
         )
     )
@@ -863,7 +863,7 @@ def test_calibrate_auto_size_honors_lower_reserved_headroom(monkeypatch):
             n_alleles=100,
             num_workers_per_gpu=1,
             num_cached_networks=0,
-            peptide_stage_dim=1024,
+            peptide_feature_dim=1024,
             num_sub_networks=1,
         )
     )
@@ -877,7 +877,7 @@ def test_calibrate_auto_size_honors_lower_reserved_headroom(monkeypatch):
             n_alleles=100,
             num_workers_per_gpu=1,
             num_cached_networks=0,
-            peptide_stage_dim=1024,
+            peptide_feature_dim=1024,
             num_sub_networks=1,
         )
     )
@@ -931,7 +931,7 @@ def test_calibrate_auto_size_reused_cache_uses_current_free_memory(
                 n_alleles=30,
                 num_workers_per_gpu=1,
                 num_cached_networks=0,
-                peptide_stage_dim=8505,
+                peptide_feature_dim=8505,
                 num_sub_networks=9,
             )
         )

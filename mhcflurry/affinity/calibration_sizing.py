@@ -61,12 +61,52 @@ class CalibrationFastCache(object):
         self.motif_signature = None
         self.motif_state = None
 
+
+def peptide_encoding_feature_dim(model):
+    """Return the raw encoded peptide feature width for ``model`` if known."""
+    enc_shape = getattr(model, "peptide_encoding_shape", None)
+    if enc_shape is None:
+        return None
+    return int(enc_shape[0]) * int(enc_shape[1])
+
+
+def resolve_peptide_feature_dim(model, peptide_feature_dim, peak_bytes):
+    """Resolve the width of cached peptide features used during calibration.
+
+    ``peptide_feature_dim`` is the actual width of
+    ``forward_peptide_stage(...)`` when the caller has probed it. Without a
+    probe, fall back to shape-derived estimates and then to the generic peak
+    memory estimate.
+    """
+    if peptide_feature_dim is not None:
+        return int(peptide_feature_dim)
+
+    sub_networks = getattr(model, "networks", None)
+    if sub_networks is not None and not hasattr(model, "peptide_encoding_shape"):
+        try:
+            sub_dims = []
+            for net in sub_networks:
+                sub_dim = peptide_encoding_feature_dim(net)
+                sub_dims.append(1024 if sub_dim is None else sub_dim)
+            return int(sum(sub_dims))
+        except (AttributeError, TypeError, ValueError, IndexError):
+            pass
+
+    try:
+        feature_dim = peptide_encoding_feature_dim(model)
+    except (AttributeError, TypeError, ValueError, IndexError):
+        feature_dim = None
+    if feature_dim is not None:
+        return feature_dim
+    return int(peak_bytes // 32) if peak_bytes else 1024
+
+
 def auto_size_calibration_batches(
         model, device, n_peptides, n_alleles,
         num_workers_per_gpu=1,
         free_memory_fraction=0.85,
         num_cached_networks=1,
-        peptide_stage_dim=None,
+        peptide_feature_dim=None,
         num_sub_networks=None,
         cuda_overhead_bytes=2 * (1 << 30),
         safety_multiplier=1.3,
@@ -86,7 +126,7 @@ def auto_size_calibration_batches(
         peak = cuda_overhead
              + cache_bytes                # peptide-stage cache,
                                           # ``num_cached_networks ×
-                                          # n_peptides × stage_dim × 4``
+                                          # n_peptides × peptide_feature_dim × 4``
              + cartesian_intermediate     # transient forward
                                           # ``a_size × p_batch ×
                                           # peak_bytes_per_row``
@@ -151,7 +191,9 @@ def auto_size_calibration_batches(
         try:
             props = torch.cuda.get_device_properties(device)
             total_memory = int(props.total_memory)
-        except Exception:
+        except (
+                AssertionError, AttributeError, RuntimeError,
+                TypeError, ValueError):
             # Tests and nonstandard CUDA wrappers may not expose device
             # properties. Fall back to free memory; the explicit reserve
             # still keeps the budget bounded.
@@ -166,49 +208,20 @@ def auto_size_calibration_batches(
         reserved_headroom_budget = int(
             max(free - reserve_bytes, 0) / workers)
         per_worker_budget = min(fraction_budget, reserved_headroom_budget)
-        stage_dim = peptide_stage_dim
         sub_networks = getattr(model, "networks", None)
         if num_sub_networks is None:
             num_sub_networks = (
                 len(sub_networks) if sub_networks is not None else 1
             )
-        if stage_dim is None:
-            # MergedClass1NeuralNetwork: peptide-stage cache is the
-            # concatenation of all sub-networks' stages → sum the
-            # per-sub-network stage dims. The peptide_encoding_shape
-            # heuristic is a *floor* (raw encoded peptide) — actual
-            # stage_dim grows when peptide_dense_layer_sizes or LC
-            # layers are configured. Caller should pass
-            # ``peptide_stage_dim`` from a real probe to avoid
-            # under-counting.
-            if (
-                sub_networks is not None
-                and not hasattr(model, "peptide_encoding_shape")
-            ):
-                try:
-                    sub_dims = []
-                    for net in sub_networks:
-                        sub_enc = getattr(net, "peptide_encoding_shape", None)
-                        if sub_enc is not None:
-                            sub_dims.append(int(sub_enc[0]) * int(sub_enc[1]))
-                        else:
-                            sub_dims.append(1024)
-                    stage_dim = int(sum(sub_dims))
-                except Exception:
-                    stage_dim = None
-            if stage_dim is None:
-                try:
-                    enc_shape = getattr(model, "peptide_encoding_shape", None)
-                    if enc_shape is not None:
-                        stage_dim = int(enc_shape[0]) * int(enc_shape[1])
-                except Exception:
-                    stage_dim = None
-            if stage_dim is None:
-                stage_dim = peak_bytes // 32 if peak_bytes else 1024
+        peptide_feature_dim = resolve_peptide_feature_dim(
+            model,
+            peptide_feature_dim,
+            peak_bytes,
+        )
         cache_bytes = (
             int(num_cached_networks)
             * int(n_peptides)
-            * int(stage_dim)
+            * int(peptide_feature_dim)
             * 4
         )
         # Small-state pad: log-IC50 accumulator, ic50_unique view,
@@ -230,24 +243,43 @@ def auto_size_calibration_batches(
         forward_budget = (
             per_worker_budget - guarded_fixed_overhead
         )
+        log_fields = {
+            "free_gb": free / 1e9,
+            "workers": workers,
+            "total_gb": total_memory / 1e9,
+            "reserve_gb": reserve_bytes / 1e9,
+            "fraction_budget_gb": fraction_budget / 1e9,
+            "per_worker_budget_gb": per_worker_budget / 1e9,
+            "peptide_feature_dim": peptide_feature_dim,
+            "num_sub_networks": num_sub_networks,
+            "num_cached_networks": num_cached_networks,
+            "cache_gb": cache_bytes / 1e9,
+            "cuda_overhead_gb": cuda_overhead_bytes / 1e9,
+            "small_state_gb": small_state_bytes / 1e9,
+            "scratch_safety": fixed_safety_multiplier,
+            "guarded_fixed_gb": guarded_fixed_overhead / 1e9,
+            "forward_budget_gb": forward_budget / 1e9,
+            "peak_bytes_per_row": peak_bytes,
+            "peak_kb_per_row": peak_bytes / 1024,
+        }
         logging.info(
-            "calibrate auto-sizer: free=%.2f GB, workers=%d, "
-            "total=%.2f GB, reserve=%.2f GB, "
-            "fraction_budget=%.2f GB, per_worker_budget=%.2f GB, "
-            "stage_dim=%d "
-            "(sub_networks=%d, num_cached=%d), cache=%.2f GB, "
-            "cuda_overhead=%.2f GB, small_state=%.2f GB, "
-            "scratch_safety=%.2fx, guarded_fixed=%.2f GB "
-            "-> forward_budget=%.2f GB, "
-            "peak_bytes_per_row=%d (≈%.2f KB)",
-            free / 1e9, workers, total_memory / 1e9,
-            reserve_bytes / 1e9, fraction_budget / 1e9,
-            per_worker_budget / 1e9, stage_dim,
-            num_sub_networks, num_cached_networks,
-            cache_bytes / 1e9, cuda_overhead_bytes / 1e9,
-            small_state_bytes / 1e9, fixed_safety_multiplier,
-            guarded_fixed_overhead / 1e9,
-            forward_budget / 1e9, peak_bytes, peak_bytes / 1024,
+            "calibrate auto-sizer: free=%(free_gb).2f GB, "
+            "workers=%(workers)d, total=%(total_gb).2f GB, "
+            "reserve=%(reserve_gb).2f GB, "
+            "fraction_budget=%(fraction_budget_gb).2f GB, "
+            "per_worker_budget=%(per_worker_budget_gb).2f GB, "
+            "peptide_feature_dim=%(peptide_feature_dim)d "
+            "(sub_networks=%(num_sub_networks)d, "
+            "num_cached=%(num_cached_networks)d), "
+            "cache=%(cache_gb).2f GB, "
+            "cuda_overhead=%(cuda_overhead_gb).2f GB, "
+            "small_state=%(small_state_gb).2f GB, "
+            "scratch_safety=%(scratch_safety).2fx, "
+            "guarded_fixed=%(guarded_fixed_gb).2f GB "
+            "-> forward_budget=%(forward_budget_gb).2f GB, "
+            "peak_bytes_per_row=%(peak_bytes_per_row)d "
+            "(≈%(peak_kb_per_row).2f KB)",
+            log_fields,
         )
         if forward_budget < peak_bytes * AUTO_BATCH_MIN_ROWS:
             logging.warning(
@@ -422,10 +454,11 @@ def calibration_stage_cache_signature(encoded_peptides, networks, device):
         str(device),
     )
 
-def probe_peptide_stage_dim(net_obj, encoded_peptides, device):
+def probe_peptide_feature_dim(net_obj, encoded_peptides, device):
     """Run a 1-row forward through ``forward_peptide_stage`` to
-    record the actual feature dimension of the peptide-stage
-    output. The auto-sizer's cache estimate depends on this and
+    record the actual width of the peptide feature tensor.
+
+    The auto-sizer's cache estimate depends on this and
     the encoding-shape heuristic under-counts when the model
     configures ``peptide_dense_layer_sizes`` or LC layers.
 
@@ -454,11 +487,11 @@ def probe_peptide_stage_dim(net_obj, encoded_peptides, device):
         model = net_obj.network(borrow=True)
         model.eval()
         with torch.no_grad():
-            stage = model.forward_peptide_stage(probe_tensor)
-        return int(stage.shape[-1])
+            peptide_features = model.forward_peptide_stage(probe_tensor)
+        return int(peptide_features.shape[-1])
     except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
         logging.warning(
-            "calibrate auto-sizer: peptide_stage_dim probe failed "
+            "calibrate auto-sizer: peptide_feature_dim probe failed "
             "(%s); falling back to encoding-shape heuristic", exc,
         )
         return None
