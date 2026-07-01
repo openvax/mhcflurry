@@ -65,6 +65,17 @@ def test_class1_neural_network_public_helpers_remain_importable():
     )
 
 
+def test_class1_affinity_predictor_helper_imports_remain_compatible():
+    import mhcflurry.class1_affinity_predictor as old_module
+    from mhcflurry.affinity import calibration_sizing
+
+    assert (
+        old_module._peptide_sequences_fingerprint
+        is calibration_sizing.peptide_sequences_fingerprint
+    )
+    assert old_module._CalibrationFastCache is calibration_sizing.CalibrationFastCache
+
+
 def test_legacy_configure_tensorflow_entry_point():
     with pytest.warns(FutureWarning, match="configure_tensorflow"):
         configure_tensorflow(backend="tensorflow", gpu_device_nums=None, num_threads=1)
